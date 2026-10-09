@@ -96,6 +96,9 @@ final class CompatRewrites {
     private static final String STRING = "Ljava/lang/String;";
 
     private static final String SYSTEM = Relocation.JDK_PACKAGE + "JdkSystem";
+    /// The methods of String that take a regular expression, in the JDK's
+    /// syntax.
+    private static final String REGEX = Relocation.JDK_PACKAGE + "JdkRegex";
     private static final String STRINGS = Relocation.JDK_PACKAGE + "JdkStrings";
     private static final String NUMBERS = Relocation.JDK_PACKAGE + "JdkNumbers";
     private static final String FUNCTIONS = Relocation.JDK_PACKAGE + "JdkFunctions";
@@ -228,7 +231,7 @@ final class CompatRewrites {
         STATIC.put(str + "join(" + seq + "Ljava/lang/Iterable;)" + STRING, STRINGS);
         STATIC.put(str + "valueOf([C)" + STRING, STRINGS);
         STATIC.put(str + "format(Ljava/util/Locale;" + STRING + "[Ljava/lang/Object;)" + STRING, STRINGS);
-        VIRTUAL.put(str + "matches(" + STRING + ")Z", STRINGS);
+        VIRTUAL.put(str + "matches(" + STRING + ")Z", REGEX);
         VIRTUAL.put(str + "toLowerCase(Ljava/util/Locale;)" + STRING, STRINGS);
         for (String builder : new String[] {"java/lang/StringBuilder", "java/lang/StringBuffer"}) {
             VIRTUAL.put(builder + ".indexOf(" + STRING + ")I", STRINGS);
@@ -454,8 +457,10 @@ final class CompatRewrites {
 
     static {
         String str = "java/lang/String.";
-        VIRTUAL.put(str + "split(" + STRING + ")[" + STRING, STRINGS);
-        VIRTUAL.put(str + "split(" + STRING + "I)[" + STRING, STRINGS);
+        VIRTUAL.put(str + "split(" + STRING + ")[" + STRING, REGEX);
+        VIRTUAL.put(str + "split(" + STRING + "I)[" + STRING, REGEX);
+        VIRTUAL.put(str + "replaceAll(" + STRING + STRING + ")" + STRING, REGEX);
+        VIRTUAL.put(str + "replaceFirst(" + STRING + STRING + ")" + STRING, REGEX);
         VIRTUAL.put(str + "formatted([" + OBJECT + ")" + STRING, STRINGS);
         VIRTUAL.put(str + "isBlank()Z", STRINGS);
         VIRTUAL.put(str + "repeat(I)" + STRING, STRINGS);

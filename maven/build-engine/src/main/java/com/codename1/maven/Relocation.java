@@ -212,6 +212,12 @@ public final class Relocation {
         {"java/nio/file/attribute/FileAttribute", JDK_PACKAGE + "FileAttribute"},
         {"java/nio/file/attribute/BasicFileAttributes", JDK_PACKAGE + "BasicFileAttributes"},
         {"java/nio/file/attribute/FileTime", JDK_PACKAGE + "FileTime"},
+        // java.util.regex: a matcher written for this runtime, with the JDK's syntax.
+        // What it lacks it refuses by name when a pattern is compiled.
+        {"java/util/regex/Pattern", JDK_PACKAGE + "Pattern"},
+        {"java/util/regex/Matcher", JDK_PACKAGE + "Matcher"},
+        {"java/util/regex/MatchResult", JDK_PACKAGE + "MatchResult"},
+        {"java/util/regex/PatternSyntaxException", JDK_PACKAGE + "PatternSyntaxException"},
     };
 
     private final String name;
