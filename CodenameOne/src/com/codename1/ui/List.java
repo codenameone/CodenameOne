@@ -332,7 +332,17 @@ public class List<T> extends Component implements ActionSource {
         if (isScrollable() && isInitialized() && scrollToSelected) {
             int index = model.getSelectedIndex();
             if (index >= 0) {
-                selectElement(index);
+                if (disposeDialogOnSelection && isSmoothScrolling() && Display.getInstance().isDesktop()) {
+                    // A capped combo popup opens AT its current value. Smooth scrolling
+                    // would open it on the first rows and then run the list down to the
+                    // value while the user is already reaching for it. Desktop only,
+                    // like the cap that makes it matter: a touch popup keeps its motion.
+                    setSmoothScrolling(false);
+                    selectElement(index);
+                    setSmoothScrolling(true);
+                } else {
+                    selectElement(index);
+                }
             }
         }
     }

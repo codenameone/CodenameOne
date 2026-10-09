@@ -69,6 +69,10 @@ import java.util.Vector;
 ///
 /// - centeredPopupBool - shows the popup dialog in the center of the screen instead of under the popup
 ///
+/// - comboPopupMaxRowsInt - the most rows the popup shows before it scrolls. A popup with a limit
+/// is anchored to the combo box, below it or above it, and never covers it. Defaults to 10 on a
+/// desktop and to 0, meaning no limit, everywhere else.
+///
 /// - otherPopupRendererBool - Uses a different list cell render for the popup than the one used for the `ComboBox`
 /// itself. When this is false `PopupItem` & `PopupFocus`  become irrelevant. Notice that the
 /// Android native theme defines this to true.
@@ -113,6 +117,8 @@ public class ComboBox<T> extends List<T> implements ActionSource {
     private static boolean defaultIncludeSelectCancel = true;
     /// Popup placement: place the list adjacent to the combo box (default behavior:
     /// above when the combo sits in the lower half of the form, below otherwise).
+    /// A popup with a row limit (the `comboPopupMaxRowsInt` theme constant) goes below
+    /// when it fits there and otherwise to the side with more room.
     public static final int POPUP_PLACEMENT_AUTO = 0;
 
     /// Popup placement: always anchor the list directly above the combo box.
@@ -461,6 +467,16 @@ public class ComboBox<T> extends List<T> implements ActionSource {
             listH += title.getPreferredH()
                     + title.getStyle().getVerticalMargins();
 
+            // The cap is taken off the height the popup is GIVEN, never off what the
+            // list asks for. The list sits in the centre of the dialog and is sized by
+            // it, so a popup shorter than the rows leaves the list's scroll size alone
+            // and the rest is reached by scrolling.
+            int maxRows = getPopupMaxRows();
+            boolean anchored = maxRows > 0;
+            if (anchored) {
+                listH -= rowsBeyondCapHeight(l, maxRows);
+            }
+
             bottom = 0;
             top = getAbsoluteY();
             int formHeight = parentForm.asContainer().getHeight();
@@ -468,7 +484,41 @@ public class ComboBox<T> extends List<T> implements ActionSource {
             // have is what this used to spell out inline.
             formHeight -= TopLevelSupport.softButtonAreaHeight(parentForm);
 
-            if (listH < formHeight) {
+            if (anchored) {
+                // A capped popup hangs off its combo and never covers it. The older
+                // rule below gives up when the list is taller than the form and fills
+                // the form from the top, combo included, and it picks a side by which
+                // half of the form the combo is in rather than by where the list fits.
+                // Here the popup goes below when it fits there, otherwise to the side
+                // with more room, and is cut to that room -- the list scrolls.
+                int above = top;
+                int below = formHeight - top - getHeight();
+                switch (popupPlacement) {
+                    case POPUP_PLACEMENT_TOP_OF_FORM:
+                        listH = Math.min(listH, formHeight);
+                        top = 0;
+                        bottom = formHeight - listH;
+                        break;
+                    case POPUP_PLACEMENT_BOTTOM_OF_FORM:
+                        listH = Math.min(listH, formHeight);
+                        bottom = 0;
+                        top = formHeight - listH;
+                        break;
+                    default:
+                        boolean upwards = popupPlacement == POPUP_PLACEMENT_ABOVE
+                                || (popupPlacement != POPUP_PLACEMENT_BELOW && listH > below && above > below);
+                        if (upwards) {
+                            listH = Math.max(0, Math.min(listH, above));
+                            bottom = formHeight - top;
+                            top = top - listH;
+                        } else {
+                            listH = Math.max(0, Math.min(listH, below));
+                            top += getHeight();
+                            bottom = formHeight - top - listH;
+                        }
+                        break;
+                }
+            } else if (listH < formHeight) {
                 switch (popupPlacement) {
                     case POPUP_PLACEMENT_ABOVE:
                         bottom = formHeight - top;
@@ -516,6 +566,28 @@ public class ComboBox<T> extends List<T> implements ActionSource {
             showingPopupDialog = false;
             return out;
         }
+    }
+
+    /// The most rows the popup shows before it scrolls, or 0 for no limit.
+    ///
+    /// The `comboPopupMaxRowsInt` theme constant. Without it the limit is ten on a
+    /// desktop, which is what desktop toolkits settle around, and none anywhere else: a
+    /// touch popup has always been as tall as its rows and this leaves it that way.
+    private int getPopupMaxRows() {
+        return getUIManager().getThemeConstant("comboPopupMaxRowsInt",
+                Display.getInstance().isDesktop() ? 10 : 0);
+    }
+
+    /// How much shorter the popup list is when it shows `maxRows` rows instead of all of
+    /// them, or 0 when it has no more rows than that.
+    private static int rowsBeyondCapHeight(List l, int maxRows) {
+        if (l.size() <= maxRows || l.getOrientation() != List.VERTICAL) {
+            return 0;
+        }
+        int capped = l.getElementSize(true, true).getHeight()
+                + (l.getElementSize(false, true).getHeight() + l.getItemGap()) * (maxRows - 1)
+                + l.getStyle().getVerticalPadding();
+        return Math.max(0, l.getPreferredH() - capped);
     }
 
     /// {@inheritDoc}
