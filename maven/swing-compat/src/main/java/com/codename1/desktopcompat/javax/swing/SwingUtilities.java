@@ -344,7 +344,9 @@ public class SwingUtilities implements SwingConstants {
         return str == null ? 0 : fm.stringWidth(str);
     }
 
-    /// Does nothing: there are no UI delegates to refresh.
+    /// Restyles `c` and everything under it with the current look and
+    /// feel's palette: there are no UI delegates to replace.
     public static void updateComponentTreeUI(Component c) {
+        com.codename1.desktopcompat.rt.LafTheme.restyle(c);
     }
 }

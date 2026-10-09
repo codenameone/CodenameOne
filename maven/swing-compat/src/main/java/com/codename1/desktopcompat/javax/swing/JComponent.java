@@ -474,6 +474,9 @@ public abstract class JComponent extends Container {
         } else {
             clientProperties.put(key, value);
         }
+        // The FlatLaf vocabulary (placeholder text, button types, style
+        // classes) is honoured where the property is set, not swallowed.
+        com.codename1.desktopcompat.rt.ClientProps.changed(this, key, value);
         firePropertyChange(String.valueOf(key), old, value);
     }
 
