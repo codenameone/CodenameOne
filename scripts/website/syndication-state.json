@@ -2614,6 +2614,22 @@
         "id": 4819748,
         "url": "https://dev.to/codenameone/native-desktop-themes-for-production-apps-4nfa",
         "syndicated_at": "2026-10-08T19:21:49+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/ae35323bac91/edit",
+        "syndicated_at": "2026-10-09T00:02:19+00:00"
+      }
+    },
+    "java-server-work-before-startup": {
+      "hashnode": {
+        "url": "https://debugagent.com/a-smaller-faster-java-server-with-a-spring-style-api",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ac82f15f82bc6ce0511a36d",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-09T00:03:26+00:00"
       }
     }
   }
