@@ -388,6 +388,30 @@ class CSSGeneratedImageTest {
     }
 
     @Test
+    void aColourHintMovesTheMiddleOfTheBlend(@TempDir Path dir) throws Exception {
+        // The box is 320px wide and starts 2px in. With the hint the half-way
+        // grey sits a fifth of the way across; without it that point would
+        // still be four fifths white.
+        Compiled c = compile(dir, "Banner { width: 50%; height: 10%;"
+                + " background: linear-gradient(to right, #ffffff 0%, 20%, #000000 100%);"
+                + " box-shadow: 0 0 4px black; }");
+        BufferedImage img = stored(c.res, "Banner_1.png", Display.DENSITY_HD);
+        int grey = img.getRGB(2 + 64, 40) & 0xff;
+        assertTrue(grey > 0x68 && grey < 0x98, "half way at the hint, was " + Integer.toHexString(grey));
+    }
+
+    @Test
+    void aCurrentColorBackgroundIsRefusedWhetherOrNotAnImageIsGenerated(@TempDir Path dir) {
+        // The background colour of a theme is a number, so there is no rule
+        // with this background for a generated image to be painted from.
+        assertThrows(RuntimeException.class, () -> compile(dir,
+                "Card { color: #ff0000; background-color: currentColor; border-radius: 4px;"
+                + " box-shadow: 0 2px 6px rgba(0,0,0,0.5); }"));
+        assertThrows(RuntimeException.class, () -> compile(dir,
+                "Plain { color: #ff0000; background-color: currentColor; }"));
+    }
+
+    @Test
     void aRadialGradientPositionedByALengthIsPaintedWhereItSays(@TempDir Path dir) throws Exception {
         // A length has no meaning in a resolution-independent gradient, so this
         // one is painted: the page is 640x100 and the centre is 10px in from

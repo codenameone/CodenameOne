@@ -873,14 +873,49 @@ public class CSSTheme {
         /// gradient, as a fraction of the full turn), or a length when
         /// `lengthBasis` is positive: the length the gradient runs over, in the
         /// pixels of the image it is being painted into.
+        /// The colour half way between two, blended with alpha taken into
+        /// account so a transparent neighbour does not darken it.
+        private static int midColor(int a, int b) {
+            int aa = a >>> 24;
+            int ba = b >>> 24;
+            int alpha = (aa + ba) / 2;
+            if (aa + ba == 0) {
+                return 0;
+            }
+            int out = alpha << 24;
+            for (int shift = 16; shift >= 0; shift -= 8) {
+                int ca = (a >> shift) & 0xff;
+                int cb = (b >> shift) & 0xff;
+                out |= ((ca * aa + cb * ba) / (aa + ba)) << shift;
+            }
+            return out;
+        }
+
         private static ParsedStops parseStops(ScaledUnit start, double lengthBasis) {
             if (start == null) return null;
             java.util.ArrayList<Integer> colors = new java.util.ArrayList<>();
             java.util.ArrayList<Float> positions = new java.util.ArrayList<>();
             ScaledUnit p = start;
+            Float hint = null;
             while (p != null) {
                 int t = p.getLexicalUnitType();
                 if (t == LexicalUnit.SAC_OPERATOR_COMMA) {
+                    p = (ScaledUnit) p.getNextLexicalUnit();
+                    continue;
+                }
+                if (!colors.isEmpty() && (t == LexicalUnit.SAC_PERCENTAGE || isLength(t) || angleDegrees(p) != null)) {
+                    // A position with no colour, between two stops, is a
+                    // colour hint: where the blend of its neighbours is half
+                    // way. It is remembered until the colour after it is read.
+                    if (t == LexicalUnit.SAC_PERCENTAGE) {
+                        hint = (float) (p.getNumericValue() / 100f);
+                    } else if (angleDegrees(p) != null) {
+                        hint = (float) (angleDegrees(p).doubleValue() / 360.0);
+                    } else if (lengthBasis <= 0) {
+                        return null;
+                    } else {
+                        hint = (float) (rasterLength(p, lengthBasis) / lengthBasis);
+                    }
                     p = (ScaledUnit) p.getNextLexicalUnit();
                     continue;
                 }
@@ -894,6 +929,15 @@ public class CSSTheme {
                     return null;
                 }
                 int argb = (alpha << 24) | (rgb & 0xffffff);
+                if (hint != null) {
+                    // The hint becomes a stop of the half-way colour. CSS
+                    // bends the blend through that point along a curve; two
+                    // straight runs meeting there are what the stop list of a
+                    // theme can hold.
+                    colors.add(midColor(colors.get(colors.size() - 1).intValue(), argb));
+                    positions.add(hint);
+                    hint = null;
+                }
                 ScaledUnit nx = (ScaledUnit) p.getNextLexicalUnit();
                 // A stop is a colour and up to two positions. `red 20% 40%`
                 // is the colour held from 20% to 40%, which is the same as
@@ -4774,6 +4818,11 @@ public class CSSTheme {
             BoxStyle.Builder box = BoxStyle.builder()
                     .borderBoxWidth(boxWidth).borderBoxHeight(boxHeight)
                     .padTop(padTop).padRight(padRight).padBottom(padBottom).padLeft(padLeft)
+                    // No fallback to the rule's `color` for `currentColor`
+                    // here: the theme's own bgColor is a number, and a rule
+                    // whose background-color is `currentColor` is refused
+                    // when it is stored ("Invalid color specification"),
+                    // generated image or not, so none reaches a painted box.
                     .backgroundColor(rasterColor(styles.get("background-color"), 0))
                     .top(top).right(right).bottom(bottom).left(left)
                     .radii(radii);

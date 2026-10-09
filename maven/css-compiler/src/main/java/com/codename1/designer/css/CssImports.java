@@ -293,7 +293,16 @@ public final class CssImports {
                 out.append(text, i, end);
                 i = end;
             } else if (text.regionMatches(true, i, "url(", 0, 4) && (i == 0 || !isIdentChar(text.charAt(i - 1)))) {
-                int close = text.indexOf(')', i + 4);
+                // A quoted url may hold a `)` of its own, as in
+                // url("icon(1).png"); the one that ends it comes after the
+                // closing quote.
+                int start = i + 4;
+                while (start < len && Character.isWhitespace(text.charAt(start))) {
+                    start++;
+                }
+                int from = start < len && (text.charAt(start) == '"' || text.charAt(start) == '\'')
+                        ? skipString(text, start) : start;
+                int close = text.indexOf(')', from);
                 if (close < 0) {
                     out.append(text, i, len);
                     break;

@@ -76,6 +76,18 @@ class CssImportDependenciesTest {
     }
 
     @Test
+    void aQuotedUrlKeepsItsParentheses(@TempDir Path tmp) throws Exception {
+        File dir = tmp.toFile();
+        File css = new File(dir, "css");
+        write(new File(css, "theme.css"), "A { background-image: url(\"../shared/icon(1).png\"); }\n");
+        File icon = write(new File(dir, "shared/icon(1).png"), "x");
+
+        Set<File> found = CssImportDependencies.outside(css);
+
+        assertTrue(found.contains(icon.getCanonicalFile()), found.toString());
+    }
+
+    @Test
     void findsTheAssetsAnOutsideImportNames(@TempDir Path tmp) throws Exception {
         File dir = tmp.toFile();
         File css = new File(dir, "css");

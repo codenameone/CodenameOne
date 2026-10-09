@@ -524,15 +524,14 @@ public class CN1CSSCLI {
         pulseThread.start();
     }
 
-    private static String prefixUrls(String contents, String prefix) {
-        
-        contents = contents.replaceAll("url\\(\"(.*?)\"\\)", "url($1)");
-        contents = contents.replaceAll("url\\('(.*?)'\\)", "url($1)");
-        contents = contents.replaceAll("url\\((.*?://.*?)\\)", "url(\"$1\")");
-        contents = contents.replaceAll("url\\((/.*?)\\)", "url(\"$1\")");
-        //contents = contents.replaceAll("url\\(((?!(.*://)).*?)?\\)", "url("+prefix+"$1)");
-        contents = contents.replaceAll("url\\(([^\\\"\'].*?)\\)", "url(\""+prefix+"$1\")");
-        return contents;
+    private static String prefixUrls(String contents, final String prefix) throws IOException {
+        return CssImports.rewriteUrls(contents, new CssImports.UrlRewriter() {
+            @Override
+            public String rewrite(String url) {
+                // Only a path relative to the stylesheet moves with it.
+                return CssImports.isRelativeUrl(url) ? prefix + url : url;
+            }
+        });
     }
 
     private static void delTree(File dir) {

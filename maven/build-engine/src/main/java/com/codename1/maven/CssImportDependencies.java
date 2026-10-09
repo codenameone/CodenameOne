@@ -54,7 +54,7 @@ public final class CssImportDependencies {
             "@import\\s+(?:url\\(\\s*)?(?:\"([^\"]*)\"|'([^']*)'|([^\"')\\s;]+))", Pattern.CASE_INSENSITIVE);
 
     private static final Pattern URL = Pattern.compile(
-            "url\\(\\s*[\"']?([^\"')]+?)[\"']?\\s*\\)", Pattern.CASE_INSENSITIVE);
+            "url\\(\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\"')]+?))\\s*\\)", Pattern.CASE_INSENSITIVE);
 
     private CssImportDependencies() {
     }
@@ -90,7 +90,10 @@ public final class CssImportDependencies {
             // directory is compiled into the theme just as an import is.
             Matcher asset = URL.matcher(text);
             while (asset.find()) {
-                File file = resolve(css, asset.group(1));
+                // A quoted name may hold a parenthesis of its own.
+                String name = asset.group(1) != null ? asset.group(1)
+                        : asset.group(2) != null ? asset.group(2) : asset.group(3);
+                File file = resolve(css, name);
                 if (file != null && !file.toPath().startsWith(root.toPath())) {
                     out.add(file);
                 }

@@ -316,6 +316,21 @@ class CN1CSSCLIEndToEndTest {
     }
 
     @Test
+    void aMergedBuildKeepsAUrlWithAParenthesisInItsName(@TempDir Path tmp) throws Exception {
+        File dir = tmp.toFile();
+        File app = write(new File(dir, "app/theme.css"),
+                "Badge { background-image: url(\"img/a(1).png\"); cn1-source-dpi: 160; }\n");
+        png(new File(dir, "app/img/a(1).png"), 8, 6, 0xff336699);
+        File res = new File(dir, "work/theme.res");
+        String[] args = {"-input", app.getPath(), "-output", res.getPath(),
+            "-merge", new File(dir, "work/theme.css.merged").getPath()};
+
+        assertEquals(0, CN1CSSCLI.run(args), stderr());
+
+        assertEquals(8, open(res).getImage("a(1).png").getWidth());
+    }
+
+    @Test
     void bundlesLocalizationAndRecompilesWhenOnlyABundleChanges(@TempDir Path tmp) throws Exception {
         File common = mavenProject(tmp.toFile());
         File css = write(new File(common, "src/main/css/theme.css"), "Label { color: #000001; }\n");
