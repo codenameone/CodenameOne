@@ -57,6 +57,7 @@ import javafx.scene.layout.CornerRadii;
 import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Polygon;
+import javafx.util.Callback;
 
 /// A table: one row per item, one [TableCell] per row and column, under
 /// a row of column headers.
@@ -80,14 +81,156 @@ import javafx.scene.shape.Polygon;
 /// In an editable table a double click on a cell edits it, if its
 /// column is editable and its cell factory makes cells that edit.
 ///
+/// With [#CONSTRAINED_RESIZE_POLICY] as the column resize policy the
+/// visible columns share the whole width of the table, each in
+/// proportion to its preferred width and within its minimum and maximum.
+/// With [#UNCONSTRAINED_RESIZE_POLICY], the default, each keeps its own
+/// width. The table knows these two by identity and never calls a
+/// policy: the user cannot drag a column wider here, so a policy of the
+/// application's own is recorded and the columns keep their own widths.
+///
 /// Cell selection (`TableSelectionModel`), row nodes (`TableRow`,
-/// `rowFactory`), column resize policies and the focus model of JavaFX
-/// are not part of this layer.
+/// `rowFactory`) and the focus model of JavaFX are not part of this
+/// layer.
 ///
 /// The control has no native component. It starts with a white
 /// background and a thin grey border, which the `Region` style names
-/// replace; the headers are labels with the style class `column-header`.
+/// replace; the headers are labels with the style class `column-header`,
+/// on a strip with the style class `column-header-background`.
 public class TableView<S> extends Control {
+
+    /// The policy that leaves every column at its own width.
+    @SuppressWarnings("rawtypes")
+    public static final Callback<ResizeFeatures, Boolean> UNCONSTRAINED_RESIZE_POLICY =
+            new Callback<ResizeFeatures, Boolean>() {
+                @Override
+                public Boolean call(ResizeFeatures features) {
+                    return Boolean.FALSE;
+                }
+
+                @Override
+                public String toString() {
+                    return "unconstrained-resize";
+                }
+            };
+
+    /// The policy that makes the visible columns share the width of the
+    /// table.
+    @SuppressWarnings("rawtypes")
+    public static final Callback<ResizeFeatures, Boolean> CONSTRAINED_RESIZE_POLICY =
+            new Callback<ResizeFeatures, Boolean>() {
+                @Override
+                public Boolean call(ResizeFeatures features) {
+                    return Boolean.FALSE;
+                }
+
+                @Override
+                public String toString() {
+                    return "constrained-resize";
+                }
+            };
+
+    /// What a column resize policy is told: the table, the column that
+    /// is being resized and by how much.
+    public static class ResizeFeatures<S> {
+
+        private final TableView<S> table;
+        private final TableColumn<S, ?> column;
+        private final Double delta;
+
+        /// Creates the description of a resize.
+        public ResizeFeatures(TableView<S> table, TableColumn<S, ?> column, Double delta) {
+            this.table = table;
+            this.column = column;
+            this.delta = delta;
+        }
+
+        /// Returns the table.
+        public TableView<S> getTable() {
+            return table;
+        }
+
+        /// Returns the column being resized, `null` for all of them.
+        public TableColumn<S, ?> getColumn() {
+            return column;
+        }
+
+        /// Returns the change of width asked for.
+        public Double getDelta() {
+            return delta;
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private final ObjectProperty<Callback<ResizeFeatures, Boolean>> columnResizePolicy =
+            new SimpleObjectProperty<Callback<ResizeFeatures, Boolean>>(this, "columnResizePolicy",
+                    UNCONSTRAINED_RESIZE_POLICY);
+
+    /// Sets the column resize policy.
+    @SuppressWarnings("rawtypes")
+    public final void setColumnResizePolicy(Callback<ResizeFeatures, Boolean> value) {
+        columnResizePolicy.set(value);
+        requestLayout();
+    }
+
+    /// Returns the column resize policy.
+    @SuppressWarnings("rawtypes")
+    public final Callback<ResizeFeatures, Boolean> getColumnResizePolicy() {
+        return columnResizePolicy.get();
+    }
+
+    /// The column resize policy.
+    @SuppressWarnings("rawtypes")
+    public final ObjectProperty<Callback<ResizeFeatures, Boolean>> columnResizePolicyProperty() {
+        return columnResizePolicy;
+    }
+
+    /// Makes the visible columns share a width, each in proportion to
+    /// its preferred width and within its own bounds.
+    private void fitColumns(double width) {
+        int n = columns.size();
+        boolean[] held = new boolean[n];
+        double room = width;
+        // A column that hits a bound keeps it and the others share the
+        // rest, so each pass settles at least one column or all of them.
+        for (int pass = 0; pass <= n; pass++) {
+            double weight = 0;
+            for (int i = 0; i < n; i++) {
+                TableColumn<S, ?> c = columns.get(i);
+                if (c.isVisible() && !held[i]) {
+                    weight += Math.max(1, c.getPrefWidth());
+                }
+            }
+            if (!(weight > 0)) {
+                return;
+            }
+            boolean again = false;
+            for (int i = 0; i < n; i++) {
+                TableColumn<S, ?> c = columns.get(i);
+                if (!c.isVisible() || held[i]) {
+                    continue;
+                }
+                double share = Math.max(0, room) * Math.max(1, c.getPrefWidth()) / weight;
+                double bounded = Math.min(Math.max(share, c.getMinWidth()), c.getMaxWidth());
+                if (bounded != share) {
+                    held[i] = true;
+                    c.doSetWidth(bounded);
+                    room -= bounded;
+                    again = true;
+                    break;
+                }
+            }
+            if (!again) {
+                for (int i = 0; i < n; i++) {
+                    TableColumn<S, ?> c = columns.get(i);
+                    if (c.isVisible() && !held[i]) {
+                        c.doSetWidth(Math.max(0, room) * Math.max(1, c.getPrefWidth()) / weight);
+                    }
+                }
+                return;
+            }
+        }
+    }
 
     private final ObjectProperty<ObservableList<S>> items = new SimpleObjectProperty<ObservableList<S>>(this,
             "items");
@@ -163,6 +306,8 @@ public class TableView<S> extends Control {
                 new BorderWidths(1))));
         header.setBackground(new Background(new BackgroundFill(Color.rgb(232, 232, 232), CornerRadii.EMPTY,
                 Insets.EMPTY)));
+        // The name JavaFX gives the strip behind its column headers.
+        header.getStyleClass().add("column-header-background");
         flow = new RowFlow(new FlowRows());
         cn1Children().add(flow);
         cn1Children().add(header);
@@ -557,6 +702,9 @@ public class TableView<S> extends Control {
         double w = Math.max(0, getWidth() - in.getLeft() - in.getRight());
         double h = Math.max(0, getHeight() - in.getTop() - in.getBottom());
         double hh = Math.min(h, headerHeight());
+        if (getColumnResizePolicy() == CONSTRAINED_RESIZE_POLICY && w > 0) {
+            fitColumns(w);
+        }
         header.resizeRelocate(in.getLeft(), in.getTop(), w, hh);
         double x = 0;
         for (int i = 0; i < headerLabels.size() && i < columns.size(); i++) {

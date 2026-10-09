@@ -80,7 +80,7 @@ final class MenuContent extends Region {
     }
 
     private MenuRow row(final MenuItem item) {
-        String text = item.getText() == null ? "" : item.getText();
+        String text = item.shownText();
         boolean marked = item instanceof CheckMenuItem && ((CheckMenuItem) item).isSelected();
         final MenuRow row = new MenuRow(item instanceof Menu ? text + "   >" : text, marked);
         row.getStyleClass().setAll(item.getStyleClass());

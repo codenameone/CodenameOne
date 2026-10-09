@@ -46,16 +46,19 @@ public abstract class ButtonBase extends Labeled {
 
     /// Creates a button with no text.
     public ButtonBase() {
+        setMnemonicParsing(true);
     }
 
     /// Creates a button with text.
     public ButtonBase(String text) {
         super(text);
+        setMnemonicParsing(true);
     }
 
     /// Creates a button with text and a graphic.
     public ButtonBase(String text, Node graphic) {
         super(text, graphic);
+        setMnemonicParsing(true);
     }
 
     /// Returns the listener a subclass adds to its native button: it

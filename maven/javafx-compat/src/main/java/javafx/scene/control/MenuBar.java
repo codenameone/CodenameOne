@@ -236,6 +236,7 @@ public class MenuBar extends Control {
             label.setPadding(new Insets(4, 8, 4, 8));
             link = new MenuLink(m, label, Side.BOTTOM).attach();
             m.textProperty().addListener(sync);
+            m.mnemonicParsingProperty().addListener(sync);
             m.disableProperty().addListener(sync);
             m.visibleProperty().addListener(sync);
             m.showingProperty().addListener(showing);
@@ -252,7 +253,7 @@ public class MenuBar extends Control {
         }
 
         void sync() {
-            label.setText(menu.getText() == null ? "" : menu.getText());
+            label.setText(menu.shownText());
             label.setDisable(menu.isDisable());
             requestLayout();
         }

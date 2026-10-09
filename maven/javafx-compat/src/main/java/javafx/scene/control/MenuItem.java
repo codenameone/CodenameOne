@@ -59,8 +59,10 @@ import javafx.scene.input.KeyCombination;
 /// a [MenuBar] of the scene fires the item when a hardware keyboard
 /// sends the combination and nothing in the scene consumed the key; it
 /// is not shown beside the text, and the items of a context menu have
-/// none in effect. Mnemonics are not parsed; `mnemonicParsing` and the
-/// menu validation event are absent.
+/// none in effect. With `mnemonicParsing` on, as it is unless turned off,
+/// the underscore that marks a mnemonic is taken out of the text shown,
+/// as `com.codename1.fxcompat.runtime.Mnemonics` describes; the mnemonic
+/// itself does nothing. The menu validation event is absent.
 public class MenuItem implements EventTarget, Styleable {
 
     private final StringProperty id = new SimpleStringProperty(this, "id");
@@ -72,6 +74,7 @@ public class MenuItem implements EventTarget, Styleable {
     private final ObjectProperty<KeyCombination> accelerator = new SimpleObjectProperty<KeyCombination>(this,
             "accelerator");
     private final BooleanProperty visible = new SimpleBooleanProperty(this, "visible", true);
+    private final BooleanProperty mnemonicParsing = new SimpleBooleanProperty(this, "mnemonicParsing", true);
     private final ReadOnlyObjectWrapper<Menu> parentMenu = new ReadOnlyObjectWrapper<Menu>(this, "parentMenu");
     private final ReadOnlyObjectWrapper<ContextMenu> parentPopup = new ReadOnlyObjectWrapper<ContextMenu>(this,
             "parentPopup");
@@ -277,6 +280,32 @@ public class MenuItem implements EventTarget, Styleable {
     /// Whether the item is shown in its menu.
     public final BooleanProperty visibleProperty() {
         return visible;
+    }
+
+    /// Returns whether an underscore in the text marks a mnemonic.
+    public final boolean isMnemonicParsing() {
+        return mnemonicParsing.get();
+    }
+
+    /// Sets whether an underscore in the text marks a mnemonic and is
+    /// left out of what is shown.
+    public final void setMnemonicParsing(boolean value) {
+        mnemonicParsing.set(value);
+    }
+
+    /// Whether an underscore in the text marks a mnemonic.
+    public final BooleanProperty mnemonicParsingProperty() {
+        return mnemonicParsing;
+    }
+
+    /// The text as a menu shows it: without the mark of a mnemonic when
+    /// mnemonics are parsed, and never `null`.
+    final String shownText() {
+        String t = getText();
+        if (t == null) {
+            return "";
+        }
+        return isMnemonicParsing() ? com.codename1.fxcompat.runtime.Mnemonics.strip(t) : t;
     }
 
     /// Chooses the item: sends it an `ActionEvent`.

@@ -24,6 +24,7 @@ package javafx.scene.control;
 
 import com.codename1.fxcompat.runtime.Dirty;
 import com.codename1.fxcompat.runtime.Fonts;
+import com.codename1.fxcompat.runtime.Mnemonics;
 import com.codename1.fxcompat.runtime.FxBoolean;
 import com.codename1.fxcompat.runtime.FxDouble;
 import com.codename1.fxcompat.runtime.FxObject;
@@ -51,12 +52,20 @@ import javafx.scene.text.TextAlignment;
 /// The native component is a Codename One `Label` or one of its
 /// subclasses; text, text colour, font, alignment, underline and the gap
 /// to the icon are copied into it. A font or colour that was never set
-/// leaves the theme's own in place.
+/// leaves the theme's own in place. A plain native label, as a `Label`
+/// and a cell have, is made transparent and borderless whatever the
+/// theme gives it: in JavaFX a label has no background but the one of
+/// its region.
 ///
 /// The graphic node is recorded; a subclass that can show it as the
 /// native icon does so. `wrapText`, `ellipsisString`, `textOverrun`,
-/// `lineSpacing` and `mnemonicParsing` are recorded or absent and have no
-/// effect on a single line native label.
+/// `lineSpacing` are recorded or absent and have no effect on a single
+/// line native label.
+///
+/// With `mnemonicParsing` on, as it is for every button and off for a
+/// label, the underscore that marks a mnemonic is taken out of the text
+/// shown, as `com.codename1.fxcompat.runtime.Mnemonics` describes; the
+/// mnemonic itself does nothing, there being no key to hold for it.
 ///
 /// Styled through `cn1ApplyStyle` with the `Labeled` names listed in
 /// `com.codename1.fxcompat.runtime.StyleTarget`.
@@ -77,6 +86,8 @@ public abstract class Labeled extends Control {
     private final DoubleProperty graphicTextGap = new FxDouble(this, "graphicTextGap", 4, TEXT);
     private final ObjectProperty<ContentDisplay> contentDisplay = new FxObject<ContentDisplay>(this,
             "contentDisplay", ContentDisplay.LEFT, TEXT);
+
+    private final BooleanProperty mnemonicParsing = new FxBoolean(this, "mnemonicParsing", false, TEXT);
 
     /// Creates a labeled control with no text.
     public Labeled() {
@@ -112,9 +123,13 @@ public abstract class Labeled extends Control {
             return;
         }
         com.codename1.ui.Label label = (com.codename1.ui.Label) c;
-        String t = getText();
+        String t = isMnemonicParsing() ? Mnemonics.strip(getText()) : getText();
         label.setText(t == null || getContentDisplay() == ContentDisplay.GRAPHIC_ONLY ? "" : t);
         Style style = label.getAllStyles();
+        if (c.getClass() == com.codename1.ui.Label.class) {
+            style.setBgTransparency(0);
+            style.setBorder(com.codename1.ui.plaf.Border.createEmpty());
+        }
         Paint fill = getTextFill();
         if (fill instanceof Color) {
             int argb = ((Color) fill).cn1Argb();
@@ -130,6 +145,22 @@ public abstract class Labeled extends Control {
         HPos h = pos == null ? HPos.LEFT : pos.getHpos();
         label.setAlignment(h == HPos.CENTER ? Component.CENTER : (h == HPos.RIGHT ? Component.RIGHT : Component.LEFT));
         label.setGap(Units.toPixels(getGraphicTextGap()));
+    }
+
+    /// Returns whether an underscore in the text marks a mnemonic.
+    public final boolean isMnemonicParsing() {
+        return mnemonicParsing.get();
+    }
+
+    /// Sets whether an underscore in the text marks a mnemonic and is
+    /// left out of what is shown.
+    public final void setMnemonicParsing(boolean value) {
+        mnemonicParsing.set(value);
+    }
+
+    /// Whether an underscore in the text marks a mnemonic.
+    public final BooleanProperty mnemonicParsingProperty() {
+        return mnemonicParsing;
     }
 
     /// Returns the text.

@@ -1154,6 +1154,20 @@ final class FxmlCompiler {
                 return number(t, target, at);
             case Type.OBJECT:
                 return coerceObject(text, t, target, at);
+            case Type.ARRAY:
+                // A comma separated list is an array of a primitive, as the
+                // dividerPositions of a SplitPane are.
+                if (target.getDimensions() == 1 && target.getElementType().getSort() != Type.OBJECT) {
+                    StringBuilder array = new StringBuilder("new " + java(target) + " {");
+                    if (t.length() > 0) {
+                        String[] parts = t.split(",", -1);
+                        for (int i = 0; i < parts.length; i++) {
+                            array.append(i > 0 ? ", " : "").append(coerce(parts[i], target.getElementType(), at));
+                        }
+                    }
+                    return array.append('}').toString();
+                }
+                throw cannot(text, target, at);
             default:
                 throw cannot(text, target, at);
         }

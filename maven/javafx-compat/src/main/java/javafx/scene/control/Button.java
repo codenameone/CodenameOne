@@ -22,14 +22,26 @@
  */
 package javafx.scene.control;
 
+import com.codename1.fxcompat.runtime.Dirty;
 import com.codename1.ui.Component;
+import com.codename1.ui.plaf.Style;
 
+import javafx.beans.InvalidationListener;
+import javafx.beans.Observable;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.event.ActionEvent;
 import javafx.scene.Node;
+import javafx.scene.layout.Background;
+import javafx.scene.layout.Border;
 
 /// A push button, shown as a Codename One `Button`.
+///
+/// A button with a background or a border of its own, set by the
+/// application or by a style sheet, is drawn by those alone: the native
+/// button under them gives up the background and the border of the
+/// theme and keeps its text. Without either it looks as the theme makes
+/// a button look.
 ///
 /// The default and cancel flags are recorded; Enter and Escape are not
 /// routed to such a button by this layer.
@@ -37,6 +49,44 @@ public class Button extends ButtonBase {
 
     private final BooleanProperty defaultButton = new SimpleBooleanProperty(this, "defaultButton", false);
     private final BooleanProperty cancelButton = new SimpleBooleanProperty(this, "cancelButton", false);
+    private boolean ownChrome;
+
+    {
+        InvalidationListener chrome = new InvalidationListener() {
+            @Override
+            public void invalidated(Observable observable) {
+                cn1Invalidated(Dirty.NATIVE);
+            }
+        };
+        backgroundProperty().addListener(chrome);
+        borderProperty().addListener(chrome);
+    }
+
+    private boolean drawsItself() {
+        Background b = getBackground();
+        if (b != null && !b.getFills().isEmpty()) {
+            return true;
+        }
+        Border border = getBorder();
+        return border != null && !border.getStrokes().isEmpty();
+    }
+
+    @Override
+    protected void cn1SyncNative() {
+        Component c = cn1NativeIfCreated();
+        boolean own = drawsItself();
+        if (c != null && ownChrome && !own) {
+            // Setting the UIID again brings the styles of the theme back.
+            c.setUIID(c.getUIID());
+        }
+        ownChrome = own;
+        super.cn1SyncNative();
+        if (c != null && own) {
+            Style style = c.getAllStyles();
+            style.setBgTransparency(0);
+            style.setBorder(com.codename1.ui.plaf.Border.createEmpty());
+        }
+    }
 
     /// Creates a button with no text.
     public Button() {

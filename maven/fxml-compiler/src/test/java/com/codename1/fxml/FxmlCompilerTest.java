@@ -146,6 +146,32 @@ public class FxmlCompilerTest {
     }
 
     @Test
+    public void aListOfNumbersIsAnArrayAndAButtonBarHoldsItsButtons() throws Exception {
+        app("arrays").resource("main.fxml", HEAD + "<?import javafx.scene.control.SplitPane?>\n"
+                + "<?import javafx.scene.control.ButtonBar?>\n"
+                + "<VBox" + NS + ">\n"
+                + "  <SplitPane dividerPositions=\"0.25, 0.75\">\n"
+                + "    <items><Label text=\"a\"/><Label text=\"b\"/><Label text=\"c\"/></items>\n"
+                + "  </SplitPane>\n"
+                + "  <ButtonBar>\n"
+                + "    <buttons>\n"
+                + "      <Button mnemonicParsing=\"false\" text=\"_OK\"/>\n"
+                + "      <Button text=\"_Cancel\"/>\n"
+                + "    </buttons>\n"
+                + "  </ButtonBar>\n"
+                + "</VBox>\n").build();
+        VBox box = app.load("main.fxml");
+        javafx.scene.control.SplitPane split = (javafx.scene.control.SplitPane) box.getChildren().get(0);
+        assertEquals(2, split.getDividerPositions().length);
+        assertEquals(0.25, split.getDividerPositions()[0], 0);
+        assertEquals(0.75, split.getDividerPositions()[1], 0);
+        javafx.scene.control.ButtonBar bar = (javafx.scene.control.ButtonBar) box.getChildren().get(1);
+        assertEquals(2, bar.getButtons().size());
+        assertFalse(((Button) bar.getButtons().get(0)).isMnemonicParsing());
+        assertTrue(((Button) bar.getButtons().get(1)).isMnemonicParsing());
+    }
+
+    @Test
     public void propertyElementsListsAndTextContent() throws Exception {
         app("elements").resource("main.fxml", HEAD + "<?import java.lang.String?>\n"
                 + "<BorderPane" + NS + ">\n"

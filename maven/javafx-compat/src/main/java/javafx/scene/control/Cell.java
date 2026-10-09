@@ -22,6 +22,8 @@
  */
 package javafx.scene.control;
 
+import java.util.List;
+
 import com.codename1.fxcompat.runtime.Renderer;
 import com.codename1.fxcompat.runtime.Units;
 import com.codename1.ui.Component;
@@ -38,7 +40,11 @@ import javafx.beans.value.ObservableValue;
 import javafx.css.PseudoClass;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
+import javafx.scene.layout.Background;
+import javafx.scene.layout.BackgroundFill;
+import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
+import javafx.scene.paint.Paint;
 
 /// One visual of a list or table: a labeled control that shows the item
 /// it was last given through [#updateItem(Object, boolean)].
@@ -51,6 +57,14 @@ import javafx.scene.paint.Color;
 /// child of the cell, placed at the leading edge with the text after it;
 /// `ContentDisplay.GRAPHIC_ONLY` hides the text and `TEXT_ONLY` the
 /// graphic, the other values are shown as `LEFT`.
+///
+/// A cell without a text fill of its own is shown in white when what is
+/// behind it is dark, and in the colour of the theme otherwise. What is
+/// behind it is the nearest background up the tree, the cell's own
+/// included, whose last fill is a colour at least half opaque. JavaFX
+/// reaches the same end through the ladder of its default style sheet on
+/// `-fx-control-inner-background`; a view whose style sheet sets that
+/// colour without a background colour to match is not followed.
 ///
 /// A selected cell without a background of its own is drawn with a
 /// translucent highlight. The pseudo-class states `empty`, `filled` and
@@ -76,6 +90,7 @@ public class Cell<T> extends Labeled {
     private final BooleanProperty editable = new SimpleBooleanProperty(this, "editable", true);
     private final ReadOnlyBooleanWrapper editing = new ReadOnlyBooleanWrapper(this, "editing", false);
     private int basePadding = -1;
+    private int themeText = -1;
 
     /// Creates an empty cell.
     public Cell() {
@@ -113,10 +128,17 @@ public class Cell<T> extends Labeled {
 
     @Override
     protected void cn1SyncNative() {
+        Component before = cn1NativeIfCreated();
+        if (before != null && themeText < 0) {
+            themeText = before.getUnselectedStyle().getFgColor() & 0xffffff;
+        }
         super.cn1SyncNative();
         Component c = cn1NativeIfCreated();
         if (c == null) {
             return;
+        }
+        if (textFillProperty().get() == null && themeText >= 0) {
+            c.getAllStyles().setFgColor(onDark() ? 0xffffff : themeText);
         }
         if (basePadding < 0) {
             basePadding = c.getStyle().getPaddingLeftNoRTL();
@@ -125,6 +147,26 @@ public class Cell<T> extends Labeled {
         Style style = c.getAllStyles();
         style.setPaddingUnitLeft(Style.UNIT_TYPE_PIXELS);
         style.setPaddingLeft(basePadding + Units.toPixels(graphicWidth()));
+    }
+
+    /// Whether the nearest background behind the text is a dark colour.
+    private boolean onDark() {
+        Node at = this;
+        while (at != null) {
+            if (at instanceof Region) {
+                Background b = ((Region) at).getBackground();
+                List<BackgroundFill> fills = b == null ? null : b.getFills();
+                if (fills != null && !fills.isEmpty()) {
+                    Paint p = fills.get(fills.size() - 1).getFill();
+                    if (p instanceof Color && ((Color) p).getOpacity() >= 0.5) {
+                        Color color = (Color) p;
+                        return 0.2126 * color.getRed() + 0.7152 * color.getGreen() + 0.0722 * color.getBlue() < 0.4;
+                    }
+                }
+            }
+            at = at.getParent();
+        }
+        return false;
     }
 
     @Override
