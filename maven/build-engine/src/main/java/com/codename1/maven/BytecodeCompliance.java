@@ -151,6 +151,53 @@ public class BytecodeCompliance {
     /// The jar each bundled library class came from, by internal name.
     private Map<String, String> libraryOrigins = Collections.emptyMap();
 
+    /// The `invokedynamic` bootstrap classes a device implements: what a
+    /// lambda, a method reference and a string concatenation compile to.
+    private static final Set<String> SUPPORTED_BOOTSTRAPS = new HashSet<String>(Arrays.asList(
+            "java/lang/invoke/LambdaMetafactory", "java/lang/invoke/StringConcatFactory"));
+
+    /// The bootstrap classes the remap step rewrites into plain methods
+    /// before this check runs. None of them is supported by a device, so one
+    /// that is still in a class when it is checked was not rewritten, and is
+    /// reported: being on this list changes what the message says, never
+    /// whether there is one. `ObjectMethods` is what a record's generated
+    /// `equals`, `hashCode` and `toString` call.
+    static final Set<String> DESUGARED_BOOTSTRAPS = new HashSet<String>(Arrays.asList(
+            "java/lang/runtime/ObjectMethods"));
+
+    /// What the last scan counted, for the port report.
+    private ScanStats stats = new ScanStats();
+
+    /// Counts taken while the classes are scanned.
+    private static final class ScanStats {
+        /// The application's own classes, and the source files they came
+        /// from as paths from the source root.
+        private int applicationClasses;
+        private final Set<String> applicationFiles = new java.util.TreeSet<String>();
+        /// The application's references into a compatibility layer, and how
+        /// many of them are to API the layer lacks.
+        private int toolkitCallSites;
+        private int toolkitCallSitesMissing;
+        /// Class files newer than the device format, and the newest.
+        private int newerClassFiles;
+        private int newestClassVersion;
+    }
+
+    /// The property `name` as the command line gives it (`-Dname=value`),
+    /// else as the project declares it; null when neither does.
+    private String property(String name) {
+        String value = System.getProperty(name);
+        if (value == null || value.isEmpty()) {
+            java.util.Properties user = host.userProperties();
+            value = user == null ? null : user.getProperty(name);
+        }
+        if (value == null || value.isEmpty()) {
+            java.util.Properties project = host.projectProperties();
+            value = project == null ? null : project.getProperty(name);
+        }
+        return value == null || value.isEmpty() ? null : value;
+    }
+
     private List<Relocation> layers() {
         return activeLayers == null ? Collections.<Relocation>emptyList() : activeLayers;
     }
@@ -307,8 +354,13 @@ public class BytecodeCompliance {
         getLog().info("See https://www.codenameone.com/javadoc/ for supported Classes and Methods");
 
         if (!hasChangedSinceLastCheck()) {
-            getLog().info("Sources haven't changed since the last compliance check. Skipping check");
-            return;
+            // The port report is written by the check, so one that is asked
+            // for somewhere it has not been written yet is a reason to run.
+            File report = portReportTarget();
+            if (report == null || report.isFile()) {
+                getLog().info("Sources haven't changed since the last compliance check. Skipping check");
+                return;
+            }
         }
 
         beforeCheck();
@@ -319,6 +371,7 @@ public class BytecodeCompliance {
             return;
         }
 
+        stats = new ScanStats();
         int rewrittenClassCount = enforceMaxClassVersion(outputDir, MAX_CLASS_MAJOR_VERSION);
         InvocationRewriteSummary invocationRewriteSummary = applyInvocationRewrites(outputDir);
         lastInvocationRewriteSummary = invocationRewriteSummary;
@@ -370,14 +423,16 @@ public class BytecodeCompliance {
         Map<String, String> origins = CompatLibraries.classOrigins(outputDir);
         libraryOrigins = origins;
         List<Violation> violations = scanProjectClasses(outputDir, allowedIndex, projectAndDependencyIndex);
-        if (!violations.isEmpty()) {
-            // The developer did not write a bundled library's classes: say
-            // which jar a finding is in.
-            if (!origins.isEmpty()) {
-                for (Violation v : violations) {
-                    v.library = origins.get(v.sourceClass.replace('.', '/'));
-                }
+        // The developer did not write a bundled library's classes: say
+        // which jar a finding is in.
+        if (!origins.isEmpty()) {
+            for (Violation v : violations) {
+                v.library = origins.get(v.sourceClass.replace('.', '/'));
             }
+        }
+        ComplianceFindings findings = group(violations);
+        portReportFile = writePortReport(outputDir, findings, violations);
+        if (!violations.isEmpty()) {
             writeComplianceReport(violations, outputDir, dependencyJars, rewrittenClassCount);
             logViolationSummary(violations);
             throw new BuildFailureException(buildFailureSummary(violations));
@@ -385,6 +440,112 @@ public class BytecodeCompliance {
 
         writeComplianceSuccess("Completed compliance check on " + host.finalName(), rewrittenClassCount);
         getLog().info("Invocation rewrite summary: classes rewritten=" + invocationRewriteSummary.rewrittenClasses + ", callsites rewritten=" + invocationRewriteSummary.rewrittenCallsites);
+    }
+
+    private Boolean desktopProject;
+
+    /// Whether the classes are a desktop application's: a Swing or JavaFX
+    /// layer is among the project's dependencies **and** its classes use
+    /// it. The jar alone says nothing -- every generated project has both --
+    /// so this asks what the remap step asks ([CompatLayers#active]).
+    private boolean isDesktopProject() {
+        if (desktopProject == null) {
+            boolean desktop = false;
+            if (activeLayers == null || activeLayers.contains(CompatLayers.SWING)
+                    || activeLayers.contains(CompatLayers.JAVAFX)) {
+                try {
+                    List<Relocation> used = CompatLayers.active(getDependencyJarsForScanning(),
+                            Collections.singletonList(new File(host.outputDirectory().getPath())));
+                    desktop = used.contains(CompatLayers.SWING) || used.contains(CompatLayers.JAVAFX);
+                } catch (IOException e) {
+                    getLog().debug("Could not tell whether this is a desktop application", e);
+                }
+            }
+            desktopProject = Boolean.valueOf(desktop);
+        }
+        return desktopProject.booleanValue();
+    }
+
+    /// The findings of `violations`, arranged for reading.
+    private static ComplianceFindings group(List<Violation> violations) {
+        ComplianceFindings findings = new ComplianceFindings();
+        for (Violation v : violations) {
+            if (v.language) {
+                findings.addLanguage(v.library, v.file(), v.line, v.api, v.suggestion);
+            } else {
+                findings.add(v.library, v.file(), v.line, v.owner, v.api == null ? v.referencedMember : v.api, v.key);
+            }
+        }
+        return findings;
+    }
+
+    /// The report file, or null when the classes are no desktop
+    /// application's.
+    private File portReportFile;
+    private File requestedPortReport;
+
+    /// Where the port report of a desktop application goes, for a plugin
+    /// that declares the choice as a parameter of its own; null leaves it to
+    /// the `cn1.desktop.report` property and then to the default,
+    /// `codenameone/desktop-port-report.md` in the build directory.
+    public BytecodeCompliance portReport(File file) {
+        this.requestedPortReport = file;
+        return this;
+    }
+
+    /// Where the port report goes: what a plugin asked for, else the
+    /// `cn1.desktop.report` property, else the default in the build
+    /// directory; a relative path is the project's. Null for a project that
+    /// is no desktop application.
+    private File portReportTarget() {
+        if (!isDesktopProject()) {
+            return null;
+        }
+        String named = property(DesktopPortReport.PROPERTY);
+        File file = requestedPortReport != null ? requestedPortReport : named != null ? new File(named)
+                : new File(host.buildDirectory(), DesktopPortReport.DEFAULT_PATH.replace('/', File.separatorChar));
+        if (!file.isAbsolute()) {
+            file = new File(host.baseDir(), file.getPath());
+        }
+        return file;
+    }
+
+    /// Writes the port report of a desktop application and answers the
+    /// file; null for any other project, which has nothing to port.
+    private File writePortReport(File outputDir, ComplianceFindings findings, List<Violation> violations)
+            throws BuildExecutionException {
+        File file = portReportTarget();
+        if (file == null) {
+            return null;
+        }
+        Map<String, Set<String>> classes = new HashMap<String, Set<String>>();
+        for (Violation v : violations) {
+            if (v.library != null) {
+                Set<String> set = classes.get(v.library);
+                if (set == null) {
+                    set = new HashSet<String>();
+                    classes.put(v.library, set);
+                }
+                set.add(v.sourceClass);
+            }
+        }
+        Map<String, Integer> classesWithFindings = new HashMap<String, Integer>();
+        for (Map.Entry<String, Set<String>> e : classes.entrySet()) {
+            classesWithFindings.put(e.getKey(), e.getValue().size());
+        }
+        String text = new DesktopPortReport(findings)
+                .application(stats.applicationClasses, stats.applicationFiles)
+                .toolkitCallSites(stats.toolkitCallSites, stats.toolkitCallSitesMissing)
+                .libraries(CompatLibraries.libraries(outputDir), classesWithFindings)
+                .newerClassFiles(stats.newerClassFiles, stats.newestClassVersion - 44)
+                .render();
+        try {
+            FileUtils.writeStringToFile(file, text, "UTF-8");
+        } catch (IOException ex) {
+            throw new BuildExecutionException("Failed to write the desktop port report " + file, ex);
+        }
+        getLog().info("Desktop port report: " + file.getAbsolutePath());
+        return file;
     }
 
     private boolean shouldSkipComplianceCheck() {
@@ -457,6 +618,7 @@ public class BytecodeCompliance {
             StringBuilder content = new StringBuilder();
             content.append(message).append("\n");
             content.append("Rewritten class files to Java 17 major version: ").append(rewrittenClassCount).append("\n");
+            content.append(newerClassFilesNote());
             content.append("Rewritten JDK API callsites: ").append(lastInvocationRewriteSummary.rewrittenCallsites)
                     .append(" across ").append(lastInvocationRewriteSummary.rewrittenClasses).append(" class(es)").append("\n");
             FileUtils.writeStringToFile(complianceOutputFile, content.toString(), "UTF-8");
@@ -473,14 +635,24 @@ public class BytecodeCompliance {
         report.append("Project: ").append(host.finalName()).append("\n");
         report.append("Output classes: ").append(outputDir.getAbsolutePath()).append("\n");
         report.append("Dependency jars scanned: ").append(dependencyJars.size()).append("\n");
-        report.append("Rewritten class files to Java 17 major version: ").append(rewrittenClassCount).append("\n\n");
+        report.append("Rewritten class files to Java 17 major version: ").append(rewrittenClassCount).append("\n");
+        report.append(newerClassFilesNote()).append("\n");
         report.append("Rewritten JDK API callsites: ").append(lastInvocationRewriteSummary.rewrittenCallsites)
                 .append(" across ").append(lastInvocationRewriteSummary.rewrittenClasses).append(" class(es)").append("\n\n");
-        report.append("Violations (").append(violations.size()).append(")\n");
-        report.append("========================================\n");
-        int i = 1;
-        for (Violation violation : violations) {
-            report.append(i++).append(") ").append(violation.render()).append("\n\n");
+        ComplianceFindings findings = group(violations);
+        report.append(findings.summary()).append("\n\n");
+        if (portReportFile != null) {
+            report.append("The port report, which lists the same findings by source file, is ")
+                    .append(portReportFile.getAbsolutePath()).append("\n\n");
+        }
+        report.append(findings.report());
+        if (violations.size() <= MAX_DETAILED_VIOLATIONS) {
+            report.append("Violations (").append(violations.size()).append(")\n");
+            report.append("========================================\n");
+            int i = 1;
+            for (Violation violation : violations) {
+                report.append(i++).append(") ").append(violation.render()).append("\n\n");
+            }
         }
 
         complianceOutputFile.getParentFile().mkdirs();
@@ -491,8 +663,16 @@ public class BytecodeCompliance {
         }
     }
 
+    /// Up to this many violations are each spelled out, in the message and
+    /// in the file, the way a single one always was. Beyond it only the
+    /// grouped report is of any use: nobody reads the 3,000th entry.
+    private static final int MAX_LISTED_VIOLATIONS = 5;
+
+    /// Up to this many violations are each written out in full in the
+    /// compliance file, after the grouped report.
+    private static final int MAX_DETAILED_VIOLATIONS = 50;
+
     private String buildFailureSummary(List<Violation> violations) {
-        int maxInMessage = Math.min(5, violations.size());
         StringBuilder sb = new StringBuilder();
         sb.append("Compliance check failed with ").append(violations.size()).append(" forbidden API reference");
         if (violations.size() != 1) {
@@ -500,21 +680,41 @@ public class BytecodeCompliance {
         }
         sb.append(".\n");
         sb.append("See ").append(complianceOutputFile.getAbsolutePath()).append(" for the full report.\n");
-        sb.append("First ").append(maxInMessage).append(" violation(s):");
-        for (int i = 0; i < maxInMessage; i++) {
-            Violation v = violations.get(i);
+        if (violations.size() > MAX_LISTED_VIOLATIONS) {
+            sb.append(group(violations).summary());
+            if (portReportFile != null) {
+                sb.append("\nWhat to change, file by file: ").append(portReportFile.getAbsolutePath());
+            }
+            return sb.toString();
+        }
+        sb.append("First ").append(violations.size()).append(" violation(s):");
+        for (Violation v : violations) {
             sb.append("\n - ").append(v.renderInline());
         }
         return sb.toString();
     }
 
     private void logViolationSummary(List<Violation> violations) {
-        int maxToLog = Math.min(5, violations.size());
         getLog().error("Bytecode compliance check found " + violations.size() + " violation(s).");
         getLog().error("Detailed report written to " + complianceOutputFile.getAbsolutePath());
-        for (int i = 0; i < maxToLog; i++) {
+        if (violations.size() > MAX_LISTED_VIOLATIONS) {
+            // The failure itself carries the grouped summary.
+            return;
+        }
+        for (int i = 0; i < violations.size(); i++) {
             getLog().error("[" + (i + 1) + "] " + violations.get(i).renderInline());
         }
+    }
+
+    /// What became of class files newer than the device format, as a line
+    /// of the compliance file; empty when there were none.
+    private String newerClassFilesNote() {
+        if (stats.newerClassFiles == 0) {
+            return "";
+        }
+        return stats.newerClassFiles + " class file(s) were compiled for a Java newer than 17 (up to Java "
+                + (stats.newestClassVersion - 44) + ") and were rewritten to the Java 17 class format. "
+                + "The Java 18+ API they use is checked like any other.\n";
     }
 
 
@@ -530,14 +730,18 @@ public class BytecodeCompliance {
                     byte[] rewrittenBytes = rewriteClassVersion(originalBytes, maxVersion);
                     FileUtils.writeByteArrayToFile(classFile, rewrittenBytes);
                     rewritten++;
-                    getLog().info("Rewrote class major version " + versionInfo.majorVersion + " -> " + maxVersion + " for " + classFile.getAbsolutePath());
+                    stats.newestClassVersion = Math.max(stats.newestClassVersion, versionInfo.majorVersion);
+                    getLog().debug("Rewrote class major version " + versionInfo.majorVersion + " -> " + maxVersion + " for " + classFile.getAbsolutePath());
                 }
             } catch (IOException ex) {
                 throw new BuildExecutionException("Failed to enforce class version for " + classFile, ex);
             }
         }
+        stats.newerClassFiles = rewritten;
         if (rewritten > 0) {
-            getLog().info("Rewrote " + rewritten + " class file(s) to Java 17 major version " + maxVersion);
+            getLog().info("Rewrote " + rewritten + " class file(s) to Java 17 major version " + maxVersion
+                    + ": they were compiled for a newer Java (up to Java " + (stats.newestClassVersion - 44)
+                    + "). The Java 18+ API they use is checked like any other");
         }
         return rewritten;
     }
@@ -1364,6 +1568,9 @@ public class BytecodeCompliance {
         @Override
         public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
             className = name;
+            if (isApplicationClass()) {
+                stats.applicationClasses++;
+            }
             if (layers.isEmpty()) {
                 return;
             }
@@ -1379,6 +1586,27 @@ public class BytecodeCompliance {
         @Override
         public void visitSource(String source, String debug) {
             sourceFile = source;
+            // A class the build generated names something that is no file.
+            if (isApplicationClass() && source != null && source.indexOf('.') > 0) {
+                stats.applicationFiles.add(packagePath(className) + source);
+            }
+        }
+
+        /// Whether the class being scanned is one the developer wrote:
+        /// neither a layer's runtime nor a library unpacked beside it.
+        private boolean isApplicationClass() {
+            return className != null && !CompatLayers.isExtractedRuntime(className)
+                    && !libraryOrigins.containsKey(className);
+        }
+
+        /// Counts one reference of the application into a layer.
+        private void countToolkit(String owner, boolean supported) {
+            if (layerOf(owner) != null && isApplicationClass()) {
+                stats.toolkitCallSites++;
+                if (!supported) {
+                    stats.toolkitCallSitesMissing++;
+                }
+            }
         }
 
         @Override
@@ -1459,6 +1687,9 @@ public class BytecodeCompliance {
                     if (layers.isEmpty()) {
                         return;
                     }
+                    if (isDesktopProject()) {
+                        checkBootstrap(sourceMethod, bootstrap);
+                    }
                     int before = violations.size();
                     checkLayerDescriptor(sourceMethod, indyDescriptor, null);
                     for (Object argument : bootstrapArguments) {
@@ -1480,29 +1711,83 @@ public class BytecodeCompliance {
                 if (reportedLayerSymbols.add(e.getKey())) {
                     DeclaredSymbol d = e.getValue();
                     violations.add(new Violation(className, d.sourceMethod, d.message, null, relativePath(),
-                            sourceFile, d.line));
+                            sourceFile, d.line).names(d.owner, d.api, apiKey(d.api)));
                 }
             }
         }
 
+        /// An `invokedynamic` is a call to whatever its bootstrap method
+        /// builds at run time. A device builds nothing at run time: the
+        /// translators implement the bootstraps of [#SUPPORTED_BOOTSTRAPS]
+        /// by hand, and any other would pass every other check here and
+        /// then fail where it is first reached.
+        private void checkBootstrap(String sourceMethod, Handle bootstrap) {
+            String owner = bootstrap.getOwner();
+            if (SUPPORTED_BOOTSTRAPS.contains(owner)) {
+                return;
+            }
+            String name = owner.replace('/', '.');
+            String feature;
+            String advice;
+            if ("java/lang/runtime/ObjectMethods".equals(owner)) {
+                feature = "a record's generated equals, hashCode and toString (invokedynamic through " + name + ")";
+                advice = "A device cannot run them as compiled. Declare equals, hashCode and toString in the record "
+                        + "yourself, or make it a class.";
+            } else if ("java/lang/runtime/SwitchBootstraps".equals(owner)) {
+                feature = "a switch over patterns (invokedynamic through " + name + ")";
+                advice = "A device cannot run it as compiled. Compile for Java 17 (maven.compiler.release 17), or "
+                        + "write the switch as instanceof tests.";
+            } else {
+                feature = "invokedynamic through " + name + "." + bootstrap.getName();
+                advice = "A device cannot run it: only lambdas, method references and string concatenation are "
+                        + "compiled ahead of time.";
+            }
+            if (DESUGARED_BOOTSTRAPS.contains(owner)) {
+                advice += " The build normally rewrites this into plain methods; this class was not rewritten.";
+            }
+            if (!reportedLayerSymbols.add("indy " + owner + "@" + sourceMethod)) {
+                return;
+            }
+            Violation v = new Violation(className, sourceMethod, feature + " is not supported on a device", advice,
+                    relativePath(), sourceFile, currentLine);
+            v.language = true;
+            v.api = feature;
+            violations.add(v);
+        }
+
         private void checkMethodReference(String sourceClass, String sourceMethod, String owner, String memberName, String memberDescriptor) {
-            if (shouldAllowMethod(owner, memberName, memberDescriptor)) {
+            boolean allowed = shouldAllowMethod(owner, memberName, memberDescriptor);
+            countToolkit(owner, allowed);
+            if (allowed) {
                 return;
             }
             if (reportLayerMember(sourceMethod, owner, memberName, memberDescriptor, true)) {
                 return;
             }
-            addViolation(sourceClass, sourceMethod, owner, owner + "#" + memberName + memberDescriptor);
+            addViolation(sourceClass, sourceMethod, owner, owner + "#" + memberName + memberDescriptor)
+                    .names(originalName(owner), javaMember(owner, memberName, memberDescriptor, true),
+                            lookupKey(owner, memberName));
         }
 
         private void checkFieldReference(String sourceClass, String sourceMethod, String owner, String memberName, String memberDescriptor) {
-            if (shouldAllowField(owner, memberName, memberDescriptor)) {
+            boolean allowed = shouldAllowField(owner, memberName, memberDescriptor);
+            countToolkit(owner, allowed);
+            if (allowed) {
                 return;
             }
             if (reportLayerMember(sourceMethod, owner, memberName, memberDescriptor, false)) {
                 return;
             }
-            addViolation(sourceClass, sourceMethod, owner, owner + "#" + memberName + ":" + memberDescriptor);
+            addViolation(sourceClass, sourceMethod, owner, owner + "#" + memberName + ":" + memberDescriptor)
+                    .names(originalName(owner), javaMember(owner, memberName, memberDescriptor, false),
+                            lookupKey(owner, memberName));
+        }
+
+        /// `java.lang.Runtime.exec` for a member, and the class alone for a
+        /// constructor: what the alternatives table is looked up by.
+        private String lookupKey(String owner, String memberName) {
+            String name = javaName(owner);
+            return "<init>".equals(memberName) || "<clinit>".equals(memberName) ? name : name + "." + memberName;
         }
 
         private void checkTypeReference(String sourceClass, String sourceMethod, String owner) {
@@ -1517,7 +1802,9 @@ public class BytecodeCompliance {
             if (isInternalRewriteHelper(owner)) {
                 return;
             }
-            if (isKnownClass(owner)) {
+            boolean known = isKnownClass(owner);
+            countToolkit(owner, known);
+            if (known) {
                 return;
             }
             Relocation layer = layerOf(owner);
@@ -1525,7 +1812,8 @@ public class BytecodeCompliance {
                 reportLayerSymbol(sourceMethod, layer, owner, javaName(owner), null);
                 return;
             }
-            addViolation(sourceClass, sourceMethod, owner, owner + " (type)");
+            addViolation(sourceClass, sourceMethod, owner, owner + " (type)")
+                    .names(originalName(owner), javaName(owner), javaName(owner));
         }
 
         private boolean isKnownClass(String internalName) {
@@ -1554,9 +1842,11 @@ public class BytecodeCompliance {
             return relativePath;
         }
 
-        private void addViolation(String sourceClass, String sourceMethod, String owner, String referencedMember) {
-            violations.add(new Violation(sourceClass, sourceMethod, referencedMember,
-                    replacementFor(referencedMember, owner, layers), relativePath(), sourceFile, currentLine));
+        private Violation addViolation(String sourceClass, String sourceMethod, String owner, String referencedMember) {
+            Violation v = new Violation(sourceClass, sourceMethod, referencedMember,
+                    replacementFor(referencedMember, owner, layers), relativePath(), sourceFile, currentLine);
+            violations.add(v);
+            return v;
         }
 
         /// The active layer whose relocated packages `internalName` is in, or
@@ -1579,9 +1869,13 @@ public class BytecodeCompliance {
         private void reportLayerSymbol(String sourceMethod, Relocation layer, String symbol, String api,
                                        List<DeclaredSymbol> declared) {
             String message = api + " is not supported by the Codename One " + layer.name() + " compatibility layer";
+            int member = symbol.indexOf('#');
+            String owner = originalName(member < 0 ? symbol : symbol.substring(0, member));
             if (declared != null) {
                 if (!declaredLayerSymbols.containsKey(symbol)) {
                     DeclaredSymbol d = new DeclaredSymbol(sourceMethod, message);
+                    d.owner = owner;
+                    d.api = api;
                     declaredLayerSymbols.put(symbol, d);
                     declared.add(d);
                 }
@@ -1591,8 +1885,9 @@ public class BytecodeCompliance {
                 return;
             }
             reportedLayerSymbols.add(symbol);
-            violations.add(new Violation(className, sourceMethod, message, null, relativePath(), sourceFile,
-                    currentLine));
+            Violation v = new Violation(className, sourceMethod, message, null, relativePath(), sourceFile,
+                    currentLine);
+            violations.add(v.names(owner, api, apiKey(api)));
         }
 
         /// Reports an unresolved member whose owner is a layer's class, and
@@ -1705,16 +2000,21 @@ public class BytecodeCompliance {
 
         /// `javax.swing.JTable` for the internal name the class ships under.
         private String javaName(String internalName) {
+            return originalName(internalName).replace('/', '.').replace('$', '.');
+        }
+
+        /// `javax/swing/JTable` for the internal name the class ships
+        /// under: the name the application was compiled against.
+        private String originalName(String internalName) {
             String original = layerNames.original(internalName);
             if (original.startsWith(Relocation.JDK_PACKAGE)) {
                 for (String[] shim : Relocation.JDK_SHIMS) {
                     if (shim[1].equals(original)) {
-                        original = shim[0];
-                        break;
+                        return shim[0];
                     }
                 }
             }
-            return original.replace('/', '.').replace('$', '.');
+            return original;
         }
 
         private String javaTypeName(Type type) {
@@ -1835,12 +2135,33 @@ public class BytecodeCompliance {
         return null;
     }
 
+    /// `javax.swing.JTable.print` for the API `javax.swing.JTable.print()`,
+    /// and `javax.swing.JTable` for `new javax.swing.JTable(int, int)`: the
+    /// API without its parameters, which is what the alternatives table is
+    /// looked up by.
+    static String apiKey(String api) {
+        if (api == null) {
+            return null;
+        }
+        String key = api.startsWith("new ") ? api.substring("new ".length()) : api;
+        int paren = key.indexOf('(');
+        return paren < 0 ? key : key.substring(0, paren);
+    }
+
+    /// The path of `internalName`'s package, with the trailing slash.
+    private static String packagePath(String internalName) {
+        int slash = internalName.lastIndexOf('/');
+        return slash < 0 ? "" : internalName.substring(0, slash + 1);
+    }
+
     /// A reference missing from a declaration, held back until the class has
     /// been read; see `ComplianceScanner`.
     private static final class DeclaredSymbol {
         private final String sourceMethod;
         private final String message;
         private int line;
+        private String owner;
+        private String api;
 
         private DeclaredSymbol(String sourceMethod, String message) {
             this.sourceMethod = sourceMethod;
@@ -1862,6 +2183,32 @@ public class BytecodeCompliance {
         /// The bundled library jar the class came from, or null for a class
         /// of the application's own.
         private String library;
+        /// What the reference is to, for the grouped report: the class it
+        /// belongs to as the application was compiled against it (an
+        /// internal name), the API as its documentation spells it, and the
+        /// key the alternatives table is looked up by. All null for a
+        /// finding that names no API.
+        private String owner;
+        private String api;
+        private String key;
+        /// Whether the finding is a language feature rather than an API.
+        private boolean language;
+
+        private Violation names(String owner, String api, String key) {
+            this.owner = owner;
+            this.api = api;
+            this.key = key;
+            return this;
+        }
+
+        /// The source file from the source root, or the class file when the
+        /// class says nothing about its source.
+        private String file() {
+            if (sourceFile == null || sourceFile.isEmpty()) {
+                return sourcePath == null ? sourceClass : sourcePath.replace(File.separatorChar, '/');
+            }
+            return packagePath(sourceClass.replace('.', '/')) + sourceFile;
+        }
 
         private Violation(String sourceClass, String sourceMethod, String referencedMember, String suggestion, String sourcePath) {
             this(sourceClass, sourceMethod, referencedMember, suggestion, sourcePath, null, 0);

@@ -77,12 +77,13 @@ public final class DesktopProjectImporter {
         COVERED.put("org.jetbrains.kotlin:kotlin-stdlib-jdk8", "Kotlin standard library");
     }
 
-    /// What an import says about a dependency no layer implements. Such a
-    /// library is application code: when it is written against Swing or
-    /// JavaFX the build relocates it with the application
+    /// What an import says about a dependency no layer implements, when it
+    /// could not read the jar and say more ([DesktopImportReport]). Such a
+    /// library is application code: the build bundles the classes the
+    /// application uses and relocates them with it
     /// ([CompatRemapper#withApplicationLibraries]).
-    public static final String BUNDLED_NOTE = "bundled and relocated; unsupported API it uses will be reported at build "
-            + "time";
+    public static final String BUNDLED_NOTE = "the classes the application uses are bundled and relocated; "
+            + "unsupported API they use will be reported at build time";
 
     /// Whether `coordinate` (`group:artifact`) is a module of a toolkit a
     /// layer stands in for. One the layer does not implement cannot be added
@@ -130,6 +131,9 @@ public final class DesktopProjectImporter {
         public String kind;
         public boolean kotlin;
         public int copiedFiles;
+        /// The Java release the project's build compiles for, or 0 when its
+        /// build files do not say. See [DesktopImportReport#javaLevelWarning].
+        public int javaLevel;
     }
 
     /// A dependency of the imported project that the application's build has
@@ -306,6 +310,7 @@ public final class DesktopProjectImporter {
                 r.setAside = setAsideMainClass(commonDir, generated);
             }
             readDependencies(moduleDir, r);
+            r.javaLevel = javaLevel(source, moduleDir);
             if (ImportedFiles.hasKotlin(target)) {
                 // The application's Kotlin build switches on when
                 // src/main/kotlin exists; it compiles the desktop sources too.
@@ -631,6 +636,78 @@ public final class DesktopProjectImporter {
             return m.find() ? m.group(1) : null;
         }
         return value;
+    }
+
+    /// A compiler plugin's own configuration: it wins over the properties.
+    private static final Pattern POM_COMPILER = Pattern.compile(
+            "<artifactId>\\s*maven-compiler-plugin\\s*</artifactId>(.*?)</plugin>", Pattern.DOTALL);
+    private static final String[] POM_LEVEL_ELEMENTS = {"release", "source", "target"};
+    private static final String[] POM_LEVEL_PROPERTIES = {"maven.compiler.release", "maven.compiler.source",
+        "maven.compiler.target"};
+    private static final Pattern[] GRADLE_LEVELS = {
+        Pattern.compile("JavaLanguageVersion\\.of\\(\\s*(\\d+)\\s*\\)"),
+        Pattern.compile("jvmToolchain\\(\\s*(\\d+)\\s*\\)"),
+        Pattern.compile("(?:sourceCompatibility|targetCompatibility|options\\.release)\\s*(?:=|\\.set\\()?\\s*"
+                + "(?:JavaVersion\\.VERSION_|JavaVersion\\.toVersion\\(\\s*)?[\"']?(1[._]\\d|\\d+)"),
+    };
+
+    /// The Java release the build of `moduleDir` compiles for: what its own
+    /// build file says, else what the project it is a module of says, else 0.
+    ///
+    /// In a pom the compiler plugin's configuration is read before the
+    /// `maven.compiler.*` properties, as Maven does, and `release` before
+    /// `source` before `target`. A value spelled through a property is
+    /// resolved in the same file; one that cannot be is passed over.
+    static int javaLevel(File source, File moduleDir) throws IOException {
+        for (String pom : buildFiles(source, moduleDir, "pom.xml")) {
+            Matcher plugin = POM_COMPILER.matcher(pom);
+            while (plugin.find()) {
+                for (String name : POM_LEVEL_ELEMENTS) {
+                    int level = level(element(plugin.group(1), name), pom);
+                    if (level > 0) {
+                        return level;
+                    }
+                }
+            }
+            for (String name : POM_LEVEL_PROPERTIES) {
+                int level = level(element(pom, name), pom);
+                if (level > 0) {
+                    return level;
+                }
+            }
+        }
+        for (String gradle : buildFiles(source, moduleDir, "build.gradle.kts", "build.gradle")) {
+            for (Pattern p : GRADLE_LEVELS) {
+                Matcher m = p.matcher(gradle);
+                if (m.find()) {
+                    int level = level(m.group(1), "");
+                    if (level > 0) {
+                        return level;
+                    }
+                }
+            }
+        }
+        return 0;
+    }
+
+    /// `17`, `1.8` or `1_8` as a release number; 0 for anything else.
+    private static int level(String value, String pom) {
+        String v = value == null ? null : resolve(value, pom);
+        if (v == null) {
+            return 0;
+        }
+        if (v.startsWith("1.") || v.startsWith("1_")) {
+            v = v.substring(2);
+        }
+        if (v.length() == 0 || v.length() > 3) {
+            return 0;
+        }
+        for (int i = 0; i < v.length(); i++) {
+            if (v.charAt(i) < '0' || v.charAt(i) > '9') {
+                return 0;
+            }
+        }
+        return Integer.parseInt(v);
     }
 
     private static void add(Set<String> out, String name) {
