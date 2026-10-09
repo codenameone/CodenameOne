@@ -202,7 +202,7 @@ public class MvcTemplatesTest {
         assertTrue(html, html.contains("value=\"B\" selected=\"selected\""));
         assertTrue(html, html.contains("token&lt;&amp;"));
         assertTrue(html, html.contains("name=\"_active\""));
-        template("dynamic", "<form th:attr=\"hx-post=@{/save}\"><button>Save</button></form>");
+        template("dynamic", "<form th:attr=\"HX-POST=@{/save}\"><button>Save</button></form>");
         compile();
         assertTrue(render("dynamic", m).contains("name=\"_csrf\""));
     }
@@ -213,7 +213,7 @@ public class MvcTemplatesTest {
                 Arrays.asList(
                         DECL + "<p th:text=\"${product.missing}\"></p>",
                         "<p th:utext=\"'unsafe'\"></p>",
-                "<span th:errors=\"*{name}\"></span>",
+                        "<span th:errors=\"*{name}\"></span>",
                         "<p th:text=\"${undeclared}\"></p>",
                         "<div th:fragment=\"loop\" th:replace=\"~{bad :: loop}\"></div>",
                         DECL + "<p th:text=\"${product.getLabel()}\"></p>")) {
@@ -415,10 +415,19 @@ public class MvcTemplatesTest {
         Locale previous = Locale.getDefault();
         try {
             Locale.setDefault(new Locale("tr", "TR"));
-            for (String url : Arrays.asList("HTTPS://example.test/", "MaIlTo:test@example.test", "TEL:123", "/products")) {
+            for (String url :
+                    Arrays.asList(
+                            "HTTPS://example.test/",
+                            "MaIlTo:test@example.test",
+                            "TEL:123",
+                            "/products")) {
                 Html.safeUrl(url);
             }
-            for (String url : Arrays.asList("JAVASCRIPT:alert(1)", "ma\u0131lto:test@example.test", "ma\u0130lto:test@example.test")) {
+            for (String url :
+                    Arrays.asList(
+                            "JAVASCRIPT:alert(1)",
+                            "ma\u0131lto:test@example.test",
+                            "ma\u0130lto:test@example.test")) {
                 try {
                     Html.safeUrl(url);
                     fail(url);
@@ -476,6 +485,286 @@ public class MvcTemplatesTest {
         } catch (IllegalStateException expected) {
             assertTrue(expected.getMessage().contains("indexed element"));
         }
+    }
+
+    private void fixtureSources(Map<String, String> sources) throws Exception {
+        List<File> cp = new ArrayList<File>(classpath());
+        cp.add(classes);
+        JavaSourceCompiler.compile(sources, classes, cp);
+        context =
+                new ProcessorContext(
+                        classes,
+                        tmp.newFolder(),
+                        ClassScanner.scan(classes),
+                        new SystemStreamLog(),
+                        project,
+                        new Properties(),
+                        null,
+                        Collections.<String>emptyList(),
+                        "UTF-8",
+                        Arrays.asList(cp.get(0).getPath(), classes.getPath()));
+    }
+
+    private HttpServer.Handler controller(String source) throws Exception {
+        fixtureSources(Collections.singletonMap("sample.Pages", source));
+        RestControllerAnnotationProcessor processor = new RestControllerAnnotationProcessor();
+        processor.start(context);
+        for (AnnotatedClass cls : context.getClassIndex().values())
+            processor.processClass(cls, context);
+        processor.finish(context);
+        assertFalse(context.getErrors().toString(), context.hasErrors());
+        loader =
+                new URLClassLoader(
+                        new URL[] {classes.toURI().toURL()}, getClass().getClassLoader());
+        Class<?> pages = loader.loadClass("sample.Pages");
+        return (HttpServer.Handler)
+                loader.loadClass("sample.PagesRouter")
+                        .getConstructor(pages)
+                        .newInstance(pages.newInstance());
+    }
+
+    @Test
+    public void mixedCaseDynamicAttributesUseCanonicalSecurityChecks() throws Exception {
+        setup();
+        for (String attribute :
+                Arrays.asList("HX-ON:click", "Hx-Vals", "HX-HEADERS", "OnClick", "TH:text")) {
+            template("a", "<div th:attr=\"" + attribute + "='payload'\"></div>");
+            try {
+                new MvcTemplates(context).sources();
+                fail(attribute);
+            } catch (IllegalArgumentException expected) {
+                assertTrue(
+                        expected.getMessage(),
+                        expected.getMessage().contains("Unsupported dynamic attribute"));
+            }
+        }
+        template(
+                "a",
+                "<!-- cn1:model url java.lang.String --><a href=\"/old\""
+                    + " th:attr=\"HREF=${url}\">link</a>");
+        compile();
+        String html = render("a", new Model().addAttribute("url", "/new"));
+        assertTrue(html, html.contains("href=\"/new\""));
+        assertFalse(html, html.contains("/old"));
+        try {
+            render("a", new Model().addAttribute("url", "javascript:alert(1)"));
+            fail("Uppercase HREF must still validate URLs");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("Unsafe URL"));
+        }
+        try {
+            Html.attribute(new com.codename1.backend.ByteSink(16), "HREF", "javascript:alert(1)");
+            fail("The runtime helper must validate uppercase URL attributes too");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("Unsafe URL"));
+        }
+    }
+
+    @Test
+    public void boxedNumbersCompareByValueWithNullsAndJavaPromotion() throws Exception {
+        setup();
+        template(
+                "a",
+                "<!-- cn1:model left java.lang.Integer --><!-- cn1:model right java.lang.Integer"
+                    + " --><b th:text=\"${left == right}\"></b><i th:text=\"${left !="
+                    + " right}\"></i>");
+        template(
+                "mixed",
+                "<!-- cn1:model left java.lang.Integer --><!-- cn1:model right java.lang.Long --><b"
+                    + " th:text=\"${left eq right}\"></b><i th:text=\"${left == 1000}\"></i>");
+        template(
+                "longs",
+                "<!-- cn1:model left java.lang.Long --><!-- cn1:model right java.lang.Long -->"
+                        + "<b th:text=\"${left == right}\"></b>");
+        template(
+                "floating",
+                "<!-- cn1:model left java.lang.Float --><!-- cn1:model right java.lang.Double -->"
+                        + "<b th:text=\"${left == right}\"></b>");
+        compile();
+        Model model =
+                new Model()
+                        .addAttribute("left", new Integer(1000))
+                        .addAttribute("right", new Integer(1000));
+        assertTrue(render("a", model).contains("<b>true</b><i>false</i>"));
+        model.addAttribute("right", 1001);
+        assertTrue(render("a", model).contains("<b>false</b><i>true</i>"));
+        model.addAttribute("left", null);
+        assertTrue(render("a", model).contains("<b>false</b>"));
+        model.addAttribute("right", null);
+        assertTrue(render("a", model).contains("<b>true</b>"));
+        model.addAttribute("left", 1000).addAttribute("right", 1000L);
+        assertTrue(render("mixed", model).contains("<b>true</b><i>true</i>"));
+        model.addAttribute("left", 9007199254740992L).addAttribute("right", 9007199254740993L);
+        assertTrue(render("longs", model).contains("<b>false</b>"));
+        model.addAttribute("left", 1.5f).addAttribute("right", 1.5d);
+        assertTrue(render("floating", model).contains("<b>true</b>"));
+        model.addAttribute("left", Float.NaN).addAttribute("right", Double.NaN);
+        assertTrue(render("floating", model).contains("<b>false</b>"));
+    }
+
+    @Test
+    public void iterationParityMatchesThymeleafAndCssChildCounting() throws Exception {
+        setup();
+        template(
+                "a",
+                DECL
+                        + "<p th:each=\"p, s : ${products}\""
+                        + " th:attr=\"data-index=${s.index},data-count=${s.count},data-even=${s.even},data-odd=${s.odd}\"></p>");
+        compile();
+        String html =
+                render(
+                        "a",
+                        new Model()
+                                .addAttribute(
+                                        "products",
+                                        Arrays.asList(product("a", 1), product("b", 2))));
+        assertTrue(
+                html,
+                html.contains(
+                        "data-index=\"0\" data-count=\"1\" data-even=\"false\" data-odd=\"true\""));
+        assertTrue(
+                html,
+                html.contains(
+                        "data-index=\"1\" data-count=\"2\" data-even=\"true\" data-odd=\"false\""));
+    }
+
+    @Test
+    public void redirectsNeedNoTemplatesAndVaryByHtmxRequestKind() throws Exception {
+        setup();
+        HttpServer.Handler handler =
+                controller(
+                        "package sample; import com.codename1.backend.annotations.*; @Controller"
+                            + " public class Pages { @GetMapping(\"/old\") public String redirect()"
+                            + " {return \"redirect:/new\";} }");
+        for (boolean hx : Arrays.asList(false, true)) {
+            Object response = handler.handle(request("GET", "/old", null, hx));
+            assertEquals(hx ? 200 : 303, field(response, "status"));
+            Map<?, ?> headers = (Map<?, ?>) field(response, "extraHeaders");
+            assertEquals("/new", headers.get(hx ? "HX-Redirect" : "Location"));
+            assertEquals("HX-Request, HX-History-Restore-Request", headers.get("Vary"));
+        }
+        Object history = handler.handle(request("GET", "/old", null, true, true));
+        assertEquals(303, field(history, "status"));
+        assertEquals(
+                "HX-Request, HX-History-Restore-Request",
+                ((Map<?, ?>) field(history, "extraHeaders")).get("Vary"));
+    }
+
+    @Test
+    public void staticAssetRootCannotBeASymlink() throws Exception {
+        setup();
+        File root = new File(project, "src/main/resources/static");
+        assertTrue(root.getParentFile().mkdirs());
+        File outside = tmp.newFolder();
+        Files.write(
+                new File(outside, "secret.txt").toPath(),
+                "private".getBytes(StandardCharsets.UTF_8));
+        try {
+            Files.createSymbolicLink(root.toPath(), outside.toPath());
+        } catch (UnsupportedOperationException | java.nio.file.FileSystemException unavailable) {
+            org.junit.Assume.assumeNoException(unavailable);
+        }
+        try {
+            MvcAssets.sources(project);
+            fail("A symlinked public root must not embed files outside the project");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("symlink"));
+        }
+    }
+
+    @Test
+    public void colonsInPathsQueriesAndFragmentsAreNotSchemes() throws Exception {
+        setup();
+        template("a", "<a th:href=\"@{/events/12:30}\">event</a>");
+        compile();
+        assertTrue(render("a", new Model()).contains("href=\"/events/12:30\""));
+        for (String url :
+                Arrays.asList("/objects/urn:123", "relative/path:part", "?time=12:30", "#urn:123"))
+            Html.safeUrl(url);
+        for (String url :
+                Arrays.asList("javascript:alert(1)", "data:text/html,x", "ftp://example.test/")) {
+            try {
+                Html.safeUrl(url);
+                fail(url);
+            } catch (IllegalArgumentException expected) {
+                assertTrue(expected.getMessage().contains("Unsafe URL"));
+            }
+        }
+    }
+
+    @Test
+    public void setterBindingPreservesJavaBeansAcronyms() throws Exception {
+        setup();
+        fixtureSources(
+                Collections.singletonMap(
+                        "sample.Form",
+                        "package sample; public class Form {private String URL, name; public void"
+                            + " setURL(String value){URL=value;} public String getURL(){return"
+                            + " URL;}public void setName(String value){name=value;} public String"
+                            + " getName(){return name;} }"));
+        template(
+                "a",
+                "<!-- cn1:model form sample.Form --><form th:object=\"${form}\"><input"
+                    + " th:field=\"*{URL}\"><input th:field=\"*{name}\"></form>");
+        HttpServer.Handler handler =
+                controller(
+                        "package sample; import com.codename1.backend.annotations.*; @Controller"
+                            + " public class Pages { @PostMapping(\"/save\") public String"
+                            + " save(@ModelAttribute(\"form\") Form form) {return \"a\";} }");
+        String html =
+                body(
+                        handler.handle(
+                                request(
+                                        "POST",
+                                        "/save",
+                                        "URL=https%3A%2F%2Fexample.test&name=Alice",
+                                        false)));
+        assertTrue(html, html.contains("value=\"https://example.test\""));
+        assertTrue(html, html.contains("value=\"Alice\""));
+    }
+
+    @Test
+    public void propertiesResolveInheritedInterfacesAndDefaultGetters() throws Exception {
+        setup();
+        Map<String, String> fixtures = new LinkedHashMap<String, String>();
+        fixtures.put(
+                "sample.Named",
+                "package sample; public interface Named {default String getName(){return"
+                    + " \"inherited\";}} ");
+        fixtures.put("sample.Left", "package sample; public interface Left extends Named {} ");
+        fixtures.put("sample.Right", "package sample; public interface Right extends Named {} ");
+        fixtures.put(
+                "sample.Child", "package sample; public interface Child extends Left,Right {} ");
+        fixtures.put(
+                "sample.DefaultProduct",
+                "package sample; public class DefaultProduct implements Child {} ");
+        fixtures.put(
+                "sample.BaseProduct",
+                "package sample; public class BaseProduct {public String getName(){return \"class"
+                    + " getter\";}} ");
+        fixtures.put(
+                "sample.OverrideProduct",
+                "package sample; public class OverrideProduct extends BaseProduct implements Child"
+                    + " {} ");
+        fixtureSources(fixtures);
+        template(
+                "a",
+                "<!-- cn1:model typed sample.Child --><!-- cn1:model concrete sample.DefaultProduct"
+                    + " --><!-- cn1:model overridden sample.OverrideProduct --><b"
+                    + " th:text=\"${typed.name}\"></b><i th:text=\"${concrete.name}\"></i><em"
+                    + " th:text=\"${overridden.name}\"></em>");
+        compile();
+        Object product = loader.loadClass("sample.DefaultProduct").newInstance();
+        String html =
+                render(
+                        "a",
+                        new Model()
+                                .addAttribute("typed", product)
+                                .addAttribute("concrete", product)
+                                .addAttribute(
+                                        "overridden",
+                                        loader.loadClass("sample.OverrideProduct").newInstance()));
+        assertTrue(html, html.contains("<b>inherited</b><i>inherited</i><em>class getter</em>"));
     }
 
     private static volatile int benchmarkSink;
@@ -570,12 +859,19 @@ public class MvcTemplatesTest {
 
     static HttpServer.Request request(String method, String target, String body, boolean hx)
             throws Exception {
+        return request(method, target, body, hx, false);
+    }
+
+    static HttpServer.Request request(
+            String method, String target, String body, boolean hx, boolean history)
+            throws Exception {
         String head =
                 method
                         + " "
                         + target
                         + " HTTP/1.1\r\nContent-Type: application/x-www-form-urlencoded\r\n"
                         + (hx ? "HX-Request: true\r\n" : "")
+                        + (history ? "HX-History-Restore-Request: true\r\n" : "")
                         + "\r\n";
         byte[] raw = head.getBytes(StandardCharsets.UTF_8);
         List<Integer> slices = new ArrayList<Integer>();

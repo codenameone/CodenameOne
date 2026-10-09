@@ -53,6 +53,7 @@ public final class IterationStatus {
     }
 
     public boolean isEven() {
+        // Thymeleaf uses one-based parity, matching CSS :nth-child(even/odd).
         return getCount() % 2 == 0;
     }
 

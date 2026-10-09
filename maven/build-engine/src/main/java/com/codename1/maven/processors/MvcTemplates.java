@@ -113,7 +113,6 @@ final class MvcTemplates {
             throw new IllegalArgumentException("MVC templates require a project directory");
         File root = new File(project, "src/main/resources/templates");
         load(root, root);
-        if (templates.isEmpty()) throw new IllegalArgumentException("No HTML templates in " + root);
         for (Template t : templates.values()) {
             compile(t.name);
             for (String fragment : t.fragments.keySet()) compile(t.name + " :: " + fragment);
@@ -471,11 +470,15 @@ final class MvcTemplates {
                     int equal = assignment.indexOf('=');
                     if (equal < 1)
                         throw new IllegalArgumentException("Expected attribute=expression");
-                    String attr = assignment.substring(0, equal).trim();
-                    if (!attr.matches("[a-zA-Z][a-zA-Z0-9:_-]*")
-                            || attr.toLowerCase(java.util.Locale.ROOT).startsWith("on")
-                            || attr.equalsIgnoreCase("style")
-                            || attr.equalsIgnoreCase("srcdoc")
+                    String attr =
+                            assignment
+                                    .substring(0, equal)
+                                    .trim()
+                                    .toLowerCase(java.util.Locale.ROOT);
+                    if (!attr.matches("[a-z][a-z0-9:_-]*")
+                            || attr.startsWith("on")
+                            || attr.equals("style")
+                            || attr.equals("srcdoc")
                             || attr.startsWith("th:")
                             || attr.startsWith("hx-on")
                             || attr.equals("hx-vals")

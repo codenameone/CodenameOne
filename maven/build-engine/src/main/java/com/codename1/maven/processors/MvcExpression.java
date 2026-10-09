@@ -133,7 +133,7 @@ final class MvcExpression {
             else if (level == 2) {
                 String eq =
                         numeric(left.type) && numeric(right.type)
-                                ? "(" + left.code + " == " + right.code + ")"
+                                ? numericEquality(left, right)
                                 : HTML + "equal(" + left.code + ", " + right.code + ")";
                 left = new Value((op.equals("!=") || op.equals("ne") ? "!" : "") + eq, "boolean");
             } else {
@@ -276,12 +276,8 @@ final class MvcExpression {
             type = "int";
             access = ".length";
         } else {
-            AnnotatedClass cls =
-                    RestControllerAnnotationProcessor.resolveClass(ctx, raw.replace('.', '/'));
             String cap = Character.toUpperCase(name.charAt(0)) + name.substring(1);
-            while (cls != null
-                    && !"java/lang/Object".equals(cls.getInternalName())
-                    && access == null) {
+            for (AnnotatedClass cls : hierarchy(raw)) {
                 for (MethodInfo m : cls.getMethods())
                     if (m.isPublic()
                             && !m.isStatic()
@@ -308,9 +304,7 @@ final class MvcExpression {
                             access = "." + name;
                             break;
                         }
-                cls =
-                        RestControllerAnnotationProcessor.resolveClass(
-                                ctx, cls.getSuperInternalName());
+                if (access != null) break;
             }
         }
         if (access == null) throw error("No readable property '" + name + "' on " + owner.type);
@@ -325,6 +319,51 @@ final class MvcExpression {
                         + access
                         + "))",
                 boxed);
+    }
+
+    private List<AnnotatedClass> hierarchy(String type) {
+        List<AnnotatedClass> result = new ArrayList<AnnotatedClass>();
+        Deque<String> pending = new ArrayDeque<String>();
+        Set<String> seen = new HashSet<String>();
+        pending.add(type.replace('.', '/'));
+        while (!pending.isEmpty()) {
+            String name = pending.removeFirst();
+            if (!seen.add(name) || "java/lang/Object".equals(name)) continue;
+            AnnotatedClass cls = RestControllerAnnotationProcessor.resolveClass(ctx, name);
+            if (cls == null) continue;
+            result.add(cls);
+            // Class declarations take precedence over inherited interface defaults.
+            if (cls.getSuperInternalName() != null) pending.addFirst(cls.getSuperInternalName());
+            pending.addAll(cls.getInterfaceInternalNames());
+        }
+        return result;
+    }
+
+    private static String numericEquality(Value left, Value right) {
+        String comparison = "(" + unboxNumber(left) + " == " + unboxNumber(right) + ")";
+        boolean leftBoxed = left.type.startsWith("java.lang.");
+        boolean rightBoxed = right.type.startsWith("java.lang.");
+        if (leftBoxed && rightBoxed)
+            return "("
+                    + left.code
+                    + " == null ? "
+                    + right.code
+                    + " == null : "
+                    + right.code
+                    + " != null && "
+                    + comparison
+                    + ")";
+        if (leftBoxed) return "(" + left.code + " != null && " + comparison + ")";
+        if (rightBoxed) return "(" + right.code + " != null && " + comparison + ")";
+        return comparison;
+    }
+
+    private static String unboxNumber(Value value) {
+        if (!value.type.startsWith("java.lang.")) return value.code;
+        String primitive =
+                value.type.substring("java.lang.".length()).toLowerCase(java.util.Locale.ROOT);
+        if (primitive.equals("integer")) primitive = "int";
+        return "(" + value.code + ")." + primitive + "Value()";
     }
 
     static String raw(String t) {

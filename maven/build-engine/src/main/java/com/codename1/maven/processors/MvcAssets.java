@@ -42,6 +42,8 @@ final class MvcAssets {
                                 + "if(!\"GET\".equals(request.getMethod()) &&"
                                 + " !\"HEAD\".equals(request.getMethod())) return null;\n");
         File root = new File(project, "src/main/resources/static");
+        if (Files.isSymbolicLink(root.toPath()))
+            throw new IllegalArgumentException("Static asset symlinks are not supported: " + root);
         collect(root, root, sources, registry);
         registry.append("return null; } }\n");
         sources.put("com.codename1.generated.mvc.Assets", registry.toString());

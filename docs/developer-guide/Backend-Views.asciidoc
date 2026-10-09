@@ -71,7 +71,7 @@ addition/subtraction, and `condition ? yes : no`. Selection expressions `*{field
 use the enclosing `th:object`. URL expressions use local paths with encoded path
 and query arguments, such as `@{/search(q=${query})}`.
 
-Dynamic text and attributes are HTML-escaped. URL arguments are percent-encoded
+Dynamic text and attributes are HTML-escaped. URL arguments use URL encoding
 before attribute escaping. Dynamic URL attributes reject executable URL schemes.
 Raw HTML, dynamic script/style content, arbitrary method calls, expression
 preprocessing, message expressions, inline expressions, custom dialects, and
@@ -90,14 +90,14 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/H
 Form DTOs need a public no-argument constructor and writable scalar fields or
 setters. Supported values are strings, numeric primitives/boxes, booleans and
 characters. Nested objects, collections, file uploads through the form DTO, and
-ORM entities are refused. Bind identifiers separately through route parameters.
+ORM entities are refused. Bind identifiers through route parameters.
 Unknown submitted fields are ignored; no property path from a request is executed.
 
 `BindingResult` must immediately follow its form parameter. Conversion errors are
 recorded before the controller runs. Without a `BindingResult`, conversion failure
 returns 400. `reject(message)` adds a global error; `rejectValue(field, message)`
 adds a field error. Validation is application code; Bean Validation annotations
-are not implemented.
+aren't implemented.
 
 [source,html]
 ----
@@ -123,7 +123,7 @@ The existing security chain remains responsible for CSRF enforcement. The model
 contains `_csrf`, whose type is declared automatically. Unsafe forms include a
 hidden CSRF token when one is available; htmx serializes it with the other fields.
 For requests outside forms, supply the existing token header explicitly. Defining
-HTML controllers does not enable a security chain automatically.
+HTML controllers doesn't enable a security chain automatically.
 
 Files in `src/main/resources/static` are embedded at build time and served under
 `/static/` after controller routes. Only enumerated assets are accessible; templates
@@ -144,4 +144,4 @@ template model declarations, use dedicated scalar form DTOs, and replace unsuppo
 expressions or dialect features. Keep existing HTML and htmx attributes within the
 supported subset. Controller advice, method-level `@ModelAttribute`, flash attributes,
 `forward:` views, custom converters, dynamic fragment selectors, and internationalized
-message bundles are not part of this first version.
+message bundles aren't part of this first version.

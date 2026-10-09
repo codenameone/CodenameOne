@@ -85,6 +85,7 @@ public final class Html {
         if (value == null) {
             return;
         }
+        name = asciiLower(name);
         if ("href".equals(name)
                 || "src".equals(name)
                 || "action".equals(name)
@@ -174,21 +175,35 @@ public final class Html {
         out.put('>');
     }
 
-    public static void safeUrl(String value) {
-        // URI schemes are ASCII. Avoid both locale dependence and runtime Locale support.
-        char[] chars = value.trim().toCharArray();
-        for (int i = 0; i < chars.length; i++) {
-            if (chars[i] >= 'A' && chars[i] <= 'Z') {
-                chars[i] = (char) (chars[i] + ('a' - 'A'));
+    private static String asciiLower(String value) {
+        // HTML names and URI schemes are ASCII; don't depend on the default locale.
+        char[] chars = null;
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c >= 'A' && c <= 'Z') {
+                if (chars == null) {
+                    chars = value.toCharArray();
+                }
+                chars[i] = (char) (c + ('a' - 'A'));
             }
         }
-        String lower = new String(chars);
+        return chars == null ? value : new String(chars);
+    }
+
+    public static void safeUrl(String value) {
+        String lower = asciiLower(value.trim());
         for (int i = 0; i < lower.length(); i++) {
             if (lower.charAt(i) < 32 || lower.charAt(i) == 127 || lower.charAt(i) == '\\') {
                 throw new IllegalArgumentException("Invalid URL");
             }
         }
         int colon = lower.indexOf(':');
+        for (int i = 0; i < colon; i++) {
+            char c = lower.charAt(i);
+            if (c == '/' || c == '?' || c == '#') {
+                return;
+            }
+        }
         if (colon >= 0
                 && !lower.startsWith("https:")
                 && !lower.startsWith("http:")
@@ -214,8 +229,10 @@ public final class Html {
 
     public static HttpServer.Response redirect(HttpServer.Request request, String location) {
         localLocation(location);
-        return Htmx.isRequest(request)
-                ? Htmx.redirect(location)
-                : HttpServer.Response.text(303, "").header("Location", location);
+        HttpServer.Response response =
+                Htmx.isRequest(request)
+                        ? Htmx.redirect(location)
+                        : HttpServer.Response.text(303, "").header("Location", location);
+        return response.header("Vary", "HX-Request, HX-History-Restore-Request");
     }
 }

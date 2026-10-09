@@ -74,8 +74,7 @@ final class MvcForms {
                         && m.getName().length() > 3
                         && Type.getArgumentTypes(m.getDescriptor()).length == 1
                         && Type.getReturnType(m.getDescriptor()).equals(Type.VOID_TYPE)) {
-                    String field =
-                            Character.toLowerCase(m.getName().charAt(3)) + m.getName().substring(4);
+                    String field = java.beans.Introspector.decapitalize(m.getName().substring(3));
                     if (!fields.containsKey(field))
                         fields.put(
                                 field,
