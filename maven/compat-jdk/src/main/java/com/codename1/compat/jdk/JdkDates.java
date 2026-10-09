@@ -537,19 +537,35 @@ public final class JdkDates {
         throw new DateTimeException("Unable to obtain Instant from " + value);
     }
 
+    /// The order of two dates. Not `compareTo`: the JDK declares it over
+    /// `ChronoLocalDate` and a device over `LocalDate`, so a call compiled
+    /// here names a method the device does not have.
+    private static int compare(LocalDate a, LocalDate b) {
+        long x = a.toEpochDay();
+        long y = b.toEpochDay();
+        return x < y ? -1 : x > y ? 1 : 0;
+    }
+
+    /// The order of two date-times, for the reason [#compare(LocalDate, LocalDate)]
+    /// gives.
+    private static int compare(LocalDateTime a, LocalDateTime b) {
+        int dates = compare(a.toLocalDate(), b.toLocalDate());
+        return dates != 0 ? dates : a.toLocalTime().compareTo(b.toLocalTime());
+    }
+
     /// `LocalDateTime.isBefore(ChronoLocalDateTime)`.
     public static boolean isBefore(LocalDateTime value, TemporalAccessor other) {
-        return value.compareTo(dateTime(other)) < 0;
+        return compare(value, dateTime(other)) < 0;
     }
 
     /// `LocalDateTime.isAfter(ChronoLocalDateTime)`.
     public static boolean isAfter(LocalDateTime value, TemporalAccessor other) {
-        return value.compareTo(dateTime(other)) > 0;
+        return compare(value, dateTime(other)) > 0;
     }
 
     /// `LocalDateTime.isEqual(ChronoLocalDateTime)`.
     public static boolean isEqual(LocalDateTime value, TemporalAccessor other) {
-        return value.compareTo(dateTime(other)) == 0;
+        return compare(value, dateTime(other)) == 0;
     }
 
     // ---------------------------------------------------------------
@@ -798,7 +814,7 @@ public final class JdkDates {
                     end.getNano(), unit);
         }
         LocalDate endDate = end.toLocalDate();
-        int dates = endDate.compareTo(start.toLocalDate());
+        int dates = compare(endDate, start.toLocalDate());
         int times = end.toLocalTime().compareTo(start.toLocalTime());
         if (dates > 0 && times < 0) {
             endDate = endDate.minusDays(1);
