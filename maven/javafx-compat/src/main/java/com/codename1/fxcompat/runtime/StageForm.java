@@ -29,6 +29,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.layouts.BorderLayout;
 
+import javafx.scene.Scene;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
@@ -47,11 +48,28 @@ public final class StageForm extends Form implements StageHost {
     private final HostCore core;
     private final boolean primary;
     private Form previous;
+    /// The display size the last whole paint of this form was made for.
+    private int paintedWidth = -1;
+    private int paintedHeight = -1;
+    private int paintedAgain;
+    /// The size the application gave the stage before showing it, or NaN.
+    private final double askedWidth;
+    private final double askedHeight;
+    private final Runnable again = new Runnable() {
+        @Override
+        public void run() {
+            repaint();
+        }
+    };
 
     /// Creates the form of a window.
     public StageForm(Window window, boolean primary) {
         super(new BorderLayout());
         this.primary = primary;
+        // Read before the scene is attached: from then on the window
+        // reports the size the form gave it, not the one it was asked for.
+        this.askedWidth = window.getWidth();
+        this.askedHeight = window.getHeight();
         this.core = new HostCore(window, getContentPane(), this);
         if (primary) {
             if (getToolbar() != null) {
@@ -177,10 +195,99 @@ public final class StageForm extends Form implements StageHost {
             String title = ((Stage) window).getTitle();
             setTitle(title == null ? "" : title);
         }
+        nativeTitle();
+    }
+
+    /// Hands the title of the stage to the window of the operating
+    /// system, on a port that keeps the title of a form there.
+    ///
+    /// The primary stage has no title area, so its title had nowhere to
+    /// go and the window kept the port's own name. Its form is given the
+    /// title only where the port shows it on the window, never where it
+    /// would draw a title strip; and since Codename One pushes a title
+    /// that is set on the form showing, and not the title a form already
+    /// has when it is shown, the push is asked for here.
+    private void nativeTitle() {
+        if (!Display.isInitialized()) {
+            return;
+        }
+        Display d = Display.getInstance();
+        if (!d.isNativeTitle()) {
+            return;
+        }
+        Window window = core.window();
+        if (primary && window instanceof Stage) {
+            String title = ((Stage) window).getTitle();
+            String wanted = title == null ? "" : title;
+            if (!wanted.equals(getTitle())) {
+                setTitle(wanted);
+            }
+        }
+        if (d.getCurrent() == this) {
+            d.refreshNativeTitle();
+        }
     }
 
     @Override
     public void boundsRequested() {
+    }
+
+    /// Gives the application's own window the size its primary stage
+    /// asks for: the stage's, or else the size its scene was created
+    /// with or prefers, as a stage with a window of its own is sized.
+    /// A stage shown over a form that is not a stage's is a guest in
+    /// that window and leaves its size alone.
+    private void sizeWindow() {
+        Display d = Display.getInstance();
+        boolean own = previous == null || previous instanceof StageForm;
+        if (!primary || !own || !d.isDesktop()) {
+            return;
+        }
+        Scene scene = core.scene();
+        double width = askedWidth;
+        double height = askedHeight;
+        if (Double.isNaN(width) && scene != null) {
+            width = scene.cn1InitialWidth() >= 0 ? scene.cn1InitialWidth()
+                    : (scene.getRoot() == null ? 0 : scene.getRoot().prefWidth(-1));
+        }
+        if (Double.isNaN(height) && scene != null) {
+            height = scene.cn1InitialHeight() >= 0 ? scene.cn1InitialHeight()
+                    : (scene.getRoot() == null ? 0 : scene.getRoot().prefHeight(-1));
+        }
+        if (width > 0 && height > 0) {
+            d.setWindowSize(Units.sizeToPixels(width), Units.sizeToPixels(height));
+        }
+    }
+
+    /// Paints the form, and asks for one more paint when the display has
+    /// a size that no paint of this form was made for yet.
+    ///
+    /// A port that draws into a buffer of the window's size may replace
+    /// the buffer when the frame ends: the native Linux port applies a
+    /// resize it has recorded right after the flush, and shows a buffer
+    /// nothing has drawn on, until an input event makes something paint.
+    /// The frame after that flush is drawn on the new buffer. It costs
+    /// one paint for each size the display takes.
+    @Override
+    public void paint(com.codename1.ui.Graphics g) {
+        super.paint(g);
+        if (!Display.isInitialized()) {
+            return;
+        }
+        Display d = Display.getInstance();
+        int w = d.getDisplayWidth();
+        int h = d.getDisplayHeight();
+        if (w != paintedWidth || h != paintedHeight) {
+            paintedWidth = w;
+            paintedHeight = h;
+            paintedAgain++;
+            d.callSerially(again);
+        }
+    }
+
+    /// How many times a paint asked for another one; see [#paint].
+    public int cn1PaintedAgain() {
+        return paintedAgain;
     }
 
     @Override
@@ -198,7 +305,11 @@ public final class StageForm extends Form implements StageHost {
         if (Display.isInitialized()) {
             Form current = Display.getInstance().getCurrent();
             previous = current == this ? null : current;
+            if (current != this) {
+                sizeWindow();
+            }
             show();
+            nativeTitle();
         }
         core.sized();
     }

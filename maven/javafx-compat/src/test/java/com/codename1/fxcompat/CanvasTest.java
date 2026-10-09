@@ -540,4 +540,29 @@ public class CanvasTest {
         paint(c);
         device(drawn.size() - 1, 0, 0, 100, 80);
     }
+
+    /// A picture drawn whole through the call that names a source
+    /// rectangle is the picture itself: one image of the platform for the
+    /// pixels, and none for a part that is all of it. There were two a
+    /// call, which a port that never frees an image keeps for good.
+    @Test
+    public void aPictureDrawnWholeIsNotCutOutOfItself() {
+        Units.setScale(1);
+        boolean before = HeadlessImplementation.rasterImages;
+        // An image has a size here only when it keeps its pixels.
+        HeadlessImplementation.rasterImages = true;
+        try {
+            javafx.scene.image.WritableImage picture = new javafx.scene.image.WritableImage(40, 30);
+            Canvas canvas = new Canvas(40, 30);
+            GraphicsContext gc = canvas.getGraphicsContext2D();
+            HeadlessImplementation.imagesMade = 0;
+            for (int frame = 0; frame < 10; frame++) {
+                picture.getPixelWriter().setArgb(frame, frame, 0xff000000 | frame);
+                gc.drawImage(picture, 0, 0, 40, 30, 0, 0, 40, 30);
+            }
+            assertEquals(10, HeadlessImplementation.imagesMade);
+        } finally {
+            HeadlessImplementation.rasterImages = before;
+        }
+    }
 }

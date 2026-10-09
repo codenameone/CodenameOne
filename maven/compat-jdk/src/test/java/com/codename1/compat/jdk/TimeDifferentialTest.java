@@ -350,6 +350,44 @@ public class TimeDifferentialTest {
         assertTrue("" + compared, compared > 1500);
     }
 
+    /// A date alone and a time alone, formatted and parsed with a pattern.
+    /// The device's formatter throws for both, so the stand-in hands it a
+    /// date with a time; what comes out, and what is refused because the
+    /// pattern names a field the value lacks, has to stay the JDK's.
+    @Test
+    public void aDateOrATimeAloneIsFormattedAsTheJdkFormatsIt() {
+        final String[] patterns = {"HH:mm:ss", "H:m", "hh:mm a", "dd.MM.yyyy", "yyyy-MM-dd", "d/M/yy",
+            "yyyy-MM-dd HH:mm", "'at' HH 'h'", "EEE d", "HH:mm:ss.SSS"};
+        final java.time.LocalTime[] times = {java.time.LocalTime.of(0, 0), java.time.LocalTime.of(1, 2, 3),
+            java.time.LocalTime.of(13, 59, 58, 123000000), java.time.LocalTime.of(23, 59, 59)};
+        final LocalDate[] dates = {LocalDate.of(1970, 1, 1), LocalDate.of(1999, 2, 21), LocalDate.of(2024, 2, 29),
+            LocalDate.of(2031, 12, 31)};
+        for (final String pattern : patterns) {
+            final java.time.format.DateTimeFormatter jdk = java.time.format.DateTimeFormatter.ofPattern(pattern,
+                    java.util.Locale.US);
+            final java.time.format.DateTimeFormatter mine = JdkTime.ofPattern(pattern, java.util.Locale.US);
+            for (final java.time.LocalTime t : times) {
+                same("time " + pattern + t, () -> t.format(jdk), () -> JdkTime.format(t, mine));
+                same("time of " + pattern + t, () -> jdk.format(t), () -> JdkTime.format(mine, t));
+            }
+            for (final LocalDate d : dates) {
+                same("date " + pattern + d, () -> d.format(jdk), () -> JdkTime.format(d, mine));
+                same("date of " + pattern + d, () -> jdk.format(d), () -> JdkTime.format(mine, d));
+                same("both " + pattern + d, () -> d.atTime(4, 5, 6).format(jdk),
+                        () -> JdkTime.format(d.atTime(4, 5, 6), mine));
+            }
+        }
+        final java.time.format.DateTimeFormatter day = JdkTime.ofPattern("dd.MM.yyyy");
+        final java.time.format.DateTimeFormatter clock = JdkTime.ofPattern("HH:mm:ss");
+        for (final String text : new String[] {"21.02.1999", "29.02.2024", "31.12.2031", "nonsense", "12:13:14"}) {
+            same("parse date " + text, () -> LocalDate.parse(text, java.time.format.DateTimeFormatter
+                    .ofPattern("dd.MM.yyyy")), () -> JdkTime.parseLocalDate(text, day));
+            same("parse time " + text, () -> java.time.LocalTime.parse(text, java.time.format.DateTimeFormatter
+                    .ofPattern("HH:mm:ss")), () -> JdkTime.parseLocalTime(text, clock));
+        }
+        assertTrue("" + compared, compared > 150);
+    }
+
     @Test
     public void daysAndMonthsAreTheJdks() {
         for (final java.time.DayOfWeek day : java.time.DayOfWeek.values()) {

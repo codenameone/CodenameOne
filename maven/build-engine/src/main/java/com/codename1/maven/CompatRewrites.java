@@ -523,6 +523,16 @@ final class CompatRewrites {
         VIRTUAL.put(fmt + "format(" + accessorT + ")" + STRING, TIME);
         VIRTUAL.put("java/time/ZonedDateTime.format(" + fmtT + ")" + STRING, TIME);
         VIRTUAL.put("java/time/OffsetDateTime.format(" + fmtT + ")" + STRING, TIME);
+        // A date or a time alone: the device's formatter of a pattern
+        // throws "Unsupported temporal type" for both, and parsing one
+        // with a pattern answers a date WITH a time under an unchecked
+        // cast, which on a device is not an exception but the wrong
+        // object.
+        VIRTUAL.put(date + "format(" + fmtT + ")" + STRING, TIME);
+        VIRTUAL.put(time + "format(" + fmtT + ")" + STRING, TIME);
+        VIRTUAL.put("java/time/LocalDateTime.format(" + fmtT + ")" + STRING, TIME);
+        STATIC.put(date + "parse(Ljava/lang/CharSequence;" + fmtT + ")" + dateT, TIME + "#parseLocalDate");
+        STATIC.put(time + "parse(Ljava/lang/CharSequence;" + fmtT + ")" + timeT, TIME + "#parseLocalTime");
         STATIC.put("java/time/ZonedDateTime.parse(Ljava/lang/CharSequence;" + fmtT + ")" + zonedT,
                 TIME + "#parseZoned");
     }
