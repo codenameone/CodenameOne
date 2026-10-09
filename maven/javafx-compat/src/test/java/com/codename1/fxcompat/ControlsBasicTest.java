@@ -483,10 +483,8 @@ public class ControlsBasicTest {
         assertTrue(bar.isIndeterminate());
         assertEquals(ProgressIndicator.INDETERMINATE_PROGRESS, bar.getProgress(), 0);
         assertTrue(has(bar, "indeterminate"));
-        Component c = bar.cn1Native();
-        assertTrue(c instanceof com.codename1.ui.Slider);
-        com.codename1.ui.Slider nativeBar = (com.codename1.ui.Slider) c;
-        assertTrue(nativeBar.isInfinite());
+        // The bar draws itself; ControlLookTest covers what it draws.
+        assertNull(bar.cn1Native());
 
         final List<Boolean> seen = new ArrayList<Boolean>();
         bar.indeterminateProperty().addListener(new ChangeListener<Boolean>() {
@@ -498,15 +496,11 @@ public class ControlsBasicTest {
         bar.setProgress(0.5);
         assertFalse(bar.isIndeterminate());
         assertEquals("[false]", seen.toString());
-        assertFalse(nativeBar.isInfinite());
         assertFalse(has(bar, "indeterminate"));
         assertTrue(has(bar, "determinate"));
-        int span = nativeBar.getMaxValue() - nativeBar.getMinValue();
-        assertEquals(span / 2, nativeBar.getProgress() - nativeBar.getMinValue());
         bar.setProgress(-1);
         assertTrue(bar.isIndeterminate());
-        assertTrue(nativeBar.isInfinite());
-        assertTrue(bar.prefWidth(-1) >= 100);
+        assertEquals(100, bar.prefWidth(-1), 0.01);
         assertPrefSize(bar);
 
         ProgressIndicator indicator = new ProgressIndicator();

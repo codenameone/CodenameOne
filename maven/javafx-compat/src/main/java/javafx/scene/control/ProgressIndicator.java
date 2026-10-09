@@ -22,13 +22,16 @@
  */
 package javafx.scene.control;
 
-import com.codename1.components.InfiniteProgress;
 import com.codename1.fxcompat.runtime.Dirty;
+import com.codename1.fxcompat.runtime.Fonts;
+import com.codename1.fxcompat.runtime.FrameClock;
 import com.codename1.fxcompat.runtime.FxDouble;
 import com.codename1.fxcompat.runtime.FxPath;
 import com.codename1.fxcompat.runtime.Renderer;
 import com.codename1.ui.Component;
 
+import javafx.beans.InvalidationListener;
+import javafx.beans.Observable;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.ReadOnlyBooleanWrapper;
@@ -37,29 +40,53 @@ import javafx.geometry.Insets;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.StrokeLineCap;
 import javafx.scene.shape.StrokeLineJoin;
+import javafx.scene.text.Font;
 
-/// A round indicator of progress.
+/// A round indicator of progress, drawn by the control itself: it has no
+/// native component, so it looks and measures the same on every theme.
 ///
-/// A negative progress is indeterminate and shows the Codename One
-/// `InfiniteProgress` spinner. From 0 to 1 the control draws a disc that
-/// fills clockwise from the top; the percentage JavaFX prints below it is
-/// not drawn. The pseudo-classes `indeterminate` and `determinate` follow
-/// the progress.
+/// A negative progress is indeterminate and shows a ring of dots, the
+/// brightest of which runs round the ring while the indicator is in a
+/// scene. From 0 to 1 the control draws a disc that fills clockwise from
+/// the top and, below it, the percentage; at 1 the disc is full, carries
+/// a tick, and the text is `Done`. The pseudo-classes `indeterminate` and
+/// `determinate` follow the progress.
+///
+/// The preferred size is that of a small disc with its line of text below
+/// it; a larger indicator is asked for with `setPrefSize`.
 public class ProgressIndicator extends Control {
 
     /// The progress of an indicator that does not know how far it is.
     public static final double INDETERMINATE_PROGRESS = -1;
 
+    /// The colour of the part that is done, the accent of JavaFX.
+    static final Color ACCENT = Color.rgb(0, 150, 201);
+
     private static final int PROGRESS = Dirty.USER;
-    private static final double DEFAULT_SIZE = 24;
+    private static final double DEFAULT_DISC = 32;
+    private static final double TEXT_GAP = 2;
+    private static final int DOTS = 12;
+    private static final long STEP_MILLIS = 100;
+    private static final String DONE_TEXT = "Done";
     private static final PseudoClass INDETERMINATE = PseudoClass.getPseudoClass("indeterminate");
     private static final PseudoClass DETERMINATE = PseudoClass.getPseudoClass("determinate");
-    private static final Color TRACK = Color.gray(0.75);
-    private static final Color DONE = Color.rgb(0, 122, 204);
+    private static final Color TRACK = Color.gray(0.73);
+    private static final Color TEXT = Color.gray(0.2);
 
     private final DoubleProperty progress = new FxDouble(this, "progress", INDETERMINATE_PROGRESS,
-            PROGRESS | Dirty.NATIVE | Dirty.PAINT);
+            PROGRESS | Dirty.PAINT);
     private final ReadOnlyBooleanWrapper indeterminate = new ReadOnlyBooleanWrapper(this, "indeterminate", true);
+    private long frameMillis;
+    private final FrameClock.Pulse frames = new FrameClock.Pulse() {
+        @Override
+        public void pulse(long nowNanos) {
+            frameMillis = nowNanos / 1000000L;
+            // A peer that is on no form is not drawn; nothing to do then.
+            if (cn1HasPeer() && cn1Peer().getComponentForm() != null) {
+                cn1Repaint();
+            }
+        }
+    };
 
     /// Creates an indeterminate indicator.
     public ProgressIndicator() {
@@ -71,22 +98,27 @@ public class ProgressIndicator extends Control {
         getStyleClass().add("progress-indicator");
         setFocusTraversable(false);
         pseudoClassStateChanged(INDETERMINATE, true);
+        sceneProperty().addListener(new InvalidationListener() {
+            @Override
+            public void invalidated(Observable observable) {
+                animate();
+            }
+        });
         setProgress(progress);
     }
 
     @Override
     protected Component cn1CreateNative() {
-        InfiniteProgress p = new InfiniteProgress();
-        p.setMaterialDesignMode(true);
-        return p;
+        return null;
     }
 
-    @Override
-    protected void cn1SyncNative() {
-        super.cn1SyncNative();
-        Component c = cn1NativeIfCreated();
-        if (c instanceof InfiniteProgress) {
-            c.setVisible(isIndeterminate());
+    /// Runs the frames of the indeterminate look while it can be seen:
+    /// the progress is unknown and the indicator is in a scene.
+    private void animate() {
+        if (isIndeterminate() && getScene() != null) {
+            FrameClock.add(frames);
+        } else {
+            FrameClock.remove(frames);
         }
     }
 
@@ -97,59 +129,131 @@ public class ProgressIndicator extends Control {
             indeterminate.set(unknown);
             pseudoClassStateChanged(INDETERMINATE, unknown);
             pseudoClassStateChanged(DETERMINATE, !unknown);
+            animate();
         }
         super.cn1Invalidated(what);
     }
 
-    /// Returns whether this indicator draws the determinate disc itself;
-    /// a progress bar leaves everything to its native component.
-    boolean drawsDisc() {
-        return true;
+    /// Returns the time of the frame the indeterminate look is at, in
+    /// milliseconds.
+    final long frameMillis() {
+        return frameMillis;
+    }
+
+    /// Returns the text drawn below the disc of a determinate indicator.
+    private String progressText() {
+        double p = getProgress();
+        if (p >= 1) {
+            return DONE_TEXT;
+        }
+        return ((int) Math.round(Math.max(0, p) * 100)) + "%";
     }
 
     @Override
     public void cn1Paint(Renderer renderer) {
         super.cn1Paint(renderer);
-        if (!drawsDisc() || isIndeterminate()) {
-            return;
-        }
         Insets in = getInsets();
         double w = getWidth() - in.getLeft() - in.getRight();
         double h = getHeight() - in.getTop() - in.getBottom();
-        double d = Math.min(w, h);
+        if (w > 0 && h > 0) {
+            paintProgress(renderer, in.getLeft(), in.getTop(), w, h);
+        }
+    }
+
+    /// Draws the indicator in a rectangle, the control less its insets; a
+    /// progress bar draws a bar instead.
+    void paintProgress(Renderer renderer, double x, double y, double w, double h) {
+        if (isIndeterminate()) {
+            paintRing(renderer, x, y, w, h);
+            return;
+        }
+        Font font = Font.getDefault();
+        double below = TEXT_GAP + Fonts.lineHeight(font);
+        double d = Math.min(w, h - below);
+        if (!(d > 2)) {
+            // No room for the text: the disc alone.
+            d = Math.min(w, h);
+            below = 0;
+        }
         if (!(d > 2)) {
             return;
         }
-        double r = d / 2 - 1;
-        double cx = in.getLeft() + w / 2;
-        double cy = in.getTop() + h / 2;
-        FxPath ring = new FxPath();
-        ring.addEllipse(cx, cy, r, r);
-        renderer.stroke(ring, TRACK, 1, StrokeLineCap.BUTT, StrokeLineJoin.MITER, 10, null, 0);
+        double r = d / 2 - 0.5;
+        double cx = x + w / 2;
+        double top = y + Math.max(0, (h - d - below) / 2);
+        double cy = top + d / 2;
         double p = Math.min(1, getProgress());
-        if (p > 0) {
-            FxPath pie = new FxPath();
-            if (p >= 1) {
-                pie.addEllipse(cx, cy, r, r);
-            } else {
+        FxPath disc = new FxPath();
+        disc.addEllipse(cx, cy, r, r);
+        if (p >= 1) {
+            renderer.fill(disc, ACCENT, cx - r, cy - r, 2 * r, 2 * r);
+            FxPath tick = new FxPath();
+            tick.moveTo(cx - r * 0.45, cy + r * 0.05);
+            tick.lineTo(cx - r * 0.1, cy + r * 0.4);
+            tick.lineTo(cx + r * 0.5, cy - r * 0.35);
+            renderer.stroke(tick, Color.WHITE, Math.max(1, r * 0.2), StrokeLineCap.ROUND, StrokeLineJoin.ROUND, 10,
+                    null, 0);
+        } else {
+            renderer.fill(disc, Color.WHITE, cx - r, cy - r, 2 * r, 2 * r);
+            if (p > 0) {
+                FxPath pie = new FxPath();
                 pie.moveTo(cx, cy);
                 pie.addArc(cx, cy, r, r, 90, -360 * p, true);
                 pie.closePath();
+                renderer.fill(pie, ACCENT, cx - r, cy - r, 2 * r, 2 * r);
             }
-            renderer.fill(pie, DONE, cx - r, cy - r, 2 * r, 2 * r);
+            renderer.stroke(disc, TRACK, 1, StrokeLineCap.BUTT, StrokeLineJoin.MITER, 10, null, 0);
         }
+        if (below > 0) {
+            String text = progressText();
+            renderer.drawText(text, cx - Fonts.width(font, text) / 2, top + d + TEXT_GAP, font, TEXT);
+        }
+    }
+
+    private void paintRing(Renderer renderer, double x, double y, double w, double h) {
+        double d = Math.min(w, h);
+        if (!(d > 4)) {
+            return;
+        }
+        double dot = d * 0.06;
+        double ring = d / 2 - dot;
+        double cx = x + w / 2;
+        double cy = y + h / 2;
+        int lead = (int) ((frameMillis / STEP_MILLIS) % DOTS);
+        for (int i = 0; i < DOTS; i++) {
+            // The dot the lead left longest ago is the faintest.
+            int age = (lead - i + DOTS) % DOTS;
+            double strength = 1 - age / (double) DOTS;
+            double angle = 2 * Math.PI * i / DOTS - Math.PI / 2;
+            double px = cx + ring * Math.cos(angle);
+            double py = cy + ring * Math.sin(angle);
+            FxPath p = new FxPath();
+            p.addEllipse(px, py, dot, dot);
+            renderer.fill(p, Color.rgb(0, 150, 201, 0.15 + 0.85 * strength), px - dot, py - dot, 2 * dot, 2 * dot);
+        }
+    }
+
+    /// Returns the preferred width inside the insets.
+    double contentPrefWidth() {
+        Font font = Font.getDefault();
+        return Math.max(DEFAULT_DISC, Math.max(Fonts.width(font, DONE_TEXT), Fonts.width(font, "100%")));
+    }
+
+    /// Returns the preferred height inside the insets.
+    double contentPrefHeight() {
+        return DEFAULT_DISC + TEXT_GAP + Fonts.lineHeight(Font.getDefault());
     }
 
     @Override
     protected double computePrefWidth(double height) {
         Insets in = getInsets();
-        return Math.max(super.computePrefWidth(height), in.getLeft() + DEFAULT_SIZE + in.getRight());
+        return in.getLeft() + snapSizeX(contentPrefWidth()) + in.getRight();
     }
 
     @Override
     protected double computePrefHeight(double width) {
         Insets in = getInsets();
-        return Math.max(super.computePrefHeight(width), in.getTop() + DEFAULT_SIZE + in.getBottom());
+        return in.getTop() + snapSizeY(contentPrefHeight()) + in.getBottom();
     }
 
     /// Returns the progress: negative for unknown, else 0 to 1.
