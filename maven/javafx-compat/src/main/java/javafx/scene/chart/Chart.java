@@ -26,6 +26,7 @@ import com.codename1.fxcompat.runtime.Dirty;
 import com.codename1.fxcompat.runtime.Fonts;
 import com.codename1.fxcompat.runtime.FxBoolean;
 import com.codename1.fxcompat.runtime.FxObject;
+import com.codename1.fxcompat.runtime.FxPath;
 import com.codename1.fxcompat.runtime.FxString;
 import com.codename1.fxcompat.runtime.Renderer;
 
@@ -50,9 +51,13 @@ import javafx.scene.text.Font;
 /// - the chart classes of a style sheet (`.chart-bar`, `.default-color0`
 ///   and the like) select nothing, and the series take the eight default
 ///   colours of JavaFX in turn;
-/// - a change of the data is drawn at once; `animated` is recorded only;
-/// - the title is always above the plot and the legend always below it;
-///   `titleSide` and `legendSide` are recorded only.
+/// - a change of the data is drawn at once; `animated` is recorded only.
+///
+/// The title is on its `titleSide` and the legend on its `legendSide`,
+/// in a box of its own: its entries side by side above or below the
+/// plot, wrapping onto more rows when they do not fit, and one under the
+/// other beside it. Each entry has the symbol its series is drawn with.
+/// The colours and sizes are those of the default style sheet of JavaFX.
 ///
 /// The preferred size is the 500 by 400 of JavaFX.
 public abstract class Chart extends Region {
@@ -62,8 +67,22 @@ public abstract class Chart extends Region {
         Color.web("#4258c9"), Color.web("#9a42c8"), Color.web("#c84164"), Color.web("#888888"),
     };
     static final Color TEXT = Color.web("#333333");
-    static final Color LINE = Color.web("#b5b5b5");
-    static final Color GRID = Color.web("#dddddd");
+    /// The lines and tick marks of the axes, and the line to the name of
+    /// a slice.
+    static final Color AXIS = Color.web("#c3c3c3");
+    static final Color GRID = Color.web("#dbdbdb");
+    static final Color ZERO = Color.web("#858585");
+    /// The background of the plot, and of what is around a chart in a
+    /// scene that sets no colour of its own.
+    static final Color PLOT = Color.web("#f4f4f4");
+    private static final Color LEGEND_EDGE = Color.web("#dedede");
+    private static final Color LEGEND_FILL = Color.web("#f5f5f5");
+    /// The room inside the box of the legend, and between two entries.
+    private static final double LEGEND_PADDING = 6;
+    private static final double LEGEND_GAP = 5;
+    private static final double SYMBOL_GAP = 4;
+    /// The room around the plot and its axes.
+    private static final double CONTENT_PADDING = 10;
 
     private final StringProperty title = new FxString(this, "title", null, Dirty.PAINT);
     private final ObjectProperty<Side> titleSide = new FxObject<Side>(this, "titleSide", Side.TOP, Dirty.PAINT);
@@ -82,27 +101,27 @@ public abstract class Chart extends Region {
         return title.get();
     }
 
-    /// Sets the title drawn above the plot.
+    /// Sets the title of the chart.
     public final void setTitle(String value) {
         title.set(value);
     }
 
-    /// The title drawn above the plot.
+    /// The title of the chart.
     public final StringProperty titleProperty() {
         return title;
     }
 
-    /// Returns the side asked for the title.
+    /// Returns the side of the chart the title is on.
     public final Side getTitleSide() {
         return titleSide.get();
     }
 
-    /// Records a side for the title; it is drawn above the plot.
+    /// Sets the side of the chart the title is on.
     public final void setTitleSide(Side value) {
         titleSide.set(value);
     }
 
-    /// The side asked for the title.
+    /// The side of the chart the title is on.
     public final ObjectProperty<Side> titleSideProperty() {
         return titleSide;
     }
@@ -122,17 +141,17 @@ public abstract class Chart extends Region {
         return legendVisible;
     }
 
-    /// Returns the side asked for the legend.
+    /// Returns the side of the chart the legend is on.
     public final Side getLegendSide() {
         return legendSide.get();
     }
 
-    /// Records a side for the legend; it is drawn below the plot.
+    /// Sets the side of the chart the legend is on.
     public final void setLegendSide(Side value) {
         legendSide.set(value);
     }
 
-    /// The side asked for the legend.
+    /// The side of the chart the legend is on.
     public final ObjectProperty<Side> legendSideProperty() {
         return legendSide;
     }
@@ -183,15 +202,19 @@ public abstract class Chart extends Region {
     /// The names of the legend, in the order of their colours.
     abstract String[] legend();
 
+    /// The width and height of the symbol of a legend entry.
+    abstract double[] legendSymbolSize(int index);
+
+    /// Draws the symbol of a legend entry with its top left corner at a
+    /// point.
+    abstract void legendSymbol(Renderer renderer, int index, double x, double y);
+
     /// Draws the plot into a rectangle of this chart.
     abstract void plot(Renderer renderer, double x, double y, double w, double h);
 
-    private double legendWidth(String[] names, Font f) {
-        double total = 0;
-        for (int i = 0; i < names.length; i++) {
-            total += 16 + Fonts.width(f, names[i]) + 12;
-        }
-        return total;
+    private static int fit(double room, double tile, int count) {
+        int n = (int) Math.floor((room - 2 * LEGEND_PADDING + LEGEND_GAP) / (tile + LEGEND_GAP));
+        return n < 1 ? 1 : (n > count ? count : n);
     }
 
     @Override
@@ -207,27 +230,99 @@ public abstract class Chart extends Region {
         }
         String t = getTitle();
         if (t != null && t.length() > 0) {
-            Font f = font(17);
-            renderer.drawText(t, x + (w - Fonts.width(f, t)) / 2, y, f, TEXT);
-            double used = Fonts.lineHeight(f) + 4;
-            y += used;
-            h -= used;
+            Font f = font(16.8);
+            double tw = Fonts.width(f, t);
+            double th = Fonts.lineHeight(f);
+            Side side = getTitleSide();
+            if (side == Side.BOTTOM) {
+                renderer.drawText(t, x + (w - tw) / 2, y + h - th, f, TEXT);
+                h -= th;
+            } else if (side == Side.LEFT) {
+                renderer.drawText(t, x, y + (h - th) / 2, f, TEXT);
+                x += tw;
+                w -= tw;
+            } else if (side == Side.RIGHT) {
+                renderer.drawText(t, x + w - tw, y + (h - th) / 2, f, TEXT);
+                w -= tw;
+            } else {
+                renderer.drawText(t, x + (w - tw) / 2, y, f, TEXT);
+                y += th;
+                h -= th;
+            }
         }
         String[] names = isLegendVisible() ? legend() : new String[0];
-        if (names.length > 0) {
+        if (names.length > 0 && w > 0 && h > 0) {
             Font f = font(12);
             double line = Fonts.lineHeight(f);
-            double used = line + 10;
-            double lx = x + Math.max(0, (w - legendWidth(names, f)) / 2);
-            double ly = y + h - line - 3;
+            // Every entry has a tile of the size of the largest.
+            double tileW = 0;
+            double tileH = line;
             for (int i = 0; i < names.length; i++) {
-                renderer.fillRect(lx, ly + (line - 10) / 2, 10, 10, color(i));
-                renderer.drawText(names[i], lx + 16, ly, f, TEXT);
-                lx += 16 + Fonts.width(f, names[i]) + 12;
+                double[] size = legendSymbolSize(i);
+                tileW = Math.max(tileW, size[0] + SYMBOL_GAP + Fonts.width(f, names[i]));
+                tileH = Math.max(tileH, size[1]);
             }
-            h -= used;
+            Side side = getLegendSide();
+            boolean beside = side == Side.LEFT || side == Side.RIGHT;
+            int count = names.length;
+            int columns;
+            int rows;
+            if (beside) {
+                rows = fit(h, tileH, count);
+                columns = (count + rows - 1) / rows;
+            } else {
+                columns = fit(w, tileW, count);
+                rows = (count + columns - 1) / columns;
+                columns = (count + rows - 1) / rows;
+            }
+            double lw = Math.min(w, 2 * LEGEND_PADDING + columns * tileW + (columns - 1) * LEGEND_GAP);
+            double lh = Math.min(h, 2 * LEGEND_PADDING + rows * tileH + (rows - 1) * LEGEND_GAP);
+            double lx;
+            double ly;
+            if (side == Side.TOP) {
+                lx = x + (w - lw) / 2;
+                ly = y;
+                y += lh;
+                h -= lh;
+            } else if (side == Side.LEFT) {
+                lx = x;
+                ly = y + (h - lh) / 2;
+                x += lw;
+                w -= lw;
+            } else if (side == Side.RIGHT) {
+                lx = x + w - lw;
+                ly = y + (h - lh) / 2;
+                w -= lw;
+            } else {
+                lx = x + (w - lw) / 2;
+                ly = y + h - lh;
+                h -= lh;
+            }
+            lx = Math.round(lx);
+            ly = Math.round(ly);
+            FxPath box = new FxPath();
+            box.addRoundRect(lx, ly, lw, lh, 4, 4);
+            renderer.fill(box, LEGEND_EDGE, lx, ly, lw, lh);
+            FxPath inside = new FxPath();
+            inside.addRoundRect(lx + 1, ly + 1, lw - 2, lh - 2, 3, 3);
+            renderer.fill(inside, LEGEND_FILL, lx + 1, ly + 1, lw - 2, lh - 2);
+            for (int i = 0; i < count; i++) {
+                // Row by row above or below the plot, column by column
+                // beside it.
+                int column = beside ? i / rows : i % columns;
+                int row = beside ? i % rows : i / columns;
+                double tx = lx + LEGEND_PADDING + column * (tileW + LEGEND_GAP);
+                double ty = ly + LEGEND_PADDING + row * (tileH + LEGEND_GAP);
+                double[] size = legendSymbolSize(i);
+                legendSymbol(renderer, i, tx, ty + (tileH - size[1]) / 2);
+                renderer.drawText(names[i], tx + size[0] + SYMBOL_GAP, ty + (tileH - line) / 2, f, TEXT);
+            }
         }
-        if (h > 0) {
+        x += CONTENT_PADDING;
+        y += CONTENT_PADDING;
+        w -= 2 * CONTENT_PADDING;
+        h -= 2 * CONTENT_PADDING;
+        if (w > 0 && h > 0) {
             plot(renderer, x, y, w, h);
         }
     }

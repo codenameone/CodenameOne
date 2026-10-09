@@ -43,9 +43,10 @@ import javafx.scene.shape.StrokeLineJoin;
 /// The points are joined in the order of their X values by default, and
 /// in the order of the data when the sorting policy is
 /// [SortingPolicy#NONE]; a policy of [SortingPolicy#Y_AXIS] orders them
-/// by their Y values. A symbol is drawn at each point unless
-/// `createSymbols` is off. See [Chart] for what the charts of this layer
-/// leave out.
+/// by their Y values. The line is three pixels wide, and a ring of the
+/// colour of the series with a white middle is drawn at each point
+/// unless `createSymbols` is off. See [Chart] for what the charts of
+/// this layer leave out.
 public class LineChart<X, Y> extends XYChart<X, Y> {
 
     /// The order the points of a series are joined in.
@@ -106,8 +107,8 @@ public class LineChart<X, Y> extends XYChart<X, Y> {
     /// The places of the points of a series that the axes have a place
     /// for, ordered along one axis: 0 for X, 1 for Y, anything else for
     /// the order of the data.
-    static <X, Y> List<double[]> places(Series<X, Y> series, Scale sx, Scale sy, double x, double y, double w,
-            double h, int orderBy) {
+    static <X, Y> List<double[]> places(Series<X, Y> series, Scale sx, Scale sy, double x, double y,
+            int orderBy) {
         List<double[]> out = new ArrayList<double[]>();
         ObservableList<Data<X, Y>> items = series.getData();
         for (int i = 0; i < items.size(); i++) {
@@ -115,7 +116,7 @@ public class LineChart<X, Y> extends XYChart<X, Y> {
             if (item == null) {
                 continue;
             }
-            double[] p = place(item, sx, sy, x, y, w, h);
+            double[] p = place(item, sx, sy, x, y);
             if (p.length < 2) {
                 continue;
             }
@@ -144,7 +145,17 @@ public class LineChart<X, Y> extends XYChart<X, Y> {
         for (int i = 1; i < points.size(); i++) {
             path.lineTo(points.get(i)[0], points.get(i)[1]);
         }
-        renderer.stroke(path, color, width, StrokeLineCap.BUTT, StrokeLineJoin.ROUND, 10, null, 0);
+        renderer.stroke(path, color, width, StrokeLineCap.BUTT, StrokeLineJoin.MITER, 10, null, 0);
+    }
+
+    @Override
+    double[] legendSymbolSize(int index) {
+        return new double[] {10, 10};
+    }
+
+    @Override
+    void legendSymbol(Renderer renderer, int index, double x, double y) {
+        ring(renderer, x + 5, y + 5, 5, 3, color(index));
     }
 
     @Override
@@ -153,11 +164,11 @@ public class LineChart<X, Y> extends XYChart<X, Y> {
         SortingPolicy policy = getAxisSortingPolicy();
         int orderBy = policy == SortingPolicy.X_AXIS ? 0 : policy == SortingPolicy.Y_AXIS ? 1 : 2;
         for (int s = 0; s < series.size(); s++) {
-            List<double[]> points = places(series.get(s), sx, sy, x, y, w, h, orderBy);
+            List<double[]> points = places(series.get(s), sx, sy, x, y, orderBy);
             polyline(renderer, points, color(s), 3);
             if (getCreateSymbols()) {
                 for (int i = 0; i < points.size(); i++) {
-                    symbol(renderer, points.get(i)[0], points.get(i)[1], color(s));
+                    ring(renderer, points.get(i)[0], points.get(i)[1], 5, 3, color(s));
                 }
             }
         }

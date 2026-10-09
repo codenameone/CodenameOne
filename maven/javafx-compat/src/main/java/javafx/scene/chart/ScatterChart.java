@@ -28,13 +28,18 @@ import com.codename1.fxcompat.runtime.FxPath;
 import com.codename1.fxcompat.runtime.Renderer;
 
 import javafx.collections.ObservableList;
+import javafx.scene.paint.Color;
 
 /// A chart that draws a symbol at each point and joins nothing.
 ///
-/// Every series is drawn with a filled circle of its colour; JavaFX
-/// gives each series a symbol of its own shape. See [Chart] for what the
-/// charts of this layer leave out.
+/// Each series has a symbol of its own shape as well as its own colour,
+/// the eight of JavaFX in turn: a disc, a square, a diamond, a cross, a
+/// triangle, and then a ring, a square and a diamond with white middles.
+/// See [Chart] for what the charts of this layer leave out.
 public class ScatterChart<X, Y> extends XYChart<X, Y> {
+
+    private static final double[] CROSS = {2, 0, 5, 4, 8, 0, 10, 0, 10, 2, 6, 5, 10, 8, 10, 10, 8, 10, 5, 6, 2, 10,
+        0, 10, 0, 8, 4, 5, 0, 2, 0, 0};
 
     /// Creates a scatter chart.
     public ScatterChart(Axis<X> xAxis, Axis<Y> yAxis) {
@@ -47,16 +52,76 @@ public class ScatterChart<X, Y> extends XYChart<X, Y> {
         setData(data);
     }
 
+    private static int shape(int series) {
+        return (series < 0 ? 0 : series) % 8;
+    }
+
+    private static void diamond(Renderer renderer, double cx, double cy, double halfWidth, double halfHeight,
+            Color color) {
+        FxPath path = new FxPath();
+        path.moveTo(cx, cy - halfHeight);
+        path.lineTo(cx + halfWidth, cy);
+        path.lineTo(cx, cy + halfHeight);
+        path.lineTo(cx - halfWidth, cy);
+        path.closePath();
+        renderer.fill(path, color, cx - halfWidth, cy - halfHeight, halfWidth * 2, halfHeight * 2);
+    }
+
+    /// Draws the symbol of a series about a point.
+    static void mark(Renderer renderer, int series, double cx, double cy) {
+        Color color = color(series);
+        int shape = shape(series);
+        if (shape == 0) {
+            ring(renderer, cx, cy, 5, 0, color);
+        } else if (shape == 1) {
+            renderer.fillRect(cx - 5, cy - 5, 10, 10, color);
+        } else if (shape == 2) {
+            diamond(renderer, cx, cy, 5, 7, color);
+        } else if (shape == 3) {
+            FxPath path = new FxPath();
+            path.moveTo(cx - 5 + CROSS[0], cy - 5 + CROSS[1]);
+            for (int i = 2; i + 1 < CROSS.length; i += 2) {
+                path.lineTo(cx - 5 + CROSS[i], cy - 5 + CROSS[i + 1]);
+            }
+            path.closePath();
+            renderer.fill(path, color, cx - 5, cy - 5, 10, 10);
+        } else if (shape == 4) {
+            FxPath path = new FxPath();
+            path.moveTo(cx, cy - 5);
+            path.lineTo(cx + 5, cy + 5);
+            path.lineTo(cx - 5, cy + 5);
+            path.closePath();
+            renderer.fill(path, color, cx - 5, cy - 5, 10, 10);
+        } else if (shape == 5) {
+            ring(renderer, cx, cy, 5, 3, color);
+        } else if (shape == 6) {
+            renderer.fillRect(cx - 5, cy - 5, 10, 10, color);
+            renderer.fillRect(cx - 3, cy - 3, 6, 6, Color.WHITE);
+        } else {
+            diamond(renderer, cx, cy, 5, 7, color);
+            diamond(renderer, cx, cy, 2.5, 4.5, Color.WHITE);
+        }
+    }
+
+    @Override
+    double[] legendSymbolSize(int index) {
+        int shape = shape(index);
+        return new double[] {10, shape == 2 || shape == 7 ? 14 : 10};
+    }
+
+    @Override
+    void legendSymbol(Renderer renderer, int index, double x, double y) {
+        double[] size = legendSymbolSize(index);
+        mark(renderer, index, x + size[0] / 2, y + size[1] / 2);
+    }
+
     @Override
     void drawSeries(Renderer renderer, List<Series<X, Y>> series, Scale sx, Scale sy, double x, double y, double w,
             double h) {
         for (int s = 0; s < series.size(); s++) {
-            List<double[]> points = LineChart.places(series.get(s), sx, sy, x, y, w, h, 2);
+            List<double[]> points = LineChart.places(series.get(s), sx, sy, x, y, 2);
             for (int i = 0; i < points.size(); i++) {
-                double[] p = points.get(i);
-                FxPath dot = new FxPath();
-                dot.addEllipse(p[0], p[1], 5, 5);
-                renderer.fill(dot, color(s), p[0] - 5, p[1] - 5, 10, 10);
+                mark(renderer, s, points.get(i)[0], points.get(i)[1]);
             }
         }
     }

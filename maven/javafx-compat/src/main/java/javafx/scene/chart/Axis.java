@@ -34,14 +34,17 @@ import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.StringProperty;
 import javafx.geometry.Side;
 import javafx.scene.layout.Region;
+import javafx.scene.paint.Color;
+import javafx.scene.paint.Paint;
+import javafx.scene.text.Font;
 
 /// One axis of a chart: its label and how its ticks are shown.
 ///
 /// An axis is drawn by the chart it belongs to and is not a child of it;
 /// it is a region so that code and FXML that treat it as one compile,
-/// and its own size and position mean nothing. The horizontal axis is
-/// always drawn below the plot and the vertical one to its left; `side`
-/// is recorded only, as is the rotation of the tick labels.
+/// and its own size and position mean nothing. The axis is drawn on its
+/// `side` of the plot, with its tick marks and labels outside the plot,
+/// and its tick labels turned by `tickLabelRotation` degrees.
 public abstract class Axis<T> extends Region {
 
     private final StringProperty label = new FxString(this, "label", null, Dirty.PAINT);
@@ -52,6 +55,10 @@ public abstract class Axis<T> extends Region {
     private final DoubleProperty tickLabelRotation = new FxDouble(this, "tickLabelRotation", 0, Dirty.PAINT);
     private final DoubleProperty tickLength = new FxDouble(this, "tickLength", 8, Dirty.PAINT);
     private final DoubleProperty tickLabelGap = new FxDouble(this, "tickLabelGap", 3, Dirty.PAINT);
+    private final ObjectProperty<Font> tickLabelFont = new FxObject<Font>(this, "tickLabelFont", Font.font(10),
+            Dirty.PAINT);
+    private final ObjectProperty<Paint> tickLabelFill = new FxObject<Paint>(this, "tickLabelFill",
+            Color.web("#707070"), Dirty.PAINT);
     private boolean animated = true;
     private Chart chart;
 
@@ -88,19 +95,30 @@ public abstract class Axis<T> extends Region {
         return label;
     }
 
-    /// Returns the side asked for the axis.
+    /// Returns the side of the plot the axis is drawn on.
     public final Side getSide() {
         return side.get();
     }
 
-    /// Records a side for the axis.
+    /// Sets the side of the plot the axis is drawn on. A side that does
+    /// not suit the direction of the axis - left or right for the X axis
+    /// of a chart - is taken as bottom, or left for a Y axis.
     public final void setSide(Side value) {
         side.set(value);
     }
 
-    /// The side asked for the axis.
+    /// The side of the plot the axis is drawn on.
     public final ObjectProperty<Side> sideProperty() {
         return side;
+    }
+
+    /// The side the axis is drawn on when it runs in the given direction.
+    final Side side(boolean horizontal) {
+        Side s = side.get();
+        if (horizontal) {
+            return s == Side.TOP ? Side.TOP : Side.BOTTOM;
+        }
+        return s == Side.RIGHT ? Side.RIGHT : Side.LEFT;
     }
 
     /// Returns whether the axis takes its range from the data.
@@ -148,19 +166,50 @@ public abstract class Axis<T> extends Region {
         return tickMarkVisible;
     }
 
-    /// Returns the rotation asked for the tick labels.
+    /// Returns the rotation of the tick labels, in degrees.
     public final double getTickLabelRotation() {
         return tickLabelRotation.get();
     }
 
-    /// Records a rotation for the tick labels; they are drawn upright.
+    /// Sets the rotation of the tick labels, in degrees clockwise about
+    /// the middle of each label.
     public final void setTickLabelRotation(double value) {
         tickLabelRotation.set(value);
     }
 
-    /// The rotation asked for the tick labels.
+    /// The rotation of the tick labels, in degrees.
     public final DoubleProperty tickLabelRotationProperty() {
         return tickLabelRotation;
+    }
+
+    /// Returns the font of the tick labels.
+    public final Font getTickLabelFont() {
+        return tickLabelFont.get();
+    }
+
+    /// Sets the font of the tick labels.
+    public final void setTickLabelFont(Font value) {
+        tickLabelFont.set(value);
+    }
+
+    /// The font of the tick labels.
+    public final ObjectProperty<Font> tickLabelFontProperty() {
+        return tickLabelFont;
+    }
+
+    /// Returns the paint of the tick labels.
+    public final Paint getTickLabelFill() {
+        return tickLabelFill.get();
+    }
+
+    /// Sets the paint of the tick labels.
+    public final void setTickLabelFill(Paint value) {
+        tickLabelFill.set(value);
+    }
+
+    /// The paint of the tick labels.
+    public final ObjectProperty<Paint> tickLabelFillProperty() {
+        return tickLabelFill;
     }
 
     /// Returns the length of a tick mark.

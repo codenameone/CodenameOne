@@ -32,14 +32,21 @@ import javafx.util.StringConverter;
 
 /// An axis of plain numbers, with a tick every `tickUnit`.
 ///
-/// Auto ranging rounds the range of the data outwards to a tick unit of
-/// 1, 2, 2.5 or 5 times a power of ten that gives about ten ticks or
-/// fewer; JavaFX pads the range by a fraction of itself first, so the
-/// two can choose bounds that differ by a tick.
+/// Auto ranging does what JavaFX does: the range of the data is padded
+/// by a hundredth of itself at each end, never across zero, and rounded
+/// outwards to a tick unit of 1, 2.5 or 5 times a power of ten - the
+/// smallest that gives a tick about every two label heights, no more
+/// than twenty ticks, and labels that do not touch. The unit it chose is
+/// written into `tickUnit`, and decides the decimals of the labels.
+///
+/// A label of an axis with a fixed range has its thousands grouped and
+/// up to three decimals, as `3,000` and `0.25`.
 public final class NumberAxis extends ValueAxis<Number> {
 
     private final BooleanProperty forceZeroInRange = new FxBoolean(this, "forceZeroInRange", true, Dirty.PAINT);
     private final DoubleProperty tickUnit = new FxDouble(this, "tickUnit", 5, Dirty.PAINT);
+    private int decimals = -1;
+    private boolean grouping = true;
 
     /// Creates an auto ranging axis.
     public NumberAxis() {
@@ -73,7 +80,7 @@ public final class NumberAxis extends ValueAxis<Number> {
         return forceZeroInRange;
     }
 
-    /// Returns the distance between two ticks of a fixed range.
+    /// Returns the distance between two ticks.
     public final double getTickUnit() {
         return tickUnit.get();
     }
@@ -83,7 +90,7 @@ public final class NumberAxis extends ValueAxis<Number> {
         tickUnit.set(value);
     }
 
-    /// The distance between two ticks of a fixed range.
+    /// The distance between two ticks.
     public final DoubleProperty tickUnitProperty() {
         return tickUnit;
     }
@@ -94,38 +101,65 @@ public final class NumberAxis extends ValueAxis<Number> {
     }
 
     @Override
+    void unit(double value) {
+        tickUnit.set(value);
+    }
+
+    @Override
+    void format(int decimals, boolean grouping) {
+        this.decimals = decimals;
+        this.grouping = grouping;
+    }
+
+    @Override
     boolean zeroInRange() {
         return isForceZeroInRange();
     }
 
-    /// Writes a number with as many decimals as the tick unit has, and no
-    /// more than six.
-    static String plain(double value, double unit) {
-        int decimals = 0;
-        double u = Math.abs(unit);
-        while (decimals < 6 && u > 0 && Math.abs(u - Math.round(u)) > 1e-9) {
-            u *= 10;
-            decimals++;
+    /// Writes a number with a fixed count of decimals, or with up to
+    /// three and no trailing zeros when the count is negative.
+    static String plain(double value, int decimals, boolean grouping) {
+        if (value != value || Double.isInfinite(value)) {
+            return String.valueOf(value);
         }
-        double scale = 1;
-        for (int i = 0; i < decimals; i++) {
+        int places = decimals < 0 ? 3 : Math.min(decimals, 9);
+        long scale = 1;
+        for (int i = 0; i < places; i++) {
             scale *= 10;
         }
-        long scaled = Math.round(Math.abs(value) * scale);
-        boolean negative = value < 0 && scaled != 0;
-        long whole = (long) (scaled / scale);
+        double magnitude = Math.abs(value) * scale;
+        if (magnitude > 9.0e17) {
+            return String.valueOf(value);
+        }
+        long scaled = Math.round(magnitude);
+        String whole = String.valueOf(scaled / scale);
         StringBuilder out = new StringBuilder();
-        if (negative) {
+        if (value < 0 && scaled != 0) {
             out.append('-');
         }
-        out.append(whole);
-        if (decimals > 0) {
-            String fraction = String.valueOf(scaled - (long) (whole * scale));
-            out.append('.');
-            for (int i = fraction.length(); i < decimals; i++) {
-                out.append('0');
+        for (int i = 0; i < whole.length(); i++) {
+            if (grouping && i > 0 && (whole.length() - i) % 3 == 0) {
+                out.append(',');
             }
-            out.append(fraction);
+            out.append(whole.charAt(i));
+        }
+        if (places > 0) {
+            StringBuilder fraction = new StringBuilder(String.valueOf(scaled % scale));
+            while (fraction.length() < places) {
+                fraction.insert(0, '0');
+            }
+            int keep = fraction.length();
+            if (decimals < 0) {
+                while (keep > 0 && fraction.charAt(keep - 1) == '0') {
+                    keep--;
+                }
+            }
+            if (keep > 0) {
+                out.append('.');
+                for (int i = 0; i < keep; i++) {
+                    out.append(fraction.charAt(i));
+                }
+            }
         }
         return out.toString();
     }
@@ -140,10 +174,6 @@ public final class NumberAxis extends ValueAxis<Number> {
         if (format != null) {
             return format.toString(n);
         }
-        return plain(n.doubleValue(), cn1Unit);
+        return plain(n.doubleValue(), decimals, grouping);
     }
-
-    /// The tick unit the chart is drawing with, which decides how many
-    /// decimals a label has.
-    double cn1Unit = 1;
 }

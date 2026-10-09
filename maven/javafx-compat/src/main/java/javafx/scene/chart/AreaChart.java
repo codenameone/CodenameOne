@@ -36,9 +36,9 @@ import javafx.scene.paint.Color;
 /// A chart that fills the area between the line of each series and zero.
 ///
 /// The points of a series are joined in the order of their X values; the
-/// fill is the colour of the series at a quarter of its strength, with
-/// the line over it. See [Chart] for what the charts of this layer leave
-/// out.
+/// fill is the colour of the series at a fifth of its strength, with a
+/// line of one pixel over it and a small ring at each point. See [Chart]
+/// for what the charts of this layer leave out.
 public class AreaChart<X, Y> extends XYChart<X, Y> {
 
     private final BooleanProperty createSymbols = new FxBoolean(this, "createSymbols", true, Dirty.PAINT);
@@ -70,11 +70,21 @@ public class AreaChart<X, Y> extends XYChart<X, Y> {
     }
 
     @Override
+    double[] legendSymbolSize(int index) {
+        return new double[] {12, 12};
+    }
+
+    @Override
+    void legendSymbol(Renderer renderer, int index, double x, double y) {
+        ring(renderer, x + 6, y + 6, 6, 3, color(index));
+    }
+
+    @Override
     void drawSeries(Renderer renderer, List<Series<X, Y>> series, Scale sx, Scale sy, double x, double y, double w,
             double h) {
-        double base = y + h - sy.zero() * h;
+        double base = y + (sy.category ? h : sy.base());
         for (int s = 0; s < series.size(); s++) {
-            List<double[]> points = LineChart.places(series.get(s), sx, sy, x, y, w, h, 0);
+            List<double[]> points = LineChart.places(series.get(s), sx, sy, x, y, 0);
             if (points.isEmpty()) {
                 continue;
             }
@@ -87,13 +97,13 @@ public class AreaChart<X, Y> extends XYChart<X, Y> {
                 }
                 area.lineTo(points.get(points.size() - 1)[0], base);
                 area.closePath();
-                renderer.fill(area, Color.color(color.getRed(), color.getGreen(), color.getBlue(), 0.25), x, y, w,
+                renderer.fill(area, Color.color(color.getRed(), color.getGreen(), color.getBlue(), 0.2), x, y, w,
                         h);
             }
             LineChart.polyline(renderer, points, color, 1);
             if (getCreateSymbols()) {
                 for (int i = 0; i < points.size(); i++) {
-                    symbol(renderer, points.get(i)[0], points.get(i)[1], color);
+                    ring(renderer, points.get(i)[0], points.get(i)[1], 3, 2, color);
                 }
             }
         }

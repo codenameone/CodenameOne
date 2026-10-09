@@ -38,6 +38,9 @@ import javafx.collections.ObservableList;
 /// The categories are the list given to the axis. While that list is
 /// empty the chart draws the names of its data, in the order it meets
 /// them, and leaves the list as it is; JavaFX fills the list in.
+///
+/// Labels that do not fit side by side along a horizontal axis are
+/// stood on end, as JavaFX does.
 public final class CategoryAxis extends Axis<String> {
 
     private final ObservableList<String> categories;
@@ -79,7 +82,7 @@ public final class CategoryAxis extends Axis<String> {
         return startMargin.get();
     }
 
-    /// Records a margin before the first category.
+    /// Sets the margin left free before the first category.
     public final void setStartMargin(double value) {
         startMargin.set(value);
     }
@@ -94,7 +97,7 @@ public final class CategoryAxis extends Axis<String> {
         return endMargin.get();
     }
 
-    /// Records a margin after the last category.
+    /// Sets the margin left free after the last category.
     public final void setEndMargin(double value) {
         endMargin.set(value);
     }
@@ -109,8 +112,8 @@ public final class CategoryAxis extends Axis<String> {
         return gapStartAndEnd.get();
     }
 
-    /// Records whether half a band is left free at each end; every
-    /// category is drawn in the middle of a band of its own.
+    /// Sets whether half a band is left free at each end. Without it
+    /// the first and the last category are at the margins of the axis.
     public final void setGapStartAndEnd(boolean value) {
         gapStartAndEnd.set(value);
     }

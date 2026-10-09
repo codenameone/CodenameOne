@@ -23,9 +23,13 @@
 package javafx.scene.chart;
 
 import com.codename1.fxcompat.runtime.Dirty;
+import com.codename1.fxcompat.runtime.FxBoolean;
 import com.codename1.fxcompat.runtime.FxDouble;
 import com.codename1.fxcompat.runtime.FxObject;
 
+import javafx.beans.InvalidationListener;
+import javafx.beans.Observable;
+import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.ObjectProperty;
@@ -35,34 +39,45 @@ import javafx.util.StringConverter;
 /// An axis of numbers between a lower and an upper bound.
 ///
 /// While the axis is auto ranging, the chart writes the range it chose
-/// into the bounds each time it draws. Minor ticks are not drawn; their
-/// count is recorded.
+/// into the bounds each time it draws. Between two ticks the axis draws
+/// minor ticks that cut the distance into `minorTickCount` parts, unless
+/// `minorTickVisible` is off or there is no room for them.
 public abstract class ValueAxis<T extends Number> extends Axis<T> {
 
     private final DoubleProperty lowerBound = new FxDouble(this, "lowerBound", 0, Dirty.PAINT);
     private final DoubleProperty upperBound = new FxDouble(this, "upperBound", 100, Dirty.PAINT);
     private final IntegerProperty minorTickCount = new SimpleIntegerProperty(this, "minorTickCount", 5);
+    private final BooleanProperty minorTickVisible = new FxBoolean(this, "minorTickVisible", true, Dirty.PAINT);
+    private final DoubleProperty minorTickLength = new FxDouble(this, "minorTickLength", 5, Dirty.PAINT);
     private final ObjectProperty<StringConverter<T>> tickLabelFormatter = new FxObject<StringConverter<T>>(this,
             "tickLabelFormatter", null, Dirty.PAINT);
     private boolean writing;
 
     /// Creates an auto ranging axis.
     public ValueAxis() {
+        minorTickCount.addListener(new InvalidationListener() {
+            @Override
+            public void invalidated(Observable observable) {
+                cn1Invalidated(Dirty.PAINT);
+            }
+        });
     }
 
     /// Creates an axis with a fixed range.
     public ValueAxis(double lowerBound, double upperBound) {
+        this();
         setAutoRanging(false);
         this.lowerBound.set(lowerBound);
         this.upperBound.set(upperBound);
     }
 
     /// Writes the range the chart chose, without asking for a repaint.
-    void range(double lower, double upper) {
+    void range(double lower, double upper, double unit) {
         writing = true;
         try {
             lowerBound.set(lower);
             upperBound.set(upper);
+            unit(unit);
         } finally {
             writing = false;
         }
@@ -105,19 +120,52 @@ public abstract class ValueAxis<T extends Number> extends Axis<T> {
         return upperBound;
     }
 
-    /// Returns the number of minor ticks asked for.
+    /// Returns the number of parts the minor ticks cut the distance
+    /// between two ticks into.
     public final int getMinorTickCount() {
         return minorTickCount.get();
     }
 
-    /// Records a number of minor ticks; none are drawn.
+    /// Sets the number of parts the minor ticks cut the distance between
+    /// two ticks into: one fewer minor ticks are drawn between them.
     public final void setMinorTickCount(int value) {
         minorTickCount.set(value);
     }
 
-    /// The number of minor ticks asked for.
+    /// The number of parts the minor ticks cut the distance between two
+    /// ticks into.
     public final IntegerProperty minorTickCountProperty() {
         return minorTickCount;
+    }
+
+    /// Returns whether the minor ticks are drawn.
+    public final boolean isMinorTickVisible() {
+        return minorTickVisible.get();
+    }
+
+    /// Sets whether the minor ticks are drawn.
+    public final void setMinorTickVisible(boolean value) {
+        minorTickVisible.set(value);
+    }
+
+    /// Whether the minor ticks are drawn.
+    public final BooleanProperty minorTickVisibleProperty() {
+        return minorTickVisible;
+    }
+
+    /// Returns the length of a minor tick.
+    public final double getMinorTickLength() {
+        return minorTickLength.get();
+    }
+
+    /// Sets the length of a minor tick.
+    public final void setMinorTickLength(double value) {
+        minorTickLength.set(value);
+    }
+
+    /// The length of a minor tick.
+    public final DoubleProperty minorTickLengthProperty() {
+        return minorTickLength;
     }
 
     /// Returns what turns a tick value into its label, `null` for the
@@ -136,8 +184,15 @@ public abstract class ValueAxis<T extends Number> extends Axis<T> {
         return tickLabelFormatter;
     }
 
-    /// The distance between two ticks when the range is fixed.
+    /// The distance between two ticks.
     abstract double unit();
+
+    /// Takes the distance between two ticks the chart chose.
+    abstract void unit(double value);
+
+    /// Takes the number of decimals the chart chose for the tick labels
+    /// and whether their thousands are grouped.
+    abstract void format(int decimals, boolean grouping);
 
     /// Whether zero is kept in a range taken from the data.
     abstract boolean zeroInRange();

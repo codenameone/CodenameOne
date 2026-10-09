@@ -36,7 +36,9 @@ import javafx.collections.ObservableList;
 /// One axis is a [CategoryAxis] and the other a [ValueAxis]: the bars
 /// stand upright when the categories are on the X axis and lie on their
 /// side when they are on the Y axis. A bar grows from zero, so the value
-/// axis always holds zero when it takes its range from the data. See
+/// axis always holds zero when it takes its range from the data. The
+/// bars of a category are as wide as its band of the axis allows after
+/// `categoryGap` between two categories and `barGap` after each bar. See
 /// [Chart] for what the charts of this layer leave out.
 public class BarChart<X, Y> extends XYChart<X, Y> {
 
@@ -107,6 +109,16 @@ public class BarChart<X, Y> extends XYChart<X, Y> {
     }
 
     @Override
+    double[] legendSymbolSize(int index) {
+        return new double[] {16, 16};
+    }
+
+    @Override
+    void legendSymbol(Renderer renderer, int index, double x, double y) {
+        renderer.fillRect(x, y, 16, 16, color(index));
+    }
+
+    @Override
     void drawSeries(Renderer renderer, List<Series<X, Y>> series, Scale sx, Scale sy, double x, double y, double w,
             double h) {
         boolean upright = sx.category;
@@ -117,15 +129,19 @@ public class BarChart<X, Y> extends XYChart<X, Y> {
         if (count == 0 || groups == 0 || values.category) {
             return;
         }
-        double band = (upright ? w : h) / count;
-        double room = Math.max(1, band - Math.max(0, getCategoryGap()));
-        double gap = Math.max(0, getBarGap());
-        double bar = (room - gap * (groups - 1)) / groups;
-        if (bar < 1) {
-            gap = 0;
-            bar = room / groups;
+        // The bars of a category share its band of the axis, less the
+        // gap between two categories, each followed by the gap between
+        // two bars.
+        double gap = getBarGap();
+        double bar = (names.spacing - (getCategoryGap() + gap)) / groups - gap;
+        if (!(bar > 0)) {
+            bar = 1;
         }
-        double zero = values.zero();
+        double start = -((names.spacing - getCategoryGap()) / 2);
+        double zero = values.base();
+        if (zero != zero) {
+            return;
+        }
         for (int s = 0; s < groups; s++) {
             ObservableList<Data<X, Y>> items = series.get(s).getData();
             for (int i = 0; i < items.size(); i++) {
@@ -138,15 +154,13 @@ public class BarChart<X, Y> extends XYChart<X, Y> {
                 if (at != at || value != value) {
                     continue;
                 }
-                value = Math.max(0, Math.min(1, value));
-                double offset = -room / 2 + s * (bar + gap);
+                double offset = start + s * (bar + gap);
                 double from = Math.min(zero, value);
                 double length = Math.abs(value - zero);
                 if (upright) {
-                    renderer.fillRect(x + at * w + offset, y + h - (from + length) * h, bar, length * h, color(s));
+                    renderer.fillRect(x + at + offset, y + from, bar, length, color(s));
                 } else {
-                    // The first category is at the bottom of a Y axis.
-                    renderer.fillRect(x + from * w, y + h - at * h + offset, length * w, bar, color(s));
+                    renderer.fillRect(x + from, y + at + offset, length, bar, color(s));
                 }
             }
         }

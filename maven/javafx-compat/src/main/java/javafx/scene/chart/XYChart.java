@@ -42,18 +42,23 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.geometry.Side;
 import javafx.scene.Node;
 import javafx.scene.paint.Color;
+import javafx.scene.paint.Paint;
 import javafx.scene.shape.StrokeLineCap;
 import javafx.scene.shape.StrokeLineJoin;
 import javafx.scene.text.Font;
 
 /// A chart of series of data drawn against two axes.
 ///
-/// The chart draws its axes itself: the X axis below the plot and the Y
-/// axis to its left, with grid lines at the ticks of both. Alternating
-/// row and column fills are recorded and not drawn. See [Chart] for what
-/// all the charts of this layer leave out.
+/// The chart draws its axes itself, each on its side of the plot: the X
+/// axis below it unless its side is the top, the Y axis to its left
+/// unless its side is the right. Dashed grid lines cross the plot at the
+/// ticks of both, and what is drawn of the series is cut off at the edge
+/// of the plot. Alternating row and column fills are recorded and not
+/// drawn, as the default style sheet of JavaFX gives them no fill. See
+/// [Chart] for what all the charts of this layer leave out.
 public abstract class XYChart<X, Y> extends Chart {
 
     private final Axis<X> xAxis;
@@ -99,9 +104,15 @@ public abstract class XYChart<X, Y> extends Chart {
         this.xAxis = xAxis;
         this.yAxis = yAxis;
         if (xAxis != null) {
+            if (xAxis.getSide() == null) {
+                xAxis.setSide(Side.BOTTOM);
+            }
             xAxis.attach(this);
         }
         if (yAxis != null) {
+            if (yAxis.getSide() == null) {
+                yAxis.setSide(Side.LEFT);
+            }
             yAxis.attach(this);
         }
         data.addListener(new InvalidationListener() {
@@ -265,16 +276,17 @@ public abstract class XYChart<X, Y> extends Chart {
             double w, double h);
 
     private static final double[] NOWHERE = new double[0];
+    private static final double[] DASHES = {3, 3};
 
     /// The place of a data item in the plot, or an empty array when an
     /// axis has no place for it.
-    static double[] place(Data<?, ?> item, Scale sx, Scale sy, double x, double y, double w, double h) {
+    static double[] place(Data<?, ?> item, Scale sx, Scale sy, double x, double y) {
         double fx = sx.at(item.getXValue());
         double fy = sy.at(item.getYValue());
         if (fx != fx || fy != fy) {
             return NOWHERE;
         }
-        return new double[] {x + fx * w, y + h - fy * h};
+        return new double[] {x + fx, y + fy};
     }
 
     static void line(Renderer renderer, double x1, double y1, double x2, double y2, Color color, double width) {
@@ -284,17 +296,47 @@ public abstract class XYChart<X, Y> extends Chart {
         renderer.stroke(path, color, width, StrokeLineCap.BUTT, StrokeLineJoin.MITER, 10, null, 0);
     }
 
-    static void symbol(Renderer renderer, double cx, double cy, Color color) {
+    private static void dashed(Renderer renderer, double x1, double y1, double x2, double y2) {
+        FxPath path = new FxPath();
+        path.moveTo(x1, y1);
+        path.lineTo(x2, y2);
+        renderer.stroke(path, GRID, 1, StrokeLineCap.BUTT, StrokeLineJoin.MITER, 10, DASHES, 0);
+    }
+
+    /// A disc of a colour with a white one of a smaller radius in it:
+    /// the symbol of a point of a line or an area.
+    static void ring(Renderer renderer, double cx, double cy, double radius, double hole, Color color) {
         FxPath outer = new FxPath();
-        outer.addEllipse(cx, cy, 5, 5);
-        renderer.fill(outer, color, cx - 5, cy - 5, 10, 10);
-        FxPath inner = new FxPath();
-        inner.addEllipse(cx, cy, 3, 3);
-        renderer.fill(inner, Color.WHITE, cx - 3, cy - 3, 6, 6);
+        outer.addEllipse(cx, cy, radius, radius);
+        renderer.fill(outer, color, cx - radius, cy - radius, radius * 2, radius * 2);
+        if (hole > 0) {
+            FxPath inner = new FxPath();
+            inner.addEllipse(cx, cy, hole, hole);
+            renderer.fill(inner, Color.WHITE, cx - hole, cy - hole, hole * 2, hole * 2);
+        }
+    }
+
+    /// Draws a text turned about its middle.
+    static void turned(Renderer renderer, String text, double cx, double cy, double degrees, Font font,
+            Paint paint) {
+        double tw = Fonts.width(font, text);
+        double th = Fonts.lineHeight(font);
+        if (degrees == 0) {
+            renderer.drawText(text, cx - tw / 2, cy - th / 2, font, paint);
+            return;
+        }
+        renderer.save();
+        renderer.translate(cx, cy);
+        renderer.rotate(degrees);
+        renderer.drawText(text, -tw / 2, -th / 2, font, paint);
+        renderer.restore();
     }
 
     @Override
     final void plot(Renderer renderer, double x, double y, double w, double h) {
+        if (xAxis == null || yAxis == null) {
+            return;
+        }
         List<Series<X, Y>> all = series();
         List<Object> xs = new ArrayList<Object>();
         List<Object> ys = new ArrayList<Object>();
@@ -308,114 +350,182 @@ public abstract class XYChart<X, Y> extends Chart {
                 }
             }
         }
-        if (xAxis == null || yAxis == null) {
-            return;
+        Side xSide = xAxis.side(true);
+        Side ySide = yAxis.side(false);
+        boolean zero = zeroBased();
+        // Each axis is as long as the plot, and the plot is what the
+        // other axis leaves: a few rounds settle the two.
+        double xThick = 0;
+        Scale sy = Scale.of(yAxis, ySide, ys, zero, h);
+        Scale sx = Scale.of(xAxis, xSide, xs, zero, w - Math.ceil(sy.thickness));
+        for (int round = 0; round < 4 && Math.abs(Math.ceil(sx.thickness) - xThick) > 0.5; round++) {
+            xThick = Math.ceil(sx.thickness);
+            sy = Scale.of(yAxis, ySide, ys, zero, h - xThick);
+            sx = Scale.of(xAxis, xSide, xs, zero, w - Math.ceil(sy.thickness));
         }
-        Scale sx = Scale.of(xAxis, xs, zeroBased());
-        Scale sy = Scale.of(yAxis, ys, zeroBased());
-        Font f = font(11);
-        Font labelFont = font(13);
-        double line = Fonts.lineHeight(f);
-        List<Object> xt = sx.ticks();
-        List<Object> yt = sy.ticks();
-
-        double left = 4;
-        if (yAxis.isTickLabelsVisible()) {
-            double widest = 0;
-            for (int i = 0; i < yt.size(); i++) {
-                widest = Math.max(widest, Fonts.width(f, sy.text(yt.get(i))));
-            }
-            left += widest + yAxis.getTickLabelGap();
+        xThick = Math.ceil(sx.thickness);
+        double ph = h - xThick;
+        if (Math.abs(sy.length - ph) > 0.01) {
+            sy = Scale.of(yAxis, ySide, ys, zero, ph);
         }
-        left += yAxis.isTickMarkVisible() ? yAxis.getTickLength() : 0;
-        String yLabel = yAxis.getLabel();
-        boolean hasYLabel = yLabel != null && yLabel.length() > 0;
-        if (hasYLabel) {
-            left += Fonts.lineHeight(labelFont) + 2;
-        }
-        double bottom = 2;
-        if (xAxis.isTickLabelsVisible()) {
-            bottom += line + xAxis.getTickLabelGap();
-        }
-        bottom += xAxis.isTickMarkVisible() ? xAxis.getTickLength() : 0;
-        String xLabel = xAxis.getLabel();
-        boolean hasXLabel = xLabel != null && xLabel.length() > 0;
-        if (hasXLabel) {
-            bottom += Fonts.lineHeight(labelFont) + 2;
-        }
-        double px = x + left;
-        double py = y + line / 2;
-        double pw = w - left - 12;
-        double ph = h - bottom - line / 2;
+        double yThick = Math.ceil(sy.thickness);
+        double pw = w - yThick;
         if (pw <= 0 || ph <= 0) {
             return;
         }
+        if (Math.abs(sx.length - pw) > 0.01) {
+            sx = Scale.of(xAxis, xSide, xs, zero, pw);
+        }
+        double px = x + (ySide == Side.LEFT ? yThick : 0);
+        double py = y + (xSide == Side.TOP ? xThick : 0);
 
-        if (isHorizontalGridLinesVisible() && !sy.category) {
-            for (int i = 0; i < yt.size(); i++) {
-                double gy = py + ph - sy.at(yt.get(i)) * ph;
-                line(renderer, px, gy, px + pw, gy, GRID, 1);
-            }
-        }
-        if (getVerticalGridLinesVisible() && !sx.category) {
-            for (int i = 0; i < xt.size(); i++) {
-                double gx = px + sx.at(xt.get(i)) * pw;
-                line(renderer, gx, py, gx, py + ph, GRID, 1);
-            }
-        }
-
-        drawSeries(renderer, all, sx, sy, px, py, pw, ph);
-
-        line(renderer, px, py, px, py + ph, LINE, 1);
-        line(renderer, px, py + ph, px + pw, py + ph, LINE, 1);
-        if (!sy.category && sy.lower < 0 && sy.upper > 0 && isHorizontalZeroLineVisible()) {
-            double zy = py + ph - sy.zero() * ph;
-            line(renderer, px, zy, px + pw, zy, LINE, 1);
-        }
-        if (!sx.category && sx.lower < 0 && sx.upper > 0 && isVerticalZeroLineVisible()) {
-            double zx = px + sx.zero() * pw;
-            line(renderer, zx, py, zx, py + ph, LINE, 1);
-        }
-
-        double yTick = yAxis.isTickMarkVisible() ? yAxis.getTickLength() : 0;
-        for (int i = 0; i < yt.size(); i++) {
-            double ty = py + ph - sy.at(yt.get(i)) * ph;
-            if (yTick > 0) {
-                line(renderer, px - yTick, ty, px, ty, LINE, 1);
-            }
-            if (yAxis.isTickLabelsVisible()) {
-                String text = sy.text(yt.get(i));
-                renderer.drawText(text, px - yTick - yAxis.getTickLabelGap() - Fonts.width(f, text), ty - line / 2,
-                        f, TEXT);
-            }
-        }
-        double xTick = xAxis.isTickMarkVisible() ? xAxis.getTickLength() : 0;
-        double lastRight = Double.NEGATIVE_INFINITY;
-        for (int i = 0; i < xt.size(); i++) {
-            double tx = px + sx.at(xt.get(i)) * pw;
-            if (xTick > 0) {
-                line(renderer, tx, py + ph, tx, py + ph + xTick, LINE, 1);
-            }
-            if (xAxis.isTickLabelsVisible()) {
-                String text = sx.text(xt.get(i));
-                double tw = Fonts.width(f, text);
-                // A label that would run into the one before it is left out.
-                if (tx - tw / 2 >= lastRight + 4) {
-                    renderer.drawText(text, tx - tw / 2, py + ph + xTick + xAxis.getTickLabelGap(), f, TEXT);
-                    lastRight = tx + tw / 2;
+        renderer.fillRect(px, py, pw, ph, PLOT);
+        renderer.save();
+        FxPath clip = new FxPath();
+        clip.addRect(px, py, pw + 1, ph + 1);
+        renderer.clip(clip);
+        double zx = sx.zero();
+        double zy = sy.zero();
+        boolean zeroX = zx == zx && isVerticalZeroLineVisible();
+        boolean zeroY = zy == zy && isHorizontalZeroLineVisible();
+        if (getVerticalGridLinesVisible()) {
+            for (int i = 0; i < sx.ticks.size(); i++) {
+                double at = sx.at(sx.ticks.get(i));
+                if (at != at) {
+                    continue;
+                }
+                long g = Math.round(at);
+                if ((!zeroX || g != Math.round(zx)) && g > 0 && g <= pw) {
+                    dashed(renderer, px + g + 0.5, py, px + g + 0.5, py + ph);
                 }
             }
         }
-        if (hasXLabel) {
-            renderer.drawText(xLabel, px + (pw - Fonts.width(labelFont, xLabel)) / 2,
-                    y + h - Fonts.lineHeight(labelFont) - 1, labelFont, TEXT);
+        if (isHorizontalGridLinesVisible()) {
+            for (int i = 0; i < sy.ticks.size(); i++) {
+                double at = sy.at(sy.ticks.get(i));
+                if (at != at) {
+                    continue;
+                }
+                long g = Math.round(at);
+                if ((!zeroY || g != Math.round(zy)) && g >= 0 && g < ph) {
+                    dashed(renderer, px, py + g + 0.5, px + pw, py + g + 0.5);
+                }
+            }
         }
-        if (hasYLabel) {
-            renderer.save();
-            renderer.translate(x + 2, py + ph / 2);
-            renderer.rotate(-90);
-            renderer.drawText(yLabel, -Fonts.width(labelFont, yLabel) / 2, 0, labelFont, TEXT);
-            renderer.restore();
+        if (zeroX) {
+            double g = px + Math.round(zx) + 0.5;
+            line(renderer, g, py, g, py + ph, ZERO, 1);
+        }
+        if (zeroY) {
+            double g = py + Math.round(zy) + 0.5;
+            line(renderer, px, g, px + pw, g, ZERO, 1);
+        }
+        drawSeries(renderer, all, sx, sy, px, py, pw, ph);
+        renderer.restore();
+
+        drawAxis(renderer, sx, x, y, w, h, px, py, pw, ph);
+        drawAxis(renderer, sy, x, y, w, h, px, py, pw, ph);
+    }
+
+    /// Draws an axis on its side of the plot: its line along the edge of
+    /// the plot, the tick marks pointing away from the plot, the tick
+    /// labels beyond them and the label of the axis at the far edge.
+    ///
+    /// @param x the left of the room the chart has for plot and axes
+    /// @param px the left of the plot
+    private static void drawAxis(Renderer renderer, Scale s, double x, double y, double w, double h, double px,
+            double py, double pw, double ph) {
+        Axis<?> axis = s.axis;
+        boolean flat = s.horizontal;
+        // The edge of the plot the axis lies on, and the direction away
+        // from the plot.
+        double edge;
+        int away;
+        if (s.side == Side.TOP) {
+            edge = py;
+            away = -1;
+        } else if (s.side == Side.BOTTOM) {
+            edge = py + ph;
+            away = 1;
+        } else if (s.side == Side.LEFT) {
+            edge = px;
+            away = -1;
+        } else {
+            edge = px + pw;
+            away = 1;
+        }
+        double start = flat ? px : py;
+        if (flat) {
+            line(renderer, px, edge + 0.5, px + pw + 1, edge + 0.5, AXIS, 1);
+        } else {
+            line(renderer, edge + 0.5, py, edge + 0.5, py + ph + 1, AXIS, 1);
+        }
+        double minor = 0;
+        if (axis instanceof ValueAxis) {
+            minor = Math.max(0, ((ValueAxis<?>) axis).getMinorTickLength());
+        }
+        for (int i = 0; i < s.minors.size() && minor > 0; i++) {
+            double c = start + Math.round(s.minors.get(i).doubleValue()) + 0.5;
+            if (flat) {
+                line(renderer, c, edge, c, edge + away * minor, AXIS, 1);
+            } else {
+                line(renderer, edge, c, edge + away * minor, c, AXIS, 1);
+            }
+        }
+        double tick = s.tickLength();
+        double gap = axis.getTickLabelGap();
+        boolean labels = axis.isTickLabelsVisible();
+        Paint fill = axis.getTickLabelFill();
+        // The stretch of the axis the last label drawn covers.
+        double shownFrom = 0;
+        double shownTo = -1;
+        for (int i = 0; i < s.ticks.size(); i++) {
+            double at = s.at(s.ticks.get(i));
+            if (at != at) {
+                continue;
+            }
+            double c = start + Math.round(at);
+            if (tick > 0) {
+                if (flat) {
+                    line(renderer, c + 0.5, edge, c + 0.5, edge + away * tick, AXIS, 1);
+                } else {
+                    line(renderer, edge, c + 0.5, edge + away * tick, c + 0.5, AXIS, 1);
+                }
+            }
+            String text = s.labels.get(i);
+            if (!labels || text == null || text.length() == 0) {
+                continue;
+            }
+            double[] box = s.box(text);
+            double along = flat ? box[0] : box[1];
+            double across = flat ? box[1] : box[0];
+            // A label that would touch the one before it is left out.
+            if (shownTo >= shownFrom && c + along / 2 >= shownFrom && c - along / 2 <= shownTo) {
+                continue;
+            }
+            shownFrom = c - along / 2;
+            shownTo = c + along / 2;
+            double far = edge + away * (tick + gap + across / 2);
+            if (flat) {
+                turned(renderer, text, c, far, s.rotation, s.font, fill);
+            } else {
+                turned(renderer, text, far, c, s.rotation, s.font, fill);
+            }
+        }
+        String label = axis.getLabel();
+        if (label == null || label.length() == 0) {
+            return;
+        }
+        Font f = font(12);
+        double half = Fonts.lineHeight(f) / 2;
+        if (s.side == Side.TOP) {
+            turned(renderer, label, px + pw / 2, y + half, 0, f, TEXT);
+        } else if (s.side == Side.BOTTOM) {
+            turned(renderer, label, px + pw / 2, y + h - half, 0, f, TEXT);
+        } else if (s.side == Side.LEFT) {
+            turned(renderer, label, x + half, py + ph / 2, -90, f, TEXT);
+        } else {
+            turned(renderer, label, x + w - half, py + ph / 2, 90, f, TEXT);
         }
     }
 
