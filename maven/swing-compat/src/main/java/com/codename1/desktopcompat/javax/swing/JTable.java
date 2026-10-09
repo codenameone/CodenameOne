@@ -282,7 +282,11 @@ public class JTable extends JComponent implements Accessible, TableModelListener
         defaultRenderersByColumnClass = new Hashtable();
         defaultRenderersByColumnClass.put(Object.class, new DefaultTableCellRenderer());
         defaultRenderersByColumnClass.put(Number.class, new NumberRenderer());
+        defaultRenderersByColumnClass.put(Float.class, new DoubleRenderer());
+        defaultRenderersByColumnClass.put(Double.class, new DoubleRenderer());
+        defaultRenderersByColumnClass.put(java.util.Date.class, new DateRenderer());
         defaultRenderersByColumnClass.put(Icon.class, new IconRenderer());
+        defaultRenderersByColumnClass.put(ImageIcon.class, new IconRenderer());
         defaultRenderersByColumnClass.put(Boolean.class, new BooleanRenderer());
     }
 
@@ -2117,6 +2121,46 @@ public class JTable extends JComponent implements Accessible, TableModelListener
     private static final class NumberRenderer extends DefaultTableCellRenderer {
         NumberRenderer() {
             setHorizontalAlignment(SwingConstants.RIGHT);
+        }
+    }
+
+    /// Floats and doubles: the number as the default number format
+    /// writes it -- grouped, with at most three fraction digits and none
+    /// that are zero, so 44.0 is `44` -- at the trailing edge.
+    private static final class DoubleRenderer extends DefaultTableCellRenderer {
+        private java.text.NumberFormat format;
+
+        DoubleRenderer() {
+            setHorizontalAlignment(SwingConstants.RIGHT);
+        }
+
+        @Override
+        protected void setValue(Object value) {
+            if (value instanceof Number) {
+                if (format == null) {
+                    format = java.text.NumberFormat.getInstance();
+                }
+                setText(format.format(((Number) value).doubleValue()));
+            } else {
+                setText(value == null ? "" : value.toString());
+            }
+        }
+    }
+
+    /// Dates: the date in the default date format.
+    private static final class DateRenderer extends DefaultTableCellRenderer {
+        private java.text.DateFormat format;
+
+        @Override
+        protected void setValue(Object value) {
+            if (value instanceof java.util.Date) {
+                if (format == null) {
+                    format = java.text.DateFormat.getDateInstance();
+                }
+                setText(format.format((java.util.Date) value));
+            } else {
+                setText(value == null ? "" : value.toString());
+            }
         }
     }
 

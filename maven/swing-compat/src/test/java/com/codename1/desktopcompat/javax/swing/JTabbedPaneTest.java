@@ -472,4 +472,121 @@ public class JTabbedPaneTest extends KernelTestBase {
         assertEquals(-1, m.getSelectedIndex());
         assertEquals(1, m.getChangeListeners().length);
     }
+
+    /// Tabs are as wide as their titles and start at the leading end,
+    /// whatever the theme does with its own tabs, and the selected one
+    /// carries a bar along the edge facing the page -- on all four sides.
+    @Test
+    public void tabsSizeToTheirTitlesAndTheSelectedOneIsMarked() {
+        java.util.Hashtable<String, Object> theme = new java.util.Hashtable<String, Object>();
+        theme.put("@tabsGridBool", "true");
+        com.codename1.ui.plaf.UIManager.getInstance().addThemeProps(theme);
+        try {
+            JTabbedPane t = new JTabbedPane();
+            t.addTab("A", page("a", 50, 50));
+            t.addTab("A much longer title", page("b", 50, 50));
+            t.addTab("Mid one", page("c", 50, 50));
+            JFrame f = new JFrame();
+            f.add(t, BorderLayout.CENTER);
+            show(f);
+            TabbedPanePeer peer = (TabbedPanePeer) t.cn1Peer();
+            for (int i = 0; i < 3; i++) {
+                peer.tab(i).getPressedStyle().setFgColor(0x12ab34);
+                peer.tab(i).getUnselectedStyle().setFgColor(0x777777);
+                // Room around the text, which the headless display draws as a box.
+                peer.tab(i).getAllStyles().setPadding(12, 12, 12, 12);
+                peer.tab(i).setShouldCalcPreferredSize(true);
+            }
+            // The strip is measured again when the placement changes.
+            t.setTabPlacement(JTabbedPane.RIGHT);
+            int[] placements = {JTabbedPane.TOP, JTabbedPane.BOTTOM, JTabbedPane.LEFT, JTabbedPane.RIGHT};
+            for (int k = 0; k < placements.length; k++) {
+                int placement = placements[k];
+                t.setTabPlacement(placement);
+                t.setSelectedIndex(1);
+                f.validate();
+                Rectangle a = t.getBoundsAt(0);
+                Rectangle b = t.getBoundsAt(1);
+                Rectangle c = t.getBoundsAt(2);
+                boolean across = placement == JTabbedPane.TOP || placement == JTabbedPane.BOTTOM;
+                if (across) {
+                    assertEquals(0, a.x);
+                    assertTrue("tabs follow one another", b.x >= a.x + a.width && c.x >= b.x + b.width);
+                    assertTrue(a.width + " < " + c.width + " < " + b.width, a.width < c.width && c.width < b.width);
+                    assertTrue("the strip is not filled", c.x + c.width < t.getWidth() - 50);
+                } else {
+                    assertEquals(0, a.y);
+                    assertTrue(b.y >= a.y + a.height && c.y >= b.y + b.height);
+                    assertTrue(c.y + c.height < t.getHeight() - 50);
+                }
+                int[][] px = raster(f);
+                // The bar: three logical pixels along the edge towards the page.
+                int bx = placement == JTabbedPane.LEFT ? b.x + b.width - 2 : b.x + 1;
+                int by = placement == JTabbedPane.TOP ? b.y + b.height - 2 : b.y + 1;
+                int bw = across ? b.width - 2 : 1;
+                int bh = across ? 1 : b.height - 2;
+                assertEquals("placement " + placement, bw * bh * 4, count(px, t, bx, by, bw, bh, 0x12ab34));
+                assertEquals("placement " + placement, 0, count(px, t, a.x + 1, a.y + 1, a.width - 2, a.height - 2, 0x12ab34));
+                assertEquals("placement " + placement, 0, count(px, t, c.x + 1, c.y + 1, c.width - 2, c.height - 2, 0x12ab34));
+            }
+        } finally {
+            theme.put("@tabsGridBool", "false");
+            com.codename1.ui.plaf.UIManager.getInstance().addThemeProps(theme);
+        }
+    }
+
+    /// A theme that gives its tabs no padding still leaves the bar of the
+    /// selected tab clear of the title: a tab is taller than its text by
+    /// the bar and a pixel on the bar's side and as much on the other, and
+    /// wider by as much when the tabs are at the side.
+    @Test
+    public void aTabHasRoomForItsBarBesideTheTitle() {
+        JTabbedPane t = new JTabbedPane();
+        t.addTab("Title", page("a", 50, 50));
+        JFrame f = new JFrame();
+        f.add(t, BorderLayout.CENTER);
+        show(f);
+        TabbedPanePeer peer = (TabbedPanePeer) t.cn1Peer();
+        com.codename1.ui.Button tab = peer.tab(0);
+        tab.getAllStyles().setPadding(0, 0, 0, 0);
+        tab.getAllStyles().setMargin(0, 0, 0, 0);
+        tab.getAllStyles().setBorder(null);
+        tab.setShouldCalcPreferredSize(true);
+        com.codename1.ui.Font font = tab.getStyle().getFont();
+        int room = 2 * (Math.max(2, com.codename1.desktopcompat.rt.Units.toDevice(3))
+                + com.codename1.desktopcompat.rt.Units.toDevice(1));
+        assertEquals(font.getHeight() + room, tab.getPreferredH());
+        int across = tab.getPreferredW();
+        t.setTabPlacement(JTabbedPane.LEFT);
+        tab = peer.tab(0);
+        tab.setShouldCalcPreferredSize(true);
+        assertEquals(font.getHeight(), tab.getPreferredH());
+        assertEquals(across + room, tab.getPreferredW());
+    }
+
+    /// A title is written in the color set for its tab, and an HTML title
+    /// in the color it asks for; a tab with neither keeps the theme's, and
+    /// gets it back when the color is taken away.
+    @Test
+    public void aTabTitleTakesTheColourAskedFor() {
+        JTabbedPane t = new JTabbedPane();
+        t.addTab("Plain", page("a", 50, 50));
+        t.addTab("<html><font color=blue><b>Blue</b></font></html>", page("b", 50, 50));
+        t.addTab("Set", page("c", 50, 50));
+        JFrame f = new JFrame();
+        f.add(t, BorderLayout.CENTER);
+        show(f);
+        TabbedPanePeer peer = (TabbedPanePeer) t.cn1Peer();
+        int theme = peer.tab(0).getUnselectedStyle().getFgColor() & 0xffffff;
+        assertEquals("Blue", peer.tab(1).getText());
+        assertEquals(0x0000ff, peer.tab(1).getUnselectedStyle().getFgColor() & 0xffffff);
+        assertEquals(0x0000ff, peer.tab(1).getPressedStyle().getFgColor() & 0xffffff);
+        assertEquals(theme, peer.tab(2).getUnselectedStyle().getFgColor() & 0xffffff);
+        t.setForegroundAt(2, new com.codename1.desktopcompat.java.awt.Color(0x10, 0x80, 0x20));
+        assertEquals(0x108020, peer.tab(2).getUnselectedStyle().getFgColor() & 0xffffff);
+        assertEquals(0x108020, peer.tab(2).getSelectedStyle().getFgColor() & 0xffffff);
+        assertEquals(theme, peer.tab(0).getUnselectedStyle().getFgColor() & 0xffffff);
+        t.setForegroundAt(2, null);
+        assertEquals(theme, peer.tab(2).getUnselectedStyle().getFgColor() & 0xffffff);
+    }
 }

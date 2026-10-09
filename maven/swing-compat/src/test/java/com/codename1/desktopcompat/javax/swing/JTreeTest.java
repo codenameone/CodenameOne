@@ -505,4 +505,53 @@ public class JTreeTest extends KernelTestBase {
         assertFalse(t.isEditing());
         assertEquals("a2", a2.getUserObject());
     }
+
+    /// A node has a folder and a leaf a sheet before its text unless the
+    /// application sets other icons, and the text starts after the icon.
+    @Test
+    public void nodesAndLeavesHaveStockIconsBeforeTheirText() {
+        com.codename1.desktopcompat.javax.swing.tree.DefaultTreeCellRenderer r =
+                new com.codename1.desktopcompat.javax.swing.tree.DefaultTreeCellRenderer();
+        assertNotNull(r.getOpenIcon());
+        assertNotNull(r.getClosedIcon());
+        assertNotNull(r.getLeafIcon());
+        assertSame(r.getDefaultLeafIcon(), r.getLeafIcon());
+        assertEquals(16, r.getClosedIcon().getIconWidth());
+
+        DefaultMutableTreeNode top = new DefaultMutableTreeNode("top");
+        DefaultMutableTreeNode folder = new DefaultMutableTreeNode("folder");
+        folder.add(new DefaultMutableTreeNode("inner"));
+        top.add(folder);
+        top.add(new DefaultMutableTreeNode("leaf"));
+        JTree t = new JTree(top);
+        t.setBackground(com.codename1.desktopcompat.java.awt.Color.WHITE);
+        t.setForeground(com.codename1.desktopcompat.java.awt.Color.BLACK);
+        JFrame f = new JFrame();
+        f.add(t, BorderLayout.CENTER);
+        show(f);
+        assertEquals("only the root is expanded at first", 3, t.getRowCount());
+        int[][] px = raster(f);
+        for (int row = 0; row < 3; row++) {
+            Rectangle b = t.getRowBounds(row);
+            int painted = b.width * b.height * 4 - count(px, t, b.x, b.y, 16, b.height, 0xffffff)
+                    - (b.width - 16) * b.height * 4;
+            assertTrue("row " + row + " has an icon", painted > 40);
+        }
+        java.util.List<Object[]> text = paint(f);
+        Object[] leaf = find(text, "leaf");
+        assertNotNull(leaf);
+        Rectangle lb = t.getRowBounds(2);
+        assertTrue("the text follows the icon",
+                ((Integer) leaf[1]).intValue() >= onDisplay(t, lb.x + 16, 0)[0]);
+
+        // An application that wants bare text sets the icons to null.
+        r.setLeafIcon(null);
+        r.setOpenIcon(null);
+        r.setClosedIcon(null);
+        t.setCellRenderer(r);
+        text = paint(f);
+        leaf = find(text, "leaf");
+        assertNotNull(leaf);
+        assertEquals(onDisplay(t, t.getRowBounds(2).x, 0)[0], ((Integer) leaf[1]).intValue());
+    }
 }

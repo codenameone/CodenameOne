@@ -25,6 +25,7 @@ package com.codename1.desktopcompat.javax.swing;
 import com.codename1.desktopcompat.java.awt.Component;
 import com.codename1.desktopcompat.java.awt.Dimension;
 import com.codename1.desktopcompat.java.awt.Insets;
+import com.codename1.desktopcompat.java.awt.LayoutManager;
 import com.codename1.desktopcompat.java.beans.PropertyChangeEvent;
 import com.codename1.desktopcompat.java.beans.PropertyChangeListener;
 import com.codename1.desktopcompat.javax.accessibility.Accessible;
@@ -43,6 +44,9 @@ public class JToolBar extends JComponent implements Accessible, SwingConstants {
     private boolean rollover;
     private boolean paintBorder = true;
     private Insets margin;
+    /// The layout this tool bar gave itself. Rows are only made under it:
+    /// a layout the application set is the application's to run.
+    private LayoutManager ownLayout;
 
     public JToolBar() {
         this(null, HORIZONTAL);
@@ -60,7 +64,124 @@ public class JToolBar extends JComponent implements Accessible, SwingConstants {
         setName(name);
         check(orientation);
         this.orientation = orientation;
-        setLayout(new BoxLayout(this, orientation == VERTICAL ? BoxLayout.Y_AXIS : BoxLayout.X_AXIS));
+        ownLayout = new BoxLayout(this, orientation == VERTICAL ? BoxLayout.Y_AXIS : BoxLayout.X_AXIS);
+        setLayout(ownLayout);
+    }
+
+    // ------------------------------------------------------------ rows
+
+    /// Whether this is a horizontal bar, under its own layout, that was
+    /// given less width than its components want side by side.
+    ///
+    /// On the desktop such a bar cuts its last components off, and the
+    /// user widens the window. Where the window is the display that
+    /// cannot be done, so the bar goes on in a further row instead: it
+    /// then prefers the height of its rows, and its minimum width is that
+    /// of its widest component. A bar that is wide enough is the one row
+    /// its layout makes.
+    private boolean rows() {
+        if (orientation != HORIZONTAL || getLayout() != ownLayout || ownLayout == null || getWidth() <= 0) {
+            return false;
+        }
+        return super.getPreferredSize().width > getWidth();
+    }
+
+    /// Places the components in rows no wider than `width` when `place`
+    /// is set, and answers the height the rows take with the insets.
+    private int rows(int width, boolean place) {
+        Insets in = getInsets();
+        int right = Math.max(in.left + 1, width - in.right);
+        int x = in.left;
+        int y = in.top;
+        int rowHeight = 0;
+        int first = 0;
+        int n = getComponentCount();
+        for (int i = 0; i <= n; i++) {
+            Dimension d = null;
+            if (i < n) {
+                Component c = getComponent(i);
+                if (!c.isVisible()) {
+                    continue;
+                }
+                d = c.getPreferredSize();
+            }
+            if (d == null || (x > in.left && x + d.width > right)) {
+                if (place) {
+                    // A row is as tall as its tallest component, and the
+                    // others stand in the middle of it.
+                    int rx = in.left;
+                    for (int j = first; j < i; j++) {
+                        Component c = getComponent(j);
+                        if (c.isVisible()) {
+                            Dimension cd = c.getPreferredSize();
+                            c.setBounds(rx, y + (rowHeight - cd.height) / 2, cd.width, cd.height);
+                            rx += cd.width;
+                        }
+                    }
+                }
+                y += rowHeight;
+                x = in.left;
+                rowHeight = 0;
+                first = i;
+            }
+            if (d != null) {
+                x += d.width;
+                rowHeight = Math.max(rowHeight, d.height);
+            }
+        }
+        return y + in.bottom;
+    }
+
+    @Override
+    public Dimension getPreferredSize() {
+        Dimension d = super.getPreferredSize();
+        if (!isPreferredSizeSet() && rows()) {
+            return new Dimension(d.width, rows(getWidth(), false));
+        }
+        return d;
+    }
+
+    @Override
+    public Dimension getMinimumSize() {
+        Dimension d = super.getMinimumSize();
+        if (isMinimumSizeSet() || orientation != HORIZONTAL || getLayout() != ownLayout) {
+            return d;
+        }
+        Insets in = getInsets();
+        int w = 0;
+        for (int i = 0; i < getComponentCount(); i++) {
+            Component c = getComponent(i);
+            if (c.isVisible()) {
+                w = Math.max(w, c.getPreferredSize().width);
+            }
+        }
+        return new Dimension(Math.min(d.width, w + in.left + in.right),
+                rows() ? rows(getWidth(), false) : d.height);
+    }
+
+    @Override
+    public void doLayout() {
+        if (rows()) {
+            rows(getWidth(), true);
+        } else {
+            super.doLayout();
+        }
+    }
+
+    /// A change of width changes the number of rows, and with it the
+    /// height this bar prefers: the container that measured it before is
+    /// asked to lay it out again.
+    @Override
+    public void setBounds(int x, int y, int width, int height) {
+        if (width == getWidth()) {
+            super.setBounds(x, y, width, height);
+            return;
+        }
+        int was = getPreferredSize().height;
+        super.setBounds(x, y, width, height);
+        if (getPreferredSize().height != was) {
+            com.codename1.desktopcompat.rt.PeerSupport.layoutAgain(this);
+        }
     }
 
     private static void check(int orientation) {
@@ -78,7 +199,8 @@ public class JToolBar extends JComponent implements Accessible, SwingConstants {
         if (orientation != o) {
             int old = orientation;
             orientation = o;
-            setLayout(new BoxLayout(this, o == VERTICAL ? BoxLayout.Y_AXIS : BoxLayout.X_AXIS));
+            ownLayout = new BoxLayout(this, o == VERTICAL ? BoxLayout.Y_AXIS : BoxLayout.X_AXIS);
+            setLayout(ownLayout);
             firePropertyChange("orientation", old, o);
             revalidate();
             repaint();

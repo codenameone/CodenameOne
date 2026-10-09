@@ -264,6 +264,12 @@ public class Container extends Component {
         return false;
     }
 
+    /// Whether this container is in the middle of laying its children
+    /// out, and will repaint when it is done.
+    boolean cn1InLayout() {
+        return cn1Validating;
+    }
+
     @Override
     public void invalidate() {
         if (layoutMgr instanceof LayoutManager2) {
@@ -341,10 +347,32 @@ public class Container extends Component {
 
     @Override
     public Dimension getMinimumSize() {
+        if (!isMinimumSizeSet() && layoutMgr == null && com.codename1.desktopcompat.rt.RootPan.measuring()) {
+            Dimension own = super.getMinimumSize();
+            if (own.width == 0 && own.height == 0) {
+                // Children placed by hand: they need the room they are in.
+                return cn1Extent();
+            }
+            return own;
+        }
         if (isMinimumSizeSet() || layoutMgr == null) {
             return super.getMinimumSize();
         }
         return layoutMgr.minimumLayoutSize(this);
+    }
+
+    /// The far corner of the visible children, as they are placed now.
+    private Dimension cn1Extent() {
+        int w = 0;
+        int h = 0;
+        for (int i = 0; i < children.size(); i++) {
+            Component c = children.get(i);
+            if (c.isVisible()) {
+                w = Math.max(w, c.getX() + c.getWidth());
+                h = Math.max(h, c.getY() + c.getHeight());
+            }
+        }
+        return new Dimension(w, h);
     }
 
     @Override

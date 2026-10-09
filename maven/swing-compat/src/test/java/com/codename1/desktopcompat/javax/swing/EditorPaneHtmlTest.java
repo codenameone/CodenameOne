@@ -162,4 +162,64 @@ public class EditorPaneHtmlTest extends KernelTestBase {
         int oneLine = pane.getFontMetrics(pane.getFont()).getHeight();
         assertTrue(pane.getPreferredSize().height >= lines * oneLine);
     }
+
+    /// An `<img>` is a word of its line, at the size its tag gives, found
+    /// through the source the caller hands the parser; without a source,
+    /// or when the picture is not found, it leaves nothing.
+    @Test
+    public void anImageStandsInItsLineAtTheSizeItsTagGives() {
+        final List<String> asked = new ArrayList<String>();
+        final com.codename1.desktopcompat.java.awt.Image pic =
+                new com.codename1.desktopcompat.java.awt.image.BufferedImage(20, 10,
+                        com.codename1.desktopcompat.java.awt.image.BufferedImage.TYPE_INT_RGB);
+        com.codename1.desktopcompat.rt.MiniHtml.ImageSource source =
+                new com.codename1.desktopcompat.rt.MiniHtml.ImageSource() {
+            @Override
+            public com.codename1.desktopcompat.java.awt.Image image(String src) {
+                asked.add(src);
+                return "missing.png".equals(src) ? null : pic;
+            }
+        };
+        String html = "<html>top<br><img src=\"a/pic.png\" width=\"80\" height=\"60\">after"
+                + "<img src=\"missing.png\"><br><img src='own.png'></html>";
+        com.codename1.desktopcompat.rt.MiniHtml.Document doc =
+                com.codename1.desktopcompat.rt.MiniHtml.parse(html, source);
+        assertEquals("[a/pic.png, missing.png, own.png]", asked.toString());
+        assertEquals(3, doc.lineCount());
+        assertEquals(2, doc.line(1).runCount());
+        assertSame(pic, doc.line(1).run(0).image());
+        assertEquals(80, doc.line(1).run(0).imageWidth());
+        assertEquals(60, doc.line(1).run(0).imageHeight());
+        assertNull(doc.line(1).run(1).image());
+        assertEquals("after", doc.line(1).text());
+        // Without a size the picture has its own.
+        assertEquals(20, doc.line(2).run(0).imageWidth());
+        assertEquals(10, doc.line(2).run(0).imageHeight());
+
+        com.codename1.desktopcompat.java.awt.Font font = com.codename1.desktopcompat.rt.Fonts.defaultFont();
+        com.codename1.desktopcompat.java.awt.FontMetrics fm = com.codename1.desktopcompat.rt.Fonts.metrics(font);
+        com.codename1.desktopcompat.java.awt.Dimension size =
+                com.codename1.desktopcompat.rt.MiniHtml.preferredSize(doc, font);
+        assertEquals(80 + fm.stringWidth("after"), size.width);
+        int descent = fm.getHeight() - fm.getAscent();
+        // A line that is only an image is as tall as the image.
+        assertEquals(fm.getHeight() + Math.max(fm.getHeight(), 60 + descent) + 10, size.height);
+        // Too narrow for both: the image keeps its line, the word moves on.
+        com.codename1.desktopcompat.rt.MiniHtml.Document wrapped =
+                com.codename1.desktopcompat.rt.MiniHtml.wrap(doc, font, 80 + fm.stringWidth("after") - 1);
+        assertEquals(4, wrapped.lineCount());
+        assertSame(pic, wrapped.line(1).run(0).image());
+        assertEquals("after", wrapped.line(2).text());
+
+        // A parser without a source drops images and keeps the text.
+        com.codename1.desktopcompat.rt.MiniHtml.Document plain =
+                com.codename1.desktopcompat.rt.MiniHtml.parse(html);
+        assertEquals(2, plain.lineCount());
+        assertEquals("after", plain.line(1).text());
+
+        // In an editor pane the text after the picture is drawn after it.
+        JEditorPane pane = new JEditorPane("text/html", "<html>x</html>");
+        JFrame f = frame(pane);
+        assertNotNull(find(paint(f), "x"));
+    }
 }

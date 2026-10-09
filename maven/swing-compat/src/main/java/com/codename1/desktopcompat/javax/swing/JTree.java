@@ -100,7 +100,7 @@ import java.util.Vector;
 ///    of the tree counts as on the row, so [#getPathForLocation] answers
 ///    the path there too. [#getPathBounds] is the JDK's rectangle: the
 ///    text's own width.
-///  - There are no lines between nodes and no stock icons.
+///  - There are no lines between nodes.
 ///  - Editing is the plain kind: a text field over the row, started by
 ///    [#startEditingAtPath], F2 or a third click.
 ///  - No drag starts from the tree (`setDragEnabled` is kept as a property);

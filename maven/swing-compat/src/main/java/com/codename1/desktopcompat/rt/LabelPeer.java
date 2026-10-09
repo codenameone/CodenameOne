@@ -26,12 +26,22 @@ import com.codename1.desktopcompat.java.awt.Component;
 import com.codename1.ui.Graphics;
 
 /// The peer of a label: a Codename One label.
+///
+/// It has the theme's font and colors and none of its spacing. A Swing
+/// label is exactly as large as its text and icon -- programs rely on it
+/// when they put an image in a scroll pane or line a label up with a
+/// field -- so the padding and margin a theme gives its labels, which
+/// are there to keep a finger's distance between widgets a Codename One
+/// layout stacks, are taken off.
 public class LabelPeer extends com.codename1.ui.Label implements Peer {
 
     private final PeerSupport support;
 
     public LabelPeer(Component owner) {
         support = new PeerSupport(owner, this);
+        com.codename1.ui.plaf.Style s = getAllStyles();
+        s.setPadding(0, 0, 0, 0);
+        s.setMargin(0, 0, 0, 0);
     }
 
     @Override

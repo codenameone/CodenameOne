@@ -55,7 +55,7 @@ public final class FrameForm extends Form implements WindowHost {
         setEnableCursors(true);
         com.codename1.ui.Component p = w.cn1Peer();
         p.remove();
-        add(BorderLayout.CENTER, p);
+        add(BorderLayout.CENTER, new RootPan(w, p));
         WindowHosts.listenWheel(w, p);
     }
 
@@ -194,6 +194,22 @@ public final class FrameForm extends Form implements WindowHost {
         if (!EventBridge.pointerEvent(window, MouseEvent.MOUSE_DRAGGED, x, y)) {
             super.pointerDragged(x, y);
         }
+    }
+
+    /// The drag of a pointer as the display delivers it. A form has two
+    /// overloads and the display calls this one, which is an
+    /// implementation of its own and never reaches the one above; with
+    /// only that one overridden no drag got to a Swing component at all,
+    /// while presses and releases, which a form routes through the plain
+    /// overloads, did. More than one pointer is a gesture of Codename
+    /// One's.
+    @Override
+    public void pointerDragged(int[] x, int[] y) {
+        if (x != null && y != null && x.length == 1 && y.length == 1
+                && EventBridge.pointerEvent(window, MouseEvent.MOUSE_DRAGGED, x[0], y[0])) {
+            return;
+        }
+        super.pointerDragged(x, y);
     }
 
     @Override

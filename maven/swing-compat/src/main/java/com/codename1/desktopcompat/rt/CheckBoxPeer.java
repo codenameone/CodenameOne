@@ -24,6 +24,8 @@ package com.codename1.desktopcompat.rt;
 
 import com.codename1.desktopcompat.java.awt.Component;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.Style;
 
 /// The peer of a check box, and of a toggle button when made a toggle: a
 /// Codename One check box.
@@ -46,9 +48,47 @@ public class CheckBoxPeer extends com.codename1.ui.CheckBox implements Peer {
         return true;
     }
 
+    /// Whether the theme draws a toggle button that is on exactly as one
+    /// that is off. Codename One draws the first in the pressed style, or
+    /// in the selected one while it has the focus -- which it has right
+    /// after the click that turned it on -- and a theme that never styled
+    /// toggle buttons gives all of them the same background and border; a
+    /// different text colour does not show on a button that is only an
+    /// icon.
+    private boolean onLooksLikeOff() {
+        Style off = getUnselectedStyle();
+        Style on = getStyle();
+        if (on == off) {
+            return true;
+        }
+        if (off.getBgColor() != on.getBgColor() || off.getBgTransparency() != on.getBgTransparency()
+                || off.getBgImage() != on.getBgImage()) {
+            return false;
+        }
+        Border a = off.getBorder();
+        Border b = on.getBorder();
+        if (a != b && (a == null || !a.equals(b))) {
+            return false;
+        }
+        String text = getText();
+        return text == null || text.length() == 0 || off.getFgColor() == on.getFgColor();
+    }
+
     @Override
     public void paintNativeLook(Graphics g) {
         support.paintStyleBackground(g);
+        if (isToggle() && isSelected() && onLooksLikeOff()) {
+            // The state has to show: a wash of the text colour, as a
+            // pressed key looks in most themes.
+            int alpha = g.getAlpha();
+            int color = g.getColor();
+            int arc = Math.max(2, Units.toDevice(6));
+            g.setColor(getUnselectedStyle().getFgColor());
+            g.setAlpha(56);
+            g.fillRoundRect(getX(), getY(), getWidth(), getHeight(), arc, arc);
+            g.setAlpha(alpha);
+            g.setColor(color);
+        }
         if (getIcon() != null) {
             // In Swing an icon takes the place of the indicator; it is not
             // drawn beside it.

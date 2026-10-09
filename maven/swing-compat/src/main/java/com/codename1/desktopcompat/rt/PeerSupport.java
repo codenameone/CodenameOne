@@ -208,6 +208,28 @@ public final class PeerSupport {
         rp.repaint(p.getAbsoluteX() + x1, p.getAbsoluteY() + y1, x2 - x1, y2 - y1);
     }
 
+    /// Invalidates `c` once the layout pass under way is over, and has
+    /// its window laid out again.
+    ///
+    /// For a component that learns, as it is given its bounds, that it
+    /// now prefers another size: a tool bar that goes into a second row,
+    /// a text that wraps. Invalidating at that moment is lost. The
+    /// containers above are in the middle of their own pass, so the
+    /// invalidation stops at the first of them, and each marks itself
+    /// valid as its pass ends.
+    public static void layoutAgain(final Component c) {
+        if (!Display.isInitialized()) {
+            c.invalidate();
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                c.revalidate();
+            }
+        });
+    }
+
     /// Has the window `c` is in laid out again on the next turn of the
     /// event dispatch thread, and repainted.
     public static void scheduleLayout(Component c) {
@@ -216,7 +238,14 @@ public final class PeerSupport {
         }
         com.codename1.ui.Component rp = root(c).cn1PeerOrNull();
         if (rp instanceof com.codename1.ui.Container && rp.getTopLevelContainer() != null) {
-            ((com.codename1.ui.Container) rp).revalidateLater();
+            com.codename1.ui.Container holder = rp.getParent();
+            if (holder instanceof RootPan) {
+                // What changed may have changed how small the window can
+                // get, and that is decided one level up.
+                holder.revalidateLater();
+            } else {
+                ((com.codename1.ui.Container) rp).revalidateLater();
+            }
         }
     }
 }

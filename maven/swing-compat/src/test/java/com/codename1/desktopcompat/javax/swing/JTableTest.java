@@ -27,6 +27,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
@@ -161,7 +162,9 @@ public class JTableTest extends KernelTestBase {
         Stamp mine = new Stamp();
         t.setDefaultRenderer(Integer.class, mine);
         assertSame(mine, t.getCellRenderer(0, 1));
-        assertSame(t.getDefaultRenderer(Number.class), t.getDefaultRenderer(Double.class));
+        // As in the JDK, floats and doubles have a renderer of their own.
+        assertNotSame(t.getDefaultRenderer(Number.class), t.getDefaultRenderer(Double.class));
+        assertSame(t.getDefaultRenderer(Number.class), t.getDefaultRenderer(Long.class));
         TableColumn c = t.getColumnModel().getColumn(0);
         c.setCellRenderer(mine);
         assertSame(mine, t.getCellRenderer(3, 0));
@@ -589,5 +592,61 @@ public class JTableTest extends KernelTestBase {
         assertEquals(3, t.getSelectedRow());
         key(t, KeyEvent.VK_DOWN);
         assertEquals(3, t.getSelectedRow());
+    }
+
+    /// The default renderers by column class write what the JDK's write:
+    /// a double through the number format (44.0 is "44", at most three
+    /// fraction digits), other numbers as they are, both at the trailing
+    /// edge; a date through the date format; an icon centered.
+    @Test
+    public void theDefaultRenderersFormatAsTheJdksDo() {
+        final java.util.Date day = new java.util.Date(86400000L * 365);
+        final Icon icon = new Icon() {
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                g.fillRect(x, y, 8, 8);
+            }
+
+            public int getIconWidth() {
+                return 8;
+            }
+
+            public int getIconHeight() {
+                return 8;
+            }
+        };
+        DefaultTableModel m = new DefaultTableModel(new Object[][]{
+            {Double.valueOf(44.0), Float.valueOf(2.5f), Integer.valueOf(7), day, icon},
+            {Double.valueOf(2.7182818285), Float.valueOf(1f), Long.valueOf(1234567L), day, icon},
+            {Double.valueOf(1234567.5), null, null, null, null}},
+                new Object[]{"d", "f", "n", "when", "pic"}) {
+            @Override
+            public Class<?> getColumnClass(int c) {
+                return c == 0 ? Double.class : c == 1 ? Float.class : c == 2 ? Number.class
+                        : c == 3 ? java.util.Date.class : Icon.class;
+            }
+        };
+        JTable t = new JTable(m);
+        javax.swing.JTable real = new javax.swing.JTable();
+        String[][] expected = {{"44", "2.5", "7"}, {"2.718", "1", "1234567"}, {"1,234,567.5", "", ""}};
+        for (int r = 0; r < 3; r++) {
+            for (int c = 0; c < 3; c++) {
+                Component comp = t.getCellRenderer(r, c).getTableCellRendererComponent(t, m.getValueAt(r, c),
+                        false, false, r, c);
+                assertTrue(comp instanceof JLabel);
+                assertEquals(r + "," + c, expected[r][c], ((JLabel) comp).getText());
+                assertEquals(SwingConstants.RIGHT, ((JLabel) comp).getHorizontalAlignment());
+                // And the JDK's own renderer for the class says the same.
+                java.awt.Component theirs = real.getDefaultRenderer(m.getColumnClass(c))
+                        .getTableCellRendererComponent(real, m.getValueAt(r, c), false, false, 0, 0);
+                assertEquals(((javax.swing.JLabel) theirs).getText(), ((JLabel) comp).getText());
+            }
+        }
+        Component date = t.getCellRenderer(0, 3).getTableCellRendererComponent(t, day, false, false, 0, 3);
+        assertEquals(java.text.DateFormat.getDateInstance().format(day), ((JLabel) date).getText());
+        Component pic = t.getCellRenderer(0, 4).getTableCellRendererComponent(t, icon, false, false, 0, 4);
+        assertSame(icon, ((JLabel) pic).getIcon());
+        assertEquals("", ((JLabel) pic).getText());
+        assertEquals(SwingConstants.CENTER, ((JLabel) pic).getHorizontalAlignment());
+        assertSame(t.getDefaultRenderer(Icon.class).getClass(), t.getDefaultRenderer(ImageIcon.class).getClass());
     }
 }

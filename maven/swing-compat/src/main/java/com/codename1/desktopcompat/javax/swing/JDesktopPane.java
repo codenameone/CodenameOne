@@ -23,6 +23,7 @@
 package com.codename1.desktopcompat.javax.swing;
 
 import com.codename1.desktopcompat.java.awt.Component;
+import com.codename1.desktopcompat.java.awt.Dimension;
 import com.codename1.desktopcompat.java.awt.Graphics;
 import java.util.ArrayList;
 
@@ -110,5 +111,15 @@ public class JDesktopPane extends JLayeredPane {
     public void removeAll() {
         super.removeAll();
         selectedFrame = null;
+    }
+
+    /// Nothing, unless a minimum size was set: as on the desktop, a
+    /// desktop pane can be any size and its frames stay where they are.
+    @Override
+    public Dimension getMinimumSize() {
+        if (isMinimumSizeSet()) {
+            return super.getMinimumSize();
+        }
+        return new Dimension(0, 0);
     }
 }

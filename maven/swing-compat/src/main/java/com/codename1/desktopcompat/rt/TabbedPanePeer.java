@@ -29,8 +29,6 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BoxLayout;
-import com.codename1.ui.layouts.GridLayout;
-import com.codename1.ui.plaf.UIManager;
 import java.util.ArrayList;
 
 /// The peer of a tabbed pane: a container peer for the pages, plus a strip
@@ -41,6 +39,15 @@ import java.util.ArrayList;
 /// knows nothing of; it is kept last, which is on top, so the indexes the
 /// pages are added at never see it. The strip is styled as the tabs of a
 /// Codename One `Tabs` are: a `TabsContainer` of `Tab` toggle buttons.
+///
+/// Two things are Swing's and not the theme's. A tab is as wide as its
+/// title and the tabs start at the leading end of the strip, which scrolls
+/// when they do not fit: a theme that spreads its own tabs evenly over the
+/// width (`tabsGridBool`) is not followed, because programs written for
+/// the desktop count on short tabs beside each other. And the selected tab
+/// is marked with a bar in its text color along the edge that faces the
+/// page, so it can be told from the others in a theme whose selected tab
+/// differs by nothing but a shade.
 public class TabbedPanePeer extends ContainerPeer {
 
     /// Placements, numbered as the Swing constants are.
@@ -86,20 +93,15 @@ public class TabbedPanePeer extends ContainerPeer {
 
     private void applyPlacement() {
         boolean across = placement == TOP || placement == BOTTOM;
-        int n = Math.max(1, buttons.size());
-        boolean grid = UIManager.getInstance().isThemeConstant("tabsGridBool", false);
-        if (across) {
-            strip.setLayout(grid ? new GridLayout(1, n) : new BoxLayout(BoxLayout.X_AXIS));
-        } else {
-            strip.setLayout(grid ? new GridLayout(n, 1) : new BoxLayout(BoxLayout.Y_AXIS));
-        }
-        strip.setScrollableX(across && !grid);
-        strip.setScrollableY(!across && !grid);
+        strip.setLayout(new BoxLayout(across ? BoxLayout.X_AXIS : BoxLayout.Y_AXIS));
+        strip.setScrollableX(across);
+        strip.setScrollableY(!across);
     }
 
     /// Makes the strip show these tabs, one per element, on the given
     /// side. Buttons are reused, so a tab the user is pressing survives.
-    public void setTabs(String[] titles, Image[] icons, boolean[] enabled, int selectedIndex, int tabPlacement) {
+    public void setTabs(String[] titles, Image[] icons, boolean[] enabled, int[] inks, int selectedIndex,
+            int tabPlacement) {
         int n = titles.length;
         while (buttons.size() > n) {
             TabButton b = buttons.remove(buttons.size() - 1);
@@ -117,6 +119,7 @@ public class TabbedPanePeer extends ContainerPeer {
             b.setText(titles[i] == null ? "" : titles[i]);
             b.setIcon(icons[i]);
             b.setEnabled(enabled[i]);
+            b.ink(inks[i]);
         }
         strip.setShouldCalcPreferredSize(true);
         select(selectedIndex);
@@ -202,6 +205,7 @@ public class TabbedPanePeer extends ContainerPeer {
     /// One tab: a toggle button that reports being chosen.
     private static final class TabButton extends RadioButton implements ActionListener<ActionEvent> {
         private final TabbedPanePeer peer;
+        private int ink = -1;
 
         TabButton(TabbedPanePeer peer, int index) {
             this.peer = peer;
@@ -214,6 +218,76 @@ public class TabbedPanePeer extends ContainerPeer {
         @Override
         public void actionPerformed(ActionEvent evt) {
             peer.chosen(this);
+        }
+
+        /// Writes the title in `rgb` whatever the state of the tab, or in
+        /// the theme's colors again for -1.
+        void ink(int rgb) {
+            if (rgb == ink) {
+                return;
+            }
+            if (ink >= 0) {
+                // The styles hold the color that was asked for last; the
+                // theme's come back with the styles themselves.
+                setUIID("Tab");
+            }
+            ink = rgb;
+            if (rgb >= 0) {
+                getAllStyles().setFgColor(rgb);
+            }
+        }
+
+        /// The thickness of the bar that marks the selected tab.
+        private static int bar() {
+            return Math.max(2, Units.toDevice(3));
+        }
+
+        /// Room for the bar on the side it is on and as much opposite, so
+        /// that it does not strike through a title in a theme that gives
+        /// its tabs no padding and the title stays in the middle.
+        @Override
+        protected Dimension calcPreferredSize() {
+            Dimension d = super.calcPreferredSize();
+            int room = 2 * (bar() + Units.toDevice(1));
+            if (peer.placement == TabbedPanePeer.LEFT || peer.placement == TabbedPanePeer.RIGHT) {
+                return new Dimension(d.getWidth() + room, d.getHeight());
+            }
+            return new Dimension(d.getWidth(), d.getHeight() + room);
+        }
+
+        @Override
+        public void paint(com.codename1.ui.Graphics g) {
+            int cx = g.getClipX();
+            int cy = g.getClipY();
+            int cw = g.getClipWidth();
+            int ch = g.getClipHeight();
+            super.paint(g);
+            if (!isSelected()) {
+                return;
+            }
+            // Painting the text may leave the clip narrowed to it.
+            g.setClip(cx, cy, cw, ch);
+            int bar = bar();
+            int x = getX();
+            int y = getY();
+            int w = getWidth();
+            int h = getHeight();
+            // A toggled button is drawn in its pressed style. The names of
+            // the sides are qualified: a button inherits constants of the
+            // same names with other values.
+            g.setColor(getPressedStyle().getFgColor());
+            int alpha = g.getAlpha();
+            g.setAlpha(255);
+            if (peer.placement == TabbedPanePeer.BOTTOM) {
+                g.fillRect(x, y, w, Math.min(bar, h));
+            } else if (peer.placement == TabbedPanePeer.LEFT) {
+                g.fillRect(x + Math.max(0, w - bar), y, Math.min(bar, w), h);
+            } else if (peer.placement == TabbedPanePeer.RIGHT) {
+                g.fillRect(x, y, Math.min(bar, w), h);
+            } else {
+                g.fillRect(x, y + Math.max(0, h - bar), w, Math.min(bar, h));
+            }
+            g.setAlpha(alpha);
         }
 
         @Override

@@ -316,4 +316,25 @@ public class JSplitPaneTest extends KernelTestBase {
             assertEquals(JSplitPane.HORIZONTAL_SPLIT, s.getOrientation());
         }
     }
+
+    /// A split pane is opaque: around a side that does not fill its half
+    /// it shows its own background, not that of the panel it stands on.
+    @Test
+    public void thePaneFillsItsAreaWithItsOwnBackground() {
+        JPanel black = new JPanel(new BorderLayout());
+        black.setBackground(com.codename1.desktopcompat.java.awt.Color.BLACK);
+        JSplitPane s = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, new JLabel("a"), new JLabel("b"));
+        assertTrue(s.isOpaque());
+        s.setDividerLocation(100);
+        black.add(s, BorderLayout.CENTER);
+        JFrame f = new JFrame();
+        f.getContentPane().add(black, BorderLayout.CENTER);
+        f.setSize(400, 300);
+        show(f);
+        int[][] rows = raster(f);
+        int want = s.getBackground().getRGB() & 0xffffff;
+        assertTrue(want != 0);
+        assertEquals(want, pixel(rows, s, 50, 280) & 0xffffff);
+        assertEquals(want, pixel(rows, s, 300, 280) & 0xffffff);
+    }
 }

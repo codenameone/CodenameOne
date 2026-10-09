@@ -98,6 +98,11 @@ public class JViewport extends JComponent implements Accessible {
             ViewportPeer v = (ViewportPeer) p;
             v.setScrollableX(nativeScrolling && scrollableX);
             v.setScrollableY(nativeScrolling && scrollableY);
+            // Codename One's own indicator is for a device that gives the
+            // scroll bars no room. Where they have room they show the
+            // position, and a second bar drawn over the content beside
+            // them says the same thing twice.
+            v.setScrollVisible(com.codename1.desktopcompat.rt.ScrollDelegate.barThickness() == 0);
         }
     }
 

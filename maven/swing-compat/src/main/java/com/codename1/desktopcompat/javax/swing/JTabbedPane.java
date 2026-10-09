@@ -136,6 +136,39 @@ public class JTabbedPane extends JComponent implements Accessible, SwingConstant
         return t == null ? "" : MiniHtml.singleLine(t);
     }
 
+    /// The color a tab's title is written in when it is not the theme's:
+    /// the one set for the tab, and otherwise the first one an HTML title
+    /// asks for. -1 for a tab that leaves it to the theme.
+    private int shownInk(Page page) {
+        if (page.foreground != null) {
+            return page.foreground.getRGB() & 0xffffff;
+        }
+        String t = page.title;
+        if (page.tabComponent instanceof JLabel) {
+            JLabel label = (JLabel) page.tabComponent;
+            if (label.isForegroundSet()) {
+                return label.getForeground().getRGB() & 0xffffff;
+            }
+            if (label.getText() != null) {
+                t = label.getText();
+            }
+        }
+        if (!MiniHtml.isHtml(t)) {
+            return -1;
+        }
+        MiniHtml.Document d = MiniHtml.parse(t);
+        for (int i = 0; i < d.lineCount(); i++) {
+            MiniHtml.Line line = d.line(i);
+            for (int r = 0; r < line.runCount(); r++) {
+                Color c = line.run(r).color();
+                if (c != null) {
+                    return c.getRGB() & 0xffffff;
+                }
+            }
+        }
+        return -1;
+    }
+
     private Icon shownIcon(Page page) {
         if (page.tabComponent instanceof JLabel) {
             Icon li = ((JLabel) page.tabComponent).getIcon();
@@ -156,9 +189,11 @@ public class JTabbedPane extends JComponent implements Accessible, SwingConstant
         String[] titles = new String[n];
         com.codename1.ui.Image[] icons = new com.codename1.ui.Image[n];
         boolean[] enabled = new boolean[n];
+        int[] inks = new int[n];
         for (int i = 0; i < n; i++) {
             Page page = pages.get(i);
             titles[i] = shownTitle(page);
+            inks[i] = shownInk(page);
             Icon ic = shownIcon(page);
             if (ic == null) {
                 page.nativeIconFor = null;
@@ -170,7 +205,7 @@ public class JTabbedPane extends JComponent implements Accessible, SwingConstant
             icons[i] = page.nativeIcon;
             enabled[i] = page.enabled;
         }
-        p.setTabs(titles, icons, enabled, getSelectedIndex(), tabPlacement);
+        p.setTabs(titles, icons, enabled, inks, getSelectedIndex(), tabPlacement);
     }
 
     private void tabsChanged() {
@@ -498,9 +533,10 @@ public class JTabbedPane extends JComponent implements Accessible, SwingConstant
         return c != null ? c : getForeground();
     }
 
-    /// Recorded only: the theme colors the tabs.
+    /// The color of one tab's title; `null` gives it back to the theme.
     public void setForegroundAt(int index, Color foreground) {
         pages.get(index).foreground = foreground;
+        syncTabs();
     }
 
     public boolean isEnabledAt(int index) {

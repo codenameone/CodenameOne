@@ -24,11 +24,12 @@ package com.codename1.desktopcompat.javax.swing;
 
 import com.codename1.desktopcompat.KernelTestBase;
 import com.codename1.desktopcompat.java.awt.BorderLayout;
+import com.codename1.desktopcompat.java.awt.Color;
 import com.codename1.desktopcompat.java.awt.Dimension;
+import com.codename1.desktopcompat.java.awt.event.KeyEvent;
 import com.codename1.desktopcompat.javax.swing.event.ChangeEvent;
 import com.codename1.desktopcompat.javax.swing.event.ChangeListener;
 import com.codename1.desktopcompat.rt.ProgressPeer;
-import com.codename1.desktopcompat.rt.SliderPeer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -190,17 +191,13 @@ public class RangeWidgetsTest extends KernelTestBase {
     }
 
     @Test
-    public void draggingTheNativeSliderDrivesTheModelWithoutEchoes() {
+    public void draggingTheSliderDrivesTheModelWithoutEchoes() {
         JSlider s = new JSlider(10, 110, 10);
         Changes changes = new Changes();
         s.addChangeListener(changes);
         JFrame f = new JFrame();
         f.add(s, BorderLayout.NORTH);
         show(f);
-        SliderPeer peer = (SliderPeer) s.cn1Peer();
-        assertTrue(peer.isEditable());
-        assertEquals(100, peer.getMaxValue());
-        assertEquals(0, peer.getProgress());
         int w = s.getWidth();
         assertTrue(w > 100);
 
@@ -209,7 +206,6 @@ public class RangeWidgetsTest extends KernelTestBase {
         assertSame(s, changes.source);
         assertTrue(s.getValueIsAdjusting());
         assertTrue("value " + s.getValue(), Math.abs(s.getValue() - 60) <= 1);
-        assertEquals(s.getValue() - 10, peer.getProgress());
 
         drag(f, s, w / 4, 3);
         assertEquals(2, changes.log.size());
@@ -228,13 +224,98 @@ public class RangeWidgetsTest extends KernelTestBase {
         s.setValue(30);
         assertEquals(4, changes.log.size());
         assertEquals("30/false", changes.log.get(3));
-        assertEquals(20, peer.getProgress());
         s.setValue(30);
         assertEquals(4, changes.log.size());
         s.setMaximum(50);
-        assertEquals(40, peer.getMaxValue());
-        assertEquals(20, peer.getProgress());
         assertEquals(30, s.getValue());
+
+        // A disabled slider does not move.
+        s.setEnabled(false);
+        press(f, s, w - 2, 3);
+        release(f, s, w - 2, 3);
+        assertEquals(30, s.getValue());
+        // The one more event is the changed maximum.
+        assertEquals(5, changes.log.size());
+    }
+
+    /// The thumb and the track are painted by the slider, in colors that
+    /// stand out from its background: a horizontal thumb that could not be
+    /// seen and a vertical slider without a track were what a Codename One
+    /// slider made of them.
+    @Test
+    public void theThumbAndTheTrackAreVisibleBothWays() {
+        Color accent = new Color(0x1166cc);
+        Color rail = new Color(0x99aabb);
+        UIManager.put("Slider.foreground", accent);
+        UIManager.put("Slider.trackColor", rail);
+        try {
+            JSlider h = new JSlider(0, 100, 25);
+            JSlider v = new JSlider(JSlider.VERTICAL, 0, 100, 75);
+            JPanel p = new JPanel(null);
+            h.setBounds(10, 10, 216, 20);
+            v.setBounds(10, 50, 20, 216);
+            p.add(h);
+            p.add(v);
+            JFrame f = new JFrame();
+            f.setContentPane(p);
+            show(f);
+            int[][] px = raster(f);
+            // The thumb's centre runs from 8 to 208: a quarter is at 58.
+            assertEquals(0x1166cc, pixel(px, h, 58, 10));
+            assertEquals(0x1166cc, pixel(px, h, 58, 4));
+            assertEquals("filled up to the thumb", 0x1166cc, pixel(px, h, 30, 10));
+            assertEquals("the rest of the track", 0x99aabb, pixel(px, h, 150, 10));
+            assertTrue(pixel(px, h, 150, 3) != 0x99aabb);
+            // Vertical: the maximum is at the top, so 75 is a quarter down.
+            assertEquals(0x1166cc, pixel(px, v, 10, 58));
+            assertEquals("the track above the thumb", 0x99aabb, pixel(px, v, 10, 30));
+            assertEquals("filled below it", 0x1166cc, pixel(px, v, 10, 150));
+
+            v.setValue(0);
+            h.setInverted(true);
+            px = raster(f);
+            assertEquals(0x1166cc, pixel(px, v, 10, 208));
+            assertEquals(0x99aabb, pixel(px, v, 10, 58));
+            assertEquals(0x1166cc, pixel(px, h, 158, 10));
+            assertEquals("inverted fills from the right", 0x1166cc, pixel(px, h, 190, 10));
+            assertEquals(0x99aabb, pixel(px, h, 58, 10));
+
+            h.setPaintTrack(false);
+            px = raster(f);
+            assertEquals(0, count(px, h, 0, 0, 216, 20, 0x99aabb));
+            assertEquals(0x1166cc, pixel(px, h, 158, 10));
+        } finally {
+            UIManager.put("Slider.foreground", null);
+            UIManager.put("Slider.trackColor", null);
+        }
+    }
+
+    @Test
+    public void theKeyboardMovesAFocusedSlider() {
+        JSlider s = new JSlider(0, 100, 50);
+        s.setMajorTickSpacing(20);
+        JFrame f = new JFrame();
+        f.add(s, BorderLayout.NORTH);
+        show(f);
+        key(s, KeyEvent.VK_RIGHT);
+        assertEquals(51, s.getValue());
+        key(s, KeyEvent.VK_DOWN);
+        assertEquals(50, s.getValue());
+        key(s, KeyEvent.VK_PAGE_UP);
+        assertEquals(70, s.getValue());
+        key(s, KeyEvent.VK_HOME);
+        assertEquals(0, s.getValue());
+        key(s, KeyEvent.VK_LEFT);
+        assertEquals(0, s.getValue());
+        key(s, KeyEvent.VK_END);
+        assertEquals(100, s.getValue());
+        s.setInverted(true);
+        key(s, KeyEvent.VK_RIGHT);
+        assertEquals(99, s.getValue());
+    }
+
+    private static void key(JSlider s, int code) {
+        s.dispatchEvent(new KeyEvent(s, KeyEvent.KEY_PRESSED, 0L, 0, code, KeyEvent.CHAR_UNDEFINED));
     }
 
     @Test
@@ -243,31 +324,27 @@ public class RangeWidgetsTest extends KernelTestBase {
         JFrame f = new JFrame();
         f.add(s, BorderLayout.NORTH);
         show(f);
-        SliderPeer peer = (SliderPeer) s.cn1Peer();
-        assertEquals(25, peer.getProgress());
         s.setInverted(true);
-        assertEquals(75, peer.getProgress());
         int w = s.getWidth();
         press(f, s, w / 10, 3);
         release(f, s, w / 10, 3);
-        assertTrue("value " + s.getValue(), Math.abs(s.getValue() - 90) <= 1);
+        // A tenth of the way along, less the half thumb the track starts after.
+        assertTrue("value " + s.getValue(), Math.abs(s.getValue() - 91) <= 1);
         s.setInverted(false);
 
         s.setMajorTickSpacing(25);
         s.setSnapToTicks(true);
         press(f, s, w * 4 / 10, 3);
         assertEquals(50, s.getValue());
-        assertEquals("the thumb snaps too", 50, peer.getProgress());
         drag(f, s, w * 3 / 10, 3);
         assertEquals(25, s.getValue());
         release(f, s, w * 3 / 10, 3);
         assertEquals(25, s.getValue());
         assertFalse(s.getValueIsAdjusting());
 
-        assertFalse(peer.isVertical());
         s.setOrientation(JSlider.VERTICAL);
-        assertTrue(peer.isVertical());
         assertEquals(200, s.getPreferredSize().height);
+        assertEquals(s.getPreferredSize().width, s.getMinimumSize().width);
     }
 
     @Test

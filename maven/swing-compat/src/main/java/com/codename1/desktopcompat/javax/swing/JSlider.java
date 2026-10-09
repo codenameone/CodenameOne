@@ -29,34 +29,45 @@ import com.codename1.desktopcompat.java.awt.Graphics;
 import com.codename1.desktopcompat.javax.accessibility.Accessible;
 import com.codename1.desktopcompat.javax.swing.event.ChangeEvent;
 import com.codename1.desktopcompat.javax.swing.event.ChangeListener;
-import com.codename1.desktopcompat.rt.SliderPeer;
-import com.codename1.desktopcompat.rt.Units;
-import com.codename1.ui.events.DataChangedListener;
+import com.codename1.desktopcompat.java.awt.AWTEvent;
+import com.codename1.desktopcompat.java.awt.event.KeyEvent;
+import com.codename1.desktopcompat.java.awt.event.MouseEvent;
+import com.codename1.desktopcompat.rt.CellTheme;
 import java.util.Dictionary;
 import java.util.Enumeration;
 import java.util.Hashtable;
 
-/// A slider over a bounded range model, shown and dragged by a Codename
-/// One slider.
+/// A slider over a bounded range model, painted and dragged by this
+/// class.
 ///
-/// Dragging sets the model's value with `valueIsAdjusting` true and ends
-/// with it false, as on the desktop; a value set through the model moves
-/// the native thumb without coming back as a change. The native track is
-/// drawn in a band as thick as the Codename One slider wants; the tick
-/// marks and the labels of the label table are painted below it (to its
-/// right when vertical) by this class, so `paintTicks`, `paintLabels`,
+/// It is drawn here -- a track, the part of it up to the value in the
+/// theme's accent color, and a round thumb -- and not by a Codename One
+/// slider, whose thumb is an image only some themes have and whose vertical
+/// form draws no track at all. The colors are the theme's, so it still
+/// belongs to the widgets around it; a color put into [UIManager] under
+/// `Slider.foreground` (the thumb and the filled part) or
+/// `Slider.trackColor` wins.
+///
+/// Pressing anywhere on the slider moves the thumb there and dragging
+/// follows the pointer, setting the model's value with `valueIsAdjusting`
+/// true and ending with it false, as on the desktop. The arrow keys, Page
+/// Up, Page Down, Home and End move a focused slider. The thumb's centre
+/// travels between half a thumb from either end, and the tick marks and
+/// the labels of the label table are painted below the track (to its right
+/// when vertical) at those same positions, so `paintTicks`, `paintLabels`,
 /// `paintTrack`, `inverted` and `snapToTicks` all take effect.
 ///
 /// Not supported: the standard labels made by `createStandardLabels` are
 /// made once and do not follow later changes of the range; there is no UI
 /// delegate, so `getUI`, `setUI` and the client property
-/// `JSlider.isFilled` are absent; the keyboard moves the thumb only as far
-/// as the Codename One slider implements it.
+/// `JSlider.isFilled` are absent.
 public class JSlider extends JComponent implements Accessible, SwingConstants {
 
     private static final int LENGTH = 200;
     private static final int MINIMUM_LENGTH = 36;
-    private static final int FALLBACK_THICKNESS = 16;
+    private static final int THUMB = 16;
+    private static final int TOUCH_THUMB = 24;
+    private static final int TRACK = 4;
     private static final int MAJOR_TICK = 8;
     private static final int MINOR_TICK = 4;
     private static final int MAX_TICKS = 2000;
@@ -76,7 +87,7 @@ public class JSlider extends JComponent implements Accessible, SwingConstants {
     private boolean inverted;
     @SuppressWarnings("rawtypes")
     private Dictionary labelTable;
-    private boolean syncing;
+    private boolean dragging;
 
     public JSlider() {
         this(HORIZONTAL, 0, 100, 50);
@@ -99,9 +110,11 @@ public class JSlider extends JComponent implements Accessible, SwingConstants {
         this.orientation = orientation;
         sliderModel = new DefaultBoundedRangeModel(value, 0, min, max);
         sliderModel.addChangeListener(bridge);
+        cn1Listen();
     }
 
     public JSlider(BoundedRangeModel brm) {
+        cn1Listen();
         orientation = HORIZONTAL;
         sliderModel = brm;
         if (brm != null) {
@@ -115,95 +128,58 @@ public class JSlider extends JComponent implements Accessible, SwingConstants {
         }
     }
 
-    // ------------------------------------------------------------- peer
+    // ------------------------------------------------------------ input
 
-    @Override
-    protected com.codename1.ui.Component cn1CreatePeer() {
-        return new SliderPeer(this);
+    private void cn1Listen() {
+        enableEvents(AWTEvent.MOUSE_EVENT_MASK | AWTEvent.MOUSE_MOTION_EVENT_MASK | AWTEvent.KEY_EVENT_MASK);
+        setFocusable(true);
     }
 
-    @Override
-    protected void cn1PeerCreated() {
-        super.cn1PeerCreated();
-        com.codename1.ui.Component p = cn1PeerOrNull();
-        if (p instanceof SliderPeer) {
-            final SliderPeer s = (SliderPeer) p;
-            s.addDataChangedListener(new DataChangedListener() {
-                @Override
-                public void dataChanged(int type, int index) {
-                    // CHANGED is the slider told its value by this class;
-                    // the user's drags and keys report ADDED or REMOVED.
-                    if (!syncing && type != DataChangedListener.CHANGED) {
-                        cn1FromNative(index, true);
-                    }
-                }
-            });
-            s.addActionListener(new com.codename1.ui.events.ActionListener<com.codename1.ui.events.ActionEvent>() {
-                @Override
-                public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
-                    if (!syncing) {
-                        cn1FromNative(s.getProgress(), false);
-                    }
-                }
-            });
-        }
-        cn1Sync();
+    /// The diameter of the thumb, which is also how thick the band of
+    /// the track is: larger where the pointer is a finger.
+    private static int thumbSize() {
+        return CellTheme.touch() ? TOUCH_THUMB : THUMB;
     }
 
-    /// The length of the native slider's range: the model's, or one for
-    /// an empty range, which the native slider cannot draw.
-    private int nativeRange() {
-        long span = (long) getMaximum() - (long) getMinimum();
-        if (span <= 0) {
-            return 1;
-        }
-        return span > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) span;
+    /// The length of the slider and how far in from either end the
+    /// thumb's centre stops.
+    private int length() {
+        return orientation == VERTICAL ? getHeight() : getWidth();
     }
 
-    private void cn1Sync() {
-        com.codename1.ui.Component p = cn1PeerOrNull();
-        if (!(p instanceof SliderPeer) || sliderModel == null) {
-            return;
-        }
-        SliderPeer s = (SliderPeer) p;
-        boolean was = syncing;
-        syncing = true;
-        try {
-            int range = nativeRange();
-            long pos = (long) getValue() - (long) getMinimum();
-            if (pos < 0) {
-                pos = 0;
-            }
-            if (pos > range) {
-                pos = range;
-            }
-            if (inverted) {
-                pos = range - pos;
-            }
-            s.setVertical(orientation == VERTICAL);
-            s.setMinValue(0);
-            s.setMaxValue(range);
-            s.setProgress((int) pos);
-        } finally {
-            syncing = was;
-        }
+    private int inset() {
+        return Math.min(thumbSize() / 2, Math.max(0, length() / 2));
     }
 
-    /// The native slider was moved by the user to `pos` of its range.
-    private void cn1FromNative(int pos, boolean adjusting) {
+    /// Moves the value to where the pointer is, `at` logical pixels along
+    /// the slider.
+    private void cn1MoveTo(int at, boolean adjusting) {
         BoundedRangeModel m = sliderModel;
         if (m == null) {
             return;
         }
         int min = m.getMinimum();
         int max = m.getMaximum();
-        int extent = m.getExtent();
-        int range = nativeRange();
-        long v = min;
-        if (max > min) {
-            int at = pos < 0 ? 0 : pos > range ? range : pos;
-            v = (long) min + (inverted ? range - at : at);
+        int inset = inset();
+        int room = length() - 2 * inset;
+        double f = room <= 0 ? 0 : (double) (at - inset) / (double) room;
+        f = f < 0 ? 0 : f > 1 ? 1 : f;
+        if (orientation == VERTICAL) {
+            f = 1 - f;
         }
+        if (inverted) {
+            f = 1 - f;
+        }
+        long v = min + Math.round(f * ((double) max - (double) min));
+        cn1Set(v, adjusting);
+    }
+
+    private void cn1Set(long value, boolean adjusting) {
+        BoundedRangeModel m = sliderModel;
+        int min = m.getMinimum();
+        int max = m.getMaximum();
+        int extent = m.getExtent();
+        long v = value;
         if (snapToTicks) {
             v = snap(v, min);
         }
@@ -214,8 +190,63 @@ public class JSlider extends JComponent implements Accessible, SwingConstants {
             v = min;
         }
         m.setRangeProperties((int) v, extent, min, max, adjusting);
-        // The model may have refused or rounded the position.
-        cn1Sync();
+    }
+
+    @Override
+    protected void processMouseEvent(MouseEvent e) {
+        super.processMouseEvent(e);
+        if (!isEnabled() || sliderModel == null) {
+            return;
+        }
+        int at = orientation == VERTICAL ? e.getY() : e.getX();
+        if (e.getID() == MouseEvent.MOUSE_PRESSED) {
+            dragging = true;
+            requestFocusInWindow();
+            cn1MoveTo(at, true);
+        } else if (e.getID() == MouseEvent.MOUSE_RELEASED && dragging) {
+            dragging = false;
+            sliderModel.setValueIsAdjusting(false);
+        }
+    }
+
+    @Override
+    protected void processMouseMotionEvent(MouseEvent e) {
+        super.processMouseMotionEvent(e);
+        if (e.getID() == MouseEvent.MOUSE_DRAGGED && dragging && isEnabled() && sliderModel != null) {
+            cn1MoveTo(orientation == VERTICAL ? e.getY() : e.getX(), true);
+        }
+    }
+
+    @Override
+    protected void processKeyEvent(KeyEvent e) {
+        super.processKeyEvent(e);
+        if (e.getID() != KeyEvent.KEY_PRESSED || e.isConsumed() || !isEnabled() || sliderModel == null) {
+            return;
+        }
+        long span = (long) getMaximum() - (long) getMinimum();
+        long unit = snapToTicks && minorTickSpacing > 0 ? minorTickSpacing
+                : snapToTicks && majorTickSpacing > 0 ? majorTickSpacing : 1;
+        long block = Math.max(unit, majorTickSpacing > 0 ? majorTickSpacing : span / 10);
+        long dir = inverted ? -1 : 1;
+        long v = getValue();
+        int code = e.getKeyCode();
+        if (code == KeyEvent.VK_RIGHT || code == KeyEvent.VK_UP) {
+            v += dir * unit;
+        } else if (code == KeyEvent.VK_LEFT || code == KeyEvent.VK_DOWN) {
+            v -= dir * unit;
+        } else if (code == KeyEvent.VK_PAGE_UP) {
+            v += dir * block;
+        } else if (code == KeyEvent.VK_PAGE_DOWN) {
+            v -= dir * block;
+        } else if (code == KeyEvent.VK_HOME) {
+            v = getMinimum();
+        } else if (code == KeyEvent.VK_END) {
+            v = getMaximum();
+        } else {
+            return;
+        }
+        cn1Set(v, false);
+        e.consume();
     }
 
     private long snap(long value, int min) {
@@ -231,11 +262,7 @@ public class JSlider extends JComponent implements Accessible, SwingConstants {
     // ------------------------------------------------------------ sizes
 
     private int nativeThickness() {
-        Dimension d = super.cn1NativePreferredSize();
-        if (d == null) {
-            return FALLBACK_THICKNESS;
-        }
-        return orientation == VERTICAL ? d.width : d.height;
+        return thumbSize() + 4;
     }
 
     /// The width (for a vertical slider) or height of the largest label,
@@ -287,25 +314,96 @@ public class JSlider extends JComponent implements Accessible, SwingConstants {
 
     // ------------------------------------------------------------ paint
 
-    /// Paints the native track in its band, then the tick marks and the
-    /// labels beside it.
+    private static Color put(String key) {
+        return UIManager.cn1PutColor(key);
+    }
+
+    /// The color of the thumb and of the track up to it: the one put
+    /// under `Slider.foreground`, else the background the theme gives the
+    /// filled part of its own slider, else the text color.
+    private Color accent() {
+        Color c = put("Slider.foreground");
+        if (c != null) {
+            return c;
+        }
+        if (com.codename1.ui.Display.isInitialized()) {
+            com.codename1.ui.plaf.Style st =
+                    com.codename1.ui.plaf.UIManager.getInstance().getComponentStyle("SliderFull");
+            Color bg = getBackground();
+            int rgb = st.getBgColor() & 0xffffff;
+            if ((st.getBgTransparency() & 0xff) != 0 && (bg == null || (bg.getRGB() & 0xffffff) != rgb)) {
+                return new Color(rgb);
+            }
+        }
+        return CellTheme.mix(base(), ink(), 0.75f);
+    }
+
+    private Color base() {
+        Color bg = getBackground();
+        return bg != null ? bg : Color.WHITE;
+    }
+
+    private Color ink() {
+        Color fg = getForeground();
+        return fg != null ? fg : Color.BLACK;
+    }
+
+    /// Paints the track in its band with the thumb on it, then the tick
+    /// marks and the labels beside it.
     @Override
     protected void paintComponent(Graphics g) {
+        if (isOpaque()) {
+            g.setColor(base());
+            g.fillRect(0, 0, getWidth(), getHeight());
+        }
         boolean vertical = orientation == VERTICAL;
         int thick = nativeThickness();
         int room = vertical ? getWidth() : getHeight();
         int start = Math.max(0, (room - across()) / 2);
-        com.codename1.ui.Component p = cn1PeerOrNull();
-        if (p instanceof SliderPeer) {
-            ((SliderPeer) p).setBand(Units.toDevice(start), Units.toDeviceSize(start, Math.min(thick, room)));
+        int thumb = Math.min(thumbSize(), Math.max(1, Math.min(room, length())));
+        int centre = start + Math.min(thick, room) / 2;
+        int inset = inset();
+        int len = length();
+        int pos = sliderModel == null ? inset : position(getValue());
+        Color track = put("Slider.trackColor");
+        if (track == null) {
+            track = CellTheme.mix(base(), ink(), 0.22f);
         }
+        Color accent = isEnabled() ? accent() : CellTheme.mix(base(), ink(), 0.35f);
         if (paintTrack) {
-            super.paintComponent(g);
+            int t = Math.min(TRACK, thumb);
+            g.setColor(track);
+            // The filled part runs from the end the minimum is at.
+            boolean fromStart = vertical == inverted;
+            if (vertical) {
+                g.fillRoundRect(centre - t / 2, inset, t, Math.max(0, len - 2 * inset), t, t);
+                g.setColor(accent);
+                if (fromStart) {
+                    g.fillRoundRect(centre - t / 2, inset, t, Math.max(0, pos - inset), t, t);
+                } else {
+                    g.fillRoundRect(centre - t / 2, pos, t, Math.max(0, len - inset - pos), t, t);
+                }
+            } else {
+                g.fillRoundRect(inset, centre - t / 2, Math.max(0, len - 2 * inset), t, t, t);
+                g.setColor(accent);
+                if (fromStart) {
+                    g.fillRoundRect(inset, centre - t / 2, Math.max(0, pos - inset), t, t, t);
+                } else {
+                    g.fillRoundRect(pos, centre - t / 2, Math.max(0, len - inset - pos), t, t, t);
+                }
+            }
         }
+        int tx = (vertical ? centre : pos) - thumb / 2;
+        int ty = (vertical ? pos : centre) - thumb / 2;
+        // An outline in the background color keeps the thumb apart from
+        // the track on either side of it.
+        g.setColor(base());
+        g.fillOval(tx - 1, ty - 1, thumb + 2, thumb + 2);
+        g.setColor(accent);
+        g.fillOval(tx, ty, thumb, thumb);
         int at = start + thick;
         if (paintTicks) {
-            Color fg = getForeground();
-            g.setColor(fg != null ? fg : Color.GRAY);
+            g.setColor(CellTheme.mix(base(), ink(), isEnabled() ? 0.7f : 0.35f));
             paintTickMarks(g, at, minorTickSpacing, MINOR_TICK);
             paintTickMarks(g, at, majorTickSpacing, MAJOR_TICK);
             at += MAJOR_TICK;
@@ -317,7 +415,8 @@ public class JSlider extends JComponent implements Accessible, SwingConstants {
 
     /// Where along the slider `value` is, in logical pixels.
     private int position(long value) {
-        int length = (orientation == VERTICAL ? getHeight() : getWidth()) - 1;
+        int inset = inset();
+        int length = length() - 2 * inset;
         long min = getMinimum();
         long span = (long) getMaximum() - min;
         double f = span <= 0 ? 0 : (double) (value - min) / (double) span;
@@ -327,7 +426,7 @@ public class JSlider extends JComponent implements Accessible, SwingConstants {
         if (orientation == VERTICAL) {
             f = 1 - f;
         }
-        return (int) Math.round(f * Math.max(0, length));
+        return inset + (int) Math.round(f * Math.max(0, length));
     }
 
     private void paintTickMarks(Graphics g, int at, int spacing, int length) {
@@ -428,7 +527,6 @@ public class JSlider extends JComponent implements Accessible, SwingConstants {
             newModel.addChangeListener(bridge);
         }
         firePropertyChange("model", old, newModel);
-        cn1Sync();
         repaint();
     }
 
@@ -496,7 +594,6 @@ public class JSlider extends JComponent implements Accessible, SwingConstants {
     }
 
     private void changed() {
-        cn1Sync();
         revalidate();
         repaint();
     }
@@ -568,7 +665,6 @@ public class JSlider extends JComponent implements Accessible, SwingConstants {
         inverted = b;
         firePropertyChange("inverted", old, b);
         if (b != old) {
-            cn1Sync();
             repaint();
         }
     }
@@ -673,7 +769,6 @@ public class JSlider extends JComponent implements Accessible, SwingConstants {
             if (changeListener == null) {
                 changeListener = createChangeListener();
             }
-            cn1Sync();
             if (changeListener != null) {
                 changeListener.stateChanged(e);
             }

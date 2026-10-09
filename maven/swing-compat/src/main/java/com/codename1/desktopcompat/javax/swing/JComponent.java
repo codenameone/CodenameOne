@@ -91,6 +91,9 @@ public abstract class JComponent extends Container {
     private boolean inheritsPopupMenu;
     private InputVerifier inputVerifier;
     private boolean verifyInputWhenFocusTarget = true;
+    /// Whether this is a component a look and feel gives colors to: 0 not
+    /// asked yet, 1 yes, 2 no.
+    private byte lookAndFeelColors;
 
     public JComponent() {
     }
@@ -174,6 +177,58 @@ public abstract class JComponent extends Container {
     public com.codename1.desktopcompat.java.awt.Font getFont() {
         com.codename1.desktopcompat.java.awt.Font f = super.getFont();
         return f != null ? f : com.codename1.desktopcompat.rt.Fonts.defaultFont();
+    }
+
+    /// Whether this is one of the components whose look and feel installs
+    /// a background and a foreground. On a desktop every Swing widget is,
+    /// so none of them takes its colors from the container around it; a
+    /// class that extends `JComponent` directly, a `Box` or a layered pane
+    /// has no look and feel and inherits them, as any AWT component does.
+    private boolean cn1LookAndFeelColors() {
+        if (lookAndFeelColors == 0) {
+            Object o = this;
+            boolean has = o instanceof JPanel || o instanceof JLabel || o instanceof AbstractButton
+                    || o instanceof JScrollPane || o instanceof JViewport || o instanceof JScrollBar
+                    || o instanceof JSplitPane || o instanceof JTabbedPane || o instanceof JToolBar
+                    || o instanceof JMenuBar || o instanceof JPopupMenu || o instanceof JSlider
+                    || o instanceof JProgressBar || o instanceof JComboBox || o instanceof JInternalFrame
+                    || o instanceof JRootPane || o instanceof JOptionPane || o instanceof JSeparator
+                    || o instanceof JSpinner || o instanceof JColorChooser || o instanceof JFileChooser
+                    || o instanceof JList || o instanceof JTable || o instanceof JTree || o instanceof JDesktopPane
+                    || o instanceof com.codename1.desktopcompat.javax.swing.text.JTextComponent
+                    || o instanceof com.codename1.desktopcompat.javax.swing.table.JTableHeader;
+            lookAndFeelColors = (byte) (has ? 1 : 2);
+        }
+        return lookAndFeelColors == 1;
+    }
+
+    /// The background that was set, and otherwise the one the look and
+    /// feel gives a widget -- the `control` color of [UIManager], which is
+    /// the theme's window background unless the application put another.
+    /// Only a component without a look and feel answers the background of
+    /// its parent.
+    @Override
+    public Color getBackground() {
+        if (!isBackgroundSet() && cn1LookAndFeelColors()) {
+            Color c = UIManager.getColor("control");
+            if (c != null) {
+                return c;
+            }
+        }
+        return super.getBackground();
+    }
+
+    /// The foreground that was set, and otherwise the `controlText` color
+    /// of [UIManager] for a widget; see [#getBackground].
+    @Override
+    public Color getForeground() {
+        if (!isForegroundSet() && cn1LookAndFeelColors()) {
+            Color c = UIManager.getColor("controlText");
+            if (c != null) {
+                return c;
+            }
+        }
+        return super.getForeground();
     }
 
     @Override
