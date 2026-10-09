@@ -529,23 +529,59 @@ public class AndroidCameraImpl extends CameraImpl {
 
     @Override
     public void setFlashMode(FlashMode mode) {
-        if (imageCapture == null) return;
+        // TORCH is not an ImageCapture flash mode: ImageCapture only decides
+        // whether the flash fires for a still, so mapping TORCH onto it lit
+        // nothing and the scanner's torch button did nothing on Android. The
+        // continuous light is CameraControl#enableTorch, which needs no
+        // permission beyond CAMERA.
+        boolean torch = mode == FlashMode.TORCH;
+        if (imageCapture != null) {
+            try {
+                // ImageCapture.FLASH_MODE_AUTO = 0, _ON = 1, _OFF = 2. With the
+                // torch lit the still needs no flash of its own.
+                int code = mode == FlashMode.ON ? 1
+                        : mode == FlashMode.AUTO ? 0
+                        : 2;
+                clsImageCapture.getMethod("setFlashMode", int.class).invoke(imageCapture, code);
+            } catch (Throwable t) {
+                Log.w(TAG, "Could not set flash mode: " + t);
+            }
+        }
         try {
-            int code = mode == null ? 2
-                    : mode == FlashMode.OFF ? 2
-                    : mode == FlashMode.ON ? 1
-                    : 0; // AUTO
-            clsImageCapture.getMethod("setFlashMode", int.class).invoke(imageCapture, code);
-        } catch (Throwable ignored) { }
+            Object cameraControl = cameraControl();
+            if (cameraControl != null) {
+                cameraControlMethod("enableTorch", boolean.class).invoke(cameraControl, torch);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not switch torch: " + t);
+        }
     }
 
     @Override
     public void setZoom(float ratio) {
-        if (camera == null) return;
         try {
-            Object cameraControl = camera.getClass().getMethod("getCameraControl").invoke(camera);
-            cameraControl.getClass().getMethod("setZoomRatio", float.class).invoke(cameraControl, ratio);
-        } catch (Throwable ignored) { }
+            Object cameraControl = cameraControl();
+            if (cameraControl != null) {
+                cameraControlMethod("setZoomRatio", float.class).invoke(cameraControl, ratio);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not set zoom: " + t);
+        }
+    }
+
+    // The bound camera and its control are instances of CameraX classes that
+    // are not public, and Method#invoke refuses a public method reached through
+    // a non-public class. Resolve both methods on the public interfaces.
+    private Object cameraControl() throws Exception {
+        if (camera == null) {
+            return null;
+        }
+        return Class.forName("androidx.camera.core.Camera")
+                .getMethod("getCameraControl").invoke(camera);
+    }
+
+    private static Method cameraControlMethod(String name, Class<?> argument) throws Exception {
+        return Class.forName("androidx.camera.core.CameraControl").getMethod(name, argument);
     }
 
     @Override
