@@ -804,21 +804,22 @@ public final class CssEngine extends StyleEngine {
         "-fx-table-header-border-color", "-fx-box-border",
     };
 
-    private static HashMap<String, CssValue> themeDefaults;
+    private static final HashMap<String, CssValue> THEME_DEFAULTS = themeDefaults();
+
+    private static HashMap<String, CssValue> themeDefaults() {
+        HashMap<String, CssValue> made = new HashMap<String, CssValue>();
+        CssValueParser p = new CssValueParser();
+        for (int i = 0; i + 1 < THEME.length; i += 2) {
+            CssValue v = p.parse(THEME[i], THEME[i + 1]);
+            if (v != null) {
+                made.put(THEME[i], v);
+            }
+        }
+        return made;
+    }
 
     private static CssValue themeDefault(String name) {
-        if (themeDefaults == null) {
-            HashMap<String, CssValue> made = new HashMap<String, CssValue>();
-            CssValueParser p = new CssValueParser();
-            for (int i = 0; i + 1 < THEME.length; i += 2) {
-                CssValue v = p.parse(THEME[i], THEME[i + 1]);
-                if (v != null) {
-                    made.put(THEME[i], v);
-                }
-            }
-            themeDefaults = made;
-        }
-        return themeDefaults.get(name);
+        return THEME_DEFAULTS.get(name);
     }
 
     /// The colour a theme name stands for where `node` is: what the

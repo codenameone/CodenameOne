@@ -1519,22 +1519,24 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
     }
 
     /// The position of the scene on the screen: where the window is plus
-    /// where the scene is in it. Zero for a node in no window.
-    private double[] sceneOnScreen() {
+    /// where the scene is in it. Answers false for a node in no window.
+    private boolean sceneOnScreen(double[] origin) {
         Scene sc = getScene();
         if (sc == null || sc.getWindow() == null) {
-            return null;
+            return false;
         }
         double wx = sc.getWindow().getX();
         double wy = sc.getWindow().getY();
-        return new double[] {(Double.isNaN(wx) ? 0 : wx) + sc.getX(), (Double.isNaN(wy) ? 0 : wy) + sc.getY()};
+        origin[0] = (Double.isNaN(wx) ? 0 : wx) + sc.getX();
+        origin[1] = (Double.isNaN(wy) ? 0 : wy) + sc.getY();
+        return true;
     }
 
     /// Converts a local point to the coordinates of the screen, or
     /// `null` for a node that is in no window.
     public Point2D localToScreen(double localX, double localY) {
-        double[] origin = sceneOnScreen();
-        if (origin == null) {
+        double[] origin = new double[2];
+        if (!sceneOnScreen(origin)) {
             return null;
         }
         Point2D p = localToScene(localX, localY);
@@ -1549,8 +1551,8 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
     /// Converts a point of the screen to local coordinates, or `null`
     /// for a node that is in no window.
     public Point2D screenToLocal(double screenX, double screenY) {
-        double[] origin = sceneOnScreen();
-        if (origin == null) {
+        double[] origin = new double[2];
+        if (!sceneOnScreen(origin)) {
             return null;
         }
         return sceneToLocal(screenX - origin[0], screenY - origin[1]);

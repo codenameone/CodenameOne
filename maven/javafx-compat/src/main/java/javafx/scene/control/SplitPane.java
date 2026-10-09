@@ -180,13 +180,16 @@ public class SplitPane extends Control {
         requestLayout();
     }
 
+    /// The bar between two items, in the colour the theme gives one.
+    private static final class Bar extends Region {
+        @Override
+        public String cn1DefaultStyle() {
+            return "-fx-background-color: derive(-fx-base, -12%);";
+        }
+    }
+
     private Region bar(final Divider divider) {
-        Region r = new Region() {
-            @Override
-            public String cn1DefaultStyle() {
-                return "-fx-background-color: derive(-fx-base, -12%);";
-            }
-        };
+        Region r = new Bar();
         r.setManaged(false);
         r.getStyleClass().add("split-pane-divider");
         r.setBackground(new Background(new BackgroundFill(Color.gray(0.8), CornerRadii.EMPTY, Insets.EMPTY)));
