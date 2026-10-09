@@ -22,14 +22,19 @@
  */
 package com.codename1.compat.jdk;
 
+import java.lang.ref.WeakReference;
 import java.time.DateTimeException;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAccessor;
+import java.util.ArrayList;
+import java.util.Locale;
 
 /// The members of the `java.time` classes a desktop application names and
 /// the device's classes do not have.
@@ -193,5 +198,155 @@ public final class JdkTime {
             throw new NullPointerException();
         }
         return query.queryFrom(formatter.parse(text));
+    }
+
+    // ---- DateTimeFormatter with an override zone ----
+    //
+    // The device's formatter is final and holds a pattern and nothing else,
+    // so the zone of `withZone` is kept beside it: every formatter made from
+    // a pattern is remembered with that pattern, and a zoned one is a second
+    // formatter of the same pattern, remembered with its zone. Both tables
+    // hold their formatter weakly.
+
+    private static final class Known {
+        final WeakReference<DateTimeFormatter> formatter;
+        final String pattern;
+        final Locale locale;
+        /// The formatter this one was made from by `withZone`, or null.
+        final DateTimeFormatter base;
+        final ZoneId zone;
+
+        Known(DateTimeFormatter formatter, String pattern, Locale locale, DateTimeFormatter base, ZoneId zone) {
+            this.formatter = new WeakReference<DateTimeFormatter>(formatter);
+            this.pattern = pattern;
+            this.locale = locale;
+            this.base = base;
+            this.zone = zone;
+        }
+    }
+
+    private static final ArrayList<Known> KNOWN = new ArrayList<Known>();
+    private static final String ISO_DATE_PATTERN = "yyyy-MM-dd";
+    private static final String ISO_TIME_PATTERN = "HH:mm:ss";
+    private static final String ISO_DATE_TIME_PATTERN = "yyyy-MM-dd'T'HH:mm:ss";
+
+    private static Known known(DateTimeFormatter formatter) {
+        for (int i = KNOWN.size() - 1; i >= 0; i--) {
+            Known k = KNOWN.get(i);
+            DateTimeFormatter f = k.formatter.get();
+            if (f == null) {
+                KNOWN.remove(i);
+            } else if (f == formatter) {
+                return k;
+            }
+        }
+        return null;
+    }
+
+    private static DateTimeFormatter remember(DateTimeFormatter formatter, String pattern, Locale locale,
+            DateTimeFormatter base, ZoneId zone) {
+        // The scan drops the entries whose formatter is gone.
+        known(null);
+        KNOWN.add(new Known(formatter, pattern, locale, base, zone));
+        return formatter;
+    }
+
+    /// `DateTimeFormatter.ofPattern(pattern)`, remembered with its pattern.
+    public static DateTimeFormatter ofPattern(String pattern) {
+        return remember(DateTimeFormatter.ofPattern(pattern), pattern, null, null, null);
+    }
+
+    /// `DateTimeFormatter.ofPattern(pattern, locale)`, remembered with both.
+    public static DateTimeFormatter ofPattern(String pattern, Locale locale) {
+        return remember(DateTimeFormatter.ofPattern(pattern, locale), pattern, locale, null, null);
+    }
+
+    private static String isoPattern(DateTimeFormatter formatter) {
+        if (formatter == DateTimeFormatter.ISO_LOCAL_DATE) {
+            return ISO_DATE_PATTERN;
+        }
+        if (formatter == DateTimeFormatter.ISO_LOCAL_TIME) {
+            return ISO_TIME_PATTERN;
+        }
+        return ISO_DATE_TIME_PATTERN;
+    }
+
+    /// `formatter.withZone(zone)`: a formatter that formats an instant, or a
+    /// date and time that has a zone or an offset, in `zone`. A null zone
+    /// answers a formatter with no override, as the JDK does.
+    ///
+    /// What comes back formats a local date or time exactly as `formatter`
+    /// does. Made from one of the `ISO_` constants it is a formatter of the
+    /// constant's pattern without the fraction of a second.
+    public static DateTimeFormatter withZone(DateTimeFormatter formatter, ZoneId zone) {
+        Known k = known(formatter);
+        DateTimeFormatter base = k != null && k.base != null ? k.base : formatter;
+        Known origin = k != null && k.base != null ? known(k.base) : k;
+        String pattern = origin != null ? origin.pattern : isoPattern(base);
+        Locale locale = origin != null ? origin.locale : null;
+        if (zone == null) {
+            return base;
+        }
+        if (k != null && zone.equals(k.zone)) {
+            return formatter;
+        }
+        return remember(make(pattern, locale), pattern, locale, base, zone);
+    }
+
+    private static DateTimeFormatter make(String pattern, Locale locale) {
+        return locale == null ? DateTimeFormatter.ofPattern(pattern) : DateTimeFormatter.ofPattern(pattern, locale);
+    }
+
+    /// `formatter.getZone()`: the zone given to [#withZone], or null.
+    public static ZoneId getZone(DateTimeFormatter formatter) {
+        Known k = known(formatter);
+        return k == null ? null : k.zone;
+    }
+
+    /// `formatter.format(temporal)`, honouring the zone of [#withZone]: an
+    /// instant and a zoned or offset date and time are shown in that zone,
+    /// a local date and time as that date and time in the zone, and a date
+    /// or a time alone as it is.
+    public static String format(DateTimeFormatter formatter, TemporalAccessor temporal) {
+        if (temporal == null) {
+            throw new NullPointerException("temporal");
+        }
+        Known k = known(formatter);
+        if (k == null || k.zone == null) {
+            return formatter.format(temporal);
+        }
+        if (temporal instanceof Instant) {
+            return formatter.format(ZonedDateTime.ofInstant((Instant) temporal, k.zone));
+        }
+        if (temporal instanceof ZonedDateTime) {
+            return formatter.format(ZonedDateTime.ofInstant(((ZonedDateTime) temporal).toInstant(), k.zone));
+        }
+        if (temporal instanceof OffsetDateTime) {
+            return formatter.format(ZonedDateTime.ofInstant(((OffsetDateTime) temporal).toInstant(), k.zone));
+        }
+        if (temporal instanceof LocalDateTime) {
+            return formatter.format(ZonedDateTime.of((LocalDateTime) temporal, k.zone));
+        }
+        return formatter.format(temporal);
+    }
+
+    /// `zoned.format(formatter)`, honouring the zone of [#withZone].
+    public static String format(ZonedDateTime zoned, DateTimeFormatter formatter) {
+        return format(formatter, zoned);
+    }
+
+    /// `offset.format(formatter)`, honouring the zone of [#withZone].
+    public static String format(OffsetDateTime offset, DateTimeFormatter formatter) {
+        return format(formatter, offset);
+    }
+
+    /// `ZonedDateTime.parse(text, formatter)`: with the zone of
+    /// [#withZone], the date and time read are those of that zone.
+    public static ZonedDateTime parseZoned(CharSequence text, DateTimeFormatter formatter) {
+        Known k = known(formatter);
+        if (k == null || k.zone == null) {
+            return ZonedDateTime.parse(text, formatter);
+        }
+        return ZonedDateTime.of(localDateTimeFrom(formatter.parse(text)), k.zone);
     }
 }

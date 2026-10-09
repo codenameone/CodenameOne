@@ -500,6 +500,23 @@ final class CompatRewrites {
                 TIME + "#localDateTimeFrom");
         VIRTUAL.put("java/time/format/DateTimeFormatter.parse(Ljava/lang/CharSequence;"
                 + "Ljava/time/temporal/TemporalQuery;)" + OBJECT, TIME);
+        // The device's formatter cannot carry the zone of withZone, so the
+        // shared classes keep it beside the formatter: every way a
+        // formatter is made from a pattern and every way a zone could show
+        // goes through them.
+        String fmt = "java/time/format/DateTimeFormatter.";
+        String fmtT = "Ljava/time/format/DateTimeFormatter;";
+        String zoneT = "Ljava/time/ZoneId;";
+        String zonedT = "Ljava/time/ZonedDateTime;";
+        STATIC.put(fmt + "ofPattern(" + STRING + ")" + fmtT, TIME);
+        STATIC.put(fmt + "ofPattern(" + STRING + "Ljava/util/Locale;)" + fmtT, TIME);
+        VIRTUAL.put(fmt + "withZone(" + zoneT + ")" + fmtT, TIME);
+        VIRTUAL.put(fmt + "getZone()" + zoneT, TIME);
+        VIRTUAL.put(fmt + "format(" + accessorT + ")" + STRING, TIME);
+        VIRTUAL.put("java/time/ZonedDateTime.format(" + fmtT + ")" + STRING, TIME);
+        VIRTUAL.put("java/time/OffsetDateTime.format(" + fmtT + ")" + STRING, TIME);
+        STATIC.put("java/time/ZonedDateTime.parse(Ljava/lang/CharSequence;" + fmtT + ")" + zonedT,
+                TIME + "#parseZoned");
     }
 
     private CompatRewrites() {

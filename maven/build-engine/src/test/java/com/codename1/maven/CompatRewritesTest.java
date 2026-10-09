@@ -215,4 +215,47 @@ public class CompatRewritesTest {
         assertEquals(after.toString(), 1, after.size());
         assertTrue(after.contains("java/lang/Class.getResourceAsStream"));
     }
+
+    private static final String TIME_SOURCE = "package q;\n"
+            + "import java.time.Instant;\n"
+            + "import java.time.LocalTime;\n"
+            + "import java.time.ZoneId;\n"
+            + "import java.time.ZoneOffset;\n"
+            + "import java.time.ZonedDateTime;\n"
+            + "import java.time.format.DateTimeFormatter;\n"
+            + "public class T {\n"
+            + "    public static Object[] run() {\n"
+            + "        DateTimeFormatter plain = DateTimeFormatter.ofPattern(\"HH:mm:ss\");\n"
+            + "        DateTimeFormatter zoned = plain.withZone(ZoneId.of(\"GMT+02:00\"));\n"
+            + "        Instant at = Instant.ofEpochSecond(5 * 3600 + 7 * 60 + 9);\n"
+            + "        return new Object[] {zoned.format(at), LocalTime.of(1, 2, 3).format(zoned),\n"
+            + "            String.valueOf(zoned.getZone()), String.valueOf(plain.getZone()),\n"
+            + "            ZonedDateTime.ofInstant(at, ZoneOffset.UTC).format(zoned),\n"
+            + "            plain.format(LocalTime.of(4, 5, 6))};\n"
+            + "    }\n"
+            + "}\n";
+
+    /// `withZone` has nowhere to live on the device's formatter, so the
+    /// zone is kept beside it: a formatter made, zoned and used by
+    /// rewritten calls shows an instant in that zone.
+    @Test
+    public void aFormatterKeepsItsOverrideZone() throws Exception {
+        File classes = tmp.newFolder();
+        CompatFixtures.compile(tmp.newFolder(), classes, "q/T.java", TIME_SOURCE);
+        byte[] original = Files.readAllBytes(new File(classes, "q/T.class").toPath());
+        byte[] relocated = new ClassRelocator(CompatLayers.JAVAFX).remap(original);
+        Set<String> after = CompatFixtures.members(relocated);
+        for (String gone : new String[] {"java/time/format/DateTimeFormatter.withZone",
+            "java/time/format/DateTimeFormatter.getZone", "java/time/format/DateTimeFormatter.ofPattern",
+            "java/time/format/DateTimeFormatter.format", "java/time/ZonedDateTime.format"}) {
+            assertFalse(gone + " survived: " + after, after.contains(gone));
+        }
+        assertTrue(after.toString(), after.contains(Relocation.JDK_PACKAGE + "JdkTime.withZone"));
+        // A local time is formatted by the device's own class, untouched.
+        assertTrue(after.toString(), after.contains("java/time/LocalTime.format"));
+        Class<?> t = new CompatFixtures.Defining(getClass().getClassLoader()).define(relocated);
+        Object[] out = (Object[]) t.getMethod("run").invoke(null);
+        assertEquals(Arrays.asList("07:07:09", "01:02:03", "GMT+02:00", "null", "07:07:09", "04:05:06"),
+                Arrays.asList(out));
+    }
 }

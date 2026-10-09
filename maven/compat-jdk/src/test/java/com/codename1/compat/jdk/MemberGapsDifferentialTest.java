@@ -413,4 +413,71 @@ public class MemberGapsDifferentialTest {
             // As the JDK's.
         }
     }
+
+    // ---- DateTimeFormatter.withZone ----
+
+    private static final String[] ZONES = {"UTC", "GMT+02:00", "GMT-05:30", "Europe/Paris", "Asia/Tokyo"};
+    private static final String[] PATTERNS = {"HH:mm:ss", "yyyy-MM-dd HH:mm", "dd.MM.yyyy", "yyyy-MM-dd'T'HH:mm:ss"};
+    private static final long[] SECONDS = {0L, 1L, 86399L, 1700000000L, 951782400L, 1711846800L, -1L};
+
+    @Test
+    public void aZonedFormatterShowsAnInstantInItsZone() {
+        for (String pattern : PATTERNS) {
+            DateTimeFormatter jdk = DateTimeFormatter.ofPattern(pattern);
+            DateTimeFormatter shim = JdkTime.ofPattern(pattern);
+            org.junit.Assert.assertNull(JdkTime.getZone(shim));
+            for (String id : ZONES) {
+                java.time.ZoneId zone = java.time.ZoneId.of(id);
+                DateTimeFormatter zoned = JdkTime.withZone(shim, zone);
+                org.junit.Assert.assertNotSame(shim, zoned);
+                assertEquals(jdk.withZone(zone).getZone(), JdkTime.getZone(zoned));
+                assertSame(zoned, JdkTime.withZone(zoned, zone));
+                for (long s : SECONDS) {
+                    java.time.Instant at = java.time.Instant.ofEpochSecond(s);
+                    String what = pattern + " " + id + " " + s;
+                    assertEquals(what, jdk.withZone(zone).format(at), JdkTime.format(zoned, at));
+                    java.time.ZonedDateTime elsewhere = java.time.ZonedDateTime.ofInstant(at, java.time.ZoneId.of("Asia/Kolkata"));
+                    assertEquals(what, jdk.withZone(zone).format(elsewhere), JdkTime.format(zoned, elsewhere));
+                    assertEquals(what, elsewhere.format(jdk.withZone(zone)), JdkTime.format(elsewhere, zoned));
+                    java.time.OffsetDateTime offset = at.atOffset(java.time.ZoneOffset.ofHours(-3));
+                    assertEquals(what, jdk.withZone(zone).format(offset), JdkTime.format(offset, zoned));
+                    java.time.LocalDateTime local = java.time.LocalDateTime.ofEpochSecond(s, 0,
+                            java.time.ZoneOffset.UTC);
+                    assertEquals(what, jdk.withZone(zone).format(local), JdkTime.format(zoned, local));
+                }
+                // The formatter it was made from is left without a zone.
+                org.junit.Assert.assertNull(JdkTime.getZone(shim));
+                // A second zone replaces the first, and null removes it.
+                DateTimeFormatter again = JdkTime.withZone(zoned, java.time.ZoneId.of("GMT+01:00"));
+                assertEquals(java.time.ZoneId.of("GMT+01:00"), JdkTime.getZone(again));
+                org.junit.Assert.assertNull(JdkTime.getZone(JdkTime.withZone(zoned, null)));
+            }
+        }
+    }
+
+    @Test
+    public void aZoneLeavesADateOrATimeAloneAsItIs() {
+        DateTimeFormatter time = JdkTime.withZone(JdkTime.ofPattern("HH:mm:ss"), java.time.ZoneId.of("Asia/Tokyo"));
+        DateTimeFormatter jdkTime = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(java.time.ZoneId.of("Asia/Tokyo"));
+        for (LocalTime t : TIMES) {
+            assertEquals(jdkTime.format(t), JdkTime.format(time, t));
+            assertEquals(t.format(jdkTime), t.format(time));
+        }
+        DateTimeFormatter date = JdkTime.withZone(JdkTime.ofPattern("dd.MM.yyyy"), java.time.ZoneId.of("UTC"));
+        DateTimeFormatter jdkDate = DateTimeFormatter.ofPattern("dd.MM.yyyy").withZone(java.time.ZoneId.of("UTC"));
+        for (LocalDate d : DATES) {
+            assertEquals(jdkDate.format(d), JdkTime.format(date, d));
+        }
+        // One of the constants, which was not made through ofPattern.
+        DateTimeFormatter iso = JdkTime.withZone(DateTimeFormatter.ISO_LOCAL_DATE, java.time.ZoneId.of("UTC"));
+        java.time.Instant at = java.time.Instant.ofEpochSecond(1700000000L);
+        assertEquals(DateTimeFormatter.ISO_LOCAL_DATE.withZone(java.time.ZoneId.of("UTC")).format(at),
+                JdkTime.format(iso, at));
+        try {
+            JdkTime.format(iso, null);
+            fail();
+        } catch (NullPointerException expected) {
+            // As the JDK's.
+        }
+    }
 }
