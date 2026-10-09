@@ -587,4 +587,34 @@ public class SceneGraphTest {
         scene.getStylesheets().add("app.css");
         assertEquals("[Pane, Region#other]", log.toString());
     }
+
+    /// A JavaFX window is light grey behind its controls: the standard
+    /// theme gives the root of a scene the theme's background colour. The
+    /// layer left a root with no background, and the white fill of the
+    /// scene showed instead. A group has no background, a pane that is
+    /// not the root none either, and a sheet's own rule wins.
+    @Test
+    public void theRootRegionOfASceneHasTheBackgroundOfTheTheme() {
+        javafx.scene.layout.Pane inner = new javafx.scene.layout.Pane();
+        javafx.scene.layout.StackPane root = new javafx.scene.layout.StackPane(inner);
+        javafx.scene.Scene scene = new javafx.scene.Scene(root, 200, 100);
+        scene.cn1Layout(200, 100);
+        assertNotNull(root.getBackground());
+        assertEquals(Color.web("#f4f4f4").toString(),
+                root.getBackground().getFills().get(0).getFill().toString());
+        assertNull(inner.getBackground());
+
+        javafx.scene.layout.StackPane styled = new javafx.scene.layout.StackPane();
+        styled.setStyle("-fx-background-color: red;");
+        javafx.scene.Scene other = new javafx.scene.Scene(styled, 200, 100);
+        other.cn1Layout(200, 100);
+        assertEquals(Color.RED, styled.getBackground().getFills().get(0).getFill());
+
+        // No longer the root, no longer grey.
+        scene.setRoot(new javafx.scene.Group());
+        javafx.scene.layout.StackPane holder = new javafx.scene.layout.StackPane(root);
+        javafx.scene.Scene third = new javafx.scene.Scene(holder, 200, 100);
+        third.cn1Layout(200, 100);
+        assertNull(root.getBackground());
+    }
 }

@@ -46,6 +46,7 @@ import javafx.geometry.Orientation;
 import javafx.geometry.VPos;
 import javafx.scene.Node;
 import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.paint.Paint;
 import javafx.scene.shape.SVGPath;
 import javafx.scene.shape.Shape;
@@ -152,6 +153,17 @@ public class Region extends Parent {
         // A change of this region's own constraints needs both this region
         // and its parent laid out again.
         requestLayout();
+    }
+
+    /// The standard theme gives the root of a scene the background colour
+    /// of the theme, the light grey a JavaFX window has behind its
+    /// controls; the white fill of the scene shows only under a root that
+    /// is not a region. A sheet that gives the root a background of its
+    /// own wins, as every rule does over these.
+    @Override
+    public String cn1DefaultStyle() {
+        Scene scene = getScene();
+        return scene != null && scene.getRoot() == this ? "-fx-background-color: -fx-background;" : null;
     }
 
     // -------------------------------------------------------------- size
