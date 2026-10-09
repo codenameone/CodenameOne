@@ -28,6 +28,7 @@ import com.codename1.desktopcompat.java.awt.Container;
 import com.codename1.desktopcompat.java.awt.Font;
 import com.codename1.desktopcompat.java.awt.Insets;
 import com.codename1.desktopcompat.java.awt.Window;
+import com.codename1.desktopcompat.javax.swing.AbstractButton;
 import com.codename1.desktopcompat.javax.swing.JList;
 import com.codename1.desktopcompat.javax.swing.JTable;
 import com.codename1.desktopcompat.javax.swing.JTree;
@@ -51,8 +52,11 @@ import java.util.Hashtable;
 /// variant of its own switches to it. A theme that has none -- its window
 /// stays light when dark was asked for, or the reverse -- gets the
 /// layer's own palette laid over it, for every widget family the layer
-/// uses. Either way there is one theming path: after the selection the
-/// theme is dark, and everything that reads it follows.
+/// uses. So does an application that has no theme to speak of, one whose
+/// fields still have the border Codename One draws when a theme says
+/// nothing, as soon as it names a look and feel: it asked for a look and
+/// has none. Either way there is one theming path: after the selection
+/// the theme is dark, and everything that reads it follows.
 ///
 /// Open windows are restyled at once. A color the layer itself gave a
 /// list, a table or a tree when it was made is exchanged for its
@@ -180,7 +184,7 @@ public final class LafTheme {
         Display.getInstance().setDarkMode(dark);
         UIManager m = UIManager.getInstance();
         m.refreshTheme();
-        if (overlaid || isDark() != want) {
+        if (overlaid || isDark() != want || (dark != null && bare(m))) {
             m.addThemeProps(overlay(want));
             overlaid = true;
         }
@@ -189,6 +193,39 @@ public final class LafTheme {
         for (int i = 0; i < all.length; i++) {
             exchange(all[i], before, after);
             restyle(all[i]);
+        }
+    }
+
+    /// Whether the theme styles nothing: a text field still has the
+    /// border Codename One gives one when no theme says otherwise.
+    private static boolean bare(UIManager m) {
+        Style s = m.getComponentStyle("TextField");
+        return s != null && s.getBorder() == Border.getDefaultBorder();
+    }
+
+    /// Gives the peers of `c` and of everything in it what was set on the
+    /// components again, after their styles were taken from the theme
+    /// anew: the colors and the font, and for a button what its border
+    /// and content area switches did to its style.
+    private static void reapply(Component c) {
+        com.codename1.ui.Component p = c.cn1PeerOrNull();
+        if (p instanceof Peer) {
+            ((Peer) p).support().applyStyle();
+        }
+        Object o = c;
+        if (o instanceof AbstractButton) {
+            // The button compares what it is asked for with what it last
+            // did, so it is asked for another margin and then for its own.
+            AbstractButton b = (AbstractButton) o;
+            Insets own = b.getMargin();
+            b.setMargin(own == null ? new Insets(1, 1, 1, 1) : null);
+            b.setMargin(own);
+        }
+        if (o instanceof Container) {
+            Component[] kids = ((Container) o).getComponents();
+            for (int i = 0; i < kids.length; i++) {
+                reapply(kids[i]);
+            }
         }
     }
 
@@ -226,6 +263,7 @@ public final class LafTheme {
                 p.refreshTheme(false);
             }
         }
+        reapply(top);
         top.invalidate();
         top.validate();
         top.repaint();
@@ -366,7 +404,7 @@ public final class LafTheme {
         int button = dark ? 0x4e5052 : 0xffffff;
         int sel = accent != null ? accent.getRGB() & 0xffffff : dark ? ACCENT_DARK : ACCENT_LIGHT;
         int selInk = 0xffffff;
-        int off = dark ? 0x8c8c8c : 0x8c8c8c;
+        int off = 0x8c8c8c;
         int line = dark ? 0x616365 : 0xc4c4c4;
         int head = mix(field, ink, 0.08f);
         Hashtable<String, Object> h = new Hashtable<String, Object>();
@@ -409,6 +447,12 @@ public final class LafTheme {
             h.put(rows[i] + ".press#bgColor", hex(sel));
             h.put(rows[i] + ".press#fgColor", hex(selInk));
         }
+        ui(h, "ToggleButton", button, ink, off, true);
+        h.put("ToggleButton.border", Border.createLineBorder(1, line));
+        h.put("ToggleButton.sel#border", Border.createLineBorder(1, sel));
+        h.put("ToggleButton.press#border", Border.createLineBorder(1, sel));
+        h.put("ToggleButton.dis#border", Border.createLineBorder(1, line));
+        h.put("ToggleButton.press#bgColor", hex(mix(button, ink, 0.22f)));
         ui(h, "ListRendererFocus", sel, selInk, off, true);
         ui(h, "ComboBoxFocus", sel, selInk, off, true);
         ui(h, "TableHeader", head, ink, off, true);

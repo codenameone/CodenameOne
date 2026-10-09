@@ -214,9 +214,6 @@ public final class ClientProps {
 
     private static void font(JComponent c, String value) {
         Font f = c.getFont();
-        if (f == null) {
-            return;
-        }
         int style = f.getStyle();
         float size = f.getSize2D();
         int start = 0;

@@ -145,6 +145,40 @@ public class LookAndFeelSwitchTest extends KernelTestBase {
         assertFalse(UIManager.getBoolean("laf.dark"));
     }
 
+    /// A switch takes every widget's style from the theme again, so what
+    /// the application set on a component has to be given back to it.
+    @Test
+    public void whatWasSetOnAComponentOutlastsASwitch() {
+        assertTrue(FlatLightLaf.setup());
+        JLabel title = new JLabel("Title");
+        title.setFont(title.getFont().deriveFont(31f));
+        title.setForeground(new Color(0x12, 0x34, 0x56));
+        JToolBar bar = new JToolBar();
+        JButton inBar = new JButton("In bar");
+        bar.add(inBar);
+        JFrame f = new JFrame();
+        f.add(bar, BorderLayout.NORTH);
+        f.add(title, BorderLayout.CENTER);
+        f.setSize(400, 300);
+        show(f);
+        com.codename1.ui.Component titlePeer = title.cn1Peer();
+        com.codename1.ui.Component barPeer = inBar.cn1Peer();
+        int size = titlePeer.getUnselectedStyle().getFont().getHeight();
+        assertTrue("a tool bar button has no border",
+                barPeer.getUnselectedStyle().getBorder().isEmptyBorder());
+
+        assertTrue(FlatDarkLaf.setup());
+        assertEquals(size, titlePeer.getUnselectedStyle().getFont().getHeight());
+        assertEquals(0x123456, titlePeer.getUnselectedStyle().getFgColor() & 0xffffff);
+        assertTrue("a tool bar button still has no border",
+                barPeer.getUnselectedStyle().getBorder().isEmptyBorder());
+        assertNull("the button's margin is its own again", inBar.getMargin());
+
+        assertTrue(FlatLightLaf.setup());
+        assertEquals(size, titlePeer.getUnselectedStyle().getFont().getHeight());
+        assertTrue(barPeer.getUnselectedStyle().getBorder().isEmptyBorder());
+    }
+
     @Test
     public void everyNameIsAcceptedAndSaysWhichPalette() throws Exception {
         UIManager.setLookAndFeel("com.formdev.flatlaf.FlatDarkLaf");

@@ -655,4 +655,86 @@
     </Match>
 
     <!-- END drag and drop, styled text and created fonts -->
+
+    <!-- BEGIN look-and-feel slice: UIManager's palettes, FlatLaf and
+         RSyntaxTextArea under their own names -->
+
+    <!-- Whether a look and feel is dark has three answers: dark, light,
+         and a name the layer does not know, which keeps the palette. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.javax.swing.UIManager"/>
+        <Method name="dark"/>
+        <Bug pattern="NP_BOOLEAN_RETURN_NULL"/>
+    </Match>
+
+    <!-- FlatLaf's API: the extra defaults are a map the application
+         hands over and reads back, per look and feel and for all of them,
+         and it is that map by FlatLaf's contract. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.com.formdev.flatlaf.FlatLaf"/>
+        <Or>
+            <Method name="getExtraDefaults"/>
+            <Method name="setExtraDefaults"/>
+            <Method name="getGlobalExtraDefaults"/>
+            <Method name="setGlobalExtraDefaults"/>
+        </Or>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+            <Bug pattern="MS_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_STATIC_REP2"/>
+        </Or>
+    </Match>
+
+    <!-- "public static int duration" and "resolution" are FlatLaf's own
+         fields, not final, which applications assign. Nothing reads them
+         here because a switch of palette is not animated. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.com.formdev.flatlaf.extras.FlatAnimatedLafChange"/>
+        <Or>
+            <Field name="duration"/>
+            <Field name="resolution"/>
+        </Or>
+        <Or>
+            <Bug pattern="MS_SHOULD_BE_FINAL"/>
+            <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD"/>
+        </Or>
+    </Match>
+
+    <!-- A Theme's fields are public in RSyntaxTextArea and applications
+         assign them; the line number font is kept for them to read back,
+         the gutter draws in the editor's font. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.org.fife.ui.rsyntaxtextarea.Theme"/>
+        <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD"/>
+    </Match>
+
+    <!-- A gutter belongs to the editor it numbers, a scroll pane hands
+         out its gutter, an editor its marked ranges and a search result
+         the range it was given: each is that object by the library's
+         contract, as with the components of the JDK packages above. -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.desktopcompat.org.fife.ui.rtextarea.Gutter"/>
+            <Class name="com.codename1.desktopcompat.org.fife.ui.rtextarea.RTextScrollPane"/>
+            <Class name="com.codename1.desktopcompat.org.fife.ui.rtextarea.RTextArea"/>
+            <Class name="com.codename1.desktopcompat.org.fife.ui.rtextarea.SearchResult"/>
+        </Or>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+
+    <!-- SearchContext.clone() is public API of the library, where the
+         class is Cloneable. Here it copies field by field: Object.clone()
+         answers null on a device, so the class must not rely on it and
+         does not declare the interface the device has no use for. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.org.fife.ui.rtextarea.SearchContext"/>
+        <Method name="clone"/>
+        <Bug pattern="CN_IMPLEMENTS_CLONE_BUT_NOT_CLONEABLE"/>
+    </Match>
+
+    <!-- END look-and-feel slice -->
 </FindBugsFilter>

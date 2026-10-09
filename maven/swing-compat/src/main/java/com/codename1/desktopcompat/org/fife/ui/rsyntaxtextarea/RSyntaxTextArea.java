@@ -245,7 +245,7 @@ public class RSyntaxTextArea extends RTextArea implements SyntaxConstants {
         if (all == null) {
             all = "";
         }
-        if (inComment == null || scanned == null || !(scanned == all || scanned.equals(all))) {
+        if (inComment == null || scanned == null || !scanned.equals(all)) {
             scanStates(all);
         }
         boolean[] states = inComment;
