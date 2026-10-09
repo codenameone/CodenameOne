@@ -767,6 +767,193 @@ public class MvcTemplatesTest {
         assertTrue(html, html.contains("<b>inherited</b><i>inherited</i><em>class getter</em>"));
     }
 
+    @Test
+    public void svgLinksRejectUnsafeSchemes() throws Exception {
+        setup();
+        template(
+                "svg",
+                "<!-- cn1:model url java.lang.String --><svg><a"
+                    + " th:attr=\"XLINK:HREF=${url}\">Open</a></svg>");
+        compile();
+        for (String url :
+                Arrays.asList(
+                        "javascript:alert(1)",
+                        "JaVaScRiPt:alert(1)",
+                        "data:text/html,test",
+                        "java\nscript:alert(1)")) {
+            try {
+                render("svg", new Model().addAttribute("url", url));
+                fail(url);
+            } catch (IllegalArgumentException expected) {
+            }
+        }
+        assertTrue(
+                render("svg", new Model().addAttribute("url", "/products#list"))
+                        .contains("xlink:href=\"/products#list\""));
+    }
+
+    @Test
+    public void templateRootCannotBeASymlink() throws Exception {
+        setup();
+        File root = new File(project, "src/main/resources/templates");
+        assertTrue(root.getParentFile().mkdirs());
+        File outside = tmp.newFolder();
+        Files.write(
+                new File(outside, "secret.html").toPath(),
+                "private".getBytes(StandardCharsets.UTF_8));
+        try {
+            Files.createSymbolicLink(root.toPath(), outside.toPath());
+        } catch (UnsupportedOperationException | java.nio.file.FileSystemException unavailable) {
+            org.junit.Assume.assumeNoException(unavailable);
+        }
+        try {
+            new MvcTemplates(context).sources();
+            fail("Template root symlink accepted");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().contains("symlink"));
+        }
+    }
+
+    @Test
+    public void urlParametersPrecedeFragments() throws Exception {
+        setup();
+        template(
+                "urls",
+                "<!-- cn1:model page java.lang.Integer --><a"
+                    + " th:href=\"@{/products#list(page=${page})}\">a</a><a"
+                    + " th:href=\"@{/products?sort=name#list(page=${page})}\">b</a><a"
+                    + " th:href=\"@{/products/{id}#{section}(id=${page},section='a"
+                    + " b',q='x&y')}\">c</a><a"
+                    + " th:href=\"@{/products#list?ignored(page=${page})}\">d</a><a"
+                    + " th:href=\"@{/products#list}\">e</a>");
+        compile();
+        org.jsoup.select.Elements links =
+                org.jsoup.Jsoup.parse(render("urls", new Model().addAttribute("page", 2)))
+                        .select("a");
+        assertEquals("/products?page=2#list", links.get(0).attr("href"));
+        assertEquals("/products?sort=name&page=2#list", links.get(1).attr("href"));
+        assertEquals("/products/2?q=x%26y#a%20b", links.get(2).attr("href"));
+        assertEquals("/products?page=2#list?ignored", links.get(3).attr("href"));
+        assertEquals("/products#list", links.get(4).attr("href"));
+    }
+
+    @Test
+    public void mixedCaseAssetExtensionsHaveBrowserMimeTypes() throws Exception {
+        setup();
+        File root = new File(project, "src/main/resources/static");
+        assertTrue(root.mkdirs());
+        String[] names = {"App.JS", "site.CsS", "icon.SVG"};
+        String[] types = {
+            "text/javascript; charset=utf-8", "text/css; charset=utf-8", "image/svg+xml"
+        };
+        for (String name : names)
+            Files.write(new File(root, name).toPath(), "asset".getBytes(StandardCharsets.UTF_8));
+        JavaSourceCompiler.compile(MvcAssets.sources(project), classes, classpath());
+        loader =
+                new URLClassLoader(
+                        new URL[] {classes.toURI().toURL()}, getClass().getClassLoader());
+        HttpServer.Handler assets =
+                (HttpServer.Handler)
+                        loader.loadClass("com.codename1.generated.mvc.Assets").newInstance();
+        for (int i = 0; i < names.length; i++) {
+            Object response = assets.handle(request("GET", "/static/" + names[i], null, false));
+            assertEquals(types[i], field(response, "contentType"));
+            assertEquals(
+                    "nosniff",
+                    ((Map<?, ?>) field(response, "extraHeaders")).get("X-Content-Type-Options"));
+            assertEquals("asset", body(response));
+        }
+        assertNull(assets.handle(request("GET", "/static/app.js", null, false)));
+    }
+
+    @Test
+    public void submitMethodOverridesIncludeCsrfTokens() throws Exception {
+        setup();
+        String declaration = "<!-- cn1:model method java.lang.String -->";
+        template(
+                "forms",
+                declaration
+                        + "<form id=\"static\"><button"
+                        + " formmethod=\"post\">Save</button></form><form id=\"input\""
+                        + " method=\"get\"><input type=\"submit\" formmethod=\"POST\"></form><form"
+                        + " id=\"dynamic\"><button"
+                        + " th:attr=\"formmethod=${method}\">Save</button></form><form"
+                        + " id=\"fragment\"><div th:replace=\"~{control ::"
+                        + " save}\"></div></form><form id=\"external\"></form><button"
+                        + " form=\"external\" formmethod=\"post\">Save</button><form"
+                        + " id=\"get\"><button formmethod=\"get\">Search</button></form>");
+        template(
+                "control",
+                declaration
+                        + "<button th:fragment=\"save\""
+                        + " th:attr=\"formmethod=${method}\">Save</button>");
+        compile();
+        Model model =
+                new Model()
+                        .addAttribute("method", "post")
+                        .addAttribute(
+                                "_csrf",
+                                new com.codename1.backend.security.CsrfToken() {
+                                    public String getToken() {
+                                        return "token<&";
+                                    }
+
+                                    public String getHeaderName() {
+                                        return "X-CSRF-TOKEN";
+                                    }
+
+                                    public String getParameterName() {
+                                        return "_csrf";
+                                    }
+                                });
+        org.jsoup.nodes.Document html = org.jsoup.Jsoup.parse(render("forms", model));
+        for (String id : Arrays.asList("static", "input", "dynamic", "fragment")) {
+            org.jsoup.select.Elements tokens = html.select("form#" + id + " input[name=_csrf]");
+            assertEquals(id, 1, tokens.size());
+            assertEquals("token<&", tokens.first().val());
+        }
+        assertEquals("token<&", html.select("input[name=_csrf][form=external]").val());
+        assertTrue(html.select("form#get input[name=_csrf]").isEmpty());
+        model.addAttribute("method", "get");
+        html = org.jsoup.Jsoup.parse(render("forms", model));
+        assertTrue(
+                html.select("form#dynamic input[name=_csrf], form#fragment input[name=_csrf]")
+                        .isEmpty());
+        assertFalse(
+                render("forms", new Model().addAttribute("method", "post"))
+                        .contains("name=\"_csrf\""));
+    }
+
+    @Test
+    public void implicitOptionValuesFollowRenderedText() throws Exception {
+        setup();
+        template(
+                "options",
+                DECL
+                        + "<!-- cn1:model label java.lang.String -->"
+                        + "<form th:object=\"${product}\"><select th:field=\"*{name}\">"
+                        + "<option>Other</option><option th:text=\"${label}\">Prototype</option>"
+                        + "<option value=\"explicit\" th:text=\"${label}\">Prototype</option>"
+                        + "</select></form>");
+        compile();
+        Model model =
+                new Model()
+                        .addAttribute("product", product("A & B", 0))
+                        .addAttribute("label", " \tA  &\n B\r ");
+        org.jsoup.select.Elements options =
+                org.jsoup.Jsoup.parse(render("options", model)).select("option");
+        assertFalse(options.get(0).hasAttr("selected"));
+        assertTrue(options.get(1).hasAttr("selected"));
+        assertEquals("A & B", options.get(1).text());
+        assertFalse(options.get(2).hasAttr("selected"));
+        BindingResult errors = new BindingResult();
+        errors.submitted("name", "explicit");
+        model.addAttribute("BindingResult.product", errors);
+        options = org.jsoup.Jsoup.parse(render("options", model)).select("option");
+        assertFalse(options.get(1).hasAttr("selected"));
+        assertTrue(options.get(2).hasAttr("selected"));
+    }
+
     private static volatile int benchmarkSink;
 
     @Test

@@ -112,6 +112,8 @@ final class MvcTemplates {
         if (project == null)
             throw new IllegalArgumentException("MVC templates require a project directory");
         File root = new File(project, "src/main/resources/templates");
+        if (Files.isSymbolicLink(root.toPath()))
+            throw new IllegalArgumentException("MVC templates root cannot be a symlink");
         load(root, root);
         for (Template t : templates.values()) {
             compile(t.name);
@@ -537,15 +539,38 @@ final class MvcTemplates {
         }
         if (tag.equals("option") && select != null) {
             MvcExpression.Value candidate = dynamic.get("value");
-            if (candidate == null)
-                candidate =
-                        new MvcExpression.Value(
-                                q(e.hasAttr("value") ? e.attr("value") : e.text()),
-                                "java.lang.String");
+            if (candidate == null) {
+                if (e.hasAttr("value"))
+                    candidate = new MvcExpression.Value(q(e.attr("value")), "java.lang.String");
+                else {
+                    MvcExpression.Value text =
+                            e.hasAttr("th:text")
+                                    ? expression(e.attr("th:text"), env, form)
+                                    : new MvcExpression.Value(q(e.wholeText()), "java.lang.String");
+                    candidate =
+                            new MvcExpression.Value(
+                                    HTML + "optionValue(" + text.code + ")", "java.lang.String");
+                }
+            }
             dynamic.put(
                     "selected",
                     new MvcExpression.Value(
                             HTML + "checked(" + select + ", " + candidate.code + ")", "boolean"));
+        }
+        if (tag.equals("button") || tag.equals("input")) {
+            MvcExpression.Value method = dynamic.get("formmethod");
+            if (method != null || e.hasAttr("formmethod")) {
+                MvcExpression.Value owner = dynamic.get("form");
+                String ownerCode =
+                        owner != null ? owner.code : e.hasAttr("form") ? q(e.attr("form")) : "null";
+                // Emit beside the submit control so fragments and conditional controls retain
+                // their rendering scope. Preserve explicit form ownership for external controls.
+                out.append("if(\"post\".equalsIgnoreCase(Html.string(")
+                        .append(method == null ? q(e.attr("formmethod")) : method.code)
+                        .append("))) Html.csrf(out, model, ")
+                        .append(ownerCode)
+                        .append(");\n");
+            }
         }
         if (!block) {
             literal(out, "<" + tag);
@@ -659,6 +684,26 @@ final class MvcTemplates {
                 args.put(name, expression(assignment.substring(eq + 1), env, form));
             }
         }
+        int hash = path.indexOf('#');
+        String fragment = hash < 0 ? "" : path.substring(hash);
+        if (hash >= 0) path = path.substring(0, hash);
+        StringBuilder code = new StringBuilder(urlPath(path, args));
+        // Consume fragment placeholders before turning the remaining arguments into a query.
+        String fragmentCode = urlPath(fragment, args);
+        boolean query = path.contains("?");
+        for (Map.Entry<String, MvcExpression.Value> arg : args.entrySet()) {
+            code.append(" + ")
+                    .append(q((query ? "&" : "?") + arg.getKey() + "="))
+                    .append(" + Html.urlPart(")
+                    .append(arg.getValue().code)
+                    .append(')');
+            query = true;
+        }
+        if (!fragment.isEmpty()) code.append(" + ").append(fragmentCode);
+        return new MvcExpression.Value("(" + code + ")", "java.lang.String");
+    }
+
+    private static String urlPath(String path, Map<String, MvcExpression.Value> args) {
         StringBuilder code = new StringBuilder();
         Matcher placeholders = Pattern.compile("\\{([A-Za-z][A-Za-z0-9_]*)}").matcher(path);
         int pos = 0;
@@ -676,16 +721,7 @@ final class MvcTemplates {
         }
         if (code.length() > 0) code.append(" + ");
         code.append(q(path.substring(pos)));
-        boolean query = path.contains("?");
-        for (Map.Entry<String, MvcExpression.Value> arg : args.entrySet()) {
-            code.append(" + ")
-                    .append(q((query ? "&" : "?") + arg.getKey() + "="))
-                    .append(" + Html.urlPart(")
-                    .append(arg.getValue().code)
-                    .append(')');
-            query = true;
-        }
-        return new MvcExpression.Value("(" + code + ")", "java.lang.String");
+        return code.toString();
     }
 
     private static String field(String value, String form) {

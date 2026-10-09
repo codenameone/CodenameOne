@@ -130,6 +130,7 @@ final class MvcAssets {
     }
 
     private static String mime(String path) {
+        path = path.toLowerCase(java.util.Locale.ROOT);
         if (path.endsWith(".js")) return "text/javascript; charset=utf-8";
         if (path.endsWith(".css")) return "text/css; charset=utf-8";
         if (path.endsWith(".svg")) return "image/svg+xml";

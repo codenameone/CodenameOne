@@ -87,6 +87,7 @@ public final class Html {
         }
         name = asciiLower(name);
         if ("href".equals(name)
+                || "xlink:href".equals(name)
                 || "src".equals(name)
                 || "action".equals(name)
                 || "formaction".equals(name)
@@ -152,6 +153,26 @@ public final class Html {
         return result == null ? "" : result.messages(name);
     }
 
+    /// The browser derives an option's implicit value by collapsing ASCII whitespace.
+    public static String optionValue(Object value) {
+        String text = string(value);
+        StringBuilder out = new StringBuilder();
+        boolean space = false;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f') {
+                space = out.length() > 0;
+            } else {
+                if (space) {
+                    out.append(' ');
+                    space = false;
+                }
+                out.append(c);
+            }
+        }
+        return out.toString();
+    }
+
     public static boolean checked(Object value, Object candidate) {
         if ("true".equalsIgnoreCase(string(candidate))
                 && ("on".equalsIgnoreCase(string(value)) || "1".equals(string(value)))) {
@@ -165,6 +186,10 @@ public final class Html {
     }
 
     public static void csrf(ByteSink out, Model model) {
+        csrf(out, model, null);
+    }
+
+    public static void csrf(ByteSink out, Model model, Object formId) {
         CsrfToken token = (CsrfToken) model.getAttribute("_csrf");
         if (token == null) {
             return;
@@ -172,6 +197,7 @@ public final class Html {
         out.putAscii("<input type=\"hidden\"");
         attribute(out, "name", token.getParameterName());
         attribute(out, "value", token.getToken());
+        attribute(out, "form", formId);
         out.put('>');
     }
 
