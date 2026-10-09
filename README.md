@@ -8,185 +8,84 @@
 ![GitHub license](https://img.shields.io/badge/license-GPL%20%2B%20CE-FFFF00?style=flat-square)
 [![GitHub Stars](https://img.shields.io/github/stars/codenameone/CodenameOne?label=GitHub%20stars&style=social)](https://github.com/codenameone/CodenameOne/stargazers/)
 
-## Native Apps From One Java Codebase. A UI You Control.
+## 100% native. Fast. Full-stack Java.
 
-[Codename One](https://www.codenameone.com/) is an open-source framework for building native applications in Java. One project can target phones, tablets, desktops, browsers, TVs, watches, and in-vehicle displays while sharing its application logic and UI.
+[Codename One](https://www.codenameone.com/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=overview) takes Java from your UI to your server, compiled to native code. Share models and typed APIs across the full stack, control the UI you ship, and deploy your server without a JVM. Target iOS, Android, desktop, watch and TV, with a JavaScript port for the web. Published benchmarks below compare runtime performance with HotSpot, Spring and Go.
 
-Codename One custom-renders the UI that ships with your application. The platform cannot silently replace those components in an OS update. Native interfaces and peer components provide direct access to platform SDKs and platform views when an application needs them.
+The UI ships with your app, so you control its components and theme. Native interfaces and peer components give you access to platform SDKs and views. The framework is GPLv2 with the Classpath Exception: free for commercial applications, with no royalties.
 
-| Build something | Explore the engineering and help improve it |
+| What do you want to build? | Start here |
 | --- | --- |
-| [Run Codename One in the browser](https://www.codenameone.com/playground/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme) | [See how the ports and compilers work](#how-does-it-work) |
-| [Generate a Maven project](https://www.codenameone.com/initializr/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme) | [Read the ParparVM source](https://github.com/codenameone/CodenameOne/tree/master/vm) |
-| [Follow the current getting-started guide](https://www.codenameone.com/getting-started/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme) | [Test an idea in GitHub Discussions](https://github.com/codenameone/CodenameOne/discussions) |
-| [Browse the supported targets](https://www.codenameone.com/port-status/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme) | [Report a reproducible problem](https://github.com/codenameone/CodenameOne/issues/new/choose) |
+| A new Java app | [Generate a project](https://www.codenameone.com/initializr/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=app-start) or [try the browser playground](https://www.codenameone.com/playground/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=playground) |
+| A native Java service | [Build a backend](https://www.codenameone.com/developer-guide/backend/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=backend) with Spring-style APIs and no JVM in the deployed executable |
+| An app and its backend | [Share models and generated REST clients](https://www.codenameone.com/blog/java-backend-shared-models/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=shared-models) |
+| An existing Android app on more platforms | [Import classic Android application code](https://www.codenameone.com/developer-guide/android-interop/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=android-import), including activities, XML layouts and resources |
+| Evidence before adopting | [Compare performance](#measured-performance) and [inspect platform support](https://www.codenameone.com/port-status/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=platforms) |
 
-The repository includes the portable UI toolkit, native compilers and ports, desktop simulator, CSS and visual design tools, Maven integration, testing infrastructure, and optional cloud-build client.
+### A backend that compiles the wiring into your application
 
+Write controllers, dependency injection, transactions and scheduled jobs with Spring-style annotations. The build generates routing and wiring as ordinary code, then ParparVM translates Java bytecode to C and the native toolchain compiles the executable. Develop and debug on the JVM; deploy a native service without it.
 
-<!-- [![Build Status](https://travis-ci.org/codenameone/CodenameOne.svg?branch=master)](https://travis-ci.org/codenameone/CodenameOne)
-![GitHub language count](https://img.shields.io/github/languages/codenameone/CodenameOne?style=plastic)
+The backend includes PostgreSQL, MySQL/MariaDB and SQLite access, managed ORM, WebSockets, sessions, an OAuth2/OIDC security stack, database migrations, OpenTelemetry and MCP tools. Initializr offers **App with backend** and **Backend only** project types.
 
-<p>
-<a href="https://twitter.com/CodenameOne"><img src="https://img.shields.io/badge/twitter-%231DA1F2.svg?&style=for-the-badge&logo=twitter&logoColor=white" height=25></a> 
-<a href="https://medium.com/CodenameOne"><img src="https://img.shields.io/badge/medium-%2312100E.svg?&style=for-the-badge&logo=medium&logoColor=white" height=25></a> 
-<a href="https://dev.to/codenameone"><img src="https://img.shields.io/badge/DEV.TO-%230A0A0A.svg?&style=for-the-badge&logo=dev-dot-to&logoColor=white" height=25></a> -->
+This is an evolving backend with its own supported API surface. Its annotations live in `com.codename1.backend.annotations`; it is not a drop-in Spring Boot replacement and does not run arbitrary JVM libraries. Start with the [backend guide](https://www.codenameone.com/developer-guide/backend/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=backend-guide) and its compatibility limits.
+
+### Bring classic Android apps to iOS, desktop and the web
+
+Import an Android Studio module with `cn1:import-android-project`, or place its sources in `common/src/main/android`. The compatibility layer implements supported `android.*` and AndroidX APIs over Codename One, including activities, fragments, XML layouts, RecyclerView, ConstraintLayout and Material Components. Java and Kotlin sources are supported.
+
+The application runs through Codename One's ports without an Android runtime on the other platforms. This supports the documented classic Android API surface, not every Android library or framework behavior. Check the [supported APIs, side-by-side captures and limitations](https://www.codenameone.com/developer-guide/android-interop/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=android-coverage), particularly reflection, Parcel and SQLite concurrency, against your application's screens and data flows.
+
+### Measured performance
+
+These are published reference measurements, not a promise about every application. Each comparison uses a different workload; follow the links for hardware, commands and raw results.
+
+| Comparison | Recorded result | Scope |
+| --- | --- | --- |
+| HotSpot / JDK 25 | **37.5% less elapsed time and 45.8% less peak memory** for ParparVM self-translation | Linux ARM64 Neoverse N2 baseline, seven calibration runs, identical generated files. [All machines and workloads](https://www.codenameone.com/blog/parparvm-four-byte-header/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=performance-hotspot). Allocation-heavy code can favor HotSpot. |
+| Spring Boot 4.1.1 / JDK 25 | **3.9× plaintext and 3.4× JSON throughput** | Two pinned server CPUs in a Linux ARM64 VM on an M4 Max, 32 connections, matched 60-second warmup. Lower-level CN1 HTTP handlers versus Spring MVC/Tomcat; no database, TLS or authentication. [Methodology and reproduction bundle](https://www.codenameone.com/blog/java-server-work-before-startup/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=performance-spring). |
+| Go / fasthttp | **595,610 vs 496,293 requests/s** | Separate plaintext test: CN1 native musl, two pinned cores, 64 connections, medians of three interleaved runs. Go used less memory and a smaller binary. [Full comparison](https://www.codenameone.com/developer-guide/backend-operations/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=performance-go). |
+
+The Spring comparison measures selected HTTP stacks, not equivalent framework features or the cost of CN1's annotation-generated controllers. The HotSpot comparison measures our compiler workload; the linked results also show workloads where HotSpot is faster. Measure your own service before sizing a deployment.
+
+### Build and test the whole application
+
+- **UI you control:** CSS themes, Liquid Glass and Material 3, layouts, animation, vector graphics and custom drawing. Embed platform views where needed.
+- **Shared app and server code:** typed REST contracts, generated clients, entities and persistence APIs, with platform-specific code kept behind explicit boundaries.
+- **Local development:** simulator, device skins, component and network inspectors, live CSS, JUnit and screenshot tests. Maven and Gradle tooling are available.
+- **Coding-agent tools:** generated project instructions and semantic MCP tools for the simulator and JavaSE-hosted tooling.
+- **Device integration:** camera, notifications, maps, Bluetooth LE, biometrics, secure storage and native SDK access.
+- **Native build options:** use local toolchains or the optional cloud service, including iOS builds from Windows or Linux. The free cloud tier includes 100 build credits per month.
 
 ### Supported targets
 
 | Form factor | Targets |
 | --- | --- |
 | Mobile | Android and iOS |
-| Desktop | Native Windows, native Linux, native macOS, and JVM desktop applications |
-| Web | JavaScript applications and installable PWAs, including multithreading support |
+| Desktop | Native Windows, Linux and macOS; JVM desktop applications |
+| Web | JavaScript applications and installable PWAs |
 | TV | Apple TV (tvOS) and Android TV / Google TV |
 | Watch | Apple Watch (watchOS) and Wear OS |
-| Vehicle | Apple CarPlay and Android Auto |
+| Vehicle | Apple CarPlay and Android Auto integrations |
+| Server | Native Java backend; JVM development mode |
 
-### A complete application stack
-
-- **Portable UI** with a rich component library, layouts, animation, vector graphics, CSS themes, dark mode, desktop input, foldable support, and complete custom drawing.
-- **Native output** built with each target's official toolchain. The native Windows, Linux, and Apple targets produce self-contained executables without requiring a JVM on the user's device.
-- **Device and OS integration** for notifications, background work, location and maps, camera and media, sharing, contacts, NFC, Bluetooth LE, Wi-Fi, USB, motion sensors, biometrics, secure storage, printing, and more.
-- **Modern application services** including REST, WebSocket, GraphQL, gRPC-Web, SQLite and ORM, deep links and routing, passkeys and OIDC, payments, advertising, analytics, and crash protection.
-- **Advanced experiences** with portable GPU/3D and game APIs, AR and VR, AI/LLM integration, speech and transcription, TensorFlow Lite, and ML Kit libraries.
-- **Productive tooling** with an instant simulator, device skins, component and network inspectors, CSS live update, JUnit and screenshot testing, on-device debugging, Maven builds, and CI support.
-- **Full native escape hatch** through native interfaces written in Swift, Objective-C, Kotlin, Java, C, JavaScript, or ordinary JavaSE code, plus the ability to mix native views into a Codename One UI.
-- **Open source and commercially supported**, with no per-application license cap.
-
-<br>
-
-#### ✨ &nbsp; Here are some concrete benefits you can get with Codename One:
-
-<br>
-
-<img align="right" src="https://www.codenameone.com/github/runs-instantly.png" height="200">
-
-### Codename One's Simulator Runs Instantly
-
-Unlike emulators which you can see in Android etc. Codename One uses a simulator. This means it starts up fast even when debugging. You can enjoy IDE features such as live code reload to modify code in runtime etc.
-
-This means faster debugging cycle and faster development process!
-
-<br>
-
-<img align="left" src="https://www.codenameone.com/github/large-selection-skins.png" height="200">
-
-### Large Selection of Device Skins
-
-Choose from a large selection of device "skins" to see how your app will look on particular devices. The skin takes into account factors such as resolution and
-device density to provide a pixel-perfect presentation of your app, as it would appear on the real device.
-Switching between device skins is nearly instant.
-
-You can edit and contribute skins in their own open source project [here](https://github.com/codenameone/codenameone-skins).
-
-<br>
-
-<img align="right" src="https://www.codenameone.com/github/interactive-console.png" height="200">
-
-### Interactive Console
-
-Interact with your application’s APIs at runtime using the interactive Groovy Console. Inspect the application state or experiment with changes all while the app is running. 
-
-This lets you investigate issues and experiment without even the small overhead of recompiling.
-
-<br>
-
-<img align="left" src="https://www.codenameone.com/github/live-reload.png" height="200">
-
-### Live Reload
-
-The Simulator let’s you take advantage of the "Reload Changed Classes" feature in IntelliJ (named "Apply Code Changes" in NetBeans) so that changes you make in your Java source code will be applied immediately to your already-running app in the simulator.
-
-Note that this is often superior to the interactive console but there are limitations such as the ability to add methods/change structure of the code. These limits don't apply to the interactive console!
-
-<br>
-
-<img align="right" src="https://www.codenameone.com/github/css-live-update.png" height="200">
-
-### CSS Live Update
-
-When you make changes to your app’s CSS stylesheet, the changes are reflected instantly in the simulator. This includes changing your theme, images, fonts etc. All changes are instantly refreshed on save, no need to reload/refresh or anything of the sort!
-
-This makes the process of styling an application remarkably easy and fast.
-
-<br>
-
-<img align="left" src="https://www.codenameone.com/github/component-inspector.png" height="200">
-
-### Component Inspector
-
-Use the powerful component inspector to browse the UI component hierarchy in your app. 
-This tool makes it easy to find out where that extra padding is coming from or why something just isn’t lining up the way you’d like. You can also change the UIID (selector) of a component in runtime to see how it impacts the UI and see which component in the hierarchy maps to an element in the component tree (DOM equivalent).
-
-<br>
-
-<img align="right" src="https://www.codenameone.com/github/network-monitor.png" height="200">
-
-### Network Monitor
-
-See all of the network connections that your app makes using the Network Monitor. This valuable tool comes in handy when you’re trying to figure out why an HTTP request isn’t working for you. Check the headers and bodies of both the request and the response. You can even throttle the network to simulate a slow network connection.
-
-<br>
-
-<img align="left" src="https://www.codenameone.com/github/record-ui-unit-tests.png" height="200">
-
-### Record UI Unit Tests
-
-Use the Test Recorder tool to record unit tests for your app. Once you start recording, it will save your interactions into a unit test that can be played back later to verify that behaviour remains correct.
-
-You can then connect the recorded tests to your CI process including automated on device testing.
-
-<br>
+Check [Port Status](https://www.codenameone.com/port-status/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=port-status) for each target's architecture, OS requirements and test coverage.
 
 ## How does it work?
 
-[Codename One](https://www.codenameone.com/) is a mature open source project with roots dating back to Sun Microsystems (2006) where one of its core underlying components was developed and open sourced. You can learn about its history and how it works in [this video](https://www.youtube.com/watch?v=MrwbpdMALig).
+ParparVM translates reachable JVM bytecode into C for the native Apple, Windows, Linux and backend targets. The platform compiler builds the generated code together with the runtime. Android applications use the Android toolchain; the JavaScript port produces browser applications. JavaSE powers the JVM desktop target and simulator.
 
-Codename One uses the target platform's official build tools and APIs rather than wrapping the application in a web view.
+Codename One draws its portable UI rather than wrapping every platform widget. Native interfaces and `PeerComponent` connect it to platform SDKs and views. The Android compatibility layer compiles supported Android resources and API calls into this same application model.
 
-- On Apple platforms, native Windows, and native Linux, ParparVM translates reachable JVM bytecode to C and the platform toolchain compiles it into a self-contained native executable.
-- On Android, the application is packaged into a generated Android Gradle project and compiled by the Android toolchain.
-- On the web, the JavaScript port compiles the application into a browser runtime with PWA and multithreading support.
-- The JavaSE port runs on the JVM and powers both desktop applications and the development simulator.
+## Quick start and documentation
 
-The portable UI is drawn consistently on every target. When an application needs a platform-specific SDK or control, native interfaces and peer components provide direct access without forcing the rest of the application to become platform-specific.
+[Generate a project](https://www.codenameone.com/initializr/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=quick-start), choose an app, app with backend, or backend-only project, and follow the [getting-started guide](https://www.codenameone.com/getting-started/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=getting-started).
 
-#### The figure below shows the build process for each supported platform:
-
-<a href="https://www.codenameone.com/img/github/codename-one-architecture.jpg" target="_blank"><img width="70%" src="https://www.codenameone.com/github/codename-one-architecture.jpg"></a>
-
-You can click the image to enlarge or view a PDF version [here](https://www.codenameone.com/img/github/architecture.pdf).
-
-
-## Quick Start
-
-Create a Maven project at [start.codenameone.com](https://start.codenameone.com), then open it in IntelliJ IDEA, NetBeans, Eclipse, VS Code, or another Maven-capable IDE.
-
-There is a lot to know about Codename One, this 3 minute video gives a very concise high level view. Notice there are similar videos for Eclipse, IntelliJ/IDEA and Netbeans [here](https://www.codenameone.com/download.html):
-
-<div>
-  <a href="https://www.youtube.com/watch?v=rl6z7DD2-vg "><img src="https://i.imgur.com/gXfNhFR.png" target="_blank" alt="Hello Codename One" img width="80%"> </a>
-</div>
-
-## Extensible
-
-Codename One can be extended easily using 3rd party libraries that can include native OS code. There is an extensive list of these libraries (cn1libs) [here](https://www.codenameone.com/cn1libs.html). The libraries list is generated automatically based on [this github project](https://github.com/codenameone/CodenameOneLibs/).
-
-You can learn more about Codename One and its capabilities at the [main site](https://www.codenameone.com) and you can see an extensive list of documentation and tutorials [here](http://www.codenameone.com/blog/tutorials-resources-learn-java-mobile-videos-courses-ios-android.html).
-
-## Important Links & Docs
-
-You can get started with the binary and the birds eye view in the [download section](https://www.codenameone.com/download.html). Additional important links are:
-
-- [JavaDoc](https://www.codenameone.com/javadoc/)
-- Developer Guide - [HTML](https://www.codenameone.com/manual/) & [PDF](https://www.codenameone.com/files/developer-guide.pdf)
-- [How Codename One Works](http://stackoverflow.com/questions/10639766/how-does-codename-one-work/10646336) (stackoverflow)
-- [Codename One Academy](http://codenameone.teachable.com/)
-- [Blog](https://www.codenameone.com/blog/)
-- [Community Discussion Forum](https://www.codenameone.com/discussion-forum.html)
-- [Using the Kotlin Support](https://www.codenameone.com/blog/kotlin-support-public-beta.html)
-
+- [Developer guide](https://www.codenameone.com/developer-guide/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=developer-guide)
+- [Client Javadoc](https://www.codenameone.com/javadoc/) and [backend Javadoc](https://www.codenameone.com/backend/javadoc/)
+- [Libraries and native integrations](https://www.codenameone.com/cn1libs/)
+- [Engineering blog](https://www.codenameone.com/blog/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=engineering)
+- [GitHub Discussions](https://github.com/codenameone/CodenameOne/discussions)
 
 ## Setup & Getting Started With The Code
 
@@ -251,13 +150,10 @@ $ ant samples
 ## ParparVM
 Codename One's native compiler is open source. You can read more about it [in its dedicated folder in this repository](https://github.com/codenameone/CodenameOne/tree/master/vm).
 
-ParparVM translates Java bytecode to portable C, performs reachability analysis to remove unused code, and then hands the generated project to the target's native compiler. It powers the native Apple, Windows, Linux, and JavaScript pipelines and produces small, self-contained applications.
-
-Apple has a tendency to change things abruptly e.g. 64bit support, bitcode etc. Since ParparVM generates a standard Xcode project there were no code changes required for any of these tectonic shifts. It's as if you handcoded the project yourself!
+ParparVM translates Java bytecode to portable C, performs reachability analysis to remove unused code, and then hands the generated project to the target's native compiler. It powers the native Apple, Windows, Linux and backend targets.
 
 You can open the generated native project and use the platform's debugger and profiler directly. On Apple platforms, for example, the output is a standard Xcode project with readable call stacks and native performance tooling.
 
-Traditional compilers fall flat in these cases.
 
 ## Help Improve Codename One
 
