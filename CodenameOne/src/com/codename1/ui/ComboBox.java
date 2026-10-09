@@ -453,8 +453,20 @@ public class ComboBox<T> extends List<T> implements ActionSource {
             // combo box in a window did nothing at all.
             TopLevelContainer parentForm = getTopLevelContainer();
 
+            // As wide as the combo, or as wide as the rows when they need more.
+            //
+            // The list's preferred width already contains its scrollbar gutter -- the
+            // look and feel adds getSideGap() to the padding it measures -- so adding the
+            // gutter again here made the popup one scrollbar wider than the combo it
+            // hangs off even when the combo was the wider of the two. On a desktop,
+            // where the gutter is a real scrollbar's width and the popup's edges sit
+            // right under the combo's, that is a visible step. Elsewhere the width is left
+            // exactly as it was, so that no touch popup moves.
             int listW = Math.max(getWidth(), l.getPreferredW());
-            listW = Math.min(listW + l.getSideGap(), parentForm.getContentPane().getWidth());
+            if (!Display.getInstance().isDesktop()) {
+                listW += l.getSideGap();
+            }
+            listW = Math.min(listW, parentForm.getContentPane().getWidth());
 
 
             Component content = popupDialog.getDialogComponent();
