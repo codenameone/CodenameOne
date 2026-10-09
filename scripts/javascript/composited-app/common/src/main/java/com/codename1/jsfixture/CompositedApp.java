@@ -26,9 +26,12 @@ import com.codename1.components.SpanLabel;
 import com.codename1.system.Lifecycle;
 import com.codename1.ui.Button;
 import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
+import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.spinner.Picker;
 
 /// The application scripts/test-javascript-composited-rendering.mjs drives: the Initializr's
 /// Hello World screen plus one long SpanLabel, which is exactly the app issues #5910 and #5912
@@ -39,6 +42,11 @@ public class CompositedApp extends Lifecycle {
 
     @Override
     public void runApp() {
+        String query = Display.getInstance().getProperty("browser.window.location.search", "");
+        if (query.indexOf("screen=picker") >= 0) {
+            showPicker();
+            return;
+        }
         Form hi = new Form("Hi World", BoxLayout.y());
         Button helloButton = new Button("Hello World");
         hi.add(helloButton);
@@ -51,6 +59,25 @@ public class CompositedApp extends Lifecycle {
         }
         hi.add(new SpanLabel(text.toString().trim()));
         hi.show();
+    }
+
+    /// A string Picker left exactly as an application gets it: nothing forces the lightweight
+    /// popup, so on this port it takes the native path and puts a `<select>` on the page. Kept
+    /// off the default screen, whose layout the scrolling checks measure.
+    private void showPicker() {
+        Form form = new Form("Picker", BoxLayout.y());
+        Picker picker = new Picker();
+        picker.setType(Display.PICKER_TYPE_STRINGS);
+        picker.setStrings("One", "Two", "Three");
+        picker.setSelectedString("One");
+        Label picked = new Label("Picked nothing");
+        picker.addActionListener(e -> {
+            picked.setText("Picked " + picker.getSelectedString());
+            form.revalidate();
+        });
+        form.add(picker);
+        form.add(picked);
+        form.show();
     }
 
     private void hello() {
