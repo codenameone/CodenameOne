@@ -272,10 +272,13 @@ public class DesktopEntryPointsTest {
         assertEquals("com.acme.fxapp.Shop", application.getClass().getName());
         assertEquals("com.codename1.fxcompat.javafx.application.Application",
                 application.getClass().getSuperclass().getName());
-        assertFalse(CompatFixtures.members(Files.readAllBytes(new File(classes, "com/acme/MyApp.class").toPath()))
-                .contains("com/acme/fxapp/Shop.main"));
+        java.util.Set<String> called = CompatFixtures.members(
+                Files.readAllBytes(new File(classes, "com/acme/MyApp.class").toPath()));
+        assertFalse(called.toString(), called.contains("com/acme/fxapp/Shop.main"));
+        assertFalse(called.toString(), called.contains("com/acme/fxapp/Shop." + ClassRelocator.DESKTOP_MAIN));
         // launch(args) in the application's own main compiles and does nothing.
-        application.getClass().getMethod("main", String[].class).invoke(null, (Object) new String[0]);
+        application.getClass().getMethod(ClassRelocator.DESKTOP_MAIN, String[].class)
+                .invoke(null, (Object) new String[0]);
         // The runtime's own events extend java.util.EventObject, which the
         // device lacks: the copy that ships extends the shared class.
         assertEquals("com.codename1.compat.jdk.EventObject", application.getClass().getClassLoader()
@@ -398,7 +401,87 @@ public class DesktopEntryPointsTest {
         Files.write(record.toPath(), "mainClass=com.acme.swingapp.Other\n".getBytes("UTF-8"));
         assertTrue(remapper(classes, record, "com.acme.MyApp").run());
         assertTrue(CompatFixtures.members(Files.readAllBytes(generated.toPath()))
-                .contains("com/acme/swingapp/Other.main"));
+                .contains("com/acme/swingapp/Other." + ClassRelocator.DESKTOP_MAIN));
+    }
+
+    /// ParparVM takes a static `main` with one array argument to mark THE
+    /// entry point of the program and stops at the second class that has one
+    /// (`Multiple main classes: ...Stub and ...`). The stub every native
+    /// builder adds has one, so a single `main` left in what ships fails the
+    /// iOS, macOS, Windows and Linux translation of the whole application --
+    /// which every imported application did, having been written with one.
+    /// The application's mains, a launcher that calls another class's, a
+    /// method reference to one and the bridge generated for a main class that
+    /// is not public all have to ship under another name, and still run.
+    @Test
+    public void noShippedClassKeepsAMainTheTranslatorWouldTakeForTheEntryPoint() throws Exception {
+        String hidden = "package com.acme.swingapp;\n"
+                + "class Hidden {\n"
+                + "    public static void main(String[] args) { Main.main(new String[3]); }\n"
+                + "}\n";
+        String referrer = "package com.acme.swingapp;\n"
+                + "public class Referrer {\n"
+                + "    public interface Entry { void run(String[] args); }\n"
+                + "    public static void main(String[] args) { Entry e = Main::main; e.run(new String[5]); }\n"
+                + "    public void main(String name) { }\n"
+                + "}\n";
+        File classes = compile("com/acme/swingapp/Main.java", SWING_MAIN, "com/acme/swingapp/Hidden.java", hidden,
+                "com/acme/swingapp/Referrer.java", referrer);
+        assertTrue(remapper(classes, record("mainClass=com.acme.swingapp.Hidden", "kind=swing"), "com.acme.MyApp")
+                .run());
+
+        List<File> shipped = new java.util.ArrayList<File>();
+        ClassRelocator.collectClassFiles(classes, shipped);
+        final List<String> mains = new java.util.ArrayList<String>();
+        for (File f : shipped) {
+            new org.objectweb.asm.ClassReader(Files.readAllBytes(f.toPath())).accept(
+                    new org.objectweb.asm.ClassVisitor(org.objectweb.asm.Opcodes.ASM9) {
+                        private String owner;
+
+                        @Override
+                        public void visit(int version, int access, String name, String signature, String superName,
+                                          String[] interfaces) {
+                            owner = name;
+                        }
+
+                        @Override
+                        public org.objectweb.asm.MethodVisitor visitMethod(int access, String name,
+                                                                           String descriptor, String signature,
+                                                                           String[] exceptions) {
+                            // The translator's own rule (BytecodeMethod.isMain): static, named
+                            // main, one argument that is a one-dimensional array.
+                            org.objectweb.asm.Type[] arguments = org.objectweb.asm.Type.getArgumentTypes(descriptor);
+                            if ((access & org.objectweb.asm.Opcodes.ACC_STATIC) != 0 && "main".equals(name)
+                                    && arguments.length == 1 && arguments[0].getSort() == org.objectweb.asm.Type.ARRAY
+                                    && arguments[0].getDimensions() == 1) {
+                                mains.add(owner);
+                            }
+                            return null;
+                        }
+                    }, org.objectweb.asm.ClassReader.SKIP_CODE);
+        }
+        assertTrue("classes that still declare a main: " + mains, mains.isEmpty());
+
+        // The generated lifecycle reaches the package-private class through
+        // the bridge, and that main still calls the other one.
+        Class<?> main = load(classes, "com.acme.MyApp");
+        call(main.getConstructor().newInstance(), "runMain");
+        Class<?> fixture = main.getClassLoader().loadClass("com.acme.swingapp.Main");
+        assertEquals(3, fixture.getField("ran").getInt(null));
+        // A method reference to a main follows the rename, and an instance
+        // method that merely shares the name is left alone.
+        Class<?> ref = main.getClassLoader().loadClass("com.acme.swingapp.Referrer");
+        ref.getMethod(ClassRelocator.DESKTOP_MAIN, String[].class).invoke(null, (Object) new String[0]);
+        assertEquals(5, fixture.getField("ran").getInt(null));
+        assertNotNull(ref.getMethod("main", String.class));
+
+        // A second run over its own output changes nothing.
+        File generated = new File(classes, "com/acme/MyApp.class");
+        byte[] first = Files.readAllBytes(generated.toPath());
+        assertTrue(remapper(classes, record("mainClass=com.acme.swingapp.Hidden", "kind=swing"), "com.acme.MyApp")
+                .run());
+        assertTrue(Arrays.equals(first, Files.readAllBytes(generated.toPath())));
+        assertCompliant(classes);
     }
 
     @Test
