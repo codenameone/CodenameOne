@@ -106,6 +106,11 @@ final class AppSupport {
 
         Cn1libs.configure(project);
 
+        // Before the javase source set below, which copies the main compile
+        // classpath as it is at that moment.
+        final TaskProvider<com.codename1.gradle.tasks.CompileUnityTask> unity =
+                registerUnity(project, layout, ext, userProperties, main);
+
         // The simulator's native-interface implementations: a real source set, so
         // src/javase/java compiles against the application and the JavaSE port and
         // lands on the simulator's classpath the next time it runs. Declared always;
@@ -202,6 +207,22 @@ final class AppSupport {
         // compile -- otherwise a native build after a hot-reload compile found
         // compileJava up to date and uploaded classes nobody had checked.
         final String skipInput = String.valueOf(skip);
+        // The translated scripts are application classes like any other, so they
+        // get the check javac's output gets -- in the task that writes them, as
+        // Kotlin's are checked in compileKotlin. They are in Maven too, where
+        // the goal installs them in the directory bytecode-compliance scans.
+        final File rootDir = layout.rootDir();
+        final File projectDir = layout.projectDir();
+        final String projectName = project.getName();
+        final org.gradle.api.file.FileCollection unityCheckClasspath = project.getConfigurations()
+                .getByName(main.getCompileClasspathConfigurationName());
+        final Provider<File> buildDirectory = project.getLayout().getBuildDirectory().getAsFile();
+        unity.configure(t -> {
+            t.getInputs().property("cn1SkipComplianceCheck", skipInput);
+            t.doLast("cn1Compliance", new com.codename1.gradle.tasks.ComplianceAction(rootDir, projectDir,
+                    t.getClassesDirectory().getAsFile(), projectName, unityCheckClasspath, compileArtifacts,
+                    complianceProperties).withBuildDirectory(buildDirectory));
+        });
         project.getTasks().named(main.getCompileJavaTaskName(), JavaCompile.class, compile -> {
             if (androidProject) {
                 // Relocation rewrites this task's output descriptors. A source edit
@@ -624,6 +645,77 @@ final class AppSupport {
         Object skip = project.findProperty("skipComplianceCheck");
         return skip != null ? String.valueOf(skip)
                 : project.getProviders().systemProperty("skipComplianceCheck").getOrNull();
+    }
+
+    /// `src/main/unity`: a Unity project's `Assets` and `ProjectSettings`.
+    static File unitySourceDir(ProjectLayout layout) {
+        return new File(layout.projectDir(), "src" + File.separator + "main" + File.separator + "unity");
+    }
+
+    /// Unity compatibility: `compileUnity` and everything that makes its
+    /// output part of the application. Registered for every application and
+    /// skipped without a Unity project, as `compileAndroidRes` is without an
+    /// Android one; only a project that has one gets the runtime, the tools and
+    /// the reference assemblies as dependencies, so no other build resolves
+    /// them.
+    ///
+    /// The runtime is an `implementation` dependency, not `compileOnly` like
+    /// the Android compatibility jar: nothing copies it into the application's
+    /// classes, so it has to reach the upload as the library it is.
+    static TaskProvider<com.codename1.gradle.tasks.CompileUnityTask> registerUnity(final Project project,
+            final ProjectLayout layout, final CodenameOneExtension ext,
+            final Provider<Map<String, String>> userProperties, final SourceSet main) {
+        final Provider<String> version = ext.getVersion();
+        final File unityDir = unitySourceDir(layout);
+        final Configuration tools = resolvable(project, "cn1UnityTools",
+                "The C# translator and scene compiler, for src/main/unity");
+        final Configuration references = resolvable(project, "cn1UnityReferences",
+                "The assemblies the C# scripts in src/main/unity compile against");
+        references.setTransitive(false);
+        if (com.codename1.maven.UnityProjectBuilder.isUnityProject(unityDir)) {
+            addFramework(project, "implementation", version, com.codename1.maven.UnityProjectBuilder.RUNTIME_ARTIFACT);
+            addFramework(project, tools.getName(), version, com.codename1.maven.UnityProjectBuilder.TOOL_ARTIFACT);
+            project.getDependencies().addProvider(references.getName(), version.map(v -> PluginInfo.GROUP + ":"
+                    + com.codename1.maven.UnityProjectBuilder.RUNTIME_ARTIFACT + ":" + v + ":"
+                    + com.codename1.maven.UnityProjectBuilder.REFERENCES_CLASSIFIER));
+        }
+        final java.util.Properties settings = AppSettings.read(layout.settingsFile());
+        // The configuration, not the source set's classpath: the latter is about
+        // to include this task's own output, and reading it here would make the
+        // task depend on itself.
+        final org.gradle.api.file.FileCollection runtime = project.getConfigurations()
+                .getByName(main.getCompileClasspathConfigurationName())
+                .filter(f -> com.codename1.gradle.tasks.CompileUnityTask.isRuntimeJar(f.getName()));
+        TaskProvider<com.codename1.gradle.tasks.CompileUnityTask> unity = project.getTasks().register(
+                "compileUnity", com.codename1.gradle.tasks.CompileUnityTask.class, t -> {
+                    common(t, project, layout, ext, userProperties);
+                    t.setDescription("Compiles the Unity project in src/main/unity: C# scripts to classes, scenes to Java");
+                    t.getUnityDirectory().set(unityDir);
+                    t.getSources().from(new File(unityDir, "Assets"), new File(unityDir, "ProjectSettings"));
+                    t.getRuntimeJar().from(runtime);
+                    t.getReferencesJar().from(references);
+                    t.getToolClasspath().from(tools);
+                    t.getMainPackage().set(settings.getProperty("codename1.packageName"));
+                    t.getMainClass().set(settings.getProperty("codename1.mainName"));
+                    t.getSourceRoots().from(layout.javaSourceDir(), new File(layout.projectDir(), "src/main/kotlin"));
+                    // -P, or -D as the Maven build takes it and the error for a
+                    // missing SDK suggests.
+                    t.getDotnet().set(project.getProviders().gradleProperty(
+                            com.codename1.maven.UnityProjectBuilder.DOTNET_PROPERTY).orElse(
+                            project.getProviders().systemProperty(
+                                    com.codename1.maven.UnityProjectBuilder.DOTNET_PROPERTY)));
+                    t.getOutputDirectory().set(new File(layout.buildDir(), "generated/sources/cn1-unity"));
+                    t.getClassesDirectory().set(new File(layout.buildDir(), "cn1-unity/classes"));
+                    t.getStateDirectory().set(new File(layout.buildDir(), "cn1-unity/state"));
+                    t.onlyIf(x -> com.codename1.maven.UnityProjectBuilder.isUnityProject(unityDir));
+                });
+        main.getJava().srcDir(unity.flatMap(com.codename1.gradle.tasks.CompileUnityTask::getOutputDirectory));
+        // Providers of the task's output, so whatever reads them waits for it.
+        Provider<org.gradle.api.file.Directory> classes = unity.flatMap(
+                com.codename1.gradle.tasks.CompileUnityTask::getClassesDirectory);
+        main.getOutput().dir(classes);
+        main.setCompileClasspath(main.getCompileClasspath().plus(project.files(classes)));
+        return unity;
     }
 
     /// `generateGuiSources`, whose generated views are a main source root. An

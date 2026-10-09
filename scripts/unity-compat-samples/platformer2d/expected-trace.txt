@@ -1,0 +1,107 @@
+headless seed=3 frames=300 view=400x300 rate=60 scenes=1
+hero over cell -7,-3 tile=Ground wall=False post=True
+wall=True centre 850,-150 corner 800,-200 post=False sign=Start follows=Hero
+frame 1 state none -> Idle sprite=hero_0
+frame 1 hero -700,-150 camera 0,0 size=500
+frame 1 objects=15 drawn=15 text="Start" text="Steps 0"
+draw frame=1 commands=15 background=ff1a1f33
+  count 9 tiles.png@0,0+16x16
+  count 2 (text)
+  count 3 dot.png@0,0+4x4
+  count 1 hero.png@24,0+8x8
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=14375,22500 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=18125,22500 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=21875,22500 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=25625,22500 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=29375,22500 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=33125,22500 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=36875,22500 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=40625,22500 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=14375,18750 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  text "Start" layer=0 order=0 at=16250,3750 size=15000x3750 font=2250 fit=0 min=6750 max=27000 align=4 style=0 wrap=1 color=ffffe666
+  dot.png src=0,0+4x4 layer=0 order=1 at=31250,13125 size=11250x938 anchor=50,50 rotation=0 color=ffe6cc4d flip=00
+  dot.png src=0,0+4x4 layer=0 order=1 at=31250,18750 size=1875x1875 anchor=50,50 rotation=0 color=ffffffff flip=00
+  hero.png src=24,0+8x8 layer=0 order=2 at=20000,18750 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  text "Steps 0" layer=0 order=0 at=1000,1000 size=20000x3000 font=2000 fit=0 min=1800 max=7200 align=3 style=0 wrap=1 color=ffffe666
+frame 2 state Idle -> Jump sprite=hero_3
+frame 3 state Jump -> Idle sprite=hero_0
+input frame=20 key=275 down
+frame 21 state Idle -> Run sprite=hero_2
+frame 28 Pebble met Ground at 150
+Pebble turned back at 150
+frame 60 objects=15 drawn=17 text="Start" text="Steps 3"
+frame 61 hero -428,-149 camera -524,-50 size=400
+Ball turned back at 254
+frame 77 Pebble met Ground at -175
+frame 95 Ball met Platform at 38
+input frame=100 key=32 down
+frame 100 jump 1 from -164
+input frame=102 key=32 up
+frame 103 state Run -> Jump sprite=hero_3
+frame 120 objects=15 drawn=20 text="Start" text="Steps 5"
+frame 121 hero -28,37 camera -124,22 size=400
+frame 130 objects=15 drawn=20 text="Start" text="Steps 5"
+draw frame=130 commands=20 background=ff1a1f33
+  count 13 tiles.png@0,0+16x16
+  count 2 (text)
+  count 4 dot.png@0,0+4x4
+  count 1 hero.png@24,0+8x8
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=-2187,26522 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=1563,26522 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=5313,26522 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=9063,26522 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=12813,26522 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=16563,26522 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=20313,26522 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=24063,26522 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=27813,26522 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=31563,26522 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=35313,26522 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=39063,26522 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  text "Start" layer=0 order=0 at=-7812,7772 size=15000x3750 font=2250 fit=0 min=6750 max=27000 align=4 style=0 wrap=1 color=ffffe666
+  text "Steps 5" layer=0 order=0 at=1000,1000 size=20000x3000 font=2000 fit=0 min=1800 max=7200 align=3 style=0 wrap=1 color=ffffe666
+frame 154 landed on Ground at 196
+frame 155 state Jump -> Idle sprite=hero_0
+frame 156 state Idle -> Proud sprite=hero_0
+frame 158 dust particles=6 playing=True
+frame 167 bowed after 1 steps=5
+frame 171 state Proud -> Idle sprite=hero_0
+frame 172 state Idle -> Run sprite=hero_2
+frame 177 ran into Thorn
+frame 178 state Run -> Hurt sprite=hero_1
+frame 180 objects=15 drawn=25 text="Steps 5"
+frame 181 hero 372,-149 camera 276,32 size=400
+hurt 6 green=59 red=100 hat=83
+hurt 12 green=12 red=100 hat=63
+frame 194 dust particles=0 playing=True
+hurt 18 green=3 red=100 hat=57
+frame 200 objects=15 drawn=19 text="Steps 5"
+draw frame=200 commands=19 background=ff1a1f33
+  count 13 tiles.png@0,0+16x16
+  count 1 tiles.png@16,0+16x16
+  count 3 dot.png@0,0+4x4
+  count 1 hero.png@8,0+8x8
+  count 1 (text)
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=-933,25557 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=2817,25557 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=6567,25557 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=10317,25557 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=14067,25557 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=17817,25557 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=21567,25557 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=25317,25557 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=29067,25557 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=32817,25557 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=36567,25557 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tiles.png src=0,0+16x16 layer=0 order=-1 at=40317,25557 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
+  text "Steps 5" layer=0 order=0 at=1000,1000 size=20000x3000 font=2000 fit=0 min=1800 max=7200 align=3 style=0 wrap=1 color=ffffe666
+hurt 24 green=42 red=100 hat=77
+hurt 30 green=93 red=100 hat=97
+frame 208 state Hurt -> Idle sprite=hero_0
+frame 209 state Idle -> Run sprite=hero_2
+frame 240 blocked at 759 slowest before=400 green=100 hat=25
+frame 240 objects=15 drawn=19 text="Steps 7"
+frame 241 hero 759,-148 camera 673,32 size=400
+input frame=270 key=275 up
+frame 271 state Run -> Idle sprite=hero_0
+frame 300 objects=15 drawn=18 text="Steps 9"

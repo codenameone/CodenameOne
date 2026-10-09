@@ -2309,6 +2309,8 @@ const jvm = {
       case "int":
         return value | 0;
       case "float":
+        // A host number is a double; a Java float holds the nearest float.
+        return Math.fround(Number(value));
       case "double":
       case "long":
         return Number(value);
@@ -4020,6 +4022,21 @@ function _LfromNumber(v) {
   return _LL((v % _TWO_PWR_32) | 0, (v / _TWO_PWR_32) | 0);
 }
 function _LtoNumber(a) { return a.h * _TWO_PWR_32 + (a.l >>> 0); }
+// long -> float, rounded once. Rounding the long to a double and that double to
+// a float rounds twice, and the first rounding can land exactly on the midpoint
+// of two floats that the long itself was above or below. Up to 2^53 a long is a
+// double exactly, so there is one rounding. Beyond it floats are at least 2^30
+// apart, so bits 0..28 can only say "something is set below the rounding bit":
+// they are replaced by bit 28 alone, which leaves 36 significant bits - exact
+// as a double - on the same side of every float and float midpoint.
+function _Ll2f(x) {
+  x = _Lc(x);
+  const h = x.h;
+  if (h >= -0x200000 && h < 0x200000) return Math.fround(h * _TWO_PWR_32 + (x.l >>> 0));
+  let l = x.l >>> 0;
+  if ((l & 0x1FFFFFFF) !== 0) l = ((l & 0xE0000000) >>> 0) + 0x10000000;
+  return Math.fround(h * _TWO_PWR_32 + l);
+}
 function _Lc(x) {
   if (x && x.__l === 1) return x;
   if (x == null) return _L0;
@@ -4181,7 +4198,8 @@ global._Lushr = _Lushr;
 global._Lcmp = _Lcmp;
 global._Li2l = (x) => _LfromInt(x | 0);      // int -> long
 global._Ll2i = _Ll2i;                        // long -> int
-global._Ll2d = (x) => _LtoNumber(_Lc(x));    // long -> float/double
+global._Ll2d = (x) => _LtoNumber(_Lc(x));    // long -> double
+global._Ll2f = _Ll2f;                        // long -> float
 global._Ld2l = (x) => _LfromNumber(x);       // float/double -> long
 // Class-registration aliases: ``_Z`` for defineClass (1592 calls, 15-char
 // prefix savings each) and ``_M`` for the methods-map registration

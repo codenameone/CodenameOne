@@ -25,6 +25,10 @@ package com.codename1.tools.translator;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Label;
+import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
@@ -120,6 +124,291 @@ class JavascriptRuntimeSemanticsTest {
                 "int multiplication must keep Java's 32-bit wraparound. raw="
                         + result.rawMessage + " err=" + result.errorMessage);
         assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void wideStackShufflesMoveALongOrDoubleAsOneValueOnBothEmitters(CompilerHelper.CompilerConfig config) throws Exception {
+        // A long or a double is one entry of the pc-switch emitter's stack, and its
+        // POP2 and DUP2 family shuffled by slot: "x = (longs[i] += n)" moved four
+        // entries for DUP2_X2 where the JVM moves three. With nothing beneath the
+        // operands the store still landed and the expression's value was lost, which
+        // is the 30 this fixture answered; with an operand beneath, the store was
+        // handed a number for its array and failed with "Array expected: number".
+        // 31 is every property; run once as emitted and once with shuffle forced
+        // onto the pc-switch emitter, which is where the bug lived.
+        WorkerRunResult structured = translateAndRunFixture(config, "JsWideStackShuffleApp.java", "JsWideStackShuffleApp");
+        assertEquals(31, structured.result,
+                "structured emitter: a wide value must be shuffled as one entry. raw="
+                        + structured.rawMessage + " err=" + structured.errorMessage);
+
+        String prevSkip = System.getProperty("parparvm.js.structured.skip");
+        System.setProperty("parparvm.js.structured.skip", "JsWideStackShuffleApp.shuffle");
+        WorkerRunResult interpreted;
+        try {
+            interpreted = translateAndRunFixture(config, "JsWideStackShuffleApp.java", "JsWideStackShuffleApp");
+        } finally {
+            if (prevSkip == null) {
+                System.clearProperty("parparvm.js.structured.skip");
+            } else {
+                System.setProperty("parparvm.js.structured.skip", prevSkip);
+            }
+        }
+        assertEquals(31, interpreted.result,
+                "pc-switch emitter: a wide value must be shuffled as one entry. raw="
+                        + interpreted.rawMessage + " err=" + interpreted.errorMessage);
+        assertTrue(interpreted.errorMessage == null || interpreted.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void floatOperationsRoundToTheNearestFloatOnBothEmitters(CompilerHelper.CompilerConfig config) throws Exception {
+        // Java rounds the result of every float operation to the nearest float.
+        // JavaScript has one number type, a double, so an emitted "a * b" keeps
+        // bits a float cannot hold and the next operation starts from the wrong
+        // value: 0.1f was the double 0.1, and a timer adding 1f/60f six hundred
+        // times crossed its threshold on a different frame than on the JVM. The
+        // fixture hashes the bits of each kind of float result - arithmetic, the
+        // conversions from int, long and double, constants, an accumulation - and
+        // the answer is the one a JVM gives for the same source. Run once as
+        // emitted and once with every method forced onto the pc-switch emitter,
+        // because the two write these instructions separately.
+        final int expected = -305782216;
+        WorkerRunResult structured = translateAndRunFixture(config, "JsFloatRoundingApp.java", "JsFloatRoundingApp");
+        assertEquals(expected, structured.result,
+                "structured emitter: every float result must be the nearest float. raw="
+                        + structured.rawMessage + " err=" + structured.errorMessage);
+
+        String prevSkip = System.getProperty("parparvm.js.structured.skip");
+        System.setProperty("parparvm.js.structured.skip", "JsFloatRoundingApp.");
+        WorkerRunResult interpreted;
+        try {
+            interpreted = translateAndRunFixture(config, "JsFloatRoundingApp.java", "JsFloatRoundingApp");
+        } finally {
+            if (prevSkip == null) {
+                System.clearProperty("parparvm.js.structured.skip");
+            } else {
+                System.setProperty("parparvm.js.structured.skip", prevSkip);
+            }
+        }
+        assertEquals(expected, interpreted.result,
+                "pc-switch emitter: every float result must be the nearest float. raw="
+                        + interpreted.rawMessage + " err=" + interpreted.errorMessage);
+        assertTrue(interpreted.errorMessage == null || interpreted.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void aCallComparedAsAFloatOrADoubleRunsOnceOnBothEmitters(CompilerHelper.CompilerConfig config) throws Exception {
+        // FCMPx and DCMPx are written as an expression that names each operand
+        // three times - twice for NaN and the two orderings. The structured
+        // emitter also carries a call's result into the instruction that uses it
+        // as text, not as a slot, and it did that for a compare: "f() > 0.5" was
+        // emitted with three copies of f() and called it two or three times. A
+        // random number generator advanced twice per test and picked the other
+        // arm. 255 is every shape called exactly once with the JVM's answer; run
+        // once as emitted and once with every method on the pc-switch emitter.
+        WorkerRunResult structured = translateAndRunFixture(config, "JsFloatCompareOnceApp.java", "JsFloatCompareOnceApp");
+        assertEquals(255, structured.result,
+                "structured emitter: a compared call must run once. raw="
+                        + structured.rawMessage + " err=" + structured.errorMessage);
+
+        String prevSkip = System.getProperty("parparvm.js.structured.skip");
+        System.setProperty("parparvm.js.structured.skip", "JsFloatCompareOnceApp.");
+        WorkerRunResult interpreted;
+        try {
+            interpreted = translateAndRunFixture(config, "JsFloatCompareOnceApp.java", "JsFloatCompareOnceApp");
+        } finally {
+            if (prevSkip == null) {
+                System.clearProperty("parparvm.js.structured.skip");
+            } else {
+                System.setProperty("parparvm.js.structured.skip", prevSkip);
+            }
+        }
+        assertEquals(255, interpreted.result,
+                "pc-switch emitter: a compared call must run once. raw="
+                        + interpreted.rawMessage + " err=" + interpreted.errorMessage);
+        assertTrue(interpreted.errorMessage == null || interpreted.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void swapExchangesTheTwoTopValuesOnEveryEmitter(CompilerHelper.CompilerConfig config) throws Exception {
+        // SWAP was written as "s0 = s1; s1 = s0;" whenever the lower of the two
+        // values was held in a slot: both entries ended up with the top value.
+        // After DUP_X1 that is always the case, and "NEW, DUP_X1, SWAP,
+        // INVOKESPECIAL" - a constructor argument that was on the stack before the
+        // object - passed the new object to its own constructor. javac swaps
+        // nothing but locals and constants, so the shapes are assembled here and
+        // replace the stand-ins the fixture compiles. The low byte is the eight
+        // shapes with no branch, which are emitted as straight line code; the
+        // high byte is the same eight behind a branch, which are structured as
+        // emitted and are then forced onto the pc-switch emitter.
+        ClassPatcher shapes = new ClassPatcher() {
+            @Override
+            public void patch(Path classesDir) throws Exception {
+                writeSwapShapes(classesDir, "JsStackSwapStraight", false);
+                writeSwapShapes(classesDir, "JsStackSwapBranching", true);
+            }
+        };
+        WorkerRunResult structured = translateAndRunFixture(config, "JsStackSwapApp.java", "JsStackSwapApp", shapes);
+        assertEquals(0xffff, structured.result,
+                "straight line and structured emitters: SWAP must exchange the two top values. raw="
+                        + structured.rawMessage + " err=" + structured.errorMessage);
+
+        String prevSkip = System.getProperty("parparvm.js.structured.skip");
+        System.setProperty("parparvm.js.structured.skip", "JsStackSwapBranching.");
+        WorkerRunResult interpreted;
+        try {
+            interpreted = translateAndRunFixture(config, "JsStackSwapApp.java", "JsStackSwapApp", shapes);
+        } finally {
+            if (prevSkip == null) {
+                System.clearProperty("parparvm.js.structured.skip");
+            } else {
+                System.setProperty("parparvm.js.structured.skip", prevSkip);
+            }
+        }
+        assertEquals(0xffff, interpreted.result,
+                "pc-switch emitter: SWAP must exchange the two top values. raw="
+                        + interpreted.rawMessage + " err=" + interpreted.errorMessage);
+        assertTrue(interpreted.errorMessage == null || interpreted.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    /// Assembles one implementation of the fixture's `JsStackSwapShapes`. With
+    /// `branching` every method starts with a test of `JsStackSwapApp.guard`
+    /// that never fails, which is all it takes to keep a method off the
+    /// straight line emitter.
+    private static void writeSwapShapes(Path classesDir, String name, boolean branching) throws Exception {
+        final String app = "JsStackSwapApp";
+        final String box = "JsStackSwapBox";
+        ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        cw.visit(Opcodes.V1_8, Opcodes.ACC_SUPER, name, null, "java/lang/Object", new String[] {"JsStackSwapShapes"});
+
+        MethodVisitor init = cw.visitMethod(0, "<init>", "()V", null, null);
+        init.visitCode();
+        init.visitVarInsn(Opcodes.ALOAD, 0);
+        init.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        init.visitInsn(Opcodes.RETURN);
+        init.visitMaxs(0, 0);
+        init.visitEnd();
+
+        MethodVisitor mv = swapShape(cw, "swapLocals", "(II)I", branching);
+        mv.visitVarInsn(Opcodes.ILOAD, 1);
+        mv.visitVarInsn(Opcodes.ILOAD, 2);
+        endSwapShape(mv, Opcodes.SWAP, Opcodes.ISUB, Opcodes.IRETURN);
+
+        mv = swapShape(cw, "swapCalls", "()I", branching);
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, app, "one", "()I", false);
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, app, "two", "()I", false);
+        endSwapShape(mv, Opcodes.SWAP, Opcodes.ISUB, Opcodes.IRETURN);
+
+        mv = swapShape(cw, "swapCallUnderLocal", "(I)I", branching);
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, app, "one", "()I", false);
+        mv.visitVarInsn(Opcodes.ILOAD, 1);
+        endSwapShape(mv, Opcodes.SWAP, Opcodes.ISUB, Opcodes.IRETURN);
+
+        mv = swapShape(cw, "swapLocalUnderCall", "(I)I", branching);
+        mv.visitVarInsn(Opcodes.ILOAD, 1);
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, app, "two", "()I", false);
+        endSwapShape(mv, Opcodes.SWAP, Opcodes.ISUB, Opcodes.IRETURN);
+
+        mv = swapShape(cw, "swapSumUnderCall", "(II)I", branching);
+        mv.visitVarInsn(Opcodes.ILOAD, 1);
+        mv.visitVarInsn(Opcodes.ILOAD, 2);
+        mv.visitInsn(Opcodes.IADD);
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, app, "two", "()I", false);
+        endSwapShape(mv, Opcodes.SWAP, Opcodes.ISUB, Opcodes.IRETURN);
+
+        mv = swapShape(cw, "swapCallUnderSum", "(II)I", branching);
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, app, "one", "()I", false);
+        mv.visitVarInsn(Opcodes.ILOAD, 1);
+        mv.visitVarInsn(Opcodes.ILOAD, 2);
+        mv.visitInsn(Opcodes.IADD);
+        endSwapShape(mv, Opcodes.SWAP, Opcodes.ISUB, Opcodes.IRETURN);
+
+        mv = swapShape(cw, "box", "(Ljava/lang/Object;)L" + box + ";", branching);
+        mv.visitVarInsn(Opcodes.ALOAD, 1);
+        mv.visitTypeInsn(Opcodes.NEW, box);
+        mv.visitInsn(Opcodes.DUP_X1);
+        mv.visitInsn(Opcodes.SWAP);
+        mv.visitMethodInsn(Opcodes.INVOKESPECIAL, box, "<init>", "(Ljava/lang/Object;)V", false);
+        endSwapShape(mv, Opcodes.ARETURN);
+
+        mv = swapShape(cw, "boxCall", "()L" + box + ";", branching);
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, app, "target", "()Ljava/lang/Object;", false);
+        mv.visitTypeInsn(Opcodes.NEW, box);
+        mv.visitInsn(Opcodes.DUP_X1);
+        mv.visitInsn(Opcodes.SWAP);
+        mv.visitMethodInsn(Opcodes.INVOKESPECIAL, box, "<init>", "(Ljava/lang/Object;)V", false);
+        endSwapShape(mv, Opcodes.ARETURN);
+
+        cw.visitEnd();
+        Files.write(classesDir.resolve(name + ".class"), cw.toByteArray());
+    }
+
+    private static MethodVisitor swapShape(ClassWriter cw, String name, String desc, boolean branching) {
+        MethodVisitor mv = cw.visitMethod(Opcodes.ACC_PUBLIC, name, desc, null, null);
+        mv.visitCode();
+        if (branching) {
+            Label go = new Label();
+            mv.visitFieldInsn(Opcodes.GETSTATIC, "JsStackSwapApp", "guard", "I");
+            mv.visitJumpInsn(Opcodes.IFGE, go);
+            if (desc.endsWith(")I")) {
+                mv.visitInsn(Opcodes.ICONST_M1);
+                mv.visitInsn(Opcodes.IRETURN);
+            } else {
+                mv.visitInsn(Opcodes.ACONST_NULL);
+                mv.visitInsn(Opcodes.ARETURN);
+            }
+            mv.visitLabel(go);
+            // The locals at the label are the method's parameters and the
+            // stack is empty, so the frame needs no computing.
+            mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
+        }
+        return mv;
+    }
+
+    private static void endSwapShape(MethodVisitor mv, int... opcodes) {
+        for (int opcode : opcodes) {
+            mv.visitInsn(opcode);
+        }
+        mv.visitMaxs(0, 0);
+        mv.visitEnd();
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void multiDimensionalArraysTakeOneSizePerDimensionOnBothEmitters(CompilerHelper.CompilerConfig config) throws Exception {
+        // MULTIANEWARRAY pops one size per allocated dimension. It was emitted as a
+        // loop around a single pop, and the pass that turns the pc-switch emitter's
+        // stack into registers counts pops as they are written, not as they run: it
+        // saw one. Every dimension then got the last size, and everything beneath
+        // the sizes was read one entry too high, so "this.f = new X[a][b]" stored
+        // through a size instead of through this. A square array hid the first half.
+        // 127 is every property. A method that allocates this way is never
+        // structured, so both runs reach the pc-switch emitter today; the second
+        // keeps it there should the structured emitter learn the instruction.
+        WorkerRunResult structured = translateAndRunFixture(config, "JsMultiArrayDimensionsApp.java", "JsMultiArrayDimensionsApp");
+        assertEquals(127, structured.result,
+                "as emitted: each dimension must take its own size. raw="
+                        + structured.rawMessage + " err=" + structured.errorMessage);
+
+        String prevSkip = System.getProperty("parparvm.js.structured.skip");
+        System.setProperty("parparvm.js.structured.skip", "JsMultiArrayDimensionsApp.");
+        WorkerRunResult interpreted;
+        try {
+            interpreted = translateAndRunFixture(config, "JsMultiArrayDimensionsApp.java", "JsMultiArrayDimensionsApp");
+        } finally {
+            if (prevSkip == null) {
+                System.clearProperty("parparvm.js.structured.skip");
+            } else {
+                System.setProperty("parparvm.js.structured.skip", prevSkip);
+            }
+        }
+        assertEquals(127, interpreted.result,
+                "pc-switch emitter: each dimension must take its own size. raw="
+                        + interpreted.rawMessage + " err=" + interpreted.errorMessage);
+        assertTrue(interpreted.errorMessage == null || interpreted.errorMessage.isEmpty(), "Worker should not emit an error message");
     }
 
     @ParameterizedTest
@@ -943,7 +1232,17 @@ class JavascriptRuntimeSemanticsTest {
         assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message during protocol handshake");
     }
 
+    /// Changes the compiled classes of a fixture before they are translated.
+    private interface ClassPatcher {
+        void patch(Path classesDir) throws Exception;
+    }
+
     private static WorkerRunResult translateAndRunFixture(CompilerHelper.CompilerConfig config, String fixtureName, String appName) throws Exception {
+        return translateAndRunFixture(config, fixtureName, appName, null);
+    }
+
+    private static WorkerRunResult translateAndRunFixture(CompilerHelper.CompilerConfig config, String fixtureName, String appName,
+            ClassPatcher patcher) throws Exception {
         Parser.cleanup();
 
         Path sourceDir = Files.createTempDirectory("js-runtime-src");
@@ -954,6 +1253,9 @@ class JavascriptRuntimeSemanticsTest {
                 JavascriptTargetIntegrationTest.loadFixture(fixtureName).getBytes(StandardCharsets.UTF_8));
 
         JavascriptTargetIntegrationTest.compileAgainstJavaApi(config, sourceDir, classesDir, javaApiDir);
+        if (patcher != null) {
+            patcher.patch(classesDir);
+        }
 
         Path outputDir = Files.createTempDirectory("js-runtime-output");
         JavascriptTargetIntegrationTest.runJavascriptTranslator(classesDir, outputDir, appName);

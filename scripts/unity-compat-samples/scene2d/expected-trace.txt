@@ -1,0 +1,23 @@
+ball awake body=True mood=1 verbose=True
+ball start at 0,400 ground at -50 marker=Marker nudge=25,0
+draw frame=1 sprites=3 background=ff334d80
+  crate.png order=-1 at=6400,28800 size=9600x4800 anchor=25,25 rotation=-3150 color=80ff8040 flip=10
+  ball.png order=0 at=16000,14400 size=4800x4800 anchor=50,50 rotation=0 color=ffffffff flip=00
+  ball.png order=5 at=30400,28800 size=2400x2400 anchor=50,50 rotation=0 color=ff00ff00 flip=11
+ball half a second in, frame 30 y=272
+ball one frame later, frame 31
+ball blink 0 red=100 green=0
+ball blink 1 red=100 green=100
+ball blinking done, frame 46
+ball hit Ground bounce 1 after 43 steps, y=48 closing=824
+draw frame=60 sprites=3 background=ff334d80
+  crate.png order=-1 at=6400,28800 size=9600x4800 anchor=25,25 rotation=-12000 color=80ff8040 flip=10
+  ball.png order=0 at=17133,31186 size=4800x4800 anchor=50,50 rotation=303 color=ffffffff flip=00
+  ball.png order=5 at=30400,28800 size=2400x2400 anchor=50,50 rotation=0 color=ff00ff00 flip=11
+ball tapped at 160,240 frame 100
+draw frame=150 sprites=3 background=ff334d80
+  ball.png order=0 at=18295,30040 size=4800x4800 anchor=50,50 rotation=3059 color=ffffffff flip=00
+  ball.png order=5 at=30400,28800 size=2400x2400 anchor=50,50 rotation=0 color=ff00ff00 flip=11
+  ball.png order=7 at=6400,28800 size=9600x4800 anchor=50,50 rotation=-25500 color=80ff8040 flip=00
+ball bounces=1 steps=125 lowest=46 y=74 vy=-374 marker gone=False
+Crate angle=25500 screen=320x480 size=500 on screen at 6400,19200,1000 corner=-333,-300,0 sprite=ball ppu=3200 pivot=1600,1600 order=7 main=True

@@ -82,6 +82,9 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
     private ActionListener dragListener;
     private ActionListener releaseListener;
     private boolean formListenersAdded;
+    /// Set once the form has delivered a pointer event to this view directly,
+    /// with every finger in it. See `#addFormPointerListeners()`.
+    private boolean touchesArrive;
 
     public GameView() {
         super(new SpriteRenderer());
@@ -225,6 +228,14 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
     @Override
     protected void initComponent() {
         super.initComponent();
+        // What the view hosts -- the GPU surface, or the placeholder that stands
+        // in for it -- is the view as far as a touch goes. A form hands a pointer
+        // event to the deepest component under it, which would be that child, and
+        // it does nothing with one; marked this way the form passes it on to its
+        // parent, and the multi-touch callbacks of this class see every finger.
+        for (int i = 0; i < getComponentCount(); i++) {
+            getComponentAt(i).setIgnorePointerEvents(true);
+        }
         addFormPointerListeners();
         if (running) {
             setContinuous(true);
@@ -239,12 +250,14 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
         super.deinitialize();
     }
 
-    /// The GPU surface is hosted in a native peer that swallows the platform's
-    /// pointer events before they reach this component, so the usual
-    /// `#pointerPressed(int[], int[])` callbacks never fire over the surface. Instead
-    /// we listen at the form level (those listeners fire for every pointer event,
-    /// regardless of which component is hit) and route the touches to the on-screen
-    /// controls ourselves.
+    /// Form-level listeners fire for every pointer event, whichever component is
+    /// hit, but they carry the first finger only. They are what feeds the view
+    /// until `#pointerPressed(int[], int[])` and its siblings have been seen to
+    /// arrive -- those carry every finger, and once they do, a press or a drag
+    /// heard here as well would take the on-screen controls back to one finger
+    /// between two reports of all of them. A release is always routed: it means
+    /// the last finger lifted, saying so twice changes nothing, and it must not be
+    /// lost when the form delivers it to another component.
     private void addFormPointerListeners() {
         if (formListenersAdded) {
             return;
@@ -257,13 +270,17 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
             pressListener = new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    routeFormTouch(e.getX(), e.getY(), true, true, false);
+                    if (!touchesArrive) {
+                        routeFormTouch(e.getX(), e.getY(), true, true, false);
+                    }
                 }
             };
             dragListener = new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    routeFormTouch(e.getX(), e.getY(), true, false, false);
+                    if (!touchesArrive) {
+                        routeFormTouch(e.getX(), e.getY(), true, false, false);
+                    }
                 }
             };
             releaseListener = new ActionListener() {
@@ -379,18 +396,34 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
         input.keyUp(keyCode);
     }
 
+    /// A key that is held is held, and nothing more. The display reports a key
+    /// that stays down as repeating -- 800 ms after the press and then every few
+    /// milliseconds, by the wall clock -- and a component turns each repeat into a
+    /// press and a release unless it says otherwise. For a text field that is a
+    /// character typed again; here it would let go of a key the player still holds:
+    /// `GameInput#isKeyDown(int)` went false one repeat interval into every held
+    /// direction on a port that does not re-send the press itself, and a subclass
+    /// that forwards `#keyReleased(int)` saw the key come up.
+    @Override
+    public void keyRepeated(int keyCode) {
+        // Deliberately empty: see above.
+    }
+
     @Override
     public void pointerPressed(int[] x, int[] y) {
+        touchesArrive = true;
         routeTouches(x, y, true, true, false);
     }
 
     @Override
     public void pointerDragged(int[] x, int[] y) {
+        touchesArrive = true;
         routeTouches(x, y, true, false, false);
     }
 
     @Override
     public void pointerReleased(int[] x, int[] y) {
+        touchesArrive = true;
         routeTouches(x, y, false, false, true);
     }
 

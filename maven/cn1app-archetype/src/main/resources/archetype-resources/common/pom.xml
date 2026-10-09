@@ -112,6 +112,25 @@
                 </dependency>
             </dependencies>
         </profile>
+        <!-- Unity compatibility: a Unity 2D project's Assets/ and
+             ProjectSettings/ placed in src/main/unity build and run on every
+             Codename One target. Its C# scripts are compiled with the .NET
+             SDK, which only a project with this directory needs; the
+             compile-unity goal below is a no-op without it. -->
+        <profile>
+            <id>unity-compat</id>
+            <activation>
+                <file>
+                    <exists>${basedir}/src/main/unity</exists>
+                </file>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-unity-compat</artifactId>
+                </dependency>
+            </dependencies>
+        </profile>
         <!-- A profile to add kotlin support.  Activated if the src/main/kotlin
             directory exists -->
         <profile>
@@ -401,6 +420,15 @@
                         <phase>generate-sources</phase>
                         <goals>
                             <goal>compile-android-res</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <!-- A Unity project (src/main/unity): its scripts as
+                             classes, its scenes as generated Java source. -->
+                        <id>compile-unity</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>compile-unity</goal>
                         </goals>
                     </execution>
                     <execution>

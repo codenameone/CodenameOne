@@ -1789,6 +1789,11 @@ final class JavascriptMethodGenerator {
             s = rx(s, 
                     "stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{\\s*let b = stack\\.q\\(\\);\\s*let a = stack\\.q\\(\\);\\s*stack\\.p\\(a\\s*([+\\-*&|\\^])\\s*b\\);\\s*\\}",
                     "stack.p(($1)$3($2));");
+            // Rule 5f: the same fold for the rounded float forms, FADD, FSUB,
+            // FMUL, FDIV and FREM. The rounding stays around the operation.
+            s = rx(s,
+                    "stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{\\s*let b = stack\\.q\\(\\);\\s*let a = stack\\.q\\(\\);\\s*stack\\.p\\(Math\\.fround\\(a\\s*([+\\-*/%])\\s*b\\)\\);\\s*\\}",
+                    "stack.p(Math.fround(($1)$3($2)));");
             // Rule 5b: ISHL/ISHR with (b & 31) shift-distance mask.
             //   stack.p(X); stack.p(Y);
             //   { let b=stack.q(); let a=stack.q(); stack.p((a|0) OP (b & 31)); }
@@ -4959,6 +4964,16 @@ final class JavascriptMethodGenerator {
             case Opcodes.SWAP: {
                 String v1 = ctx.pop();
                 String v2 = ctx.pop();
+                if (!ctx.lastPopWasPending) {
+                    // The lower value lives in the very slot the first push
+                    // below assigns, so it has to be read out before that:
+                    // "s0 = s1; s1 = s0;" left both entries holding the top
+                    // value, and the swap was lost. No Java compiler writes
+                    // SWAP over two computed values, which is how this stood.
+                    String saved = ctx.nextTemp("__dup");
+                    out.append("  let ").append(saved).append(" = ").append(v2).append(";\n");
+                    v2 = saved;
+                }
                 out.append("  ").append(ctx.push(v1)).append(";\n");
                 out.append("  ").append(ctx.push(v2)).append(";\n");
                 return true;
@@ -4976,17 +4991,24 @@ final class JavascriptMethodGenerator {
                 return emitBinary(out, ctx, "Math.imul(%s, %s)");
             case Opcodes.LADD:
                 return emitBinary(out, ctx, "_Ladd(%s, %s)");
+            // A float result is rounded to the nearest float, as the JVM does
+            // after every float operation. JavaScript computes in double
+            // precision, and the bits a float cannot hold would otherwise be
+            // carried into the next operation. Double results are left alone.
             case Opcodes.FADD:
+                return emitBinary(out, ctx, "Math.fround(%s + %s)");
             case Opcodes.DADD:
                 return emitBinary(out, ctx, "(%s + %s)");
             case Opcodes.LSUB:
                 return emitBinary(out, ctx, "_Lsub(%s, %s)");
             case Opcodes.FSUB:
+                return emitBinary(out, ctx, "Math.fround(%s - %s)");
             case Opcodes.DSUB:
                 return emitBinary(out, ctx, "(%s - %s)");
             case Opcodes.LMUL:
                 return emitBinary(out, ctx, "_Lmul(%s, %s)");
             case Opcodes.FMUL:
+                return emitBinary(out, ctx, "Math.fround(%s * %s)");
             case Opcodes.DMUL:
                 return emitBinary(out, ctx, "(%s * %s)");
             case Opcodes.IDIV:
@@ -4994,6 +5016,7 @@ final class JavascriptMethodGenerator {
             case Opcodes.LDIV:
                 return emitBinary(out, ctx, "_Ldiv(%s, %s)");
             case Opcodes.FDIV:
+                return emitBinary(out, ctx, "Math.fround(%s / %s)");
             case Opcodes.DDIV:
                 return emitBinary(out, ctx, "(%s / %s)");
             case Opcodes.IREM:
@@ -5001,12 +5024,15 @@ final class JavascriptMethodGenerator {
             case Opcodes.LREM:
                 return emitBinary(out, ctx, "_Lrem(%s, %s)");
             case Opcodes.FREM:
+                return emitBinary(out, ctx, "Math.fround(%s %% %s)");
             case Opcodes.DREM:
                 return emitBinary(out, ctx, "(%s %% %s)");
             case Opcodes.INEG:
                 return emitUnary(out, ctx, "-(%s|0)");
             case Opcodes.LNEG:
                 return emitUnary(out, ctx, "_Lneg(%s)");
+            // FNEG needs no rounding: it flips the sign bit, and the negation
+            // of a float is a float.
             case Opcodes.FNEG:
             case Opcodes.DNEG:
                 return emitUnary(out, ctx, "-%s");
@@ -5036,13 +5062,18 @@ final class JavascriptMethodGenerator {
                 return emitBinary(out, ctx, "_Lxor(%s, %s)");
             case Opcodes.I2L:
                 return emitUnary(out, ctx, "_Li2l(%s)");
+            // A long reaches a float in one rounding, which is not what
+            // rounding its double would give; the runtime's _Ll2f does that.
             case Opcodes.L2F:
+                return emitUnary(out, ctx, "_Ll2f(%s)");
             case Opcodes.L2D:
                 return emitUnary(out, ctx, "_Ll2d(%s)");
+            // An int above 2^24 and most doubles are not floats.
             case Opcodes.I2F:
+            case Opcodes.D2F:
+                return emitUnary(out, ctx, "Math.fround(%s)");
             case Opcodes.I2D:
             case Opcodes.F2D:
-            case Opcodes.D2F:
                 return true;
             case Opcodes.I2B:
                 return emitUnary(out, ctx, "((%s << 24) >> 24)");
@@ -5144,6 +5175,21 @@ final class JavascriptMethodGenerator {
         boolean aField = ctx.lastPopHadField;
         String expr;
         if (repeatedArgs) {
+            // The format names each operand three times, and an operand can
+            // be a deferred expression rather than a slot: canDeferInvokeResult
+            // lets a call's result ride into a compare, so "f() > 0.5" was
+            // written with three copies of the call and ran f up to three
+            // times. Anything that is not a bare local or a literal is settled
+            // in the slot it would have occupied, the left operand first, and
+            // the format names the slot.
+            if (aPending && !StraightLineContext.isDeferrable(a)) {
+                out.append("  s").append(ctx.sp).append(" = ").append(a).append(";\n");
+                a = "s" + ctx.sp;
+            }
+            if (bPending && !StraightLineContext.isDeferrable(b)) {
+                out.append("  s").append(ctx.sp + 1).append(" = ").append(b).append(";\n");
+                b = "s" + (ctx.sp + 1);
+            }
             expr = String.format(format, a, b, a, b, a, b);
         } else {
             expr = String.format(format, a, b);
@@ -5154,6 +5200,16 @@ final class JavascriptMethodGenerator {
             out.append("  ").append(ctx.push(expr)).append(";\n");
         }
         return true;
+    }
+
+    /// The JavaScript literal of a float constant. `Float.toString` is the
+    /// shortest decimal that names the float among floats - "0.1" - and
+    /// JavaScript reads that as the double nearest 0.1, which is a different
+    /// number. The double a float widens to is exact, and its own shortest
+    /// decimal reads back as that same double. NaN and the infinities print as
+    /// the names JavaScript gives them.
+    private static String floatLiteral(Float value) {
+        return Double.toString(value.doubleValue());
     }
 
     private static boolean emitUnary(StringBuilder out, StraightLineContext ctx, String format) {
@@ -5214,7 +5270,11 @@ final class JavascriptMethodGenerator {
             out.append("  ").append(ctx.push("_Llit(" + ((int) lv) + ", " + ((int) (lv >>> 32)) + ")")).append(";\n");
             return true;
         }
-        if (value instanceof Integer || value instanceof Float || value instanceof Double) {
+        if (value instanceof Float) {
+            out.append("  ").append(ctx.push(floatLiteral((Float) value))).append(";\n");
+            return true;
+        }
+        if (value instanceof Integer || value instanceof Double) {
             out.append("  ").append(ctx.push(value.toString())).append(";\n");
             return true;
         }
@@ -6723,11 +6783,30 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         int totalDimensions = arrayDescriptorDimensions(desc);
         String componentType = arrayDescriptorComponent(desc);
         int allocatedDimensions = instruction.getDimensionsToAllocate();
-        out.append("        { let sizes = new Array(").append(totalDimensions).append(");");
-        out.append(" for (let i = ").append(allocatedDimensions - 1).append("; i >= 0; i--) { sizes[i] = stack.q() | 0; }");
-        out.append(" for (let i = ").append(allocatedDimensions).append("; i < ").append(totalDimensions)
-                .append("; i++) { sizes[i] = -1; }");
-        out.append(" stack.p(jvm.newMultiArray(sizes, \"").append(componentType).append("\", ")
+        // One pop is written out per allocated dimension, last dimension first,
+        // and never a loop around a single pop. rewriteStackToRegisters() turns
+        // this text into register reads by counting the pops it can see: a loop
+        // that ran one pop N times was one pop to it, so every dimension read the
+        // same register and each operand beneath the sizes was taken one entry
+        // too high -- "this.f = new X[a][b]" stored through a size.
+        out.append("        {");
+        for (int i = allocatedDimensions - 1; i >= 0; i--) {
+            out.append(" let __dim").append(i).append(" = stack.q() | 0;");
+        }
+        out.append(" stack.p(jvm.newMultiArray([");
+        for (int i = 0; i < totalDimensions; i++) {
+            if (i > 0) {
+                out.append(", ");
+            }
+            // A dimension the instruction leaves unallocated ("new int[3][]") is
+            // -1, which is where the runtime stops descending.
+            if (i < allocatedDimensions) {
+                out.append("__dim").append(i);
+            } else {
+                out.append("-1");
+            }
+        }
+        out.append("], \"").append(componentType).append("\", ")
                 .append(totalDimensions).append(")); pc = ").append(index + 1).append("; break; }\n");
     }
 
@@ -6794,7 +6873,55 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         return target.intValue();
     }
 
+    // The category-aware form of POP2 and the DUP family for the interpreter
+    // emitter, the counterpart of emitDup above. A long or double is ONE entry
+    // of this emitter's stack, so the slot-based shuffles below it are right
+    // only when every operand is category 1: a DUP_X2 over a long moved three
+    // entries where the JVM moves two, and the store that followed was handed a
+    // number where it expected its array. Parser resolves the real shape from
+    // the frames; when it could not, the instruction is unstamped and the
+    // category-1 shuffle is still what runs.
+    private static boolean appendResolvedStackShuffle(StringBuilder out, BasicInstruction instruction, int index) {
+        int nDup = instruction.getDupNDup();
+        if (nDup < 0) {
+            return false;
+        }
+        int opcode = instruction.getOpcode();
+        if (opcode == Opcodes.POP2) {
+            out.append("        ");
+            for (int i = 0; i < nDup; i++) {
+                out.append("stack.q(); ");
+            }
+            out.append("pc = ").append(index + 1).append("; break;\n");
+            return true;
+        }
+        if (opcode != Opcodes.DUP_X2 && opcode != Opcodes.DUP2 && opcode != Opcodes.DUP2_X1
+                && opcode != Opcodes.DUP2_X2) {
+            return false;
+        }
+        int total = nDup + instruction.getDupNSkip();
+        out.append("        {");
+        // v1 is the topmost entry.
+        for (int i = 1; i <= total; i++) {
+            out.append(" let v").append(i).append(" = stack.q();");
+        }
+        for (int i = nDup; i >= 1; i--) {
+            out.append(" stack.p(v").append(i).append(");");
+        }
+        for (int i = total; i > nDup; i--) {
+            out.append(" stack.p(v").append(i).append(");");
+        }
+        for (int i = nDup; i >= 1; i--) {
+            out.append(" stack.p(v").append(i).append(");");
+        }
+        out.append(" pc = ").append(index + 1).append("; break; }\n");
+        return true;
+    }
+
     private static void appendBasicInstruction(StringBuilder out, BytecodeMethod method, BasicInstruction instruction, int index) {
+        if (appendResolvedStackShuffle(out, instruction, index)) {
+            return;
+        }
         switch (instruction.getOpcode()) {
             case Opcodes.NOP:
                 out.append("        pc = ").append(index + 1).append("; break;\n");
@@ -6901,15 +7028,23 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             case Opcodes.LMUL:
                 out.append("        { let b = stack.q(); let a = stack.q(); stack.p(_Lmul(a, b)); pc = ").append(index + 1).append("; break; }\n");
                 return;
+            // Float results are rounded to the nearest float here exactly as
+            // in the straight-line emitter above; see the note on FADD there.
             case Opcodes.FADD:
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(Math.fround(a + b)); pc = ").append(index + 1).append("; break; }\n");
+                return;
             case Opcodes.DADD:
                 out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a + b); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.FSUB:
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(Math.fround(a - b)); pc = ").append(index + 1).append("; break; }\n");
+                return;
             case Opcodes.DSUB:
                 out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a - b); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.FMUL:
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(Math.fround(a * b)); pc = ").append(index + 1).append("; break; }\n");
+                return;
             case Opcodes.DMUL:
                 out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a * b); pc = ").append(index + 1).append("; break; }\n");
                 return;
@@ -6920,6 +7055,8 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 out.append("        { let b = stack.q(); let a = stack.q(); stack.p(_Ldiv(a, b)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.FDIV:
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(Math.fround(a / b)); pc = ").append(index + 1).append("; break; }\n");
+                return;
             case Opcodes.DDIV:
                 out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a / b); pc = ").append(index + 1).append("; break; }\n");
                 return;
@@ -6930,6 +7067,8 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 out.append("        { let b = stack.q(); let a = stack.q(); stack.p(_Lrem(a, b)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.FREM:
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(Math.fround(a % b)); pc = ").append(index + 1).append("; break; }\n");
+                return;
             case Opcodes.DREM:
                 out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a % b); pc = ").append(index + 1).append("; break; }\n");
                 return;
@@ -6983,8 +7122,11 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 out.append("        stack.p(_Li2l(stack.q())); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.F2D:
-            case Opcodes.D2F:
                 out.append("        pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.D2F:
+            case Opcodes.I2F:
+                out.append("        stack.p(Math.fround(stack.q())); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.I2B:
                 out.append("        stack.p((stack.q() << 24) >> 24); pc = ").append(index + 1).append("; break;\n");
@@ -7003,6 +7145,8 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 out.append("        stack.p(stack.q() | 0); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.L2F:
+                out.append("        stack.p(_Ll2f(stack.q())); pc = ").append(index + 1).append("; break;\n");
+                return;
             case Opcodes.L2D:
                 out.append("        stack.p(_Ll2d(stack.q())); pc = ").append(index + 1).append("; break;\n");
                 return;
@@ -7010,7 +7154,6 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             case Opcodes.D2L:
                 out.append("        stack.p(_Ld2l(stack.q())); pc = ").append(index + 1).append("; break;\n");
                 return;
-            case Opcodes.I2F:
             case Opcodes.I2D:
                 out.append("        pc = ").append(index + 1).append("; break;\n");
                 return;
@@ -7144,7 +7287,11 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                     .append(")); pc = ").append(index + 1).append("; break;\n");
             return;
         }
-        if (value instanceof Integer || value instanceof Float || value instanceof Double) {
+        if (value instanceof Float) {
+            out.append("        stack.p(").append(floatLiteral((Float) value)).append("); pc = ").append(index + 1).append("; break;\n");
+            return;
+        }
+        if (value instanceof Integer || value instanceof Double) {
             out.append("        stack.p(").append(value.toString()).append("); pc = ").append(index + 1).append("; break;\n");
             return;
         }

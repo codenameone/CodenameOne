@@ -39,6 +39,14 @@ jobs:
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       R2_BUCKET: ${{ vars.R2_BUCKET }}
       R2_BASE_URL: https://repo.codenameone.com/maven2
+      # The .NET SDK, which the core reactor needs for codenameone-unity-compat (see
+      # "Set up .NET" below). Its first-run state and the NuGet package cache stay in
+      # the workspace rather than the runner's home directory, so the one package the
+      # build restores is visibly this job's and nothing outlives it.
+      DOTNET_CLI_HOME: ${{ github.workspace }}/.dotnet/cli-home
+      NUGET_PACKAGES: ${{ github.workspace }}/.nuget-packages
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
 
     steps:
       - uses: actions/checkout@v6
@@ -63,8 +71,39 @@ jobs:
           git config --global user.name "GitHub Actions Bot"
           git config --global user.email "github-actions@codenameone.com"
 
+      # codenameone-cil-translator and codenameone-unity-compat are published by the
+      # core reactor below, at the release's own version: the archetype's poms and
+      # both build plugins resolve them at that version, so a release without them
+      # is one whose generated projects cannot build a Unity source tree. The
+      # runtime's build compiles two C# projects, hence the SDK. Both target
+      # netstandard2.1, which any current SDK builds; the channel is the one
+      # unity-compat.yml tests the same build with, so the release compiles the C#
+      # with the compiler CI exercised.
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
       - name: Check Maven Version
         run: mvn -v
+
+      - name: Require the .NET SDK
+        # Not continue-on-error, for the reason the frozen-artifact check below is
+        # not: nothing has been built yet, so there is nothing to salvage. Without
+        # this the same absence surfaces an hour into the reactor, as exec-maven-plugin
+        # failing to start a program in a module nobody was looking at.
+        run: |
+          if ! command -v dotnet >/dev/null 2>&1; then
+            echo "The .NET SDK is not on the PATH. The release builds" >&2
+            echo "codenameone-unity-compat, which compiles C# with it." >&2
+            exit 1
+          fi
+          if [ -z "$(dotnet --list-sdks)" ]; then
+            echo "dotnet is on the PATH but no SDK is installed (a runtime alone" >&2
+            echo "cannot build). The release builds codenameone-unity-compat with it." >&2
+            exit 1
+          fi
+          dotnet --version
 
       - name: Verify frozen artifacts are on R2
         # A release resolves codenameone-designer at its pinned version but does not
@@ -99,8 +138,14 @@ jobs:
           # this same reactor, so at that moment it exists only in the local
           # repo and no remote can serve it. -DskipTests covers the matching
           # surefire pass.
+          # -Dunity-compat: codenameone-cil-translator and codenameone-unity-compat
+          # sit in a profile, because building the second needs the .NET SDK and
+          # an ordinary framework build must not. A release does publish them, in
+          # this pass and at this version, so the profile is on here. Leaving the
+          # flag off does not fail the build -- the two modules simply drop out
+          # of the reactor -- which is why "Confirm artifacts on R2" names them.
           xvfb-run -a mvn deploy -Psign-artifacts -Dgpg.passphrase=$MAVEN_GPG_PASSPHRASE \
-            -Plocal-dev-javase -Darchetype.test.skip=true -DskipTests \
+            -Plocal-dev-javase -Dunity-compat -Darchetype.test.skip=true -DskipTests \
             -DskipPublishing=true
         env:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
@@ -138,6 +183,7 @@ jobs:
           set -e
           for artifact in codenameone-core codenameone-maven-plugin codenameone-platform-feature-catalog \
                           codenameone-build-hint-catalog codenameone-build-hint-tools \
+                          codenameone-cil-translator codenameone-unity-compat \
                           cn1app-archetype cn1lib-archetype; do
             url="${R2_BASE_URL}/com/codenameone/${artifact}/${GITHUB_REF_NAME}/${artifact}-${GITHUB_REF_NAME}.pom?cb=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
             code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
@@ -146,6 +192,22 @@ jobs:
               exit 1
             fi
             echo "ok: $artifact ${GITHUB_REF_NAME}"
+          done
+          # A pom says the module was staged, not that its jars were. These three are
+          # resolved by name during an application's build -- the runtime merged into
+          # the application, the translator forked as a tool, and the "references"
+          # classifier its C# compiles against -- and the last is an attachment no
+          # pom mentions, so only asking for the file itself notices it missing.
+          for file in codenameone-cil-translator/${GITHUB_REF_NAME}/codenameone-cil-translator-${GITHUB_REF_NAME}.jar \
+                      codenameone-unity-compat/${GITHUB_REF_NAME}/codenameone-unity-compat-${GITHUB_REF_NAME}.jar \
+                      codenameone-unity-compat/${GITHUB_REF_NAME}/codenameone-unity-compat-${GITHUB_REF_NAME}-references.jar; do
+            url="${R2_BASE_URL}/com/codenameone/${file}?cb=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+            if [ "$code" != "200" ]; then
+              echo "MISSING on R2: $file (HTTP $code)" >&2
+              exit 1
+            fi
+            echo "ok: $file"
           done
 
       # --- Game Builder editor -------------------------------------------------
@@ -379,7 +441,7 @@ jobs:
         # poll, not the deploy, was the verdict, and the marker could not trust it. With
         # skipPublishing there is no upload to misreport: a build that fails, fails, and
         # the tree it staged may be missing whichever modules came after the failure.
-        # r2_core_confirm only covers seven key artifacts, so without this a build that
+        # r2_core_confirm only covers nine key artifacts, so without this a build that
         # died late could publish and advertise a version that is quietly incomplete.
         if: >-
           always() && steps.deploy.outcome == 'success' &&

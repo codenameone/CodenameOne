@@ -799,3 +799,8 @@ Toolchain
 # (performance.asciidoc).
 inlining
 inlined
+Sokoban
+Juwal
+Fruitopia
+Kharrat
+Cinemachine

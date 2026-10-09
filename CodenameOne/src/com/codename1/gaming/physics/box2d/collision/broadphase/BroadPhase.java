@@ -23,8 +23,6 @@
  ******************************************************************************/
 package com.codename1.gaming.physics.box2d.collision.broadphase;
 
-import java.util.Arrays;
-
 import com.codename1.gaming.physics.box2d.callbacks.DebugDraw;
 import com.codename1.gaming.physics.box2d.callbacks.PairCallback;
 import com.codename1.gaming.physics.box2d.callbacks.TreeCallback;
@@ -169,7 +167,7 @@ public class BroadPhase implements TreeCallback {
     m_moveCount = 0;
 
     // Sort the pair buffer to expose duplicates.
-    Arrays.sort(m_pairBuffer, 0, m_pairCount);
+    sortPairs(m_pairBuffer, m_pairCount);
 
     // Send the pairs back to the client.
     int i = 0;
@@ -195,6 +193,28 @@ public class BroadPhase implements TreeCallback {
 
     // Try to keep the tree balanced.
     // m_tree.rebalance(Settings.TREE_REBALANCE_STEPS);
+  }
+
+  /// Sorts the first `count` pairs by their proxy ids, in place. `Arrays.sort` takes a merge
+  /// buffer for anything over a few dozen elements, and this runs on every step of a world
+  /// with many moving proxies. A shell sort needs none, and which of two equal pairs comes
+  /// first is of no consequence: the caller skips duplicates.
+  static void sortPairs(Pair[] pairs, int count) {
+    int gap = 1;
+    while (gap < count / 3) {
+      gap = gap * 3 + 1;
+    }
+    for (; gap >= 1; gap /= 3) {
+      for (int i = gap; i < count; i++) {
+        Pair moved = pairs[i];
+        int j = i;
+        while (j >= gap && pairs[j - gap].compareTo(moved) > 0) {
+          pairs[j] = pairs[j - gap];
+          j -= gap;
+        }
+        pairs[j] = moved;
+      }
+    }
   }
 
   /// Query an AABB for overlapping proxies. The callback class is called for each proxy that

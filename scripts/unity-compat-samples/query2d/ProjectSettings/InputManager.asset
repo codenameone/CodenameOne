@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!13 &1
+InputManager:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Axes:
+  - serializedVersion: 3
+    m_Name: Horizontal
+    negativeButton: left
+    positiveButton: right
+    altNegativeButton:
+    altPositiveButton:
+    type: 0
+    axis: 0
+  - serializedVersion: 3
+    m_Name: Fire1
+    negativeButton: 
+    positiveButton: mouse 0
+    altNegativeButton:
+    altPositiveButton:
+    type: 0
+    axis: 0
+  - serializedVersion: 3
+    m_Name: Mouse X
+    negativeButton: 
+    positiveButton: 
+    altNegativeButton:
+    altPositiveButton:
+    sensitivity: 0.5
+    type: 1
+    axis: 0
+  - serializedVersion: 3
+    m_Name: Mouse Y
+    negativeButton: 
+    positiveButton: 
+    altNegativeButton:
+    altPositiveButton:
+    sensitivity: 0.5
+    type: 1
+    axis: 1

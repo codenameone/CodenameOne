@@ -1,0 +1,377 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    The runtime is held at zero SpotBugs findings. What SpotBugs reported that
+    was a defect was fixed in the code. Each exception below is a finding that
+    describes the shape the runtime has to have, and is scoped to the classes,
+    members or packages it is true of.
+-->
+<FindBugsFilter>
+    <!--
+        The classes translated from C# (src/main/csharp/UnityEngine.Values) by
+        codenameone-cil-translator during this build. They are generated
+        bytecode with no Java source to fix, and the names, the float
+        equality and the struct equals() in them are C#'s own. Everything this
+        module writes in Java lives under com.codename1.unitycompat and is
+        analysed in full.
+    -->
+    <Match>
+        <Class name="~UnityEngine\..*"/>
+    </Match>
+
+    <!--
+        C# and Unity member names (get_position, GetComponent, Item1), and the
+        `Clear`/`clear` and `get_name`/`getName` pairs that follow from them.
+        Translated bytecode calls these members by exactly these names, so
+        they cannot be renamed to Java's convention.
+    -->
+    <Match>
+        <Package name="~com\.codename1\.unitycompat\.(system|unityengine|tmpro|cinemachine)(\..*)?"/>
+        <Or>
+            <Bug pattern="NM_METHOD_NAMING_CONVENTION"/>
+            <Bug pattern="NM_FIELD_NAMING_CONVENTION"/>
+            <Bug pattern="NM_CONFUSING"/>
+        </Or>
+    </Match>
+    <!-- The lifecycle's stop(), which SpotBugs reads as a misspelling of the
+         Stop() Unity's own classes have for the reason above. -->
+    <Match>
+        <Class name="com.codename1.unitycompat.app.UnityApplication"/>
+        <Method name="stop"/>
+        <Bug pattern="NM_CONFUSING"/>
+    </Match>
+    <!-- UnityEngine.Object is the name C# code refers to; it cannot be given
+         another. -->
+    <Match>
+        <Class name="com.codename1.unitycompat.unityengine.Object"/>
+        <Bug pattern="NM_SAME_SIMPLE_NAME_AS_SUPERCLASS"/>
+    </Match>
+    <!-- A delegate's target is written by translated code, which this
+         analysis never sees doing it. -->
+    <Match>
+        <Class name="com.codename1.unitycompat.system.Delegate"/>
+        <Field name="$target"/>
+        <Bug pattern="UWF_UNWRITTEN_PUBLIC_OR_PROTECTED_FIELD"/>
+    </Match>
+
+    <!--
+        Unity's object model is shared references by contract: a component's
+        gameObject IS the game object, transform.parent IS the parent, and a
+        script that sets renderer.sprite expects that sprite back. None of
+        these is an array or a private buffer, and a copy would be a different
+        object with a different identity.
+    -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.unitycompat.app.UnityApplication"/>
+                <Or>
+                    <Field name="form"/>
+                    <Field name="view"/>
+                </Or>
+            </And>
+            <And>
+                <Class name="com.codename1.unitycompat.system.Exception"/>
+                <Field name="inner"/>
+            </And>
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.AudioSource"/>
+                <Field name="clip"/>
+            </And>
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.Canvas"/>
+                <Field name="worldCamera"/>
+            </And>
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.Collision2D"/>
+                <Or>
+                    <Field name="mine"/>
+                    <Field name="theirs"/>
+                </Or>
+            </And>
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.Component"/>
+                <Field name="gameObject"/>
+            </And>
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.GameObject"/>
+                <Field name="transform"/>
+            </And>
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.RaycastHit2D"/>
+                <Field name="collider"/>
+            </And>
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.SpriteRenderer"/>
+                <Field name="sprite"/>
+            </And>
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.Transform"/>
+                <Field name="parent"/>
+            </And>
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.ui.Image"/>
+                <Field name="sprite"/>
+            </And>
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.ui.Selectable"/>
+                <Field name="targetGraphic"/>
+            </And>
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.Animator"/>
+                <Field name="controller"/>
+            </And>
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.ParticleSystemRenderer"/>
+                <Field name="sprite"/>
+            </And>
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.Sprite"/>
+                <Field name="texture"/>
+            </And>
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.tilemaps.Tile"/>
+                <Field name="sprite"/>
+            </And>
+            <And>
+                <Class name="com.codename1.unitycompat.cinemachine.CinemachineBrain"/>
+                <Field name="camera"/>
+            </And>
+        </Or>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+    <!-- The same, for the two things installed process-wide: where
+         preferences are kept, and the compiled project that runs. -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.PlayerPrefs"/>
+                <Field name="store"/>
+            </And>
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.UnityRuntime"/>
+                <Field name="app"/>
+            </And>
+        </Or>
+        <Or>
+            <Bug pattern="EI_EXPOSE_STATIC_REP2"/>
+            <Bug pattern="MS_EXPOSE_REP"/>
+        </Or>
+    </Match>
+
+    <!--
+        Performance: a collider's paths are constants of the generated scene
+        code, shared by every instance of a prefab. $paths() documents that
+        they are kept and not copied; a copy would allocate the whole outline
+        again for every Instantiate. An edge collider's points are the same
+        thing under $points().
+    -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.PolygonCollider2D"/>
+                <Method name="$paths"/>
+            </And>
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.EdgeCollider2D"/>
+                <Method name="$points"/>
+            </And>
+        </Or>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <!--
+        The same for the other tables the generated scene code holds as
+        constants and hands over once: the rows of a sprite's solid pixels,
+        which every tile of that sprite shares, and a particle system's
+        colours, gradients and bursts.
+    -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.Sprite"/>
+                <Method name="$solid"/>
+            </And>
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.ParticleSystem"/>
+                <Or>
+                    <Method name="$color"/>
+                    <Method name="$bursts"/>
+                </Or>
+            </And>
+        </Or>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <!--
+        Performance: the camera brain walks this list every frame to choose
+        among the virtual cameras. Its comment says the list is the runtime's
+        own; a copy would be an allocation a frame.
+    -->
+    <Match>
+        <Class name="com.codename1.unitycompat.unityengine.UnityRuntime"/>
+        <Method name="$lateTickers"/>
+        <Bug pattern="MS_EXPOSE_REP"/>
+    </Match>
+    <!--
+        Performance: the draw list is one object, refilled every frame and
+        handed to the view that paints it. Returning a copy would allocate a
+        frame's worth of draw commands sixty times a second.
+    -->
+    <Match>
+        <Class name="com.codename1.unitycompat.unityengine.UnityRuntime"/>
+        <Method name="render"/>
+        <Bug pattern="MS_EXPOSE_REP"/>
+    </Match>
+
+    <!--
+        $copyFrom(source) is called by Instantiate alone, on the object the
+        source's own $new() has just made, so the argument is of the receiver's
+        class by construction. A check would be a branch that cannot be taken.
+        The casts in copyTree and samePlace are the same: a transform's $new()
+        makes a transform, and Instantiate takes a game object or a component.
+    -->
+    <Match>
+        <Package name="~com\.codename1\.unitycompat\.(unityengine|tmpro|cinemachine)(\..*)?"/>
+        <Method name="$copyFrom"/>
+        <Bug pattern="BC_UNCONFIRMED_CAST"/>
+    </Match>
+    <Match>
+        <Class name="com.codename1.unitycompat.unityengine.UnityRuntime"/>
+        <Or>
+            <Method name="copyTree"/>
+            <Method name="samePlace"/>
+        </Or>
+        <Or>
+            <Bug pattern="BC_UNCONFIRMED_CAST"/>
+            <Bug pattern="BC_UNCONFIRMED_CAST_OF_RETURN_VALUE"/>
+        </Or>
+    </Match>
+
+    <!--
+        "Is this the value that was written last?", asked of a float that was
+        stored and is read back unchanged: a transform against the position
+        physics last synchronised, a cached text image against the size it
+        was drawn at. Exact equality is the question, and a tolerance would
+        miss a real, small move.
+    -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.PhysicsWorld"/>
+                <Or>
+                    <Method name="push"/>
+                    <Method name="sync"/>
+                    <Method name="step"/>
+                    <Method name="freeze"/>
+                </Or>
+            </And>
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.ui.UnityGameView$PaintedText"/>
+                <Method name="shows"/>
+            </And>
+            <!-- An animated value against the one the object already has:
+                 nothing is invalidated when a curve writes what is there. -->
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.Animator"/>
+                <Method name="write"/>
+            </And>
+            <!-- A tile's matrix against the identity and its mirror images,
+                 which the scene compiler writes as exactly 0, 1 and -1: only
+                 such a tile is the plain square that needs no outline traced. -->
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.TilemapColliderBase"/>
+                <Method name="build"/>
+            </And>
+        </Or>
+        <Bug pattern="FE_FLOATING_POINT_EQUALITY"/>
+    </Match>
+    <!--
+        Equals of a C# struct written by hand in Java. C# compares a struct's
+        fields exactly, and a script that asks whether two of them are equal
+        has to get that answer.
+    -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.unitycompat.unityengine.AnimatorStateInfo"/>
+            <Class name="com.codename1.unitycompat.unityengine.ParticleSystem$MinMaxCurve"/>
+            <Class name="com.codename1.unitycompat.cinemachine.LensSettings"/>
+        </Or>
+        <Method name="equals"/>
+        <Bug pattern="FE_FLOATING_POINT_EQUALITY"/>
+    </Match>
+
+    <!-- string.ToString() on null has to throw, as C#'s does: the call is the
+         null check. Reference equality first is the fast path of ==. -->
+    <Match>
+        <Class name="com.codename1.unitycompat.system.String_"/>
+        <Method name="ToString"/>
+        <Bug pattern="DM_STRING_TOSTRING"/>
+    </Match>
+    <Match>
+        <Class name="com.codename1.unitycompat.system.String_"/>
+        <Method name="op_Equality"/>
+        <Bug pattern="ES_COMPARING_PARAMETER_STRING_WITH_EQ"/>
+    </Match>
+
+    <!-- null is "these two polygons do not join into a convex one", which an
+         empty array would not say. -->
+    <Match>
+        <Class name="com.codename1.unitycompat.unityengine.PhysicsWorld"/>
+        <Method name="join"/>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
+
+    <!--
+        Plain records filled in by the one place that makes them, in the
+        statements right after `new`: a collision before it is handed to a
+        script, a coroutine before it is queued, the shape builder's scratch
+        state before every use, the form in start(). A transform's parent and
+        children are null until it has them, and every reader checks.
+    -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.unitycompat.app.UnityApplication"/>
+                <Field name="form"/>
+            </And>
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.Collision2D"/>
+                <Or>
+                    <Field name="mine"/>
+                    <Field name="theirs"/>
+                </Or>
+            </And>
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.Coroutine"/>
+                <Or>
+                    <Field name="routine"/>
+                    <Field name="owner"/>
+                </Or>
+            </And>
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.PhysicsWorld$Shapes"/>
+                <Or>
+                    <Field name="body"/>
+                    <Field name="collider"/>
+                    <Field name="at"/>
+                    <Field name="bodyAt"/>
+                </Or>
+            </And>
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.Transform"/>
+                <Or>
+                    <Field name="parent"/>
+                    <Field name="children"/>
+                </Or>
+            </And>
+            <!-- The draw list of the frame, given to the one view by
+                 render() before any component is asked to draw into it. -->
+            <And>
+                <Class name="com.codename1.unitycompat.unityengine.DrawView"/>
+                <Field name="list"/>
+            </And>
+        </Or>
+        <Bug pattern="UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR"/>
+    </Match>
+</FindBugsFilter>

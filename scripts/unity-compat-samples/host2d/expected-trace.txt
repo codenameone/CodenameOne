@@ -1,0 +1,46 @@
+host installed, keeper=false
+keeper awake host=True gauge=False
+host told: awake
+headless seed=3 frames=130 view=400x300 rate=60 scenes=2
+marker start in First keeper=True total=5 keepers=1 frame 1
+input frame=5 host=10
+keeper add 10 total=15 frame 5 in First
+host told: total 15
+input frame=10 pointer=200,150 down
+Pad mouse down frame 10
+input frame=14 pointer=20,20 up
+Pad mouse up frame 14
+input frame=20 pointer=20,20 down
+input frame=22 pointer=20,20 up
+keeper tick 1 frame 30 in First
+keeper focus=False frame 39
+keeper pause=True frame 39
+input frame=40 app=pause
+keeper pause=False frame 43
+keeper focus=True frame 43
+input frame=44 app=resume
+input frame=50 key=110 down
+marker start in Second keeper=True total=15 keepers=1 frame 51
+input frame=52 key=110 up
+frame 60 objects=3 Keeper=1 drawn=0
+keeper tick 2 frame 61 in Second
+input frame=70 host=7
+keeper add 7 total=22 frame 70 in Second
+host told: total 22
+input frame=80 pointer=200,150 down
+input frame=82 pointer=200,150 up
+input frame=90 key=110 down
+keeper: a second one in First removes itself
+marker start in First keeper=True total=22 keepers=2 frame 91
+input frame=92 key=110 up
+keeper tick 3 frame 92 in First
+input frame=100 pointer=200,150 down
+input frame=100 host=1
+keeper add 1 total=23 frame 100 in First
+host told: total 23
+Pad mouse down frame 100
+input frame=103 pointer=200,150 up
+Pad mouse up frame 103
+frame 120 objects=5 Keeper=1 drawn=0
+keeper tick 4 frame 123 in First
+frame 130 objects=5 Keeper=1 drawn=0

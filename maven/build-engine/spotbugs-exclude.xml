@@ -291,4 +291,12 @@
         <Class name="com.codename1.maven.AndroidProjectImporter$Result" />
         <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
     </Match>
+    <!--
+    UnityProjectImporter.Result is the same hand-back: the Maven goal reports
+    productName to the developer from another module.
+    -->
+    <Match>
+        <Class name="com.codename1.maven.UnityProjectImporter$Result" />
+        <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
+    </Match>
 </FindBugsFilter>

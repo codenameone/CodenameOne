@@ -1,0 +1,128 @@
+// tag::unityInteropMainClass[]
+package com.example.mygame;
+
+public class MyGame extends com.codename1.unitycompat.app.UnityApplication {
+    @Override
+    protected void installProject() {
+        com.codename1.generated.unity.UnityAppImpl.install();
+    }
+}
+// end::unityInteropMainClass[]
+
+// tag::unityInteropApplication[]
+public class MyGame extends UnityApplication {
+    private final GameServices services = new GameServices(this);
+    private final Label scoreLabel = new Label("Score 0");
+
+    @Override
+    protected void installProject() {
+        UnityAppImpl.install();
+    }
+
+    @Override
+    protected void onProjectInstalled() {
+        // No scene is built yet: every Awake and Start finds this set.
+        Platform.Services = services;
+    }
+
+    @Override
+    protected Form createForm(UnityGameView gameView) {
+        Form form = new Form(new BorderLayout());
+        Toolbar toolbar = new Toolbar();
+        form.setToolbar(toolbar);
+        form.setTitle("My Game");
+        form.setScrollable(false);
+        toolbar.addMaterialCommandToRightBar("", FontImage.MATERIAL_LEADERBOARD,
+                e -> callInFrame(() -> services.ShowLeaderboard(score().get_Best())));
+        toolbar.addMaterialCommandToSideMenu("Restart", FontImage.MATERIAL_REPLAY,
+                e -> callInFrame(() -> score().points = 0));
+        form.add(BorderLayout.CENTER, gameView);
+        form.add(BorderLayout.SOUTH, scoreLabel);
+        return form;
+    }
+
+    @Override
+    protected void onStarted(Form gameForm, UnityGameView gameView) {
+        // Twice a second: read the score inside the frame, show it on the
+        // event dispatch thread.
+        UITimer.timer(500, true, gameForm, () -> callInFrame(() -> {
+            int points = score().points;
+            CN.callSerially(() -> {
+                scoreLabel.setText("Score " + points);
+                gameForm.revalidate();
+            });
+        }));
+    }
+
+    // Only ever called inside the frame.
+    private static Score score() {
+        return (Score) GameObject.Find("Ball").GetComponent(Score.class);
+    }
+}
+// end::unityInteropApplication[]
+
+// tag::unityInteropServices[]
+final class GameServices implements IPlatformServices {
+    private final UnityApplication app;
+
+    GameServices(UnityApplication app) {
+        this.app = app;
+    }
+
+    // Scripts call these inside a frame, which isn't always on the event
+    // dispatch thread. Each one hands its work to that thread.
+
+    @Override
+    public void SignIn() {
+        CN.callSerially(() -> {
+            if (Preferences.get("player", null) != null) {
+                return;
+            }
+            GoogleConnect.getInstance().signIn(
+                    "YOUR_CLIENT_ID.apps.googleusercontent.com",
+                    "com.example.mygame:/oauth2redirect",
+                    "openid", "email"
+            ).ready(tokens -> Preferences.set("player", tokens.getEmail()));
+        });
+    }
+
+    @Override
+    public void Share(String text) {
+        CN.callSerially(() -> CN.share(text, null, null));
+    }
+
+    @Override
+    public void ShowLeaderboard(int score) {
+        CN.callSerially(() -> showLeaderboard(score));
+    }
+
+    private void showLeaderboard(int score) {
+        app.getView().pause();
+        Form board = new Form(BoxLayout.y());
+        Toolbar toolbar = new Toolbar();
+        board.setToolbar(toolbar);
+        board.setTitle("Leaderboard");
+        board.add(new Label("Your best: " + score));
+        toolbar.setBackCommand("", e -> {
+            app.getForm().showBack();
+            app.getView().resume();
+        });
+        board.show();
+    }
+}
+// end::unityInteropServices[]
+
+        // tag::unityInteropCallingRules[]
+        // Inside a frame: in a Runnable given to callInFrame, or in a
+        // method a script called.
+        // By the name of its object, then by the script's class.
+        Score score = (Score) GameObject.Find("Ball").GetComponent(Score.class);
+        // Or the first one in the scene, whatever object it is on.
+        Score first = (Score) com.codename1.unitycompat.unityengine.Object
+                .FindObjectOfType(Score.class);
+
+        int points = score.points;                   // public int points;
+        int best = score.get_Best();                 // public int Best { get; }
+        Vector2 where = score.Where(new Vector2());  // public Vector2 Where()
+        float height = where.y;
+        // end::unityInteropCallingRules[]

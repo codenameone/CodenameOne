@@ -839,6 +839,10 @@ public class BackendPackager {
                 // provably miscompiles the output without these.
                 "-fwrapv", "-fno-strict-aliasing",
                 "-fno-builtin-fmod", "-fno-builtin-fmodf",
+                // Java evaluates a * b + c as two rounded operations. Clang fuses
+                // them into one multiply-add where the CPU has one (arm64), which
+                // rounds once and answers differently from every other target.
+                "-ffp-contract=off",
                 // One section per function and per object, so that the link
                 // below can leave out what nothing reaches. The natives are
                 // compiled whole; without this a server that signs nothing

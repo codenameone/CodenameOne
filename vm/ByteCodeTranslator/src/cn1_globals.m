@@ -20748,7 +20748,12 @@ void** initVtableForInterface() {
 
 int byteSizeForArray(struct clazz* cls) {
     int byteSize = sizeof(JAVA_ARRAY_BYTE);
-    if( cls->primitiveType ) {
+    // An array of primitive arrays -- int[][], float[][][] -- is described by a class
+    // that names the primitive as its type and says primitiveType, with dimensions above
+    // one. Its ELEMENTS are references. Sizing them as the primitive made
+    // System.arraycopy move four bytes for each int[] of an int[][] (half the references,
+    // the rest left null) and made clone() allocate and copy an array half the size.
+    if( cls->primitiveType && cls->dimensions < 2 ) {
         if((*cls).arrayType == &class__java_lang_Long) {
             byteSize = sizeof(JAVA_ARRAY_LONG);
         } else {
@@ -20829,9 +20834,10 @@ JAVA_OBJECT cloneArray(JAVA_OBJECT array) {
     // could be in the snapshot. Off-mark this is one predicted-not-taken flag load.
 #ifndef CN1_NO_BULK_INSERTION_BARRIER
     // The bracket spans the memcpy, not just the logging; see cn1SatbBulkBegin. A primitive
-    // array publishes no references, so it needs neither.
+    // array publishes no references, so it needs neither. An array OF primitive arrays
+    // does publish them; see byteSizeForArray.
     JAVA_BOOLEAN cn1__satbReg = JAVA_FALSE;
-    if(!cls->primitiveType) {
+    if(!cls->primitiveType || cls->dimensions > 1) {
         cn1__satbReg = JAVA_TRUE;
         if(cn1SatbBulkBegin()) {
             cn1SatbEnqueueRangeLocked((JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA(src), src->length);

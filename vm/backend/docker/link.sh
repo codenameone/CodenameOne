@@ -17,7 +17,7 @@
 set -e
 cd /src
 OUT_NAME="${CN1_OUT_NAME:-bootstrap}"
-COMMON="-O3 -w -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf"
+COMMON="-O3 -w -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf -ffp-contract=off"
 # What nothing reaches is left out by the linker: the natives are compiled whole,
 # so without this a server with no security still carried every signature and
 # cipher native, and in the static build the OpenSSL code behind them. The same

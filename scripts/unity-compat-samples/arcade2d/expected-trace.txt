@@ -1,0 +1,67 @@
+player enabled
+headless seed=3 frames=300 view=400x300 rate=60 scenes=1
+player start bonus=2:20 words=2:two words tints=2 shot=Shot label=Hits: none muzzle at 0,-220
+frame 1 objects=9 Shot=1 drawn=4 text="Hits: none"
+draw frame=1 commands=4 background=ff1a1a33
+  count 2 sheet.png@32,0+32x32
+  count 1 sheet.png@0,0+32x32
+  count 1 (text)
+  sheet.png src=32,0+32x32 layer=0 order=0 at=29000,21000 size=3000x3000 anchor=25,75 rotation=0 color=ffffffff flip=00
+  sheet.png src=32,0+32x32 layer=0 order=1 at=19250,9000 size=3000x3000 anchor=25,75 rotation=0 color=ffff8040 flip=00
+  sheet.png src=0,0+32x32 layer=0 order=2 at=20000,24000 size=3000x3000 anchor=50,50 rotation=0 color=ffffffff flip=00
+  text "Hits: none" layer=0 order=0 at=500,1000 size=15000x2000 font=1200 fit=0 min=500 max=2000 align=3 style=1 wrap=1 color=ffffffff
+input frame=5 key=32 down
+fired 1 Shot(Clone) from 0,-220 heading 0,100 live=1
+input frame=8 key=32 up
+player ready, frame 15
+rock landed on Floor touching=1 contacts=some falling=True
+frame 40 objects=10 Shot=2 drawn=5 text="Hits: none"
+draw frame=40 commands=5 background=ff1a1a33
+  count 2 sheet.png@32,0+32x32
+  count 1 sheet.png@0,0+32x32
+  count 1 unity-builtin-knob-20x20.png@0,0+20x20
+  count 1 (text)
+  sheet.png src=32,0+32x32 layer=0 order=0 at=28996,26231 size=3000x3000 anchor=25,75 rotation=80 color=ffffffff flip=00
+  sheet.png src=32,0+32x32 layer=0 order=1 at=19250,9000 size=3000x3000 anchor=25,75 rotation=0 color=ffff8040 flip=00
+  sheet.png src=0,0+32x32 layer=0 order=2 at=20000,24000 size=3000x3000 anchor=50,50 rotation=0 color=ffffffff flip=00
+  unity-builtin-knob-20x20.png src=0,0+20x20 layer=0 order=3 at=20000,11160 size=600x600 anchor=50,50 rotation=0 color=ffffff00 flip=00
+  text "Hits: none" layer=0 order=0 at=500,1000 size=15000x2000 font=1200 fit=0 min=500 max=2000 align=3 style=1 wrap=1 color=ffffffff
+target entered by Shot(Clone)
+shot entered Target tag=Target
+target hit 1 of 2
+input frame=60 key=32 down
+fired 2 Shot(Clone) from 0,-220 heading 0,100 live=1
+frame 60 objects=10 Shot=2 drawn=5 text="Hits: 1"
+input frame=63 key=32 up
+target entered by Shot(Clone)
+shot entered Target tag=Target
+target hit 2 of 2
+target disabled
+frame 100 objects=9 Shot=1 drawn=3 text="Hits: 2"
+draw frame=100 commands=3 background=ff1a1a33
+  count 1 sheet.png@32,0+32x32
+  count 1 sheet.png@0,0+32x32
+  count 1 (text)
+  sheet.png src=32,0+32x32 layer=0 order=0 at=29003,26205 size=3000x3000 anchor=25,75 rotation=1 color=ffffffff flip=00
+  sheet.png src=0,0+32x32 layer=0 order=2 at=20000,24000 size=3000x3000 anchor=50,50 rotation=0 color=ffffffff flip=00
+  text "Hits: 2" layer=0 order=0 at=500,1000 size=15000x2000 font=1200 fit=0 min=500 max=2000 align=3 style=1 wrap=1 color=ffffffff
+input frame=120 key=100 down
+frame 120 objects=9 Shot=1 drawn=3 text="Hits: 2"
+input frame=150 key=100 up
+input frame=160 key=32 down
+fired 3 Shot(Clone) from 57,-243 heading 71,71 live=1
+input frame=163 key=32 up
+frame 180 objects=10 Shot=2 drawn=4 text="Hits: 2"
+frame 200 objects=10 Shot=2 drawn=4 text="Hits: 2"
+draw frame=200 commands=4 background=ff1a1a33
+  count 1 sheet.png@32,0+32x32
+  count 1 sheet.png@0,0+32x32
+  count 1 unity-builtin-knob-20x20.png@0,0+20x20
+  count 1 (text)
+  sheet.png src=32,0+32x32 layer=0 order=0 at=29003,26205 size=3000x3000 anchor=25,75 rotation=1 color=ffffffff flip=00
+  sheet.png src=0,0+32x32 layer=0 order=2 at=20000,24000 size=3000x3000 anchor=50,50 rotation=4500 color=ffffffff flip=00
+  unity-builtin-knob-20x20.png src=0,0+20x20 layer=0 order=3 at=30097,13903 size=600x600 anchor=50,50 rotation=4500 color=ffffff00 flip=00
+  text "Hits: 2" layer=0 order=0 at=500,1000 size=15000x2000 font=1200 fit=0 min=500 max=2000 align=3 style=1 wrap=1 color=ffffffff
+frame 240 objects=10 Shot=2 drawn=4 text="Hits: 2"
+shot expired at 701,401
+frame 300 objects=9 Shot=1 drawn=3 text="Hits: 2"

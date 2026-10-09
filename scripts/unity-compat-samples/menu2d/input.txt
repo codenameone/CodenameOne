@@ -1,0 +1,11 @@
+# A press beside the button and a release on it is no click; then a real
+# click on the button, which starts the game and hides the panel. Space is
+# pressed once with the panel up and once after it has gone.
+10 space down
+12 space up
+20 pointer:60,250 down
+24 pointer:200,170 up
+40 pointer:200,170 down
+44 pointer:200,170 up
+90 space down
+92 space up

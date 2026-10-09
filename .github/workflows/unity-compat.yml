@@ -1,0 +1,249 @@
+name: Unity compatibility
+
+# Unity 2D projects built as Codename One applications: the CIL translator and
+# scene compiler (maven/cil-translator) and the runtime translated scripts run
+# against (maven/unity-compat). Both live behind the unity-compat Maven profile,
+# because building them needs the .NET SDK and the framework build must not.
+#
+#   unit tests                 the metadata reader against .NET's own
+#                              System.Reflection.Metadata, the console sample's
+#                              output against `dotnet run`, and the 2D scene's
+#                              trace; -Dunity.requireDotnet=true turns "no .NET
+#                              SDK, skipped" into a failure
+#   unity-compat-test.sh       every sample under scripts/unity-compat-samples
+#                              run on the JVM, through ParparVM's C target as a
+#                              native executable and through its JavaScript
+#                              target under Node, all traces identical
+#   unity-compat-project-test.sh
+#                              the build integration: a sample imported into an
+#                              archetype application with cn1:import-unity-project,
+#                              built by the application's own Maven build and
+#                              staged for every target, then converted to
+#                              Gradle and staged again: the same entries
+#   static analysis            SpotBugs (zero findings), PMD (the forbidden
+#                              list) and Checkstyle (zero errors) over both
+#                              modules, enforced by the script PR CI uses for
+#                              the rest of the tree, and the ClassCastException
+#                              gate over the runtime, which ParparVM translates
+#
+# The static analysis gates run HERE and not in pr.yml's Java 8 leg, where the
+# other modules are judged. Both modules build only with the .NET SDK, and
+# putting them in that leg would make every pull request in the repository
+# install .NET and build C# to analyse code it did not touch. Nothing is lost
+# by keeping them apart: the `paths` below name both modules, the rulesets and
+# the scripts that do the judging, so no change to any of them can merge
+# without this workflow running, and the report script fails on a module that
+# produced no report rather than reading the absence as clean.
+on:
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'maven/cil-translator/**'
+      - 'maven/unity-compat/**'
+      - 'maven/pom.xml'
+      - 'maven/integration-tests/unity-compat-test.sh'
+      - 'maven/integration-tests/unity-compat-project-test.sh'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
+      - 'maven/codenameone-gradle-plugin/src/main/java/com/codename1/gradle/AppSupport.java'
+      - 'maven/codenameone-gradle-plugin/src/main/java/com/codename1/gradle/tasks/CompileUnityTask.java'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/GradleConversion.java'
+      - 'maven/cn1app-archetype/**'
+      - 'maven/integration-tests/inc/**'
+      - 'scripts/unity-compat-samples/**'
+      - 'CodenameOne/src/com/codename1/gaming/**'
+      - 'vm/ByteCodeTranslator/**'
+      - 'vm/JavaAPI/**'
+      - 'vm/selfhost/js/**'
+      # What judges the two modules: a change that weakens a gate has to run it.
+      - '.github/scripts/generate-quality-report.py'
+      - 'maven/core-unittests/pmd.xml'
+      - 'maven/core-unittests/checkstyle.xml'
+      - 'scripts/check-cast-semantics.sh'
+      - 'scripts/cast-semantics-baseline.txt'
+      - '.github/workflows/unity-compat.yml'
+  push:
+    branches: [ master ]
+    paths:
+      - 'maven/cil-translator/**'
+      - 'maven/unity-compat/**'
+      - 'maven/pom.xml'
+      - 'maven/integration-tests/unity-compat-test.sh'
+      - 'maven/integration-tests/unity-compat-project-test.sh'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
+      - 'maven/codenameone-gradle-plugin/src/main/java/com/codename1/gradle/AppSupport.java'
+      - 'maven/codenameone-gradle-plugin/src/main/java/com/codename1/gradle/tasks/CompileUnityTask.java'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/GradleConversion.java'
+      - 'maven/cn1app-archetype/**'
+      - 'maven/integration-tests/inc/**'
+      - 'scripts/unity-compat-samples/**'
+      - 'CodenameOne/src/com/codename1/gaming/**'
+      - 'vm/ByteCodeTranslator/**'
+      - 'vm/JavaAPI/**'
+      - 'vm/selfhost/js/**'
+      # What judges the two modules: a change that weakens a gate has to run it.
+      - '.github/scripts/generate-quality-report.py'
+      - 'maven/core-unittests/pmd.xml'
+      - 'maven/core-unittests/checkstyle.xml'
+      - 'scripts/check-cast-semantics.sh'
+      - 'scripts/cast-semantics-baseline.txt'
+      - '.github/workflows/unity-compat.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  unity-compat:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          java-version: '8'
+          distribution: 'temurin'
+          cache: 'maven'
+      # The scripts and the runtime's C# target netstandard2.1, which any SDK
+      # builds, but the console sample is also built for net10.0 (that build is
+      # the `dotnet run` oracle) and the metadata dumper is a net10.0 program.
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+      # xvfb as in the other Maven builds; clang for the native executables.
+      - name: Install xvfb and clang
+        run: bash scripts/ci/apt-get-install.sh xvfb clang
+      - name: Build the core, the translator and the runtime
+        env:
+          RETRY_ONLY_MATCHING: transient
+          RETRY_ATTEMPTS: '5'
+          RETRY_DELAY_SECONDS: '60'
+        run: |
+          cd maven
+          bash ../scripts/ci/retry.sh xvfb-run -a mvn -B install -Plocal-dev-javase -Dunity-compat -DskipTests -Darchetype.test.skip=true -Dmaven.javadoc.skip=true -pl cil-translator,unity-compat -am
+      - name: Unit tests
+        working-directory: maven
+        run: xvfb-run -a mvn -B -Plocal-dev-javase -Dunity-compat -Dunity.requireDotnet=true -pl cil-translator,unity-compat test
+      # `verify` writes the three reports of each module and fails on its own
+      # for SpotBugs and Checkstyle. The reports are deleted first so that the
+      # step after this one reads this run's answer and never a cached one.
+      - name: Static analysis of the translator and the runtime
+        working-directory: maven
+        run: |
+          rm -f cil-translator/target/spotbugsXml.xml cil-translator/target/pmd.xml cil-translator/target/checkstyle-result.xml
+          rm -f unity-compat/target/spotbugsXml.xml unity-compat/target/pmd.xml unity-compat/target/checkstyle-result.xml
+          xvfb-run -a mvn -B -Plocal-dev-javase -Dunity-compat -DskipTests -pl cil-translator,unity-compat verify
+      # The same script, with the same forbidden PMD list, that judges the rest
+      # of the tree in pr.yml. PMD only writes a report, so this step is what
+      # enforces it; every module named must have produced each report.
+      - name: Enforce the quality gates
+        if: ${{ !cancelled() }}
+        env:
+          QUALITY_REPORT_TARGET_DIRS: maven/cil-translator/target:maven/unity-compat/target
+          QUALITY_REPORT_REQUIRED_SPOTBUGS: cil-translator:unity-compat
+          QUALITY_REPORT_REQUIRED_PMD: cil-translator:unity-compat
+          QUALITY_REPORT_REQUIRED_CHECKSTYLE: cil-translator:unity-compat
+          QUALITY_REPORT_TITLE: Unity compatibility quality report
+        run: python3 .github/scripts/generate-quality-report.py
+      - name: Build ParparVM's class library and translator
+        run: |
+          bash scripts/ci/retry.sh mvn -B -f vm/JavaAPI/pom.xml package -DskipTests
+          bash scripts/ci/retry.sh mvn -B -f vm/ByteCodeTranslator/pom.xml package -DskipTests
+      # The runtime and the classes translated from C# are translated again by
+      # ParparVM, whose CHECKCAST does not throw. Named explicitly: the default
+      # roots belong to pr.yml, which builds them.
+      - name: No reliance on ClassCastException in the runtime
+        run: |
+          test -d maven/unity-compat/target/classes/UnityEngine
+          scripts/check-cast-semantics.sh maven/unity-compat/target/classes
+      - name: Samples on the JVM, native and JavaScript
+        working-directory: maven/integration-tests
+        run: bash unity-compat-test.sh --parparvm
+      - name: Upload the samples' logs and traces
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unity-compat-logs
+          path: |
+            maven/integration-tests/build/unity-compat/**/*.log
+            maven/integration-tests/build/unity-compat/**/*.txt
+            maven/integration-tests/build/unity-compat/**/*.err
+            maven/integration-tests/build/unity-compat/**/*.diff
+            maven/cil-translator/target/unity-tests/**/*.txt
+            maven/cil-translator/target/surefire-reports/**
+          if-no-files-found: ignore
+
+  # The build integration needs the whole reactor -- the Maven plugin and the
+  # archetype, not just the translator and the runtime -- so it is a job of its
+  # own rather than a longer build in front of the samples.
+  unity-compat-project:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+    steps:
+      - uses: actions/checkout@v6
+      # Installed FIRST so the JDK 8 below is the one JAVA_HOME names.
+      - name: Set up JDK 17 for the application build
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - run: echo "GRADLE_JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          java-version: '8'
+          distribution: 'temurin'
+          cache: 'maven'
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      # xvfb for the CSS compiler, which opens an AWT frame.
+      - name: Install xvfb
+        run: bash scripts/ci/apt-get-install.sh xvfb
+      - name: Build Codename One Maven artifacts with the Unity profile
+        env:
+          RETRY_ONLY_MATCHING: transient
+          RETRY_ATTEMPTS: '5'
+          RETRY_DELAY_SECONDS: '60'
+        run: |
+          cd maven
+          bash ../scripts/ci/retry.sh xvfb-run -a mvn -B install -Plocal-dev-javase -Dunity-compat -DskipTests -Darchetype.test.skip=true -Dmaven.javadoc.skip=true
+      - name: Unit tests of the builder and the goals
+        working-directory: maven
+        run: xvfb-run -a mvn -B -Plocal-dev-javase -pl build-engine,codenameone-maven-plugin test -Dtest='Unity*Test,CompileUnityMojoTest' -Dsurefire.failIfNoSpecifiedTests=false
+      - name: Refresh archetype catalog
+        run: |
+          cd maven
+          xvfb-run -a mvn archetype:update-local-catalog -Plocal-dev-javase
+          xvfb-run -a mvn archetype:crawl -Plocal-dev-javase
+      - name: A Unity project imported and built as an application
+        working-directory: maven/integration-tests
+        env:
+          CN1_GRADLE_REQUIRED: '1'
+        run: xvfb-run -a bash unity-compat-project-test.sh
+      - name: Upload the build logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unity-compat-project-logs
+          path: |
+            maven/integration-tests/build/unity-compat-project/*.log
+            maven/integration-tests/build/unity-compat-project/*.txt
+            maven/integration-tests/build/unity-compat-project/*.diff
+            maven/integration-tests/build/unity-compat-project/*.err
+            maven/integration-tests/build/unity-compat-project/app/common/target/unity/*.log
+          if-no-files-found: ignore

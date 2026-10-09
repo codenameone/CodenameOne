@@ -115,7 +115,13 @@ build plugins share), `project-model` (the project-layout API),
 `android-res-compiler` and `android-compat` (the Android compatibility
 runtime), `codenameone-gradle-plugin` and `javac` (the in-tree Java compiler,
 `vm/JavaCompiler`), then enforces the result in
-`.github/scripts/generate-quality-report.py`.
+`.github/scripts/generate-quality-report.py`. `cil-translator` and
+`unity-compat` (the Unity compatibility translator and runtime) are held to the
+same script with SpotBugs, PMD and Checkstyle all three, but in
+`.github/workflows/unity-compat.yml`: they build only with the .NET SDK, and
+the Java 8 leg must not need one. That workflow's `paths` name both modules,
+the core's `pmd.xml` and `checkstyle.xml` and the report script, so a change to
+any of them cannot skip it.
 
 - **SpotBugs is a zero-findings gate.** *Any* finding of *any* pattern in *any*
   of those projects fails the build, and a project that produces no SpotBugs
@@ -126,7 +132,8 @@ runtime), `codenameone-gradle-plugin` and `javac` (the in-tree Java compiler,
   `vm/ByteCodeTranslator/`, `maven/codenameone-maven-plugin/`,
   `maven/build-engine/`, `maven/project-model/`,
   `maven/android-res-compiler/`, `maven/android-compat/`,
-  `maven/codenameone-gradle-plugin/`, `maven/javac/`), scoped to the
+  `maven/codenameone-gradle-plugin/`, `maven/javac/`,
+  `maven/cil-translator/`, `maven/unity-compat/`), scoped to the
   class or method it applies to and with a comment explaining why. Keep the
   generated report at zero rather than tolerating known noise.
 - PMD and Checkstyle still gate on their own lists in the same script.
@@ -139,6 +146,20 @@ cd maven && mvn -B -DskipTests=true -Pcompile-android \
   -pl android,ios,project-model,android-res-compiler,android-compat,build-engine,codenameone-maven-plugin,codenameone-gradle-plugin,javac -am verify
 mvn -B -DunitTests -DskipTests=true -pl core-unittests verify
 mvn -B -DskipTests=true -f ../vm/ByteCodeTranslator/pom.xml verify
+```
+
+And the Unity compatibility modules, which need the .NET SDK. `verify` fails on
+a SpotBugs finding or a Checkstyle error by itself; **PMD only writes
+`target/pmd.xml`**, so the script is what judges it:
+
+```bash
+cd maven && mvn -B -Dunity-compat -DskipTests=true -pl cil-translator,unity-compat clean verify
+cd .. && QUALITY_REPORT_TARGET_DIRS=maven/cil-translator/target:maven/unity-compat/target \
+  QUALITY_REPORT_REQUIRED_SPOTBUGS=cil-translator:unity-compat \
+  QUALITY_REPORT_REQUIRED_PMD=cil-translator:unity-compat \
+  QUALITY_REPORT_REQUIRED_CHECKSTYLE=cil-translator:unity-compat \
+  python3 .github/scripts/generate-quality-report.py
+scripts/check-cast-semantics.sh maven/unity-compat/target/classes
 ```
 
 **Run the `core-unittests` line too, and do not skip it because the first
@@ -783,6 +804,182 @@ Traps that have already cost a fix:
   `scripts/android-compat-samples/*` and stages every target's upload jar
   (`.github/workflows/android-compat.yml`); it fails if any shipped class still
   names `android/`.
+
+### Unity compatibility: Unity 2D projects as Codename One apps
+
+A Unity project's `Assets` and `ProjectSettings` dropped into
+`common/src/main/unity` (or imported with `cn1:import-unity-project`) builds
+unmodified:
+
+- **`maven/cil-translator`** reads the assembly the C# compiler produced and
+  writes one class file per C# type (`com.codename1.cil`), and compiles every
+  `.unity` scene and `.prefab` to Java source, the generated
+  `com.codename1.generated.unity.UnityAppImpl`
+  (`com.codename1.unity.scenecompiler`).
+- **`maven/unity-compat`** is the runtime the translated classes run against:
+  a .NET base library in Java, the `UnityEngine` value types (C#, translated at
+  build time) and the engine over `com.codename1.gaming`. Its `references`
+  classifier jar carries the three assemblies application scripts compile
+  against; `com.codename1.unitycompat.app.UnityApplication` is the lifecycle
+  class the imported main class extends.
+- **The build step** (`build-engine/.../UnityProjectBuilder`, goal
+  `compile-unity` in `generate-sources`) runs `dotnet build` on a generated
+  project file, forks the translator and the scene compiler, and installs the
+  classes and images in the common module's classes. It has no compile
+  dependency on `cil-translator` -- the tool is resolved at the runtime's own
+  version and forked -- so `build-engine` builds without the profile below.
+- **Gradle** runs the same builder as the `compileUnity` task
+  (`codenameone-gradle-plugin`, `AppSupport.registerUnity`), and adds the
+  runtime, the tool and the references itself for a project with
+  `src/main/unity`. The translated classes go to a directory of their own
+  (`build/cn1-unity/classes`, an output directory of the main source set and on
+  javac's classpath), never into `compileJava`'s destination: javac empties
+  that on a full recompile. The task reads the runtime jar from the
+  `compileClasspath` *configuration*; the source set's classpath contains the
+  task's own output, and reading that would make the task depend on itself.
+
+Both modules live behind the **`unity-compat` profile** (`-Dunity-compat`),
+because building them needs the .NET SDK and the framework build must not.
+An application needs the SDK only when it has Unity sources, and only for a
+build that follows a change to them.
+
+Both are on the static analysis gates, at zero (see *Static Analysis Gates* for
+where they run and how to reproduce them). Three things about the runtime's
+exceptions, so that the next finding is fixed rather than added to them:
+
+- **C# member names are excused by package, nothing else is.**
+  `get_position`, `GetComponent` and `Item1` are what translated bytecode
+  calls, so SpotBugs' `NM_*` patterns are excluded for
+  `com.codename1.unitycompat.{system,unityengine}` and each class with such
+  members carries `@SuppressWarnings("PMD.MethodNamingConventions")`. A new
+  runtime class needs that annotation; a Java-named helper never does.
+- **The translated classes are left out of SpotBugs by name**
+  (`UnityEngine.*`): they are generated bytecode in `target/classes` with no
+  Java source. PMD and Checkstyle read sources and never see them. A finding
+  there that points at wasted or wrong codegen is the translator's to fix.
+- **Indexed loops stay indexed.** `// NOPMD ForLoopCanBeForeach` on a loop over
+  a list is deliberate: a for-each allocates an iterator, in code that runs
+  every frame, and several of those lists grow while they are walked.
+
+`scripts/check-cast-semantics.sh` covers `maven/unity-compat/target/classes`
+(the runtime and the translated classes) whenever the module is built, and
+`unity-compat.yml` names it explicitly. It is not one of the roots
+`--require-all` demands, because PR CI's Java 8 leg does not build it.
+
+**A release publishes both**, in the core reactor pass and at the release's own
+version, because the archetype and both build plugins resolve them at that
+version. `release.yml` installs the SDK and passes `-Dunity-compat`; a release
+build without the flag *succeeds* two modules short, so its "Confirm artifacts
+on R2" step names both, and the `references` jar by file. `versions:set` reads
+the modules of every profile, so `update-version.sh` bumps them unaided.
+
+Traps that have already cost a fix:
+
+- **A method returning a struct takes a hidden last parameter**, the object
+  the result is written into (`Names`, in `com.codename1.cil.translate`). Java
+  has no value types, `a + b` on two vectors is a call, and an object per call
+  measured an order of magnitude slower under ParparVM. A hand-written runtime
+  method that returns a value type follows the same convention, or the
+  translated call site passes one argument more than it declares; and the
+  reference it returns may be read but never kept.
+- **Float arithmetic has to round the way C# rounds.** Natively that needs
+  `-ffp-contract=off`, or clang fuses a multiply and an add and the last bit
+  differs from the JVM; on JavaScript every `float` result goes through
+  `Math.fround`, because a JavaScript number is a double. Without both, a
+  seeded game diverges between targets after a few hundred frames, which is
+  what the committed traces compare.
+- **A script with no namespace lands in package `global`**, since a class in
+  Java's default package cannot be imported by the generated factory.
+- **No reflection.** Scenes, prefabs and serialized fields compile to code
+  that calls constructors and assigns fields; `Invoke("name")`, `Instantiate` and
+  `AddComponent` go through methods the translator writes into each script
+  (`$invoke`, `$copyFrom`, `$new`). Nothing looks a name up at run time,
+  because ParparVM strips what nothing references.
+- **A C# `T[,]` is one flat Java array**, never an array of arrays: an
+  `MdArray*` holder (`com.codename1.unitycompat.system`) keeps the lengths,
+  and `a[i, j]` is a static `get`/`set` that checks each dimension by itself --
+  an index past the end of one row is otherwise a valid element of the next.
+- **A helper method that takes an enum has the enum in its name**
+  (`Split$StringSplitOptions`, `Names.enumSuffix`). An enum is an `int` once
+  erased, so `Split(char[], int)` and `Split(char[], StringSplitOptions)`
+  would be one Java method.
+- **`Resources.Load` is resolved at build time.** The scene compiler embeds
+  what is under any `Resources` folder and generates `loadResource`, a chain
+  of string comparisons; a kind it cannot load is a build note, and the call
+  answers null.
+- **`UnityEngine/*.class` is translated twice** -- into the runtime jar and
+  again with the scripts. The builder skips every class the runtime jar
+  already has; a second copy in the application would shadow the runtime's.
+- **A Unity message is sent only if three places agree.** Unity calls
+  `OnMouseDown` by its name; here the translator writes a `$onMouseDown`
+  override for a method in `Translator.MESSAGES`, `MonoBehaviour` declares
+  the empty hook, and `UnityRuntime` calls it. A documented message in none of
+  them is in `UNSENT_MESSAGES`, and a script declaring one gets a build
+  warning with its file and line. Dispatching a new one means all three and
+  taking it off that list -- otherwise it compiles and is never called.
+- **Code outside the frame reaches a script through
+  `UnityRuntime.callInFrame`** (`UnityApplication.callInFrame`), never
+  directly: a port may run the frame off the EDT. The queue is an
+  `AtomicReference` to an immutable array, as the key events are.
+- **Animation, tiles and particles are compiled, not loaded.** The scene
+  compiler turns every `.anim`, `.controller`, tile asset, tilemap and
+  particle module into code (`AnimationAssets`, `TilemapAssets`,
+  `ParticleAssets`); nothing parses YAML on the device. A property a curve
+  names that the runtime cannot write is a build note, never a silent skip.
+- **TextMeshPro and Cinemachine are our own classes**
+  (`com.codename1.unitycompat.{tmpro,cinemachine}`), matched to a scene by the
+  package's script GUID (`SceneCompiler.PACKAGE_CLASSES`) because a package's
+  scripts are not under `Assets`. The packages' sources are never read. A new
+  runtime package has to be added in three places or a gate fails far from
+  the cause: the source roots the `cil-translator` tests compile, and both
+  package patterns in `maven/unity-compat/spotbugs-exclude.xml`.
+- **A tilemap collider is outlines, not boxes.** Solid cells are merged and
+  traced into chains, so a body sliding along a floor meets no seam between
+  two tiles; `platformer2d`'s trace holds the speed of such a slide. Box2D
+  makes no contact between two chains, so a tilemap never collides with
+  another tilemap -- `World.popContact` used to throw on that pair.
+- **ParparVM copied an array of primitive arrays as primitives.** `int[][]`
+  has a primitive element class and two dimensions; `System.arraycopy` and
+  `clone()` on it skipped the reference path. Fixed in `cn1_globals.m` and
+  `nativeMethods.m`, held by `PrimitiveArrayOfArraysIntegrationTest`.
+- **The world sweeps only while a body is Continuous.** Box2D finds times of
+  impact for every dynamic body against every static one by default; Unity
+  does it for a `Rigidbody2D` set to Continuous and no other. Box2D's switch is
+  per world, so `PhysicsWorld.sweepIfAnyAsks` turns it on while any body asks.
+  Left on, a level of Discrete bodies on a tilemap spent 70% of its step in
+  `World.solveTOI`. `platformer2d`'s pebble is the Continuous body: the frame
+  it turns back on (150, and 156 when nothing sweeps) is what holds this.
+- **A level with a tilemap sorts dozens of broad-phase pairs a step.**
+  `Arrays.sort` takes a merge buffer above 31 elements, which was most of
+  what such a level allocated; `BroadPhase.sortPairs` sorts in place
+  (`BroadPhasePairSortTest`). Contact delivery likewise refills one
+  `Collision2D` per side of a pair in touch, as Unity's
+  `reuseCollisionCallbacks` does -- a script must not keep the one it is given.
+- **Two images with one file name ship as `Name.png` and `Name~N.png`.**
+  Resources are flat on a device; a project with `Idle.png` in ten folders is
+  ordinary, so the name is made distinct rather than warned about.
+- **`unity-compat-project-test.sh` resolves from `MAVEN_REPO_LOCAL`**, and
+  reads `~/.m2` when it is unset: export it to the checkout's `.m2-repo` after
+  installing `core`, both Unity modules and both build plugins there.
+- **Clean room.** Unity's reference source and Unity's own assemblies are
+  never read, decompiled or shipped. The `UnityEngine.dll` in the references
+  jar is compiled from our own `src/main/csharp`, every body a bare `throw`; the
+  API comes from Unity's public documentation and from observed behaviour.
+- **`maven/integration-tests/unity-compat-test.sh`** runs every sample under
+  `scripts/unity-compat-samples` on the JVM, natively and on JavaScript and
+  compares traces; **`unity-compat-project-test.sh`** imports one into an
+  archetype application, builds it with the Maven goal, converts it to
+  Gradle and holds every target's staged upload to the same entries from both
+  (`.github/workflows/unity-compat.yml`).
+- **`netstandard.dll` in the references jar is Microsoft's**, from the NuGet
+  package `NETStandard.Library.Ref` (MIT). Its `LICENSE.TXT` and
+  `THIRD-PARTY-NOTICES.TXT` are kept verbatim in
+  `maven/unity-compat/third-party` and packed into the jar under
+  `META-INF/licenses`; the root `NOTICE` has the entry. The .NET SDK does not
+  bundle that package, so the first build of `maven/unity-compat` on a machine
+  restores it from nuget.org (later ones read `NUGET_PACKAGES`, offline). An
+  application build never restores anything: its generated project turns the
+  implicit framework reference off and names the three assemblies by path.
 
 ### Integration Tests
 

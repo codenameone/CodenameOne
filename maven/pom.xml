@@ -779,6 +779,36 @@
                 <module>backend-parparvm</module>
             </modules>
         </profile>
+        <!--
+            Unity 2D compatibility: the CIL translator and scene compiler
+            (cil-translator) and the runtime translated scripts run against
+            (unity-compat). The runtime's build compiles C# with the .NET SDK
+            and the translator's tests build the C# samples with it, so both
+            stay out of the default reactor: the framework build must never
+            need .NET. Turn it on with -Dunity-compat; -Ddotnet.executable
+            names the CLI when it is not on the PATH, and
+            -Dunity.requireDotnet=true makes a missing SDK fail the tests
+            instead of skipping them.
+
+            Unlike the profiles above, both modules ARE published: the
+            archetype and both build plugins resolve them at the release's own
+            version. .github/workflows/release.yml installs the SDK and passes
+            -Dunity-compat to the reactor pass that stages everything else, and
+            its "Confirm artifacts on R2" step fails a release that lacks them.
+            A release build without the flag still succeeds, two modules short.
+            -->
+        <profile>
+            <id>unity-compat</id>
+            <activation>
+                <property>
+                    <name>unity-compat</name>
+                </property>
+            </activation>
+            <modules>
+                <module>cil-translator</module>
+                <module>unity-compat</module>
+            </modules>
+        </profile>
         <!-- The Game Builder editor is published by the release workflow as a
              separate Java-17 pass over scripts/gamebuilder (its gamebuilder-central
              profile), not from this reactor: it is a CN1 app that depends on the

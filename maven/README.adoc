@@ -32,6 +32,14 @@ publishing scripts enforce.
 
 NOTE: SNAPSHOT versions do not trigger a release.
 
+The release needs a .NET SDK, and network access to nuget.org. `codenameone-cil-translator`
+and `codenameone-unity-compat` are published with everything else, in the same reactor pass
+and at the same version, and the second compiles C# and restores the `NETStandard.Library.Ref`
+reference pack to do it. The workflow installs the SDK, passes `-Dunity-compat` to turn on the
+profile both modules live in, and stops before building anything if `dotnet` is absent.
+Bumping the version needs neither: `update-version.sh` reaches the two modules without the
+profile, because `versions:set` reads the modules of every profile.
+
 ==== Step 1: Update Version to New Release Version
 
 [source,bash]

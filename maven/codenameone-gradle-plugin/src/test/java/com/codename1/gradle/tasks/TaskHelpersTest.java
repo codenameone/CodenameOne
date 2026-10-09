@@ -40,6 +40,8 @@ import java.util.HashSet;
 import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TaskHelpersTest {
@@ -64,6 +66,45 @@ class TaskHelpersTest {
         assertEquals(new HashSet<String>(Arrays.asList("a/b/Main", "Top")),
                 ComplianceAction.javaTypesUnder(new File(tmp.toFile(), "java")));
         assertEquals(Collections.emptySet(), ComplianceAction.javaTypesUnder(new File(tmp.toFile(), "missing")));
+    }
+
+    /// The reference assemblies are published under the runtime's own artifact
+    /// id, so a file name that only starts like the runtime's is not enough to
+    /// go by: translating against the jar of assemblies finds no class in it.
+    @Test
+    void theUnityRuntimeIsNotMistakenForItsReferenceAssemblies() {
+        assertTrue(CompileUnityTask.isRuntimeJar("codenameone-unity-compat-1.0.jar"));
+        assertTrue(CompileUnityTask.isRuntimeJar("codenameone-unity-compat-1.0-20260102.030405-6.jar"));
+        assertFalse(CompileUnityTask.isRuntimeJar("codenameone-unity-compat-1.0-references.jar"));
+        assertFalse(CompileUnityTask.isRuntimeJar("codenameone-unity-compat-1.0-sources.jar"));
+        assertFalse(CompileUnityTask.isRuntimeJar("codenameone-unity-compat-1.0.pom"));
+        assertFalse(CompileUnityTask.isRuntimeJar("codenameone-core-1.0.jar"));
+
+        File references = new File("repo/codenameone-unity-compat-1.0-references.jar");
+        File runtime = new File("repo/codenameone-unity-compat-1.0.jar");
+        assertEquals(runtime, CompileUnityTask.runtimeJar(Arrays.asList(
+                new File("repo/codenameone-core-1.0.jar"), references, runtime)));
+        assertNull(CompileUnityTask.runtimeJar(Collections.singletonList(references)));
+    }
+
+    /// The task fails with the builder's own message when the project is there
+    /// and the runtime is not, rather than translating against nothing: this is
+    /// the path a build takes when the dependency was excluded by hand.
+    @Test
+    void aUnityProjectWithoutTheRuntimeIsRefusedByTheSharedBuilder() throws IOException {
+        touch("unity/Assets/Player.cs");
+        touch("unity/ProjectSettings/ProjectSettings.asset");
+        File unity = new File(tmp.toFile(), "unity");
+        assertTrue(com.codename1.maven.UnityProjectBuilder.isUnityProject(unity));
+        assertFalse(com.codename1.maven.UnityProjectBuilder.isUnityProject(new File(unity, "Assets")));
+        com.codename1.maven.UnityProjectBuilder builder = new com.codename1.maven.UnityProjectBuilder(unity,
+                new File(tmp.toFile(), "generated"), new File(tmp.toFile(), "classes"),
+                new File(tmp.toFile(), "state"), CompileUnityTask.runtimeJar(Collections.<File>emptyList()), null,
+                Collections.<File>emptyList(), null, "a.b", "Main", Collections.<File>emptyList(), null);
+        com.codename1.builders.BuildException ex = org.junit.jupiter.api.Assertions.assertThrows(
+                com.codename1.builders.BuildException.class, builder::run);
+        assertTrue(ex.getMessage().contains("codenameone-unity-compat"), ex.getMessage());
+        assertFalse(new File(tmp.toFile(), "classes").exists(), "nothing is written before the runtime is found");
     }
 
     /// The GUI tools and the simulator read the project through this file, so it
