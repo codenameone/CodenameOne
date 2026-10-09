@@ -477,4 +477,138 @@ public class DesktopPaneAndFriendsTest extends KernelTestBase {
                 + " against " + plain.getPreferredSize().width,
                 iconed.getPreferredSize().width < plain.getPreferredSize().width);
     }
+
+    /// The title bar, the edges and the three title buttons answer the
+    /// pointer: a press selects the frame and its title bar takes the
+    /// highlight colour, a drag of the bar moves it, a drag of an edge
+    /// resizes it, and the buttons iconify, maximise and close.
+    @Test
+    public void thePointerMovesResizesAndPressesTheTitleButtons() throws Exception {
+        UIManager.put("textHighlight", new Color(0x12, 0x34, 0xab));
+        try {
+            desktop();
+            JInternalFrame a = frame("A", 20, 20);
+            JInternalFrame b = frame("B", 300, 200);
+            window.setSize(540, 900);
+            show(window);
+            a.setSelected(true);
+            assertTrue(a.isSelected());
+
+            // Unselected, the bar of B is not the highlight; a press makes it so.
+            int[][] rows = raster(window);
+            assertEquals(0, count(rows, b, 4, 4, 100, 24, 0x1234ab));
+            assertTrue(count(rows, a, 4, 4, 100, 24, 0x1234ab) > 500);
+            press(window, b, 60, 14);
+            assertTrue(b.isSelected());
+            assertFalse(a.isSelected());
+            rows = raster(window);
+            assertTrue(count(rows, b, 4, 4, 100, 24, 0x1234ab) > 500);
+            assertEquals(0, count(rows, a, 4, 4, 100, 24, 0x1234ab));
+
+            // The same press, dragged, moves the frame by as much.
+            drag(window, b, 70, 34);
+            release(window, b, 60, 14);
+            assertEquals(310, b.getX());
+            assertEquals(220, b.getY());
+            assertEquals(200, b.getWidth());
+
+            // The right edge and the bottom edge resize; the corner both.
+            press(window, b, 198, 80);
+            drag(window, b, 228, 80);
+            release(window, b, 227, 80);
+            assertEquals(230, b.getWidth());
+            assertEquals(150, b.getHeight());
+            assertEquals(310, b.getX());
+            press(window, b, 228, 148);
+            drag(window, b, 208, 168);
+            release(window, b, 207, 167);
+            assertEquals(210, b.getWidth());
+            assertEquals(170, b.getHeight());
+            // The left edge moves the frame as it resizes it.
+            press(window, b, 1, 80);
+            drag(window, b, 11, 80);
+            release(window, b, 1, 80);
+            assertEquals(320, b.getX());
+            assertEquals(200, b.getWidth());
+
+            // From the right: close, maximise, iconify, 18 wide and 3 apart.
+            int close = 200 - 4 - 3 - 9;
+            press(window, b, close - 42, 16);
+            release(window, b, close - 42, 16);
+            assertTrue(b.isIcon());
+            b.setIcon(false);
+            assertFalse(b.isIcon());
+            assertEquals(200, b.getWidth());
+            press(window, b, close - 21, 16);
+            release(window, b, close - 21, 16);
+            assertTrue(b.isMaximum());
+            assertEquals(desktop.getWidth(), b.getWidth());
+            b.setMaximum(false);
+            assertEquals(200, b.getWidth());
+            assertEquals(320, b.getX());
+            // A press that leaves the button before it is let go does nothing.
+            press(window, b, close, 16);
+            release(window, b, close, 60);
+            assertFalse(b.isClosed());
+            press(window, b, close, 16);
+            release(window, b, close, 16);
+            assertTrue(b.isClosed());
+            assertNull(b.getParent());
+        } finally {
+            UIManager.put("textHighlight", null);
+        }
+    }
+
+    /// In the theme as it comes, where the selection colour is a faint
+    /// tint of the window, the title bar of the selected frame is still
+    /// clearly darker than that of the others.
+    @Test
+    public void theSelectedFrameShowsInAThemeWithoutASelectionColour() throws Exception {
+        desktop();
+        JInternalFrame a = frame("A", 20, 20);
+        JInternalFrame b = frame("B", 300, 200);
+        window.setSize(540, 900);
+        show(window);
+        a.setSelected(true);
+        int[][] rows = raster(window);
+        int on = pixel(rows, a, 100, 8);
+        int off = pixel(rows, b, 100, 8);
+        int lumaOn = ((on >> 16) & 0xff) * 3 + ((on >> 8) & 0xff) * 6 + (on & 0xff);
+        int lumaOff = ((off >> 16) & 0xff) * 3 + ((off >> 8) & 0xff) * 6 + (off & 0xff);
+        assertTrue(Integer.toHexString(on) + " against " + Integer.toHexString(off),
+                Math.abs(lumaOn - lumaOff) >= 480);
+        b.setSelected(true);
+        rows = raster(window);
+        assertEquals(off & 0xffffff, pixel(rows, a, 100, 8) & 0xffffff);
+        assertEquals(on & 0xffffff, pixel(rows, b, 100, 8) & 0xffffff);
+    }
+
+    /// A component the application moves or resizes is painted where it
+    /// now is: its container is asked to repaint, which a layout pass
+    /// does for itself and a call from the application has to ask for.
+    @Test
+    public void movingAComponentRepaintsItsContainer() {
+        final int[] repaints = {0};
+        JPanel holder = new JPanel(null) {
+            @Override
+            public void repaint() {
+                repaints[0]++;
+                super.repaint();
+            }
+        };
+        JLabel piece = new JLabel("x");
+        holder.add(piece);
+        piece.setBounds(10, 10, 40, 20);
+        JFrame f = new JFrame();
+        f.getContentPane().add(holder, BorderLayout.CENTER);
+        show(f);
+        int before = repaints[0];
+        piece.setLocation(60, 30);
+        assertEquals(before + 1, repaints[0]);
+        piece.setSize(50, 20);
+        assertEquals(before + 2, repaints[0]);
+        // Bounds that do not change ask for nothing.
+        piece.setBounds(60, 30, 50, 20);
+        assertEquals(before + 2, repaints[0]);
+    }
 }

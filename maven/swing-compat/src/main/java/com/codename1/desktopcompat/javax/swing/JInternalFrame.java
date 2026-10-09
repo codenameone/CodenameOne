@@ -724,6 +724,14 @@ public class JInternalFrame extends JComponent implements Accessible, WindowCons
 
     /// `c` moved toward black by `by` in each channel; a middle gray for
     /// no color.
+    /// Whether two colours are too close in brightness to tell two title
+    /// bars apart.
+    private static boolean cn1Near(Color a, Color b) {
+        int la = a.getRed() * 3 + a.getGreen() * 6 + a.getBlue();
+        int lb = b.getRed() * 3 + b.getGreen() * 6 + b.getBlue();
+        return Math.abs(la - lb) < 480;
+    }
+
     static Color cn1Shade(Color c, int by) {
         if (c == null) {
             return new Color(160, 160, 160);
@@ -780,13 +788,20 @@ public class JInternalFrame extends JComponent implements Accessible, WindowCons
         g.setColor(line);
         g.drawRect(0, 0, w - 1, h - 1);
 
-        Color bar = isSelected ? UIManager.getColor("textHighlight") : null;
+        Color plain = cn1Shade(face, 16);
+        Color bar = isSelected ? UIManager.getColor("textHighlight") : plain;
         Color ink = isSelected ? UIManager.getColor("textHighlightText") : UIManager.getColor("controlText");
-        if (bar == null) {
-            bar = cn1Shade(face, 40);
-        }
         if (ink == null) {
             ink = Color.BLACK;
+        }
+        if (bar == null || (isSelected && cn1Near(bar, plain))) {
+            // A theme without a selection colour of its own answers a
+            // faint tint of the window, which beside the bar of a frame
+            // that is not selected cannot be told from it. The selected
+            // frame is the one the keyboard goes to; it has to show.
+            Color text = UIManager.getColor("controlText");
+            bar = com.codename1.desktopcompat.rt.CellTheme.mix(face, text == null ? Color.BLACK : text, 0.38f);
+            ink = face;
         }
         g.setColor(bar);
         g.fillRect(EDGE, EDGE, Math.max(0, w - 2 * EDGE), BAR);

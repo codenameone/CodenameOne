@@ -234,4 +234,22 @@ public class MiniHtmlTest extends KernelTestBase {
         assertEquals(5, narrow.lineCount());
         assertEquals("aaaa ", narrow.line(0).text());
     }
+
+    /// A font of the monospaced family is drawn in the platform's fixed
+    /// width font, whatever the case the family is written in; any other
+    /// family is not.
+    @Test
+    public void aMonospacedFamilyGetsTheFixedWidthFont() {
+        com.codename1.compat.testing.HeadlessImplementation.lastFontFace = -1;
+        Fonts.nativeFont(new Font("Dialog", Font.PLAIN, 12), 23.25f);
+        assertTrue(com.codename1.compat.testing.HeadlessImplementation.lastFontFace
+                != com.codename1.ui.Font.FACE_MONOSPACE);
+        Fonts.nativeFont(new Font("monospaced", Font.PLAIN, 12), 23.25f);
+        assertEquals(com.codename1.ui.Font.FACE_MONOSPACE,
+                com.codename1.compat.testing.HeadlessImplementation.lastFontFace);
+        com.codename1.compat.testing.HeadlessImplementation.lastFontFace = -1;
+        Fonts.nativeFont(new Font("Courier New", Font.BOLD, 12), 23.25f);
+        assertEquals(com.codename1.ui.Font.FACE_MONOSPACE,
+                com.codename1.compat.testing.HeadlessImplementation.lastFontFace);
+    }
 }

@@ -32,7 +32,6 @@ import com.codename1.desktopcompat.java.awt.Insets;
 import com.codename1.desktopcompat.java.awt.event.MouseEvent;
 import com.codename1.desktopcompat.javax.accessibility.Accessible;
 import com.codename1.desktopcompat.rt.Align;
-import com.codename1.desktopcompat.rt.Icons;
 import com.codename1.desktopcompat.rt.LabelPeer;
 import com.codename1.desktopcompat.rt.MiniHtml;
 import com.codename1.desktopcompat.rt.Units;
@@ -109,9 +108,9 @@ public class JLabel extends JComponent implements Accessible, SwingConstants {
         com.codename1.ui.Component p = cn1PeerOrNull();
         if (p instanceof com.codename1.ui.Label) {
             com.codename1.ui.Label l = (com.codename1.ui.Label) p;
-            boolean isHtml = MiniHtml.isHtml(text);
-            l.setText(text == null || isHtml ? "" : text);
-            l.setIcon(isHtml ? null : Icons.toNative(shownIcon(), this));
+            boolean own = paintsItself();
+            l.setText(text == null || own ? "" : text);
+            l.setIcon(null);
             l.setAlignment(nativeAlignment(horizontalAlignment));
             l.setVerticalAlignment(Align.vertical(verticalAlignment));
             l.setTextPosition(Align.textPosition(horizontalTextPosition, verticalTextPosition));
@@ -124,6 +123,25 @@ public class JLabel extends JComponent implements Accessible, SwingConstants {
     }
 
     // ------------------------------------------------------------ html
+
+    /// Whether the label is drawn here instead of by the Codename One
+    /// label behind it: when its text is HTML, and when it has an icon.
+    /// An icon is asked to paint itself on this component each time, as on
+    /// the desktop, because an icon may draw from the state of the
+    /// component it is given -- its size, whether it is enabled -- and one
+    /// larger than the label is clipped, not scaled.
+    private boolean paintsItself() {
+        return MiniHtml.isHtml(text) || shownIcon() != null;
+    }
+
+    /// The size of the text of a label that is not HTML.
+    private Dimension plainSize(Font f) {
+        if (text == null || text.length() == 0) {
+            return new Dimension(0, 0);
+        }
+        com.codename1.desktopcompat.java.awt.FontMetrics fm = com.codename1.desktopcompat.rt.Fonts.metrics(f);
+        return new Dimension(fm.stringWidth(text), fm.getHeight());
+    }
 
     private MiniHtml.Document document() {
         if (html == null) {
@@ -162,6 +180,9 @@ public class JLabel extends JComponent implements Accessible, SwingConstants {
         if (ic == null) {
             return textSize;
         }
+        if (textSize.width == 0) {
+            return new Dimension(ic.getIconWidth(), ic.getIconHeight());
+        }
         if (iconBeside()) {
             return new Dimension(ic.getIconWidth() + iconTextGap + textSize.width,
                     Math.max(ic.getIconHeight(), textSize.height));
@@ -172,20 +193,80 @@ public class JLabel extends JComponent implements Accessible, SwingConstants {
 
     @Override
     protected Dimension cn1NativePreferredSize() {
-        if (!MiniHtml.isHtml(text)) {
+        if (!paintsItself()) {
             return super.cn1NativePreferredSize();
         }
-        Dimension d = htmlContent(MiniHtml.preferredSize(document(), htmlFont()));
+        boolean isHtml = MiniHtml.isHtml(text);
+        Dimension text = isHtml ? MiniHtml.preferredSize(document(), htmlFont()) : plainSize(htmlFont());
+        int wrap = isHtml ? wrapWidth() : 0;
+        if (wrap > 0) {
+            text = new Dimension(text.width, MiniHtml.wrappedSize(document(), htmlFont(), wrap).height);
+        }
+        Dimension d = htmlContent(text);
         Insets in = htmlInsets();
         return new Dimension(d.width + in.left + in.right, d.height + in.top + in.bottom);
     }
 
+    /// The preferred size, except that an HTML text can be as narrow as
+    /// its longest word: as on the desktop, where the minimum of an HTML
+    /// label is its preferred size less what its text gives up by
+    /// wrapping.
+    @Override
+    public Dimension getMinimumSize() {
+        Dimension d = super.getMinimumSize();
+        if (isMinimumSizeSet() || !MiniHtml.isHtml(text)) {
+            return d;
+        }
+        int unbroken = MiniHtml.preferredSize(document(), htmlFont()).width;
+        int word = MiniHtml.wrappedSize(document(), htmlFont(), 1).width;
+        return new Dimension(Math.max(0, d.width - Math.max(0, unbroken - word)), d.height);
+    }
+
+    /// The width the HTML text is broken to, or 0 while the label is wide
+    /// enough for its longest line, has no size yet or is not HTML.
+    ///
+    /// As on the desktop, an HTML label that was given less room than its
+    /// text wants on one line wraps, and from then on prefers the height of
+    /// the wrapped text; its preferred width stays that of the unbroken
+    /// text. A layout that measured it before it had a size therefore lays
+    /// it out a second time, which [#setBounds(int, int, int, int)] asks
+    /// for.
+    private int wrapWidth() {
+        if (!MiniHtml.isHtml(text) || getWidth() <= 0) {
+            return 0;
+        }
+        Insets in = htmlInsets();
+        int avail = getWidth() - in.left - in.right;
+        Icon ic = shownIcon();
+        if (ic != null && iconBeside()) {
+            avail -= ic.getIconWidth() + iconTextGap;
+        }
+        if (avail <= 0) {
+            return 0;
+        }
+        return avail < MiniHtml.preferredSize(document(), htmlFont()).width ? avail : 0;
+    }
+
+    @Override
+    public void setBounds(int x, int y, int width, int height) {
+        if (width == getWidth() || !MiniHtml.isHtml(text)) {
+            super.setBounds(x, y, width, height);
+            return;
+        }
+        int was = wrapWidth();
+        super.setBounds(x, y, width, height);
+        if (wrapWidth() != was) {
+            com.codename1.desktopcompat.rt.PeerSupport.layoutAgain(this);
+        }
+    }
+
     @Override
     protected void paintComponent(Graphics g) {
-        if (!MiniHtml.isHtml(text)) {
+        if (!paintsItself()) {
             super.paintComponent(g);
             return;
         }
+        boolean isHtml = MiniHtml.isHtml(text);
         if (isOpaque()) {
             Color bg = getBackground();
             if (bg != null) {
@@ -200,8 +281,9 @@ public class JLabel extends JComponent implements Accessible, SwingConstants {
         Icon ic = shownIcon();
         boolean beside = iconBeside();
         int textAvail = ic != null && beside ? Math.max(1, availW - ic.getIconWidth() - iconTextGap) : availW;
-        MiniHtml.Document doc = MiniHtml.wrap(document(), f, textAvail);
-        Dimension textSize = MiniHtml.preferredSize(doc, f);
+        MiniHtml.Document doc = isHtml ? MiniHtml.wrap(document(), f, textAvail) : null;
+        Dimension textSize = isHtml ? MiniHtml.preferredSize(doc, f) : plainSize(f);
+        int iconTextGap = textSize.width == 0 ? 0 : this.iconTextGap;
         Dimension content = htmlContent(textSize);
         int x = in.left;
         int nativeAlign = nativeAlignment(horizontalAlignment);
@@ -251,7 +333,11 @@ public class JLabel extends JComponent implements Accessible, SwingConstants {
         }
         int lineAlign = nativeAlign == com.codename1.ui.Component.CENTER ? MiniHtml.ALIGN_CENTER
                 : nativeAlign == com.codename1.ui.Component.RIGHT ? MiniHtml.ALIGN_RIGHT : MiniHtml.ALIGN_LEFT;
-        MiniHtml.paint(g, doc, textX, textY, textSize.width, lineAlign);
+        if (isHtml) {
+            MiniHtml.paint(g, doc, textX, textY, textSize.width, lineAlign);
+        } else if (textSize.width > 0) {
+            g.drawString(text, textX, textY + com.codename1.desktopcompat.rt.Fonts.metrics(f).getAscent());
+        }
     }
 
     @Override

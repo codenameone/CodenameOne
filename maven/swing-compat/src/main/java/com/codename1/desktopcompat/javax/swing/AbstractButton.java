@@ -22,6 +22,7 @@
  */
 package com.codename1.desktopcompat.javax.swing;
 
+import com.codename1.desktopcompat.java.awt.Dimension;
 import com.codename1.desktopcompat.java.awt.Insets;
 import com.codename1.desktopcompat.java.awt.ItemSelectable;
 import com.codename1.desktopcompat.java.awt.event.ActionEvent;
@@ -68,6 +69,7 @@ public abstract class AbstractButton extends JComponent implements ItemSelectabl
     private int horizontalTextPosition = TRAILING;
     private int verticalTextPosition = CENTER;
     private boolean borderPainted = true;
+    private MiniHtml.Document html;
     private boolean focusPainted = true;
     private boolean contentAreaFilled = true;
     private boolean rolloverEnabled;
@@ -123,7 +125,7 @@ public abstract class AbstractButton extends JComponent implements ItemSelectabl
         com.codename1.ui.Component p = cn1PeerOrNull();
         if (p instanceof com.codename1.ui.Button) {
             com.codename1.ui.Button b = (com.codename1.ui.Button) p;
-            b.setText(text == null ? "" : MiniHtml.singleLine(text));
+            b.setText(text == null || htmlOverlay() ? "" : MiniHtml.singleLine(text));
             boolean selected = model != null && model.isSelected();
             b.setIcon(nativeIcon(0, selected && selectedIcon != null ? selectedIcon : icon));
             b.setPressedIcon(nativeIcon(1, pressedIcon));
@@ -207,9 +209,110 @@ public abstract class AbstractButton extends JComponent implements ItemSelectabl
     }
 
     private void changed() {
+        html = null;
         sync();
         revalidate();
         repaint();
+    }
+
+    // ------------------------------------------------------------ html
+
+    /// Whether the text is HTML that is drawn here, over the native
+    /// button, with its colors, sizes and styles: for a button without an
+    /// icon that is not a check box or radio button. The others show the
+    /// text of the HTML on one line, in the widget's own style, because
+    /// only the widget knows where it puts text beside a mark or an icon.
+    private boolean htmlOverlay() {
+        if (!MiniHtml.isHtml(text) || icon != null) {
+            return false;
+        }
+        com.codename1.ui.Component p = cn1PeerOrNull();
+        if (!(p instanceof com.codename1.ui.Button)) {
+            return false;
+        }
+        boolean mark = p instanceof com.codename1.ui.CheckBox || p instanceof com.codename1.ui.RadioButton;
+        return !mark || ((com.codename1.ui.Button) p).isToggle();
+    }
+
+    private MiniHtml.Document htmlDocument() {
+        if (html == null) {
+            html = MiniHtml.parse(text);
+        }
+        return html;
+    }
+
+    /// The font HTML text starts from: the one that was set, else the
+    /// font the theme gives the button.
+    private com.codename1.desktopcompat.java.awt.Font htmlFont() {
+        com.codename1.ui.Component p = cn1PeerOrNull();
+        if (!isFontSet() && p != null && p.getStyle().getFont() != null) {
+            return com.codename1.desktopcompat.rt.Fonts.fromNative(p.getStyle().getFont());
+        }
+        return getFont();
+    }
+
+    @Override
+    protected Dimension cn1NativePreferredSize() {
+        Dimension d = super.cn1NativePreferredSize();
+        if (d == null || !htmlOverlay()) {
+            return d;
+        }
+        com.codename1.ui.plaf.Style st = cn1Peer().getStyle();
+        Dimension t = MiniHtml.preferredSize(htmlDocument(), htmlFont());
+        int padV = Units.toLogicalCeil(st.getPaddingTop()) + Units.toLogicalCeil(st.getPaddingBottom());
+        return new Dimension(d.width + t.width, Math.max(d.height, t.height + padV));
+    }
+
+    /// The preferred size, except that a button whose text is HTML can
+    /// grow as wide as it is let. That is the desktop's doing -- the size
+    /// the view of an HTML text can take has no limit -- and layouts that
+    /// hand out spare room by maximum size, a box among them, give it to
+    /// such a button. The limit is the largest `int` and not the largest
+    /// `short` that glue has, so beside glue the button takes all of it.
+    @Override
+    public Dimension getMaximumSize() {
+        Dimension d = super.getMaximumSize();
+        if (!isMaximumSizeSet() && MiniHtml.isHtml(text) && d != null) {
+            return new Dimension(Integer.MAX_VALUE, d.height);
+        }
+        return d;
+    }
+
+    @Override
+    protected void paintComponent(com.codename1.desktopcompat.java.awt.Graphics g) {
+        super.paintComponent(g);
+        if (!htmlOverlay()) {
+            return;
+        }
+        com.codename1.ui.plaf.Style st = cn1Peer().getStyle();
+        int left = Units.toLogicalCeil(st.getPaddingLeftNoRTL());
+        int right = Units.toLogicalCeil(st.getPaddingRightNoRTL());
+        int top = Units.toLogicalCeil(st.getPaddingTop());
+        int bottom = Units.toLogicalCeil(st.getPaddingBottom());
+        com.codename1.desktopcompat.java.awt.Font f = htmlFont();
+        MiniHtml.Document doc = htmlDocument();
+        Dimension t = MiniHtml.preferredSize(doc, f);
+        int availW = Math.max(0, getWidth() - left - right);
+        int availH = Math.max(0, getHeight() - top - bottom);
+        int align = horizontalAlignmentSet ? horizontalAlignment : CENTER;
+        int x = left;
+        int lineAlign = MiniHtml.ALIGN_LEFT;
+        if (align == CENTER) {
+            x += (availW - t.width) / 2;
+            lineAlign = MiniHtml.ALIGN_CENTER;
+        } else if (align == RIGHT || align == TRAILING) {
+            x += availW - t.width;
+            lineAlign = MiniHtml.ALIGN_RIGHT;
+        }
+        int y = top + (availH - t.height) / 2;
+        g.setFont(f);
+        com.codename1.desktopcompat.java.awt.Color fg = isForegroundSet() ? getForeground()
+                : new com.codename1.desktopcompat.java.awt.Color(st.getFgColor() & 0xffffff);
+        if (!isEnabled()) {
+            fg = com.codename1.desktopcompat.java.awt.Color.GRAY;
+        }
+        g.setColor(fg);
+        MiniHtml.paint(g, doc, x, y, t.width, lineAlign);
     }
 
     private void styleChanged() {

@@ -115,6 +115,19 @@ public class JTextField extends JTextComponent implements SwingConstants {
         return new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE);
     }
 
+    /// As on the desktop a field can be far narrower than it prefers --
+    /// there its minimum is little more than its own edges, here it is as
+    /// wide as it is tall -- so a row that is short of room narrows its
+    /// fields before it pushes anything out of sight.
+    @Override
+    public Dimension getMinimumSize() {
+        Dimension d = super.getMinimumSize();
+        if (isMinimumSizeSet()) {
+            return d;
+        }
+        return new Dimension(Math.min(d.width, d.height), d.height);
+    }
+
     public int getColumns() {
         return columns;
     }

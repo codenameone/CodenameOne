@@ -119,6 +119,10 @@ public class JSplitPane extends JComponent implements Accessible {
         }
         orientation = newOrientation;
         continuousLayout = newContinuousLayout;
+        // A split pane fills its own area, as every look and feel has it:
+        // a side smaller than its half is surrounded by the pane's
+        // background, not by whatever the pane happens to stand on.
+        setOpaque(true);
         enableEvents(AWTEvent.MOUSE_EVENT_MASK | AWTEvent.MOUSE_MOTION_EVENT_MASK);
         if (newLeftComponent != null) {
             setLeftComponent(newLeftComponent);

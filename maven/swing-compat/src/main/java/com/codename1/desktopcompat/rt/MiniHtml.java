@@ -38,14 +38,18 @@ import java.util.ArrayList;
 ///
 /// Understood: `<b>` `<strong>` `<i>` `<em>` `<u>` `<br>` `<p>` `<div>`
 /// `<center>` `<font color= size=>` `<big>` `<small>` `<h1>` to `<h6>`
-/// `<li>`, the `align` attribute and a `color` in a `style` attribute, and
+/// `<li>`, `<img src= width= height=>` where the caller says how a source
+/// is found, the `align` attribute and a `color` in a `style` attribute, and
 /// the entities `&amp;` `&lt;` `&gt;` `&nbsp;` `&quot;` `&apos;` and the
 /// numeric ones. Every other tag is dropped and its content kept, except
 /// `<head>`, `<style>`, `<script>` and `<title>`, whose content goes too.
 /// Malformed input never throws: what cannot be read as a tag is text.
 ///
-/// Not supported: images, tables, lists beyond a dash per item, links,
-/// style sheets and font faces.
+/// An image stands on the baseline of its line like a word and is never
+/// broken; the attribute `align` does not float it to a side.
+///
+/// Not supported: tables, lists beyond a dash per item, style sheets and
+/// font faces.
 public final class MiniHtml {
 
     /// The alignment of a line that asked for none.
@@ -78,6 +82,13 @@ public final class MiniHtml {
 
     // ------------------------------------------------------------ model
 
+    /// Finds the picture an `<img>` names. A text parsed without one has
+    /// its images dropped.
+    public interface ImageSource {
+        /// The image for what `src` says, or `null` when there is none.
+        com.codename1.desktopcompat.java.awt.Image image(String src);
+    }
+
     /// A stretch of text in one style.
     public static final class Run {
         private final String text;
@@ -87,6 +98,9 @@ public final class MiniHtml {
         private final Color color;
         private final float scale;
         private final String href;
+        private com.codename1.desktopcompat.java.awt.Image image;
+        private int imageWidth;
+        private int imageHeight;
 
         Run(String text, boolean bold, boolean italic, boolean underline, Color color, float scale) {
             this(text, bold, italic, underline, color, scale, null);
@@ -138,8 +152,27 @@ public final class MiniHtml {
             return new Run(t, bold, italic, underline, color, scale, href);
         }
 
+        /// The picture of an `<img>`, or `null` for text.
+        public com.codename1.desktopcompat.java.awt.Image image() {
+            return image;
+        }
+
+        /// The width an image is drawn at, in logical pixels.
+        public int imageWidth() {
+            return imageWidth;
+        }
+
+        /// The height an image is drawn at, in logical pixels.
+        public int imageHeight() {
+            return imageHeight;
+        }
+
+        int width(Font base) {
+            return image != null ? imageWidth : Fonts.metrics(font(base)).stringWidth(text);
+        }
+
         boolean sameStyle(Run o) {
-            return bold == o.bold && italic == o.italic && underline == o.underline && Float.compare(scale, o.scale) == 0
+            return image == null && o.image == null && bold == o.bold && italic == o.italic && underline == o.underline && Float.compare(scale, o.scale) == 0
                     && (color == null ? o.color == null : color.equals(o.color))
                     && (href == null ? o.href == null : href.equals(o.href));
         }
@@ -280,6 +313,7 @@ public final class MiniHtml {
         final Document doc = new Document();
         final ArrayList<State> stack = new ArrayList<State>();
         final StringBuilder text = new StringBuilder();
+        ImageSource images;
         Line line = new Line();
         boolean pendingGap;
         boolean spacePending;
@@ -306,6 +340,20 @@ public final class MiniHtml {
                 line.add(new Run(text.toString(), s.bold, s.italic, s.underline, s.color, s.scale, s.href));
                 text.setLength(0);
             }
+        }
+
+        /// Puts an image where the text is, as a word of its own.
+        void image(com.codename1.desktopcompat.java.awt.Image img, int w, int h) {
+            flush();
+            State s = top();
+            if (line.runs.isEmpty()) {
+                line.alignment = s.align;
+            }
+            Run r = new Run("", false, false, false, s.color, s.scale, s.href);
+            r.image = img;
+            r.imageWidth = w;
+            r.imageHeight = h;
+            line.runs.add(r);
         }
 
         boolean lineHasText() {
@@ -379,7 +427,14 @@ public final class MiniHtml {
     /// Reads `html` into lines of runs. A text that is not HTML is read
     /// the same way, so its tags, if it has any, are honoured too.
     public static Document parse(String html) {
+        return parse(html, null);
+    }
+
+    /// Reads `html` as [#parse(String)] does, with the pictures of its
+    /// `<img>` tags found by `images`.
+    public static Document parse(String html, ImageSource images) {
         Builder b = new Builder();
+        b.images = images;
         if (html == null) {
             return b.doc;
         }
@@ -555,6 +610,10 @@ public final class MiniHtml {
         if ("html".equals(name) || "body".equals(name)) {
             return;
         }
+        if ("img".equals(name)) {
+            image(attrs, b);
+            return;
+        }
         State s = b.top().copy(name);
         int heading = headingLevel(name);
         if ("b".equals(name) || "strong".equals(name)) {
@@ -617,6 +676,56 @@ public final class MiniHtml {
             b.character('-', false);
             b.character(' ', false);
         }
+    }
+
+    /// An `<img>`: the picture its source names, at the size the tag
+    /// gives or else its own. A picture that is not found leaves nothing.
+    private static void image(String attrs, Builder b) {
+        String src = attribute(attrs, "src");
+        if (src == null || b.images == null) {
+            return;
+        }
+        com.codename1.desktopcompat.java.awt.Image img = b.images.image(src);
+        if (img == null) {
+            return;
+        }
+        int w = pixels(attribute(attrs, "width"));
+        int h = pixels(attribute(attrs, "height"));
+        int ownW = img.getWidth(null);
+        int ownH = img.getHeight(null);
+        if (w <= 0 && h <= 0) {
+            w = ownW;
+            h = ownH;
+        } else if (w <= 0) {
+            w = ownH > 0 ? (int) ((long) ownW * h / ownH) : h;
+        } else if (h <= 0) {
+            h = ownW > 0 ? (int) ((long) ownH * w / ownW) : w;
+        }
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        b.image(img, w, h);
+    }
+
+    /// A length in pixels as an attribute writes it, or 0 for none and
+    /// for one that is not a plain number, such as a percentage.
+    private static int pixels(String value) {
+        if (value == null) {
+            return 0;
+        }
+        String v = value.trim();
+        int n = 0;
+        if (v.length() == 0 || v.length() > 6) {
+            return 0;
+        }
+        for (int i = 0; i < v.length(); i++) {
+            char c = v.charAt(i);
+            if (c < '0' || c > '9') {
+                return 0;
+            }
+            n = n * 10 + (c - '0');
+        }
+        return n;
     }
 
     private static void closeTag(String name, Builder b) {
@@ -785,26 +894,42 @@ public final class MiniHtml {
     private static int lineWidth(Line l, Font base) {
         int w = 0;
         for (int i = 0; i < l.runs.size(); i++) {
-            Run r = l.runs.get(i);
-            w += Fonts.metrics(r.font(base)).stringWidth(r.text);
+            w += l.runs.get(i).width(base);
         }
         return w;
     }
 
+    /// The height of a line: its tallest text, and an image standing on
+    /// the baseline with the text's descent below it.
     private static int lineHeight(Line l, Font base) {
         int h = 0;
+        int descent = 0;
+        int image = 0;
         for (int i = 0; i < l.runs.size(); i++) {
-            h = Math.max(h, Fonts.metrics(l.runs.get(i).font(base)).getHeight());
+            Run r = l.runs.get(i);
+            if (r.image != null) {
+                image = Math.max(image, r.imageHeight);
+                continue;
+            }
+            FontMetrics fm = Fonts.metrics(r.font(base));
+            h = Math.max(h, fm.getHeight());
+            descent = Math.max(descent, fm.getHeight() - fm.getAscent());
+        }
+        if (image > 0) {
+            return Math.max(h, image + descent);
         }
         return h > 0 ? h : Fonts.metrics(base).getHeight();
     }
 
     private static int lineAscent(Line l, Font base) {
         int a = 0;
+        boolean any = false;
         for (int i = 0; i < l.runs.size(); i++) {
-            a = Math.max(a, Fonts.metrics(l.runs.get(i).font(base)).getAscent());
+            Run r = l.runs.get(i);
+            any = true;
+            a = Math.max(a, r.image != null ? r.imageHeight : Fonts.metrics(r.font(base)).getAscent());
         }
-        return a > 0 ? a : Fonts.metrics(base).getAscent();
+        return any ? a : Fonts.metrics(base).getAscent();
     }
 
     private static int gap(Font base) {
@@ -855,6 +980,18 @@ public final class MiniHtml {
             int curWidth = 0;
             for (int r = 0; r < l.runs.size(); r++) {
                 Run run = l.runs.get(r);
+                if (run.image != null) {
+                    // An image is one word.
+                    if (curWidth + run.imageWidth > width && !cur.runs.isEmpty()) {
+                        out.lines.add(cur);
+                        cur = new Line();
+                        cur.alignment = l.alignment;
+                        curWidth = 0;
+                    }
+                    cur.runs.add(run);
+                    curWidth += run.imageWidth;
+                    continue;
+                }
                 FontMetrics fm = Fonts.metrics(run.font(base));
                 String t = run.text;
                 int from = 0;
@@ -903,7 +1040,7 @@ public final class MiniHtml {
                 int lx = lineStart(l, base, width, alignment);
                 for (int r = 0; r < l.runs.size(); r++) {
                     Run run = l.runs.get(r);
-                    int rw = Fonts.metrics(run.font(base)).stringWidth(run.text);
+                    int rw = run.width(base);
                     if (px >= lx && px < lx + rw) {
                         return run.href;
                     }
@@ -953,6 +1090,11 @@ public final class MiniHtml {
                 int lx = x + lineStart(l, base, width, alignment);
                 for (int r = 0; r < l.runs.size(); r++) {
                     Run run = l.runs.get(r);
+                    if (run.image != null) {
+                        g.drawImage(run.image, lx, baseline - run.imageHeight, run.imageWidth, run.imageHeight, null);
+                        lx += run.imageWidth;
+                        continue;
+                    }
                     Font f = run.font(base);
                     FontMetrics fm = Fonts.metrics(f);
                     int rw = fm.stringWidth(run.text);

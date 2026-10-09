@@ -186,7 +186,7 @@ Compliance check failed with 2 forbidden API references.
 See /projects/orders/common/target/codenameone/compliance_check.txt for the full report.
 First 2 violation(s):
  - com/example/OrdersPanel#printOrders()V -> javax.swing.JTable.print() is not supported by the Codename One Swing compatibility layer (com/example/OrdersPanel.class) at OrdersPanel.java:48
- - com/example/HelpDialog#showManual()V -> javax.swing.JEditorPane.setPage(java.lang.String) is not supported by the Codename One Swing compatibility layer (com/example/HelpDialog.class) at HelpDialog.java:31
+ - com/example/NotesDialog#printNotes()V -> javax.swing.JTextArea.print() is not supported by the Codename One Swing compatibility layer (com/example/NotesDialog.class) at NotesDialog.java:31
 ----
 
 The report file lists every reference, one entry each:
@@ -233,7 +233,21 @@ A `JLabel`, button, tab title or tool tip whose text starts with `<html>`
 is formatted from a small subset of HTML: bold, italic and underlined text,
 line breaks and paragraphs, headings, `font` colors and sizes, and list
 items. Images, tables, links and style sheets
-inside such text aren't supported.
+inside such text aren't supported. An HTML label that is given less width
+than its text needs on one line wraps and grows taller. A button keeps its
+platform look and draws the formatted text over it.
+
+A `JEditorPane` formats the same subset and also shows the images an
+`<img>` tag names, at the size its `width` and `height` attributes give. A
+relative `src` is resolved against the page passed to `setPage`, so pages
+and pictures packaged as resources of the application load as they do on
+the desktop.
+
+`JSlider` draws its own track, thumb, ticks and labels in the theme's
+colors, horizontally and vertically, and `JTree` draws folder, open folder
+and leaf icons unless the renderer or `UIManager` supplies others. A
+`JToggleButton` that is on is shaded when the theme doesn't distinguish it
+from one that is off.
 
 `JTable`, `JTree` and `JList` paint themselves the way they do on the
 desktop: each visible cell is drawn by the component its renderer returns.
@@ -282,6 +296,36 @@ desktop window.
 To make every logical pixel larger or smaller, set the Display property
 `desktopcompat.scale` to the number of device pixels for each logical pixel
 before the application shows its first window.
+
+==== Small displays
+
+A window that fills the display is laid out at the size of the display
+whenever its content can be that small. Whether it can is what the layout
+managers answer as the minimum size of the content pane and the menu bar,
+so a scroll pane, a text area or a panel under a `BorderLayout` shrinks to
+the display as it would shrink with a desktop window.
+
+Content that can't get that small isn't cut off. In an axis in which the
+minimum size is larger than the display, the window keeps its minimum size
+and the user pans across it by dragging, the same gesture that scrolls
+everything else on the device. The other axis still has the size of the
+display. A minimum size set on the frame itself is ignored. A minimum size
+set on a component inside it is honored.
+
+Three rules keep ordinary screens from panning:
+
+* A horizontal `JToolBar` that is given less width than its buttons need
+  continues in a further row and takes the height of its rows. It never
+  holds the window wider than its widest button.
+* A component with no layout manager and no minimum size counts as
+  needing the room its children occupy, and nothing when it has no
+  children. A custom-painted panel therefore shrinks to the display.
+* A `JDesktopPane` can be any size. Internal frames that lie outside it
+  stay where the application put them and can be dragged into view.
+
+A row of buttons in a `FlowLayout` wraps, and a `BoxLayout` row doesn't,
+exactly as on the desktop. To make a wide form usable on a phone without
+panning, put it in a `JScrollPane` or choose layouts that wrap or stack.
 
 ==== Windows
 
@@ -792,9 +836,8 @@ Swing and AWT:
   (`javax.accessibility`).
 * Styled text: `StyledDocument`, editor kits and `javax.swing.undo`.
   `JTextPane` behaves as a `JEditorPane`, which shows plain text or simple
-  HTML that the user can't edit, and has no `setPage`.
-* `JDesktopPane` and `JInternalFrame`, and the internal-frame variants of
-  `JOptionPane`.
+  HTML that the user can't edit.
+* The internal-frame variants of `JOptionPane`.
 * Tool tips for each row and type-ahead search in `JTree`.
 * The regular expression filter of `RowFilter` and the regular expression
   filters and predicates of SwingX.

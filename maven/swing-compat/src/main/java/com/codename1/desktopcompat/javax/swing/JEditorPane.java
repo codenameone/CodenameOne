@@ -132,9 +132,10 @@ public class JEditorPane extends JTextComponent {
         boolean html = len >= 5 && name.regionMatches(true, len - 5, ".html", 0, 5)
                 || len >= 4 && name.regionMatches(true, len - 4, ".htm", 0, 4);
         URL old = pageUrl;
+        // Before the text is read: its pictures are found against it.
+        pageUrl = page;
         setContentType(html ? "text/html" : "text/plain");
         setText(text);
-        pageUrl = page;
         firePropertyChange("page", old, page);
     }
 
@@ -318,6 +319,21 @@ public class JEditorPane extends JTextComponent {
         }
     }
 
+    /// The picture an `<img>` of the page names: an absolute URL as it
+    /// is, anything else against the page that is showing. A page read
+    /// from a resource of the application finds its pictures among the
+    /// resources the same way it finds the pages it links to.
+    private com.codename1.desktopcompat.java.awt.Image cn1Image(String src) {
+        URL url;
+        try {
+            url = new URL(src);
+        } catch (MalformedURLException notAbsolute) {
+            url = cn1Relative(src);
+        }
+        com.codename1.ui.Image img = com.codename1.desktopcompat.rt.ImageLoader.fromUrl(url);
+        return img == null ? null : com.codename1.desktopcompat.rt.ImageLoader.wrap(img);
+    }
+
     private boolean html() {
         return "text/html".equalsIgnoreCase(contentType);
     }
@@ -326,7 +342,12 @@ public class JEditorPane extends JTextComponent {
     public void setText(String t) {
         if (html() && t != null) {
             markup = t;
-            page = MiniHtml.parse(t);
+            page = MiniHtml.parse(t, new MiniHtml.ImageSource() {
+                @Override
+                public com.codename1.desktopcompat.java.awt.Image image(String src) {
+                    return cn1Image(src);
+                }
+            });
             shown = cn1PlainText(t);
             super.setText(shown);
         } else {

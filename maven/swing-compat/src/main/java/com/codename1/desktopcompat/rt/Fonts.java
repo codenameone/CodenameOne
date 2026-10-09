@@ -39,12 +39,15 @@ public final class Fonts {
     /// The Codename One font that draws `font` at `devicePixels` high.
     public static com.codename1.ui.Font nativeFont(Font font, float devicePixels) {
         int quarter = Math.max(4, Math.round(devicePixels * 4));
-        Integer key = Integer.valueOf(quarter * 4 + (font.getStyle() & 3));
+        boolean mono = monospaced(font);
+        Integer key = Integer.valueOf((quarter * 4 + (font.getStyle() & 3)) * 2 + (mono ? 1 : 0));
         com.codename1.ui.Font f = CACHE.get(key);
         if (f != null) {
             return f;
         }
-        if (com.codename1.ui.Font.isNativeFontSchemeSupported()) {
+        if (mono) {
+            f = fixedWidth(font, quarter / 4f);
+        } else if (com.codename1.ui.Font.isNativeFontSchemeSupported()) {
             String face;
             if (font.isBold()) {
                 face = font.isItalic() ? "native:ItalicBold" : "native:MainBold";
@@ -61,6 +64,38 @@ public final class Fonts {
         }
         CACHE.put(key, f);
         return f;
+    }
+
+    /// Whether `font` asks for a family whose characters are all one
+    /// width: text set in one is lined up in columns, which no other
+    /// family can stand in for.
+    static boolean monospaced(Font font) {
+        String family = font.getFamily();
+        return family != null && (family.equalsIgnoreCase(Font.MONOSPACED) || family.equalsIgnoreCase("Courier")
+                || family.equalsIgnoreCase("Courier New"));
+    }
+
+    /// The platform's fixed width font. It comes in three sizes and no
+    /// more, so this is the one nearest in height to what was asked for.
+    private static com.codename1.ui.Font fixedWidth(Font font, float devicePixels) {
+        int style = (font.isBold() ? com.codename1.ui.Font.STYLE_BOLD : 0)
+                | (font.isItalic() ? com.codename1.ui.Font.STYLE_ITALIC : 0);
+        int[] sizes = {com.codename1.ui.Font.SIZE_SMALL, com.codename1.ui.Font.SIZE_MEDIUM,
+            com.codename1.ui.Font.SIZE_LARGE};
+        // A font is about a fifth taller than its size says.
+        float want = devicePixels * 1.2f;
+        com.codename1.ui.Font best = null;
+        float off = 0;
+        for (int i = 0; i < sizes.length; i++) {
+            com.codename1.ui.Font c = com.codename1.ui.Font.createSystemFont(
+                    com.codename1.ui.Font.FACE_MONOSPACE, style, sizes[i]);
+            float d = Math.abs(c.getHeight() - want);
+            if (best == null || d < off) {
+                best = c;
+                off = d;
+            }
+        }
+        return best;
     }
 
     /// The AWT font nearest a Codename One one: its height in logical pixels.

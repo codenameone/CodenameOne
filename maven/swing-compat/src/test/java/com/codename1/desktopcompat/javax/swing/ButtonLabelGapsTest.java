@@ -348,11 +348,23 @@ public class ButtonLabelGapsTest extends KernelTestBase {
     }
 
     @Test
-    public void aButtonShowsHtmlAsItsPlainText() {
+    public void aButtonDrawsItsHtmlOverTheNativeButton() {
         JButton b = new JButton("<html><b>Save</b> <i>all</i><br>now</html>");
-        frame(b);
+        JFrame f = frame(b);
         assertEquals("<html><b>Save</b> <i>all</i><br>now</html>", b.getText());
-        assertEquals("Save all now", peer(b).getText());
+        // The widget has no text of its own: the layer draws the HTML,
+        // styled and on its two lines, over the native button.
+        assertEquals("", peer(b).getText());
+        java.util.List<Object[]> drawn = paint(f);
+        Object[] save = find(drawn, "Save");
+        Object[] now = find(drawn, "now");
+        assertNotNull(save);
+        assertNotNull(now);
+        assertTrue(((Integer) now[2]).intValue() > ((Integer) save[2]).intValue());
+        // A check box keeps the text beside its mark, on one line.
+        JCheckBox c = new JCheckBox("<html><b>Save</b> all</html>");
+        frame(c);
+        assertEquals("Save all", ((com.codename1.ui.Button) c.cn1Peer()).getText());
         b.setText("plain <b>");
         assertEquals("plain <b>", peer(b).getText());
         b.setText(null);
@@ -437,25 +449,30 @@ public class ButtonLabelGapsTest extends KernelTestBase {
         JLabel l = new JLabel("Name", plain, SwingConstants.LEADING);
         l.setDisabledIcon(disabled);
         assertSame(disabled, l.getDisabledIcon());
-        frame(l);
+        JFrame f = frame(l);
+        // An icon paints itself on the label each time the label is
+        // painted; the Codename One label behind it holds none.
         com.codename1.ui.Label p = peer(l);
-        assertNotNull(p.getIcon());
+        assertNull(p.getIcon());
+        paint(f);
         assertEquals(0, disabled.painted);
         int plainPaints = plain.painted;
+        assertTrue(plainPaints > 0);
         l.setEnabled(false);
-        assertEquals(1, disabled.painted);
+        paint(f);
+        assertTrue(disabled.painted > 0);
         assertEquals(plainPaints, plain.painted);
-        assertNotNull(p.getIcon());
+        int disabledPaints = disabled.painted;
         l.setEnabled(true);
-        assertEquals(1, disabled.painted);
-        assertEquals(plainPaints + 1, plain.painted);
+        paint(f);
+        assertEquals(disabledPaints, disabled.painted);
+        assertTrue(plain.painted > plainPaints);
         l.setEnabled(false);
-        assertEquals(2, disabled.painted);
         l.setDisabledIcon(null);
-        assertEquals(2, disabled.painted);
-        assertEquals(plainPaints + 2, plain.painted);
-        l.setIcon(null);
-        assertNull(p.getIcon());
+        plainPaints = plain.painted;
+        paint(f);
+        assertEquals(disabledPaints, disabled.painted);
+        assertTrue(plain.painted > plainPaints);
     }
 
     @Test

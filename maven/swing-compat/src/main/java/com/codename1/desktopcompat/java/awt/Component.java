@@ -536,6 +536,14 @@ public abstract class Component implements ImageObserver {
         this.width = width;
         this.height = height;
         cn1SyncPeerBounds();
+        if (parent != null && !parent.cn1InLayout() && peer != null) {
+            // Moved or resized by the application, not by a layout pass
+            // that repaints when it is done: a frame dragged about a
+            // desktop pane, a piece of a game moved by a timer. Codename
+            // One does not repaint for a peer that changed place, so
+            // without this the screen keeps showing it where it was.
+            parent.repaint();
+        }
         if (resized) {
             invalidate();
             fireComponentEvent(ComponentEvent.COMPONENT_RESIZED);
@@ -605,7 +613,13 @@ public abstract class Component implements ImageObserver {
             return new Dimension(minSize);
         }
         Dimension d = cn1NativePreferredSize();
-        return d != null ? d : new Dimension(width, height);
+        if (d != null) {
+            return d;
+        }
+        // The desktop's answer is the size of the moment. Asked how small
+        // the window can get, that would be the size it was last given.
+        return com.codename1.desktopcompat.rt.RootPan.measuring() ? new Dimension(0, 0)
+                : new Dimension(width, height);
     }
 
     public void setMaximumSize(Dimension maximumSize) {

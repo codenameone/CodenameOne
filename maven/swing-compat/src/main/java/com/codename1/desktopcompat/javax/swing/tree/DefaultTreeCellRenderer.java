@@ -35,9 +35,10 @@ import com.codename1.desktopcompat.rt.CellTheme;
 /// The renderer of tree rows: a label, and so a Codename One label,
 /// showing the node's text in the theme's colors.
 ///
-/// There are no stock folder and document icons: the three icons are
-/// `null` until an application sets them, and a row without one is just
-/// its text. The tree draws the expand handles itself.
+/// A node has a folder before its text, open while it is expanded, and
+/// a leaf a sheet of paper, until an application sets other icons; one set
+/// to `null` leaves the row with its text alone. The tree draws the expand
+/// handles itself.
 public class DefaultTreeCellRenderer extends JLabel implements TreeCellRenderer {
 
     protected boolean selected;
@@ -61,18 +62,29 @@ public class DefaultTreeCellRenderer extends JLabel implements TreeCellRenderer 
         backgroundNonSelectionColor = null;
         borderSelectionColor = CellTheme.mix(backgroundSelectionColor, textSelectionColor, 0.6f);
         setName("Tree.cellRenderer");
+        openIcon = getDefaultOpenIcon();
+        closedIcon = getDefaultClosedIcon();
+        leafIcon = getDefaultLeafIcon();
     }
 
+    /// The icon of an expanded node unless one is set: the one put into
+    /// [com.codename1.desktopcompat.javax.swing.UIManager] under
+    /// `Tree.openIcon`, else an open folder drawn in the theme's colors.
     public Icon getDefaultOpenIcon() {
-        return null;
+        Icon i = com.codename1.desktopcompat.javax.swing.UIManager.getIcon("Tree.openIcon");
+        return i != null ? i : com.codename1.desktopcompat.rt.TreeIcons.OPEN;
     }
 
+    /// The icon of a collapsed node: `Tree.closedIcon`, else a folder.
     public Icon getDefaultClosedIcon() {
-        return null;
+        Icon i = com.codename1.desktopcompat.javax.swing.UIManager.getIcon("Tree.closedIcon");
+        return i != null ? i : com.codename1.desktopcompat.rt.TreeIcons.CLOSED;
     }
 
+    /// The icon of a leaf: `Tree.leafIcon`, else a sheet of paper.
     public Icon getDefaultLeafIcon() {
-        return null;
+        Icon i = com.codename1.desktopcompat.javax.swing.UIManager.getIcon("Tree.leafIcon");
+        return i != null ? i : com.codename1.desktopcompat.rt.TreeIcons.LEAF;
     }
 
     public void setOpenIcon(Icon newIcon) {

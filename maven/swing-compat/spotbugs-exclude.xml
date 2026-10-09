@@ -331,6 +331,23 @@
         </Or>
     </Match>
 
+    <!-- The container a window's peer pans in exists to hold the window
+         whose minimum size it lays that peer out at. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.rt.RootPan"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- The JDK's renderer takes its three icons from getDefaultOpenIcon,
+         getDefaultClosedIcon and getDefaultLeafIcon while it is being
+         built, and an application overrides those to give a tree its own
+         icons; calling them from the constructor is the contract. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.javax.swing.tree.DefaultTreeCellRenderer"/>
+        <Method name="&lt;init&gt;"/>
+        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR"/>
+    </Match>
+
     <!-- The form a dialog floats in exists to hold the window it shows. -->
     <Match>
         <Class name="com.codename1.desktopcompat.rt.DialogForm"/>
