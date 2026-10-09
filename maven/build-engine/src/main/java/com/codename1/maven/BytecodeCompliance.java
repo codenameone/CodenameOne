@@ -1825,7 +1825,10 @@ public class BytecodeCompliance {
             } else if (argument instanceof Handle) {
                 Handle handle = (Handle) argument;
                 String owner = handle.getOwner();
-                if (layerOf(owner) != null) {
+                if (layerOf(owner) != null || owner.equals(className)) {
+                    // A layer's member is checked with the layer's own
+                    // rules below, and a handle on this class is the body of
+                    // a lambda: a method of this file, read like the rest.
                     return;
                 }
                 if (handle.getTag() >= Opcodes.H_INVOKEVIRTUAL) {
