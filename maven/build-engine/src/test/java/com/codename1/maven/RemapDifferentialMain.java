@@ -37,7 +37,20 @@ public final class RemapDifferentialMain {
                 Class.forName("com.codename1.compat.testing.HeadlessImplementation")
                         .getMethod("install").invoke(null);
             }
-            Class.forName("q.D").getMethod("main", String[].class).invoke(null, (Object) new String[0]);
+            // The relocation ships a desktop application's main under
+            // another name (ClassRelocator.DESKTOP_MAIN), so the remapped
+            // arm finds it there and the JDK arm under its own.
+            java.lang.reflect.Method entry = null;
+            for (java.lang.reflect.Method m : Class.forName("q.D").getMethods()) {
+                if (m.getParameterTypes().length == 1 && m.getParameterTypes()[0] == String[].class
+                        && ("main".equals(m.getName()) || "cn1DesktopMain".equals(m.getName()))) {
+                    entry = m;
+                }
+            }
+            if (entry == null) {
+                throw new NoSuchMethodException("q.D has no main(String[])");
+            }
+            entry.invoke(null, (Object) new String[0]);
         } catch (Throwable t) {
             t.printStackTrace(System.out);
             result = 1;
