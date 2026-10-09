@@ -74,6 +74,7 @@ public class CanvasTest {
     public void tearDown() {
         Units.setScale(0);
         Renderer.setTrace(null);
+        HeadlessImplementation.pixelImages = false;
     }
 
     private void paint(Canvas canvas) {
@@ -513,5 +514,30 @@ public class CanvasTest {
         assertEquals("image", drawn.get(0));
         device(0, 0, 0, 40, 40);
         assertEquals("fill", drawn.get(9));
+    }
+
+    /// The Mandelbrot sample on a display whose density is not whole: it
+    /// keeps what was drawn in an image of `(int) width` pixels, draws it
+    /// back with the width itself, and computes only what lies beyond
+    /// that width. The fraction of a pixel between the two was left
+    /// undrawn, a line across the picture.
+    @Test
+    public void aSourceAFractionWiderThanTheImageStillFillsItsDestination() {
+        HeadlessImplementation.pixelImages = true;
+        Canvas c = new Canvas(100, 100);
+        javafx.scene.image.WritableImage kept = new javafx.scene.image.WritableImage(50, 40);
+        kept.getPixelWriter().setArgb(0, 0, 0xff102030);
+        GraphicsContext gc = c.getGraphicsContext2D();
+        gc.drawImage(kept, 0, 0, 50.8, 40.6, 0, 0, 50.8, 40.6);
+        paint(c);
+        assertEquals("[image]", drawn.toString());
+        // At two device pixels to one, each edge on the nearest of them.
+        device(0, 0, 0, 102, 81);
+
+        // More than a pixel past the edge is not there to be drawn.
+        gc.clearRect(0, 0, 100, 100);
+        gc.drawImage(kept, 0, 0, 60, 40, 0, 0, 60, 40);
+        paint(c);
+        device(drawn.size() - 1, 0, 0, 100, 80);
     }
 }

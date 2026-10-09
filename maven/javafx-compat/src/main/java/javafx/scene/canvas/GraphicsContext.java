@@ -1111,7 +1111,8 @@ public final class GraphicsContext {
 
     /// Draws a rectangle of an image, given in its pixels, into a
     /// rectangle of the canvas. The part of the source rectangle that
-    /// lies outside the image is not drawn.
+    /// lies outside the image is not drawn, unless it is less than a
+    /// pixel of it.
     public void drawImage(Image img, double sx, double sy, double sw, double sh, double dx, double dy, double dw,
             double dh) {
         com.codename1.ui.Image full = img == null ? null : img.cn1Native();
@@ -1126,10 +1127,28 @@ public final class GraphicsContext {
             return;
         }
         // The destination shrinks with the part of the source that was
-        // cut off.
+        // cut off -- but not for a part of less than one pixel. JavaFX
+        // reads past the edge of an image by repeating its last pixel,
+        // so a source rectangle a fraction wider than the image, which
+        // is what `(int) width` of a size that is not whole leaves,
+        // still fills its whole destination. Shrinking it left a line
+        // of the canvas undrawn between this image and whatever the
+        // application drew beside it.
         double kx = dw / sw;
         double ky = dh / sh;
-        image(full.subImage(x1, y1, x2 - x1, y2 - y1, true), dx + (x1 - sx) * kx, dy + (y1 - sy) * ky,
-                (x2 - x1) * kx, (y2 - y1) * ky);
+        double left = within(x1 - sx);
+        double top = within(y1 - sy);
+        double right = within(sx + sw - x2);
+        double bottom = within(sy + sh - y2);
+        image(full.subImage(x1, y1, x2 - x1, y2 - y1, true), dx + left * kx, dy + top * ky,
+                dw - (left + right) * kx, dh - (top + bottom) * ky);
+    }
+
+    /// What of a source rectangle is cut off at one side, for the
+    /// destination: nothing when it is less than a pixel, which the last
+    /// pixel of the image covers, and nothing for a negative amount, a
+    /// side that rounding moved outwards.
+    private static double within(double cut) {
+        return cut < 1 ? 0 : cut;
     }
 }

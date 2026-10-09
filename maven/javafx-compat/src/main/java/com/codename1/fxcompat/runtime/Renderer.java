@@ -565,15 +565,31 @@ public final class Renderer {
         double px = m[0] * x + m[2] * y + m[4];
         double py = m[1] * x + m[3] * y + m[5];
         double k = uniformScale();
-        int pw = (int) Math.max(1, Math.round(w * (axisAligned() ? Math.abs(m[0]) : k)));
-        int ph = (int) Math.max(1, Math.round(h * (axisAligned() ? Math.abs(m[3]) : k)));
+        boolean straight = axisAligned();
+        int left = (int) Math.round(px);
+        int top = (int) Math.round(py);
+        int pw;
+        int ph;
+        if (straight) {
+            // Each edge goes to the device pixel nearest to where it is,
+            // so that two images that meet in logical pixels meet on the
+            // screen. Rounding the size instead leaves a gap or an
+            // overlap of a pixel wherever the place is not whole, which
+            // on a display with a fractional density is most places.
+            pw = Math.max(1, (int) Math.round(px + w * Math.abs(m[0])) - left);
+            ph = Math.max(1, (int) Math.round(py + h * Math.abs(m[3])) - top);
+        } else {
+            pw = (int) Math.max(1, Math.round(w * k));
+            ph = (int) Math.max(1, Math.round(h * k));
+        }
         if (trace != null) {
-            trace.drawn("image", new double[] {px, py, px + pw, py + ph}, null, null);
+            trace.drawn("image", straight ? new double[] {left, top, left + pw, top + ph}
+                    : new double[] {px, py, px + pw, py + ph}, null, null);
         }
         int old = g.getAlpha();
         g.setAlpha(alpha(old, 255));
-        if (axisAligned() || !g.isTransformSupported()) {
-            g.drawImage(image, (int) Math.round(px), (int) Math.round(py), pw, ph);
+        if (straight || !g.isTransformSupported()) {
+            g.drawImage(image, left, top, pw, ph);
         } else {
             Transform before = Transform.makeIdentity();
             g.getTransform(before);
