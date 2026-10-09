@@ -17,7 +17,7 @@ Our approach is different. We compile the application into native code for iOS a
 
 **You can now compile classic Android apps into native Codename One apps.** Activities, XML layouts and AndroidX code work on iOS, desktop and the web through the compatibility layer. Each imported view is a Codename One component underneath, so you can replace screens individually and mix the two APIs as you migrate.
 
-[Try the imported gallery in your browser](/demos/android-compatibility/). The same gallery produces an **8.73 MB compressed iOS app bundle**, including the compatibility code it uses and the runtime. We built both versions locally; the table below separates the compressed bundle from its unpacked size.
+[Try the imported gallery in your browser](/android-compatibility-demo/). The same gallery produces an **8.73 MB compressed iOS app bundle**, including the compatibility code it uses and the runtime. We built both versions locally; the table below separates the compressed bundle from its unpacked size.
 
 The framework and compatibility layer are [open source and free for commercial use](/faq/). You can build locally with your own tools. The optional cloud build service has [free and paid plans](/pricing/).
 
@@ -59,7 +59,7 @@ There are visible differences. The Codename One Android build uses a narrower bo
 
 ## Try the Android gallery in your browser
 
-[Open the interactive Android gallery](/demos/android-compatibility/), or [download its source project](/blog/release-2026-10-09/android-gallery-source.zip). Tap **Count**, open **Details**, then use the overflow menu to try the other screens. This is the imported Android sample compiled to JavaScript, not a video or a recreation in HTML.
+[Open the interactive Android gallery](/android-compatibility-demo/), or [download its source project](/blog/release-2026-10-09/android-gallery-source.zip). Tap **Count**, open **Details**, then use the overflow menu to try the other screens. This is the imported Android sample compiled to JavaScript, not a video or a recreation in HTML.
 
 [![The Android gallery running in Chromium at a phone-sized browser viewport after a counter tap](/blog/release-2026-10-09/android-browser-main.png)](/blog/release-2026-10-09/android-browser-main.png)
 

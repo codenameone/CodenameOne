@@ -56,6 +56,14 @@ class CaseResult:
 
 REQUIRED_CASES = [
     Case(
+        source="/android-compatibility-demo/",
+        expected_status=200,
+        expected_target="",
+        label="required",
+        require_no_redirect=True,
+        expected_body_pattern=r"re:<title>DroidApp</title>",
+    ),
+    Case(
         source="/files/CodenameOneBuildClient.jar",
         expected_status=302,
         expected_target=(
@@ -127,7 +135,11 @@ REQUIRED_CASES = [
 
 def discover_local_priority_cases() -> list[Case]:
     public_root = REPO_ROOT / "docs" / "website" / "public"
-    directories = [("demos", "/demos"), ("files", "/files")]
+    directories = [
+        ("demos", "/demos"),
+        ("files", "/files"),
+        ("android-compatibility-demo", "/android-compatibility-demo"),
+    ]
     cases: list[Case] = []
     for disk_dir, url_prefix in directories:
         root = public_root / disk_dir

@@ -4,7 +4,7 @@ Source baseline: ebe0e64be3b77e7b098a2e152c97549cc7b7c8ac (master, refreshed Oct
 
 Android demo
 ============
-The browser bundle at /demos/android-compatibility/ is a real build of
+The browser bundle at /android-compatibility-demo/ is a real build of
 scripts/android-compat-samples/gallery from that revision. Android source and
 resources are unchanged; the manifest package was supplied during import.
 The imported Maven project is android-gallery-source.zip. It uses local
