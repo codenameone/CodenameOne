@@ -227,6 +227,26 @@ public final class Relocation {
         {"java/util/concurrent/ThreadFactory", JDK_PACKAGE + "ThreadFactory"},
         {"java/util/concurrent/ScheduledExecutorService", JDK_PACKAGE + "ScheduledExecutorService"},
         {"java/util/concurrent/ScheduledFuture", JDK_PACKAGE + "ScheduledFuture"},
+        // java.time: the days, the months and the units, as enums of the JDK's shape.
+        // Temporal goes to the one interface every date and time class of the
+        // device implements, so a method declared over it takes any of them.
+        {"java/time/DayOfWeek", JDK_PACKAGE + "DayOfWeek"},
+        {"java/time/Month", JDK_PACKAGE + "Month"},
+        {"java/time/temporal/ChronoUnit", JDK_PACKAGE + "ChronoUnit"},
+        {"java/time/temporal/TemporalUnit", JDK_PACKAGE + "TemporalUnit"},
+        {"java/time/temporal/Temporal", "java/time/temporal/TemporalAccessor"},
+        // Text forms and digests: URL, Base64 and hexadecimal coding written
+        // here, the digests and the random bytes over Codename One's own.
+        {"java/net/URLDecoder", JDK_PACKAGE + "URLDecoder"},
+        {"java/net/URLEncoder", JDK_PACKAGE + "URLEncoder"},
+        {"java/util/Base64", JDK_PACKAGE + "Base64"},
+        {"java/util/Base64$Encoder", JDK_PACKAGE + "Base64$Encoder"},
+        {"java/util/Base64$Decoder", JDK_PACKAGE + "Base64$Decoder"},
+        {"java/util/HexFormat", JDK_PACKAGE + "HexFormat"},
+        {"java/security/MessageDigest", JDK_PACKAGE + "MessageDigest"},
+        {"java/security/NoSuchAlgorithmException", JDK_PACKAGE + "NoSuchAlgorithmException"},
+        {"java/security/GeneralSecurityException", JDK_PACKAGE + "GeneralSecurityException"},
+        {"java/security/SecureRandom", JDK_PACKAGE + "SecureRandom"},
     };
 
     private final String name;

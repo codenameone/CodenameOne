@@ -59,7 +59,10 @@ final class RemapDifferential {
             + "import java.util.stream.*;\n"
             + "import java.time.*;\n"
             + "import java.time.format.*;\n"
-            + "import java.time.temporal.*;\n";
+            + "import java.time.temporal.*;\n"
+            + "import java.net.URLDecoder;\n"
+            + "import java.net.URLEncoder;\n"
+            + "import java.security.*;\n";
 
     private final File work;
     private final int release;
@@ -69,6 +72,23 @@ final class RemapDifferential {
     RemapDifferential(File work, int release) {
         this.work = work;
         this.release = release;
+    }
+
+    /// The class path of this test, with the headless implementation ahead
+    /// of everything: its `ImplementationFactory` has to be found before the
+    /// simulator's, which would open a window.
+    private static String testClassPath() {
+        String path = System.getProperty("surefire.test.class.path");
+        if (path == null || path.length() == 0) {
+            path = System.getProperty("java.class.path");
+        }
+        StringBuilder first = new StringBuilder();
+        StringBuilder rest = new StringBuilder();
+        for (String entry : path.split(File.pathSeparator)) {
+            StringBuilder to = entry.contains("compat-testing") ? first : rest;
+            to.append(entry).append(File.pathSeparator);
+        }
+        return first.append(rest).toString();
     }
 
     private static int running() {
@@ -119,10 +139,6 @@ final class RemapDifferential {
                 + "        return String.valueOf(o);\n"
                 + "    }\n"
                 + "    public static String[] texts() throws Exception {\n"
-                + "        if (Boolean.getBoolean(\"cn1.remapped\")) {\n"
-                + "            Class.forName(\"com.codename1.compat.testing.HeadlessImplementation\")\n"
-                + "                    .getMethod(\"install\").invoke(null);\n"
-                + "        }\n"
                 + "        List<Object> all = run();\n"
                 + "        String[] t = new String[all.size()];\n"
                 + "        for (int i = 0; i < t.length; i++) { t[i] = text(all.get(i)); }\n"
@@ -240,10 +256,12 @@ final class RemapDifferential {
         List<String> args = new ArrayList<String>();
         args.add(new File(jdk, "bin/java").getAbsolutePath());
         args.add("-Djava.awt.headless=true");
-        args.add("-Dcn1.remapped=" + device);
         args.add("-cp");
-        args.add(classes.getAbsolutePath() + File.pathSeparator + System.getProperty("java.class.path"));
-        args.add("q.D");
+        args.add(classes.getAbsolutePath() + File.pathSeparator + testClassPath());
+        // Started through a class the remap never saw: every call in the
+        // fixture is redirected, the one that would end the process included.
+        args.add(RemapDifferentialMain.class.getName());
+        args.add(device ? "device" : "jdk");
         String[] result = fork(args);
         assertEquals(result[1], "0", result[0]);
         String text = result[1];
@@ -253,17 +271,38 @@ final class RemapDifferential {
         return text.substring(0, text.length() - 1).split("\n", -1);
     }
 
+    private static final long FORK_TIMEOUT = 120000L;
+
     private String[] fork(List<String> args) throws Exception {
         ProcessBuilder pb = new ProcessBuilder(args);
         pb.redirectErrorStream(true);
-        Process p = pb.start();
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        InputStream in = p.getInputStream();
-        byte[] buffer = new byte[8192];
-        for (int n = in.read(buffer); n >= 0; n = in.read(buffer)) {
-            out.write(buffer, 0, n);
+        final Process p = pb.start();
+        // A fork that never ends is a failure of this test, not of the build
+        // that waits for it.
+        Thread watchdog = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(FORK_TIMEOUT);
+                    p.destroyForcibly();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }, "remap-differential-watchdog");
+        watchdog.setDaemon(true);
+        watchdog.start();
+        try {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            InputStream in = p.getInputStream();
+            byte[] buffer = new byte[8192];
+            for (int n = in.read(buffer); n >= 0; n = in.read(buffer)) {
+                out.write(buffer, 0, n);
+            }
+            return new String[] {String.valueOf(p.waitFor()), new String(out.toByteArray(), "UTF-8")};
+        } finally {
+            watchdog.interrupt();
         }
-        return new String[] {String.valueOf(p.waitFor()), new String(out.toByteArray(), "UTF-8")};
     }
 
     private static final class Loader extends ClassLoader {
