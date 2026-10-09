@@ -247,6 +247,8 @@ public final class Relocation {
         {"java/security/NoSuchAlgorithmException", JDK_PACKAGE + "NoSuchAlgorithmException"},
         {"java/security/GeneralSecurityException", JDK_PACKAGE + "GeneralSecurityException"},
         {"java/security/SecureRandom", JDK_PACKAGE + "SecureRandom"},
+        // What an exhaustive pattern switch throws; javac names it in every one.
+        {"java/lang/MatchException", JDK_PACKAGE + "MatchException"},
     };
 
     private final String name;
