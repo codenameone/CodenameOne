@@ -96,6 +96,7 @@ final class BackendBeans {
     static final String COUNTED = PKG + "Counted;";
     static final String MCP_TOOL = PKG + "McpTool;";
     static final String MCP_PARAM = PKG + "McpParam;";
+    static final String MVC_CONTROLLER = PKG + "Controller;";
     static final String REST_CONTROLLER = PKG + "RestController;";
     static final String WEBSOCKET_MAPPING = PKG + "WebSocketMapping;";
     static final String GENERATED = PKG + "Generated;";
@@ -123,11 +124,11 @@ final class BackendBeans {
                     PROFILE, ON_PROPERTY, ON_MISSING,
                     POST_CONSTRUCT, PRE_DESTROY, TRANSACTIONAL, ASYNC, SCHEDULED,
                     MANAGED_RESOURCE, MANAGED_ATTRIBUTE, MANAGED_OPERATION, TIMED, COUNTED,
-                    MCP_TOOL, REST_CONTROLLER, WEBSOCKET_MAPPING, PRE_AUTHORIZE, SECURED,
+                    MCP_TOOL, MVC_CONTROLLER, REST_CONTROLLER, WEBSOCKET_MAPPING, PRE_AUTHORIZE, SECURED,
                     ROLES_ALLOWED, PERMIT_ALL, DENY_ALL)));
 
     private static final String[] STEREOTYPES = {COMPONENT, CONFIGURATION,
-            REST_CONTROLLER, WEBSOCKET_MAPPING};
+            REST_CONTROLLER, MVC_CONTROLLER, WEBSOCKET_MAPPING};
 
     static final String CONFIG_TYPE = "com/codename1/backend/Config";
     static final String DATASOURCE_TYPE = "com/codename1/backend/DataSource";
@@ -841,7 +842,7 @@ final class BackendBeans {
             bean.name = decapitalize(RestClientAnnotationProcessor.simpleName(
                     cls.getBinaryName().replace('$', '.')));
         }
-        bean.controller = cls.getClassAnnotation(REST_CONTROLLER) != null;
+        bean.controller = cls.getClassAnnotation(REST_CONTROLLER) != null || cls.getClassAnnotation(MVC_CONTROLLER) != null;
         bean.webSocket = cls.getClassAnnotation(WEBSOCKET_MAPPING) != null;
         readModifiers(bean, cls.getClassAnnotations(), cls);
         bean.types.addAll(assignableTypes(cls.getInternalName()));
