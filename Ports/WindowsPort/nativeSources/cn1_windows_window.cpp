@@ -93,6 +93,7 @@ void cn1WindowsLog(const char* message) {
 
 /* Last-resort crash logger: prints the exception code + faulting address (and a
  * few raw return addresses) so a silent native crash leaves a breadcrumb. */
+static LPTOP_LEVEL_EXCEPTION_FILTER cn1PreviousUnhandled;
 static LONG WINAPI cn1WinUnhandled(EXCEPTION_POINTERS* info) {
     char buf[256];
     sprintf(buf, "UNHANDLED EXCEPTION code=0x%08lX addr=%p base=%p",
@@ -183,6 +184,11 @@ static LONG WINAPI cn1WinUnhandled(EXCEPTION_POINTERS* info) {
         }
     }
 #endif
+    /* Keep the VM's fault-context unwind and Java stack report. Replacing its
+     * filter silently discarded both on x64, leaving only the crash address. */
+    if (cn1PreviousUnhandled != NULL && cn1PreviousUnhandled != cn1WinUnhandled) {
+        cn1PreviousUnhandled(info);
+    }
     return EXCEPTION_EXECUTE_HANDLER;
 }
 
@@ -1039,7 +1045,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_initDisplay___java_lang_Strin
     }
 
     CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
-    SetUnhandledExceptionFilter(cn1WinUnhandled);
+    cn1PreviousUnhandled = SetUnhandledExceptionFilter(cn1WinUnhandled);
     /* First-chance: turn null-deref / stack-overflow faults into catchable Java
      * exceptions (see cn1WinFaultToException). Installed first (FirstHandler=1)
      * so it runs before the OS default, but it only redirects genuine null

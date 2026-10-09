@@ -250,6 +250,24 @@ final class BackendWiringWriter {
             initialize(sb, b, b.var, "        ", true);
         }
         for (BackendBeans.Bean b : model.beans) {
+            if (BackendBeans.isSecurityChain(b)) {
+                // The server asks them in @Order; a chain whose condition is off
+                // is null and is not registered.
+                sb.append("        environment.registerSecurityFilterChain(").append(b.var)
+                  .append(", ").append(b.order).append(");\n");
+            }
+        }
+        for (String name : model.namedBeans) {
+            BackendBeans.Bean b = model.byName.get(name);
+            if (b != null && b.isEager()) {
+                // What an authorization expression calls as @name: reached
+                // through the server the calling thread works for, since a
+                // process may hold several.
+                sb.append("        environment.registerNamedBean(")
+                  .append(BackendSources.quote(name)).append(", ").append(b.var).append(");\n");
+            }
+        }
+        for (BackendBeans.Bean b : model.beans) {
             if (b.managed == null && b.tools.isEmpty()) {
                 continue;
             }
@@ -542,6 +560,30 @@ final class BackendWiringWriter {
             }
             if ("httpSession".equals(p.builtin)) {
                 return "request.getSession(true)";
+            }
+            if ("httpSecurity".equals(p.builtin)) {
+                StringBuilder sb = new StringBuilder("com.codename1.impl.backend.security."
+                        + "SecuritySupport.http(config, new Object[] {");
+                for (int i = 0; i < p.candidates.size(); i++) {
+                    if (i > 0) {
+                        sb.append(", ");
+                    }
+                    sb.append(reference(p.candidates.get(i)));
+                }
+                // And what the layer cannot read off an object: each bean's name and
+                // whether it is @Primary, by position. A chain that looks for one bean
+                // of a type and finds two chooses the way an injection point would,
+                // and names them when it cannot.
+                sb.append("}, new String[] {");
+                for (int i = 0; i < p.candidates.size(); i++) {
+                    sb.append(i > 0 ? ", " : "")
+                      .append(BackendSources.quote(p.candidates.get(i).name));
+                }
+                sb.append("}, new boolean[] {");
+                for (int i = 0; i < p.candidates.size(); i++) {
+                    sb.append(i > 0 ? ", " : "").append(p.candidates.get(i).primary);
+                }
+                return sb.append("})").toString();
             }
             return p.builtin;
         }

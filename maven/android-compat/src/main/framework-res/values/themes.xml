@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Framework themes. Theme.Material.Light.DarkActionBar is what an
+     application with no android:theme gets on a current Android release
+     (Theme.DeviceDefault.Light.DarkActionBar), so it is the runtime default. -->
+<resources>
+    <style name="Theme">
+        <item name="isLightTheme">false</item>
+        <item name="colorPrimary">@color/primary_material_dark</item>
+        <item name="colorPrimaryDark">@color/primary_dark_material_dark</item>
+        <item name="colorAccent">@color/accent_material_dark</item>
+        <item name="colorControlNormal">?attr/textColorSecondary</item>
+        <item name="colorControlActivated">?attr/colorAccent</item>
+        <item name="colorControlHighlight">@color/ripple_material_dark</item>
+        <item name="colorButtonNormal">@color/button_material_dark</item>
+        <item name="colorBackground">@color/background_material_dark</item>
+        <item name="colorForeground">@color/white</item>
+        <item name="colorError">@color/error_color_material</item>
+        <item name="windowBackground">?attr/colorBackground</item>
+        <item name="windowActionBar">true</item>
+        <item name="windowNoTitle">false</item>
+        <item name="windowFullscreen">false</item>
+        <item name="windowLightStatusBar">false</item>
+        <item name="statusBarColor">?attr/colorPrimaryDark</item>
+        <item name="navigationBarColor">@color/black</item>
+        <item name="disabledAlpha">0.26</item>
+        <item name="textColorPrimary">@color/primary_text_default_material_dark</item>
+        <item name="textColorSecondary">@color/secondary_text_default_material_dark</item>
+        <item name="textColorTertiary">@color/secondary_text_default_material_dark</item>
+        <item name="textColorPrimaryInverse">@color/primary_text_default_material_light</item>
+        <item name="textColorSecondaryInverse">@color/secondary_text_default_material_light</item>
+        <item name="textColorHint">@color/hint_foreground_material_dark</item>
+        <item name="textColorHintInverse">@color/hint_foreground_material_light</item>
+        <item name="textColorHighlight">#6680cbc4</item>
+        <item name="textColorLink">?attr/colorAccent</item>
+        <item name="editTextColor">?attr/textColorPrimary</item>
+        <item name="editTextBackground">@drawable/edit_text_material</item>
+        <item name="textAppearance">@style/TextAppearance.Material</item>
+        <item name="textAppearanceLarge">@style/TextAppearance.Material.Large</item>
+        <item name="textAppearanceMedium">@style/TextAppearance.Material.Medium</item>
+        <item name="textAppearanceSmall">@style/TextAppearance.Material.Small</item>
+        <item name="textAppearanceButton">@style/TextAppearance.Material.Button</item>
+        <item name="textAppearanceListItem">@style/TextAppearance.Material.Subhead</item>
+        <item name="textAppearanceListItemSmall">@style/TextAppearance.Material.Subhead</item>
+        <item name="textViewStyle">@style/Widget.Material.TextView</item>
+        <item name="buttonStyle">@style/Widget.Material.Button</item>
+        <item name="buttonStyleSmall">@style/Widget.Material.Button.Small</item>
+        <item name="editTextStyle">@style/Widget.Material.EditText</item>
+        <item name="imageButtonStyle">@style/Widget.Material.ImageButton</item>
+        <item name="imageViewStyle">@style/Widget.Material.ImageView</item>
+        <item name="checkboxStyle">@style/Widget.Material.CompoundButton.CheckBox</item>
+        <item name="radioButtonStyle">@style/Widget.Material.CompoundButton.RadioButton</item>
+        <item name="switchStyle">@style/Widget.Material.CompoundButton.Switch</item>
+        <item name="buttonStyleToggle">@style/Widget.Material.Button.Toggle</item>
+        <item name="checkedTextViewStyle">@style/Widget.Material.CheckedTextView</item>
+        <item name="progressBarStyle">@style/Widget.Material.ProgressBar</item>
+        <item name="progressBarStyleSmall">@style/Widget.Material.ProgressBar.Small</item>
+        <item name="progressBarStyleLarge">@style/Widget.Material.ProgressBar.Large</item>
+        <item name="progressBarStyleHorizontal">@style/Widget.Material.ProgressBar.Horizontal</item>
+        <item name="seekBarStyle">@style/Widget.Material.SeekBar</item>
+        <item name="listViewStyle">@style/Widget.Material.ListView</item>
+        <item name="gridViewStyle">@style/Widget.Material.GridView</item>
+        <item name="spinnerStyle">@style/Widget.Material.Spinner</item>
+        <item name="listDivider">@drawable/list_divider_material</item>
+        <item name="ratingBarStyle">@style/Widget.Material.RatingBar</item>
+        <item name="ratingBarStyleIndicator">@style/Widget.Material.RatingBar.Indicator</item>
+        <item name="ratingBarStyleSmall">@style/Widget.Material.RatingBar.Small</item>
+        <item name="listPreferredItemHeight">@dimen/list_item_height</item>
+        <item name="listPreferredItemHeightSmall">@dimen/list_item_height_small</item>
+        <item name="listPreferredItemPaddingLeft">@dimen/list_item_padding</item>
+        <item name="listPreferredItemPaddingRight">@dimen/list_item_padding</item>
+        <item name="listPreferredItemPaddingStart">@dimen/list_item_padding</item>
+        <item name="listPreferredItemPaddingEnd">@dimen/list_item_padding</item>
+        <item name="selectableItemBackground">@drawable/item_background_material</item>
+        <item name="selectableItemBackgroundBorderless">@drawable/item_background_material</item>
+        <item name="actionBarSize">@dimen/action_bar_default_height_material</item>
+        <item name="colorBackgroundFloating">@color/background_floating_material_dark</item>
+        <item name="popupWindowStyle">@style/Widget.Material.PopupWindow</item>
+        <item name="listPopupWindowStyle">@style/Widget.Material.ListPopupWindow</item>
+        <item name="popupMenuStyle">@style/Widget.Material.PopupMenu</item>
+        <item name="actionOverflowMenuStyle">@style/Widget.Material.PopupMenu.Overflow</item>
+        <item name="textAppearanceLargePopupMenu">@style/TextAppearance.Material.Widget.PopupMenu.Large</item>
+        <item name="textAppearanceSmallPopupMenu">@style/TextAppearance.Material.Widget.PopupMenu.Small</item>
+        <item name="dropdownListPreferredItemHeight">@dimen/dropdown_item_height</item>
+        <item name="webViewStyle">@style/Widget.Material.WebView</item>
+        <item name="autoCompleteTextViewStyle">@style/Widget.Material.AutoCompleteTextView</item>
+        <item name="datePickerStyle">@style/Widget.Material.DatePicker</item>
+        <item name="timePickerStyle">@style/Widget.Material.TimePicker</item>
+        <item name="numberPickerStyle">@style/Widget.Material.NumberPicker</item>
+    </style>
+
+    <style name="Theme.Light">
+        <item name="isLightTheme">true</item>
+        <item name="colorPrimary">@color/primary_material_dark</item>
+        <item name="colorPrimaryDark">@color/primary_dark_material_dark</item>
+        <item name="colorAccent">@color/accent_material_light</item>
+        <item name="colorControlHighlight">@color/ripple_material_light</item>
+        <item name="colorButtonNormal">@color/button_material_light</item>
+        <item name="colorBackground">@color/background_material_light</item>
+        <item name="colorBackgroundFloating">@color/background_floating_material_light</item>
+        <item name="colorForeground">@color/black</item>
+        <item name="textColorPrimary">@color/primary_text_default_material_light</item>
+        <item name="textColorSecondary">@color/secondary_text_default_material_light</item>
+        <item name="textColorTertiary">@color/secondary_text_default_material_light</item>
+        <item name="textColorPrimaryInverse">@color/primary_text_default_material_dark</item>
+        <item name="textColorSecondaryInverse">@color/secondary_text_default_material_dark</item>
+        <item name="textColorHint">@color/hint_foreground_material_light</item>
+        <item name="textColorHintInverse">@color/hint_foreground_material_dark</item>
+        <item name="textColorHighlight">#66009688</item>
+    </style>
+
+    <style name="Theme.NoTitleBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+    <style name="Theme.NoTitleBar.Fullscreen">
+        <item name="windowFullscreen">true</item>
+    </style>
+    <style name="Theme.Light.NoTitleBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+    <style name="Theme.Light.NoTitleBar.Fullscreen">
+        <item name="windowFullscreen">true</item>
+    </style>
+    <style name="Theme.Black" parent="Theme"/>
+    <style name="Theme.Black.NoTitleBar" parent="Theme.NoTitleBar"/>
+    <style name="Theme.Black.NoTitleBar.Fullscreen" parent="Theme.NoTitleBar.Fullscreen"/>
+    <style name="Theme.Translucent" parent="Theme"/>
+    <style name="Theme.Translucent.NoTitleBar" parent="Theme.NoTitleBar"/>
+
+    <style name="Theme.Material" parent="Theme"/>
+    <style name="Theme.Material.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+    <style name="Theme.Material.NoActionBar.Fullscreen">
+        <item name="windowFullscreen">true</item>
+    </style>
+    <style name="Theme.Material.Light" parent="Theme.Light"/>
+    <style name="Theme.Material.Light.DarkActionBar"/>
+    <style name="Theme.Material.Light.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+    <style name="Theme.Material.Light.NoActionBar.Fullscreen">
+        <item name="windowFullscreen">true</item>
+    </style>
+
+    <style name="Theme.Holo" parent="Theme.Material"/>
+    <style name="Theme.Holo.NoActionBar" parent="Theme.Material.NoActionBar"/>
+    <style name="Theme.Holo.Light" parent="Theme.Material.Light"/>
+    <style name="Theme.Holo.Light.DarkActionBar" parent="Theme.Material.Light.DarkActionBar"/>
+    <style name="Theme.Holo.Light.NoActionBar" parent="Theme.Material.Light.NoActionBar"/>
+
+    <style name="Theme.DeviceDefault" parent="Theme.Material"/>
+    <style name="Theme.DeviceDefault.NoActionBar" parent="Theme.Material.NoActionBar"/>
+    <style name="Theme.DeviceDefault.Light" parent="Theme.Material.Light"/>
+    <style name="Theme.DeviceDefault.Light.DarkActionBar" parent="Theme.Material.Light.DarkActionBar"/>
+    <style name="Theme.DeviceDefault.Light.NoActionBar" parent="Theme.Material.Light.NoActionBar"/>
+    <style name="Theme.DeviceDefault.DayNight" parent="Theme.Material.Light.DarkActionBar"/>
+</resources>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Attributes of the scrolling containers (ScrollView, HorizontalScrollView). -->
+<resources>
+    <attr name="fillViewport" format="boolean"/>
+    <declare-styleable name="ScrollView">
+        <attr name="fillViewport"/>
+    </declare-styleable>
+    <declare-styleable name="HorizontalScrollView">
+        <attr name="fillViewport"/>
+    </declare-styleable>
+</resources>

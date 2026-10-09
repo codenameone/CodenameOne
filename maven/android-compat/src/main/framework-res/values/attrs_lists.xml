@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Attributes of the list widgets: AbsListView, ListView, GridView and the
+     spinners. Formats and enum values follow the Android framework. -->
+<resources>
+    <attr name="gridViewStyle" format="reference"/>
+    <attr name="dividerHeight" format="dimension"/>
+    <attr name="listSelector" format="reference|color"/>
+    <attr name="drawSelectorOnTop" format="boolean"/>
+    <attr name="stackFromBottom" format="boolean"/>
+    <attr name="scrollingCache" format="boolean"/>
+    <attr name="textFilterEnabled" format="boolean"/>
+    <attr name="smoothScrollbar" format="boolean"/>
+    <attr name="fastScrollEnabled" format="boolean"/>
+    <attr name="cacheColorHint" format="color"/>
+    <attr name="headerDividersEnabled" format="boolean"/>
+    <attr name="footerDividersEnabled" format="boolean"/>
+    <attr name="entries" format="reference"/>
+    <attr name="prompt" format="reference|string"/>
+    <attr name="popupBackground" format="reference|color"/>
+    <attr name="dropDownHorizontalOffset" format="dimension"/>
+    <attr name="dropDownVerticalOffset" format="dimension"/>
+    <attr name="columnWidth" format="dimension"/>
+    <attr name="horizontalSpacing" format="dimension"/>
+    <attr name="verticalSpacing" format="dimension"/>
+    <attr name="choiceMode">
+        <enum name="none" value="0"/>
+        <enum name="singleChoice" value="1"/>
+        <enum name="multipleChoice" value="2"/>
+        <enum name="multipleChoiceModal" value="3"/>
+    </attr>
+    <attr name="transcriptMode">
+        <enum name="disabled" value="0"/>
+        <enum name="normal" value="1"/>
+        <enum name="alwaysScroll" value="2"/>
+    </attr>
+    <attr name="numColumns" format="integer">
+        <enum name="auto_fit" value="-1"/>
+    </attr>
+    <attr name="stretchMode">
+        <enum name="none" value="0"/>
+        <enum name="spacingWidth" value="1"/>
+        <enum name="columnWidth" value="2"/>
+        <enum name="spacingWidthUniform" value="3"/>
+    </attr>
+    <attr name="spinnerMode">
+        <enum name="dialog" value="0"/>
+        <enum name="dropdown" value="1"/>
+    </attr>
+    <attr name="dropDownWidth" format="dimension">
+        <enum name="fill_parent" value="-1"/>
+        <enum name="match_parent" value="-1"/>
+        <enum name="wrap_content" value="-2"/>
+    </attr>
+
+    <declare-styleable name="AbsListView">
+        <attr name="listSelector"/>
+        <attr name="drawSelectorOnTop"/>
+        <attr name="stackFromBottom"/>
+        <attr name="scrollingCache"/>
+        <attr name="textFilterEnabled"/>
+        <attr name="transcriptMode"/>
+        <attr name="cacheColorHint"/>
+        <attr name="fastScrollEnabled"/>
+        <attr name="smoothScrollbar"/>
+        <attr name="choiceMode"/>
+    </declare-styleable>
+    <declare-styleable name="ListView">
+        <attr name="entries"/>
+        <attr name="divider"/>
+        <attr name="dividerHeight"/>
+        <attr name="headerDividersEnabled"/>
+        <attr name="footerDividersEnabled"/>
+    </declare-styleable>
+    <declare-styleable name="GridView">
+        <attr name="numColumns"/>
+        <attr name="columnWidth"/>
+        <attr name="horizontalSpacing"/>
+        <attr name="verticalSpacing"/>
+        <attr name="stretchMode"/>
+        <attr name="gravity"/>
+    </declare-styleable>
+    <declare-styleable name="AbsSpinner">
+        <attr name="entries"/>
+    </declare-styleable>
+    <declare-styleable name="Spinner">
+        <attr name="spinnerMode"/>
+        <attr name="prompt"/>
+        <attr name="dropDownWidth"/>
+        <attr name="popupBackground"/>
+        <attr name="dropDownHorizontalOffset"/>
+        <attr name="dropDownVerticalOffset"/>
+        <attr name="gravity"/>
+    </declare-styleable>
+</resources>

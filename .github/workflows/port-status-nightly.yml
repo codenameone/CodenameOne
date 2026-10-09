@@ -78,8 +78,7 @@ jobs:
       - name: Install Playwright browser
         working-directory: scripts
         run: |
-          npm init -y 2>/dev/null || true
-          npm install playwright
+          npm ci
           # Playwright shells out to apt for the OS-level deps, so the runner
           # image's third-party sources have to be pruned FIRST -- a broken
           # vendor mirror makes its apt-get fail as a whole and it reports

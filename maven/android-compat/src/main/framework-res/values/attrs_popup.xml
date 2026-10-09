@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Attributes of the floating windows: PopupWindow, ListPopupWindow and
+     PopupMenu. Formats follow the Android framework. -->
+<resources>
+    <attr name="colorBackgroundFloating" format="color"/>
+    <attr name="popupWindowStyle" format="reference"/>
+    <attr name="listPopupWindowStyle" format="reference"/>
+    <attr name="popupMenuStyle" format="reference"/>
+    <attr name="actionOverflowMenuStyle" format="reference"/>
+    <attr name="dropDownListViewStyle" format="reference"/>
+    <attr name="textAppearanceLargePopupMenu" format="reference"/>
+    <attr name="textAppearanceSmallPopupMenu" format="reference"/>
+    <attr name="dropdownListPreferredItemHeight" format="dimension"/>
+    <attr name="popupElevation" format="dimension"/>
+    <attr name="popupAnimationStyle" format="reference"/>
+    <attr name="overlapAnchor" format="boolean"/>
+    <attr name="popupEnterTransition" format="reference"/>
+    <attr name="popupExitTransition" format="reference"/>
+    <attr name="dropDownSelector" format="reference|color"/>
+
+    <declare-styleable name="PopupWindow">
+        <attr name="popupBackground"/>
+        <attr name="popupElevation"/>
+        <attr name="popupAnimationStyle"/>
+        <attr name="overlapAnchor"/>
+        <attr name="popupEnterTransition"/>
+        <attr name="popupExitTransition"/>
+    </declare-styleable>
+    <declare-styleable name="ListPopupWindow">
+        <attr name="dropDownVerticalOffset"/>
+        <attr name="dropDownHorizontalOffset"/>
+    </declare-styleable>
+</resources>

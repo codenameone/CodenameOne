@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Attributes of the web view and the input widgets: AutoCompleteTextView,
+     DatePicker, TimePicker and NumberPicker. Formats and enum values follow
+     the Android framework. -->
+<resources>
+    <attr name="webViewStyle" format="reference"/>
+    <attr name="autoCompleteTextViewStyle" format="reference"/>
+    <attr name="datePickerStyle" format="reference"/>
+    <attr name="timePickerStyle" format="reference"/>
+    <attr name="numberPickerStyle" format="reference"/>
+    <attr name="datePickerDialogTheme" format="reference"/>
+    <attr name="timePickerDialogTheme" format="reference"/>
+    <attr name="completionHint" format="string"/>
+    <attr name="completionHintView" format="reference"/>
+    <attr name="completionThreshold" format="integer"/>
+    <attr name="dropDownAnchor" format="reference"/>
+    <attr name="dropDownHeight" format="dimension">
+        <enum name="fill_parent" value="-1"/>
+        <enum name="match_parent" value="-1"/>
+        <enum name="wrap_content" value="-2"/>
+    </attr>
+    <attr name="datePickerMode">
+        <enum name="spinner" value="1"/>
+        <enum name="calendar" value="2"/>
+    </attr>
+    <attr name="timePickerMode">
+        <enum name="spinner" value="1"/>
+        <enum name="clock" value="2"/>
+    </attr>
+    <attr name="startYear" format="integer"/>
+    <attr name="endYear" format="integer"/>
+    <attr name="minDate" format="string"/>
+    <attr name="maxDate" format="string"/>
+    <attr name="firstDayOfWeek" format="integer"/>
+    <attr name="spinnersShown" format="boolean"/>
+    <attr name="calendarViewShown" format="boolean"/>
+
+    <declare-styleable name="AutoCompleteTextView">
+        <attr name="completionHint"/>
+        <attr name="completionHintView"/>
+        <attr name="completionThreshold"/>
+        <attr name="dropDownSelector"/>
+        <attr name="dropDownAnchor"/>
+        <attr name="dropDownWidth"/>
+        <attr name="dropDownHeight"/>
+        <attr name="popupBackground"/>
+        <attr name="dropDownHorizontalOffset"/>
+        <attr name="dropDownVerticalOffset"/>
+    </declare-styleable>
+    <declare-styleable name="DatePicker">
+        <attr name="datePickerMode"/>
+        <attr name="startYear"/>
+        <attr name="endYear"/>
+        <attr name="minDate"/>
+        <attr name="maxDate"/>
+        <attr name="firstDayOfWeek"/>
+        <attr name="spinnersShown"/>
+        <attr name="calendarViewShown"/>
+    </declare-styleable>
+    <declare-styleable name="TimePicker">
+        <attr name="timePickerMode"/>
+    </declare-styleable>
+</resources>

@@ -26,7 +26,11 @@ jobs:
     permissions:
       contents: read
     runs-on: macos-15
-    timeout-minutes: 45
+    # Allow setup plus the separately bounded 30-minute generation and 45-minute
+    # XCTest build/run steps. A 45-minute job cap canceled a progressing native
+    # build after only 34 minutes of the XCTest step in run 37728629000.
+    # The hello app also translates the Android compatibility gallery and Kotlin stdlib.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v6
 
@@ -131,7 +135,8 @@ jobs:
         # scheme carries an embedded watch app with a ParparVM translation of its own, and
         # xcodebuild builds that before it can run a single test -- 16 of the 25 minutes went on
         # compiling it. The packaging job already allows 65 for the same reason.
-        timeout-minutes: 45
+        # Still compiling at 36 minutes once the hello app gained the Android compatibility gallery, its runtime and the Kotlin stdlib.
+        timeout-minutes: 70
 
       - name: Upload native iOS artifacts
         if: ${{ !cancelled() }}

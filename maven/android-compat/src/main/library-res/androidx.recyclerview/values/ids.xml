@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- androidx.recyclerview: the library's view ids. -->
+<resources>
+    <item type="id" name="item_touch_helper_previous_elevation"/>
+</resources>

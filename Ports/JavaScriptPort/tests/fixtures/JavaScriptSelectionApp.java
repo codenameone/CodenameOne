@@ -1,0 +1,906 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+import com.codename1.impl.html5.JavaScriptPortBootstrap;
+import com.codename1.system.Lifecycle;
+import com.codename1.ui.*;
+import com.codename1.ui.layouts.BoxLayout;
+
+/** Browser regression fixture for issues 5943, 5944 and 5946. */
+public class JavaScriptSelectionApp extends Lifecycle {
+    public static void main(String[] args) {
+        JavaScriptPortBootstrap.bootstrap(new JavaScriptSelectionApp());
+    }
+
+    @Override
+    public void init(Object context) {
+        String query = Display.getInstance().getProperty("browser.window.location.search", "");
+        Display.getInstance().setProperty("javascript.textSelection", query.indexOf("selection=off") >= 0 ? "false" : "true");
+        // The initial default Font wraps a null native handle. Android theme
+        // initialization measures this before replacing the default (#5943).
+        Font font = Font.getDefaultFont();
+        if (font.getHeight() <= 0 || font.stringWidth("Default font") <= 0
+                || font.charWidth('M') <= 0 || font.charsWidth(new char[] {'M'}, 0, 1) <= 0) {
+            throw new IllegalStateException("Default font metrics failed");
+        }
+        if (query.indexOf("review=paintlock") >= 0) Display.getInstance().setProperty("paintLockEnabled", "true");
+        super.init(context);
+    }
+
+    @Override
+    public void runApp() {
+        String query = Display.getInstance().getProperty("browser.window.location.search", "");
+        if (query.indexOf("review=") >= 0) {
+            showReviewFixture(query);
+            return;
+        }
+        Form form = new Form("Selection regressions", BoxLayout.y());
+        TextField title = new TextField("Title");
+        title.setName("selectionTitle");
+        TextArea notes = new TextArea("Caffè, perché, città, più, però.\nSecond paragraph with words.", 4, 24);
+        notes.setName("selectionNotes");
+        notes.setMaxSize(4096);
+        notes.setGrowByContent(true);
+        TextArea readOnly = new TextArea("First paragraph wraps across several lines so copying must preserve spaces.\nSecond paragraph remains separate.", 4, 24);
+        readOnly.setEditable(false);
+        readOnly.setName("selectionReadOnly");
+        Label status = new Label("Ready");
+        Button action = new Button("Run action");
+        action.addActionListener(e -> status.setText("Action fired"));
+        Button dialog = new Button("Open dialog");
+        dialog.addActionListener(e -> Dialog.show("Selection dialog", "Modal text", "OK", null));
+        form.addAll(title, notes, readOnly, action, dialog, status);
+        TextArea appOwned = new TextArea("Application-owned interaction");
+        appOwned.setName("selectionAppOwned");
+        appOwned.addActionListener(e -> status.setText("Custom action fired"));
+        form.add(appOwned);
+        TextArea notSelectable = new TextArea("Selection explicitly disabled");
+        notSelectable.setName("selectionDisabled");
+        notSelectable.setEditable(false);
+        notSelectable.setTextSelectionEnabled(false);
+        form.add(notSelectable);
+        for (int i = 0; i < 18; i++) form.add(new Label("Scrollable row " + i));
+        form.show();
+    }
+
+    private void showReviewFixture(String query) {
+        final Label status = new Label("Shortcut ready");
+        Form form = query.indexOf("review=pointeroverride") >= 0 ? new Form("Pointer overrides", BoxLayout.y()) {
+            public void pointerPressed(int x, int y) { status.setText("Override pressed"); super.pointerPressed(x, y); }
+            public void pointerReleased(int x, int y) { status.setText("Override released"); super.pointerReleased(x, y); }
+            public void pointerDragged(int[] x, int[] y) { status.setText("Override dragged"); super.pointerDragged(x, y); }
+        } : new Form("Review regressions", BoxLayout.y()) {
+            public void keyReleased(int keyCode) {
+                // Application-level shortcuts can consume the key before it is
+                // interpreted as input by the focused TextField.
+                if (keyCode == 27) { status.setText("Escape received"); return; }
+                if (keyCode == 113) { status.setText("F2 received"); return; }
+                if (keyCode == 75 || keyCode == 107) { status.setText("K received"); return; }
+                super.keyReleased(keyCode);
+            }
+        };
+        if (query.indexOf("review=transparentcover") >= 0) {
+            Container layers = new Container(new com.codename1.ui.layouts.Layout() {
+                public boolean isOverlapSupported() { return true; }
+                public void layoutContainer(Container parent) {
+                    Component text = parent.getComponentAt(0), cover = parent.getComponentAt(1);
+                    text.setX(0); text.setY(0); text.setWidth(parent.getWidth()); text.setHeight(60);
+                    cover.setX(12); cover.setY(0); cover.setWidth(40); cover.setHeight(60);
+                }
+                public com.codename1.ui.geom.Dimension getPreferredSize(Container parent) {
+                    return new com.codename1.ui.geom.Dimension(400, 80);
+                }
+            });
+            Component target;
+            if (query.indexOf("kind=label") >= 0) {
+                target = new Label("Transparently covered label");
+            } else {
+                target = new TextArea("Transparently covered editor", 2, 24);
+                target.setName("transparentCoveredEditor");
+            }
+            Container cover = new Container();
+            cover.getAllStyles().setBgTransparency(0);
+            cover.getAllStyles().setBorder(com.codename1.ui.plaf.Border.createEmpty());
+            cover.addPointerPressedListener(e -> status.setText("Transparent responder pressed"));
+            Runnable activate = () -> {
+                if (query.indexOf("mode=focus") >= 0) cover.setFocusable(true);
+                else if (query.indexOf("mode=scroll") >= 0) { cover.setScrollableY(true); cover.setAlwaysTensile(true); }
+                else if (query.indexOf("mode=drag") >= 0) cover.setDraggable(true);
+                else cover.setGrabsPointerEvents(true);
+                form.repaint();
+            };
+            layers.addAll(target, cover);
+            Button passive = new Button("Make responder passive"), active = new Button("Make responder active");
+            passive.addActionListener(e -> {
+                cover.setFocusable(false); cover.setGrabsPointerEvents(false); cover.setDraggable(false);
+                cover.setScrollableY(false); cover.setAlwaysTensile(false); form.repaint();
+            });
+            active.addActionListener(e -> activate.run());
+            Button bounds = new Button("Report cover bounds");
+            bounds.addActionListener(e -> status.setText("Cover bounds " + cover.getAbsoluteX() + ","
+                    + cover.getAbsoluteY() + "," + cover.getWidth() + "," + cover.getHeight()));
+            form.addAll(new Button("Initial focus"), layers, passive, active, bounds, status);
+            activate.run();
+        } else if (query.indexOf("review=pointeroverride") >= 0) {
+            Label label = new Label("Overridden pointer label");
+            TextArea area = new TextArea("Overridden pointer editor", 2, 24); area.setName("overrideEditor");
+            form.addAll(new Button("Initial focus"), label, area, status);
+        } else if (query.indexOf("review=inputdevice") >= 0) {
+            final int[] closed = new int[3];
+            try { form.setCurrentInputDevice(() -> closed[0]++); } catch (Exception ex) { throw new RuntimeException(ex); }
+            TextField first = new TextField("Device first"); first.setName("deviceFirst");
+            TextField second = new TextField("Device second"); second.setName("deviceSecond");
+            first.addCloseListener(e -> closed[1]++); second.addCloseListener(e -> closed[2]++);
+            Button check = new Button("Check closed devices");
+            check.addActionListener(e -> status.setText("Devices closed " + closed[0] + "," + closed[1] + "," + closed[2]));
+            Button replace = new Button("Replace input device");
+            replace.addActionListener(e -> { try { form.setCurrentInputDevice(() -> {}); } catch (Exception ex) { throw new RuntimeException(ex); } });
+            form.addAll(new Button("Initial focus"), first, second, check, replace, status);
+        } else if (query.indexOf("review=paintlock") >= 0) {
+            Container parent = new Container(BoxLayout.y());
+            parent.getAllStyles().setBgTransparency(255);
+            TextArea area = new TextArea("Locked snapshot editor", 2, 24); area.setName("lockedEditor");
+            parent.add(area);
+            Button lock = new Button("Lock snapshot"), release = new Button("Release snapshot");
+            lock.addActionListener(e -> { parent.paintLock(true); parent.repaint(); });
+            release.addActionListener(e -> { parent.paintLockRelease(); parent.repaint(); });
+            form.addAll(new Button("Initial focus"), parent, lock, release);
+        } else if (query.indexOf("review=ancestorglass") >= 0) {
+            final boolean[] covered = new boolean[1];
+            TextArea area = new TextArea("Ancestor glass text", 2, 24); area.setName("glassEditor");
+            Container parent = new Container(BoxLayout.y()) {
+                protected void paintGlass(Graphics g) {
+                    if (covered[0]) {
+                        int color = g.getColor(); g.setColor(0xff0000);
+                        g.fillRect(area.getAbsoluteX() + area.getWidth() / 2, area.getAbsoluteY(),
+                                area.getWidth() / 2, area.getHeight());
+                        g.setColor(color);
+                    }
+                }
+            };
+            parent.add(area);
+            Button cover = new Button("Paint ancestor glass");
+            cover.addActionListener(e -> { covered[0] = true; form.repaint(); });
+            form.addAll(new Button("Initial focus"), parent, cover);
+        } else if (query.indexOf("review=renderermutation") >= 0) {
+            Label label = new Label("Renderer mutation label");
+            TextArea area = new TextArea("Renderer mutation editor", 2, 24); area.setName("rendererEditor");
+            Button enable = new Button("Mark renderers"), disable = new Button("Unmark renderers");
+            enable.addActionListener(e -> com.codename1.ui.util.UITimer.timer(400, false, form, () -> {
+                label.setCellRenderer(true); area.setCellRenderer(true);
+            }));
+            disable.addActionListener(e -> com.codename1.ui.util.UITimer.timer(400, false, form, () -> {
+                label.setCellRenderer(false); area.setCellRenderer(false);
+            }));
+            form.addAll(new Button("Initial focus"), label, area, enable, disable);
+        } else if (query.indexOf("review=formediting") >= 0) {
+            TextField first = new TextField("First value"); first.setName("formEditingFirst");
+            TextField second = new TextField("Second value"); second.setName("formEditingSecond");
+            first.setEditable(query.indexOf("readonly=true") < 0);
+            Button check = new Button("Check form editing");
+            check.addActionListener(e -> status.setText("Form editing=" + form.isEditing()
+                    + " first=" + first.isEditing() + " second=" + second.isEditing()));
+            Button stop = new Button("Stop form editing");
+            stop.addActionListener(e -> form.stopEditing(() -> {
+                status.setText("Form stopped " + first.getText() + " editing=" + form.isEditing()
+                        + " field=" + first.isEditing());
+                if (query.indexOf("handoff=true") >= 0) second.startEditingAsync();
+            }));
+            form.addAll(new Button("Initial focus"), first, second, check, stop, status);
+        } else if (query.indexOf("review=multitouch") >= 0) {
+            Label label = new Label("Pinch promoted label");
+            TextArea area = new TextArea("Pinch native editor", 2, 24);
+            area.setName("pinchEditor");
+            form.addAll(new Button("Initial focus"), label, area, status);
+        } else if (query.indexOf("review=stalefocus") >= 0) {
+            TextArea removed = new TextArea("Removed editor value", 2, 24); removed.setName("removedEditor");
+            TextField next = new TextField("Next editor value"); next.setName("nextEditor");
+            Button remove = new Button("Remove editor");
+            remove.addActionListener(e -> { removed.remove(); form.revalidate(); });
+            Button check = new Button("Check removed editor");
+            check.addActionListener(e -> status.setText("Removed editor editing " + removed.isEditing()));
+            form.addAll(new Button("Initial focus"), removed, next, remove, check, status);
+        } else if (query.indexOf("review=paintcontext") >= 0) {
+            final int[] mode = new int[1];
+            Container painter = new Container(BoxLayout.y()) {
+                public void paint(Graphics g) {
+                    Transform saved = g.getTransform();
+                    int alpha = g.getAlpha();
+                    g.pushClip();
+                    try {
+                        if (mode[0] == 1) {
+                            Transform moved = saved.copy(); moved.translate(35, 20, 0); g.setTransform(moved);
+                        } else if (mode[0] == 2) {
+                            com.codename1.ui.geom.GeneralPath clip = new com.codename1.ui.geom.GeneralPath();
+                            clip.moveTo(getX(), getY()); clip.lineTo(getX() + getWidth(), getY());
+                            clip.lineTo(getX(), getY() + getHeight()); clip.closePath();
+                            g.setClip(clip);
+                        } else if (mode[0] == 3) {
+                            g.setClip(0, 0, 0, 0);
+                        } else if (mode[0] == 4) {
+                            g.clipRect(getX(), getY(), getWidth() / 2, getHeight());
+                        }
+                        if (mode[0] == 5) g.setAlpha(0);
+                        if (mode[0] == 6) g.setAlpha(100);
+                        super.paint(g);
+                    } finally {
+                        g.setAlpha(alpha); g.setTransform(saved); g.popClip();
+                    }
+                }
+            };
+            TextArea area = new TextArea("Context painted value", 2, 24); area.setName("paintContextArea");
+            painter.add(area); painter.setPreferredH(120);
+            form.addAll(new Button("Initial focus"), painter);
+            for (int i = 0; i < 7; i++) {
+                final int value = i;
+                Button change = new Button("Paint mode " + i);
+                change.addActionListener(e -> { mode[0] = value; form.repaint(); });
+                form.add(change);
+            }
+            Button partial = new Button("Partial editor repaint");
+            partial.addActionListener(e -> com.codename1.ui.util.UITimer.timer(400, false, form,
+                    () -> area.repaint(area.getAbsoluteX() + 20, area.getAbsoluteY() + 5, 30, 15)));
+            form.add(partial);
+        } else if (query.indexOf("review=ancestorgutter") >= 0) {
+            Container viewport = new Container(new com.codename1.ui.layouts.Layout() {
+                public void layoutContainer(Container parent) {
+                    Component child = parent.getComponentAt(0);
+                    child.setX(0); child.setY(0);
+                    child.setWidth(parent.getWidth() + 100); child.setHeight(parent.getHeight() + 160);
+                }
+                public com.codename1.ui.geom.Dimension getPreferredSize(Container parent) {
+                    return new com.codename1.ui.geom.Dimension(1200, 320);
+                }
+            });
+            viewport.setPreferredH(160);
+            viewport.setScrollableX(true); viewport.setScrollableY(true); viewport.setSmoothScrolling(false);
+            viewport.setRTL(query.indexOf("rtl=true") >= 0);
+            TextArea area = new TextArea("Ancestor clipped text", 2, 24); area.setName("ancestorGutterArea");
+            area.setRTL(viewport.isRTL()); viewport.add(area);
+            Button configure = new Button("Configure ancestor gutters");
+            configure.addActionListener(e -> {
+                java.util.Hashtable props = new java.util.Hashtable();
+                props.put("@interactiveScrollBool", "true");
+                props.put("DesktopScroll.padding", "0,0,8,8");
+                props.put("DesktopScroll.padUnit", new byte[] {0, 0, 0, 0});
+                props.put("DesktopHorizontalScroll.padding", "8,8,0,0");
+                props.put("DesktopHorizontalScroll.padUnit", new byte[] {0, 0, 0, 0});
+                com.codename1.ui.plaf.UIManager.getInstance().addThemeProps(props);
+                com.codename1.ui.plaf.UIManager.getInstance().getLookAndFeel().setFadeScrollBar(false);
+                form.refreshTheme(); form.revalidate();
+                status.setText("Viewport " + (viewport.getAbsoluteX() + viewport.getScrollX())
+                    + "," + (viewport.getAbsoluteY() + viewport.getScrollY())
+                    + "," + viewport.getWidth() + "," + viewport.getHeight() + ","
+                    + viewport.getSideGap() + "," + viewport.getBottomGap());
+            });
+            form.addAll(new Button("Initial focus"), viewport, configure, status);
+        } else if (query.indexOf("review=completionstate") >= 0) {
+            TextField field = new TextField("Before completion"); field.setName("stateCompletion");
+            boolean initiallyReadonly = query.indexOf("readonly=true") >= 0;
+            field.setEditable(!initiallyReadonly);
+            final int[] completions = new int[1];
+            field.bindProperty("text", (source, property, oldValue, newValue) -> {
+                completions[0]++;
+                status.setText("Completed " + completions[0] + " value " + newValue);
+            });
+            Button readonly = new Button("End as readonly"), disable = new Button("End as disabled");
+            readonly.addActionListener(e -> field.setEditable(false));
+            disable.addActionListener(e -> field.setEnabled(false));
+            Button check = new Button("Check completions");
+            check.addActionListener(e -> status.setText("Completion count " + completions[0]));
+            form.addAll(new Button("Initial focus"), field, readonly, disable, check, status);
+        } else if (query.indexOf("review=legacysuperseded") >= 0) {
+            TextField first = new TextField("Retired session", "", 80, TextArea.PASSWORD);
+            TextArea second = new TextArea("Replacement session", 2, 24, TextArea.PASSWORD);
+            first.setName("retiredLegacy"); second.setName("replacementLegacy");
+            Button start = new Button("Start retired session"); start.addActionListener(e -> first.startEditingAsync());
+            Button swap = new Button("Supersede legacy session");
+            // Two stop requests queue completion and release the editing guard,
+            // allowing a replacement before the queued callback drains.
+            swap.addActionListener(e -> {
+                com.codename1.impl.html5.HTML5Implementation impl = com.codename1.impl.html5.HTML5Implementation.getInstance();
+                impl.stopTextEditing(); impl.stopTextEditing();
+                impl.editString(second, second.getMaxSize(), second.getConstraint(), second.getText(), 0);
+            });
+            Button mutate = new Button("Mutate superseded model");
+            mutate.addActionListener(e -> { first.setText("Changed after completion"); status.setText("Superseded model changed"); });
+            form.addAll(new Button("Initial focus"), first, second, start, swap, mutate, status);
+        } else if (query.indexOf("review=legacypadding") >= 0) {
+            form.setFormBottomPaddingEditingMode(true);
+            TextField field = new TextField("Old padded session"); field.setName("oldPaddedSession");
+            Button start = new Button("Start padded editor"); start.addActionListener(e -> field.startEditingAsync());
+            Form next = new Form("Replacement form", BoxLayout.y());
+            TextField replacement = new TextField("Replacement value", "", 80, TextArea.PASSWORD);
+            replacement.setName("paddingReplacement");
+            Label result = new Label("Replacement ready");
+            Button check = new Button("Check original padding");
+            check.addActionListener(e -> result.setText("Original padding "
+                + form.getContentPane().getUnselectedStyle().getPadding(Component.BOTTOM)));
+            Button mutate = new Button("Mutate retired editor");
+            mutate.addActionListener(e -> { field.setText("Retired model changed"); result.setText("Retired model mutated"); });
+            next.addAll(replacement, check, mutate, result);
+            Button swap = new Button("Replace padded session");
+            swap.addActionListener(e -> {
+                next.show();
+                Display.getInstance().callSerially(() -> replacement.startEditingAsync());
+            });
+            com.codename1.ui.util.UITimer.timer(100, true, form, () -> status.setText("Old padding "
+                + form.getContentPane().getUnselectedStyle().getPadding(Component.BOTTOM)));
+            form.addAll(new Button("Initial focus"), field, start, swap, status);
+        } else if (query.indexOf("review=ignorepointer") >= 0) {
+            Label label = new Label("Ignore pointer label");
+            TextArea area = new TextArea("Ignore pointer area", 2, 24); area.setName("ignorePointerArea");
+            Button toggle = new Button("Toggle ignored pointers");
+            toggle.addActionListener(e -> com.codename1.ui.util.UITimer.timer(400, false, form, () -> {
+                label.setIgnorePointerEvents(!label.isIgnorePointerEvents());
+                area.setIgnorePointerEvents(!area.isIgnorePointerEvents());
+            }));
+            form.addAll(label, area, toggle);
+        } else if (query.indexOf("review=numericinitiating") >= 0) {
+            TextArea area = new TextArea("12", 2, 24, TextArea.NUMERIC); area.setName("numericInitiating");
+            Button type = new Button("Type numeric queued keys");
+            type.addActionListener(e -> {
+                area.keyReleased('A'); area.keyReleased(10); area.keyReleased('3');
+                status.setText("Numeric queued " + area.getText());
+            });
+            form.addAll(type, area, status);
+        } else if (query.indexOf("review=nativepolicy") >= 0) {
+            TextField field = new TextField("Policy value"); field.setName("nativePolicy");
+            Button toggle = new Button("Toggle native input");
+            toggle.addActionListener(e -> com.codename1.ui.util.UITimer.timer(400, false, form,
+                () -> TextField.setUseNativeTextInput(!TextField.isUseNativeTextInput())));
+            form.addAll(field, toggle);
+        } else if (query.indexOf("review=custompainter") >= 0) {
+            com.codename1.ui.layouts.LayeredLayout layout = new com.codename1.ui.layouts.LayeredLayout();
+            Container layers = new Container(layout); layers.setPreferredH(160);
+            TextArea area = new TextArea("Painter covered value", 3, 24); area.setName("painterCovered");
+            Container cover = new Container();
+            cover.getAllStyles().setBgTransparency(0);
+            cover.getAllStyles().setBorder(com.codename1.ui.plaf.Border.createEmpty());
+            Button configure = new Button("Configure painter");
+            configure.addActionListener(e -> {
+                cover.getAllStyles().setBgPainter((g, rect) -> {
+                    g.setColor(0xff0000); g.fillRect(rect.getX(), rect.getY(), rect.getWidth(), rect.getHeight());
+                });
+                form.repaint();
+                status.setText("Painter configured " + cover.getWidth() + "x" + cover.getHeight());
+            });
+            layers.addAll(area, cover);
+            layout.setInsets(area, "0"); layout.setInsets(cover, "0 0 50% 80%");
+            form.addAll(layers, configure, status);
+        } else if (query.indexOf("review=readback") >= 0) {
+            TextField field = new TextField("Readback field value"); field.setName("readbackField");
+            TextArea area = new TextArea("Readback area value", 2, 24); area.setName("readbackArea");
+            area.setEditable(false);
+            Button capture = new Button("Capture display");
+            capture.addActionListener(e -> Display.getInstance().screenshot(img -> status.setText("Display captured")));
+            form.addAll(field, area, capture, status);
+        } else if (query.indexOf("review=autocompletemutation") >= 0) {
+            TextField area = new TextField("Autofill value"); area.setName("autocompleteMutation");
+            form.add(area);
+            for (final String token : new String[] {"off", "one-time-code", "clear", "bulk-clear"}) {
+                Button change = new Button("Autocomplete " + token);
+                change.addActionListener(e -> com.codename1.ui.util.UITimer.timer(400, false, form,
+                    () -> {
+                        if ("bulk-clear".equals(token)) area.clearClientProperties();
+                        else area.putClientProperty("cn1$autocomplete", "clear".equals(token) ? null : token);
+                    }));
+                form.add(change);
+            }
+        } else if (query.indexOf("review=blocklead") >= 0) {
+            Label label = new Label("Block lead text"); label.setBlockLead(true);
+            Button lead = new Button("Lead action"); lead.addActionListener(e -> status.setText("Lead fired"));
+            Container parent = BoxLayout.encloseY(label, lead); parent.setLeadComponent(lead);
+            Button configure = new Button("Configure lead"); configure.addActionListener(e -> parent.setFocusable(false));
+            Button block = new Button("Block lead"), unblock = new Button("Unblock lead");
+            block.addActionListener(e -> com.codename1.ui.util.UITimer.timer(400, false, form, () -> label.setBlockLead(true)));
+            unblock.addActionListener(e -> com.codename1.ui.util.UITimer.timer(400, false, form, () -> label.setBlockLead(false)));
+            form.addAll(configure, block, parent, unblock, status);
+        } else if (query.indexOf("review=stopcallback") >= 0 || query.indexOf("review=mobileenter") >= 0) {
+            TextField first = new TextField("First value"); first.setName("completionFirst");
+            TextField second = new TextField("Second value"); second.setName("completionSecond");
+            first.addDataChangedListener((type, index) -> status.setText("First committed " + first.getText()));
+            Button stop = new Button("Stop and continue");
+            stop.addActionListener(e -> first.stopEditing(() -> {
+                status.setText("Stopped " + first.getText() + " editing=" + first.isEditing());
+                second.startEditingAsync();
+            }));
+            form.addAll(new Button("Initial focus"), first, second, stop, status);
+        } else if (query.indexOf("review=actionmutations") >= 0) {
+            TextArea area = new TextArea("Action listener field"); area.setName("actionMutationArea");
+            com.codename1.ui.events.ActionListener listener = event -> {};
+            Button add = new Button("Add action listener"), remove = new Button("Remove action listener");
+            // Mutate after the button's own repaint has settled: only the setter
+            // should schedule the frame that updates native eligibility.
+            add.addActionListener(e -> com.codename1.ui.util.UITimer.timer(400, false, form, () -> area.addActionListener(listener)));
+            remove.addActionListener(e -> com.codename1.ui.util.UITimer.timer(400, false, form, () -> area.removeActionListener(listener)));
+            form.addAll(add, area, remove);
+        } else if (query.indexOf("review=associatedlabels") >= 0) {
+            TextArea area = new TextArea("Field content"); area.setName("associatedField");
+            Label label = new Label("Associated field label");
+            Button associate = new Button("Associate label"), clear = new Button("Disassociate label");
+            associate.addActionListener(e -> com.codename1.ui.util.UITimer.timer(400, false, form, () -> area.setLabelForComponent(label)));
+            clear.addActionListener(e -> com.codename1.ui.util.UITimer.timer(400, false, form, () -> area.setLabelForComponent(null)));
+            form.addAll(area, associate, clear);
+        } else if (query.indexOf("review=nativehover") >= 0) {
+            TooltipManager.enableTooltips();
+            Label label = new Label("Hover native label"); label.setTooltip("Native label tooltip");
+            TextArea area = new TextArea("Hover native editor"); area.setName("hoverNativeArea"); area.setTooltip("Native editor tooltip");
+            form.addAll(new Button("Initial focus"), label, area);
+        } else if (query.indexOf("review=accessiblelabels") >= 0) {
+            TextArea area = new TextArea("Field content"); area.setName("internalFieldName"); area.setHint("Fallback hint");
+            area.setAccessibilityText("Configured accessible label");
+            Button semantics = new Button("Set semantic label"), associated = new Button("Use associated label"), clear = new Button("Clear accessible label");
+            semantics.addActionListener(e -> area.getSemantics().setLabel("Updated semantic label"));
+            associated.addActionListener(e -> { area.setAccessibilityText(null); area.setLabelForComponent(new Label("Associated label")); });
+            clear.addActionListener(e -> { area.setAccessibilityText(null); area.setLabelForComponent(null); });
+            form.addAll(area, semantics, associated, clear);
+        } else if (query.indexOf("review=defaultselection") >= 0) {
+            Label defaultLabel = new Label("Default selection label");
+            Label explicitOn = new Label("Explicit selection on"); explicitOn.setTextSelectionEnabled(true);
+            Label explicitOff = new Label("Explicit selection off"); explicitOff.setTextSelectionEnabled(false);
+            TextArea area = new TextArea("Default readonly selection"); area.setEditable(false); area.setName("defaultSelectionArea");
+            Button enable = new Button("Enable default selection"), disable = new Button("Disable default selection");
+            enable.addActionListener(e -> TextSelection.setDefaultSelectable(true));
+            disable.addActionListener(e -> TextSelection.setDefaultSelectable(false));
+            form.addAll(enable, defaultLabel, explicitOn, explicitOff, area, disable);
+        } else if (query.indexOf("review=dynamicdrag") >= 0) {
+            Label label = new Label("Dynamic drag label");
+            TextArea area = new TextArea("Dynamic drag area"); area.setName("dynamicDragArea");
+            Button enable = new Button("Enable dragging"), disable = new Button("Disable dragging");
+            enable.addActionListener(e -> { label.setDraggable(true); area.setDraggable(true); });
+            disable.addActionListener(e -> { label.setDraggable(false); area.setDraggable(false); });
+            form.addAll(enable, label, area, disable);
+        } else if (query.indexOf("review=selectedstyles") >= 0) {
+            TextArea area = new TextArea("ABBA"); area.setName("selectedStyleArea");
+            Runnable applyStyle = () -> {
+                if (query.indexOf("style=font") >= 0) {
+                    Image glyphs = Image.createImage(24, 12, 0xffffffff);
+                    area.getSelectedStyle().setFont(Font.createBitmapFont(glyphs, new int[] {0, 12}, new int[] {12, 12}, "AB"));
+                } else if (query.indexOf("style=opacity") >= 0) {
+                    area.getSelectedStyle().setOpacity(100);
+                } else {
+                    area.getSelectedStyle().setTextDecoration(com.codename1.ui.plaf.Style.TEXT_DECORATION_UNDERLINE);
+                }
+            };
+            applyStyle.run();
+            Button apply = new Button("Apply selected style"); apply.addActionListener(e -> applyStyle.run());
+            Button edit = new Button("Edit selected style"); edit.addActionListener(e -> area.startEditingAsync());
+            form.addAll(apply, area, edit);
+        } else if (query.indexOf("review=legacysession") >= 0) {
+            com.codename1.ui.layouts.LayeredLayout layout = new com.codename1.ui.layouts.LayeredLayout();
+            Container layers = new Container(layout); layers.setPreferredH(160);
+            TextArea area = new TextArea("Original model", 3, 24); area.setName("legacySessionArea");
+            Button cover = new Button("Cover edge");
+            layers.addAll(area, cover); layout.setInsets(area, "0"); layout.setInsets(cover, "0 0 auto auto");
+            Button edit = new Button("Start legacy"), uncover = new Button("Remove cover"), stop = new Button("Finish legacy"), repaint = new Button("Repaint legacy");
+            edit.addActionListener(e -> area.startEditingAsync());
+            uncover.addActionListener(e -> { layers.removeComponent(cover); layers.revalidate(); status.setText("Cover removed"); });
+            stop.addActionListener(e -> Display.getInstance().stopEditing(area, () -> status.setText("Committed " + area.getText())));
+            repaint.addActionListener(e -> { form.repaint(); status.setText("Legacy repaint completed"); });
+            form.addAll(edit, layers, uncover, stop, repaint, status);
+        } else if (query.indexOf("review=readonlykeys") >= 0) {
+            TextArea area = new TextArea("Readonly shortcut text"); area.setName("readonlyKeys"); area.setEditable(false);
+            if (query.indexOf("disabled=true") >= 0) area.setEnabled(false);
+            form.addAll(new Button("Initial focus"), area, status);
+        } else if (query.indexOf("review=optingate") >= 0) {
+            Label label = new Label("Explicit framework selection"); label.setTextSelectionEnabled(true);
+            form.add(label); form.getTextSelection().setEnabled(true);
+        } else if (query.indexOf("review=dynamicconstraints") >= 0) {
+            TextArea area = new TextArea("Secret value"); area.setSingleLineTextArea(true); area.setName("dynamicArea");
+            Button password = new Button("Enable password"), done = new Button("Add done listener"), reset = new Button("Reset constraints");
+            password.addActionListener(e -> area.setConstraint(TextArea.PASSWORD));
+            done.addActionListener(e -> area.setDoneListener(event -> status.setText("Done received")));
+            reset.addActionListener(e -> { area.setConstraint(TextArea.ANY); area.setDoneListener(null); });
+            form.addAll(area, password, done, reset, status);
+        } else if (query.indexOf("review=ancestorownership") >= 0) {
+            Label label = new Label("Ancestor owned label");
+            Container parent = BoxLayout.encloseY(label);
+            parent.addPointerPressedListener(e -> status.setText("Parent pressed"));
+            TextArea area = new TextArea("Ancestor owned area"); area.setName("ancestorOwnedArea"); parent.add(area);
+            Button grab = new Button("Grab pointer"), focus = new Button("Focusable parent"), drag = new Button("Draggable parent"), reset = new Button("Release pointer");
+            grab.addActionListener(e -> parent.setGrabsPointerEvents(true));
+            focus.addActionListener(e -> parent.setFocusable(true));
+            drag.addActionListener(e -> parent.setDraggable(true));
+            reset.addActionListener(e -> { parent.setGrabsPointerEvents(false); parent.setFocusable(false); parent.setDraggable(false); });
+            form.addAll(parent, grab, focus, drag, reset, status);
+        } else if (query.indexOf("review=keyboardpadding") >= 0) {
+            TextArea area = new TextArea("Keyboard layout"); area.setName("paddingArea");
+            Button enable = new Button("Enable keyboard padding"), disable = new Button("Disable keyboard padding");
+            enable.addActionListener(e -> form.setFormBottomPaddingEditingMode(true));
+            disable.addActionListener(e -> form.setFormBottomPaddingEditingMode(false));
+            form.addAll(area, enable, disable);
+        } else if (query.indexOf("review=initiatingkeys") >= 0) {
+            TextArea area = new TextArea(""); area.setName("initiatingArea"); area.setMaxSize(3);
+            Button type = new Button("Type queued keys");
+            type.addActionListener(e -> {
+                area.keyReleased('A'); area.keyReleased('B'); area.keyReleased('C'); area.keyReleased('D');
+                status.setText("Typed " + area.getText());
+            });
+            form.addAll(type, area, status);
+        } else if (query.indexOf("review=elevated") >= 0) {
+            com.codename1.ui.layouts.LayeredLayout layout = new com.codename1.ui.layouts.LayeredLayout();
+            Container layers = new Container(layout); layers.setPreferredH(160);
+            layers.getAllStyles().setSurface(true);
+            Container earlier = new Container(new com.codename1.ui.layouts.BorderLayout());
+            earlier.getAllStyles().setBgTransparency(0);
+            Button cover = new Button("Elevated edge"); cover.getAllStyles().setElevation(5);
+            cover.addActionListener(e -> status.setText("Elevated clicked"));
+            earlier.add(com.codename1.ui.layouts.BorderLayout.NORTH, cover);
+            TextArea area = new TextArea("Covered by elevated descendant", 3, 24); area.setName("elevatedArea");
+            layers.addAll(earlier, area);
+            layout.setInsets(earlier, "0 0 auto auto"); layout.setInsets(area, "0");
+            form.addAll(layers, status);
+        } else if (query.indexOf("review=runorder") >= 0) {
+            Label first = new Label("Order alpha"), second = new Label("Order beta");
+            Container labels = BoxLayout.encloseY(first, second);
+            Button reverse = new Button("Reverse labels");
+            reverse.addActionListener(e -> {
+                Component moved = labels.getComponentAt(0);
+                labels.removeComponent(moved); labels.add(moved); labels.revalidate();
+            });
+            form.addAll(labels, reverse);
+        } else if (query.indexOf("review=pointerfocus") >= 0) {
+            Label label = new Label("Focusable label"); label.setFocusable(true);
+            TextArea area = new TextArea("Focusable readonly"); area.setEditable(false); area.setFocusable(true);
+            area.setName("focusReadonly");
+            com.codename1.ui.events.FocusListener listener = new com.codename1.ui.events.FocusListener() {
+                public void focusGained(Component c) { status.setText(c == label ? "Label focused" : "Readonly focused"); }
+                public void focusLost(Component c) { }
+            };
+            label.addFocusListener(listener); area.addFocusListener(listener);
+            form.addAll(new Button("Initial focus"), label, area, status);
+        } else if (query.indexOf("review=multialign") >= 0) {
+            for (int alignment : new int[] {Component.CENTER, Component.BOTTOM}) {
+                TextArea area = new TextArea("First line\nSecond line", 2, 24);
+                area.setName(alignment == Component.CENTER ? "multiCenter" : "multiBottom");
+                area.setGrowByContent(false); area.setPreferredH(160); area.setEditable(false);
+                area.setVerticalAlignment(alignment); area.setRowsGap(7);
+                area.getAllStyles().setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
+                area.getAllStyles().setPadding(11, 19, 5, 5);
+                form.add(area);
+            }
+        } else if (query.indexOf("review=opacity") >= 0) {
+            TextArea area = new TextArea("Fading field"); area.setName("opacityArea");
+            Container parent = BoxLayout.encloseY(area);
+            Button fade = new Button("Fade field"), ancestor = new Button("Fade ancestor"), reset = new Button("Reset opacity");
+            fade.addActionListener(e -> { area.getAllStyles().setOpacity(100); form.repaint(); });
+            ancestor.addActionListener(e -> { parent.getAllStyles().setOpacity(100); form.repaint(); });
+            reset.addActionListener(e -> { area.getAllStyles().setOpacity(255); parent.getAllStyles().setOpacity(255); form.repaint(); });
+            form.addAll(parent, fade, ancestor, reset);
+        } else if (query.indexOf("review=uniqueeditor") >= 0) {
+            TextArea area = new TextArea("Single accessible field"); area.setName("uniqueEditor");
+            Button hide = new Button("Canvas fallback"), restore = new Button("Restore editor");
+            hide.addActionListener(e -> area.setEndsWith3Points(true));
+            restore.addActionListener(e -> area.setEndsWith3Points(false));
+            Button disable = new Button("Disable editor"), enable = new Button("Enable editor");
+            disable.addActionListener(e -> area.setEnabled(false)); enable.addActionListener(e -> area.setEnabled(true));
+            form.addAll(area, hide, restore, disable, enable);
+        } else if (query.indexOf("review=traversal") >= 0) {
+            TextField first = new TextField("First"); first.setName("tabFirst");
+            TextField last = new TextField("Last"); last.setName("tabLast");
+            form.addAll(first, new Button("Middle button"), new CheckBox("Middle check"), last);
+        } else if (query.indexOf("review=occlusion") >= 0) {
+            com.codename1.ui.layouts.LayeredLayout layout = new com.codename1.ui.layouts.LayeredLayout();
+            Container layers = new Container(layout);
+            layers.setPreferredH(160);
+            TextArea area = new TextArea("Partly covered text", 3, 24);
+            area.setName("coveredArea");
+            Button cover = new Button("Edge button");
+            cover.addActionListener(e -> status.setText("Edge button clicked"));
+            layers.addAll(area, cover);
+            layout.setInsets(area, "0");
+            layout.setInsets(cover, "0 0 auto auto");
+            form.addAll(layers, status);
+        } else if (query.indexOf("review=interactionstate") >= 0) {
+            Container context = new Container(BoxLayout.y());
+            Container stylus = new Container(BoxLayout.y());
+            Container commands = new Container(BoxLayout.y());
+            Container[] parents = {context, stylus, commands};
+            String[] names = {"dynamicContext", "dynamicStylus", "dynamicCommands"};
+            for (int i = 0; i < parents.length; i++) {
+                TextArea area = new TextArea(names[i]); area.setName(names[i]);
+                parents[i].addAll(new Label(names[i] + " label"), area);
+                form.add(parents[i]);
+            }
+            com.codename1.ui.events.ActionListener handler = e -> { };
+            com.codename1.ui.util.UITimer.timer(3000, false, form, () -> {
+                context.addContextMenuListener(handler);
+                stylus.addStylusListener(handler);
+                commands.setContextMenuCommands(new Command("Menu"));
+            });
+            com.codename1.ui.util.UITimer.timer(6000, false, form, () -> {
+                context.removeContextMenuListener(handler);
+                stylus.removeStylusListener(handler);
+                commands.setContextMenuCommands((Command[]) null);
+            });
+        } else if (query.indexOf("review=accessiblename") >= 0) {
+            TextField field = new TextField("", "Original hint");
+            field.setName("Original name");
+            com.codename1.ui.util.UITimer.timer(3000, false, form, () -> field.setName("Updated name"));
+            com.codename1.ui.util.UITimer.timer(5000, false, form, () -> field.setName(""));
+            com.codename1.ui.util.UITimer.timer(7000, false, form, () -> field.setHint("Updated hint"));
+            form.add(field);
+        } else if (query.indexOf("review=maxsize") >= 0) {
+            TextField field = new TextField(""); field.setName("limitedField"); field.setMaxSize(20);
+            com.codename1.ui.util.UITimer.timer(3000, false, form, () -> field.setMaxSize(3));
+            Button check = new Button("Check maximum");
+            check.addActionListener(e -> status.setText("Maximum " + field.getMaxSize() + " value " + field.getText()));
+            form.addAll(field, check, status);
+        } else if (query.indexOf("review=subclasses") >= 0) {
+            TextArea area = new TextArea("Custom area") {
+                public void pointerPressed(int x, int y) { status.setText("Custom area pressed"); }
+            };
+            TextField field = new TextField("Custom field") {
+                public void pointerPressed(int x, int y) { status.setText("Custom field pressed"); }
+            };
+            area.setName("customArea"); field.setName("customField");
+            form.addAll(area, field, status);
+        } else if (query.indexOf("review=ellipsis") >= 0) {
+            TextArea area = new TextArea("First row\nSecond row\nThird row\nFourth row", 2, 24);
+            area.setName("ellipsisArea"); area.setEditable(false);
+            area.setGrowByContent(true); area.setGrowLimit(2); area.setEndsWith3Points(true);
+            form.add(area);
+        } else if (query.indexOf("review=ownership") >= 0) {
+            TextField field = new TextField("Active session");
+            field.setName("ownershipField");
+            TextField password = new TextField("", "Password", 20, TextArea.PASSWORD);
+            password.setName("legacyPassword");
+            Button readonly = new Button("Make readonly");
+            readonly.addActionListener(e -> field.setEditable(false));
+            Button disable = new Button("Disable field");
+            disable.addActionListener(e -> field.setEnabled(false));
+            Button editPassword = new Button("Edit password");
+            editPassword.addActionListener(e -> password.startEditingAsync());
+            form.addAll(field, password, readonly, disable, editPassword);
+        } else if (query.indexOf("review=numeric") >= 0) {
+            TextField field = new TextField("Not a number", "", 20, TextArea.NUMERIC);
+            field.setName("numericModel");
+            Button change = new Button("Change numeric model");
+            change.addActionListener(e -> field.setText("Still not numeric"));
+            field.addDataChangedListener((type, index) -> status.setText("Numeric model " + field.getText()));
+            Label completion = new Label("Numeric completion pending");
+            field.bindProperty("text", (source, property, oldValue, newValue) -> completion.setText("Numeric completed [" + newValue + "]"));
+            form.addAll(field, change, status, completion);
+        } else if (query.indexOf("review=linemode") >= 0) {
+            TextArea area = new TextArea("Changing line mode", 2, 24);
+            area.setName("changingLineMode");
+            com.codename1.ui.util.UITimer.timer(3000, false, form, () -> area.setSingleLineTextArea(true));
+            com.codename1.ui.util.UITimer.timer(5000, false, form, () -> area.setSingleLineTextArea(false));
+            form.add(area);
+        } else if (query.indexOf("review=canvasstyles") >= 0) {
+            Image glyphs = Image.createImage(24, 12, 0xffffffff);
+            Font bitmap = Font.createBitmapFont(glyphs, new int[] {0, 12}, new int[] {12, 12}, "AB");
+            TextArea area = new TextArea("ABBA");
+            area.setName("bitmapArea");
+            area.getAllStyles().setFont(bitmap);
+            area.setEditable(false);
+            form.add(area);
+            int[] decorations = {1, 2, 4, 7, 8, 16, 32};
+            for (int decoration : decorations) {
+                TextArea decorated = new TextArea("Decoration " + decoration);
+                decorated.setName("decoration" + decoration);
+                decorated.setEditable(false);
+                form.add(decorated);
+            }
+            Button apply = new Button("Apply decorations");
+            apply.addActionListener(e -> {
+                // Apply after startup so deferred theme initialization has completed.
+                for (int i = 0; i < decorations.length; i++) {
+                    Component decorated = form.getContentPane().getComponentAt(i + 1);
+                    decorated.getUnselectedStyle().setTextDecoration(decorations[i]);
+                    decorated.getSelectedStyle().setTextDecoration(decorations[i]);
+                }
+                form.repaint();
+            });
+            form.add(apply);
+        } else if (query.indexOf("review=metadata") >= 0) {
+            TextField field = new TextField("123", "", 20, TextArea.EMAILADDR);
+            field.setName("reviewField");
+            field.setPreferredH(200);
+            field.setVerticalAlignment(Component.BOTTOM);
+            field.getAllStyles().setFgColor(0x123456);
+            field.getAllStyles().setFgAlpha(96);
+            Button change = new Button("Change constraints");
+            change.addActionListener(e -> {
+                field.setConstraint(TextArea.NUMERIC | TextArea.SENSITIVE);
+                field.repaint();
+            });
+            Button reset = new Button("Reset constraints");
+            reset.addActionListener(e -> {
+                field.setConstraint(TextArea.ANY | TextArea.INITIAL_CAPS_WORD);
+                field.putClientProperty("cn1$autocomplete", "nickname");
+                field.repaint();
+            });
+            form.addAll(field, change, reset, status);
+        } else if (query.indexOf("review=selectionstate") >= 0) {
+            Label selectable = new Label("Toggle selection label");
+            TextArea readOnly = new TextArea("Toggle readonly selection");
+            readOnly.setName("toggleReadOnly");
+            readOnly.setEditable(false);
+            // Only the flag setters repaint: no buttons, focus changes or status updates.
+            com.codename1.ui.util.UITimer.timer(3000, false, form, () -> selectable.setTextSelectionEnabled(false));
+            com.codename1.ui.util.UITimer.timer(5000, false, form, () -> selectable.setTextSelectionEnabled(true));
+            com.codename1.ui.util.UITimer.timer(7000, false, form, () -> readOnly.setTextSelectionEnabled(false));
+            com.codename1.ui.util.UITimer.timer(9000, false, form, () -> readOnly.setTextSelectionEnabled(true));
+            com.codename1.ui.util.UITimer.timer(11000, false, form, () -> form.getTextSelection().setEnabled(false));
+            com.codename1.ui.util.UITimer.timer(13000, false, form, () -> form.getTextSelection().setEnabled(true));
+            form.addAll(selectable, readOnly);
+        } else if (query.indexOf("review=editable") >= 0) {
+            TextArea area = new TextArea("Static editability");
+            area.setName("toggleEditable");
+            com.codename1.ui.util.UITimer.timer(3000, false, form, () -> area.setEditable(false));
+            com.codename1.ui.util.UITimer.timer(5000, false, form, () -> area.setEditable(true));
+            form.add(area);
+        } else if (query.indexOf("review=focus") >= 0) {
+            TextArea area = new TextArea("Readonly focus");
+            area.setName("focusReadOnly");
+            area.setEditable(false);
+            TextArea disabled = new TextArea("Disabled focus");
+            disabled.setName("focusDisabled");
+            disabled.setEnabled(false);
+            Button target = new Button("Focus destination");
+            Button move = new Button("Move focus");
+            move.addActionListener(e -> target.requestFocus());
+            form.addAll(area, disabled, target, move);
+        } else if (query.indexOf("review=formpointer") >= 0) {
+            Label label = new Label("Form pointer label");
+            TextArea area = new TextArea("Form pointer area");
+            area.setEditable(false);
+            area.setName("formPointerArea");
+            if (query.indexOf("handler=release") >= 0) {
+                form.addPointerReleasedListener(e -> status.setText("Form release received"));
+            } else if (query.indexOf("handler=drag") >= 0) {
+                form.addPointerDraggedListener(e -> status.setText("Form drag received"));
+            } else if (query.indexOf("handler=long") >= 0) {
+                form.addLongPressListener(e -> status.setText("Form long received"));
+            } else {
+                form.addPointerPressedListener(e -> status.setText("Form press received"));
+            }
+            form.addAll(label, area, status);
+        } else if (query.indexOf("review=snapshot") >= 0) {
+            TextField field = new TextField("Snapshot field value");
+            field.setName("snapshotField");
+            TextArea area = new TextArea("Snapshot area value", 2, 24);
+            area.setName("snapshotArea");
+            Button capture = new Button("Capture text images");
+            capture.addActionListener(e -> {
+                boolean fieldText = snapshotContainsText(field);
+                boolean areaText = snapshotContainsText(area);
+                status.setText(fieldText && areaText ? "Snapshots contain text" : "Snapshot text missing");
+            });
+            form.addAll(field, area, capture, status);
+        } else if (query.indexOf("review=stylus") >= 0) {
+            Label direct = new Label("Stylus listener label");
+            direct.addStylusListener(e -> status.setText("Stylus received"));
+            Container parent = new Container(BoxLayout.y());
+            parent.addStylusListener(e -> status.setText("Inherited stylus received"));
+            parent.add(new Label("Inherited stylus label"));
+            TextArea area = new TextArea("Stylus listener area");
+            area.setName("stylusArea");
+            area.addStylusListener(e -> status.setText("Area stylus received"));
+            form.addAll(direct, parent, area, status);
+        } else if (query.indexOf("review=rendering") >= 0) {
+            TextField hint = new TextField("", "Styled empty hint");
+            hint.setName("reviewHint");
+            hint.getHintLabel().getAllStyles().setFgColor(0x654321);
+            TextArea multiline = new TextArea("", 3, 24);
+            multiline.setName("reviewMultilineHint");
+            multiline.setHint("Multiline empty hint");
+            Button clear = new Button("Clear hint field");
+            clear.addActionListener(e -> hint.setText(""));
+            form.addAll(hint, multiline, clear);
+            for (int align : new int[] {Component.LEFT, Component.RIGHT, Component.CENTER}) {
+                TextField rtl = new TextField("שלום");
+                rtl.setName("rtl" + align);
+                rtl.setRTL(true);
+                rtl.getAllStyles().setAlignment(align);
+                form.add(rtl);
+            }
+        } else if (query.indexOf("review=exclusions") >= 0) {
+            TextField.setUseNativeTextInput(false);
+            TextField lightweight = new TextField("Lightweight value");
+            lightweight.setName("reviewLightweight");
+            Label menu = new Label("Context listener label");
+            menu.addContextMenuListener(e -> { status.setText("Context received"); e.consume(); });
+            TextArea commands = new TextArea("Context command area");
+            commands.setName("reviewContextCommands");
+            commands.setContextMenuCommands(new Command("Application command"));
+            Container inherited = new Container(BoxLayout.y());
+            inherited.addContextMenuListener(e -> { status.setText("Inherited context received"); e.consume(); });
+            inherited.add(new Label("Inherited context label"));
+            form.addAll(lightweight, menu, commands, inherited, status);
+        } else if (query.indexOf("review=scroll") >= 0) {
+            StringBuilder lines = new StringBuilder();
+            for (int i = 0; i < 30; i++) lines.append("Text row ").append(i).append("\n");
+            TextArea area = new TextArea(lines.toString(), 3, 24);
+            area.setName("reviewScroll");
+            area.setGrowByContent(false);
+            area.setPreferredH(110);
+            area.setSmoothScrolling(false);
+            Label position = new Label("Scroll Y 0");
+            area.addScrollListener((x, y, oldX, oldY) -> position.setText("Scroll Y " + y));
+            Button reset = new Button("Reset scroll");
+            reset.addActionListener(e -> com.codename1.ui.Accessor.setNativeTextScrollY(area, 0));
+            if (query.indexOf("interactive=true") >= 0) form.add(new Button("Initial focus"));
+            form.addAll(area, position, reset);
+            if (query.indexOf("interactive=true") >= 0) {
+                area.setRTL(query.indexOf("rtl=true") >= 0);
+                Button configure = new Button("Configure scrollbar");
+                configure.addActionListener(e -> {
+                    java.util.Hashtable props = new java.util.Hashtable();
+                    props.put("@interactiveScrollBool", "true");
+                    props.put("DesktopScroll.padding", "0,0,8,8");
+                    props.put("DesktopScroll.padUnit", new byte[] {0, 0, 0, 0});
+                    com.codename1.ui.plaf.UIManager.getInstance().addThemeProps(props);
+                    com.codename1.ui.plaf.UIManager.getInstance().getLookAndFeel().setFadeScrollBar(false);
+                    form.refreshTheme(); form.revalidate();
+                    com.codename1.ui.util.UITimer.timer(25, true, form, () -> {
+                        if (area.isVScrollThumbGrabbed()) status.setText("Thumb grabbed");
+                    });
+                });
+                form.addAll(configure, status);
+            }
+        } else {
+            Label normal = new Label("Plain selectable label");
+            Label custom = new Label("Custom pointer label") {
+                public void pointerReleased(int x, int y) { setText("Custom pointer fired"); }
+            };
+            custom.setFocusable(true);
+            Label draggable = new Label("Draggable label");
+            draggable.setDraggable(true);
+            Slider slider = new Slider();
+            slider.setEditable(true);
+            slider.setRenderPercentageOnTop(true);
+            slider.setProgress(50);
+            slider.setName("reviewSlider");
+            Container horizontal = new Container(BoxLayout.x());
+            horizontal.setScrollableX(true);
+            horizontal.setScrollableY(false);
+            // Keep the scrollbar from overlapping the glyphs: overlapping canvas
+            // decoration correctly demotes those runs out of the native text layer.
+            horizontal.setScrollVisible(false);
+            TextArea horizontalText = new TextArea("Horizontal selectable text", 2, 30);
+            horizontalText.setName("horizontalText");
+            horizontalText.setEditable(false);
+            horizontalText.setPreferredW(Display.getInstance().getDisplayWidth() * 2);
+            horizontalText.setPreferredH(CN.convertToPixels(12));
+            horizontal.add(horizontalText);
+            form.addAll(normal, custom, draggable, slider, horizontal);
+        }
+        form.show();
+    }
+    private boolean snapshotContainsText(TextArea area) {
+        String value = area.getText();
+        int[] withText = area.toImage().getRGB();
+        area.setText("");
+        int[] withoutText = area.toImage().getRGB();
+        area.setText(value);
+        int changed = 0;
+        for (int i = 0; i < withText.length; i++) {
+            if (withText[i] != withoutText[i]) changed++;
+        }
+        return changed > 20;
+    }
+
+}

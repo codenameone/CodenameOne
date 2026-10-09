@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AppCompat's text appearances and widget styles. The widgets themselves
+     draw like the framework's Material widgets, so most styles extend the
+     framework's and add AppCompat's own attributes. -->
+<resources>
+    <style name="TextAppearance.AppCompat" parent="android:TextAppearance.Material"/>
+    <style name="TextAppearance.AppCompat.Display4" parent="android:TextAppearance.Material.Display4"/>
+    <style name="TextAppearance.AppCompat.Display3" parent="android:TextAppearance.Material.Display3"/>
+    <style name="TextAppearance.AppCompat.Display2" parent="android:TextAppearance.Material.Display2"/>
+    <style name="TextAppearance.AppCompat.Display1" parent="android:TextAppearance.Material.Display1"/>
+    <style name="TextAppearance.AppCompat.Headline" parent="android:TextAppearance.Material.Headline"/>
+    <style name="TextAppearance.AppCompat.Title" parent="android:TextAppearance.Material.Title"/>
+    <style name="TextAppearance.AppCompat.Subhead" parent="android:TextAppearance.Material.Subhead"/>
+    <style name="TextAppearance.AppCompat.Body2" parent="android:TextAppearance.Material.Body2"/>
+    <style name="TextAppearance.AppCompat.Body1" parent="android:TextAppearance.Material.Body1"/>
+    <style name="TextAppearance.AppCompat.Caption" parent="android:TextAppearance.Material.Caption"/>
+    <style name="TextAppearance.AppCompat.Large" parent="android:TextAppearance.Material.Large"/>
+    <style name="TextAppearance.AppCompat.Medium" parent="android:TextAppearance.Material.Medium"/>
+    <style name="TextAppearance.AppCompat.Small" parent="android:TextAppearance.Material.Small"/>
+    <style name="TextAppearance.AppCompat.Button" parent="android:TextAppearance.Material.Button"/>
+    <style name="TextAppearance.AppCompat.Menu" parent="android:TextAppearance.Material.Body1"/>
+    <style name="TextAppearance.AppCompat.Widget.ActionBar.Title" parent="TextAppearance.AppCompat.Title">
+        <item name="android:textSize">@dimen/abc_text_size_title_material_toolbar</item>
+        <item name="android:textColor">?android:attr/textColorPrimary</item>
+    </style>
+    <style name="TextAppearance.AppCompat.Widget.ActionBar.Subtitle" parent="TextAppearance.AppCompat.Subhead">
+        <item name="android:textSize">@dimen/abc_text_size_subtitle_material_toolbar</item>
+        <item name="android:textColor">?android:attr/textColorSecondary</item>
+    </style>
+    <style name="TextAppearance.Widget.AppCompat.Toolbar.Title" parent="TextAppearance.AppCompat.Widget.ActionBar.Title"/>
+    <style name="TextAppearance.Widget.AppCompat.Toolbar.Subtitle" parent="TextAppearance.AppCompat.Widget.ActionBar.Subtitle"/>
+    <style name="TextAppearance.AppCompat.Widget.PopupMenu.Large" parent="android:TextAppearance.Material.Widget.PopupMenu.Large"/>
+    <style name="TextAppearance.AppCompat.Widget.PopupMenu.Small" parent="android:TextAppearance.Material.Widget.PopupMenu.Small"/>
+
+    <style name="Widget.AppCompat.Toolbar">
+        <item name="titleTextAppearance">@style/TextAppearance.Widget.AppCompat.Toolbar.Title</item>
+        <item name="subtitleTextAppearance">@style/TextAppearance.Widget.AppCompat.Toolbar.Subtitle</item>
+        <item name="android:minHeight">?attr/actionBarSize</item>
+        <item name="titleMargin">@dimen/abc_action_bar_title_margin</item>
+        <item name="maxButtonHeight">@dimen/abc_action_bar_default_height_material</item>
+        <item name="buttonGravity">top</item>
+        <item name="collapseIcon">?attr/homeAsUpIndicator</item>
+        <item name="contentInsetStart">@dimen/abc_action_bar_content_inset_material</item>
+        <item name="contentInsetStartWithNavigation">@dimen/abc_action_bar_content_inset_with_nav</item>
+        <item name="android:paddingLeft">@dimen/abc_action_bar_default_padding_start_material</item>
+        <item name="android:paddingRight">@dimen/abc_action_bar_default_padding_end_material</item>
+    </style>
+    <style name="Widget.AppCompat.Toolbar.Button.Navigation">
+        <item name="android:minWidth">56dp</item>
+        <item name="android:scaleType">center</item>
+        <item name="android:background">?attr/controlBackground</item>
+    </style>
+    <style name="Widget.AppCompat.ActionButton">
+        <item name="android:minWidth">@dimen/abc_action_button_min_width_material</item>
+        <item name="android:minHeight">@dimen/abc_action_button_min_height_material</item>
+        <item name="android:scaleType">center</item>
+        <item name="android:background">?attr/actionBarItemBackground</item>
+    </style>
+    <style name="Widget.AppCompat.ActionButton.Overflow">
+        <item name="android:src">@drawable/abc_ic_menu_overflow_material</item>
+        <item name="android:minWidth">@dimen/abc_action_button_min_width_overflow_material</item>
+    </style>
+    <style name="Widget.AppCompat.ActionBar">
+        <item name="displayOptions">showTitle</item>
+        <item name="height">?attr/actionBarSize</item>
+        <item name="titleTextStyle">@style/TextAppearance.AppCompat.Widget.ActionBar.Title</item>
+        <item name="subtitleTextStyle">@style/TextAppearance.AppCompat.Widget.ActionBar.Subtitle</item>
+        <item name="background">?attr/colorPrimary</item>
+        <item name="elevation">@dimen/abc_action_bar_elevation_material</item>
+        <item name="contentInsetStart">@dimen/abc_action_bar_content_inset_material</item>
+    </style>
+    <style name="Widget.AppCompat.ActionBar.Solid"/>
+    <style name="Widget.AppCompat.Light.ActionBar" parent="Widget.AppCompat.ActionBar"/>
+    <style name="Widget.AppCompat.Light.ActionBar.Solid" parent="Widget.AppCompat.Light.ActionBar"/>
+    <style name="Widget.AppCompat.PopupMenu" parent="android:Widget.Material.PopupMenu"/>
+    <style name="Widget.AppCompat.PopupMenu.Overflow" parent="android:Widget.Material.PopupMenu.Overflow"/>
+    <style name="Widget.AppCompat.Light.PopupMenu" parent="Widget.AppCompat.PopupMenu"/>
+    <style name="Widget.AppCompat.Light.PopupMenu.Overflow" parent="Widget.AppCompat.PopupMenu.Overflow"/>
+    <style name="Widget.AppCompat.ListPopupWindow" parent="android:Widget.Material.ListPopupWindow"/>
+    <style name="Widget.AppCompat.ListView" parent="android:Widget.Material.ListView"/>
+    <style name="Widget.AppCompat.TextView" parent="android:Widget.Material.TextView"/>
+    <style name="Widget.AppCompat.Button" parent="android:Widget.Material.Button"/>
+    <style name="Widget.AppCompat.Button.Small" parent="android:Widget.Material.Button.Small"/>
+    <style name="Widget.AppCompat.Button.Colored">
+        <item name="backgroundTint">?attr/colorAccent</item>
+        <item name="android:textColor">@android:color/white</item>
+    </style>
+    <style name="Widget.AppCompat.Button.Borderless" parent="android:Widget.Material.Button.Borderless"/>
+    <style name="Widget.AppCompat.Button.Borderless.Colored">
+        <item name="android:textColor">?attr/colorAccent</item>
+    </style>
+    <style name="Widget.AppCompat.Button.ButtonBar.AlertDialog" parent="Widget.AppCompat.Button.Borderless.Colored"/>
+    <style name="Widget.AppCompat.EditText" parent="android:Widget.Material.EditText"/>
+    <style name="Widget.AppCompat.AutoCompleteTextView" parent="android:Widget.Material.AutoCompleteTextView"/>
+    <style name="Widget.AppCompat.ImageButton" parent="android:Widget.Material.ImageButton"/>
+    <style name="Widget.AppCompat.CompoundButton.CheckBox" parent="android:Widget.Material.CompoundButton.CheckBox"/>
+    <style name="Widget.AppCompat.CompoundButton.RadioButton" parent="android:Widget.Material.CompoundButton.RadioButton"/>
+    <style name="Widget.AppCompat.CompoundButton.Switch" parent="android:Widget.Material.CompoundButton.Switch"/>
+    <style name="Widget.AppCompat.SeekBar" parent="android:Widget.Material.SeekBar"/>
+    <style name="Widget.AppCompat.RatingBar" parent="android:Widget.Material.RatingBar"/>
+    <style name="Widget.AppCompat.RatingBar.Indicator" parent="android:Widget.Material.RatingBar.Indicator"/>
+    <style name="Widget.AppCompat.RatingBar.Small" parent="android:Widget.Material.RatingBar.Small"/>
+    <style name="Widget.AppCompat.Spinner" parent="android:Widget.Material.Spinner"/>
+    <style name="Widget.AppCompat.Spinner.Underlined"/>
+    <style name="Widget.AppCompat.ProgressBar" parent="android:Widget.Material.ProgressBar"/>
+    <style name="Widget.AppCompat.ProgressBar.Horizontal" parent="android:Widget.Material.ProgressBar.Horizontal"/>
+</resources>

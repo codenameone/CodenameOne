@@ -179,6 +179,11 @@ public class LocalNotificationPublisher extends BroadcastReceiver {
             int requestCode = 1;
             for (LocalNotification.Action a : localNotif.getActions()) {
                 Intent actionIntent = (Intent) contentTemplate.clone();
+                // Only this application may receive it. The template names the launch
+                // activity, but it arrives through a Bundle and falls back to an implicit
+                // intent when that activity could not be found; a PendingIntent carrying
+                // an implicit intent can be filled in by whatever app intercepts it.
+                actionIntent.setPackage(ctx.getPackageName());
                 actionIntent.putExtra("LocalNotificationActionId", a.getId());
                 actionIntent.putExtra("LocalNotificationActionTitle", a.getTitle() == null ? "" : a.getTitle());
                 // make the per-action intent unique so the PendingIntents don't collide

@@ -1905,11 +1905,195 @@
   // and a deferred preventDefault would miss the browser's dispatch
   // window. Apps that depend on conditional preventDefault need to set
   // it from the native host-bridge path instead.
+  function nativeSelectionElement(node) {
+    for (; node; node = node.parentNode) {
+      if (node.getAttribute && node.getAttribute('data-cn1-native-selection') === 'true') return node;
+    }
+    return null;
+  }
+
+  // Selection happens synchronously in the browser; only a scrolling gesture is
+  // handed back to the canvas. A stationary long press remains native selection.
+  function installNativeTextInteractions() {
+    var doc = global.document;
+    if (!doc || doc.__cn1NativeTextInteractions) return;
+    doc.__cn1NativeTextInteractions = true;
+    var touch = null;
+    var mouseOwned = false, lastMouseReleaseOwned = false, pointers = {};
+    function ownGesture(event) {
+      var type = event.type, native = !!nativeSelectionElement(event.target);
+      if (type.indexOf('pointer') === 0) {
+        if (event.pointerType === 'touch') return; // touch scrolling is relayed separately
+        if (type === 'pointerdown') pointers[event.pointerId] = native;
+        event.__cn1NativeTextGesture = !!pointers[event.pointerId];
+        if (type === 'pointerup' || type === 'pointercancel') delete pointers[event.pointerId];
+      } else {
+        if (type === 'mousedown') { mouseOwned = native; lastMouseReleaseOwned = false; }
+        event.__cn1NativeTextGesture = mouseOwned || ((type === 'click' || type === 'dblclick') && event.detail > 0 && lastMouseReleaseOwned);
+        if (type === 'mouseup') { lastMouseReleaseOwned = mouseOwned; mouseOwned = false; }
+      }
+    }
+    ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'mousedown', 'mousemove', 'mouseup', 'click', 'dblclick']
+      .forEach(function(type) { doc.addEventListener(type, ownGesture, true); });
+    if (global.addEventListener) global.addEventListener('blur', function() {
+      mouseOwned = lastMouseReleaseOwned = false; pointers = {};
+    });
+    doc.addEventListener('selectionchange', reconcileNativeTextOrder);
+    function canvas() { return doc.getElementById('codenameone-canvas'); }
+    function relayTouch(type, event) {
+      var target = canvas();
+      if (!target) return;
+      function copy(list) {
+        return Array.prototype.map.call(list || [], function(t) {
+          return new global.Touch({ identifier: t.identifier, target: target,
+            clientX: t.clientX, clientY: t.clientY, screenX: t.screenX, screenY: t.screenY,
+            pageX: t.pageX, pageY: t.pageY });
+        });
+      }
+      var relayed = new global.TouchEvent(type, { bubbles: true, cancelable: true,
+        touches: copy(event.touches), targetTouches: copy(event.touches), changedTouches: copy(event.changedTouches) });
+      relayed.__cn1TextTouchRelay = true;
+      target.dispatchEvent(relayed);
+    }
+    doc.addEventListener('wheel', function(event) {
+      if (!nativeSelectionElement(event.target) || !canvas() || event.ctrlKey || event.metaKey) return;
+      event.preventDefault();
+      canvas().dispatchEvent(new global.WheelEvent('wheel', { bubbles: true, cancelable: true,
+        clientX: event.clientX, clientY: event.clientY, deltaX: event.deltaX,
+        deltaY: event.deltaY, deltaMode: event.deltaMode, ctrlKey: event.ctrlKey,
+        shiftKey: event.shiftKey, altKey: event.altKey, metaKey: event.metaKey }));
+    }, { passive: false });
+    doc.addEventListener('touchstart', function(event) {
+      if (event.__cn1TextTouchRelay) return;
+      var el = nativeSelectionElement(event.target);
+      if (event.touches.length > 1 && (touch || el || Array.prototype.some.call(event.touches, function(t) {
+        return !!nativeSelectionElement(t.target);
+      }))) {
+        // Take over the whole sequence, even if the other finger lands on the
+        // canvas. Mark the original before worker listeners see it to avoid
+        // delivering both the original and the canvas relay.
+        touch = { scrolling: true, multi: true };
+        event.__cn1NativeTextGesture = true;
+        event.preventDefault();
+        relayTouch('touchstart', event);
+        return;
+      }
+      if (!el) return;
+      touch = null;
+      if (event.touches.length !== 1) return;
+      var selected = global.getSelection && global.getSelection();
+      if (/^(INPUT|TEXTAREA)$/.test(el.tagName)) {
+        if (doc.activeElement === el && el.selectionStart !== el.selectionEnd) return;
+      } else if (selected && !selected.isCollapsed
+          && (nativeSelectionElement(selected.anchorNode) === el || nativeSelectionElement(selected.focusNode) === el)) return;
+      var t = event.touches[0];
+      touch = { x: t.clientX, y: t.clientY, at: Date.now(), start: event, scrolling: false };
+    }, { passive: false, capture: true });
+    doc.addEventListener('touchmove', function(event) {
+      if (event.__cn1TextTouchRelay) return;
+      if (touch && touch.multi) {
+        event.__cn1NativeTextGesture = true;
+        event.preventDefault();
+        relayTouch('touchmove', event);
+        return;
+      }
+      if (!touch || !nativeSelectionElement(event.target) || event.touches.length !== 1) return;
+      var t = event.touches[0];
+      if (!touch.scrolling) {
+        if (Date.now() - touch.at > 350) { touch = null; return; }
+        if (Math.max(Math.abs(t.clientY - touch.y), Math.abs(t.clientX - touch.x)) < 8) return;
+        touch.scrolling = true;
+        relayTouch('touchstart', touch.start);
+      }
+      event.preventDefault();
+      relayTouch('touchmove', event);
+    }, { passive: false, capture: true });
+    function finishTouch(event) {
+      if (event.__cn1TextTouchRelay || !touch || (!touch.multi && !nativeSelectionElement(event.target))) return;
+      if (touch.scrolling) {
+        event.__cn1NativeTextGesture = true;
+        event.preventDefault();
+        relayTouch(event.type, event);
+      }
+      if (!touch.multi || event.touches.length === 0) touch = null;
+    }
+    doc.addEventListener('touchend', finishTouch, { passive: false, capture: true });
+    doc.addEventListener('touchcancel', finishTouch, { passive: false, capture: true });
+    doc.addEventListener('keydown', function(event) {
+      var el = nativeSelectionElement(event.target);
+      if (el && /^(INPUT|TEXTAREA)$/.test(el.tagName) && event.key === 'Tab') {
+        // The worker chooses the next CN1 component; suppress the browser's
+        // unrelated tab order before the asynchronous callback reaches it.
+        event.preventDefault();
+      }
+      if (el && el.getAttribute('data-cn1-single-line') === 'true' && event.key === 'Enter'
+          && !event.isComposing && nativeTextOwnsKey(event, el)) {
+        event.preventDefault();
+        if (el.getAttribute('data-cn1-enter-next') === 'true') {
+          el.dispatchEvent(new global.Event('cn1-next'));
+        } else {
+          el.blur();
+        }
+      }
+    }, true);
+  }
+
+  function nativeTextOwnsKey(event, nativeText) {
+    var code = event.keyCode || event.which || 0;
+    var key = event.key || '';
+    var editable = /^(INPUT|TEXTAREA)$/.test(nativeText.tagName) && !nativeText.readOnly
+        && !nativeText.disabled && nativeText.getAttribute('aria-disabled') !== 'true';
+    if (event.isComposing || code === 229 || key === 'Dead') return editable;
+    // Selection, navigation and copy remain native even in readonly controls.
+    // Editing keys belong to the app unless the native control can edit.
+    if (/^(Tab|ArrowLeft|ArrowRight|ArrowUp|ArrowDown|Home|End|PageUp|PageDown)$/.test(key)
+        || [9, 33, 34, 35, 36, 37, 38, 39, 40].indexOf(code) >= 0) return true;
+    if (/^(Enter|Backspace|Delete)$/.test(key) || [8, 13, 46].indexOf(code) >= 0) return editable;
+    if (event.ctrlKey && event.altKey) {
+      return !!(editable && event.getModifierState && event.getModifierState('AltGraph') && key.length === 1);
+    }
+    // Standard Windows/Linux clipboard alternatives also belong to the control.
+    if (key === 'Insert' || code === 45) {
+      return !!(!event.altKey && !event.metaKey
+          && (event.ctrlKey && !event.shiftKey || editable && event.shiftKey && !event.ctrlKey));
+    }
+    if (event.ctrlKey || event.metaKey) {
+      return /^[ac]$/i.test(key) || [65, 67].indexOf(code) >= 0
+          || (editable && (/^[vxyz]$/i.test(key) || [86, 88, 89, 90].indexOf(code) >= 0));
+    }
+    return editable && (key.length === 1 || (!key && (code === 0 || code >= 48 && code <= 90)));
+  }
+
   function makeWorkerCallback(callbackId) {
     if (workerCallbackProxies[callbackId]) {
       return workerCallbackProxies[callbackId];
     }
     var fn = function(event) {
+      // Native text owns its gesture on the host. Forwarding the document/window
+      // listeners too starts CN1's selection or moves focus after the browser has
+      // already selected text. Copy must likewise stay inside this dispatch.
+      if (event && event.__cn1NativeTextGesture && !nativeSelectionElement(event.currentTarget)) return;
+      var nativeText = nativeSelectionElement(event && event.target);
+      if (!nativeText && event && event.type === 'copy' && global.getSelection) {
+        var selection = global.getSelection();
+        nativeText = selection && !selection.isCollapsed && nativeSelectionElement(selection.anchorNode);
+      }
+      if (nativeText && event && /^(mouse|pointer|touch|key|contextmenu|copy|cut|paste)/.test(event.type)
+          && event.currentTarget !== nativeText
+          // An unpressed move updates framework hover styles and tooltips. Active
+          // native-selection moves were rejected by the gesture marker above.
+          && !(/^(mouse|pointer)move$/.test(event.type) && !event.buttons)
+          && (!/^key/.test(event.type) || nativeTextOwnsKey(event, nativeText))) return;
+      // Programmatic scroll replay must not feed the model its browser-clamped
+      // value, especially while a paint or keyboard viewport change is pending.
+      if (nativeText && event.type === 'scroll'
+          && nativeText.scrollTop === nativeText.__cn1AppliedScrollTop) return;
+      if (nativeText && event.type === 'scroll') nativeText.__cn1AppliedScrollTop = nativeText.scrollTop;
+      if (event && event.type === 'contextmenu' && event.target
+          && event.target.id === 'codenameone-canvas'
+          && event.target.getAttribute('data-cn1-text-selection') === 'true') {
+        event.preventDefault();
+      }
       var target = global.__parparWorker;
       if (!target || typeof target.postMessage !== 'function') {
         return;
@@ -2236,6 +2420,17 @@
     var kind = payload.kind;
     var member = payload.member;
     var args = mapHostArgs(payload.args || []);
+    // A semantic snapshot may have been queued before the user's native focus
+    // gesture. Do not let its late focus request steal the editor's first input
+    // or selection. An intentional CN1 focus change blurs the editor first via
+    // its FocusListener, so it still reaches the semantic target normally.
+    // Read-only selection never acquires CN1 focus and has no such focusLost
+    // handoff, so it must not block the application's semantic focus requests.
+    var activeEditor = global.document && global.document.activeElement;
+    if (member === 'focus' && receiver.closest && receiver.closest('#cn1-accessibility-tree')
+        && activeEditor && /^(INPUT|TEXTAREA)$/.test(activeEditor.tagName)
+        && !activeEditor.readOnly && !activeEditor.disabled
+        && nativeSelectionElement(activeEditor)) return null;
     var value;
     if (kind === 'getter') {
       value = receiver[member];
@@ -2364,7 +2559,7 @@
     // Text-layer DOM mutations. They ride the draw stream so the elements and the pixels of
     // one frame are applied in one task; see SurfaceCommandRecorder.OP_TEXT_* and TextLayerOp.
     TEXT_ATTACH: 90, TEXT_DETACH: 91, TEXT_CLIP_CSS: 92, TEXT_RUN_CSS: 93,
-    TEXT_CONTENT: 94, TEXT_CLEAR: 95, TEXT_DISPLAY: 96
+    TEXT_CONTENT: 94, TEXT_CLEAR: 95, TEXT_DISPLAY: 96, TEXT_SCROLL: 97, TEXT_ORDER: 98
   };
   // The display surface id. Mirrors HTML5Implementation.DISPLAY_SURFACE_ID.
   var SURF_DISPLAY_ID = 1;
@@ -3135,6 +3330,22 @@
   }
 
   // Replay one command stream (opcodes + nums + objs) onto ``ctx``.
+  function reconcileNativeTextOrder() {
+    var doc = global.document;
+    var layer = doc && doc.getElementById('cn1-text-layer');
+    if (!layer || !layer.__cn1OrderDirty) return;
+    var selection = global.getSelection && global.getSelection();
+    if (selection && !selection.isCollapsed
+        && (layer.contains(selection.anchorNode) || layer.contains(selection.focusNode))) return;
+    var ordered = Array.prototype.slice.call(layer.children).sort(function(a, b) {
+      return Number(a.__cn1TextOrder || 0) - Number(b.__cn1TextOrder || 0);
+    });
+    for (var i = 0; i < ordered.length; i++) {
+      if (layer.children[i] !== ordered[i]) layer.insertBefore(ordered[i], layer.children[i] || null);
+    }
+    layer.__cn1OrderDirty = false;
+  }
+
   function replaySurfaceCommands(ctx, ops, opCount, nums, objs) {
     var ni = 0; // num cursor
     var oi = 0; // obj cursor
@@ -3361,6 +3572,7 @@
           // it, which drops any selection or focus inside it.
           if (taParent && taChild && taChild.parentNode !== taParent) {
             taParent.appendChild(taChild);
+            taParent.__cn1OrderDirty = true;
           }
           break;
         }
@@ -3381,6 +3593,15 @@
           }
           break;
         }
+        case SURF.TEXT_ORDER: {
+          var toEl = surfaceTextElement(objs[oi++]);
+          var toOrder = Number(objs[oi++]);
+          if (toEl) {
+            toEl.__cn1TextOrder = toOrder;
+            if (toEl.parentNode) toEl.parentNode.__cn1OrderDirty = true;
+          }
+          break;
+        }
         case SURF.TEXT_CONTENT: {
           var ttEl = surfaceTextElement(objs[oi++]);
           var ttText = objs[oi++];
@@ -3393,6 +3614,15 @@
           var tclEl = surfaceTextElement(objs[oi++]);
           if (tclEl) {
             tclEl.innerHTML = '';
+          }
+          break;
+        }
+        case SURF.TEXT_SCROLL: {
+          var tsEl = surfaceTextElement(objs[oi++]);
+          var tsY = Number(objs[oi++]);
+          if (tsEl) {
+            tsEl.scrollTop = tsY;
+            tsEl.__cn1AppliedScrollTop = tsEl.scrollTop;
           }
           break;
         }
@@ -3411,6 +3641,7 @@
           break;
       }
     }
+    reconcileNativeTextOrder();
   }
 
   // Create / resize a surface. Fire-and-forget. Idempotent: an existing surface
@@ -6917,6 +7148,7 @@
   }
 
   function installWorkerMode() {
+    installNativeTextInteractions();
     log('worker-mode');
     diag('BOOT', 'bridgeMode', 'worker');
     var workerUrl = 'worker.js';

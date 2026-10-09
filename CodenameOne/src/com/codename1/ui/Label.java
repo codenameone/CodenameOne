@@ -1527,6 +1527,13 @@ public class Label extends Component implements IconHolder, TextHolder {
         if (enabled) {
             setCursor(Component.TEXT_CURSOR);
         }
+        // Refresh the containing paint tree so native text layers can update hit testing.
+        TopLevelContainer top = getTopLevelContainer();
+        if (top != null) {
+            top.asContainer().repaint();
+        } else {
+            repaint();
+        }
     }
 
     @Override

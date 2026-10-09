@@ -45,6 +45,7 @@ on:
       - 'vm/backend/src/**'
       - 'vm/backend/impl/**'
       - 'vm/backend/shared-sources.sh'
+      - 'vm/backend/package-docs/**'
       # build.sh renders the Port Status JDK 25 table with this script's `summary`, so a
       # change to its output shape must go through the Hugo build and validate_port_status.
       # The baseline DATA (vm/selfhost/perf-baseline/**) is left out on purpose: a row
@@ -83,6 +84,7 @@ on:
       - 'vm/backend/src/**'
       - 'vm/backend/impl/**'
       - 'vm/backend/shared-sources.sh'
+      - 'vm/backend/package-docs/**'
       # As above: the JDK 25 table's renderer.
       - 'vm/selfhost/perf_baseline.py'
       - '.github/workflows/website-docs.yml'
@@ -362,7 +364,7 @@ jobs:
         run: |
           set -euo pipefail
           cd scripts
-          npm install playwright
+          npm ci
           bash "$GITHUB_WORKSPACE/scripts/ci/apt-get-update.sh"
           npx playwright install-deps chromium firefox
           npx playwright install chromium firefox

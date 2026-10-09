@@ -60,6 +60,22 @@
                 </exclusion>
             </exclusions>
         </dependency>
+        <!-- Test only: a test that fakes org.gradle.api.Task with a dynamic proxy
+             needs every type the interface names, and Task.getAnt() names
+             Gradle's AntBuilder, whose superclass is in groovy-ant (left out with
+             groovy-all above). -->
+        <dependency>
+            <groupId>org.codehaus.groovy</groupId>
+            <artifactId>groovy-ant</artifactId>
+            <version>3.0.22</version>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>

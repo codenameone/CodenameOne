@@ -42,7 +42,7 @@ public class DateFormatSymbols implements Cloneable {
     private static final String L10N_MONTH_SHORTNAME = "MONTH_SHORTNAME_";
     private static final String L10N_AMPM = "AMPM_";
     private static final String L10N_ERA = "ERA_";
-    private static final String[] MONTHS = {"January", "February", "March", "April", "May", "June", "July", "August",
+    static final String[] MONTHS = {"January", "February", "March", "April", "May", "June", "July", "August",
             "September", "October", "November", "December"};
     private static final String[] WEEKDAYS = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
             "Saturday"};
@@ -241,7 +241,8 @@ public class DateFormatSymbols implements Cloneable {
         String[] shortForms = new String[longForms.length];
         int sflen = shortForms.length;
         for (int i = 0; i < sflen; i++) {
-            String defaultVal = longForms == MONTHS ? getPlatformLocalizedShortMonths()[i] : null;
+            String[] platformShort = longForms == MONTHS ? getPlatformLocalizedShortMonths() : null;
+            String defaultVal = platformShort == null ? null : platformShort[i];
             String shortForm = getLocalizedValue(l10nKey + longForms[i].toUpperCase(), defaultVal);
             if (shortForm != null) {
                 shortForms[i] = shortForm;
@@ -336,9 +337,11 @@ public class DateFormatSymbols implements Cloneable {
         return platformLocalizedMonths;
     }
 
+    /// The platform's short month names, or null when not localized: the
+    /// caller then derives them from the English long names.
     private String[] getPlatformLocalizedShortMonths() {
         if (!localized) {
-            return MONTHS;
+            return null;
         }
         if (platformLocalizedShortMonths == null) {
             int len = MONTHS.length;
@@ -348,7 +351,7 @@ public class DateFormatSymbols implements Cloneable {
             cal.set(Calendar.DAY_OF_MONTH, 15);
             for (int i = 0; i < len; i++) {
                 cal.set(Calendar.MONTH, i);
-                platformLocalizedMonths[i] = l10n.getShortMonthName(cal.getTime());
+                platformLocalizedShortMonths[i] = l10n.getShortMonthName(cal.getTime());
             }
         }
         return platformLocalizedShortMonths;

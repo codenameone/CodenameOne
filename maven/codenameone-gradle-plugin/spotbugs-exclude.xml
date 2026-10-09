@@ -18,6 +18,7 @@
         <Or>
             <Class name="com.codename1.gradle.tasks.ComplianceAction"/>
             <Class name="com.codename1.gradle.tasks.ProcessAnnotationsAction"/>
+            <Class name="com.codename1.gradle.tasks.RemapAndroidAction"/>
         </Or>
         <Method name="&lt;init&gt;"/>
         <Bug pattern="EI_EXPOSE_REP2"/>
@@ -51,6 +52,13 @@
                 <Class name="com.codename1.gradle.tasks.SplitOutputCheck"/>
                 <Method name="&lt;init&gt;"/>
                 <Field name="classesDirs"/>
+            </And>
+            <!-- The directories RemapAndroidAction scans for onClick handlers: the
+                 same source-set view, Kotlin's output included once it exists. -->
+            <And>
+                <Class name="com.codename1.gradle.tasks.RemapAndroidAction"/>
+                <Method name="&lt;init&gt;"/>
+                <Field name="handlerDirs"/>
             </And>
         </Or>
         <Bug pattern="EI_EXPOSE_REP2"/>

@@ -131,6 +131,8 @@ include::Backend-Data.asciidoc[]
 
 include::Backend-Sessions.asciidoc[]
 
+include::Backend-Security.asciidoc[]
+
 include::Backend-Scheduling.asciidoc[]
 
 include::Backend-Observability.asciidoc[]
@@ -240,6 +242,8 @@ include::App-Store-Submission.asciidoc[]
 include::Working-With-iOS.asciidoc[]
 
 include::Working-With-Javascript.asciidoc[]
+
+include::Android-Interop.asciidoc[]
 
 include::Working-with-Mac-OS-X.asciidoc[]
 

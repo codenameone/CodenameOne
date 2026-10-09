@@ -66,12 +66,19 @@ public class JS {
         return o == null || (o instanceof JSObject && isUndefined((JSObject)o));
     }
     
-    public static String unwrapString(JSObject o) {
+    /// Takes `Object` because a JS string never reaches Java as a `JSString`:
+    /// the bridge answers every string result, an array element included, as a
+    /// `java.lang.String`, whatever type was declared. The JavaScript VM checks
+    /// casts, so casting one to `JSString` or `JSObject` throws
+    /// ClassCastException.
+    public static String unwrapString(Object o) {
+        if (o instanceof String) {
+            return (String) o;
+        }
         if (isUndefined(o)) {
             return null;
-        } else {
-            return ((JSString)o).stringValue();
         }
+        return ((JSString) o).stringValue();
     }
     
     @JSBody(params={"o"}, script="return o ? true : false")
@@ -99,8 +106,12 @@ public class JS {
         int len = input.getLength();
         String[] out = new String[len];
         for (int i=0; i<len; i++) {
-            JSString el = input.get(i);
-            out[i] = el != null && !JS.isUndefined(el) ? el.stringValue() : null;
+            // Read as Object: assigning the element to a JSString variable is a
+            // cast, and the element is a java.lang.String (see unwrapString).
+            // LocalForage.keys() used to swallow that ClassCastException and
+            // answer no keys, so every listFiles on this port was empty.
+            Object el = input.get(i);
+            out[i] = unwrapString(el);
         }
         return out;
     }
@@ -233,7 +244,7 @@ for (int i=0; i<len; i++) {
             char[] out = new char[len];
             
 for (int i=0; i<len; i++) {
-            out[i] = (char)(unwrapString((JSObject)jarr.get(i)).charAt(0) );
+            out[i] = (char)(unwrapString(jarr.get(i)).charAt(0) );
         }
             return out;
         } else if (JSType.STRING.equals(getType(arr))) {

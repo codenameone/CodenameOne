@@ -25,6 +25,7 @@ package com.codename1.io.rest;
 
 import com.codename1.compat.java.util.Objects;
 import com.codename1.io.ConnectionRequest;
+import com.codename1.io.RequestAuthorizer;
 import com.codename1.io.Data;
 import com.codename1.io.JSONParser;
 import com.codename1.io.Log;
@@ -94,6 +95,7 @@ public class RequestBuilder {
     private boolean insecure;
     private Boolean useBoolean;
     private Boolean useLongs;
+    private RequestAuthorizer authorizer;
 
     RequestBuilder(String method, String url) {
         this.method = method;
@@ -577,6 +579,30 @@ public class RequestBuilder {
     /// RequestBuilder instance
     public RequestBuilder bearer(String token) {
         header("Authorization", "Bearer " + token);
+        return this;
+    }
+
+    /// Gives the request an authorizer: the source of its `Authorization` header, renewed
+    /// and sent again once if the service answers `401`. See [RequestAuthorizer].
+    ///
+    /// Without this call the request uses whatever
+    /// [com.codename1.io.NetworkManager#setAuthorizer(String, RequestAuthorizer)] registered
+    /// for its URL. A header set with [#header(String, String)], [#bearer(String)] or
+    /// [#basicAuth(String, String)] wins over either. The blocking methods of this builder,
+    /// such as [#getAsString()], return the final answer like the asynchronous ones: a
+    /// renewal and the second attempt happen before they do.
+    ///
+    /// #### Parameters
+    ///
+    /// - `authorizer`: the authorizer, or [RequestAuthorizer#NONE] to send this request
+    ///   without even the default one
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instance
+    public RequestBuilder authorizer(RequestAuthorizer authorizer) {
+        checkFetched();
+        this.authorizer = authorizer;
         return this;
     }
 
@@ -1119,6 +1145,9 @@ public class RequestBuilder {
         }
 
         req.setInsecure(insecure);
+        if (authorizer != null) {
+            req.setAuthorizer(authorizer);
+        }
         if (cookiesEnabled != null) {
             req.setCookiesEnabled(cookiesEnabled);
         }

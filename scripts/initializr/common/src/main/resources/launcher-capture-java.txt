@@ -1,0 +1,83 @@
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+/**
+ * Runs the Maven wrapper for build.bat and keeps a copy of its output, so the
+ * launcher can say in one word why a build stopped -- the same way build.sh
+ * does with tee. cmd cannot copy a program's output without either hiding it
+ * from you or losing the program's exit code; this does neither. Your keyboard
+ * still reaches Maven, its output still reaches your console byte for byte,
+ * and this exits with Maven's own status.
+ *
+ * Usage (from .mvn\cn1-capture.cmd): java Cn1Capture.java LOG MARKER MVNW ARGS...
+ * MARKER is created once Maven HAS started: cn1-capture.cmd runs Maven itself
+ * if it is missing, so a helper or a launch that failed never costs a build. The log
+ * is only read for the reason and deleted by build.bat afterwards; a log this
+ * could not write completely is deleted here, so a lost line is never misread.
+ */
+public class Cn1Capture {
+    private static volatile boolean logFailed;
+
+    public static void main(String[] args) throws Exception {
+        List<String> command = new ArrayList<>(Arrays.asList(args).subList(2, args.length));
+        Process maven = new ProcessBuilder(command).redirectInput(ProcessBuilder.Redirect.INHERIT).start();
+        new File(args[1]).createNewFile();
+        File logFile = new File(args[0]);
+        OutputStream log;
+        try {
+            log = new FileOutputStream(logFile, true);
+        } catch (IOException noLog) {
+            log = null; // no copy, no reason; the build itself is unaffected
+        }
+        Thread out = copy(maven.getInputStream(), System.out, log);
+        Thread err = copy(maven.getErrorStream(), System.err, log);
+        int code = maven.waitFor();
+        out.join();
+        err.join();
+        if (log != null) {
+            try {
+                log.close();
+            } catch (IOException closing) {
+                logFailed = true;
+            }
+            if (logFailed) {
+                logFile.delete();
+            }
+        }
+        System.out.flush();
+        System.err.flush();
+        System.exit(code);
+    }
+
+    private static Thread copy(InputStream from, OutputStream console, OutputStream log) {
+        Thread t = new Thread(() -> {
+            byte[] buffer = new byte[8192];
+            try {
+                int n;
+                while ((n = from.read(buffer)) > 0) {
+                    console.write(buffer, 0, n);
+                    console.flush();
+                    if (log != null && !logFailed) {
+                        synchronized (log) {
+                            try {
+                                log.write(buffer, 0, n);
+                            } catch (IOException full) {
+                                // a full disk loses the copy, never the build output
+                                logFailed = true;
+                            }
+                        }
+                    }
+                }
+            } catch (IOException ignored) {
+            }
+        });
+        t.start();
+        return t;
+    }
+}

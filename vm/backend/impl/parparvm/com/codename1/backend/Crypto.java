@@ -163,6 +163,217 @@ public final class Crypto {
         return actual != null && equalsConstantTime(expected, actual);
     }
 
+    /// The digest names [#hmac] and [#pbkdf2] take.
+    public static final String SHA1 = "SHA-1";
+    public static final String SHA256 = "SHA-256";
+    public static final String SHA384 = "SHA-384";
+    public static final String SHA512 = "SHA-512";
+
+    /// RSASSA-PKCS1-v1_5 over SHA-256, SHA-384 and SHA-512: the same bytes for
+    /// the same key and message, every time.
+    public static final String RS256 = "RS256";
+    public static final String RS384 = "RS384";
+    public static final String RS512 = "RS512";
+    /// RSASSA-PSS over SHA-256 with MGF1-SHA-256 and a 32 byte salt.
+    public static final String PS256 = "PS256";
+    /// ECDSA over P-256 with SHA-256, and over P-384 with SHA-384.
+    public static final String ES256 = "ES256";
+    public static final String ES384 = "ES384";
+
+    /// SHA-384; null for null.
+    public static byte[] sha384(byte[] data) {
+        return digestImpl(3, data);
+    }
+
+    /// SHA-512; null for null.
+    public static byte[] sha512(byte[] data) {
+        return digestImpl(4, data);
+    }
+
+    /// HMAC over one of [#SHA1], [#SHA256], [#SHA384] and [#SHA512]. SHA-1 is
+    /// here for what specifies it by name -- a TOTP secret an authenticator
+    /// application already holds, Spring's oldest password format -- and not for
+    /// anything new.
+    ///
+    /// @return the tag, or null when `key` or `data` is null
+    /// @throws IllegalArgumentException for a digest that is not one of the four
+    public static byte[] hmac(String digest, byte[] key, byte[] data) {
+        return hmacImpl(digestCode(digest), key, data);
+    }
+
+    /// PBKDF2 over HMAC with one of [#SHA1], [#SHA256], [#SHA384] and [#SHA512],
+    /// on the password's bytes as they are given.
+    ///
+    /// @throws IOException when a count is not positive or derivation fails
+    public static byte[] pbkdf2(String digest, byte[] password, byte[] salt, int iterations,
+                                int length) throws IOException {
+        int code = digestCode(digest);
+        if (password == null || salt == null) {
+            throw new IOException("A password and a salt are required");
+        }
+        if (iterations <= 0 || length <= 0) {
+            throw new IOException("iterations and length must both be positive");
+        }
+        byte[] out = pbkdf2DigestImpl(code, password, salt, iterations, length);
+        if (out == null) {
+            throw new IOException("Key derivation failed");
+        }
+        return out;
+    }
+
+    /// Signs `data` with a private key in PKCS#8 DER, under one of [#RS256],
+    /// [#RS384], [#RS512], [#PS256], [#ES256] and [#ES384].
+    ///
+    /// The key has to be of the kind the algorithm is defined over: an RSA key
+    /// for the first four, a P-256 key for ES256, a P-384 key for ES384. Any
+    /// other pairing is refused rather than adapted to.
+    ///
+    /// An ECDSA signature is returned as ASN.1 DER, the SEQUENCE of r and s both
+    /// OpenSSL and the JDK produce. JOSE wants the two numbers side by side
+    /// instead; `com.codename1.backend.security.crypto.Der` converts.
+    ///
+    /// @throws IOException when the key cannot be read, does not fit the
+    /// algorithm, or signing fails
+    public static byte[] sign(String algorithm, byte[] privateKey, byte[] data) throws IOException {
+        int code = signatureCode(algorithm);
+        if (privateKey == null || data == null) {
+            throw new IOException("A key and data are required");
+        }
+        byte[] out = signImpl(code, privateKey, data);
+        if (out == null) {
+            throw new IOException("Could not sign with " + algorithm
+                    + ": the key is not a PKCS#8 key of the kind that algorithm uses");
+        }
+        return out;
+    }
+
+    /// Checks a signature against a public key in SubjectPublicKeyInfo DER. The
+    /// algorithms and the pairing of key and algorithm are those of [#sign], and
+    /// an ECDSA signature is given as ASN.1 DER.
+    ///
+    /// @return true when `signature` is that key's signature of `data`; false
+    /// when it is not, whatever is wrong with it
+    /// @throws IOException when the question could not be asked: the key cannot
+    /// be read or does not fit the algorithm. A key that is broken is never
+    /// reported as a signature that is forged.
+    public static boolean verify(String algorithm, byte[] publicKey, byte[] data, byte[] signature)
+            throws IOException {
+        int code = signatureCode(algorithm);
+        if (publicKey == null || data == null) {
+            throw new IOException("A key and data are required");
+        }
+        if (signature == null) {
+            return false;
+        }
+        int answer = verifyImpl(code, publicKey, data, signature);
+        if (answer < 0) {
+            throw new IOException("Could not verify with " + algorithm
+                    + ": the key is not a SubjectPublicKeyInfo of the kind that algorithm uses");
+        }
+        return answer == 1;
+    }
+
+    /// A new RSA private key as PKCS#8 DER, with the public exponent 65537.
+    ///
+    /// For a development profile, so a server that signs tokens starts without
+    /// a key file. A key made at start-up is gone at the next one, and every
+    /// token signed with it stops verifying: a deployed server loads its key.
+    ///
+    /// @param bits 2048 to 8192
+    public static byte[] generateRsaKey(int bits) throws IOException {
+        if (bits < 2048 || bits > 8192) {
+            throw new IOException("An RSA key is 2048 to 8192 bits, not " + bits);
+        }
+        byte[] out = generateRsaKeyImpl(bits);
+        if (out == null) {
+            throw new IOException("Could not generate an RSA key");
+        }
+        return out;
+    }
+
+    /// AES-GCM. The result is the ciphertext followed by the 16 byte tag.
+    ///
+    /// The nonce must never repeat under one key: 12 bytes from [#randomBytes]
+    /// for each call is the ordinary way, stored beside the result.
+    ///
+    /// @param key 16, 24 or 32 bytes
+    /// @param iv the nonce; 12 bytes unless a protocol says otherwise
+    /// @param aad data that is authenticated and not encrypted; null for none
+    public static byte[] aesGcmEncrypt(byte[] key, byte[] iv, byte[] aad, byte[] plaintext)
+            throws IOException {
+        checkGcm(key, iv, plaintext, 0);
+        byte[] out = aesGcmImpl(true, key, iv, aad, plaintext);
+        if (out == null) {
+            throw new IOException("AES-GCM encryption failed");
+        }
+        return out;
+    }
+
+    /// Opens what [#aesGcmEncrypt] sealed.
+    ///
+    /// @return the plaintext, or null when the tag does not match: the key, the
+    /// nonce, the associated data or the sealed bytes are not the ones it was
+    /// made with
+    /// @throws IOException when the sizes are not ones AES-GCM has
+    public static byte[] aesGcmDecrypt(byte[] key, byte[] iv, byte[] aad, byte[] sealed)
+            throws IOException {
+        checkGcm(key, iv, sealed, 16);
+        return aesGcmImpl(false, key, iv, aad, sealed);
+    }
+
+    private static int digestCode(String digest) {
+        if (SHA256.equals(digest)) {
+            return 2;
+        }
+        if (SHA1.equals(digest)) {
+            return 1;
+        }
+        if (SHA384.equals(digest)) {
+            return 3;
+        }
+        if (SHA512.equals(digest)) {
+            return 4;
+        }
+        throw new IllegalArgumentException("Not a supported digest: " + digest);
+    }
+
+    private static int signatureCode(String algorithm) throws IOException {
+        if (RS256.equals(algorithm)) {
+            return 1;
+        }
+        if (RS384.equals(algorithm)) {
+            return 2;
+        }
+        if (RS512.equals(algorithm)) {
+            return 3;
+        }
+        if (PS256.equals(algorithm)) {
+            return 4;
+        }
+        if (ES256.equals(algorithm)) {
+            return 5;
+        }
+        if (ES384.equals(algorithm)) {
+            return 6;
+        }
+        throw new IOException("Not a supported signature algorithm: " + algorithm);
+    }
+
+    private static void checkGcm(byte[] key, byte[] iv, byte[] input, int minimum) throws IOException {
+        if (key == null || iv == null || input == null) {
+            throw new IOException("AES-GCM needs a key, a nonce and data");
+        }
+        if (key.length != 16 && key.length != 24 && key.length != 32) {
+            throw new IOException("An AES key is 16, 24 or 32 bytes, not " + key.length);
+        }
+        if (iv.length == 0) {
+            throw new IOException("AES-GCM needs a nonce");
+        }
+        if (input.length < minimum) {
+            throw new IOException("Too short to carry an AES-GCM tag");
+        }
+    }
+
     static byte[] pbkdf2(byte[] password, byte[] salt, int iterations, int length) throws IOException {
         byte[] out = pbkdf2Impl(password, salt, iterations, length);
         if (out == null) {
@@ -205,4 +416,13 @@ public final class Crypto {
     private static native byte[] pbkdf2Impl(byte[] password, byte[] salt, int iterations, int length);
     private static native byte[] randomBytesImpl(int length);
     private static native boolean equalsConstantTimeImpl(byte[] a, byte[] b);
+    private static native byte[] digestImpl(int algorithm, byte[] data);
+    private static native byte[] hmacImpl(int algorithm, byte[] key, byte[] data);
+    private static native byte[] pbkdf2DigestImpl(int algorithm, byte[] password, byte[] salt,
+                                                  int iterations, int length);
+    private static native byte[] signImpl(int algorithm, byte[] pkcs8, byte[] data);
+    private static native int verifyImpl(int algorithm, byte[] spki, byte[] data, byte[] signature);
+    private static native byte[] generateRsaKeyImpl(int bits);
+    private static native byte[] aesGcmImpl(boolean encrypt, byte[] key, byte[] iv, byte[] aad,
+                                            byte[] input);
 }

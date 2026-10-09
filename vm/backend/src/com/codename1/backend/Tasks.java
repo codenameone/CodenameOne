@@ -91,6 +91,18 @@ public final class Tasks {
         HttpServer server;
         /// Whether a server opened this registry, as opposed to a bare process.
         final boolean ownedByServer;
+        /// The beans the wiring registered by name for the woven code to call --
+        /// a bean an authorization expression names -- or null. Kept here because
+        /// this is what a thread carries of the server it works for.
+        private Map namedBeans;
+
+        synchronized void namedBeans(Map beans) {
+            this.namedBeans = beans;
+        }
+
+        synchronized Object namedBean(String name) {
+            return namedBeans == null ? null : namedBeans.get(name);
+        }
 
         Registry(Config config, boolean ownedByServer) {
             this.config = config;
@@ -162,6 +174,12 @@ public final class Tasks {
             }
             return (Registry) LIVE.get(LIVE.size() - 1);
         }
+    }
+
+    /// The bean the wiring of the calling thread's server registered under
+    /// `name`, or null.
+    static Object namedBean(String name) {
+        return current().namedBean(name);
     }
 
     /// The executor called `name` of the calling thread's server, created

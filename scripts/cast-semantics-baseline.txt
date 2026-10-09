@@ -27,7 +27,6 @@ com/codename1/impl/ios/IOSImplementation$Loc#getGeofenceListener(Ljava/lang/Stri
 com/codename1/impl/ios/IOSImplementation$Loc#getGeofenceListener(Ljava/lang/String;)Lcom/codename1/location/GeofenceListener;|cast to java.lang.String inside catch(java.lang.Throwable)
 com/codename1/impl/ios/IOSInferenceImpl#metadata(IZ)[Lcom/codename1/ai/inference/TensorInfo;|cast to java.util.Map inside catch(java.lang.Exception)
 com/codename1/io/Socket$1Listener#run()V|cast to com.codename1.io.SocketConnection inside catch(java.lang.RuntimeException)
-com/codename1/io/oidc/TokenStore$DefaultStorageTokenStore#load(Ljava/lang/String;)Lcom/codename1/util/AsyncResource;|cast to java.lang.String inside catch(java.lang.Throwable)
 com/codename1/io/rest/RequestBuilder#getAsPropertyList(Ljava/lang/Class;Ljava/lang/String;)Lcom/codename1/io/rest/Response;|cast to java.util.List inside catch(java.lang.RuntimeException)
 com/codename1/location/GeofenceManager#getExpiryTimes(Z)Ljava/util/Map;|cast to java.util.Map inside catch(java.lang.Throwable)
 com/codename1/location/GeofenceManager#getListener()Lcom/codename1/location/GeofenceListener;|cast to com.codename1.location.GeofenceListener inside catch(java.lang.Throwable)

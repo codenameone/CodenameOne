@@ -259,6 +259,16 @@ public final class ProjectLayout {
         return file(projectDir, "src", "main", "rad", "views");
     }
 
+    /// An Android application's sources (`AndroidManifest.xml`, `res/`,
+    /// `assets/`, `java/`), laid out like an Android Studio module's
+    /// `src/main`; compiled onto the Android compatibility runtime.
+    public File androidSourceDir() {
+        if (isAnt()) {
+            return file(projectDir, "android-src");
+        }
+        return srcMain("android");
+    }
+
     /// The directory the Game Builder saves scenes to.
     public File gamesDir() {
         return new File(resourcesDir(), "games");

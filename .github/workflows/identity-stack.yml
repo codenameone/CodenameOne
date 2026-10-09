@@ -294,11 +294,6 @@ jobs:
         run: |
           set -euo pipefail
           cd Ports/iOSPort/nativeSources
-          SDK="$(xcrun --show-sdk-path --sdk iphoneos)"
-          if [ ! -d "$SDK" ]; then
-            echo "::error::No iPhoneOS SDK available on this runner"
-            exit 1
-          fi
           # The .m files include "xmlvm.h" and use ParparVM's CN1_THREAD_*
           # macros. Those live in the ParparVM build pipeline, not in this
           # checkout, so we stage a minimal shim header that defines the
@@ -328,38 +323,48 @@ jobs:
           #define CN1_THREAD_GET_STATE_PASS_ARG threadStateData,
           #define CN1_THREAD_GET_STATE_PASS_SINGLE_ARG threadStateData
           EOF
-          # Exercise BOTH configurations -- the "stubs" path (apps that
-          # don't reference com.codename1.io.oidc / AppleSignIn) and the
-          # "full" path (apps that do). IPhoneBuilder flips the macros on
-          # via the classpath scanner; we want either to keep building.
-          for label in stubs full; do
-            extra=""
-            if [ "$label" = full ]; then
-              extra="-DCN1_INCLUDE_OIDC -DCN1_INCLUDE_APPLESIGNIN -DCN1_INCLUDE_WEBAUTHN"
-            fi
-            echo "::group::clang $label"
-            # -fmodules because the port's Metal sources use @import, and the
-            # real build compiles with CLANG_ENABLE_MODULES=YES. The renderer
-            # header used to be unreachable here -- CN1_USE_METAL was a
-            # commented-out define the builder uncommented -- so a lint with
-            # modules off never saw the @import. Metal is the only renderer
-            # now and the define is unconditional, so this lint has to compile
-            # the way the product does or it fails on syntax the product
-            # accepts.
-            xcrun --sdk iphoneos clang \
-                -fsyntax-only \
-                -fmodules \
-                -fmodules-cache-path="$STUB/modulecache" \
-                -arch arm64 \
-                -fobjc-arc \
-                -Werror=incompatible-pointer-types \
-                -Werror=objc-method-access \
-                -Wno-unused-parameter \
-                -I"$STUB" \
-                -DNEW_CODENAME_ONE_VM=1 \
-                $extra \
-                CN1OidcBrowser.m \
-                CN1AppleSignIn.m \
-                CN1WebAuthn.m
-            echo "::endgroup::"
+          # Identity sources are copied into the watch companion too. Compile
+          # the actual SDK variants so unavailable presentation APIs fail here.
+          for sdk in iphoneos watchos; do
+            SDK="$(xcrun --show-sdk-path --sdk "$sdk")"
+            case "$sdk" in
+              iphoneos) target=arm64-apple-ios12.0 ;;
+              watchos) target=arm64_32-apple-watchos6.2 ;;
+            esac
+            # Exercise BOTH configurations -- the "stubs" path (apps that
+            # don't reference com.codename1.io.oidc / AppleSignIn) and the
+            # "full" path (apps that do). IPhoneBuilder flips the macros on
+            # via the classpath scanner; we want either to keep building.
+            for label in stubs full; do
+              extra=""
+              if [ "$label" = full ]; then
+                extra="-DCN1_INCLUDE_OIDC -DCN1_INCLUDE_APPLESIGNIN -DCN1_INCLUDE_WEBAUTHN"
+              fi
+              echo "::group::clang $sdk $label"
+              # -fmodules because the port's Metal sources use @import, and the
+              # real build compiles with CLANG_ENABLE_MODULES=YES. The renderer
+              # header used to be unreachable here -- CN1_USE_METAL was a
+              # commented-out define the builder uncommented -- so a lint with
+              # modules off never saw the @import. Metal is the only renderer
+              # now and the define is unconditional, so this lint has to compile
+              # the way the product does or it fails on syntax the product
+              # accepts.
+              xcrun --sdk "$sdk" clang \
+                  -fsyntax-only \
+                  -fmodules \
+                  -fmodules-cache-path="$STUB/modulecache" \
+                  -target "$target" \
+                  -isysroot "$SDK" \
+                  -fobjc-arc \
+                  -Werror=incompatible-pointer-types \
+                  -Werror=objc-method-access \
+                  -Wno-unused-parameter \
+                  -I"$STUB" \
+                  -DNEW_CODENAME_ONE_VM=1 \
+                  $extra \
+                  CN1OidcBrowser.m \
+                  CN1AppleSignIn.m \
+                  CN1WebAuthn.m
+              echo "::endgroup::"
+            done
           done

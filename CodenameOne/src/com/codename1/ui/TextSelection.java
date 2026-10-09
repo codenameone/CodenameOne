@@ -196,7 +196,7 @@ public class TextSelection {
     private Component selectionRoot;
     private boolean ignoreEvents;
     /// The listener that handles all of the pointer events to update the selections.
-    private final ActionListener pressListener = new ActionListener() {
+    private final ActionListener pressListener = new Component.NativeTextSelectionListener() {
         final Rectangle startSelectedBounds = new Rectangle();
         private final int ONE_MM = CN.convertToPixels(1);
         int startX;
@@ -481,7 +481,15 @@ public class TextSelection {
     ///
     /// - `selectable`: true to make read-only text selectable by default
     public static void setDefaultSelectable(boolean selectable) {
+        boolean changed = defaultSelectable != selectable;
         defaultSelectable = selectable;
+        if (changed && Display.isInitialized()) {
+            Form current = Display.getInstance().getCurrent();
+            if (current != null) {
+                current.repaint();
+            }
+            Desktop.getInstance().repaintWindows();
+        }
     }
 
     /// Whether read-only text is selectable by default. See `#setDefaultSelectable(boolean)`.
@@ -580,6 +588,7 @@ public class TextSelection {
                 f.removeLongPressListener(pressListener);
                 Display.impl.deinitializeTextSelection(this);
             }
+            f.repaint();
         }
     }
 

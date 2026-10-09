@@ -1,0 +1,103 @@
+name: Android compatibility
+
+# Classic Android applications built as Codename One applications: the resource
+# compiler (maven/android-res-compiler), the android.* runtime
+# (maven/android-compat) and the build steps that compile, relocate and package
+# them (build-engine, the Maven and Gradle plugins, the archetype profile).
+#
+#   unit tests                    the compiler's encoding and qualifier rules,
+#                                 the runtime's table reader, the remapper and
+#                                 the project importer
+#   android-compat-test.sh        every sample under scripts/android-compat-samples
+#                                 imported unmodified, built by Maven and Gradle,
+#                                 checked for unrelocated android.* references,
+#                                 and staged for iOS, Android, JavaScript and the
+#                                 desktop with identical uploads from both tools
+on:
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'maven/android-compat/**'
+      - 'maven/android-res-compiler/**'
+      - 'maven/build-engine/**'
+      - 'maven/codenameone-maven-plugin/**'
+      - 'maven/codenameone-gradle-plugin/**'
+      - 'maven/project-model/**'
+      - 'maven/cn1app-archetype/**'
+      - 'maven/pom.xml'
+      - 'maven/integration-tests/android-compat-test.sh'
+      - 'maven/integration-tests/android-gradle-incremental-test.sh'
+      - 'maven/integration-tests/inc/**'
+      - 'scripts/android-compat-samples/**'
+      - '.github/workflows/android-compat.yml'
+  push:
+    branches: [ master ]
+    paths:
+      - 'maven/android-compat/**'
+      - 'maven/android-res-compiler/**'
+      - 'maven/build-engine/**'
+      - 'maven/codenameone-maven-plugin/**'
+      - 'maven/codenameone-gradle-plugin/**'
+      - 'maven/project-model/**'
+      - 'maven/cn1app-archetype/**'
+      - 'maven/pom.xml'
+      - 'maven/integration-tests/android-compat-test.sh'
+      - 'maven/integration-tests/android-gradle-incremental-test.sh'
+      - 'maven/integration-tests/inc/**'
+      - 'scripts/android-compat-samples/**'
+      - '.github/workflows/android-compat.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  android-compat:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CN1_GRADLE_REQUIRED: '1'
+    steps:
+      - uses: actions/checkout@v6
+      # Installed FIRST so the JDK 8 below is the one JAVA_HOME names.
+      - name: Set up JDK 17 for Gradle
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - run: echo "GRADLE_JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          java-version: '8'
+          distribution: 'temurin'
+          cache: 'maven'
+      # xvfb for the CSS compiler, which opens an AWT frame.
+      - name: Install xvfb
+        run: bash scripts/ci/apt-get-install.sh xvfb
+      - name: Build Codename One Maven artifacts (includes archetypes and both plugins)
+        env:
+          RETRY_ONLY_MATCHING: transient
+          RETRY_ATTEMPTS: '5'
+          RETRY_DELAY_SECONDS: '60'
+        run: |
+          cd maven
+          bash ../scripts/ci/retry.sh xvfb-run -a mvn install -Plocal-dev-javase -DskipTests -Darchetype.test.skip=true -Dmaven.javadoc.skip=true
+      - name: Unit tests
+        working-directory: maven
+        run: xvfb-run -a mvn -B -Plocal-dev-javase -pl android-res-compiler,android-compat,build-engine test
+      - name: Refresh archetype catalog
+        run: |
+          cd maven
+          xvfb-run -a mvn archetype:update-local-catalog -Plocal-dev-javase
+          xvfb-run -a mvn archetype:crawl -Plocal-dev-javase
+      - name: Android samples, imported and built by Maven and Gradle
+        working-directory: maven/integration-tests
+        run: xvfb-run -a bash android-compat-test.sh
+      - name: Upload the test projects' logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-compat-logs
+          path: maven/integration-tests/build/android-compat/**/*.log
+          if-no-files-found: ignore

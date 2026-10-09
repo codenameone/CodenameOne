@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="text_size_display_4_material">112sp</dimen>
+    <dimen name="text_size_display_3_material">56sp</dimen>
+    <dimen name="text_size_display_2_material">45sp</dimen>
+    <dimen name="text_size_display_1_material">34sp</dimen>
+    <dimen name="text_size_headline_material">24sp</dimen>
+    <dimen name="text_size_title_material">20sp</dimen>
+    <dimen name="text_size_subhead_material">16sp</dimen>
+    <dimen name="text_size_body_2_material">14sp</dimen>
+    <dimen name="text_size_body_1_material">14sp</dimen>
+    <dimen name="text_size_caption_material">12sp</dimen>
+    <dimen name="text_size_button_material">14sp</dimen>
+    <dimen name="text_size_large_material">22sp</dimen>
+    <dimen name="text_size_medium_material">18sp</dimen>
+    <dimen name="text_size_small_material">14sp</dimen>
+    <dimen name="button_inset_horizontal_material">4dp</dimen>
+    <dimen name="button_inset_vertical_material">6dp</dimen>
+    <dimen name="button_padding_horizontal_material">8dp</dimen>
+    <dimen name="button_padding_vertical_material">4dp</dimen>
+    <dimen name="control_corner_material">2dp</dimen>
+    <dimen name="action_bar_default_height_material">56dp</dimen>
+    <dimen name="list_item_height">64dp</dimen>
+    <dimen name="dropdown_item_height">48dp</dimen>
+    <dimen name="floating_window_z">16dp</dimen>
+    <dimen name="list_item_height_small">48dp</dimen>
+    <dimen name="list_item_padding">16dp</dimen>
+    <dimen name="app_icon_size">48dp</dimen>
+    <dimen name="thumbnail_height">192dp</dimen>
+    <dimen name="thumbnail_width">192dp</dimen>
+</resources>

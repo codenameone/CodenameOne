@@ -39,7 +39,7 @@ import java.util.concurrent.TimeoutException;
 /// call's arguments and whose [#call] invokes the method's original body.
 /// The rewritten method constructs one, hands it to its executor and returns it,
 /// so the caller's `Future` is this object. A method whose body itself
-/// returns a Future -- [AsyncResult#of] -- completes this one with that
+/// returns a Future -- [com.codename1.backend.AsyncResult#of(Object)] -- completes this one with that
 /// Future's value.
 ///
 /// The caller's span, if it was being traced, is the parent of the span the

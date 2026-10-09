@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- androidx.core: the attributes core's color state lists and fonts use. -->
+<resources>
+    <attr name="alpha" format="float"/>
+    <attr name="lStar" format="float"/>
+    <attr name="font" format="reference"/>
+    <attr name="fontStyle">
+        <enum name="normal" value="0"/>
+        <enum name="italic" value="1"/>
+    </attr>
+    <attr name="fontWeight" format="integer"/>
+    <attr name="fontVariationSettings" format="string"/>
+    <attr name="ttcIndex" format="integer"/>
+    <attr name="fontProviderAuthority" format="string"/>
+    <attr name="fontProviderPackage" format="string"/>
+    <attr name="fontProviderQuery" format="string"/>
+    <attr name="fontProviderCerts" format="reference"/>
+    <declare-styleable name="ColorStateListItem">
+        <attr name="android:color"/>
+        <attr name="alpha"/>
+        <attr name="android:alpha"/>
+        <attr name="lStar"/>
+    </declare-styleable>
+    <declare-styleable name="FontFamilyFont">
+        <attr name="font"/>
+        <attr name="fontStyle"/>
+        <attr name="fontWeight"/>
+        <attr name="ttcIndex"/>
+        <attr name="fontVariationSettings"/>
+    </declare-styleable>
+</resources>

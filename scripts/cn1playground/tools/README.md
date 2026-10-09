@@ -33,8 +33,10 @@ project exporter uses.
 ### Demo behavior regressions
 
 `verify-playground-demos.mjs` exercises the unmodified Bouncing Balls, 3D / GPU,
-and Camera Capture samples. It is part of `run-playground-browser-tests.sh` and
-can also target an already-served bundle:
+and Camera Capture samples. A separate GPU lifecycle fixture initializes a peer
+before attachment, then verifies that continuous rendering resumes after it joins
+the displayed preview. The checker is part of `run-playground-browser-tests.sh`
+and can also target an already-served bundle:
 
 ```bash
 PLAYGROUND_BROWSER_ARTIFACT_DIR=/tmp/playground-demos \
@@ -54,7 +56,10 @@ assertions use the same coordinate space as the accessibility bounds. The tests
 derive the preview bounds from the accessibility tree and examine screenshot
 pixels for visible scene content,
 preview coverage, and animation. They reject blank scenes, a fixed-size scene
-painted into a corner of a larger preview, and frozen foregrounds. The cube must
+painted into a corner of a larger preview, and frozen foregrounds. Animation
+sampling starts immediately and allows up to five seconds for visible movement
+on software WebGL; the foreground change threshold is unchanged. A permanently
+frozen scene still fails, with every sampled frame retained in the artifacts. The cube must
 also be centered and retain its proportions. Pixel thresholds tolerate antialiasing; these are behavioral
 checks rather than machine-specific golden screenshots. The small Node test
 suite validates the pixel oracle against good, blank, misplaced and frozen

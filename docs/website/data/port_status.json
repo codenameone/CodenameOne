@@ -109,6 +109,27 @@
       ]
     },
     {
+      "id": "android-compatibility",
+      "category": "Application runtime",
+      "name": "Android applications (android.* and AndroidX)",
+      "description": "Runs an unmodified Android Studio application -- XML layouts, themes, the framework widgets, fragments, SQLite, AppCompat, ConstraintLayout, RecyclerView, Material and Kotlin -- through the Android compatibility runtime.",
+      "tests": [
+        "AndroidCompatMainScreenshotTest",
+        "AndroidCompatDetailScreenshotTest",
+        "AndroidCompatWidgetsScreenshotTest",
+        "AndroidCompatListScreenshotTest",
+        "AndroidCompatFragmentsScreenshotTest",
+        "AndroidCompatInputsScreenshotTest",
+        "AndroidCompatDataScreenshotTest",
+        "AndroidCompatAppCompatScreenshotTest",
+        "AndroidCompatConstraintScreenshotTest",
+        "AndroidCompatJetpackScreenshotTest",
+        "AndroidCompatRecyclerScreenshotTest",
+        "AndroidCompatMaterialScreenshotTest",
+        "AndroidCompatKotlinScreenshotTest"
+      ]
+    },
+    {
       "id": "ads",
       "category": "Application runtime",
       "name": "Advertising components",
@@ -627,6 +648,18 @@
       ]
     },
     {
+      "id": "backend-sign-in",
+      "category": "Application runtime",
+      "name": "Signing in to a Codename One backend",
+      "description": "Signs in to the CI's own backend with the app's OpenID Connect client: an authorization code with PKCE, a generated REST client that reaches a secured API through the request authorizer, a refused access token renewed with a rotating refresh token, the device grant from both ends, and a one-time code computed on the device as a second factor.",
+      "tests": [
+        "BackendAuthTest",
+        "BackendTokenRefreshTest",
+        "BackendDeviceGrantTest",
+        "BackendTotpTest"
+      ]
+    },
+    {
       "id": "contact-picker",
       "category": "Device APIs",
       "name": "Contact picker",
@@ -694,6 +727,15 @@
         "DatabaseEncryptionTest",
         "DatabaseStatementLegacyTest",
         "DatabaseCursorLegacyTest"
+      ]
+    },
+    {
+      "id": "sqlite-migrations",
+      "category": "Storage and security",
+      "name": "SQLite schema migrations",
+      "description": "Brings a database to the application's schema with versioned migrations: the set compiled into the application, a set built in code, and the same on a connection in legacy compatibility mode.",
+      "tests": [
+        "DatabaseMigrationTest"
       ]
     },
     {
@@ -1490,6 +1532,58 @@
     {
       "pattern": "Window-Dialog*",
       "test": "WindowDialogTest"
+    },
+    {
+      "pattern": "AndroidCompatMain",
+      "test": "AndroidCompatMainScreenshotTest"
+    },
+    {
+      "pattern": "AndroidCompatDetail",
+      "test": "AndroidCompatDetailScreenshotTest"
+    },
+    {
+      "pattern": "AndroidCompatWidgets",
+      "test": "AndroidCompatWidgetsScreenshotTest"
+    },
+    {
+      "pattern": "AndroidCompatList",
+      "test": "AndroidCompatListScreenshotTest"
+    },
+    {
+      "pattern": "AndroidCompatFragments",
+      "test": "AndroidCompatFragmentsScreenshotTest"
+    },
+    {
+      "pattern": "AndroidCompatInputs",
+      "test": "AndroidCompatInputsScreenshotTest"
+    },
+    {
+      "pattern": "AndroidCompatData",
+      "test": "AndroidCompatDataScreenshotTest"
+    },
+    {
+      "pattern": "AndroidCompatAppCompat",
+      "test": "AndroidCompatAppCompatScreenshotTest"
+    },
+    {
+      "pattern": "AndroidCompatConstraint",
+      "test": "AndroidCompatConstraintScreenshotTest"
+    },
+    {
+      "pattern": "AndroidCompatJetpack",
+      "test": "AndroidCompatJetpackScreenshotTest"
+    },
+    {
+      "pattern": "AndroidCompatRecycler",
+      "test": "AndroidCompatRecyclerScreenshotTest"
+    },
+    {
+      "pattern": "AndroidCompatMaterial",
+      "test": "AndroidCompatMaterialScreenshotTest"
+    },
+    {
+      "pattern": "AndroidCompatKotlin",
+      "test": "AndroidCompatKotlinScreenshotTest"
     }
   ]
 }

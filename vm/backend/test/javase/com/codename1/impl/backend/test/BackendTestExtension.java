@@ -23,6 +23,7 @@
 package com.codename1.impl.backend.test;
 
 import org.junit.jupiter.api.extension.AfterEachCallback;
+import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.TestInstancePostProcessor;
 
@@ -34,7 +35,8 @@ import org.junit.jupiter.api.extension.TestInstancePostProcessor;
 /// a nested class's `$` written `_` -- which this, the JVM half, may do by
 /// reflection. The compiled half has no reflection and no JUnit; the build writes
 /// the same calls into a generated runner instead.
-public final class BackendTestExtension implements TestInstancePostProcessor, AfterEachCallback {
+public final class BackendTestExtension implements TestInstancePostProcessor,
+        BeforeEachCallback, AfterEachCallback {
     private static final ExtensionContext.Namespace NAMESPACE =
             ExtensionContext.Namespace.create(BackendTestExtension.class);
     private static boolean hookInstalled;
@@ -49,8 +51,29 @@ public final class BackendTestExtension implements TestInstancePostProcessor, Af
         extension.getStore(NAMESPACE).put("environment", environment);
     }
 
+    /// Before the test's own @BeforeEach methods, so they already run as the
+    /// user the test names -- the order Spring's test support has too.
+    @Override
+    public void beforeEach(ExtensionContext extension) throws Exception {
+        Object stored = extension.getStore(NAMESPACE).get("environment");
+        if (!(stored instanceof TestEnvironment) || !extension.getTestMethod().isPresent()) {
+            return;
+        }
+        // Asked of the generated context by name: the build read the
+        // annotations, as it does for a compiled run.
+        String[] who = ((TestEnvironment) stored).context().securityContext(
+                extension.getTestMethod().get().getName());
+        if (who != null) {
+            TestSecurity.apply(who);
+            extension.getStore(NAMESPACE).put("security", Boolean.TRUE);
+        }
+    }
+
     @Override
     public void afterEach(ExtensionContext extension) throws Exception {
+        if (extension.getStore(NAMESPACE).remove("security") != null) {
+            TestSecurity.clear();
+        }
         // Found from a method context however the instance was made: a store
         // lookup falls back to the parent contexts, so with PER_CLASS the entry
         // put in the class context is read here too (PerClassMockedStoreTest).

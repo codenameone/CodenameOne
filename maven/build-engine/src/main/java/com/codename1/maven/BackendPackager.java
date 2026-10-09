@@ -550,6 +550,11 @@ public class BackendPackager {
             return;
         }
         try {
+            // NOT the migration scripts. The build compiles those into a class (see
+            // MigrationGenerator), so the copy here would be dead weight in the
+            // translator input and would trip the warning below over files the
+            // server never reads from the classpath.
+            compiledInResources = new File(processed, "db" + File.separator + "migration");
             int staged = copyNonClasses(processed, classes);
             // Staged is not the same as READABLE, and the difference is silent.
             // These files reach the translator, so anything that reads them at
@@ -577,6 +582,9 @@ public class BackendPackager {
         }
     }
 
+    /** A processed-resources directory that is not staged; see stageResources. */
+    private File compiledInResources;
+
     /** @return how many non-class files were copied. */
     private int copyNonClasses(File from, File to) throws IOException {
         if (from == null || !from.isDirectory()) {
@@ -590,6 +598,9 @@ public class BackendPackager {
         for (File child : children) {
             File target = new File(to, child.getName());
             if (child.isDirectory()) {
+                if (child.equals(compiledInResources)) {
+                    continue;
+                }
                 target.mkdirs();
                 copied += copyNonClasses(child, target);
             } else if (!child.getName().endsWith(".class")) {
@@ -758,6 +769,16 @@ public class BackendPackager {
         mkdirs(sourceDir);
         copyDirectory(nativeSources, sourceDir);
 
+        // One main per translation, and it is the server's (or the test runner's).
+        // The migrate goals' entry point is a main too, generated beside the
+        // scripts for the JVM to launch (BackendMigrateEntryPoint.CLASS_NAME);
+        // left in, the translator stops with "Multiple main classes".
+        File migrateCli = BackendMigrateEntryPoint.classFile(classes);
+        if (migrateCli.isFile() && !migrateCli.delete()) {
+            throw new BuildExecutionException("Could not remove " + migrateCli
+                    + " from the translation");
+        }
+
         List<String> command = new ArrayList<String>();
         command.add(new File(jdk, "bin/java").getAbsolutePath());
         if (sqlite) {
@@ -817,7 +838,13 @@ public class BackendPackager {
                 // Mandatory for generated C: Java arithmetic wraps, and clang -O3
                 // provably miscompiles the output without these.
                 "-fwrapv", "-fno-strict-aliasing",
-                "-fno-builtin-fmod", "-fno-builtin-fmodf"));
+                "-fno-builtin-fmod", "-fno-builtin-fmodf",
+                // One section per function and per object, so that the link
+                // below can leave out what nothing reaches. The natives are
+                // compiled whole; without this a server that signs nothing
+                // carried every signature and cipher native. The same flags as
+                // vm/backend/build.sh and docker/link.sh.
+                "-ffunction-sections", "-fdata-sections"));
         if (!sqlite) {
             // Turning the engine OFF is two changes, not one. Without
             // -Dcn1.sqlite=true the translator leaves cn1_sqlite3.h out, but
@@ -855,9 +882,21 @@ public class BackendPackager {
         }
         command.addAll(Arrays.asList("-lm", "-lpthread",
                 "-lcurl", "-lssl", "-lcrypto", "-lnghttp2"));
+        command.add(deadStripFlag(System.getProperty("os.name", "")));
         command.add("-o");
         command.add(binary.getAbsolutePath());
         run(command, host.baseDir(), "compile the generated C");
+    }
+
+    /**
+     * The linker flag that leaves unreferenced sections out: Apple's linker and
+     * the ELF ones spell it differently.
+     *
+     * @param osName the os.name of the machine that links
+     */
+    static String deadStripFlag(String osName) {
+        return osName.regionMatches(true, 0, "mac", 0, 3) ? "-Wl,-dead_strip"
+                : "-Wl,--gc-sections";
     }
 
     /**

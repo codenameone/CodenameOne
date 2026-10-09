@@ -8,6 +8,8 @@
 #  3. its runBackend serves the template's /healthz on the JVM;
 #  4. backendPackage translates it to a native binary (skipped without clang,
 #     unless CN1_BACKEND_PACKAGE_REQUIRED=1), and the binary serves /healthz.
+#  5. its migration tasks say so when there is nothing to migrate, and apply,
+#     list and validate a script once there is one.
 #
 # Needs the reactor installed (mvn install) and a JDK 17+; see inc/gradle.sh.
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
@@ -109,5 +111,34 @@ elif [ "${CN1_BACKEND_PACKAGE_REQUIRED:-}" = "1" ]; then
 else
   echo "   skipped: no clang on PATH"
 fi
+
+echo "== migrations"
+# The migration tasks launch a class the build generates, and nothing ran them: they
+# named the class that holds the scripts, which has no main, and every one of them
+# died at start-up. Last in this script, because a server with a migration needs a
+# database to start and the steps above start this one without.
+if run_gradle "$SVC" backendMigrateInfo > "$WORKDIR/migrate-none.log" 2>&1; then
+  cat "$WORKDIR/migrate-none.log"
+  fail "backendMigrateInfo succeeded for a backend with no migrations"
+fi
+grep -q "This module has no migrations to run" "$WORKDIR/migrate-none.log" \
+  || { cat "$WORKDIR/migrate-none.log"; fail "backendMigrateInfo did not say the backend has no migrations"; }
+mkdir -p "$SVC/src/main/resources/db/migration"
+printf 'CREATE TABLE notes (id INTEGER PRIMARY KEY, body VARCHAR(100));\n' \
+  > "$SVC/src/main/resources/db/migration/V1__create_notes.sql"
+MIGRATE_DB="$WORKDIR/migrate.db"
+run_gradle "$SVC" backendMigrate "-Pcn1.datasource.url=$MIGRATE_DB" > "$WORKDIR/migrate.log" 2>&1 \
+  || { cat "$WORKDIR/migrate.log"; fail "backendMigrate"; }
+grep -q "applied V1__create_notes.sql" "$WORKDIR/migrate.log" \
+  || { cat "$WORKDIR/migrate.log"; fail "backendMigrate did not apply the script"; }
+run_gradle "$SVC" backendMigrateInfo "-Pcn1.datasource.url=$MIGRATE_DB" > "$WORKDIR/migrate-info.log" 2>&1 \
+  || { cat "$WORKDIR/migrate-info.log"; fail "backendMigrateInfo"; }
+grep -Eq "^1 .*SQL +SUCCESS" "$WORKDIR/migrate-info.log" \
+  || { cat "$WORKDIR/migrate-info.log"; fail "backendMigrateInfo did not list the applied migration"; }
+run_gradle "$SVC" backendMigrateValidate "-Pcn1.datasource.url=$MIGRATE_DB" > "$WORKDIR/migrate-validate.log" 2>&1 \
+  || { cat "$WORKDIR/migrate-validate.log"; fail "backendMigrateValidate"; }
+grep -q "the schema history matches this build's migrations" "$WORKDIR/migrate-validate.log" \
+  || { cat "$WORKDIR/migrate-validate.log"; fail "backendMigrateValidate did not confirm the history"; }
+echo "   applied, listed and validated"
 
 echo "gradle-initializr-test: OK"

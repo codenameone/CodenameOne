@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.l10n;
 
 import com.codename1.junit.UITestBase;
@@ -25,6 +47,33 @@ class SimpleDateFormatTest extends UITestBase {
     @AfterEach
     void resetRestrictionFlag() {
         SimpleDateFormat.setRestrictMonthNameLength(originalRestrict);
+    }
+
+    @Test
+    void localizedMonthNamesRoundTripWithPunctuationAndUnicode() throws Exception {
+        for (String month : new String[]{"avr.", "März", "四月", "四"}) {
+            final String localizedMonth = month;
+            implementation.setLocalizationManager(new L10NManager("fr", "FR") {
+                @Override public String getShortMonthName(Date date) {
+                    Calendar cal = Calendar.getInstance();
+                    cal.setTime(date);
+                    return cal.get(Calendar.MONTH) == Calendar.APRIL ? localizedMonth
+                            : DateFormatSymbols.MONTHS[cal.get(Calendar.MONTH)].substring(0, 3);
+                }
+                @Override public String getLongMonthName(Date date) {
+                    Calendar cal = Calendar.getInstance();
+                    cal.setTime(date);
+                    return DateFormatSymbols.MONTHS[cal.get(Calendar.MONTH)];
+                }
+            });
+            SimpleDateFormat format = new SimpleDateFormat("dd MMM yyyy HH:mm:ss");
+            Calendar date = Calendar.getInstance();
+            date.clear();
+            date.set(2026, Calendar.APRIL, 7);
+            String rendered = format.format(date.getTime());
+            assertEquals("07 " + month + " 2026 00:00:00", rendered);
+            assertEquals(date.getTime(), format.parse(rendered));
+        }
     }
 
     @Test

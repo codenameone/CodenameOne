@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">Droid Test</string>
+    <string name="hello">Hello from an unmodified Android app!</string>
+    <string name="greeting">Hi, %1$s</string>
+    <string name="detail_title">Details</string>
+    <string name="enter_name">Your name</string>
+    <string name="go">Open details</string>
+    <plurals name="clicks">
+        <item quantity="one">Clicked %d time</item>
+        <item quantity="other">Clicked %d times</item>
+    </plurals>
+</resources>

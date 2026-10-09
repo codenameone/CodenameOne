@@ -18,6 +18,12 @@ set -e
 cd /src
 OUT_NAME="${CN1_OUT_NAME:-bootstrap}"
 COMMON="-O3 -w -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf"
+# What nothing reaches is left out by the linker: the natives are compiled whole,
+# so without this a server with no security still carried every signature and
+# cipher native, and in the static build the OpenSSL code behind them. The same
+# flags as vm/backend/build.sh and BackendPackager.link; keep the three together.
+COMMON="$COMMON -ffunction-sections -fdata-sections"
+GC="-Wl,--gc-sections"
 
 # CN1_LINK_DEBUG=1 keeps the symbol table and frame pointers so a debugger can
 # name what it finds. Without it every backtrace from a deployed binary is a list
@@ -41,13 +47,13 @@ if [ "${CN1_LINK_MODE:-static}" = "static" ]; then
     clang $COMMON -static -fuse-ld=lld -I. -I/opt/curlstatic/include \
         ${CN1_EXTRA_CFLAGS} *.c $ASM_SOURCES \
         -L/opt/curlstatic/lib -lcurl -lnghttp2 -lssl -lcrypto -lz -lm -lpthread \
-        $STRIP \
+        $GC $STRIP \
         -o "/out/$OUT_NAME"
 else
     # shellcheck disable=SC2086
     clang $COMMON -I. ${CN1_EXTRA_CFLAGS} *.c $ASM_SOURCES \
         -lcurl -lnghttp2 -lssl -lcrypto -lz -lm -lpthread \
-        $STRIP \
+        $GC $STRIP \
         -o "/out/$OUT_NAME"
 fi
 

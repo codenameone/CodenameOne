@@ -291,7 +291,11 @@ public class LocalForage {
     }
     
     public String setItem(String key, String value) throws IOException {
-        return ((JSString)setItem(key, JSString.valueOf(value))).stringValue();
+        // What is stored is the value given, so answer it rather than unwrap
+        // the host's echo: that crosses back as a plain string (or nothing),
+        // and a plain string has no stringValue member to call.
+        setItem(key, JSString.valueOf(value));
+        return value;
     }
     
     public JSObject setItem(String key, JSObject value) throws IOException {
@@ -303,11 +307,7 @@ public class LocalForage {
     }
     
     public String getString(String key) throws IOException {
-        JSObject o = getItem(key);
-        if (o==null) {
-            return null;
-        }
-        return ((JSString)o).stringValue();
+        return JS.unwrapString(getItem(key));
     }
     
     public <T extends JSObject> T getItem(String key, Class<T> type) throws IOException {
@@ -422,18 +422,15 @@ public class LocalForage {
     }
 
     private static JSObject getValue(LocalForageImpl impl, String key) throws IOException {
-        final Object[] result = new Object[1];
-        final IOException[] error = new IOException[1];
+        // Returned straight from the bridge, never through a cast: a stored
+        // STRING (a directory marker is the empty string) crosses back as a
+        // java.lang.String, which a checkcast to JSObject refuses. Callers
+        // that meet one only test it against null.
         try {
-            result[0] = impl.getItemSync(key);
+            return impl.getItemSync(key);
         } catch (Throwable t) {
-            error[0] = new IOException("Failed to get value: " + t);
+            throw new IOException("Failed to get value: " + t);
         }
-
-        if (error[0] != null) {
-            throw error[0];
-        }
-        return (JSObject) result[0];
     }
 
     private static void removeItem(LocalForageImpl impl, String key) throws IOException {

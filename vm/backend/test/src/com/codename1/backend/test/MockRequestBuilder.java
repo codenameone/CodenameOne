@@ -35,6 +35,11 @@ public class MockRequestBuilder {
     private final Map headerValues = new LinkedHashMap();
     private final List params = new ArrayList();
     private final List cookies = new ArrayList();
+    private final List postProcessors = new ArrayList();
+    /// What post-processors asked to run just before and just after the request
+    /// is sent, in the order they asked.
+    private List before;
+    private List after;
     byte[] content;
     String contentType;
 
@@ -112,6 +117,82 @@ public class MockRequestBuilder {
     public MockRequestBuilder cookie(String name, String value) {
         cookies.add(name + "=" + value);
         return this;
+    }
+
+    /// Applies `postProcessor` to the request when it is sent: who it is from, a
+    /// CSRF token, credentials. See [SecurityMockMvcRequestPostProcessors].
+    public MockRequestBuilder with(RequestPostProcessor postProcessor) {
+        if (postProcessor == null) {
+            throw new IllegalArgumentException("postProcessor cannot be null");
+        }
+        postProcessors.add(postProcessor);
+        return this;
+    }
+
+    /// Runs `first` just before this request is sent and `last` just after,
+    /// whether or not sending it threw: for a post-processor that changes
+    /// something outside the request for as long as the request takes.
+    void around(Runnable first, Runnable last) {
+        before.add(first);
+        after.add(last);
+    }
+
+    /// Sets a header, in place of any value it had.
+    void replaceHeader(String name, String value) {
+        String key = lower(name);
+        if (headerValues.remove(key) != null) {
+            for (int iter = headerNames.size() - 1 ; iter >= 0 ; iter--) {
+                if (key.equals(lower((String) headerNames.get(iter)))) {
+                    headerNames.remove(iter);
+                }
+            }
+        }
+        header(name, value);
+    }
+
+    /// Sets a request parameter, in place of any value it had.
+    void replaceParam(String name, String value) {
+        for (int iter = params.size() - 1 ; iter >= 0 ; iter--) {
+            if (name.equals(((String[]) params.get(iter))[0])) {
+                params.remove(iter);
+            }
+        }
+        param(name, value);
+    }
+
+    /// Applies the post-processors and returns the builder to send, with what
+    /// they asked to run around the request collected on it.
+    MockRequestBuilder prepare() {
+        MockRequestBuilder prepared = this;
+        prepared.before = new ArrayList();
+        prepared.after = new ArrayList();
+        for (Object each : postProcessors) {
+            MockRequestBuilder next = ((RequestPostProcessor) each).postProcessRequest(prepared);
+            if (next != null && next != prepared) { //NOPMD CompareObjectsWithEquals - the builder itself
+                if (next.before == null) {
+                    next.before = new ArrayList();
+                    next.after = new ArrayList();
+                }
+                next.before.addAll(0, prepared.before);
+                next.after.addAll(0, prepared.after);
+                prepared = next;
+            }
+        }
+        return prepared;
+    }
+
+    /// Runs what [#around] collected to run first.
+    void runBefore() {
+        for (Object each : before) {
+            ((Runnable) each).run();
+        }
+    }
+
+    /// Runs what [#around] collected to run last, the latest asked first.
+    void runAfter() {
+        for (int iter = after.size() - 1 ; iter >= 0 ; iter--) {
+            ((Runnable) after.get(iter)).run();
+        }
     }
 
     /// Accepted for familiarity; bodies are always UTF-8 here.

@@ -55,7 +55,11 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           if [ -n "${BASE_SHA}" ]; then
-            python3 vm/selfhost/perf_baseline.py check --base "${BASE_SHA}" --pr "${PR_NUMBER}"
+            # checkout uses the synthetic merge, which can target a newer master
+            # than event.pull_request.base.sha. Compare against its actual base
+            # parent so master's nightly folds are not attributed to this PR.
+            MERGE_BASE_SHA="$(git rev-parse HEAD^1)"
+            python3 vm/selfhost/perf_baseline.py check --base "${MERGE_BASE_SHA}" --pr "${PR_NUMBER}"
           else
             python3 vm/selfhost/perf_baseline.py check
           fi

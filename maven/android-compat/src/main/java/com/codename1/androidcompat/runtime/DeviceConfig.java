@@ -1,0 +1,64 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.androidcompat.runtime;
+
+/// The configuration of the running device, in the terms resource qualifiers
+/// are written in. Rebuilt whenever the Codename One display changes size,
+/// orientation, locale or dark mode.
+public final class DeviceConfig {
+    public String language = "en";
+    public String region = "US";
+    /// The locale's script (`Hans`, `Hant`), or null when it is unknown.
+    public String script;
+    public boolean rtl;
+    public int smallestWidthDp;
+    public int widthDp;
+    public int heightDp;
+    /// 1 portrait, 2 landscape.
+    public int orientation = 1;
+    /// 1 not night, 2 night.
+    public int night = 1;
+    public int densityDpi = 160;
+    public int sdkVersion = android.os.Build.VERSION.SDK_INT;
+    /// Bumped on every change so cached best-variant choices can be dropped.
+    public int generation;
+
+    /// A copy of this configuration at another density, for resolving a
+    /// resource as `getDrawableForDensity` asks.
+    public DeviceConfig withDensity(int dpi) {
+        DeviceConfig c = new DeviceConfig();
+        c.language = language;
+        c.region = region;
+        c.script = script;
+        c.rtl = rtl;
+        c.smallestWidthDp = smallestWidthDp;
+        c.widthDp = widthDp;
+        c.heightDp = heightDp;
+        c.orientation = orientation;
+        c.night = night;
+        c.densityDpi = dpi;
+        c.sdkVersion = sdkVersion;
+        c.generation = generation;
+        return c;
+    }
+}

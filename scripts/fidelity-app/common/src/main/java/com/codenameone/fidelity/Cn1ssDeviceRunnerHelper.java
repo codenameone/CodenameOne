@@ -421,18 +421,45 @@ final class Cn1ssWebSocketSink {
     // EDT), so the blocking trySend/connect above cannot be used there. The
     // async path never blocks: it connects, sends on open, and advances the
     // sequential test suite from the ACK callback by invoking the per-test
-    // onComplete. ASYNC_IDLE -> ASYNC_CONNECTING -> ASYNC_OPEN / ASYNC_FAILED.
-    private static final int ASYNC_IDLE = 0;
-    private static final int ASYNC_CONNECTING = 1;
-    private static final int ASYNC_OPEN = 2;
-    private static final int ASYNC_FAILED = 3;
-    private static int asyncState = ASYNC_IDLE;
+    // onComplete. The state machine, including the redial after the server
+    // sheds an idle socket, lives in Cn1ssAsyncSink; this is its websocket.
     private static WebSocket asyncSocket;
-    private static final Map<String, Runnable> asyncPending = new HashMap<String, Runnable>();
-    // The suite is sequential (each test waits for onComplete before the next),
-    // so at most one screenshot is in flight; this holds the single send that
-    // arrived while the socket was still connecting. {name, png, hash, onComplete}
-    private static Object[] asyncQueuedWhileConnecting;
+    private static final Cn1ssAsyncSink ASYNC = new Cn1ssAsyncSink(new Cn1ssAsyncSink.Transport() {
+        public boolean isSupported() {
+            return WebSocket.isSupported();
+        }
+
+        public void connect(final int generation) {
+            WebSocket ws = WebSocket.build(resolveUrl())
+                    .onConnect(new WebSocket.ConnectHandler() {
+                        public void onConnect(WebSocket w) {
+                            ASYNC.onOpen(generation);
+                        }
+                    })
+                    .onTextMessage(new WebSocket.TextHandler() {
+                        public void onText(WebSocket w, String message) {
+                            ASYNC.onText(message);
+                        }
+                    })
+                    .onClose(new WebSocket.CloseHandler() {
+                        public void onClose(WebSocket w, int code, String reason) {
+                            ASYNC.onClosed(generation, "closed:" + code);
+                        }
+                    })
+                    .onError(new WebSocket.ErrorHandler() {
+                        public void onError(WebSocket w, Exception ex) {
+                            ASYNC.onClosed(generation, "error:" + ex.getMessage());
+                        }
+                    });
+            asyncSocket = ws;
+            ws.connect(0);
+        }
+
+        public void send(String meta, byte[] png) {
+            asyncSocket.send(meta);
+            asyncSocket.send(png);
+        }
+    });
 
     private Cn1ssWebSocketSink() {
     }
@@ -452,128 +479,10 @@ final class Cn1ssWebSocketSink {
 
     /// Non-blocking send for the JS port. Returns true when the WebSocket path
     /// has taken ownership of completion (it will run onComplete from the ACK
-    /// callback, or immediately if the send fails); false when WS is
+    /// callback, or when it gives up on the send); false when WS is
     /// unavailable, in which case the screenshot is simply absent (no fallback).
-    static synchronized boolean trySendAsync(String safeName, byte[] pngBytes, String hashHex, Runnable onComplete) {
-        if (asyncState == ASYNC_FAILED) {
-            return false;
-        }
-        if (asyncState == ASYNC_IDLE) {
-            if (!WebSocket.isSupported()) {
-                asyncState = ASYNC_FAILED;
-                System.out.println("CN1SS:INFO:ws-sink-unavailable reason=not-supported");
-                return false;
-            }
-            connectAsync();
-        }
-        if (asyncState == ASYNC_OPEN) {
-            sendAsyncNow(safeName, pngBytes, hashHex, onComplete);
-            return true;
-        }
-        if (asyncState == ASYNC_CONNECTING) {
-            // Hold the single in-flight send until onConnect flushes it.
-            asyncQueuedWhileConnecting = new Object[] { safeName, pngBytes, hashHex, onComplete };
-            return true;
-        }
-        return false;
-    }
-
-    private static void connectAsync() {
-        asyncState = ASYNC_CONNECTING;
-        WebSocket ws = WebSocket.build(resolveUrl())
-                .onConnect(new WebSocket.ConnectHandler() {
-                    public void onConnect(WebSocket w) {
-                        asyncState = ASYNC_OPEN;
-                        flushQueuedAsync();
-                    }
-                })
-                .onTextMessage(new WebSocket.TextHandler() {
-                    public void onText(WebSocket w, String message) {
-                        handleAckAsync(message);
-                    }
-                })
-                .onClose(new WebSocket.CloseHandler() {
-                    public void onClose(WebSocket w, int code, String reason) {
-                        failAsync("closed:" + code);
-                    }
-                })
-                .onError(new WebSocket.ErrorHandler() {
-                    public void onError(WebSocket w, Exception ex) {
-                        failAsync("error:" + ex.getMessage());
-                    }
-                });
-        asyncSocket = ws;
-        ws.connect(0);
-    }
-
-    private static void sendAsyncNow(String name, byte[] png, String hash, Runnable onComplete) {
-        try {
-            String meta = "META {\"test\":\"" + name + "\",\"png_bytes\":"
-                    + png.length + ",\"png_fnv1a64\":\"" + hash + "\"}";
-            asyncSocket.send(meta);
-            asyncSocket.send(png);
-            if (onComplete != null) {
-                synchronized (asyncPending) {
-                    asyncPending.put(name, onComplete);
-                }
-            }
-        } catch (Throwable t) {
-            System.out.println("CN1SS:ERR:test=" + name + " message=ws-async-send-failed:" + t);
-            Log.e(t);
-            if (onComplete != null) {
-                onComplete.run(); // never stall the sequential suite
-            }
-        }
-    }
-
-    private static void flushQueuedAsync() {
-        Object[] q = asyncQueuedWhileConnecting;
-        asyncQueuedWhileConnecting = null;
-        if (q != null) {
-            sendAsyncNow((String) q[0], (byte[]) q[1], (String) q[2], (Runnable) q[3]);
-        }
-    }
-
-    private static void handleAckAsync(String text) {
-        if (text == null || !text.startsWith("ACK ")) {
-            return;
-        }
-        String body = text.substring(4).trim();
-        int sp = body.indexOf(' ');
-        String name = sp > 0 ? body.substring(0, sp) : body;
-        Runnable r;
-        synchronized (asyncPending) {
-            r = asyncPending.remove(name);
-        }
-        if (r != null) {
-            r.run(); // advance the suite to the next test
-        }
-    }
-
-    /// Connection failed or dropped: stop using WS and release every waiter so
-    /// the sequential suite proceeds. Missing screenshots then surface through
-    /// the host-side count guard rather than hanging the run.
-    private static void failAsync(String reason) {
-        boolean firstFailure = asyncState != ASYNC_FAILED;
-        asyncState = ASYNC_FAILED;
-        if (firstFailure) {
-            System.out.println("CN1SS:INFO:ws-sink-unavailable reason=" + reason);
-        }
-        Object[] q = asyncQueuedWhileConnecting;
-        asyncQueuedWhileConnecting = null;
-        if (q != null && q[3] != null) {
-            ((Runnable) q[3]).run();
-        }
-        java.util.List<Runnable> waiters = new java.util.ArrayList<Runnable>();
-        synchronized (asyncPending) {
-            waiters.addAll(asyncPending.values());
-            asyncPending.clear();
-        }
-        for (Runnable r : waiters) {
-            if (r != null) {
-                r.run();
-            }
-        }
+    static boolean trySendAsync(String safeName, byte[] pngBytes, String hashHex, Runnable onComplete) {
+        return ASYNC.send(safeName, pngBytes, hashHex, onComplete);
     }
 
     static synchronized boolean trySend(String safeName, byte[] pngBytes, String hashHex) {

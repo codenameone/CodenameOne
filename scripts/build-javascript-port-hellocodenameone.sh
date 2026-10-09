@@ -88,7 +88,11 @@ if [ "${SKIP_MAVEN_BUILD:-0}" != "1" ] && [ "${SKIP_COMMON_BUILD:-0}" != "1" ]; 
   fi
   (
     cd "$HELLO_ROOT"
-    ./mvnw -q -U -pl common -am -DskipTests -Dautomated=true package dependency:copy-dependencies -DincludeScope=compile -DoutputDirectory=common/target/parparvm-deps
+    # An absolute output directory: Maven resolves a relative one against each
+    # module's own directory, so "common/target/parparvm-deps" landed in
+    # common/common/target and no dependency jar (the Kotlin runtime above
+    # all) ever reached the translator.
+    ./mvnw -q -U -pl common -am -DskipTests -Dautomated=true package dependency:copy-dependencies -DincludeScope=compile "-DoutputDirectory=$COMMON_ROOT/target/parparvm-deps"
   )
 fi
 

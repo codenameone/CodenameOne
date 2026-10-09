@@ -129,5 +129,9 @@ with tempfile.TemporaryDirectory(prefix='cn1-generator-') as directory:
             assert '.\\build.bat javascript_cloud' in readme and './build.sh javascript_cloud' in readme
             if archive.name.startswith('ECLIPSE'):
                 assert 'Run/Debug > Launch Configurations' in readme
-        subprocess.run([sys.executable, str(root / 'scripts/test-starter-launchers.py'), str(archive)], check=True)
+        # The launcher's reason table once, on the default download; the rest of
+        # the launcher checks on every archive.
+        reasons = ['--reasons'] if archive.name == 'INTELLIJ-JAVA_17.zip' else []
+        subprocess.run([sys.executable, str(root / 'scripts/test-starter-launchers.py'), str(archive)] + reasons,
+                       check=True)
     print('PASS: real Initializr ZIPs across all IDEs, Java 8/17 Maven, every Maven layout and every Gradle project type')

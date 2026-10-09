@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical" android:layout_width="match_parent" android:layout_height="match_parent">
+    <LinearLayout android:orientation="horizontal" android:gravity="center_vertical" android:padding="16dp"
+        android:layout_width="match_parent" android:layout_height="wrap_content">
+        <TextView android:id="@+id/counter_text" android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="wrap_content" android:textSize="18sp" android:text="Count: 0"/>
+        <Button android:id="@+id/count_button" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:text="Count"/>
+    </LinearLayout>
+    <androidx.fragment.app.FragmentContainerView
+        android:id="@+id/jetpack_container"
+        android:name="com.example.droid.ItemListFragment"
+        android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"/>
+</LinearLayout>
