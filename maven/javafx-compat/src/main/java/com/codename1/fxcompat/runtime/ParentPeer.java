@@ -29,8 +29,10 @@ import com.codename1.ui.events.WheelEvent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.Layout;
 
+import javafx.scene.Group;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.layout.Pane;
 import javafx.scene.paint.Paint;
 
 /// The Codename One container behind a parent node. It holds the peers of
@@ -77,6 +79,13 @@ public class ParentPeer extends Container implements FxPeer {
         return true;
     }
 
+    /// Returns whether what is in a parent is cut off at its bounds. A
+    /// pane and a group draw their children whole wherever they are; a
+    /// control, whose skin holds a viewport, does not.
+    public static boolean clipsChildren(Parent parent) {
+        return !(parent instanceof Pane || parent instanceof Group);
+    }
+
     @Override
     public void paint(Graphics g) {
         if (PeerPaint.unseen(node)) {
@@ -92,7 +101,13 @@ public class ParentPeer extends Container implements FxPeer {
         int cy = g.getClipY();
         int cw = g.getClipWidth();
         int ch = g.getClipHeight();
-        if (m != null) {
+        // A pane or a group does not clip what is in it: a child larger
+        // than the pane, or placed beyond its edge, is drawn whole. Codename
+        // One clips a container to its bounds, so the clip is the parent's
+        // again. A control keeps its own, which is what holds the content
+        // of a scroll pane or a list inside it.
+        boolean widened = m != null || !clipsChildren(node);
+        if (widened) {
             PeerPaint.widenClip(g, this);
         }
         boolean clipped = PeerPaint.pushClip(g, node, getX(), getY());
@@ -110,7 +125,7 @@ public class ParentPeer extends Container implements FxPeer {
         if (clipped) {
             g.popClip();
         }
-        if (m != null) {
+        if (widened) {
             g.setClip(cx, cy, cw, ch);
         }
         g.setAlpha(old);

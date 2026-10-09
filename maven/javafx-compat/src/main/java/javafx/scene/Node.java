@@ -238,8 +238,11 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
         if (p == null) {
             return;
         }
-        Bounds lb = getLayoutBounds();
+        // The parent's bounds first: a group that sizes its children gives
+        // them their sizes when asked for its bounds, this node among them,
+        // and bounds of this node read before that would be the old ones.
         Bounds plb = p.getLayoutBounds();
+        Bounds lb = getLayoutBounds();
         double x = getLayoutX() + getTranslateX() + lb.getMinX() - plb.getMinX();
         double y = getLayoutY() + getTranslateY() + lb.getMinY() - plb.getMinY();
         int x1 = Units.toPixels(x);

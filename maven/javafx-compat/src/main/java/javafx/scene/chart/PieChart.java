@@ -46,6 +46,7 @@ import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.Node;
+import javafx.scene.layout.Region;
 import javafx.scene.shape.StrokeLineCap;
 import javafx.scene.shape.StrokeLineJoin;
 import javafx.scene.text.Font;
@@ -63,6 +64,11 @@ import javafx.scene.text.Font;
 /// pie is as large as its names allow. A slice is filled with its colour
 /// alone, where JavaFX shades it. See [Chart] for what the charts of
 /// this layer leave out.
+///
+/// The node of a data item is a child of the chart that draws nothing:
+/// it is what the pointer finds over the slice, so a handler set on it
+/// hears of a click on the slice, and an event it does not consume goes
+/// on to the chart.
 public class PieChart extends Chart {
 
     private final ObjectProperty<ObservableList<Data>> data = new SimpleObjectProperty<ObservableList<Data>>(this,
@@ -82,6 +88,10 @@ public class PieChart extends Chart {
         void added(Data item) {
             if (item != null) {
                 item.chart.set(PieChart.this);
+                item.node.drawn = false;
+                if (!getChildren().contains(item.node)) {
+                    getChildren().add(item.node);
+                }
             }
         }
 
@@ -89,6 +99,8 @@ public class PieChart extends Chart {
         void removed(Data item) {
             if (item != null && item.chart.get() == PieChart.this) {
                 item.chart.set(null);
+                item.node.drawn = false;
+                getChildren().remove(item.node);
             }
         }
 
@@ -245,6 +257,9 @@ public class PieChart extends Chart {
                 total += v;
             }
         }
+        for (int i = 0; i < all.size(); i++) {
+            all.get(i).node.drawn = false;
+        }
         if (!(total > 0)) {
             return;
         }
@@ -296,6 +311,7 @@ public class PieChart extends Chart {
                 continue;
             }
             double extent = direction * 360 * v / total;
+            all.get(i).node.place(cx, cy, radius, angle, extent);
             FxPath slice = new FxPath();
             if (Math.abs(extent) >= 360 - 1e-9) {
                 slice.addEllipse(cx, cy, radius, radius);
@@ -359,15 +375,79 @@ public class PieChart extends Chart {
         }
     }
 
+    /// What the pointer finds over a slice. The chart draws the slice; this
+    /// node only answers whether a point of the chart is inside it.
+    static final class Slice extends Region {
+
+        boolean drawn;
+        private double cx;
+        private double cy;
+        private double radius;
+        private double start;
+        private double extent;
+
+        Slice() {
+            getStyleClass().add("chart-pie");
+            setManaged(false);
+        }
+
+        /// Where the chart drew the slice, in the chart's coordinates: the
+        /// centre and the radius of the pie, the angle the slice starts at
+        /// and how far it turns, counter clockwise when positive.
+        void place(double centreX, double centreY, double r, double from, double turn) {
+            cx = centreX;
+            cy = centreY;
+            radius = r;
+            start = from;
+            extent = turn;
+            drawn = true;
+        }
+
+        boolean inside(double x, double y) {
+            if (!drawn) {
+                return false;
+            }
+            double dx = x - cx;
+            double dy = y - cy;
+            if (dx * dx + dy * dy > radius * radius) {
+                return false;
+            }
+            if (Math.abs(extent) >= 360 - 1e-9) {
+                return true;
+            }
+            // The turn from the start of the slice to the point, in the
+            // direction the slice turns.
+            double turn = (Math.toDegrees(Math.atan2(-dy, dx)) - start) % 360;
+            if (extent < 0) {
+                turn = -turn;
+            }
+            if (turn < 0) {
+                turn += 360;
+            }
+            return turn <= Math.abs(extent);
+        }
+
+        @Override
+        public boolean contains(double x, double y) {
+            return inside(x, y);
+        }
+
+        @Override
+        protected Node cn1PickLocal(double x, double y) {
+            return inside(x, y) ? this : null;
+        }
+    }
+
     /// One slice of a pie: a name and a value.
     ///
-    /// The node of a data item is always `null`: the chart draws its
-    /// slices itself.
+    /// The node of a data item draws nothing, the chart draws its slices
+    /// itself; it is what a click on the slice reaches.
     public static final class Data {
 
         private final StringProperty name = new SimpleStringProperty(this, "name");
         private final DoubleProperty pieValue = new SimpleDoubleProperty(this, "pieValue");
         final ReadOnlyObjectWrapper<PieChart> chart = new ReadOnlyObjectWrapper<PieChart>(this, "chart");
+        final Slice node = new Slice();
 
         /// Creates a slice.
         public Data(String name, double value) {
@@ -426,9 +506,10 @@ public class PieChart extends Chart {
             return pieValue;
         }
 
-        /// Returns `null`: a slice has no node in this layer.
+        /// Returns the node a click on the slice reaches. It draws nothing:
+        /// the chart draws the slice.
         public Node getNode() {
-            return null;
+            return node;
         }
 
         @Override

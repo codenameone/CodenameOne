@@ -365,4 +365,53 @@ public class TouchAndTextFlowTest {
         assertEquals(0, box.getLayoutY(), 0.51);
         assertEquals(50 - Fonts.ascent(a.getFont()), a.getBoundsInParent().getMinY(), 1.01);
     }
+
+    /// A group gives a resizable child its preferred size when it is asked
+    /// for its own bounds. The peer of the child asked the group while it
+    /// was placing itself, with the child's bounds from before in hand,
+    /// and stayed empty: a text flow in a group, shown after the scene was
+    /// laid out once, drew nothing.
+    @Test
+    public void aRegionInAGroupAddedToAShownSceneHasAPeerOfItsSize() {
+        javafx.scene.layout.StackPane root = new javafx.scene.layout.StackPane();
+        javafx.scene.Scene scene = new javafx.scene.Scene(root, 400, 300);
+        scene.cn1Layout(400, 300);
+        root.cn1Peer();
+        javafx.scene.text.TextFlow flow = new javafx.scene.text.TextFlow(new javafx.scene.text.Text("some words"));
+        root.getChildren().setAll(new javafx.scene.Group(flow));
+        scene.cn1Layout(400, 300);
+        org.junit.Assert.assertTrue(flow.getWidth() > 0);
+        org.junit.Assert.assertEquals(com.codename1.fxcompat.runtime.Units.toPixels(flow.getWidth()),
+                flow.cn1Peer().getWidth(), 1);
+        org.junit.Assert.assertEquals(com.codename1.fxcompat.runtime.Units.toPixels(flow.getHeight()),
+                flow.cn1Peer().getHeight(), 1);
+    }
+
+    /// A pane does not clip its children. Codename One clips a container
+    /// to its bounds, so a tile pane taller than the pane it is in lost
+    /// the rows below the pane's edge. What the children of a pane may
+    /// paint in is what the pane itself may: the area of its parent.
+    @Test
+    public void aPaneLetsItsChildrenPaintBeyondItsBounds() {
+        javafx.scene.layout.Pane small = new javafx.scene.layout.Pane();
+        small.setMaxSize(40, 30);
+        small.setPrefSize(40, 30);
+        javafx.scene.layout.Pane tall = new javafx.scene.layout.Pane();
+        tall.setPrefSize(40, 120);
+        small.getChildren().add(tall);
+        javafx.scene.layout.StackPane root = new javafx.scene.layout.StackPane(small);
+        javafx.scene.Scene scene = new javafx.scene.Scene(root, 400, 300);
+        scene.cn1Layout(400, 300);
+        org.junit.Assert.assertEquals(30, small.getHeight(), 0.5);
+        org.junit.Assert.assertEquals(120, tall.getHeight(), 0.5);
+        org.junit.Assert.assertFalse(com.codename1.fxcompat.runtime.ParentPeer.clipsChildren(small));
+        org.junit.Assert.assertFalse(com.codename1.fxcompat.runtime.ParentPeer.clipsChildren(root));
+        org.junit.Assert.assertFalse(
+                com.codename1.fxcompat.runtime.ParentPeer.clipsChildren(new javafx.scene.Group()));
+        // The content of a scroll pane or a list stays inside it.
+        org.junit.Assert.assertTrue(com.codename1.fxcompat.runtime.ParentPeer
+                .clipsChildren(new javafx.scene.control.ScrollPane()));
+        org.junit.Assert.assertTrue(com.codename1.fxcompat.runtime.ParentPeer
+                .clipsChildren(new javafx.scene.control.ListView<String>()));
+    }
 }

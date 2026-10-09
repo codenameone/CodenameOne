@@ -23,6 +23,8 @@
 package com.codename1.fxcompat;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
@@ -394,7 +396,6 @@ public class ChartTest {
         PieChart.Data nothing = new PieChart.Data("Nothing", 0);
         PieChart chart = new PieChart(FXCollections.observableArrayList(quarter, rest, nothing));
         assertSame(chart, quarter.getChart());
-        assertNull(quarter.getNode());
         chart.setLegendVisible(false);
         paint(chart);
         List<double[]> first = filled(FIRST);
@@ -433,6 +434,47 @@ public class ChartTest {
         // The colours follow the place in the data, so "Rest" is first now.
         assertEquals(1, filled(FIRST).size());
         assertEquals(0, filled(SECOND).size());
+    }
+
+    /// The node of a slice is what an application sets its handlers on:
+    /// `data.getNode().setOnMouseClicked(...)`. It was `null`, and the
+    /// application stopped there. The chart draws the slice and the node
+    /// answers the pointer over it.
+    @Test
+    public void theNodeOfASliceIsFoundUnderThePointerOverTheSlice() {
+        PieChart.Data quarter = new PieChart.Data("Quarter", 1);
+        PieChart.Data rest = new PieChart.Data("Rest", 3);
+        PieChart chart = new PieChart(FXCollections.observableArrayList(quarter, rest));
+        assertNotNull(quarter.getNode());
+        assertNotSame(quarter.getNode(), rest.getNode());
+        chart.setLegendVisible(false);
+        // Not drawn yet: there is no slice to be over.
+        chart.resize(800, 600);
+        assertSame(chart, chart.cn1Pick(400, 300));
+        paint(chart);
+        double[] r = filled(SECOND).get(0);
+        double cx = (r[0] + r[2]) / 2;
+        double cy = (r[1] + r[3]) / 2;
+        double radius = (r[2] - r[0]) / 2;
+        // Clockwise from three o'clock: the quarter is the lower right one.
+        assertSame(quarter.getNode(), chart.cn1Pick(cx + radius / 2, cy + radius / 2));
+        assertSame(rest.getNode(), chart.cn1Pick(cx - radius / 2, cy + radius / 2));
+        assertSame(rest.getNode(), chart.cn1Pick(cx - radius / 2, cy - radius / 2));
+        assertSame(rest.getNode(), chart.cn1Pick(cx + radius / 2, cy - radius / 2));
+        // Outside the pie it is the chart.
+        assertSame(chart, chart.cn1Pick(cx + radius * 0.9, cy + radius * 0.9));
+        assertSame(chart, quarter.getNode().getParent());
+
+        chart.setClockwise(false);
+        paint(chart);
+        assertSame(quarter.getNode(), chart.cn1Pick(cx + radius / 2, cy - radius / 2));
+        assertSame(rest.getNode(), chart.cn1Pick(cx + radius / 2, cy + radius / 2));
+
+        // A slice taken out of the chart is no longer found.
+        chart.getData().remove(quarter);
+        assertNull(quarter.getNode().getParent());
+        paint(chart);
+        assertSame(rest.getNode(), chart.cn1Pick(cx + radius / 2, cy - radius / 2));
     }
 
     private static XYChart.Series<Number, Number> numbers(String name, double x1, double y1, double x2,
