@@ -92,6 +92,12 @@ public class DefaultTableCellRenderer extends JLabel implements TableCellRendere
         }
         Color fg;
         Color bg;
+        JTable.DropLocation drop = table.getDropLocation();
+        if (drop != null && !drop.isInsertRow() && !drop.isInsertColumn() && drop.getRow() == row
+                && drop.getColumn() == column) {
+            // The cell a drag would be dropped on is drawn as a selected one.
+            isSelected = true;
+        }
         if (isSelected) {
             fg = table.getSelectionForeground();
             bg = table.getSelectionBackground();

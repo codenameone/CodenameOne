@@ -204,10 +204,11 @@ public final class CompatRemapper {
 
     /// The dependency jars that are part of the application -- Maven's
     /// `compile` scope, Gradle's `implementation` -- as opposed to the ones
-    /// something else provides. Those among them that are written against a
-    /// desktop layer are unpacked into the classes directory and relocated
-    /// with the application; see [CompatLibraries]. Jars that name no desktop
-    /// layer are left alone, so the whole list can be passed as it is.
+    /// something else provides. What the application uses of them is
+    /// unpacked into the classes directory and relocated with it: a library
+    /// written against a desktop layer whole, a pure-Java one by the classes
+    /// the application reaches. See [CompatLibraries], which classifies each
+    /// jar itself, so the whole list can be passed as it is.
     public CompatRemapper withApplicationLibraries(List<File> jars) {
         this.applicationLibraries = jars == null ? null : new ArrayList<File>(jars);
         return this;
@@ -217,7 +218,9 @@ public final class CompatRemapper {
     /// classes directory is read for the layers it uses: a library's use of
     /// Swing is the application's.
     private void bundleLibraries() throws BuildException {
-        if (!shipRuntime || applicationLibraries == null || applicationLibraries.isEmpty()) {
+        // An empty list is still a list: the last library an application
+        // dropped has classes here to take away.
+        if (!shipRuntime || applicationLibraries == null) {
             return;
         }
         List<Relocation> desktop = new ArrayList<Relocation>();
@@ -426,7 +429,7 @@ public final class CompatRemapper {
         }
         resourcesShipped = true;
         try {
-            new CompatResources(classesDir, resourceDirectories(), handlerDirs, log).run();
+            new CompatResources(classesDir, resourceDirectories(), handlerDirs, relocator, log).run();
         } catch (BuildException e) {
             // The hooks' contract is IOException; run() reports either as
             // the build failure it is, with this message.

@@ -22,6 +22,9 @@
  */
 package com.codename1.desktopcompat.javax.swing;
 
+import com.codename1.desktopcompat.java.awt.event.MouseMotionListener;
+import com.codename1.desktopcompat.java.awt.event.MouseEvent;
+import com.codename1.desktopcompat.java.awt.event.MouseAdapter;
 import com.codename1.desktopcompat.java.awt.Component;
 import com.codename1.desktopcompat.java.awt.Container;
 import com.codename1.desktopcompat.java.awt.Window;
@@ -99,14 +102,49 @@ public class ToolTipManager {
         return reshowDelay;
     }
 
-    /// A component's tip follows its tool tip text without registering.
+    private final Tips tips = new Tips();
+
+    /// Makes `component` show a tool tip: from here on the pointer
+    /// entering it or moving over it asks its
+    /// `getToolTipText(MouseEvent)` for the text at that place. As in
+    /// Swing this is done with a mouse listener, so the component gets
+    /// the mouse events over it from then on.
     public void registerComponent(JComponent component) {
+        component.removeMouseListener(tips);
+        component.addMouseListener(tips);
+        component.removeMouseMotionListener(tips);
+        component.addMouseMotionListener(tips);
         component.cn1ApplyToolTip();
     }
 
-    /// A component's tip follows its tool tip text; set that to `null` to
-    /// take the tip away.
     public void unregisterComponent(JComponent component) {
+        component.removeMouseListener(tips);
+        component.removeMouseMotionListener(tips);
         component.cn1ApplyToolTip();
+    }
+
+    /// Asks a component for the tool tip at the pointer as it moves.
+    private static final class Tips extends MouseAdapter {
+
+        private static void ask(MouseEvent e) {
+            Object src = e.getSource();
+            if (src instanceof JComponent) {
+                ((JComponent) src).cn1ToolTipAt(e);
+            }
+        }
+
+        @Override
+        public void mouseEntered(MouseEvent e) {
+            ask(e);
+        }
+
+        @Override
+        public void mouseMoved(MouseEvent e) {
+            ask(e);
+        }
+
+        @Override
+        public void mouseDragged(MouseEvent e) {
+        }
     }
 }

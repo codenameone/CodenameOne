@@ -258,6 +258,25 @@ public final class EventBridge {
                 || id == MouseEvent.MOUSE_ENTERED || id == MouseEvent.MOUSE_EXITED ? MouseEvent.NOBUTTON : button));
     }
 
+    /// The component a press was on that takes no mouse events itself,
+    /// while the toolkit's listeners are told of them.
+    private static Component toldPress;
+
+    /// Tells the toolkit's listeners of a mouse event on a component that
+    /// handles the pointer in its widget and so is sent none: on the
+    /// desktop every widget has mouse listeners of its look and feel, and
+    /// an `AWTEventListener` hears of a click on a button.
+    private static void tell(Window w, Component hit, int id, int x, int y, int clicks, int button) {
+        if (hit == null || !AwtListeners.any()) {
+            return;
+        }
+        int[] p = local(w, hit, x, y);
+        boolean down = id == MouseEvent.MOUSE_PRESSED || id == MouseEvent.MOUSE_DRAGGED;
+        int mods = both(input.modifiers()) | buttonMask(button) | (down ? buttonDownMask(button) : 0);
+        AwtListeners.dispatching(new MouseEvent(hit, id, System.currentTimeMillis(), mods, p[0], p[1], clicks,
+                false, id == MouseEvent.MOUSE_DRAGGED || id == MouseEvent.MOUSE_MOVED ? MouseEvent.NOBUTTON : button));
+    }
+
     private static void hover(Window w, Component target, int x, int y) {
         if (target == hoverTarget) {
             return;
@@ -321,6 +340,8 @@ public final class EventBridge {
         int y = Units.toLogical(deviceY - rp.getAbsoluteY());
         switch (id) {
             case MouseEvent.MOUSE_PRESSED: {
+                // A drag whose release never arrived is over.
+                Dnd.cancel();
                 Component hit = w.findComponentAt(x, y);
                 MenuSelectionManager menus = MenuSelectionManager.defaultManager();
                 if (menus.cn1PopupShowing() && !menus.cn1Inside(hit)) {
@@ -350,8 +371,12 @@ public final class EventBridge {
                 pressButton = button;
                 dragged = false;
                 boolean trigger = button == MouseEvent.BUTTON3;
+                toldPress = null;
                 if (target != null) {
                     send(w, target, id, x, y, clickCount, button, trigger);
+                } else if (hit != null && hit.isEnabled()) {
+                    toldPress = hit;
+                    tell(w, hit, id, x, y, 1, button);
                 }
                 if (trigger) {
                     popupShown = showPopup(w, hit, x, y);
@@ -362,18 +387,34 @@ public final class EventBridge {
                 if (swallowed) {
                     return true;
                 }
+                if (Dnd.dragging()) {
+                    Dnd.localMove(w, x, y, both(input.modifiers()));
+                    return true;
+                }
                 int slop = Math.max(2, (int) (3 * Units.scale()));
                 if (Math.abs(deviceX - pressX) > slop || Math.abs(deviceY - pressY) > slop) {
                     dragged = true;
                 }
                 if (pressTarget != null) {
                     send(w, pressTarget, id, x, y, 0, pressButton, false);
+                } else {
+                    tell(w, toldPress, id, x, y, 0, pressButton);
                 }
-                return false;
+                // The component may have begun a drag of its data with
+                // this very event; the pointer is the drag's from here on.
+                return Dnd.dragging();
             }
             case MouseEvent.MOUSE_RELEASED: {
                 if (swallowed) {
                     swallowed = false;
+                    return true;
+                }
+                if (Dnd.dragging()) {
+                    // The press that began the drag gets no release and
+                    // no click, as on a desktop: the drop is what ends it.
+                    pressTarget = null;
+                    longPressed = false;
+                    Dnd.localDrop(w, x, y, both(input.modifiers()));
                     return true;
                 }
                 Component target = pressTarget;
@@ -388,6 +429,13 @@ public final class EventBridge {
                         lastClickButton = pressButton;
                         send(w, target, MouseEvent.MOUSE_CLICKED, x, y, clickCount, pressButton, false);
                     }
+                } else if (toldPress != null) {
+                    Component told = toldPress;
+                    toldPress = null;
+                    tell(w, told, id, x, y, 1, pressButton);
+                    if (!dragged) {
+                        tell(w, told, MouseEvent.MOUSE_CLICKED, x, y, 1, pressButton);
+                    }
                 }
                 if (trigger && !popupShown) {
                     showPopup(w, w.findComponentAt(x, y), x, y);
@@ -399,6 +447,8 @@ public final class EventBridge {
                 hover(w, target, x, y);
                 if (target != null) {
                     send(w, target, id, x, y, 0, MouseEvent.NOBUTTON, false);
+                } else {
+                    tell(w, w.findComponentAt(x, y), id, x, y, 0, MouseEvent.NOBUTTON);
                 }
                 return false;
             }

@@ -22,6 +22,8 @@
  */
 package com.codename1.desktopcompat.javax.swing;
 
+import com.codename1.desktopcompat.javax.swing.plaf.basic.BasicTreeUI;
+import com.codename1.desktopcompat.javax.swing.plaf.TreeUI;
 import com.codename1.desktopcompat.java.awt.AWTEvent;
 import com.codename1.desktopcompat.java.awt.Color;
 import com.codename1.desktopcompat.java.awt.Component;
@@ -1290,32 +1292,66 @@ public class JTree extends JComponent implements Accessible, Scrollable {
         int first = Math.max(0, clip.y / rh);
         int last = Math.min(all.size() - 1, (clip.y + clip.height - 1) / rh);
         int step = indent();
-        int width = getWidth();
-        Color tint = null;
         for (int row = first; row <= last; row++) {
             TreePath path = all.get(row);
             int y = row * rh;
             int lx = labelX(path);
             boolean selected = isPathSelected(path);
-            if (selected) {
-                if (tint == null) {
-                    tint = rowSelectionColor();
-                }
-                g.setColor(tint);
-                g.fillRect(0, y, width, rh);
+            if (cn1TreeUi instanceof BasicTreeUI) {
+                ((BasicTreeUI) cn1TreeUi).cn1PaintRow(g, clip, getInsets(), getPathBounds(path), path, row,
+                        isExpanded(path), hasBeenExpanded(path), leaf(path));
+            } else {
+                cn1PaintRow(g, path, row);
             }
             if (lx > 0 && !leaf(path)) {
                 paintHandle(g, lx - step / 2, y + rh / 2, isExpanded(path), selected);
             }
-            if (path.equals(editingPath) && editorComp != null) {
-                continue;
-            }
-            Component c = rendererFor(path, row);
-            if (c != null) {
-                int w = Math.max(width - lx, c.getPreferredSize().width);
-                CellPainter.paint(g, c, lx, y, w, rh);
-            }
         }
+    }
+
+    /// Paints what a row has but for its arrow: the tint of a selected
+    /// row across the tree, and the renderer's component. Called for each
+    /// row, by the tree or by the `paintRow` of a delegate set with
+    /// [#setUI]. Not Swing API.
+    public void cn1PaintRow(Graphics g, TreePath path, int row) {
+        int rh = getRowHeight();
+        int y = row * rh;
+        int width = getWidth();
+        if (isPathSelected(path)) {
+            g.setColor(rowSelectionColor());
+            g.fillRect(0, y, width, rh);
+        }
+        if (path.equals(editingPath) && editorComp != null) {
+            return;
+        }
+        Component c = rendererFor(path, row);
+        if (c != null) {
+            int lx = labelX(path);
+            int w = Math.max(width - lx, c.getPreferredSize().width);
+            CellPainter.paint(g, c, lx, y, w, rh);
+        }
+    }
+
+    private TreeUI cn1TreeUi;
+
+    /// Sets a delegate. The tree goes on measuring, laying out and
+    /// handling input itself; what a delegate decides is how a row is
+    /// painted, when it is a `BasicTreeUI`: see its `paintRow`.
+    public void setUI(TreeUI ui) {
+        TreeUI old = cn1TreeUi;
+        if (old == ui) {
+            return;
+        }
+        if (old != null) {
+            old.uninstallUI(this);
+        }
+        cn1TreeUi = ui;
+        if (ui != null) {
+            ui.installUI(this);
+        }
+        firePropertyChange("UI", old, ui);
+        revalidate();
+        repaint();
     }
 
     /// The arrow of a node with children: pointing down when it is

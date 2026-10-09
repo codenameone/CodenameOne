@@ -22,6 +22,10 @@
  */
 package com.codename1.desktopcompat.javax.swing;
 
+import com.codename1.desktopcompat.java.awt.event.MouseEvent;
+import com.codename1.desktopcompat.javax.swing.plaf.UIResource;
+import com.codename1.desktopcompat.java.awt.dnd.DropTarget;
+import com.codename1.desktopcompat.java.awt.Point;
 import com.codename1.desktopcompat.java.awt.Color;
 import com.codename1.desktopcompat.java.awt.Component;
 import com.codename1.desktopcompat.java.awt.Container;
@@ -329,20 +333,47 @@ public abstract class JComponent extends Container {
     // ------------------------------------------------------------ misc
 
     /// Sets the tool tip of the Codename One widget behind this
-    /// component.
+    /// component. A text that is not `null` registers the component with
+    /// the `ToolTipManager`, as in Swing, and `null` takes it out again.
     public void setToolTipText(String text) {
         String old = toolTipText;
         toolTipText = text;
+        if (text != null) {
+            if (old == null) {
+                ToolTipManager.sharedInstance().registerComponent(this);
+            }
+        } else if (old != null) {
+            ToolTipManager.sharedInstance().unregisterComponent(this);
+        }
         cn1ApplyToolTip();
         firePropertyChange(TOOL_TIP_TEXT_KEY, old, text);
+    }
+
+    /// The tool tip for where the pointer of `event` is. As it comes it
+    /// is the text that was set; a component with a tip per place
+    /// overrides this, and is asked whenever the pointer moves over it.
+    public String getToolTipText(MouseEvent event) {
+        return getToolTipText();
     }
 
     /// Gives the widget the tool tip, or none while the tool tip manager
     /// is disabled.
     void cn1ApplyToolTip() {
+        cn1Tip(toolTipText);
+    }
+
+    /// The pointer is over the component: the widget gets the tip for
+    /// that place.
+    void cn1ToolTipAt(MouseEvent e) {
+        cn1Tip(getToolTipText(e));
+    }
+
+    private void cn1Tip(String text) {
         com.codename1.ui.Component p = cn1PeerOrNull();
         if (p != null) {
-            p.setTooltip(ToolTipManager.sharedInstance().isEnabled() ? toolTipText : null);
+            // An empty text shows no tip, in Swing as here.
+            boolean show = text != null && text.length() > 0 && ToolTipManager.sharedInstance().isEnabled();
+            p.setTooltip(show ? text : null);
         }
     }
 
@@ -392,6 +423,40 @@ public abstract class JComponent extends Container {
         return toolTipText;
     }
 
+    // ------------------------------------------------------------ transfer
+
+    private TransferHandler cn1TransferHandler;
+
+    /// Sets what moves data into and out of this component. With a
+    /// handler the component is a drop target, unless the application
+    /// gave it a `DropTarget` of its own.
+    public void setTransferHandler(TransferHandler newHandler) {
+        TransferHandler old = cn1TransferHandler;
+        cn1TransferHandler = newHandler;
+        DropTarget target = getDropTarget();
+        if (target == null || target instanceof UIResource) {
+            setDropTarget(newHandler == null ? null : TransferHandler.cn1DropTarget(this));
+        }
+        firePropertyChange("transferHandler", old, newHandler);
+    }
+
+    public TransferHandler getTransferHandler() {
+        return cn1TransferHandler;
+    }
+
+    /// Where a drop at `p` would go, in this component's own terms; `null`
+    /// for a component that has none.
+    TransferHandler.DropLocation dropLocationForPoint(Point p) {
+        return null;
+    }
+
+    /// Shows where a drop would go, or with `null` stops showing it.
+    /// `state` is what the last call answered, and `forDrop` whether the
+    /// drop happened and was taken.
+    Object setDropLocation(TransferHandler.DropLocation location, Object state, boolean forDrop) {
+        return null;
+    }
+
     public final Object getClientProperty(Object key) {
         return clientProperties == null ? null : clientProperties.get(key);
     }
@@ -409,6 +474,9 @@ public abstract class JComponent extends Container {
         } else {
             clientProperties.put(key, value);
         }
+        // The FlatLaf vocabulary (placeholder text, button types, style
+        // classes) is honoured where the property is set, not swallowed.
+        com.codename1.desktopcompat.rt.ClientProps.changed(this, key, value);
         firePropertyChange(String.valueOf(key), old, value);
     }
 

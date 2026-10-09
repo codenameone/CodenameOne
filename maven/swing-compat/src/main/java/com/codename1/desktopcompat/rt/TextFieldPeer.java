@@ -33,6 +33,9 @@ public class TextFieldPeer extends com.codename1.ui.TextField implements Peer {
     public TextFieldPeer(Component owner) {
         support = new PeerSupport(owner, this);
         support.trackFocus();
+        // One line never scrolls down, and a desktop theme would draw
+        // its scroll bar down the side of the field all the same.
+        setScrollVisible(false);
     }
 
     @Override

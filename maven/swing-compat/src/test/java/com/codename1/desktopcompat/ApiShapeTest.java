@@ -70,7 +70,30 @@ public class ApiShapeTest {
             // Open in Java 8 and 17, final in Java 19 and later.
             "javax.swing.GroupLayout$SequentialGroup"));
 
-    private final List<String> problems = new ArrayList<String>();
+    /// API the layer has that a release after Java 8 added, by the JDK's
+    /// own name: a class, a package (ending in a dot) or a member. This
+    /// test runs on Java 8, whose class library cannot vouch for them, so
+    /// on Java 8 -- and only there -- a problem that names one is dropped.
+    /// On a later JDK every one of them is compared like the rest.
+    private static final String[] AFTER_JAVA_8 = {
+        "java.awt.Taskbar", "java.awt.desktop.", "java.awt.Toolkit.getMenuShortcutKeyMaskEx()",
+        "java.awt.Desktop$Action.APP_", "java.awt.Desktop$Action.BROWSE_FILE_DIR",
+        "java.awt.Desktop$Action.MOVE_TO_TRASH", "java.awt.Desktop.setPreferencesHandler(",
+        "javax.swing.text.JTextComponent.viewToModel2D(", "javax.swing.text.JTextComponent.modelToView2D("};
+
+    private final List<String> problems = new ArrayList<String>() {
+        @Override
+        public boolean add(String problem) {
+            if (System.getProperty("java.specification.version", "").startsWith("1.")) {
+                for (String later : AFTER_JAVA_8) {
+                    if (problem.contains(PREFIX + later)) {
+                        return false;
+                    }
+                }
+            }
+            return super.add(problem);
+        }
+    };
     private int checked;
 
     @Test

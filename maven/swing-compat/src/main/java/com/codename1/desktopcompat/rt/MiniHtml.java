@@ -40,8 +40,9 @@ import java.util.ArrayList;
 /// `<center>` `<font color= size=>` `<big>` `<small>` `<h1>` to `<h6>`
 /// `<li>`, `<img src= width= height=>` where the caller says how a source
 /// is found, the `align` attribute and a `color` in a `style` attribute, and
-/// the entities `&amp;` `&lt;` `&gt;` `&nbsp;` `&quot;` `&apos;` and the
-/// numeric ones. Every other tag is dropped and its content kept, except
+/// the entities `&amp;` `&lt;` `&gt;` `&nbsp;` `&quot;` `&apos;`, the
+/// common named ones (`&plusmn;`, `&copy;`, `&hellip;`, `&rarr;` ...) and
+/// the numeric ones. Every other tag is dropped and its content kept, except
 /// `<head>`, `<style>`, `<script>` and `<title>`, whose content goes too.
 /// Malformed input never throws: what cannot be read as a tag is text.
 ///
@@ -520,7 +521,9 @@ public final class MiniHtml {
                 ch = '"';
             } else if ("apos".equals(name)) {
                 ch = '\'';
-            } else if (name.charAt(0) == '#' && name.length() > 1) {
+            } else if (name.charAt(0) != '#') {
+                ch = namedEntity(name);
+            } else if (name.length() > 1) {
                 try {
                     if (name.charAt(1) == 'x' || name.charAt(1) == 'X') {
                         ch = name.length() > 2 ? Integer.parseInt(name.substring(2), 16) : -1;
@@ -546,6 +549,31 @@ public final class MiniHtml {
         b.character('&', false);
         return at + 1;
     }
+
+    /// The character of a named entity beyond the five of XML, or -1: the
+    /// ones text in a label is written with.
+    private static int namedEntity(String name) {
+        for (int i = 0; i < ENTITY_NAMES.length; i++) {
+            if (ENTITY_NAMES[i].equals(name)) {
+                return ENTITY_CHARS[i];
+            }
+        }
+        return -1;
+    }
+
+    private static final String[] ENTITY_NAMES = {
+        "plusmn", "copy", "reg", "deg", "middot", "laquo", "raquo", "times", "divide", "sect", "para", "micro",
+        "frac12", "frac14", "frac34", "sup2", "sup3", "cent", "pound", "yen", "euro", "trade", "hellip", "mdash",
+        "ndash", "bull", "lsquo", "rsquo", "ldquo", "rdquo", "larr", "uarr", "rarr", "darr", "harr", "le", "ge",
+        "ne", "infin", "minus", "check", "cross", "iexcl", "iquest", "szlig", "dagger"
+    };
+
+    private static final int[] ENTITY_CHARS = {
+        177, 169, 174, 176, 183, 171, 187, 215, 247, 167, 182, 181,
+        189, 188, 190, 178, 179, 162, 163, 165, 8364, 8482, 8230, 8212,
+        8211, 8226, 8216, 8217, 8220, 8221, 8592, 8593, 8594, 8595, 8596, 8804, 8805,
+        8800, 8734, 8722, 10003, 10007, 161, 191, 223, 8224
+    };
 
     /// Reads the tag at `at` and answers the index after it, or `at`
     /// when what is there is not a tag.

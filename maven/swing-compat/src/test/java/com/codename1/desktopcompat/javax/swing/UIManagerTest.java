@@ -123,16 +123,16 @@ public class UIManagerTest extends KernelTestBase {
     }
 
     @Test
-    public void aLookAndFeelObjectIsRememberedAndNotInstalled() throws Exception {
+    public void aLookAndFeelObjectIsRememberedAndInitialized() throws Exception {
         LookAndFeel builtIn = UIManager.getLookAndFeel();
         assertNotNull(builtIn);
         assertEquals("Codename One", builtIn.getName());
         assertTrue(builtIn.isSupportedLookAndFeel());
-        assertSame(UIManager.getDefaults(), builtIn.getDefaults());
+        assertSame(UIManager.getLookAndFeelDefaults(), builtIn.getDefaults());
         Mine mine = new Mine(true);
         UIManager.setLookAndFeel(mine);
         assertSame(mine, UIManager.getLookAndFeel());
-        assertFalse(mine.initialized);
+        assertTrue(mine.initialized);
         assertNull(mine.getDefaults());
         assertTrue(mine.toString().indexOf("A look of the application's own") >= 0);
         try {
@@ -169,7 +169,8 @@ public class UIManagerTest extends KernelTestBase {
         assertEquals(0, UIManager.getInt("Mine.text"));
 
         UIDefaults defaults = UIManager.getDefaults();
-        assertSame(defaults, UIManager.getLookAndFeelDefaults());
+        // The look and feel has a table of its own beneath this one.
+        assertTrue(defaults != UIManager.getLookAndFeelDefaults());
         assertSame(c, defaults.getColor("Mine.color"));
         assertSame(c, defaults.get("Mine.color"));
         defaults.put("Mine.color", Color.BLUE);

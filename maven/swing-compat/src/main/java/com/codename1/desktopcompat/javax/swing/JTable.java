@@ -22,6 +22,7 @@
  */
 package com.codename1.desktopcompat.javax.swing;
 
+import com.codename1.desktopcompat.rt.Dnd;
 import com.codename1.desktopcompat.java.awt.AWTEvent;
 import com.codename1.desktopcompat.java.awt.Color;
 import com.codename1.desktopcompat.java.awt.Component;
@@ -1794,7 +1795,11 @@ public class JTable extends JComponent implements Accessible, TableModelListener
     @Override
     protected void processMouseMotionEvent(MouseEvent e) {
         if (isEnabled() && e.getID() == MouseEvent.MOUSE_DRAGGED) {
-            if (pressTouch) {
+            if (dndArmed != null || dndStarted) {
+                // A drag of the data, which neither scrolls the table nor
+                // moves its selection.
+                dragDnd(e);
+            } else if (pressTouch) {
                 ScrollDelegate.forward(this, e);
             } else if (pressOnCell && !isEditing()) {
                 int row = rowAtPoint(e.getPoint());
@@ -1821,18 +1826,43 @@ public class JTable extends JComponent implements Accessible, TableModelListener
             case MouseEvent.MOUSE_PRESSED:
                 pressTouch = CellTheme.touch();
                 pressOnCell = false;
+                dndArmed = null;
+                dndStarted = false;
+                dndTouch = false;
                 if (overEditor(e)) {
                     return;
                 }
                 if (pressTouch) {
-                    ScrollDelegate.forward(this, e);
+                    if (cn1DragEnabled && !isEditing()
+                            && canStartDrag(rowAtPoint(e.getPoint()), columnAtPoint(e.getPoint()), true)
+                            && dragAction(e) != TransferHandler.NONE) {
+                        // A finger on a selected cell drags it; the tap
+                        // that follows when it does not is a click.
+                        dndArmed = e;
+                        dndTouch = true;
+                    } else {
+                        ScrollDelegate.forward(this, e);
+                    }
                 } else if (e.getButton() == MouseEvent.BUTTON1) {
-                    select(e);
+                    if (cn1DragEnabled) {
+                        pressDnd(e);
+                    } else {
+                        select(e);
+                    }
                 }
                 break;
             case MouseEvent.MOUSE_RELEASED:
                 if (pressTouch) {
-                    ScrollDelegate.forward(this, e);
+                    if (!dndTouch) {
+                        ScrollDelegate.forward(this, e);
+                    }
+                    dndArmed = null;
+                } else if (dndArmed != null) {
+                    MouseEvent armed = dndArmed;
+                    dndArmed = null;
+                    if (!dndPressSelected) {
+                        select(armed);
+                    }
                 }
                 break;
             case MouseEvent.MOUSE_CLICKED:
@@ -2287,8 +2317,11 @@ public class JTable extends JComponent implements Accessible, TableModelListener
 
     // ------------------------------------------------------------ drag
 
-    /// Records whether dragging out of the component is wanted. The layer
-    /// starts no drag of its own, so this is a property and nothing more.
+    /// Whether dragging a row begins a drag of the data of the table's
+    /// `TransferHandler`. As in Swing a drag begins on a cell that is
+    /// already selected, or on any cell when one row and one column at
+    /// most can be selected; a press elsewhere selects. With a finger it
+    /// is always a selected cell, and a drag anywhere else scrolls.
     public void setDragEnabled(boolean b) {
         cn1DragEnabled = b;
     }
@@ -2298,6 +2331,371 @@ public class JTable extends JComponent implements Accessible, TableModelListener
     }
 
     private boolean cn1DragEnabled;
+    private DropMode dropMode = DropMode.USE_SELECTION;
+    private transient DropLocation dropLocation;
+    private MouseEvent dndArmed;
+    private boolean dndStarted;
+    private boolean dndPressSelected;
+
+    /// Sets how the table shows where a drop would go.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if `dropMode` is `null`
+    public final void setDropMode(DropMode dropMode) {
+        if (dropMode == null) {
+            throw new IllegalArgumentException("null: Unsupported drop mode for table");
+        }
+        this.dropMode = dropMode;
+    }
+
+    public final DropMode getDropMode() {
+        return dropMode;
+    }
+
+    /// Where a drag over the table would be dropped, `null` when there is
+    /// none or its place is not to be shown.
+    public final DropLocation getDropLocation() {
+        return dropLocation;
+    }
+
+    /// Where in a table a drop would go.
+    public static final class DropLocation extends TransferHandler.DropLocation {
+
+        private final int row;
+        private final int col;
+        private final boolean isInsertRow;
+        private final boolean isInsertCol;
+
+        private DropLocation(Point p, int row, int col, boolean isInsertRow, boolean isInsertCol) {
+            super(p);
+            this.row = row;
+            this.col = col;
+            this.isInsertRow = isInsertRow;
+            this.isInsertCol = isInsertCol;
+        }
+
+        /// The row of the cell the drop goes on, or the row it goes
+        /// before; the number of rows for the end of the table.
+        public int getRow() {
+            return row;
+        }
+
+        public int getColumn() {
+            return col;
+        }
+
+        public boolean isInsertRow() {
+            return isInsertRow;
+        }
+
+        public boolean isInsertColumn() {
+            return isInsertCol;
+        }
+
+        @Override
+        public String toString() {
+            return getClass().getName() + "[dropPoint=" + getDropPoint() + ",row=" + row + ",column=" + col
+                    + ",insertRow=" + isInsertRow + ",insertColumn=" + isInsertCol + "]";
+        }
+    }
+
+    private static final int LEADING_PART = 0;
+    private static final int MIDDLE_PART = 1;
+    private static final int TRAILING_PART = 2;
+
+    /// Which part of a cell a coordinate lies in: of three, where the
+    /// outer two are a third of the cell and ten pixels at most, or of
+    /// two halves.
+    private static int part(int p0, int length, int p, boolean three) {
+        if (three) {
+            int boundary = length >= 30 ? 10 : length / 3;
+            if (p < p0 + boundary) {
+                return LEADING_PART;
+            }
+            if (p >= p0 + length - boundary) {
+                return TRAILING_PART;
+            }
+            return MIDDLE_PART;
+        }
+        return p >= p0 + length / 2 ? TRAILING_PART : LEADING_PART;
+    }
+
+    @Override
+    TransferHandler.DropLocation dropLocationForPoint(Point p) {
+        int row = rowAtPoint(p);
+        int col = columnAtPoint(p);
+        Rectangle rect = getCellRect(row, col, true);
+        boolean between = false;
+        int xs;
+        int ys;
+        switch (dropMode) {
+            case INSERT:
+                if (row == -1 && col == -1) {
+                    return new DropLocation(p, 0, 0, true, true);
+                }
+                xs = part(rect.x, rect.width, p.x, true);
+                if (row == -1) {
+                    if (xs == LEADING_PART) {
+                        return new DropLocation(p, getRowCount(), col, true, true);
+                    }
+                    if (xs == TRAILING_PART) {
+                        return new DropLocation(p, getRowCount(), col + 1, true, true);
+                    }
+                    return new DropLocation(p, getRowCount(), col, true, false);
+                }
+                if (xs == LEADING_PART || xs == TRAILING_PART) {
+                    ys = part(rect.y, rect.height, p.y, true);
+                    if (ys == LEADING_PART) {
+                        between = true;
+                    } else if (ys == TRAILING_PART) {
+                        row++;
+                        between = true;
+                    }
+                    return new DropLocation(p, row, xs == TRAILING_PART ? col + 1 : col, between, true);
+                }
+                if (part(rect.y, rect.height, p.y, false) == TRAILING_PART) {
+                    row++;
+                }
+                return new DropLocation(p, row, col, true, false);
+            case INSERT_ROWS:
+                if (row == -1 && col == -1) {
+                    return new DropLocation(p, -1, -1, false, false);
+                }
+                if (row == -1) {
+                    return new DropLocation(p, getRowCount(), col, true, false);
+                }
+                if (part(rect.y, rect.height, p.y, false) == TRAILING_PART) {
+                    row++;
+                }
+                return new DropLocation(p, row, col, true, false);
+            case ON_OR_INSERT_ROWS:
+                if (row == -1 && col == -1) {
+                    return new DropLocation(p, -1, -1, false, false);
+                }
+                if (row == -1) {
+                    return new DropLocation(p, getRowCount(), col, true, false);
+                }
+                ys = part(rect.y, rect.height, p.y, true);
+                if (ys == LEADING_PART) {
+                    between = true;
+                } else if (ys == TRAILING_PART) {
+                    row++;
+                    between = true;
+                }
+                return new DropLocation(p, row, col, between, false);
+            case INSERT_COLS:
+                if (row == -1) {
+                    return new DropLocation(p, -1, -1, false, false);
+                }
+                if (col == -1) {
+                    return new DropLocation(p, getColumnCount(), col, false, true);
+                }
+                if (part(rect.x, rect.width, p.x, false) == TRAILING_PART) {
+                    col++;
+                }
+                return new DropLocation(p, row, col, false, true);
+            case ON_OR_INSERT_COLS:
+                if (row == -1) {
+                    return new DropLocation(p, -1, -1, false, false);
+                }
+                if (col == -1) {
+                    return new DropLocation(p, row, getColumnCount(), false, true);
+                }
+                xs = part(rect.x, rect.width, p.x, true);
+                if (xs == LEADING_PART) {
+                    between = true;
+                } else if (xs == TRAILING_PART) {
+                    col++;
+                    between = true;
+                }
+                return new DropLocation(p, row, col, false, between);
+            case ON_OR_INSERT:
+                if (row == -1 && col == -1) {
+                    return new DropLocation(p, 0, 0, true, true);
+                }
+                xs = part(rect.x, rect.width, p.x, true);
+                if (row == -1) {
+                    if (xs == LEADING_PART) {
+                        return new DropLocation(p, getRowCount(), col, true, true);
+                    }
+                    if (xs == TRAILING_PART) {
+                        return new DropLocation(p, getRowCount(), col + 1, true, true);
+                    }
+                    return new DropLocation(p, getRowCount(), col, true, false);
+                }
+                ys = part(rect.y, rect.height, p.y, true);
+                if (ys == LEADING_PART) {
+                    between = true;
+                } else if (ys == TRAILING_PART) {
+                    row++;
+                    between = true;
+                }
+                return new DropLocation(p, row, xs == TRAILING_PART ? col + 1 : col, between, xs != MIDDLE_PART);
+            case USE_SELECTION:
+            case ON:
+            default:
+                if (row == -1 || col == -1) {
+                    return new DropLocation(p, -1, -1, false, false);
+                }
+                return new DropLocation(p, row, col, false, false);
+        }
+    }
+
+    @Override
+    Object setDropLocation(TransferHandler.DropLocation location, Object state, boolean forDrop) {
+        Object retVal = null;
+        DropLocation tableLocation = location instanceof DropLocation ? (DropLocation) location : null;
+        if (dropMode == DropMode.USE_SELECTION) {
+            if (tableLocation == null) {
+                if (!forDrop && state instanceof int[][]) {
+                    // The drag left without a drop: the selection it
+                    // moved about goes back to what it was.
+                    int[][] saved = (int[][]) state;
+                    clearSelection();
+                    for (int r : saved[0]) {
+                        if (r < getRowCount()) {
+                            addRowSelectionInterval(r, r);
+                        }
+                    }
+                    for (int c : saved[1]) {
+                        if (c < getColumnCount()) {
+                            addColumnSelectionInterval(c, c);
+                        }
+                    }
+                }
+            } else {
+                retVal = dropLocation == null ? new int[][]{getSelectedRows(), getSelectedColumns()} : state;
+                if (tableLocation.getRow() == -1) {
+                    clearSelection();
+                } else {
+                    setRowSelectionInterval(tableLocation.getRow(), tableLocation.getRow());
+                    setColumnSelectionInterval(tableLocation.getColumn(), tableLocation.getColumn());
+                }
+            }
+        }
+        DropLocation old = dropLocation;
+        dropLocation = tableLocation;
+        firePropertyChange("dropLocation", old, dropLocation);
+        if (old != dropLocation) {
+            repaint();
+        }
+        return retVal;
+    }
+
+    /// Draws the line that says between which rows or columns a drop
+    /// would go. A drop on a cell is shown by the cell, which its
+    /// renderer draws as it draws a selected one.
+    private void paintDropLines(Graphics g) {
+        DropLocation loc = dropLocation;
+        if (loc == null || (!loc.isInsertRow() && !loc.isInsertColumn())) {
+            return;
+        }
+        Color line = UIManager.getColor("Table.dropLineColor");
+        if (line == null) {
+            line = getSelectionBackground();
+        }
+        if (line == null) {
+            line = getForeground();
+        }
+        g.setColor(line);
+        if (loc.isInsertRow()) {
+            int rows = getRowCount();
+            int y;
+            if (rows == 0) {
+                y = 0;
+            } else if (loc.getRow() >= rows) {
+                Rectangle last = getCellRect(rows - 1, 0, true);
+                y = last.y + last.height;
+            } else {
+                y = getCellRect(loc.getRow(), 0, true).y;
+            }
+            y = y == 0 ? -1 : y - 2;
+            g.fillRect(0, y, getWidth(), 3);
+        }
+        if (loc.isInsertColumn()) {
+            int columns = getColumnCount();
+            int x;
+            if (columns == 0) {
+                x = 0;
+            } else if (loc.getColumn() >= columns) {
+                Rectangle last = getCellRect(0, columns - 1, true);
+                x = last.x + last.width;
+            } else {
+                x = getCellRect(0, loc.getColumn(), true).x;
+            }
+            x = x == 0 ? -1 : x - 2;
+            g.fillRect(x, 0, 3, getHeight());
+        }
+    }
+
+    @Override
+    public void paint(Graphics g) {
+        super.paint(g);
+        paintDropLines(g);
+    }
+
+    /// The action a drag begun by `e` would ask for, [TransferHandler#NONE]
+    /// when it would begin none.
+    private int dragAction(MouseEvent e) {
+        TransferHandler th = getTransferHandler();
+        if (th == null || e.getButton() != MouseEvent.BUTTON1) {
+            return TransferHandler.NONE;
+        }
+        return Dnd.userAction(e.getModifiers() | e.getModifiersEx(), th.getSourceActions(this));
+    }
+
+    private boolean canStartDrag(int row, int col, boolean touch) {
+        if (row < 0 || col < 0) {
+            return false;
+        }
+        if (!touch && getSelectionModel().getSelectionMode() == ListSelectionModel.SINGLE_SELECTION
+                && getColumnModel().getSelectionModel().getSelectionMode() == ListSelectionModel.SINGLE_SELECTION) {
+            return true;
+        }
+        return isCellSelected(row, col);
+    }
+
+    /// A press with the mouse on a table that drags. A press on a
+    /// selected cell may be the start of a drag of the selection, which
+    /// is then left as it is until the button is let go without one.
+    private void pressDnd(MouseEvent e) {
+        int row = rowAtPoint(e.getPoint());
+        int col = columnAtPoint(e.getPoint());
+        dndPressSelected = true;
+        if (canStartDrag(row, col, false) && dragAction(e) != TransferHandler.NONE) {
+            dndArmed = e;
+            if (!e.isShiftDown() && !e.isControlDown() && !e.isMetaDown() && isCellSelected(row, col)) {
+                getSelectionModel().addSelectionInterval(row, row);
+                getColumnModel().getSelectionModel().addSelectionInterval(col, col);
+                dndPressSelected = false;
+                return;
+            }
+        }
+        select(e);
+    }
+
+    /// The pointer moved with a drag armed: past a few pixels the
+    /// handler's data is dragged.
+    private void dragDnd(MouseEvent e) {
+        MouseEvent armed = dndArmed;
+        if (armed == null) {
+            return;
+        }
+        if (Math.abs(e.getX() - armed.getX()) <= DRAG_THRESHOLD && Math.abs(e.getY() - armed.getY()) <= DRAG_THRESHOLD) {
+            return;
+        }
+        dndArmed = null;
+        TransferHandler th = getTransferHandler();
+        int action = dragAction(armed);
+        if (th != null && action != TransferHandler.NONE) {
+            dndStarted = true;
+            th.exportAsDrag(this, armed, action);
+        }
+    }
+
+    private static final int DRAG_THRESHOLD = 5;
+    private boolean dndTouch;
 
     // ------------------------------------------------------------ print
 

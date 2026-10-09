@@ -25,9 +25,9 @@ package com.codename1.desktopcompat.javax.swing;
 /// The type of a look and feel, so that code which names one, asks
 /// [UIManager] for the current one or passes its own compiles and runs.
 ///
-/// The widgets of the layer are drawn by Codename One with its theme, and
-/// no look and feel changes that: one that is set is remembered and handed
-/// back, and is never asked to install anything.
+/// The widgets of the layer are drawn by Codename One with its theme, so a
+/// look and feel installs no UI delegates. What it does choose is the
+/// palette, light or dark, and its defaults: see [UIManager].
 public abstract class LookAndFeel {
 
     public LookAndFeel() {
@@ -43,16 +43,17 @@ public abstract class LookAndFeel {
 
     public abstract boolean isSupportedLookAndFeel();
 
-    /// Never called by the layer.
+    /// Called by [UIManager] when this look and feel is set.
     public void initialize() {
     }
 
-    /// Never called by the layer.
+    /// Called by [UIManager] when another look and feel replaces this one.
     public void uninitialize() {
     }
 
     /// The defaults of this look and feel; `null` unless a subclass has
-    /// some. The layer does not read them.
+    /// some. [UIManager] copies them into the look and feel defaults when
+    /// this look and feel is set.
     public UIDefaults getDefaults() {
         return null;
     }

@@ -98,8 +98,7 @@ public class ImportDesktopProjectMojo extends AbstractCN1Mojo {
                 continue;
             }
             if (declares(declared, u)) {
-                getLog().info("  not part of the desktop compatibility layers: " + u + ". It is a dependency of the "
-                        + "common module (scope compile), and so " + DesktopProjectImporter.BUNDLED_NOTE + ".");
+                // The table below says what becomes of it.
                 continue;
             }
             getLog().warn("  not part of the desktop compatibility layers: " + u + ". Add it to the common "
@@ -115,6 +114,77 @@ public class ImportDesktopProjectMojo extends AbstractCN1Mojo {
         }
         for (String u : r.unresolved) {
             getLog().warn("  " + u);
+        }
+        reportDependencies(r, common);
+        String level = DesktopImportReport.javaLevelWarning(r.javaLevel);
+        if (level != null) {
+            getLog().warn(level);
+        }
+    }
+
+    /// Prints what the build will do with each jar the project depends on,
+    /// its own dependencies included: [DesktopImportReport]. A dependency
+    /// whose jar cannot be had -- no version in the build file, or nothing to
+    /// download it from -- is named and left to the build, which classifies
+    /// it the same way.
+    private void reportDependencies(DesktopProjectImporter.Result r, File common) {
+        java.util.Set<File> jars = new java.util.LinkedHashSet<File>();
+        for (DesktopProjectImporter.Library lib : r.libraries) {
+            if (lib.version == null) {
+                continue;
+            }
+            int before = jars.size();
+            try {
+                org.apache.maven.artifact.Artifact artifact = repositorySystem.createArtifact(lib.groupId,
+                        lib.artifactId, lib.version, "jar");
+                org.apache.maven.artifact.resolver.ArtifactResolutionResult result = repositorySystem.resolve(
+                        new org.apache.maven.artifact.resolver.ArtifactResolutionRequest()
+                                .setOffline(offline)
+                                .setLocalRepository(localRepository)
+                                .setRemoteRepositories(
+                                        new java.util.ArrayList<org.apache.maven.artifact.repository.ArtifactRepository>(
+                                                remoteRepositories))
+                                .setResolveTransitively(true)
+                                .setArtifact(artifact));
+                addJar(jars, artifact);
+                if (result != null && result.getArtifacts() != null) {
+                    java.util.List<org.apache.maven.artifact.Artifact> resolved =
+                            new java.util.ArrayList<org.apache.maven.artifact.Artifact>(result.getArtifacts());
+                    java.util.Collections.sort(resolved);
+                    for (org.apache.maven.artifact.Artifact a : resolved) {
+                        if (!"test".equals(a.getScope())) {
+                            addJar(jars, a);
+                        }
+                    }
+                }
+            } catch (RuntimeException e) {
+                getLog().debug("Could not resolve " + lib.coordinate(), e);
+            }
+            if (jars.size() == before) {
+                getLog().info("  " + lib.coordinate() + " could not be read here; at build time "
+                        + DesktopProjectImporter.BUNDLED_NOTE + ".");
+            }
+        }
+        if (jars.isEmpty()) {
+            return;
+        }
+        try {
+            java.util.List<DesktopImportReport.Row> rows = DesktopImportReport.rows(jars,
+                    new File(common, "src/main/desktop"));
+            getLog().info("What the build does with the project's dependencies (" + rows.size() + " jars, "
+                    + "their own dependencies included):");
+            for (String line : DesktopImportReport.table(rows)) {
+                getLog().info("  " + line);
+            }
+        } catch (java.io.IOException e) {
+            getLog().warn("Could not read the project's dependencies: " + e.getMessage());
+        }
+    }
+
+    private static void addJar(java.util.Set<File> jars, org.apache.maven.artifact.Artifact a) {
+        File f = a.getFile();
+        if (f != null && f.isFile() && f.getName().endsWith(".jar")) {
+            jars.add(f);
         }
     }
 

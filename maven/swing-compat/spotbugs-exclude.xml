@@ -576,4 +576,165 @@
     </Match>
 
     <!-- END hardening slice -->
+
+    <!-- BEGIN drag and drop, styled text and created fonts -->
+
+    <!-- The desktop, the toolkit, the default style context and the three
+         clipboard actions of TransferHandler are each one object for the
+         whole application, handed out by a static method: that is the
+         JDK's contract, and every one is touched on the event dispatch
+         thread only. The style context is made on first use there. -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.desktopcompat.java.awt.Desktop"/>
+                <Method name="getDesktop"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.java.awt.Toolkit"/>
+                <Method name="getDefaultToolkit"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.text.StyleContext"/>
+                <Method name="getDefaultStyleContext"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.TransferHandler"/>
+                <Or>
+                    <Method name="getCutAction"/>
+                    <Method name="getCopyAction"/>
+                    <Method name="getPasteAction"/>
+                </Or>
+            </And>
+        </Or>
+        <Or>
+            <Bug pattern="MS_EXPOSE_REP"/>
+            <Bug pattern="LI_LAZY_INIT_STATIC"/>
+        </Or>
+    </Match>
+
+    <!-- The drop target events and the desktop's application events are
+         Serializable only because java.util.EventObject is. A device has
+         no object streams, so there is no serialized form to version and
+         no field that could fail to be written. -->
+    <Match>
+        <Class name="~com\.codename1\.desktopcompat\.java\.awt\.(dnd|desktop)\..*Event"/>
+        <Or>
+            <Bug pattern="SE_NO_SERIALVERSIONID"/>
+            <Bug pattern="SE_BAD_FIELD"/>
+        </Or>
+    </Match>
+
+    <!-- A text pane's document has to be a styled one, so JTextPane
+         overrides setDocument, which the constructor of JEditorPane
+         calls (as the JDK does) before this class has its fields. The
+         override reads its listener field to tell that call apart, and
+         a null there is the answer it is looking for. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.javax.swing.JTextPane"/>
+        <Method name="setDocument"/>
+        <Bug pattern="UR_UNINIT_READ_CALLED_FROM_SUPER_CONSTRUCTOR"/>
+    </Match>
+
+    <!-- A face hands out the platform's font of its file, which is an
+         immutable handle: deriving a size from it makes another. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.rt.FontFiles$Face"/>
+        <Method name="base"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+
+    <!-- Making a drop target for a component attaches it: the JDK's
+         constructor calls the component's setDropTarget, a public method
+         of Component, and so does this one. The target's own fields are
+         all set before the call. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.java.awt.dnd.DropTarget"/>
+        <Method name="&lt;init&gt;"/>
+        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR"/>
+    </Match>
+
+    <!-- END drag and drop, styled text and created fonts -->
+
+    <!-- BEGIN look-and-feel slice: UIManager's palettes, FlatLaf and
+         RSyntaxTextArea under their own names -->
+
+    <!-- Whether a look and feel is dark has three answers: dark, light,
+         and a name the layer does not know, which keeps the palette. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.javax.swing.UIManager"/>
+        <Method name="dark"/>
+        <Bug pattern="NP_BOOLEAN_RETURN_NULL"/>
+    </Match>
+
+    <!-- FlatLaf's API: the extra defaults are a map the application
+         hands over and reads back, per look and feel and for all of them,
+         and it is that map by FlatLaf's contract. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.com.formdev.flatlaf.FlatLaf"/>
+        <Or>
+            <Method name="getExtraDefaults"/>
+            <Method name="setExtraDefaults"/>
+            <Method name="getGlobalExtraDefaults"/>
+            <Method name="setGlobalExtraDefaults"/>
+        </Or>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+            <Bug pattern="MS_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_STATIC_REP2"/>
+        </Or>
+    </Match>
+
+    <!-- "public static int duration" and "resolution" are FlatLaf's own
+         fields, not final, which applications assign. Nothing reads them
+         here because a switch of palette is not animated. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.com.formdev.flatlaf.extras.FlatAnimatedLafChange"/>
+        <Or>
+            <Field name="duration"/>
+            <Field name="resolution"/>
+        </Or>
+        <Or>
+            <Bug pattern="MS_SHOULD_BE_FINAL"/>
+            <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD"/>
+        </Or>
+    </Match>
+
+    <!-- A Theme's fields are public in RSyntaxTextArea and applications
+         assign them; the line number font is kept for them to read back,
+         the gutter draws in the editor's font. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.org.fife.ui.rsyntaxtextarea.Theme"/>
+        <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD"/>
+    </Match>
+
+    <!-- A gutter belongs to the editor it numbers, a scroll pane hands
+         out its gutter, an editor its marked ranges and a search result
+         the range it was given: each is that object by the library's
+         contract, as with the components of the JDK packages above. -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.desktopcompat.org.fife.ui.rtextarea.Gutter"/>
+            <Class name="com.codename1.desktopcompat.org.fife.ui.rtextarea.RTextScrollPane"/>
+            <Class name="com.codename1.desktopcompat.org.fife.ui.rtextarea.RTextArea"/>
+            <Class name="com.codename1.desktopcompat.org.fife.ui.rtextarea.SearchResult"/>
+        </Or>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+
+    <!-- SearchContext.clone() is public API of the library, where the
+         class is Cloneable. Here it copies field by field: Object.clone()
+         answers null on a device, so the class must not rely on it and
+         does not declare the interface the device has no use for. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.org.fife.ui.rtextarea.SearchContext"/>
+        <Method name="clone"/>
+        <Bug pattern="CN_IMPLEMENTS_CLONE_BUT_NOT_CLONEABLE"/>
+    </Match>
+
+    <!-- END look-and-feel slice -->
 </FindBugsFilter>

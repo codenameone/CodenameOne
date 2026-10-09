@@ -252,4 +252,15 @@ public class MiniHtmlTest extends KernelTestBase {
         assertEquals(com.codename1.ui.Font.FACE_MONOSPACE,
                 com.codename1.compat.testing.HeadlessImplementation.lastFontFace);
     }
+
+    /// The entities a label is written with beyond the five of XML; one
+    /// that is not known stays as it was typed.
+    @Test
+    public void namedEntitiesAreTheirCharacters() {
+        assertEquals("1" + (char) 177 + "2", MiniHtml.plainText("<html>1&plusmn;2"));
+        assertEquals(String.valueOf((char) 169) + (char) 8230 + (char) 8594,
+                MiniHtml.plainText("<html>&copy;&hellip;&rarr;"));
+        assertEquals("a&nosuch;b", MiniHtml.plainText("<html>a&nosuch;b"));
+        assertEquals("<", MiniHtml.plainText("<html>&#60;"));
+    }
 }

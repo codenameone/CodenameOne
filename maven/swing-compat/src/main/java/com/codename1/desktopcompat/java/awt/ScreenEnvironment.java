@@ -41,7 +41,20 @@ final class ScreenEnvironment extends GraphicsEnvironment {
 
     @Override
     public String[] getAvailableFontFamilyNames() {
-        return new String[]{Font.DIALOG, Font.DIALOG_INPUT, Font.MONOSPACED, Font.SANS_SERIF, Font.SERIF};
+        String[] own = {Font.DIALOG, Font.DIALOG_INPUT, Font.MONOSPACED, Font.SANS_SERIF, Font.SERIF};
+        String[] added = com.codename1.desktopcompat.rt.FontFiles.families();
+        String[] all = new String[own.length + added.length];
+        System.arraycopy(own, 0, all, 0, own.length);
+        System.arraycopy(added, 0, all, own.length, added.length);
+        return all;
+    }
+
+    @Override
+    public Graphics2D createGraphics(com.codename1.desktopcompat.java.awt.image.BufferedImage img) {
+        if (img == null) {
+            throw new NullPointerException("BufferedImage cannot be null");
+        }
+        return img.createGraphics();
     }
 
     /// The display.

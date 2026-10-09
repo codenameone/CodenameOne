@@ -193,20 +193,33 @@ public class CompatLibrariesTest {
 
         File panel = new File(classes, "org/fancy/FancyPanel.class");
         assertEquals("com/codename1/desktopcompat/javax/swing/JPanel", superName(panel));
-        assertTrue("A library's resources come with it", new File(classes, "org/fancy/notes.properties").isFile());
+        // Under the one name a device can find it by: a bundle has no directories.
+        assertTrue("A library's resources come with it", new File(classes, "org__fancy__notes.properties").isFile());
+        assertFalse(new File(classes, "org/fancy/notes.properties").exists());
         assertFalse("The jar's manifest is not the application's",
                 new File(classes, "META-INF/MANIFEST.MF").exists());
         // What a device lacks is redirected in the library as in the application.
         assertTrue(CompatFixtures.members(Files.readAllBytes(panel.toPath()))
                 .contains("com/codename1/compat/jdk/JdkStrings.join"));
-        assertFalse("A library that names no desktop toolkit stays a dependency",
+        assertFalse("A library the application never reaches ships nothing",
                 new File(classes, "org/plain/Words.class").exists());
+        assertFalse(new File(classes, "org/plain/notes.properties").exists());
+        assertFalse(new File(classes, "org__plain__notes.properties").exists());
         assertTrue(logged.toString(), logged.toString().contains(
                 "info: Bundling fancy-lib-1.0.jar with the application (1 classes, 1 KB): it is written against"));
-        assertFalse(logged.toString(), logged.toString().contains("plain-lib"));
+        assertTrue(logged.toString(), logged.toString().contains(
+                "info: plain-lib-1.0.jar is not used by the application's classes and is left out of it"));
 
-        assertEquals(Collections.singleton("fancy-lib-1.0.jar"),
+        // Both are the step's to ship or leave out, so neither is merged
+        // whole into the application afterwards.
+        assertEquals(new java.util.HashSet<String>(Arrays.asList("fancy-lib-1.0.jar", "plain-lib-1.0.jar")),
                 CompatLibraries.bundledJarNames(Collections.singletonList(classes)));
+        CompatLibraries.Library left = CompatLibraries.libraries(classes).get("plain-lib-1.0.jar");
+        assertEquals(DependencyClassifier.Kind.PURE_JAVA, left.kind());
+        assertEquals(1, left.classCount());
+        assertEquals(0, left.shippedCount());
+        assertEquals(DependencyClassifier.Kind.UI_LIBRARY, CompatLibraries.libraries(classes)
+                .get("fancy-lib-1.0.jar").kind());
         assertEquals(Collections.singletonMap("org/fancy/FancyPanel", "fancy-lib-1.0.jar"),
                 CompatLibraries.classOrigins(classes));
         // The relocated copy is the one the check reads, although the jar is
@@ -217,8 +230,101 @@ public class CompatLibrariesTest {
         // is where the module assembling the application looks for it.
         File built = CompatRemapperTest.jar(new File(tmp.newFolder(), "common-1.0.jar"), CompatLibraries.RECORD,
                 Files.readAllBytes(new File(classes, CompatLibraries.RECORD).toPath()));
-        assertEquals(Collections.singleton("fancy-lib-1.0.jar"),
+        assertEquals(new java.util.HashSet<String>(Arrays.asList("fancy-lib-1.0.jar", "plain-lib-1.0.jar")),
                 CompatLibraries.bundledJarNames(Arrays.asList(built, plain, new File("no-such.jar"))));
+    }
+
+    /// An application that counts words, through a library of plain Java.
+    private static final String WORDY_MAIN = "package com.acme.swingapp;\n"
+            + "public class Main {\n"
+            + "    public static void main(String[] args) {\n"
+            + "        new javax.swing.JLabel(String.valueOf(org.plain.Words.count(\"a b\")));\n"
+            + "    }\n"
+            + "}\n";
+
+    private static final String WORDS = "package org.plain;\n"
+            + "public class Words {\n"
+            + "    public static int count(String s) { return Splitter.split(s).length; }\n"
+            + "}\n";
+
+    private static final String SPLITTER = "package org.plain;\n"
+            + "class Splitter {\n"
+            + "    static String[] split(String s) { return new String[] {String.join(\"-\", s, s)}; }\n"
+            + "}\n";
+
+    /// The part of the library the application has no use for, and which no
+    /// device could run.
+    private static final String SHELL = "package org.plain;\n"
+            + "public class Shell {\n"
+            + "    public Object run() { return new ProcessBuilder(\"ls\"); }\n"
+            + "}\n";
+
+    private File plainLibrary(Object... extra) throws Exception {
+        File out = tmp.newFolder();
+        CompatFixtures.compileAgainst(runtimes(), tmp.newFolder(), out, "org/plain/Words.java", WORDS,
+                "org/plain/Splitter.java", SPLITTER, "org/plain/Shell.java", SHELL);
+        List<Object> entries = new ArrayList<Object>();
+        for (String name : new String[] {"Words", "Splitter", "Shell"}) {
+            entries.add("org/plain/" + name + ".class");
+            entries.add(Files.readAllBytes(new File(out, "org/plain/" + name + ".class").toPath()));
+        }
+        entries.add("org/plain/words.properties");
+        entries.add("a=b\n".getBytes("UTF-8"));
+        entries.add("module-info.class");
+        entries.add(new byte[] {1});
+        entries.addAll(Arrays.asList(extra));
+        return CompatRemapperTest.jar(new File(tmp.newFolder(), "plain-lib-1.0.jar"), entries.toArray());
+    }
+
+    @Test
+    public void ofAPureJavaLibraryOnlyWhatTheApplicationReachesShips() throws Exception {
+        File plain = plainLibrary();
+        File classes = application(WORDY_MAIN, plain);
+        assertTrue(remapper(classes, Collections.singletonList(plain), plain).run());
+
+        assertTrue(new File(classes, "org/plain/Words.class").isFile());
+        assertTrue("What a reached class uses is reached", new File(classes, "org/plain/Splitter.class").isFile());
+        assertFalse("Nothing leads to it", new File(classes, "org/plain/Shell.class").exists());
+        assertTrue(new File(classes, "org__plain__words.properties").isFile());
+        assertFalse(new File(classes, "module-info.class").exists());
+        // A pure-Java library is relocated for the JDK classes a device lacks.
+        assertTrue(CompatFixtures.members(Files.readAllBytes(new File(classes, "org/plain/Splitter.class").toPath()))
+                .contains("com/codename1/compat/jdk/JdkStrings.join"));
+        assertTrue(logged.toString(), logged.toString().contains(
+                "info: Bundling 2 of the 3 classes of plain-lib-1.0.jar with the application"));
+        CompatLibraries.Library lib = CompatLibraries.libraries(classes).get("plain-lib-1.0.jar");
+        assertEquals(DependencyClassifier.Kind.PURE_JAVA, lib.kind());
+        assertEquals(3, lib.classCount());
+        assertEquals(2, lib.shippedCount());
+        assertEquals("org.plain", lib.mainPackage());
+        assertEquals("plain-lib-1.0.jar", CompatLibraries.classOrigins(classes).get("org/plain/Words"));
+        // The class that starts a process did not ship, so it is no finding.
+        new BytecodeCompliance(host(classes, plain)).execute();
+    }
+
+    @Test
+    public void aLibraryNoLongerDeclaredTakesItsClassesWithIt() throws Exception {
+        File plain = plainLibrary();
+        File classes = application(WORDY_MAIN, plain);
+        assertTrue(remapper(classes, Collections.singletonList(plain), plain).run());
+        assertTrue(new File(classes, "org/plain/Words.class").isFile());
+
+        assertTrue(remapper(classes, Collections.<File>emptyList(), plain).run());
+        assertFalse(new File(classes, "org/plain/Words.class").exists());
+        assertFalse(new File(classes, "org/plain/words.properties").exists());
+        assertTrue(CompatLibraries.bundledJarNames(Collections.singletonList(classes)).isEmpty());
+    }
+
+    @Test
+    public void nativeCodeIsNamedAndItsBinariesStayBehind() throws Exception {
+        File plain = plainLibrary("linux-x86-64/libwords.so", new byte[] {127, 'E', 'L', 'F'});
+        File classes = application(WORDY_MAIN, plain);
+        assertTrue(remapper(classes, Collections.singletonList(plain), plain).run());
+        assertFalse(new File(classes, "linux-x86-64/libwords.so").exists());
+        assertTrue(new File(classes, "org/plain/Words.class").isFile());
+        assertEquals("ships native libraries", CompatLibraries.libraries(classes).get("plain-lib-1.0.jar")
+                .nativeCode());
+        assertTrue(logged.toString(), logged.toString().contains("warn: plain-lib-1.0.jar ships native libraries"));
     }
 
     @Test

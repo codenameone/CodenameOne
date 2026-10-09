@@ -90,6 +90,7 @@ public final class Relocation {
         // callers name it in the method descriptor.
         {"java/util/concurrent/ConcurrentHashMap$KeySetView", JDK_PACKAGE + "ConcurrentHashMap$KeySetView"},
         {"java/util/concurrent/CopyOnWriteArrayList", JDK_PACKAGE + "CopyOnWriteArrayList"},
+        {"java/util/concurrent/CopyOnWriteArraySet", JDK_PACKAGE + "CopyOnWriteArraySet"},
         // Executors run their tasks on Codename One background threads,
         // never on the event dispatch thread.
         {"java/util/concurrent/Executor", JDK_PACKAGE + "Executor"},
@@ -184,6 +185,87 @@ public final class Relocation {
         {"java/util/function/ToLongFunction", JDK_PACKAGE + "ToLongFunction"},
         // java.time. A query is what parse(text, LocalDate::from) takes.
         {"java/time/temporal/TemporalQuery", JDK_PACKAGE + "TemporalQuery"},
+        // java.nio.file, over the one file system a device has. Watching,
+        // channels, file stores and POSIX attributes have no row: nothing
+        // on a device answers for them.
+        {"java/nio/file/Path", JDK_PACKAGE + "Path"},
+        {"java/nio/file/Paths", JDK_PACKAGE + "Paths"},
+        {"java/nio/file/Files", JDK_PACKAGE + "Files"},
+        {"java/nio/file/OpenOption", JDK_PACKAGE + "OpenOption"},
+        {"java/nio/file/CopyOption", JDK_PACKAGE + "CopyOption"},
+        {"java/nio/file/LinkOption", JDK_PACKAGE + "LinkOption"},
+        {"java/nio/file/StandardOpenOption", JDK_PACKAGE + "StandardOpenOption"},
+        {"java/nio/file/StandardCopyOption", JDK_PACKAGE + "StandardCopyOption"},
+        {"java/nio/file/FileVisitOption", JDK_PACKAGE + "FileVisitOption"},
+        {"java/nio/file/FileVisitResult", JDK_PACKAGE + "FileVisitResult"},
+        {"java/nio/file/FileVisitor", JDK_PACKAGE + "FileVisitor"},
+        {"java/nio/file/SimpleFileVisitor", JDK_PACKAGE + "SimpleFileVisitor"},
+        {"java/nio/file/DirectoryStream", JDK_PACKAGE + "DirectoryStream"},
+        {"java/nio/file/DirectoryStream$Filter", JDK_PACKAGE + "DirectoryStream$Filter"},
+        {"java/nio/file/DirectoryIteratorException", JDK_PACKAGE + "DirectoryIteratorException"},
+        {"java/nio/file/FileSystemException", JDK_PACKAGE + "FileSystemException"},
+        {"java/nio/file/NoSuchFileException", JDK_PACKAGE + "NoSuchFileException"},
+        {"java/nio/file/FileAlreadyExistsException", JDK_PACKAGE + "FileAlreadyExistsException"},
+        {"java/nio/file/DirectoryNotEmptyException", JDK_PACKAGE + "DirectoryNotEmptyException"},
+        {"java/nio/file/NotDirectoryException", JDK_PACKAGE + "NotDirectoryException"},
+        {"java/nio/file/AccessDeniedException", JDK_PACKAGE + "AccessDeniedException"},
+        {"java/nio/file/InvalidPathException", JDK_PACKAGE + "InvalidPathException"},
+        {"java/nio/file/attribute/FileAttribute", JDK_PACKAGE + "FileAttribute"},
+        {"java/nio/file/attribute/BasicFileAttributes", JDK_PACKAGE + "BasicFileAttributes"},
+        {"java/nio/file/attribute/FileTime", JDK_PACKAGE + "FileTime"},
+        // java.util.regex: a matcher written for this runtime, with the JDK's syntax.
+        // What it lacks it refuses by name when a pattern is compiled.
+        {"java/util/regex/Pattern", JDK_PACKAGE + "Pattern"},
+        {"java/util/regex/Matcher", JDK_PACKAGE + "Matcher"},
+        {"java/util/regex/MatchResult", JDK_PACKAGE + "MatchResult"},
+        {"java/util/regex/PatternSyntaxException", JDK_PACKAGE + "PatternSyntaxException"},
+        // java.util.concurrent: futures that complete each other, latches and work run later,
+        // on Codename One's threads.
+        {"java/util/concurrent/CompletableFuture", JDK_PACKAGE + "CompletableFuture"},
+        {"java/util/concurrent/CompletionStage", JDK_PACKAGE + "CompletionStage"},
+        {"java/util/concurrent/CompletionException", JDK_PACKAGE + "CompletionException"},
+        {"java/util/concurrent/CountDownLatch", JDK_PACKAGE + "CountDownLatch"},
+        {"java/util/concurrent/ThreadFactory", JDK_PACKAGE + "ThreadFactory"},
+        {"java/util/concurrent/ScheduledExecutorService", JDK_PACKAGE + "ScheduledExecutorService"},
+        {"java/util/concurrent/ScheduledFuture", JDK_PACKAGE + "ScheduledFuture"},
+        // java.time: the days, the months and the units, as enums of the JDK's shape.
+        // Temporal goes to the one interface every date and time class of the
+        // device implements, so a method declared over it takes any of them.
+        {"java/time/DayOfWeek", JDK_PACKAGE + "DayOfWeek"},
+        {"java/time/Month", JDK_PACKAGE + "Month"},
+        {"java/time/temporal/ChronoUnit", JDK_PACKAGE + "ChronoUnit"},
+        {"java/time/temporal/TemporalUnit", JDK_PACKAGE + "TemporalUnit"},
+        {"java/time/temporal/Temporal", "java/time/temporal/TemporalAccessor"},
+        // Text forms and digests: URL, Base64 and hexadecimal coding written
+        // here, the digests and the random bytes over Codename One's own.
+        {"java/net/URLDecoder", JDK_PACKAGE + "URLDecoder"},
+        {"java/net/URLEncoder", JDK_PACKAGE + "URLEncoder"},
+        {"java/util/Base64", JDK_PACKAGE + "Base64"},
+        {"java/util/Base64$Encoder", JDK_PACKAGE + "Base64$Encoder"},
+        {"java/util/Base64$Decoder", JDK_PACKAGE + "Base64$Decoder"},
+        {"java/util/HexFormat", JDK_PACKAGE + "HexFormat"},
+        {"java/security/MessageDigest", JDK_PACKAGE + "MessageDigest"},
+        {"java/security/NoSuchAlgorithmException", JDK_PACKAGE + "NoSuchAlgorithmException"},
+        {"java/security/GeneralSecurityException", JDK_PACKAGE + "GeneralSecurityException"},
+        {"java/security/SecureRandom", JDK_PACKAGE + "SecureRandom"},
+        // What an exhaustive pattern switch throws; javac names it in every one.
+        {"java/lang/MatchException", JDK_PACKAGE + "MatchException"},
+        // Service providers, from the META-INF/services files the build read:
+        // the generated registry creates each with "new".
+        {"java/util/ServiceLoader", JDK_PACKAGE + "ServiceLoader"},
+        {"java/util/ServiceLoader$Provider", JDK_PACKAGE + "ServiceLoader$Provider"},
+        {"java/util/ServiceConfigurationError", JDK_PACKAGE + "ServiceConfigurationError"},
+        // The one unnamed module of an application without modules, and the
+        // layer it is not in. Class.getModule() itself is a CompatRewrites rule.
+        {"java/lang/Module", JDK_PACKAGE + "Module"},
+        {"java/lang/ModuleLayer", JDK_PACKAGE + "ModuleLayer"},
+        // "Not running in OSGi", for a library that asks before it takes its
+        // class path route. These four types and no more: nothing here is an
+        // OSGi framework.
+        {"org/osgi/framework/FrameworkUtil", JDK_PACKAGE + "osgi/FrameworkUtil"},
+        {"org/osgi/framework/Bundle", JDK_PACKAGE + "osgi/Bundle"},
+        {"org/osgi/framework/BundleContext", JDK_PACKAGE + "osgi/BundleContext"},
+        {"org/osgi/framework/ServiceReference", JDK_PACKAGE + "osgi/ServiceReference"},
     };
 
     private final String name;

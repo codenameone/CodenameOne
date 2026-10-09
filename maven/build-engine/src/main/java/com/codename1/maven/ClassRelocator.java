@@ -157,7 +157,9 @@ public final class ClassRelocator {
             // is compiled against.
             chain = CompatRewrites.visitor(chain);
         }
-        cr.accept(chain, 0);
+        // First of all, so that what it generates is rewritten and relocated
+        // like the code javac wrote.
+        cr.accept(new RecordDesugar(chain), 0);
         return cw.toByteArray();
     }
 

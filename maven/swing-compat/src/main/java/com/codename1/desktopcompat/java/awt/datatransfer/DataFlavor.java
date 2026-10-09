@@ -34,6 +34,11 @@ public class DataFlavor {
     /// A Java string.
     public static final DataFlavor stringFlavor = new DataFlavor(String.class, "Unicode String");
 
+    /// A list of files, each a `java.io.File`: what a drag of files from
+    /// another application carries.
+    public static final DataFlavor javaFileListFlavor = new DataFlavor("application/x-java-file-list",
+            java.util.List.class, "application/x-java-file-list");
+
     public static final String javaSerializedObjectMimeType = "application/x-java-serialized-object";
 
     private final String primary;
@@ -47,6 +52,12 @@ public class DataFlavor {
         this.primary = javaSerializedObjectMimeType;
         this.representationClass = representationClass;
         this.humanPresentableName = humanPresentableName == null ? primary : humanPresentableName;
+    }
+
+    private DataFlavor(String primary, Class<?> representationClass, String humanPresentableName) {
+        this.primary = primary;
+        this.representationClass = representationClass;
+        this.humanPresentableName = humanPresentableName;
     }
 
     /// A flavor for a MIME type whose data is read from a stream. The
@@ -115,6 +126,12 @@ public class DataFlavor {
 
     public final boolean isMimeTypeEqual(DataFlavor dataFlavor) {
         return dataFlavor != null && primary.equals(dataFlavor.primary);
+    }
+
+    /// Whether this is the flavor of a list of files.
+    public boolean isFlavorJavaFileListType() {
+        return primary.equals(javaFileListFlavor.primary)
+                && java.util.List.class.equals(representationClass);
     }
 
     public boolean isFlavorTextType() {

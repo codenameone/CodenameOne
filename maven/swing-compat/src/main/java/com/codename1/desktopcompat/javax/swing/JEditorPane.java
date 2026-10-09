@@ -61,7 +61,8 @@ import java.net.URL;
 ///    not editable, and that is the one kind there is here. Its document
 ///    holds the text without the tags, and [#getText()] answers the markup
 ///    that was set.
-///  - There are no editor kits and no styled documents.
+///  - There are no editor kits. Styled documents are shown by
+///    [JTextPane].
 ///  - [#setPage(URL)] reads the whole page before it returns, where the
 ///    desktop may load it in the background. A link relative to the page
 ///    is resolved against it.
@@ -185,11 +186,17 @@ public class JEditorPane extends JTextComponent {
     }
 
     /// Keeps the widget from being edited while the pane shows a page.
-    private void cn1ApplyMode() {
+    void cn1ApplyMode() {
         com.codename1.ui.Component p = cn1PeerOrNull();
         if (p instanceof com.codename1.ui.TextArea) {
-            ((com.codename1.ui.TextArea) p).setEditable(isEditable() && !html());
+            ((com.codename1.ui.TextArea) p).setEditable(isEditable() && !html() && !cn1Styled());
         }
+    }
+
+    /// Whether the pane draws its text itself because the document has
+    /// attributes; a text pane does.
+    boolean cn1Styled() {
+        return false;
     }
 
     /// The page that is showing, or `null` when the pane shows plain
@@ -203,7 +210,7 @@ public class JEditorPane extends JTextComponent {
         return now != null && now.equals(shown) ? page : null;
     }
 
-    private Insets cn1TextInsets() {
+    Insets cn1TextInsets() {
         Insets in = getInsets();
         Insets m = getMargin();
         int t = m == null ? PAD : m.top;

@@ -22,6 +22,8 @@
  */
 package com.codename1.desktopcompat.java.awt;
 
+import com.codename1.desktopcompat.java.awt.image.BufferedImage;
+
 /// The screens of the device: there is one, the display.
 public abstract class GraphicsEnvironment {
 
@@ -51,8 +53,30 @@ public abstract class GraphicsEnvironment {
 
     public abstract GraphicsDevice getDefaultScreenDevice();
 
-    /// The family names `Font` maps to Codename One fonts.
+    /// The family names `Font` maps to Codename One fonts, and those of
+    /// the fonts that were registered.
     public abstract String[] getAvailableFontFamilyNames();
+
+    /// A graphics that draws into `img`.
+    public abstract Graphics2D createGraphics(BufferedImage img);
+
+    /// Lets `new Font` find a font made by `Font.createFont` under its
+    /// family and its name. `false` for a font that was not created from
+    /// a file, and for one named as a font of the platform or as another
+    /// registered font is.
+    public boolean registerFont(Font font) {
+        com.codename1.desktopcompat.rt.FontFiles.Face face = font == null ? null : font.cn1Face();
+        if (face == null) {
+            return false;
+        }
+        String family = face.family();
+        if (family.equalsIgnoreCase(Font.DIALOG) || family.equalsIgnoreCase(Font.DIALOG_INPUT)
+                || family.equalsIgnoreCase(Font.MONOSPACED) || family.equalsIgnoreCase(Font.SANS_SERIF)
+                || family.equalsIgnoreCase(Font.SERIF)) {
+            return false;
+        }
+        return com.codename1.desktopcompat.rt.FontFiles.register(face);
+    }
 
     /// The center of the display, in logical pixels.
     public Point getCenterPoint() {

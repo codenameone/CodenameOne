@@ -100,5 +100,34 @@
             <version>1.6.5-1</version>
             <scope>test</scope>
         </dependency>
+        <!-- The real FlatLaf and RSyntaxTextArea, for the API shape tests
+             alone: the layer's com.formdev.flatlaf and org.fife classes are
+             held to their signatures. Test scope on purpose; nothing the
+             module ships may name them. RSyntaxTextArea is the last line
+             that is Java 8 bytecode, which is what these tests run on. -->
+        <dependency>
+            <groupId>com.formdev</groupId>
+            <artifactId>flatlaf</artifactId>
+            <version>3.7.1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.formdev</groupId>
+            <artifactId>flatlaf-extras</artifactId>
+            <version>3.7.1</version>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>com.fifesoft</groupId>
+            <artifactId>rsyntaxtextarea</artifactId>
+            <version>3.6.0</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>

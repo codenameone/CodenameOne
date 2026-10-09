@@ -96,6 +96,9 @@ final class CompatRewrites {
     private static final String STRING = "Ljava/lang/String;";
 
     private static final String SYSTEM = Relocation.JDK_PACKAGE + "JdkSystem";
+    /// The methods of String that take a regular expression, in the JDK's
+    /// syntax.
+    private static final String REGEX = Relocation.JDK_PACKAGE + "JdkRegex";
     private static final String STRINGS = Relocation.JDK_PACKAGE + "JdkStrings";
     private static final String NUMBERS = Relocation.JDK_PACKAGE + "JdkNumbers";
     private static final String FUNCTIONS = Relocation.JDK_PACKAGE + "JdkFunctions";
@@ -154,6 +157,9 @@ final class CompatRewrites {
         STATIC.put("java/lang/ClassLoader.getSystemResourceAsStream" + stream, RESOURCES);
         STATIC.put("java/lang/ClassLoader.getSystemResources" + urls, RESOURCES);
         VIRTUAL.put("java/lang/Thread.getContextClassLoader()Ljava/lang/ClassLoader;", RESOURCES);
+        // The device's Class has no module to answer; the stand-in answers
+        // the unnamed one, which is in no layer.
+        VIRTUAL.put("java/lang/Class.getModule()Ljava/lang/Module;", Relocation.JDK_PACKAGE + "Module#cn1Of");
         VIRTUAL.put("java/lang/Thread.setContextClassLoader(Ljava/lang/ClassLoader;)V", RESOURCES);
 
         String supplier = "Ljava/util/function/Supplier;";
@@ -228,7 +234,7 @@ final class CompatRewrites {
         STATIC.put(str + "join(" + seq + "Ljava/lang/Iterable;)" + STRING, STRINGS);
         STATIC.put(str + "valueOf([C)" + STRING, STRINGS);
         STATIC.put(str + "format(Ljava/util/Locale;" + STRING + "[Ljava/lang/Object;)" + STRING, STRINGS);
-        VIRTUAL.put(str + "matches(" + STRING + ")Z", STRINGS);
+        VIRTUAL.put(str + "matches(" + STRING + ")Z", REGEX);
         VIRTUAL.put(str + "toLowerCase(Ljava/util/Locale;)" + STRING, STRINGS);
         for (String builder : new String[] {"java/lang/StringBuilder", "java/lang/StringBuffer"}) {
             VIRTUAL.put(builder + ".indexOf(" + STRING + ")I", STRINGS);
@@ -454,8 +460,10 @@ final class CompatRewrites {
 
     static {
         String str = "java/lang/String.";
-        VIRTUAL.put(str + "split(" + STRING + ")[" + STRING, STRINGS);
-        VIRTUAL.put(str + "split(" + STRING + "I)[" + STRING, STRINGS);
+        VIRTUAL.put(str + "split(" + STRING + ")[" + STRING, REGEX);
+        VIRTUAL.put(str + "split(" + STRING + "I)[" + STRING, REGEX);
+        VIRTUAL.put(str + "replaceAll(" + STRING + STRING + ")" + STRING, REGEX);
+        VIRTUAL.put(str + "replaceFirst(" + STRING + STRING + ")" + STRING, REGEX);
         VIRTUAL.put(str + "formatted([" + OBJECT + ")" + STRING, STRINGS);
         VIRTUAL.put(str + "isBlank()Z", STRINGS);
         VIRTUAL.put(str + "repeat(I)" + STRING, STRINGS);
@@ -517,6 +525,197 @@ final class CompatRewrites {
         VIRTUAL.put("java/time/OffsetDateTime.format(" + fmtT + ")" + STRING, TIME);
         STATIC.put("java/time/ZonedDateTime.parse(Ljava/lang/CharSequence;" + fmtT + ")" + zonedT,
                 TIME + "#parseZoned");
+    }
+
+    /// Constructors the device lacks whose last argument only has to be
+    /// converted for one it has: `owner.<init> descriptor` to the static
+    /// method that converts the argument on top of the stack, and the
+    /// descriptor of the constructor called instead.
+    private static final Map<String, String[]> CONSTRUCTORS = new HashMap<String, String[]>();
+
+    private static final String CHARSETS = Relocation.JDK_PACKAGE + "JdkCharsets";
+    private static final String CHARSET = "Ljava/nio/charset/Charset;";
+
+    static {
+        // The device encodes and decodes by the NAME of an encoding. Its
+        // Charset is that name, so an overload taking a Charset becomes the
+        // one taking a name.
+        String[] byName = {CHARSETS, "name", "(" + CHARSET + ")" + STRING};
+        CONSTRUCTORS.put("java/lang/String.<init>([BII" + CHARSET + ")V",
+                new String[] {byName[0], byName[1], byName[2], "([BII" + STRING + ")V"});
+        CONSTRUCTORS.put("java/io/InputStreamReader.<init>(Ljava/io/InputStream;" + CHARSET + ")V",
+                new String[] {byName[0], byName[1], byName[2], "(Ljava/io/InputStream;" + STRING + ")V"});
+        CONSTRUCTORS.put("java/io/OutputStreamWriter.<init>(Ljava/io/OutputStream;" + CHARSET + ")V",
+                new String[] {byName[0], byName[1], byName[2], "(Ljava/io/OutputStream;" + STRING + ")V"});
+        String cs = "java/nio/charset/Charset.";
+        STATIC.put(cs + "forName(" + STRING + ")" + CHARSET, CHARSETS);
+        STATIC.put(cs + "defaultCharset()" + CHARSET, CHARSETS);
+        STATIC.put(cs + "isSupported(" + STRING + ")Z", CHARSETS);
+        VIRTUAL.put(cs + "name()" + STRING, CHARSETS);
+        VIRTUAL.put(cs + "toString()" + STRING, CHARSETS);
+        VIRTUAL.put("java/io/ByteArrayOutputStream.toString(" + CHARSET + ")" + STRING, CHARSETS);
+    }
+
+    private static final String DATES = Relocation.JDK_PACKAGE + "JdkDates";
+    private static final String IO = Relocation.JDK_PACKAGE + "JdkIo";
+    private static final String TEXT = Relocation.JDK_PACKAGE + "JdkText";
+
+    /// Adds a rule for each of `names`, instance methods of `owner` that
+    /// take `arguments` and answer `result`.
+    private static void members(String owner, String arguments, String result, String target, String... names) {
+        for (String name : names) {
+            VIRTUAL.put(owner + "." + name + "(" + arguments + ")" + result, target);
+        }
+    }
+
+    static {
+        // The rest of java.time: what the device's classes leave out is
+        // arithmetic over what they have, and JdkDates does it.
+        String instant = "java/time/Instant";
+        String instantT = "Ljava/time/Instant;";
+        String zone = "Ljava/time/ZoneId;";
+        String zoned = "java/time/ZonedDateTime";
+        String zonedT = "Ljava/time/ZonedDateTime;";
+        String date = "java/time/LocalDate";
+        String dateT = "Ljava/time/LocalDate;";
+        String dateTime = "java/time/LocalDateTime";
+        String dateTimeT = "Ljava/time/LocalDateTime;";
+        String duration = "java/time/Duration";
+        String durationT = "Ljava/time/Duration;";
+        String unit = "Ljava/time/temporal/TemporalUnit;";
+        String temporal = "Ljava/time/temporal/Temporal;";
+        String accessor = "Ljava/time/temporal/TemporalAccessor;";
+        String dayT = "Ljava/time/DayOfWeek;";
+        String monthT = "Ljava/time/Month;";
+
+        members(instant, zone, zonedT, DATES, "atZone");
+        members(instant, instantT, "Z", DATES, "isBefore", "isAfter");
+        members(instant, "J", instantT, DATES, "plusNanos", "minusNanos");
+        // The device's Duration and Period share no interface, so an
+        // amount reaches its stand-in as an Object and is told apart there.
+        for (String op : new String[] {"plus", "minus"}) {
+            for (String[] type : new String[][] {{instant, instantT}, {date, dateT}, {dateTime, dateTimeT}}) {
+                VIRTUAL.put(type[0] + "." + op + "(J" + unit + ")" + type[1], DATES);
+                VIRTUAL.put(type[0] + "." + op + "(Ljava/time/temporal/TemporalAmount;)" + type[1],
+                        DATES + "#" + op + "Amount(" + type[1] + OBJECT + ")" + type[1]);
+            }
+        }
+
+        String utilDate = "java/util/Date";
+        String utilDateT = "Ljava/util/Date;";
+        members(utilDate, "", instantT, DATES, "toInstant");
+        STATIC.put(utilDate + ".from(" + instantT + ")" + utilDateT, DATES);
+        members(utilDate, utilDateT, "Z", DATES, "after", "before");
+        members(utilDate, "", "I", DATES, "getYear", "getMonth", "getDate", "getDay", "getHours", "getMinutes",
+                "getSeconds");
+
+        members(date, "", dayT, DATES, "getDayOfWeek");
+        members(date, "", monthT, DATES, "getMonth");
+        members(date, "", "I", DATES, "getDayOfYear", "lengthOfYear");
+        members(date, "", dateTimeT, DATES, "atStartOfDay");
+        members(date, "I", dateT, DATES, "withDayOfMonth", "withMonth", "withYear", "withDayOfYear");
+        members(date, dateT, "Ljava/util/stream/Stream;", DATES, "datesUntil");
+        STATIC.put(date + ".of(I" + monthT + "I)" + dateT, DATES + "#localDateOf");
+        STATIC.put(date + ".ofInstant(" + instantT + zone + ")" + dateT, DATES + "#localDateOfInstant");
+        STATIC.put(date + ".now(" + zone + ")" + dateT, DATES + "#localDateNow");
+
+        members(dateTime, "", dayT, DATES, "getDayOfWeek");
+        members(dateTime, "", monthT, DATES, "getMonth");
+        members(dateTime, "", "I", DATES, "getDayOfYear");
+        members(dateTime, "J", dateTimeT, DATES, "minusDays", "minusHours", "minusMinutes", "minusSeconds",
+                "plusWeeks", "minusWeeks", "plusMonths", "minusMonths", "plusYears", "minusYears", "plusNanos",
+                "minusNanos");
+        members(dateTime, "I", dateTimeT, DATES, "withHour", "withMinute", "withSecond", "withNano");
+        members(dateTime, unit, dateTimeT, DATES, "truncatedTo");
+        members(dateTime, zone, zonedT, DATES, "atZone");
+        members(dateTime, "Ljava/time/ZoneOffset;", "J", DATES, "toEpochSecond");
+        for (String test : new String[] {"isBefore", "isAfter", "isEqual"}) {
+            // As for LocalDate: the device has no java.time.chrono, and the
+            // stand-in takes the other value as the interface it does have.
+            VIRTUAL.put(dateTime + "." + test + "(Ljava/time/chrono/ChronoLocalDateTime;)Z",
+                    DATES + "#" + test + "(" + dateTimeT + accessor + ")Z");
+            VIRTUAL.put(zoned + "." + test + "(Ljava/time/chrono/ChronoZonedDateTime;)Z",
+                    DATES + "#" + test + "(" + zonedT + accessor + ")Z");
+        }
+
+        members(zoned, "", dateT, DATES, "toLocalDate");
+        members(zoned, "", "Ljava/time/LocalTime;", DATES, "toLocalTime");
+        members(zoned, "", "J", DATES, "toEpochSecond");
+        members(zoned, "", "I", DATES, "getYear", "getMonthValue", "getDayOfMonth", "getDayOfYear", "getHour",
+                "getMinute", "getSecond", "getNano");
+        members(zoned, "", monthT, DATES, "getMonth");
+        members(zoned, "", dayT, DATES, "getDayOfWeek");
+        members(zoned, zone, zonedT, DATES, "withZoneSameInstant");
+        members(zoned, "J", zonedT, DATES, "plusDays", "minusDays", "plusWeeks", "minusWeeks", "plusMonths",
+                "minusMonths", "plusYears", "minusYears", "plusSeconds", "minusSeconds", "plusMinutes",
+                "minusMinutes", "plusHours", "minusHours");
+
+        // Temporal is relocated to the device's TemporalAccessor, which is
+        // what every one of its date and time classes implements.
+        for (String[] type : new String[][] {{instant, instantT}, {date, dateT}, {dateTime, dateTimeT},
+            {zoned, zonedT}, {"java/time/LocalTime", "Ljava/time/LocalTime;"}}) {
+            VIRTUAL.put(type[0] + ".until(" + temporal + unit + ")J",
+                    DATES + "#until(" + accessor + temporal + unit + ")J");
+        }
+        STATIC.put(duration + ".between(" + temporal + temporal + ")" + durationT, DATES);
+        STATIC.put(duration + ".ofNanos(J)" + durationT, DATES);
+        STATIC.put(duration + ".of(J" + unit + ")" + durationT, DATES);
+        FIELDS.put(duration + ".ZERO", DATES);
+        members(duration, "", "J", DATES, "toDays", "toHours", "toMinutes", "toSeconds", "toNanos", "toDaysPart");
+        members(duration, "", "I", DATES, "toHoursPart", "toMinutesPart", "toSecondsPart", "toMillisPart",
+                "toNanosPart");
+        members(duration, "", "Z", DATES, "isZero", "isNegative");
+        members(duration, "J", durationT, DATES, "plusDays", "plusHours", "plusMinutes", "plusSeconds", "plusMillis",
+                "plusNanos", "minusDays", "minusHours", "minusMinutes", "minusSeconds", "minusMillis", "minusNanos",
+                "multipliedBy", "dividedBy");
+        members(duration, "", durationT, DATES, "negated", "abs");
+    }
+
+    static {
+        // Streams. The call names the class the variable was declared as,
+        // so each stream class an application is likely to hold gets a row;
+        // the stand-in takes it as the InputStream or Reader it is.
+        String in = "Ljava/io/InputStream;";
+        for (String owner : new String[] {"InputStream", "FileInputStream", "ByteArrayInputStream",
+            "BufferedInputStream", "FilterInputStream", "DataInputStream"}) {
+            String o = "java/io/" + owner + ".";
+            VIRTUAL.put(o + "readAllBytes()[B", IO + "#readAllBytes(" + in + ")[B");
+            VIRTUAL.put(o + "readNBytes(I)[B", IO + "#readNBytes(" + in + "I)[B");
+            VIRTUAL.put(o + "readNBytes([BII)I", IO + "#readNBytes(" + in + "[BII)I");
+            VIRTUAL.put(o + "transferTo(Ljava/io/OutputStream;)J", IO + "#transferTo(" + in + "Ljava/io/OutputStream;)J");
+        }
+        for (String owner : new String[] {"Reader", "InputStreamReader", "BufferedReader", "FileReader",
+            "StringReader"}) {
+            VIRTUAL.put("java/io/" + owner + ".transferTo(Ljava/io/Writer;)J",
+                    IO + "#transferTo(Ljava/io/Reader;Ljava/io/Writer;)J");
+        }
+        VIRTUAL.put("java/io/BufferedReader.lines()" + STREAM, IO);
+
+        String seq = "Ljava/lang/CharSequence;";
+        String ints = "Ljava/util/stream/IntStream;";
+        for (String owner : new String[] {"String", "CharSequence", "StringBuilder", "StringBuffer"}) {
+            VIRTUAL.put("java/lang/" + owner + ".codePoints()" + ints, TEXT + "#codePoints(" + seq + ")" + ints);
+        }
+        for (String owner : new String[] {"CharSequence", "StringBuilder", "StringBuffer"}) {
+            VIRTUAL.put("java/lang/" + owner + ".isEmpty()Z", TEXT + "#isEmpty(" + seq + ")Z");
+        }
+        VIRTUAL.put("java/lang/StringBuilder.appendCodePoint(I)Ljava/lang/StringBuilder;", TEXT);
+        VIRTUAL.put("java/lang/StringBuffer.appendCodePoint(I)Ljava/lang/StringBuffer;", TEXT);
+        STATIC.put("java/lang/Character.toString(I)" + STRING, TEXT + "#codePointToString");
+
+        // The sequenced List of Java 21. LinkedList and the deques have
+        // had the first six all along and keep their own.
+        String list = "Ljava/util/List;";
+        for (String owner : new String[] {"java/util/List", "java/util/ArrayList", "java/util/AbstractList",
+            "java/util/Vector", "java/util/concurrent/CopyOnWriteArrayList"}) {
+            VIRTUAL.put(owner + ".getFirst()" + OBJECT, TEXT + "#getFirst(" + list + ")" + OBJECT);
+            VIRTUAL.put(owner + ".getLast()" + OBJECT, TEXT + "#getLast(" + list + ")" + OBJECT);
+            VIRTUAL.put(owner + ".removeFirst()" + OBJECT, TEXT + "#removeFirst(" + list + ")" + OBJECT);
+            VIRTUAL.put(owner + ".removeLast()" + OBJECT, TEXT + "#removeLast(" + list + ")" + OBJECT);
+            VIRTUAL.put(owner + ".addFirst(" + OBJECT + ")V", TEXT + "#addFirst(" + list + OBJECT + ")V");
+            VIRTUAL.put(owner + ".addLast(" + OBJECT + ")V", TEXT + "#addLast(" + list + OBJECT + ")V");
+            VIRTUAL.put(owner + ".reversed()" + list, TEXT + "#reversed(" + list + ")" + list);
+        }
     }
 
     private CompatRewrites() {
@@ -713,6 +912,12 @@ final class CompatRewrites {
                             targetDescriptor(target, receiverFirst(owner, descriptor)), false);
                     return;
                 }
+            } else if (opcode == Opcodes.INVOKESPECIAL && CONSTRUCTORS.containsKey(owner + "." + name + descriptor)) {
+                // The argument to convert is the last one, so it is on top.
+                String[] rule = CONSTRUCTORS.get(owner + "." + name + descriptor);
+                super.visitMethodInsn(Opcodes.INVOKESTATIC, rule[0], rule[1], rule[2], false);
+                super.visitMethodInsn(opcode, owner, name, rule[3], false);
+                return;
             } else if (opcode == Opcodes.INVOKESPECIAL && JAVA_LOCALE.equals(owner)) {
                 // The device's Locale is a language and a country. A locale
                 // of a language alone has the empty country; a variant has

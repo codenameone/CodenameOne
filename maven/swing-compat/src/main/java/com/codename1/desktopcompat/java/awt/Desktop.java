@@ -22,6 +22,7 @@
  */
 package com.codename1.desktopcompat.java.awt;
 
+import com.codename1.desktopcompat.java.awt.desktop.PreferencesHandler;
 import com.codename1.desktopcompat.rt.Launcher;
 import java.io.File;
 import java.io.IOException;
@@ -36,12 +37,19 @@ import java.net.URI;
 ///
 /// What differs from the desktop: `EDIT` and `PRINT` are not supported;
 /// `open` asks the device to show the file and cannot start a program; a
-/// file is not checked for existing first.
+/// file is not checked for existing first. None of the `APP_` actions is
+/// supported -- there is no application menu to put an About or a
+/// Preferences item in -- so [#isSupported] answers false for them and
+/// [#setPreferencesHandler] throws, as on a desktop without them.
 public class Desktop {
 
     /// What a desktop can be asked to do.
     public enum Action {
-        OPEN, EDIT, PRINT, MAIL, BROWSE
+        OPEN, EDIT, PRINT, MAIL, BROWSE,
+        APP_EVENT_FOREGROUND, APP_EVENT_HIDDEN, APP_EVENT_REOPENED, APP_EVENT_SCREEN_SLEEP,
+        APP_EVENT_SYSTEM_SLEEP, APP_EVENT_USER_SESSION, APP_ABOUT, APP_PREFERENCES, APP_OPEN_FILE,
+        APP_PRINT_FILE, APP_OPEN_URI, APP_QUIT_HANDLER, APP_QUIT_STRATEGY, APP_SUDDEN_TERMINATION,
+        APP_REQUEST_FOREGROUND, APP_HELP_VIEWER, APP_MENU_BAR, BROWSE_FILE_DIR, MOVE_TO_TRASH
     }
 
     private static final Desktop DESKTOP = new Desktop();
@@ -93,5 +101,17 @@ public class Desktop {
         }
         String path = file.getAbsolutePath();
         Launcher.open(path.indexOf("://") >= 0 ? path : "file://" + path);
+    }
+
+    /// Sets what the Preferences item of the application menu does.
+    ///
+    /// #### Throws
+    ///
+    /// - `UnsupportedOperationException`: always: `APP_PREFERENCES` is not
+    ///   supported, which [#isSupported] says and a caller has to ask first
+    public void setPreferencesHandler(PreferencesHandler preferencesHandler) {
+        if (!isSupported(Action.APP_PREFERENCES)) {
+            throw new UnsupportedOperationException(Action.APP_PREFERENCES.name());
+        }
     }
 }

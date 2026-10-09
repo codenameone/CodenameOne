@@ -24,8 +24,9 @@ package com.codename1.desktopcompat.javax.swing.text;
 
 import java.util.Enumeration;
 
-/// A read only set of attributes. The documents of this layer carry plain
-/// text, so the only sets there are describe an element and are empty.
+/// A read only set of attributes: of an element of a document, or made by
+/// the application to style text with, see [SimpleAttributeSet] and
+/// [StyleConstants].
 public interface AttributeSet {
 
     Object NameAttribute = "name";

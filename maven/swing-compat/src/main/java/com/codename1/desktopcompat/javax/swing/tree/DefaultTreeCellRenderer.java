@@ -54,6 +54,15 @@ public class DefaultTreeCellRenderer extends JLabel implements TreeCellRenderer 
 
     private Color shownForeground;
 
+    /// A subclass that colours one row leaves the colour on the renderer,
+    /// which is shared by every row: what is shown is tracked here, so the
+    /// next row gets its own colour back.
+    @Override
+    public void setForeground(Color fg) {
+        shownForeground = fg;
+        super.setForeground(fg);
+    }
+
     public DefaultTreeCellRenderer() {
         setOpaque(false);
         textSelectionColor = CellTheme.selectionForeground("Tree.selectionForeground");

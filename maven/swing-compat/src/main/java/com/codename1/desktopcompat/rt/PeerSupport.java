@@ -153,8 +153,11 @@ public final class PeerSupport {
             s.setBgColor(bg.getRGB() & 0xffffff);
             s.setBgTransparency(bg.getAlpha());
         }
-        if (owner.isFontSet()) {
-            Font f = owner.getFont();
+        // A font of the component's own, else the one the application
+        // chose for everything; with neither the theme's font for this
+        // kind of widget stays.
+        Font f = owner.isFontSet() ? owner.getFont() : Fonts.applicationFont();
+        if (f != null) {
             s.setFont(Fonts.nativeFont(f, f.getSize2D() * Units.scale()));
         }
     }

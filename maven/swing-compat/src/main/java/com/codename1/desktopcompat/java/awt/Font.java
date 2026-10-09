@@ -22,12 +22,27 @@
  */
 package com.codename1.desktopcompat.java.awt;
 
+import java.io.InputStream;
+import java.io.IOException;
+import java.io.FileInputStream;
+import java.io.File;
+
 /// A typeface, a style and a size in logical pixels.
 ///
-/// The family is a request, not a file: every font is drawn with the
+/// The family is a request, not a file: a font is drawn with the
 /// platform's own typeface in the asked weight and slant, so a 12 pixel
 /// bold "Arial" is the device's 12 pixel bold font. Sizes follow the
 /// desktop convention of one point per pixel.
+///
+/// The exception is a font the application carries. [#createFont] makes
+/// a font of a TrueType or OpenType file that is among the application's
+/// resources, and that font -- and every font derived from it -- is drawn
+/// with the file's own glyphs, which is what an icon font needs. Once it
+/// is registered with `GraphicsEnvironment.registerFont`, a `new Font`
+/// that names its family is drawn with it too. The file has to be a
+/// resource of the application: a font is opened by the platform under
+/// the name the build shipped it as, so bytes from anywhere else make a
+/// font with the right names that is drawn with the platform's typeface.
 public class Font {
 
     public static final String DIALOG = "Dialog";
@@ -48,6 +63,8 @@ public class Font {
     protected int style;
     protected int size;
     protected float pointSize;
+    /// The file this font was created from, when it was.
+    private com.codename1.desktopcompat.rt.FontFiles.Face face;
 
     public Font(String name, int style, int size) {
         this.name = name != null ? name : "Default";
@@ -61,17 +78,59 @@ public class Font {
         this.style = font.style;
         this.size = font.size;
         this.pointSize = font.pointSize;
+        this.face = font.face;
     }
 
-    private Font(String name, int style, float sizePts) {
+    private Font(String name, int style, float sizePts, com.codename1.desktopcompat.rt.FontFiles.Face face) {
         this.name = name;
         this.style = (style & ~0x03) == 0 ? style : 0;
         this.size = (int) (sizePts + 0.5);
         this.pointSize = sizePts;
+        this.face = face;
+    }
+
+    /// Makes a font of the bytes of a TrueType or OpenType file: plain,
+    /// one point high, to be given a size with [#deriveFont(float)]. The
+    /// stream is read to its end and left open.
+    ///
+    /// #### Throws
+    ///
+    /// - `FontFormatException`: the bytes are no such file, or the format
+    ///   asked for is Type 1, which no platform here reads.
+    public static Font createFont(int fontFormat, InputStream fontStream) throws FontFormatException, IOException {
+        if (fontFormat != TRUETYPE_FONT && fontFormat != TYPE1_FONT) {
+            throw new IllegalArgumentException("font format not recognized");
+        }
+        if (fontFormat == TYPE1_FONT) {
+            throw new FontFormatException("Type 1 fonts are not supported");
+        }
+        com.codename1.desktopcompat.rt.FontFiles.Face made = com.codename1.desktopcompat.rt.FontFiles.fromBytes(
+                com.codename1.desktopcompat.rt.FontFiles.readAll(fontStream));
+        if (made == null) {
+            throw new FontFormatException("Unsupported sfnt");
+        }
+        return new Font(made.fullName(), PLAIN, 1f, made);
+    }
+
+    /// As [#createFont(int, InputStream)], of a file.
+    public static Font createFont(int fontFormat, File fontFile) throws FontFormatException, IOException {
+        InputStream in = new FileInputStream(fontFile);
+        try {
+            return createFont(fontFormat, in);
+        } finally {
+            in.close();
+        }
+    }
+
+    /// The font file this font is drawn with: the one it was created
+    /// from, or the registered one its name finds. `null` for a font of
+    /// the platform.
+    public com.codename1.desktopcompat.rt.FontFiles.Face cn1Face() {
+        return face != null ? face : com.codename1.desktopcompat.rt.FontFiles.registered(name);
     }
 
     public String getFamily() {
-        return name;
+        return face != null ? face.family() : name;
     }
 
     public String getName() {
@@ -107,15 +166,15 @@ public class Font {
     }
 
     public Font deriveFont(int style, float size) {
-        return new Font(name, style, size);
+        return new Font(name, style, size, face);
     }
 
     public Font deriveFont(float size) {
-        return new Font(name, style, size);
+        return new Font(name, style, size, face);
     }
 
     public Font deriveFont(int style) {
-        return new Font(name, style, pointSize);
+        return new Font(name, style, pointSize, face);
     }
 
     /// Whether the platform font can draw the character; the layer cannot
@@ -168,7 +227,7 @@ public class Font {
 
     @Override
     public int hashCode() {
-        return name.hashCode() ^ style ^ Float.floatToIntBits(pointSize);
+        return name.hashCode() ^ style ^ Float.floatToIntBits(pointSize) ^ (face == null ? 0 : face.hashCode());
     }
 
     @Override
@@ -181,7 +240,8 @@ public class Font {
         }
         Font font = (Font) obj;
         return size == font.size && style == font.style
-                && Float.floatToIntBits(pointSize) == Float.floatToIntBits(font.pointSize) && name.equals(font.name);
+                && Float.floatToIntBits(pointSize) == Float.floatToIntBits(font.pointSize) && name.equals(font.name)
+                && face == font.face;
     }
 
     @Override

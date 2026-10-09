@@ -258,12 +258,25 @@ final class AppSupport {
         if (skip != null) {
             complianceProperties.put("skipComplianceCheck", String.valueOf(skip));
         }
+        // Where a desktop application's port report goes, as Maven's
+        // -Dcn1.desktop.report names it; given with -P or -D.
+        Object report = project.findProperty(com.codename1.maven.DesktopPortReport.PROPERTY);
+        if (report == null) {
+            report = project.getProviders().systemProperty(com.codename1.maven.DesktopPortReport.PROPERTY)
+                    .getOrNull();
+        }
+        if (report != null) {
+            complianceProperties.put(com.codename1.maven.DesktopPortReport.PROPERTY, String.valueOf(report));
+        }
         // The two post-compile steps depend on more than the sources: hot reload
         // compiles with -PskipComplianceCheck=true, and the codename1.* overrides
         // reach the annotation processors. As inputs, a change in either reruns the
         // compile -- otherwise a native build after a hot-reload compile found
         // compileJava up to date and uploaded classes nobody had checked.
         final String skipInput = String.valueOf(skip);
+        // The same for where the port report goes: asked for somewhere new,
+        // it has to be written there, which only a compile that runs does.
+        final String reportInput = String.valueOf(report);
         project.getTasks().named(main.getCompileJavaTaskName(), JavaCompile.class, compile -> {
             if (androidProject || desktopProject) {
                 // Relocation rewrites this task's output descriptors. A source edit
@@ -287,6 +300,7 @@ final class AppSupport {
                 compile.getInputs().property("cn1DesktopMain", desktopMain == null ? "" : desktopMain);
             }
             compile.getInputs().property("cn1SkipComplianceCheck", skipInput);
+            compile.getInputs().property("cn1DesktopReport", reportInput);
             processingInputs(compile, layout, userProperties);
             Provider<List<String>> roots = project.provider(() -> sourceRoots(main, layout));
             // Compliance first (it caps and rewrites classes in place), then the
@@ -386,6 +400,7 @@ final class AppSupport {
         project.getPluginManager().withPlugin("org.jetbrains.kotlin.jvm", kotlin ->
                 project.getTasks().named("compileKotlin").configure(compile -> {
                     compile.getInputs().property("cn1SkipComplianceCheck", skipInput);
+                    compile.getInputs().property("cn1DesktopReport", reportInput);
                     processingInputs(compile, layout, userProperties);
                     Provider<File> kotlinClasses = kotlinDestinationProvider(compile, layout);
                     Provider<List<String>> roots = project.provider(() -> sourceRoots(main, layout));

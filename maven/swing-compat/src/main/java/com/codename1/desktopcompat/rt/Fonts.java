@@ -33,12 +33,33 @@ public final class Fonts {
 
     private static final HashMap<Integer, com.codename1.ui.Font> CACHE = new HashMap<Integer, com.codename1.ui.Font>();
 
+    private static final HashMap<String, com.codename1.ui.Font> FACES = new HashMap<String, com.codename1.ui.Font>();
+
     private Fonts() {
+    }
+
+    static void forgetFaces() {
+        FACES.clear();
     }
 
     /// The Codename One font that draws `font` at `devicePixels` high.
     public static com.codename1.ui.Font nativeFont(Font font, float devicePixels) {
         int quarter = Math.max(4, Math.round(devicePixels * 4));
+        FontFiles.Face own = font.cn1Face();
+        com.codename1.ui.Font file = own == null ? null : own.base();
+        if (file != null) {
+            // A font of the application's own file: its glyphs, at the
+            // size and in the style asked for.
+            String name = own.postScriptName() + '/' + quarter + '/' + (font.getStyle() & 3);
+            com.codename1.ui.Font sized = FACES.get(name);
+            if (sized == null) {
+                int style = (font.isBold() ? com.codename1.ui.Font.STYLE_BOLD : 0)
+                        | (font.isItalic() ? com.codename1.ui.Font.STYLE_ITALIC : 0);
+                sized = file.derive(quarter / 4f, style);
+                FACES.put(name, sized);
+            }
+            return sized;
+        }
         boolean mono = monospaced(font);
         Integer key = Integer.valueOf((quarter * 4 + (font.getStyle() & 3)) * 2 + (mono ? 1 : 0));
         com.codename1.ui.Font f = CACHE.get(key);
@@ -125,9 +146,21 @@ public final class Fonts {
         return new Font(Font.DIALOG, Font.PLAIN, Math.max(1, Math.round(px / Units.scale())));
     }
 
-    /// The font of a component that was given none: the theme's label font,
+    /// The font an application chose for everything by putting it under
+    /// `defaultFont`, the key the FlatLaf look and feels read, or `null`
+    /// when it put none.
+    public static Font applicationFont() {
+        return com.codename1.desktopcompat.javax.swing.UIManager.cn1PutFont("defaultFont");
+    }
+
+    /// The font of a component that was given none: the one the
+    /// application put under `defaultFont`, else the theme's label font,
     /// or 12 pixel Dialog before a display exists.
     public static Font defaultFont() {
+        Font chosen = applicationFont();
+        if (chosen != null) {
+            return chosen;
+        }
         if (!Display.isInitialized()) {
             return new Font(Font.DIALOG, Font.PLAIN, 12);
         }

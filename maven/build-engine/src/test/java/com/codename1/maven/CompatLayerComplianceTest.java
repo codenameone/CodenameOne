@@ -533,14 +533,19 @@ public class CompatLayerComplianceTest {
                 "javax/swing/JTable#setRowHeight(I)V @80",
                 "javax/swing/JTable#setRowHeight(I)V @80",
                 "java/awt/Color#RED:Ljava/awt/Color; @81",
+                // What the lambda and the method reference name only in
+                // their bootstrap arguments.
+                "java/awt/event/ActionEvent (type) @81",
+                "javax/swing/JTable#repaint()V @81",
+                "java/awt/event/ActionEvent (type) @81",
                 "javafx/application/Platform#exit()V @81",
                 "com/vendor/Sdk#start()V @81"), summary(violations));
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 8; i++) {
             assertEquals(CompatLayers.enableHint(CompatLayers.SWING), field(violations.get(i), "suggestion"));
         }
         assertTrue(CompatLayers.enableHint(CompatLayers.SWING).contains("src/main/desktop"));
-        assertEquals(CompatLayers.enableHint(CompatLayers.JAVAFX), field(violations.get(5), "suggestion"));
-        assertNull(field(violations.get(6), "suggestion"));
+        assertEquals(CompatLayers.enableHint(CompatLayers.JAVAFX), field(violations.get(8), "suggestion"));
+        assertNull(field(violations.get(9), "suggestion"));
         // A class compiled without debug information says nothing new.
         Object bare = newViolation("a/B", "m()V", "c/D#e()V", null, "a/B.class");
         assertEquals("a/B#m()V -> c/D#e()V (a/B.class)", render(bare, "renderInline"));
@@ -575,7 +580,10 @@ public class CompatLayerComplianceTest {
             call(mv, Opcodes.INVOKESTATIC, "com/vendor/Sdk", "start", "()V");
         });
         cw.visitEnd();
-        assertEquals(Arrays.asList("com/vendor/Sdk#start()V @90", "com/vendor/Sdk#start()V @90"),
+        // Three: the two calls, and the method reference, which reaches the
+        // same method through a handle and through no instruction.
+        assertEquals(Arrays.asList("com/vendor/Sdk#start()V @90", "com/vendor/Sdk#start()V @90",
+                        "com/vendor/Sdk#start()V @90"),
                 summary(scanWithSwing(cw.toByteArray())));
 
         List<?> raw = scan(appWith(mv -> mv.visitTypeInsn(Opcodes.NEW, "java/awt/Color")),

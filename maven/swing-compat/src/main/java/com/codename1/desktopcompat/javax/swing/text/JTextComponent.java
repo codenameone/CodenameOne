@@ -22,6 +22,10 @@
  */
 package com.codename1.desktopcompat.javax.swing.text;
 
+import com.codename1.desktopcompat.java.awt.geom.Rectangle2D;
+import com.codename1.desktopcompat.java.awt.geom.Point2D;
+import com.codename1.desktopcompat.java.awt.FontMetrics;
+import com.codename1.desktopcompat.java.awt.Point;
 import com.codename1.desktopcompat.java.awt.Color;
 import com.codename1.desktopcompat.java.awt.Dimension;
 import com.codename1.desktopcompat.java.awt.Insets;
@@ -528,6 +532,135 @@ public abstract class JTextComponent extends JComponent implements Accessible, S
             // The selection is always inside the document.
             repaint();
         }
+    }
+
+    // ------------------------------------------------------------ geometry
+
+    /// The offset in the document nearest a point of the component: the
+    /// character whose nearer half the point is in. `-1` while the
+    /// component has no size.
+    public int viewToModel(Point pt) {
+        return cn1ViewToModel(pt.x, pt.y);
+    }
+
+    public int viewToModel2D(Point2D pt) {
+        return cn1ViewToModel((int) pt.getX(), (int) pt.getY());
+    }
+
+    /// Where the caret stands before the character at `pos`, in the
+    /// coordinates of the component: a rectangle one pixel wide and as
+    /// high as the line. `null` while the component has no size.
+    public Rectangle modelToView(int pos) throws BadLocationException {
+        if (pos < 0 || pos > length()) {
+            throw new BadLocationException("Invalid position", pos);
+        }
+        return cn1ModelToView(pos);
+    }
+
+    public Rectangle2D modelToView2D(int pos) throws BadLocationException {
+        return modelToView(pos);
+    }
+
+    /// The rows the widget shows the text in, as the offsets they start
+    /// at, with the length of the text after the last. `null` when there
+    /// is no widget that tells.
+    private int[] cn1Rows(com.codename1.ui.TextArea t, String text) {
+        if (t.isSingleLineTextArea()) {
+            return new int[]{0, text.length()};
+        }
+        int n = Math.max(1, t.getLines());
+        int[] starts = new int[n + 1];
+        int cursor = 0;
+        for (int i = 0; i < n; i++) {
+            String row = t.getTextAt(i);
+            int len = row == null ? 0 : row.length();
+            if (len > 0) {
+                int found = text.indexOf(row, cursor);
+                if (found >= 0) {
+                    cursor = found;
+                }
+            }
+            starts[i] = Math.min(cursor, text.length());
+            cursor = Math.min(text.length(), cursor + len);
+            if (cursor < text.length() && text.charAt(cursor) == '\n') {
+                cursor++;
+            }
+        }
+        starts[n] = text.length();
+        return starts;
+    }
+
+    /// One past the last character a row shows: before the line break
+    /// that ends it.
+    private static int cn1RowEnd(int[] starts, int row, String text) {
+        int end = row + 2 < starts.length ? starts[row + 1] : text.length();
+        while (end > starts[row] && end <= text.length() && text.charAt(end - 1) == '\n') {
+            end--;
+        }
+        return Math.max(starts[row], end);
+    }
+
+    /// The offset for a point; what [#viewToModel] answers. The rows are
+    /// the widget's own, so the answer follows its wrapping, and the
+    /// columns are measured with the component's font.
+    protected int cn1ViewToModel(int x, int y) {
+        com.codename1.ui.TextArea t = nativeText();
+        if (t == null || getWidth() <= 0 || getHeight() <= 0) {
+            return -1;
+        }
+        String text = getText();
+        int[] starts = cn1Rows(t, text);
+        FontMetrics fm = getFontMetrics(getFont());
+        int rowHeight = Math.max(1, cn1RowHeight(t, fm));
+        int top = Units.toLogical(t.getStyle().getPaddingTop());
+        int left = Units.toLogical(t.getStyle().getPaddingLeftNoRTL());
+        int rows = starts.length - 1;
+        int row = t.isSingleLineTextArea() ? 0 : Math.max(0, Math.min(rows - 1, (y - top) / rowHeight));
+        int end = cn1RowEnd(starts, row, text);
+        int at = left;
+        for (int i = starts[row]; i < end; i++) {
+            int cw = fm.charWidth(text.charAt(i));
+            if (x < at + cw / 2 + (cw & 1)) {
+                return i;
+            }
+            at += cw;
+        }
+        return end;
+    }
+
+    /// The caret's place for an offset; what [#modelToView] answers.
+    protected Rectangle cn1ModelToView(int pos) {
+        com.codename1.ui.TextArea t = nativeText();
+        if (t == null || getWidth() <= 0 || getHeight() <= 0) {
+            return null;
+        }
+        String text = getText();
+        int[] starts = cn1Rows(t, text);
+        FontMetrics fm = getFontMetrics(getFont());
+        int rowHeight = Math.max(1, cn1RowHeight(t, fm));
+        int top = Units.toLogical(t.getStyle().getPaddingTop());
+        int left = Units.toLogical(t.getStyle().getPaddingLeftNoRTL());
+        int row = 0;
+        for (int i = 0; i + 1 < starts.length - 1; i++) {
+            if (pos >= starts[i + 1]) {
+                row = i + 1;
+            }
+        }
+        int upTo = Math.max(starts[row], Math.min(pos, cn1RowEnd(starts, row, text)));
+        int x = left + fm.stringWidth(text.substring(starts[row], upTo));
+        if (t.isSingleLineTextArea()) {
+            return new Rectangle(x, Math.max(0, (getHeight() - fm.getHeight()) / 2), 1, fm.getHeight());
+        }
+        return new Rectangle(x, top + row * rowHeight, 1, rowHeight);
+    }
+
+    /// The distance from one row of the widget to the next.
+    private static int cn1RowHeight(com.codename1.ui.TextArea t, FontMetrics fm) {
+        com.codename1.ui.Font f = t.getStyle().getFont();
+        if (f == null) {
+            return fm.getHeight();
+        }
+        return Units.toLogical(f.getHeight() + t.getRowsGap());
     }
 
     // ------------------------------------------------------------ actions

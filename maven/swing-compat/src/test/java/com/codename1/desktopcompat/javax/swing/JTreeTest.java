@@ -554,4 +554,28 @@ public class JTreeTest extends KernelTestBase {
         assertNotNull(leaf);
         assertEquals(onDisplay(t, t.getRowBounds(2).x, 0)[0], ((Integer) leaf[1]).intValue());
     }
+
+    /// A renderer that colours one row is shared by all of them: the next
+    /// row has its own colour again, as it does in the JDK.
+    @Test
+    public void aRowColouredByASubclassDoesNotColourTheNext() {
+        JTree t = new JTree(model);
+        com.codename1.desktopcompat.javax.swing.tree.DefaultTreeCellRenderer r =
+                new com.codename1.desktopcompat.javax.swing.tree.DefaultTreeCellRenderer() {
+            @Override
+            public Component getTreeCellRendererComponent(JTree tree, Object value, boolean sel, boolean expanded,
+                                                          boolean leaf, int row, boolean hasFocus) {
+                super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus);
+                if (row == 1) {
+                    setForeground(com.codename1.desktopcompat.java.awt.Color.RED);
+                }
+                return this;
+            }
+        };
+        com.codename1.desktopcompat.java.awt.Color plain =
+                r.getTreeCellRendererComponent(t, a, false, false, false, 0, false).getForeground();
+        assertEquals(com.codename1.desktopcompat.java.awt.Color.RED,
+                r.getTreeCellRendererComponent(t, a, false, false, false, 1, false).getForeground());
+        assertEquals(plain, r.getTreeCellRendererComponent(t, b, false, false, false, 2, false).getForeground());
+    }
 }
