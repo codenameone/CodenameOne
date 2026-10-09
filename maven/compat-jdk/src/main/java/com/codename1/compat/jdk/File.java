@@ -515,4 +515,33 @@ public class File implements Comparable<File>, java.io.Serializable {
     public String toString() {
         return path;
     }
+
+    /// This file as a `java.nio.file.Path`.
+    public Path toPath() {
+        return PathImpl.of(path);
+    }
+
+    /// The `file:` URI of the absolute path.
+    public java.net.URI toURI() {
+        return toPath().toUri();
+    }
+
+    /// A device has no permission bits to change. Like the JDK on a file
+    /// system without them, the three setters answer whether the file is
+    /// already as asked: readable and writable it is, executable it is not.
+    public boolean setExecutable(boolean executable) {
+        return exists() && !executable;
+    }
+
+    public boolean setExecutable(boolean executable, boolean ownerOnly) {
+        return setExecutable(executable);
+    }
+
+    public boolean setReadable(boolean readable, boolean ownerOnly) {
+        return setReadable(readable);
+    }
+
+    public boolean setWritable(boolean writable, boolean ownerOnly) {
+        return setWritable(writable);
+    }
 }

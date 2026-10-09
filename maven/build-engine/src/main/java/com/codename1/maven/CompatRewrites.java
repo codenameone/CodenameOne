@@ -519,6 +519,35 @@ final class CompatRewrites {
                 TIME + "#parseZoned");
     }
 
+    /// Constructors the device lacks whose last argument only has to be
+    /// converted for one it has: `owner.<init> descriptor` to the static
+    /// method that converts the argument on top of the stack, and the
+    /// descriptor of the constructor called instead.
+    private static final Map<String, String[]> CONSTRUCTORS = new HashMap<String, String[]>();
+
+    private static final String CHARSETS = Relocation.JDK_PACKAGE + "JdkCharsets";
+    private static final String CHARSET = "Ljava/nio/charset/Charset;";
+
+    static {
+        // The device encodes and decodes by the NAME of an encoding. Its
+        // Charset is that name, so an overload taking a Charset becomes the
+        // one taking a name.
+        String[] byName = {CHARSETS, "name", "(" + CHARSET + ")" + STRING};
+        CONSTRUCTORS.put("java/lang/String.<init>([BII" + CHARSET + ")V",
+                new String[] {byName[0], byName[1], byName[2], "([BII" + STRING + ")V"});
+        CONSTRUCTORS.put("java/io/InputStreamReader.<init>(Ljava/io/InputStream;" + CHARSET + ")V",
+                new String[] {byName[0], byName[1], byName[2], "(Ljava/io/InputStream;" + STRING + ")V"});
+        CONSTRUCTORS.put("java/io/OutputStreamWriter.<init>(Ljava/io/OutputStream;" + CHARSET + ")V",
+                new String[] {byName[0], byName[1], byName[2], "(Ljava/io/OutputStream;" + STRING + ")V"});
+        String cs = "java/nio/charset/Charset.";
+        STATIC.put(cs + "forName(" + STRING + ")" + CHARSET, CHARSETS);
+        STATIC.put(cs + "defaultCharset()" + CHARSET, CHARSETS);
+        STATIC.put(cs + "isSupported(" + STRING + ")Z", CHARSETS);
+        VIRTUAL.put(cs + "name()" + STRING, CHARSETS);
+        VIRTUAL.put(cs + "toString()" + STRING, CHARSETS);
+        VIRTUAL.put("java/io/ByteArrayOutputStream.toString(" + CHARSET + ")" + STRING, CHARSETS);
+    }
+
     private CompatRewrites() {
     }
 
@@ -713,6 +742,12 @@ final class CompatRewrites {
                             targetDescriptor(target, receiverFirst(owner, descriptor)), false);
                     return;
                 }
+            } else if (opcode == Opcodes.INVOKESPECIAL && CONSTRUCTORS.containsKey(owner + "." + name + descriptor)) {
+                // The argument to convert is the last one, so it is on top.
+                String[] rule = CONSTRUCTORS.get(owner + "." + name + descriptor);
+                super.visitMethodInsn(Opcodes.INVOKESTATIC, rule[0], rule[1], rule[2], false);
+                super.visitMethodInsn(opcode, owner, name, rule[3], false);
+                return;
             } else if (opcode == Opcodes.INVOKESPECIAL && JAVA_LOCALE.equals(owner)) {
                 // The device's Locale is a language and a country. A locale
                 // of a language alone has the empty country; a variant has

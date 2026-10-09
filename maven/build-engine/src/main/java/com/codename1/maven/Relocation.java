@@ -184,6 +184,34 @@ public final class Relocation {
         {"java/util/function/ToLongFunction", JDK_PACKAGE + "ToLongFunction"},
         // java.time. A query is what parse(text, LocalDate::from) takes.
         {"java/time/temporal/TemporalQuery", JDK_PACKAGE + "TemporalQuery"},
+        // java.nio.file, over the one file system a device has. Watching,
+        // channels, file stores and POSIX attributes have no row: nothing
+        // on a device answers for them.
+        {"java/nio/file/Path", JDK_PACKAGE + "Path"},
+        {"java/nio/file/Paths", JDK_PACKAGE + "Paths"},
+        {"java/nio/file/Files", JDK_PACKAGE + "Files"},
+        {"java/nio/file/OpenOption", JDK_PACKAGE + "OpenOption"},
+        {"java/nio/file/CopyOption", JDK_PACKAGE + "CopyOption"},
+        {"java/nio/file/LinkOption", JDK_PACKAGE + "LinkOption"},
+        {"java/nio/file/StandardOpenOption", JDK_PACKAGE + "StandardOpenOption"},
+        {"java/nio/file/StandardCopyOption", JDK_PACKAGE + "StandardCopyOption"},
+        {"java/nio/file/FileVisitOption", JDK_PACKAGE + "FileVisitOption"},
+        {"java/nio/file/FileVisitResult", JDK_PACKAGE + "FileVisitResult"},
+        {"java/nio/file/FileVisitor", JDK_PACKAGE + "FileVisitor"},
+        {"java/nio/file/SimpleFileVisitor", JDK_PACKAGE + "SimpleFileVisitor"},
+        {"java/nio/file/DirectoryStream", JDK_PACKAGE + "DirectoryStream"},
+        {"java/nio/file/DirectoryStream$Filter", JDK_PACKAGE + "DirectoryStream$Filter"},
+        {"java/nio/file/DirectoryIteratorException", JDK_PACKAGE + "DirectoryIteratorException"},
+        {"java/nio/file/FileSystemException", JDK_PACKAGE + "FileSystemException"},
+        {"java/nio/file/NoSuchFileException", JDK_PACKAGE + "NoSuchFileException"},
+        {"java/nio/file/FileAlreadyExistsException", JDK_PACKAGE + "FileAlreadyExistsException"},
+        {"java/nio/file/DirectoryNotEmptyException", JDK_PACKAGE + "DirectoryNotEmptyException"},
+        {"java/nio/file/NotDirectoryException", JDK_PACKAGE + "NotDirectoryException"},
+        {"java/nio/file/AccessDeniedException", JDK_PACKAGE + "AccessDeniedException"},
+        {"java/nio/file/InvalidPathException", JDK_PACKAGE + "InvalidPathException"},
+        {"java/nio/file/attribute/FileAttribute", JDK_PACKAGE + "FileAttribute"},
+        {"java/nio/file/attribute/BasicFileAttributes", JDK_PACKAGE + "BasicFileAttributes"},
+        {"java/nio/file/attribute/FileTime", JDK_PACKAGE + "FileTime"},
     };
 
     private final String name;
