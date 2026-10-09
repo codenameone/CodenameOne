@@ -165,6 +165,16 @@ final class CssSheet {
                         + ", which was not compiled into the application");
             }
         }
+        for (int i = 0; i < data.fontCount(); i++) {
+            // The family the rule declares is one more name of the font.
+            FontFiles.Face face = FontFiles.load(data.fontSource(i));
+            if (face == null) {
+                CssEngine.warnOnce("The style sheet " + path + " declares the font " + data.fontFamily(i) + " from "
+                        + data.fontSource(i) + ", which is not a font file of the application");
+            } else {
+                FontFiles.alias(data.fontFamily(i), face);
+            }
+        }
         add(data, rules);
         return true;
     }

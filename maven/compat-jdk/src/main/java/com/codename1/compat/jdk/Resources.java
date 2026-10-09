@@ -122,6 +122,22 @@ public final class Resources {
         current.add(path);
     }
 
+    /// Every path the build recorded, in no particular order; empty when
+    /// no build step recorded any. A loader that has to find a resource by
+    /// what is IN it -- a font by the name it gives itself -- reads these.
+    public static String[] cn1ResourcePaths() {
+        Set<String> current = index;
+        if (current == null) {
+            return new String[0];
+        }
+        String[] out = new String[current.size()];
+        int i = 0;
+        for (String path : current) {
+            out[i++] = path;
+        }
+        return out;
+    }
+
     /// Forgets the index, as if no build step had run. For tests.
     public static void cn1ClearIndex() {
         index = null;

@@ -51,10 +51,10 @@ import com.codename1.fxml.css.CssValueParser;
 /// #### At-rules
 ///
 /// `@import` is resolved against the sheet's own path and recorded; the
-/// device reads the imported table first. `@font-face` is recorded and
-/// warned about: the layer has no `Font.loadFont`, so the family is only
-/// found when the device already has a font of that name. Any other
-/// at-rule is skipped with a warning.
+/// device reads the imported table first. `@font-face` is recorded as a
+/// family and the font file it names; the device loads the file when it
+/// reads the sheet, and the family is one more name of that font. Any
+/// other at-rule is skipped with a warning.
 public final class CssCompiler {
 
     private final String file;
@@ -312,8 +312,6 @@ public final class CssCompiler {
         }
         fontFamilies.add(family);
         fontSources.add(source);
-        messages.warning(file, text, start, "@font-face '" + family + "' is recorded but not loaded: this layer"
-                + " has no Font.loadFont, so the family is used only where the device has a font of that name");
     }
 
     private static String unquote(String s) {

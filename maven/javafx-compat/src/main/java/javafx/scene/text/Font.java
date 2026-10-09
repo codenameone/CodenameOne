@@ -22,11 +22,14 @@
  */
 package javafx.scene.text;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.codename1.fxcompat.runtime.FontFiles;
 import com.codename1.fxcompat.runtime.Fonts;
+import com.codename1.fxcompat.runtime.ResourceUrls;
 
 import javafx.beans.NamedArg;
 
@@ -45,11 +48,13 @@ public final class Font {
     private final double size;
     private final FontWeight weight;
     private final FontPosture posture;
+    private final String lookup;
+    private final int lookupWeight;
     private Object nativeFont;
 
     /// Creates the default typeface at a size.
     public Font(@NamedArg("size") double size) {
-        this(null, size);
+        this((String) null, size);
     }
 
     /// Creates a font by its full name, `Arial Bold`.
@@ -57,7 +62,22 @@ public final class Font {
         this(familyOf(name), weightOf(name), postureOf(name), size);
     }
 
+    /// A font out of a file the application loaded: its names are the
+    /// file's own.
+    private Font(FontFiles.Face face, double size) {
+        this.family = face.family();
+        this.name = face.fullName();
+        this.style = face.style();
+        this.size = size < 0 ? DEFAULT_SIZE : size;
+        this.weight = FontWeight.findByWeight(face.weight());
+        this.posture = face.italic() ? FontPosture.ITALIC : FontPosture.REGULAR;
+        this.lookup = face.fullName();
+        this.lookupWeight = face.weight();
+    }
+
     private Font(String family, FontWeight weight, FontPosture posture, double size) {
+        this.lookup = null;
+        this.lookupWeight = 0;
         this.family = family == null || family.length() == 0 ? "System" : family;
         this.weight = weight == null ? FontWeight.NORMAL : weight;
         this.posture = posture == null ? FontPosture.REGULAR : posture;
@@ -185,23 +205,43 @@ public final class Font {
         return new Font(null, null, null, size);
     }
 
-    /// Loads a font file an application carries, which this layer does
-    /// not do: the answer is `null`, the answer JavaFX gives for a font
-    /// it could not load, and every application has to be ready for it.
+    /// Loads a font file the application carries and answers the font at
+    /// a size. The URL is the one `getResource(...).toExternalForm()` gave;
+    /// the file has to be one of the application's resources.
     ///
-    /// A family named after such a file, in a style sheet or in
-    /// [#font(String, double)], is drawn with the system face of the
-    /// weight and posture its name ends in, so `Clear Sans Bold` is the
-    /// bold system face.
+    /// From then on the font answers to its family and to its full name,
+    /// in [#font(String, double)] and in a style sheet's `-fx-font-family`,
+    /// which is what an application loads one for. The names are the
+    /// file's own, read from it.
+    ///
+    /// The answer is `null` for a URL that names no resource or a file that
+    /// is not a TrueType or OpenType font, as in JavaFX. A platform that
+    /// cannot open the file still answers a font with the file's names; its
+    /// text is drawn with the system face of the same weight.
     public static Font loadFont(String urlStr, double size) {
-        return null;
+        if (urlStr == null) {
+            return null;
+        }
+        FontFiles.Face face = FontFiles.loadUrl(urlStr);
+        return face == null ? null : new Font(face, size);
     }
 
-    /// Loads a font from a stream, which this layer does not do: the
-    /// answer is `null`, as for [#loadFont(String, double)]. The stream
-    /// is neither read nor closed, as in JavaFX.
+    /// Loads a font from a stream, which is read to its end and left
+    /// open; see [#loadFont(String, double)]. A platform opens a font by
+    /// its file, so the font drawn is the application resource that names
+    /// itself as these bytes do, and the system face when there is none.
     public static Font loadFont(InputStream in, double size) {
-        return null;
+        if (in == null) {
+            return null;
+        }
+        byte[] data;
+        try {
+            data = ResourceUrls.readAll(in);
+        } catch (IOException unreadable) {
+            return null;
+        }
+        FontFiles.Face face = FontFiles.loadBytes(data);
+        return face == null ? null : new Font(face, size);
     }
 
     /// Returns the family names known by name to every platform.
@@ -248,7 +288,8 @@ public final class Font {
     /// scale, a `com.codename1.ui.Font`.
     public Object cn1Native() {
         if (nativeFont == null || !Fonts.isCurrent(nativeFont)) {
-            nativeFont = Fonts.create(family, weight.getWeight(), posture == FontPosture.ITALIC, size);
+            nativeFont = lookup != null ? Fonts.create(lookup, lookupWeight, posture == FontPosture.ITALIC, size)
+                    : Fonts.create(family, weight.getWeight(), posture == FontPosture.ITALIC, size);
         }
         return nativeFont;
     }

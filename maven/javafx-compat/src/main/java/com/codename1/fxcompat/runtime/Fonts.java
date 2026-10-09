@@ -60,7 +60,20 @@ public final class Fonts {
         float pixels = (float) Math.max(1, size * scale);
         Font font = null;
         int style = (weight >= 600 ? Font.STYLE_BOLD : Font.STYLE_PLAIN) | (italic ? Font.STYLE_ITALIC : 0);
-        if (Font.isNativeFontSchemeSupported() || Font.isTrueTypeFileSupported()) {
+        // A font file the application loaded answers to its names before
+        // any face of the platform does.
+        FontFiles.Face loaded = FontFiles.find(family, weight, italic);
+        if (loaded != null) {
+            Font base = loaded.base();
+            if (base != null) {
+                try {
+                    font = base.derive(pixels, Font.STYLE_PLAIN);
+                } catch (RuntimeException unavailable) {
+                    font = null;
+                }
+            }
+        }
+        if (font == null && (Font.isNativeFontSchemeSupported() || Font.isTrueTypeFileSupported())) {
             String face;
             if (isAsciiName(family, "Monospaced") || isAsciiName(family, "Monospace")
                     || isAsciiName(family, "Courier New")) {
@@ -96,6 +109,12 @@ public final class Fonts {
         }
         CACHE.put(key, font);
         return font;
+    }
+
+    /// Forgets every cached font, so a family is looked up again: a font
+    /// file loaded after a text was first drawn in its family takes over.
+    public static void flush() {
+        CACHE.clear();
     }
 
     /// Returns whether a native font came from the cache of the current

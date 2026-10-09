@@ -25,6 +25,7 @@ package javafx.scene.image;
 import java.io.IOException;
 import java.io.InputStream;
 
+import com.codename1.fxcompat.runtime.ResourceUrls;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.ui.Display;
 
@@ -201,7 +202,13 @@ public class Image {
         if (!path.startsWith("/")) {
             path = "/" + path;
         }
-        InputStream in = resource(path);
+        // Through the resource index first: a device keeps a nested
+        // resource under a flat name only that knows, and a port refuses a
+        // path with directories.
+        InputStream in = ResourceUrls.open(url);
+        if (in == null) {
+            in = resource(path);
+        }
         int slash = path.lastIndexOf('/');
         if (in == null && slash > 0) {
             in = resource(path.substring(slash));
