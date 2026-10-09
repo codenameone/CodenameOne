@@ -28,7 +28,7 @@ public class PollingFileWatcher  {
 
     private File[] files;
     private long interval;
-    private long lastMtime;
+    private long[] lastMtime;
     private boolean stop;
     
     public PollingFileWatcher(File[] files, long interval) {
@@ -37,16 +37,18 @@ public class PollingFileWatcher  {
         this.lastMtime = lastModified();
     }
     
-    private long lastModified() {
-        long out = 0;
-        for (File f : files) {
-            out = Math.max(out, f.lastModified());
+    // One time per file, 0 for a file that is not there. The newest of them
+    // alone would not move when an older file is edited back, or deleted.
+    private long[] lastModified() {
+        long[] out = new long[files.length];
+        for (int i = 0; i < files.length; i++) {
+            out[i] = files[i].lastModified();
         }
         return out;
     }
     
     public synchronized void poll() throws InterruptedException {
-        while (!stop && lastModified() == lastMtime) {
+        while (!stop && java.util.Arrays.equals(lastModified(), lastMtime)) {
             wait(interval);
         }
         lastMtime = lastModified();

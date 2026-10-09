@@ -4205,6 +4205,9 @@ public class CSSTheme {
     }
 
     private BufferedImage readRasterImage(String url) {
+        // A url is a file or an http address. A `data:` url is not decoded
+        // here because it is not decoded anywhere: the theme's own image
+        // loader refuses one before a rule gets as far as being painted.
         try {
             URL imgURL = url.startsWith("http://") || url.startsWith("https://") ? new URL(url) : new URL(baseURL, url);
             File multi = multiImageDirectory(url);

@@ -268,6 +268,11 @@ public class CN1CSSCLI {
         // The project is found from where the stylesheet is, which is known
         // before a merged one has been written for the first time.
         ProjectLayout layout = getLayout(css.isFile() ? css : css.getAbsoluteFile().getParentFile());
+        if (layout == null && options.mergeFile != null) {
+            // A build directory can be outside the project, and the merged
+            // stylesheet with it. The stylesheets it is merged from are not.
+            layout = getLayout(options.inputFiles[0]);
+        }
         if (layout == null) {
             // Not inside a project (the framework's own theme build, a one-off
             // compile). There is no state directory to keep anything in, so the

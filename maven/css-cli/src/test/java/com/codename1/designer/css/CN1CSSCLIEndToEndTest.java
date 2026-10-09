@@ -303,6 +303,61 @@ class CN1CSSCLIEndToEndTest {
     }
 
     @Test
+    void aBuildDirectoryOutsideTheProjectIsStillAProjectBuild(@TempDir Path tmp) throws Exception {
+        File common = mavenProject(new File(tmp.toFile(), "project"));
+        File css = write(new File(common, "src/main/css/theme.css"), "Label { color: #000001; }\n");
+        File merged = new File(tmp.toFile(), "elsewhere/theme.css.merged");
+        File res = new File(tmp.toFile(), "elsewhere/theme.res");
+        String[] args = {"-input", css.getPath(), "-output", res.getPath(), "-merge", merged.getPath()};
+
+        assertEquals(0, CN1CSSCLI.run(args), stderr());
+        long built = res.lastModified();
+        assertEquals(0, CN1CSSCLI.run(args), stderr());
+
+        assertTrue(stdout().contains("File has not changed since last compile."), stdout());
+        assertEquals(built, res.lastModified(), "the second compile found the project and skipped");
+    }
+
+    @Test
+    void anImportNamedInAQuotedUrlMayHoldAParenthesis(@TempDir Path tmp) throws Exception {
+        File css = write(new File(tmp.toFile(), "theme.css"), "@import url(\"base).css\");\n");
+        write(new File(tmp.toFile(), "base).css"), "Imported { color: #abcdef; }\n");
+        File res = new File(tmp.toFile(), "theme.res");
+
+        assertEquals(0, CN1CSSCLI.run(new String[] {"-input", css.getPath(), "-output", res.getPath()}), stderr());
+
+        assertEquals("abcdef", theme(res).get("Imported.fgColor"));
+    }
+
+    @Test
+    void aWatcherNoticesAFileThatIsNotTheNewestGoingAway(@TempDir Path tmp) throws Exception {
+        File newest = write(new File(tmp.toFile(), "theme.css"), "A { color: red; }\n");
+        final File older = write(new File(tmp.toFile(), "part.css"), "B { color: red; }\n");
+        assertTrue(older.setLastModified(newest.lastModified() - 60000));
+        final PollingFileWatcher watcher = new PollingFileWatcher(new File[] {newest, older}, 50);
+        final boolean[] woke = {false};
+        Thread poller = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    watcher.poll();
+                    woke[0] = true;
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+        poller.start();
+        assertTrue(older.delete());
+        poller.join(10000);
+        boolean returned = !poller.isAlive();
+        watcher.stop();
+        poller.join(10000);
+
+        assertTrue(returned && woke[0], "deleting the older file woke the watcher");
+    }
+
+    @Test
     void aMissingImportIsStillSomethingTheStylesheetDependsOn(@TempDir Path tmp) throws Exception {
         File css = write(new File(tmp.toFile(), "theme.css"),
                 "@import \"first.css\";\n@import \"absent.css\";\n");

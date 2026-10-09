@@ -126,6 +126,11 @@ public final class CssImports {
         rewriteUrls(text, new UrlRewriter() {
             @Override
             public String rewrite(String url) {
+                // The name is taken as written. One with a query or a
+                // fragment after it (`icon.png?v=2`) is not looked for under
+                // the shorter name: the compiler opens images and fonts as
+                // files and refuses such a url, so no theme is ever built
+                // from one and none can go stale.
                 if (isRelativeUrl(url)) {
                     File file = new File(dir, url);
                     if (file.isFile()) {
@@ -184,7 +189,15 @@ public final class CssImports {
         String target;
         String rest;
         if (statement.regionMatches(true, 0, "url(", 0, 4)) {
-            int close = statement.indexOf(')');
+            // A quoted name may hold a parenthesis of its own, so the one
+            // that closes url() is looked for after the string.
+            int nameStart = 4;
+            while (nameStart < statement.length() && Character.isWhitespace(statement.charAt(nameStart))) {
+                nameStart++;
+            }
+            boolean quoted = nameStart < statement.length()
+                    && (statement.charAt(nameStart) == '"' || statement.charAt(nameStart) == '\'');
+            int close = statement.indexOf(')', quoted ? skipString(statement, nameStart) : nameStart);
             if (close < 0) {
                 throw new IOException("Malformed @import in " + current + ": " + statement);
             }
