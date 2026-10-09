@@ -377,11 +377,7 @@ public class JToolBar extends JComponent implements Accessible, SwingConstants {
         /// separator of a menu draws one along its top.
         @Override
         protected void paintComponent(com.codename1.desktopcompat.java.awt.Graphics g) {
-            com.codename1.desktopcompat.java.awt.Color line = com.codename1.desktopcompat.rt.LafTheme.line();
-            if (line == null) {
-                return;
-            }
-            g.setColor(line);
+            g.setColor(com.codename1.desktopcompat.rt.LafTheme.line());
             int w = getWidth();
             int h = getHeight();
             if (cn1AcrossHorizontalBar()) {

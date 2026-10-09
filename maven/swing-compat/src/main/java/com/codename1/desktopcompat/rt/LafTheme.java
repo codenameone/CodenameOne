@@ -184,7 +184,7 @@ public final class LafTheme {
         Display.getInstance().setDarkMode(dark);
         UIManager m = UIManager.getInstance();
         m.refreshTheme();
-        if (overlaid || isDark() != want || (dark != null && bare(m))) {
+        if (overlaid || isDark() != want || (dark != null && bare(m)) || inkIsLight() != want) {
             m.addThemeProps(overlay(want));
             overlaid = true;
         }
@@ -194,6 +194,15 @@ public final class LafTheme {
             exchange(all[i], before, after);
             restyle(all[i]);
         }
+    }
+
+    /// Whether rows are written in a light ink, which is what a dark theme
+    /// does. A theme can turn its windows dark and leave its rows as they
+    /// were, and their text is then dark on dark: such a theme gets the
+    /// layer's palette like one that has no dark side at all.
+    private static boolean inkIsLight() {
+        Color ink = CellTheme.foreground(null);
+        return (ink.getRed() * 3 + ink.getGreen() * 6 + ink.getBlue()) / 10 > 128;
     }
 
     /// Whether the theme styles nothing: a text field still has the
@@ -668,7 +677,7 @@ public final class LafTheme {
             return Integer.valueOf(CellTheme.touch() ? 40 : 32);
         }
         if ("SplitPane.dividerSize".equals(k)) {
-            return Integer.valueOf(CellTheme.touch() ? 12 : 5);
+            return Integer.valueOf(CellTheme.touch() ? 10 : 5);
         }
         return null;
     }

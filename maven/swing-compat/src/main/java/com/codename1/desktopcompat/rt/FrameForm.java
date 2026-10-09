@@ -117,8 +117,12 @@ public final class FrameForm extends Form implements WindowHost {
     @Override
     public void title(String title) {
         setTitle(title);
-        // A title label keeps the width of the text it was laid out with.
-        revalidate();
+        // A title label keeps the width of the text it was laid out with:
+        // the title area alone is laid out again, never the content.
+        com.codename1.ui.Toolbar bar = getToolbar();
+        if (bar != null) {
+            bar.revalidate();
+        }
     }
 
     @Override

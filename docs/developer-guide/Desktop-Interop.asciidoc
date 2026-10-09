@@ -204,6 +204,65 @@ instead of once for each of its members. A JDK class outside the toolkits
 that the device doesn't have, such as `java.math.BigDecimal`, is reported by
 the same check.
 
+A project with more than five such references gets a summary instead of a
+list. It counts the references and the distinct APIs behind them, gives one
+line to the application and one to each library, and groups them by kind:
+
+----
+44 references to 19 APIs a device does not have:
+  The application: 26 call sites, 6 APIs
+    JDK API a device lacks: 6 APIs, 26 call sites -- processes 26
+  icons-1.0.jar: 18 call sites, 13 APIs -- reflection and class loading 10, concurrency 4
+What to change, file by file: /projects/orders/common/target/codenameone/desktop-port-report.md
+----
+
+The report file then lists each API once, with the number of references,
+the source files and lines that use it, and what to use instead where
+Codename One has an equivalent:
+
+----
+  7 x java.lang.ProcessBuilder.start()
+      com/example/Tools.java:113, 115, 117
+      Instead: A device cannot start a process. To open a URL, a file or another application use CN.execute(url), after CN.canExecute(url); anything else belongs behind an interface with a desktop-only implementation.
+----
+
+==== The port report
+
+Every build of a project that uses a desktop layer also writes
+`target/codenameone/desktop-port-report.md`, whether the check passes or
+fails. It summarizes how much of the application builds unchanged, lists
+what to change source file by source file, says what became of each
+dependency, and names the language features that can't run on a device. Set
+the `cn1.desktop.report` property to write it elsewhere
+(`-Dcn1.desktop.report=port.md` with Maven, `-Pcn1.desktop.report=port.md`
+with Gradle); a relative path is relative to the project.
+
+The import goal prints the same classification of the dependencies when it
+copies them, so the libraries that can't come along are known before the
+first build. It also warns when the project is built for a Java release
+newer than 17, the newest language level the builds accept.
+
+==== Records, pattern switches and newer class files
+
+A record's generated `equals`, `hashCode` and `toString`, and a `switch`
+over type patterns or over the constants of a sealed hierarchy's enum,
+compile to `invokedynamic` calls that no device can run as they are. The
+build rewrites them into ordinary methods with the same results as the JDK:
+components compared in declaration order, `float` and `double` components
+compared as `Float.compare` and `Double.compare` do, arrays by reference, and
+`Point[x=1, y=2]` from `toString`. This applies to every Codename One
+project, with or without desktop sources.
+
+Any other `invokedynamic` bootstrap, and any dynamic constant, is a build
+error that names the class, the method and the source line. A `switch` with
+a primitive type pattern, or one in an interface's default method, is
+reported this way.
+
+Class files compiled for a release newer than Java 17 are rewritten to the
+Java 17 format. That is safe because nothing in them escapes the check:
+every API they call and every bootstrap method they use is examined like
+any other class's.
+
 One case passes the check. A method the application *overrides* isn't a
 reference to anything, so an override of a method the layer never calls
 compiles, builds and is never called on a device. If a callback you rely on
@@ -222,12 +281,44 @@ combo boxes, sliders, progress bars and tabs. They look the way the
 Codename One theme makes them look on each platform, not the way a desktop
 look and feel draws them.
 
-For that reason there are no look and feel classes, UI delegates or JavaFX
-skins. `UIManager.setLookAndFeel` is accepted and changes nothing, so the
-usual call at the top of `main` runs as it is. `UIManager` defaults that the
-application puts are stored and returned, and common keys that were never
-put (a `.background`, `.foreground` or `.font` key) are answered from the
-theme.
+For that reason there are no UI delegates or JavaFX skins to replace. A
+Swing look and feel is a palette instead. `UIManager.setLookAndFeel` accepts
+any look and feel, by instance or by class name, so the usual call at the
+top of `main` runs as it is. A name the layer knows as dark, such as
+`FlatDarkLaf`, `FlatDarculaLaf` or a name containing "Dark", selects the
+layer's dark palette, and a known light name selects the light one. An
+unknown name keeps the current palette and logs one line. Switching while
+windows are open restyles them at once, and
+`SwingUtilities.updateComponentTreeUI` restyles the tree it's given.
+
+`UIManager` defaults that the application puts are stored, returned and
+kept across a switch. Common keys that were never put (a `.background`,
+`.foreground` or `.font` key) are answered from the palette. A packaged
+desktop application doesn't follow the operating system's light or dark
+setting unless the `desktop.themeMode` build hint says so.
+
+A font the application puts under `defaultFont`, the key FlatLaf reads, is
+the font of every component that wasn't given one. Without it each kind of
+widget has the font the Codename One theme gives it, and those differ from
+one kind to the next.
+
+On a desktop, text is drawn with the fonts of the theme the packaged
+application uses. Set `codename1.arg.desktop.themeMode=native` in
+`codenameone_settings.properties` to get the desktop's own theme and its
+system font; the default is the theme a phone build uses, whose regular
+weight is heavier than a desktop's.
+
+FlatLaf's entry points are part of the layer, so an application written
+against it compiles and runs without the FlatLaf jar being shipped:
+`FlatLightLaf`, `FlatDarkLaf`, `FlatIntelliJLaf` and `FlatDarculaLaf` with
+`setup()`, `FlatLaf.isLafDark()`, extra defaults, the accent color and style
+classes. These client properties are honored where they're set:
+`JTextField.placeholderText`, the `borderless` and `toolBarButton` button
+types, `JComponent.outline`, `FlatLaf.styleClass`, the background,
+foreground and font of `FlatLaf.style`, and `JComponent.minimumWidth` and
+`minimumHeight`. Other FlatLaf properties are stored and have no effect.
+FlatLaf's `ui`, `icons`, `json` and `extras` packages, among them
+`FlatSVGIcon`, aren't part of the layer and are build errors.
 
 A `JLabel`, button, tab title or tool tip whose text starts with `<html>`
 is formatted from a small subset of HTML: bold, italic and underlined text,
@@ -437,16 +528,21 @@ include::../demos/desktop-interop/src/main/java/com/codenameone/developerguide/d
 
 ==== Menus
 
-A `JMenuBar` set on a frame with `setJMenuBar` isn't drawn as a bar. Every
-visible item of every menu becomes a Codename One command. On the desktop
-ports the commands appear in the native menu bar under the name of their
-top-level menu, and an accelerator made of a letter or a digit with the
+On a desktop, a `JMenuBar` set on a frame with `setJMenuBar` is drawn in the
+window as a row of menus above the content, as Swing draws it. Anywhere else
+it isn't drawn as a bar: every visible item of every menu becomes a Codename
+One command in the overflow menu of the form's toolbar, as one flat list
+where an item of a submenu is prefixed with the submenu's name, and
+separators are dropped. An accelerator made of a letter or a digit with the
 control or meta key becomes the command's shortcut with the platform's
-primary modifier. On a phone the commands are in the overflow menu of the
-form's toolbar as one flat list, where an item of a submenu is prefixed
-with the submenu's name. Separators are dropped. A `JMenuBar` added to a
-container like any other component, or set on a dialog, is drawn as a row of
-menus that open popups.
+primary modifier.
+
+The display property `desktopcompat.menuBar` chooses for every frame:
+`window` draws the bar on a phone too, and `commands` turns the menus into
+commands on a desktop, where a port with a native menu bar shows them under
+the name of their top-level menu. A `JMenuBar` added to a container like any
+other component, or set on a dialog, is always drawn as a row of menus that
+open popups.
 
 A JavaFX `MenuBar` is always drawn inside the scene; the system menu bar
 isn't used. `JPopupMenu` and `ContextMenu` open on a secondary click and on
@@ -509,9 +605,46 @@ include::../demos/common/src/main/snippets/developer-guide/desktop-interop.xml[t
 The build unpacks such a library into the application and remaps it with
 the application's own classes. The check for unsupported API covers it as
 well, and a report about one of its classes names the library it came from.
-Whether a particular library builds depends on the API it uses. A library
-that doesn't refer to a desktop toolkit is merged into the application as
-before, and a library with the `provided` scope is never unpacked.
+Whether a particular library builds depends on the API it uses.
+
+A `compile` scope library that doesn't refer to a desktop toolkit is treated
+the same way, with one difference: only the classes the application reaches
+are shipped. The build log says so for each jar, either
+`Bundling N of the M classes of X with the application: the ones it uses,
+relocated and checked with it` or `X is not used by the application's
+classes and is left out of it`. A library with the `provided` scope is never
+unpacked.
+
+Two libraries are replaced by the layer instead of being unpacked, because
+their own code reaches deep into Swing internals. FlatLaf is described with
+the platform's theme above. RSyntaxTextArea's
+`RSyntaxTextArea`, `RTextScrollPane`, `Theme`, `SyntaxConstants` and search
+classes are a code view: line numbers in the gutter, line highlights,
+mark-all, token colors from a simple scanner, `Theme` loading, and plain,
+match-case and whole-word search. Regular expression search reports nothing
+found, and code folding, the language parsers and undo aren't available.
+Keep both dependencies as they are. The build recognizes the two jars, says
+`is provided by the Swing compatibility layer` for each, and ships the
+layer's classes in their place.
+
+A library that finds its implementations with `java.util.ServiceLoader`
+works, with the providers fixed when the application is built. The build
+reads the `META-INF/services` files of the application and of the libraries
+it bundles and generates the code that creates each provider: the
+application's first, then the libraries', in the order the files list them,
+each created when the loader first reaches it. A library's providers are
+registered only when a shipped class names the service. A listed class that
+is missing, abstract, not public or has no public no-argument constructor
+gets one build warning and is skipped. The class loader and module layer
+arguments of `load` select nothing, and `loadInstalled` finds nothing.
+`Class.getModule()` answers an unnamed module, and a library that asks
+`org.osgi.framework.FrameworkUtil.getBundle` is told it isn't running in
+OSGi.
+
+The resources of a bundled library ship with the application, so an icon
+font pack such as Ikonli's works unchanged: `FontIcon.of(FontAwesomeSolid.CODE_BRANCH, 16)`
+finds its pack through `ServiceLoader` and its font file among the
+resources.
 
 === FXML and style sheets
 
@@ -703,8 +836,9 @@ and `JLayeredPane`
 
 |Text
 |`JTextField`, `JPasswordField`, `JFormattedTextField` with its formatters,
-`JTextArea`, `JEditorPane` and `JTextPane` for plain text and simple HTML,
-`PlainDocument`, `DocumentFilter`, `DocumentListener` and `Caret`
+`JTextArea`, `JEditorPane` for plain text and simple HTML, `JTextPane` with
+`StyledDocument`, `StyleConstants` and `SimpleAttributeSet`, `PlainDocument`,
+`DocumentFilter`, `DocumentListener` and `Caret`
 
 |Lists and values
 |`JList`, `JComboBox`, `JSpinner` with the number, list and date models,
@@ -742,10 +876,94 @@ support
 |`SwingUtilities`, `EventQueue`, `SwingWorker` and `javax.swing.Timer`
 
 |Services
-|`Toolkit` (screen and font metrics, images), `Desktop` (`browse`, `mail`
-and `open`), the system `Clipboard` for text, `Cursor` and `UIManager`
-defaults
+|`Toolkit` (screen and font metrics, images, event listeners), `Desktop`
+(`browse`, `mail` and `open`), the system `Clipboard` for text, `Cursor`
+and `UIManager` defaults
+
+|Drag and drop
+|`TransferHandler`, `DropTarget` and the events of `java.awt.dnd`, `DropMode`
+on `JTable`, `DataFlavor` and `Transferable`
+
+|Look and feel
+|`UIManager.setLookAndFeel` with any class, `LookAndFeel`,
+`SwingUtilities.updateComponentTreeUI`, `ScrollPaneLayout`, and
+`BasicTreeUI` as a base class for painting tree rows
+
+|Fonts
+|`Font.createFont` for a `.ttf` or `.otf` file that the application ships as
+a resource
 |===
+
+A `JTextPane` draws the foreground, background, bold, italic, underline,
+strike-through, family, size and alignment attributes of its styled
+document; justified text is drawn left aligned. Once a document carries
+attributes the pane is read-only and has no selection.
+
+Files dropped on the application from the operating system arrive as
+`DataFlavor.javaFileListFlavor`. A drag that starts inside the application
+stays inside it.
+
+`Font.createFont` matches the stream it's given against the font files
+among the application's resources by the name recorded inside the font, and
+uses that file. A font that isn't shipped as a resource falls back to the
+platform's typeface.
+
+==== JDK classes
+
+A device's class library is smaller than the JDK's. The build redirects
+these to implementations that run on every target, so code that uses them
+needs no change:
+
+[cols="1,3",options="header"]
+|===
+|Area |Classes
+
+|Files
+|`java.io.File` with the file streams, readers and writers, and
+`java.nio.file`: `Path`, `Paths`, `Files` (reading, writing, copying,
+moving, deleting, attributes, directory streams and `walkFileTree`), the
+open and copy options and the file exceptions
+
+|Text
+|`java.util.regex.Pattern` and `Matcher`, with the `String` methods built
+on them; `Base64`, `HexFormat`, `URLEncoder` and `URLDecoder`
+
+|Time
+|The `java.time` classes of the device, with `DayOfWeek`, `Month`,
+`ChronoUnit` and the comparison, arithmetic and conversion methods the
+device's versions lack
+
+|Concurrency
+|`CompletableFuture` and `CompletionStage`, `CountDownLatch`,
+`ScheduledExecutorService` and the `Executors` factories
+
+|Security
+|`MessageDigest` for MD5 and the SHA-1 and SHA-2 families, and
+`SecureRandom`
+
+|Collections and streams
+|The `List`, `Map` and `Set` factories, the `Stream` API, `Optional`, and
+the members Java 9 to 21 added to `String`, `StringBuilder`, the
+collections and the input streams
+|===
+
+`java.nio.file` works on the one file system a device has, the same one
+`java.io.File` resolves in. Watch services, file systems other than the
+default, and channels aren't available.
+
+The regular expression engine is a backtracking matcher with the JDK's
+syntax: character classes, greedy, reluctant and possessive quantifiers,
+named and atomic groups, back references, lookahead, bounded lookbehind and
+the flags. `Pattern.compile` throws for what it doesn't implement: Unicode
+scripts and blocks other than the common ones, `\X`, `\N{...}`, `\b{g}`,
+`(?U)`, `CANON_EQ`, lookbehind without a bound, and characters above
+U+FFFF in a class. `hitEnd`, `requireEnd` and the bounds modes of `Matcher`
+are missing.
+
+`SecureRandom` ignores a seed it's given and always draws from the
+platform's generator. `URLDecoder.decode(String)` decodes UTF-8.
+`BufferedReader.lines()` reads the whole input before it returns. A
+`Charset` is one of UTF-8, US-ASCII and ISO-8859-1.
 
 ==== SwingX
 
@@ -873,14 +1091,18 @@ the text says the call is accepted.
 
 Swing and AWT:
 
-* Look and feel classes and UI delegates. `UIManager.setLookAndFeel` is
-  accepted and ignored, and `updateUI` does nothing.
+* UI delegates. A look and feel selects a palette, as described above;
+  `updateUI` does nothing, `JTree.getUI` isn't available, and no delegate
+  other than a `BasicTreeUI` subclass's `paintRow` is called.
 * Printing (`java.awt.print`, and `print` on `JTable` and the text
-  components), dragging data with `java.awt.dnd` or `TransferHandler`, and the accessibility API
-  (`javax.accessibility`).
-* Styled text: `StyledDocument`, editor kits and `javax.swing.undo`.
-  `JTextPane` behaves as a `JEditorPane`, which shows plain text or simple
-  HTML that the user can't edit.
+  components) and the accessibility API (`javax.accessibility`).
+* In drag and drop: `TransferHandler(String)`, which copies a bean property
+  by reflection, listeners added to a `DropTarget` after it's created, and
+  the drop locations of `JList` and `JTree`.
+* Editor kits and `javax.swing.undo`. A `JTextPane` whose document carries
+  attributes can't be edited.
+* The application menu handlers of `Desktop` (about, preferences and quit)
+  and the features of `Taskbar`, which report that they're unsupported.
 * The internal-frame variants of `JOptionPane`.
 * Tool tips for each row and type-ahead search in `JTree`.
 * The regular expression filter of `RowFilter` and the regular expression
@@ -915,9 +1137,13 @@ Both toolkits:
   calls are build errors, and code that loads plugins or classes by name
   with `Class.forName` or a class loader doesn't run on iOS.
 * Java serialization (`ObjectOutputStream` and `ObjectInputStream`).
-* `java.math.BigDecimal` and `BigInteger`, `java.util.regex`, the
-  `java.nio` file and channel APIs, sockets and JDBC. Use the Codename One
-  APIs for networking, storage and databases.
+* Processes. `ProcessBuilder`, `Process` and `Runtime.exec` are build
+  errors: a device can't start one. Use `CN.execute(url)` to hand a URL or a
+  file to the system.
+* `java.math.BigDecimal` and `BigInteger`, `java.net.http`,
+  `HttpURLConnection`, sockets, `javax.crypto`, `java.util.zip` archives,
+  channels and JDBC. Use the Codename One APIs for networking, storage,
+  encryption and databases.
 * Keyboard modifiers on phones. The state of Shift, Control, Alt and Meta
   is reported on the desktop ports only, for key and mouse events alike.
 * Function keys and the Home, End, Page Up, Page Down and Insert keys,

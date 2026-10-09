@@ -544,8 +544,8 @@ public class CompatLayerComplianceTest {
             assertEquals(CompatLayers.enableHint(CompatLayers.SWING), field(violations.get(i), "suggestion"));
         }
         assertTrue(CompatLayers.enableHint(CompatLayers.SWING).contains("src/main/desktop"));
-        assertEquals(CompatLayers.enableHint(CompatLayers.JAVAFX), field(violations.get(5), "suggestion"));
-        assertNull(field(violations.get(6), "suggestion"));
+        assertEquals(CompatLayers.enableHint(CompatLayers.JAVAFX), field(violations.get(8), "suggestion"));
+        assertNull(field(violations.get(9), "suggestion"));
         // A class compiled without debug information says nothing new.
         Object bare = newViolation("a/B", "m()V", "c/D#e()V", null, "a/B.class");
         assertEquals("a/B#m()V -> c/D#e()V (a/B.class)", render(bare, "renderInline"));

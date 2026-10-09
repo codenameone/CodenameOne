@@ -113,7 +113,9 @@ final class NativeWindows implements SecondaryWindows {
             int w = window.getWidth();
             int h = window.getHeight();
             if (w > 0 && h > 0) {
-                setWindowContentSize(Units.toDevice(w), Units.toDevice(h));
+                // The size of an AWT window is its frame's, title bar and
+                // borders included, and so is this one.
+                setWindowSize(Units.toDevice(w), Units.toDevice(h));
             }
             if (window.getX() != 0 || window.getY() != 0) {
                 setWindowLocation(Units.toDevice(window.getX()), Units.toDevice(window.getY()));
@@ -150,7 +152,14 @@ final class NativeWindows implements SecondaryWindows {
         @Override
         public void bounds() {
             if (isWindowShowing() && window.getWidth() > 0 && window.getHeight() > 0) {
-                setWindowContentSize(Units.toDevice(window.getWidth()), Units.toDevice(window.getHeight()));
+                int dw = Units.toDevice(window.getWidth());
+                int dh = Units.toDevice(window.getHeight());
+                // The window has the size of what is inside the frame
+                // once it is showing: only a size the application set
+                // since is a new one for the frame.
+                if (Math.abs(dw - getWidth()) > 1 || Math.abs(dh - getHeight()) > 1) {
+                    setWindowSize(dw, dh);
+                }
                 setWindowLocation(Units.toDevice(window.getX()), Units.toDevice(window.getY()));
             }
         }
