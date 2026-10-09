@@ -408,6 +408,12 @@ public class TouchAndTextFlowTest {
         org.junit.Assert.assertFalse(com.codename1.fxcompat.runtime.ParentPeer.clipsChildren(root));
         org.junit.Assert.assertFalse(
                 com.codename1.fxcompat.runtime.ParentPeer.clipsChildren(new javafx.scene.Group()));
+        // Under a scaled parent the clip of the screen cannot be handed
+        // down, and a pane is left with the one it has.
+        org.junit.Assert.assertFalse(com.codename1.fxcompat.runtime.ParentPeer.underTransform(small));
+        root.setScaleX(0.5);
+        org.junit.Assert.assertTrue(com.codename1.fxcompat.runtime.ParentPeer.underTransform(small));
+        org.junit.Assert.assertFalse(com.codename1.fxcompat.runtime.ParentPeer.underTransform(root));
         // The content of a scroll pane or a list stays inside it.
         org.junit.Assert.assertTrue(com.codename1.fxcompat.runtime.ParentPeer
                 .clipsChildren(new javafx.scene.control.ScrollPane()));

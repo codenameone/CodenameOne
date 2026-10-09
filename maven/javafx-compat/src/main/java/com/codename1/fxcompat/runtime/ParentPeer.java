@@ -86,6 +86,17 @@ public class ParentPeer extends Container implements FxPeer {
         return !(parent instanceof Pane || parent instanceof Group);
     }
 
+    /// Returns whether a parent above this one is scaled, rotated or
+    /// otherwise transformed.
+    public static boolean underTransform(Parent parent) {
+        for (Parent above = parent.getParent(); above != null; above = above.getParent()) {
+            if (above.cn1PaintMatrix() != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Override
     public void paint(Graphics g) {
         if (PeerPaint.unseen(node)) {
@@ -106,7 +117,11 @@ public class ParentPeer extends Container implements FxPeer {
         // One clips a container to its bounds, so the clip is the parent's
         // again. A control keeps its own, which is what holds the content
         // of a scroll pane or a list inside it.
-        boolean widened = m != null || !clipsChildren(node);
+        //
+        // Not under a scale or a rotation, though: the clip recorded by
+        // the parent is in the coordinates of the screen, and under a
+        // transform the graphics reads it in the transformed ones.
+        boolean widened = m != null || (!clipsChildren(node) && !underTransform(node));
         if (widened) {
             PeerPaint.widenClip(g, this);
         }
