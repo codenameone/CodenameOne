@@ -73,7 +73,8 @@ public class RTextArea extends RTextAreaBase {
 
     private final ArrayList<LineMark> lineMarks = new ArrayList<LineMark>();
     private List<DocumentRange> marked = new ArrayList<DocumentRange>();
-    private Color markAllHighlightColor = getDefaultMarkAllHighlightColor();
+    /// Null follows the palette.
+    private Color markAllHighlightColor;
     private boolean markAllOnOccurrenceSearches = true;
     private int textMode;
 
@@ -168,11 +169,11 @@ public class RTextArea extends RTextAreaBase {
     }
 
     public Color getMarkAllHighlightColor() {
-        return markAllHighlightColor;
+        return markAllHighlightColor != null ? markAllHighlightColor : getDefaultMarkAllHighlightColor();
     }
 
     public void setMarkAllHighlightColor(Color color) {
-        Color old = markAllHighlightColor;
+        Color old = getMarkAllHighlightColor();
         markAllHighlightColor = color;
         firePropertyChange(MARK_ALL_COLOR_PROPERTY, old, color);
         repaint();
@@ -211,10 +212,10 @@ public class RTextArea extends RTextAreaBase {
 
     @Override
     protected void cn1PaintMarks(Graphics g, String all, int first, int last) {
-        if (marked.isEmpty() || markAllHighlightColor == null) {
+        if (marked.isEmpty()) {
             return;
         }
-        g.setColor(markAllHighlightColor);
+        g.setColor(getMarkAllHighlightColor());
         for (int i = 0; i < marked.size(); i++) {
             DocumentRange r = marked.get(i);
             cn1FillRange(g, all, r.getStartOffset(), Math.min(all.length(), r.getEndOffset()), first, last);

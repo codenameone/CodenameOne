@@ -75,7 +75,8 @@ public abstract class RTextAreaBase extends JTextArea {
     private boolean marginLineEnabled;
     private int marginLinePosition = getDefaultMarginLinePosition();
     private Color marginLineColor = getDefaultMarginLineColor();
-    private Color currentLineHighlightColor = getDefaultCurrentLineHighlightColor();
+    /// Null follows the palette.
+    private Color currentLineHighlightColor;
     /// The widest line in columns, or -1 when the text changed.
     private int widestColumns = -1;
     private String measuredText;
@@ -150,14 +151,15 @@ public abstract class RTextAreaBase extends JTextArea {
     // ------------------------------------------------------------ properties
 
     public Color getCurrentLineHighlightColor() {
-        return currentLineHighlightColor;
+        return currentLineHighlightColor != null ? currentLineHighlightColor
+                : getDefaultCurrentLineHighlightColor();
     }
 
     public void setCurrentLineHighlightColor(Color color) {
         if (color == null) {
             throw new NullPointerException();
         }
-        Color old = currentLineHighlightColor;
+        Color old = getCurrentLineHighlightColor();
         currentLineHighlightColor = color;
         firePropertyChange(CURRENT_LINE_HIGHLIGHT_COLOR_PROPERTY, old, color);
         repaint();
@@ -529,7 +531,7 @@ public abstract class RTextAreaBase extends JTextArea {
         int caretLine = getCaretLineNumber();
         if (highlightCurrentLine && caretLine >= first && caretLine <= last
                 && getSelectionStart() == getSelectionEnd()) {
-            g.setColor(currentLineHighlightColor);
+            g.setColor(getCurrentLineHighlightColor());
             g.fillRect(0, top() + caretLine * lineHeight, w, lineHeight);
         }
         cn1PaintLineBackgrounds(g, first, last);
