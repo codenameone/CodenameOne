@@ -118,6 +118,10 @@ public final class GraphicsContext {
         Font font;
         com.codename1.ui.Image image;
         boolean backing;
+        /// Whether the backing image may be drawn on again.
+        boolean reusable;
+        /// An image, not the backing one, that covers the whole canvas.
+        boolean cover;
         double x;
         double y;
         double w;
@@ -170,6 +174,8 @@ public final class GraphicsContext {
     private final ArrayList<State> saved = new ArrayList<State>();
     private State state = new State();
     private final FxPath path = new FxPath();
+    /// How many recorded images cover the whole canvas.
+    private int covers;
 
     GraphicsContext(Canvas canvas) {
         this.canvas = canvas;
@@ -499,7 +505,11 @@ public final class GraphicsContext {
 
     /// Draws what was recorded; called by the canvas when it paints.
     void replay(Renderer r) {
-        for (int i = 0; i < ops.size(); i++) {
+        replay(r, 0);
+    }
+
+    private void replay(Renderer r, int from) {
+        for (int i = from; i < ops.size(); i++) {
             Op o = ops.get(i);
             r.save();
             for (int c = 0; c < o.clips.length; c++) {
@@ -540,9 +550,21 @@ public final class GraphicsContext {
         double s = Units.scale();
         int pw = (int) Math.ceil(canvas.getWidth() * s - 1e-6);
         int ph = (int) Math.ceil(canvas.getHeight() * s - 1e-6);
+        covers = 0;
         if (pw <= 0 || ph <= 0 || ops.isEmpty()) {
             ops.clear();
             return null;
+        }
+        Op first = ops.get(0);
+        if (first.backing && first.reusable && first.image.getWidth() == pw && first.image.getHeight() == ph) {
+            // The image of the last time is at the bottom and nothing
+            // else has it: what came after is drawn onto it. An
+            // application that draws a frame over the last one, for ever,
+            // then costs no image at all once the first exists.
+            replay(new Renderer(first.image.getGraphics(), 0, 0), 1);
+            ops.clear();
+            ops.add(first);
+            return first;
         }
         com.codename1.ui.Image image = com.codename1.ui.Image.createImage(pw, ph, 0);
         replay(new Renderer(image.getGraphics(), 0, 0));
@@ -554,6 +576,7 @@ public final class GraphicsContext {
         o.clips = NO_CLIPS;
         o.image = image;
         o.backing = true;
+        o.reusable = true;
         o.w = pw / s;
         o.h = ph / s;
         o.bounds = new double[] {0, 0, o.w, o.h};
@@ -860,6 +883,7 @@ public final class GraphicsContext {
         double[] whole = {0, 0, Math.max(0, canvas.getWidth()), Math.max(0, canvas.getHeight())};
         if (upright && !clipped && inside(whole, cleared)) {
             ops.clear();
+            covers = 0;
             canvas.cn1Repaint();
             return;
         }
@@ -870,7 +894,9 @@ public final class GraphicsContext {
                 continue;
             }
             if (upright && !clipped && inside(b, cleared)) {
-                ops.remove(i);
+                if (ops.remove(i).cover) {
+                    covers--;
+                }
             } else {
                 partly = true;
             }
@@ -931,6 +957,7 @@ public final class GraphicsContext {
             }
         }
         backing.image = com.codename1.ui.Image.createImage(rgb, iw, ih);
+        backing.reusable = false;
     }
 
     /// Fills a rectangle.
@@ -1091,7 +1118,21 @@ public final class GraphicsContext {
         o.w = dw;
         o.h = dh;
         o.bounds = Matrix2D.bounds(m, dx, dy, dw, dh);
+        // An image over the whole canvas hides most of what is under it,
+        // and an application that shows a picture it keeps computing
+        // draws one every frame without clearing: a list of them is a
+        // frame of pixels held per call, thousands of them before the
+        // limit on calls is reached. The second one folds the list into
+        // its image.
+        double[] whole = {0, 0, Math.max(0, canvas.getWidth()), Math.max(0, canvas.getHeight())};
+        o.cover = state.clips.length == 0 && inside(whole, o.bounds);
+        if (o.cover) {
+            covers++;
+        }
         record(o);
+        if (covers > 1) {
+            rasterise();
+        }
     }
 
     /// Draws an image at its own size with its top left corner at a
@@ -1140,7 +1181,9 @@ public final class GraphicsContext {
         double top = within(y1 - sy);
         double right = within(sx + sw - x2);
         double bottom = within(sy + sh - y2);
-        image(full.subImage(x1, y1, x2 - x1, y2 - y1, true), dx + left * kx, dy + top * ky,
+        // The whole picture is the picture: no copy of it is made.
+        boolean all = x1 == 0 && y1 == 0 && x2 == full.getWidth() && y2 == full.getHeight();
+        image(all ? full : full.subImage(x1, y1, x2 - x1, y2 - y1, true), dx + left * kx, dy + top * ky,
                 dw - (left + right) * kx, dh - (top + bottom) * ky);
     }
 
