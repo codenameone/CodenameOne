@@ -312,6 +312,22 @@
             <version>1.6.5-1</version>
             <scope>test</scope>
         </dependency>
+        <!-- IkonliFontIconTest: a library that finds its parts with
+             ServiceLoader and loads a font out of META-INF/resources, bundled
+             and relocated with an application the way a project's build
+             does it. -->
+        <dependency>
+            <groupId>org.kordamp.ikonli</groupId>
+            <artifactId>ikonli-swing</artifactId>
+            <version>12.4.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.kordamp.ikonli</groupId>
+            <artifactId>ikonli-fontawesome5-pack</artifactId>
+            <version>12.4.0</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>com.miglayout</groupId>
             <artifactId>miglayout-swing</artifactId>

@@ -617,9 +617,9 @@ public class CompatStreamRewritesTest {
         // the compliance check to name.
         assertEquals(new TreeSet<String>(Arrays.asList("java/util/zip/ZipFile.stream")),
                 membersAfter(Opcodes.INVOKEVIRTUAL, "java/util/zip/ZipFile", "stream", stream));
-        assertEquals(new TreeSet<String>(Arrays.asList("java/util/ServiceLoader.stream")),
+        // ServiceLoader and Optional are replaced whole, stream() and all.
+        assertEquals(new TreeSet<String>(Arrays.asList(JDK + "ServiceLoader.stream")),
                 membersAfter(Opcodes.INVOKEVIRTUAL, "java/util/ServiceLoader", "stream", stream));
-        // Optional is replaced whole, stream() and all.
         assertEquals(new TreeSet<String>(Arrays.asList(JDK + "Optional.stream")),
                 membersAfter(Opcodes.INVOKEVIRTUAL, "java/util/Optional", "stream", stream));
         // Another name, other arguments, another return type.

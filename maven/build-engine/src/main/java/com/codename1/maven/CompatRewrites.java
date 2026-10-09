@@ -157,6 +157,9 @@ final class CompatRewrites {
         STATIC.put("java/lang/ClassLoader.getSystemResourceAsStream" + stream, RESOURCES);
         STATIC.put("java/lang/ClassLoader.getSystemResources" + urls, RESOURCES);
         VIRTUAL.put("java/lang/Thread.getContextClassLoader()Ljava/lang/ClassLoader;", RESOURCES);
+        // The device's Class has no module to answer; the stand-in answers
+        // the unnamed one, which is in no layer.
+        VIRTUAL.put("java/lang/Class.getModule()Ljava/lang/Module;", Relocation.JDK_PACKAGE + "Module#cn1Of");
         VIRTUAL.put("java/lang/Thread.setContextClassLoader(Ljava/lang/ClassLoader;)V", RESOURCES);
 
         String supplier = "Ljava/util/function/Supplier;";

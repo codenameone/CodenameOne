@@ -75,9 +75,19 @@ import java.util.zip.ZipFile;
 /// calls now spell `com.codename1.compat.jdk.File` -- and checked like the
 /// application's own code. [#reach] therefore walks from the application's
 /// classes through the libraries, and only what it reaches is unpacked.
-/// Classes found only by reflection or a service loader are not reached:
-/// a device has neither. A class named by a string constant
-/// (`Class.forName("a.b.C")`) is.
+/// Classes found only by reflection are not reached: a device has none. A
+/// class named by a string constant (`Class.forName("a.b.C")`) is.
+///
+/// #### Service providers
+///
+/// A provider is named by no instruction either, only by a line of a
+/// `META-INF/services/<service>` file, and `ServiceLoader` does work on a
+/// device: the build generates the registry that creates each provider with
+/// `new`. So a jar's services files are read with its classes, and when the
+/// SERVICE is reached -- something the application ships names the
+/// interface, which it has to in order to load it -- every provider the
+/// libraries list for it is reached too, with whatever it refers to. A
+/// provider of a service nothing names stays out: nothing could ask for it.
 public final class DependencyClassifier {
 
     /// What a dependency jar is to a device build.
@@ -127,6 +137,9 @@ public final class DependencyClassifier {
 
     private static final String CN1_PACKAGE = "com/codename1/";
 
+    /// Where a jar lists its service providers, one file per service.
+    static final String SERVICES = "META-INF/services/";
+
     private DependencyClassifier() {
     }
 
@@ -146,6 +159,10 @@ public final class DependencyClassifier {
     public static final class Library {
         private final File file;
         private final Map<String, ClassInfo> classes = new LinkedHashMap<String, ClassInfo>();
+        /// The jar's `META-INF/services` files: each service's class name,
+        /// as the file is named, to the provider class names it lists.
+        private final Map<String, List<String>> services = new LinkedHashMap<String, List<String>>();
+        private final Set<String> reachedServices = new TreeSet<String>();
         private final Set<String> reached = new TreeSet<String>();
         private Kind kind = Kind.NO_CLASSES;
         private int toolkitClasses;
@@ -232,6 +249,20 @@ public final class DependencyClassifier {
             return classes.keySet();
         }
 
+        /// The services this jar lists providers for and the application
+        /// reaches, each with the provider class names its file lists, in
+        /// the file's order; names are dotted, as the file has them. Empty
+        /// until [#reach] has run.
+        public Map<String, List<String>> reachedServices() {
+            Map<String, List<String>> out = new LinkedHashMap<String, List<String>>();
+            for (Map.Entry<String, List<String>> e : services.entrySet()) {
+                if (reachedServices.contains(e.getKey())) {
+                    out.put(e.getKey(), e.getValue());
+                }
+            }
+            return out;
+        }
+
         /// The package most of the jar's classes are in, dotted and at most
         /// three parts deep (`com.fasterxml.jackson`); null for a jar
         /// without classes. It is what names the library to a table of
@@ -297,6 +328,19 @@ public final class DependencyClassifier {
                 }
                 if (isNativeLibrary(name)) {
                     nativeFiles++;
+                    continue;
+                }
+                if (name.startsWith(SERVICES) && name.indexOf('/', SERVICES.length()) < 0
+                        && name.length() > SERVICES.length()) {
+                    InputStream in = zip.getInputStream(e);
+                    try {
+                        // Read as the runtime's ServiceLoader reads one: comments,
+                        // blank lines and repeats dropped, by the same method.
+                        lib.services.put(name.substring(SERVICES.length()), com.codename1.compat.jdk.ServiceLoader
+                                .cn1ProviderNames(new String(readAll(in), StandardCharsets.UTF_8), null));
+                    } finally {
+                        in.close();
+                    }
                     continue;
                 }
                 if (!name.endsWith(".class") || name.startsWith("META-INF/") || name.endsWith("module-info.class")) {
@@ -409,15 +453,33 @@ public final class DependencyClassifier {
     /// so every class of it is walked. A jar a layer stands in for is not
     /// walked: its classes do not ship, and what they refer to is not the
     /// application's concern.
+    ///
+    /// A name that is reached and that a library lists providers for
+    /// (`META-INF/services/<name>`) reaches those providers, in every
+    /// library that lists some: see the class description.
     public static int reach(Collection<String> references, List<Library> libraries) {
         Map<String, Library> owner = new HashMap<String, Library>();
+        Map<String, List<Library>> listing = new HashMap<String, List<Library>>();
         for (Library lib : libraries) {
             for (String c : lib.classNames()) {
                 if (!owner.containsKey(c)) {
                     owner.put(c, lib);
                 }
             }
+            if (lib.kind == Kind.LAYER_PROVIDED || !lib.managed()) {
+                continue;
+            }
+            for (String service : lib.services.keySet()) {
+                String name = service.replace('.', '/');
+                List<Library> libs = listing.get(name);
+                if (libs == null) {
+                    libs = new ArrayList<Library>();
+                    listing.put(name, libs);
+                }
+                libs.add(lib);
+            }
         }
+        Set<String> asked = new HashSet<String>();
         Deque<String> queue = new ArrayDeque<String>();
         for (String r : references) {
             queue.add(r.indexOf('.') >= 0 ? r.replace('.', '/') : r);
@@ -425,6 +487,21 @@ public final class DependencyClassifier {
         int count = 0;
         while (!queue.isEmpty()) {
             String name = queue.removeFirst();
+            List<Library> providers = listing.get(name);
+            if (providers != null && asked.add(name)) {
+                for (Library listed : providers) {
+                    // A services file writes a nested class with its dollar
+                    // sign, so every dot of a name is a package separator.
+                    for (Map.Entry<String, List<String>> e : listed.services.entrySet()) {
+                        if (e.getKey().replace('.', '/').equals(name)) {
+                            listed.reachedServices.add(e.getKey());
+                            for (String provider : e.getValue()) {
+                                queue.add(provider.replace('.', '/'));
+                            }
+                        }
+                    }
+                }
+            }
             Library lib = owner.get(name);
             if (lib == null || !lib.reached.add(name)) {
                 continue;

@@ -90,6 +90,7 @@ public final class Relocation {
         // callers name it in the method descriptor.
         {"java/util/concurrent/ConcurrentHashMap$KeySetView", JDK_PACKAGE + "ConcurrentHashMap$KeySetView"},
         {"java/util/concurrent/CopyOnWriteArrayList", JDK_PACKAGE + "CopyOnWriteArrayList"},
+        {"java/util/concurrent/CopyOnWriteArraySet", JDK_PACKAGE + "CopyOnWriteArraySet"},
         // Executors run their tasks on Codename One background threads,
         // never on the event dispatch thread.
         {"java/util/concurrent/Executor", JDK_PACKAGE + "Executor"},
@@ -249,6 +250,22 @@ public final class Relocation {
         {"java/security/SecureRandom", JDK_PACKAGE + "SecureRandom"},
         // What an exhaustive pattern switch throws; javac names it in every one.
         {"java/lang/MatchException", JDK_PACKAGE + "MatchException"},
+        // Service providers, from the META-INF/services files the build read:
+        // the generated registry creates each with "new".
+        {"java/util/ServiceLoader", JDK_PACKAGE + "ServiceLoader"},
+        {"java/util/ServiceLoader$Provider", JDK_PACKAGE + "ServiceLoader$Provider"},
+        {"java/util/ServiceConfigurationError", JDK_PACKAGE + "ServiceConfigurationError"},
+        // The one unnamed module of an application without modules, and the
+        // layer it is not in. Class.getModule() itself is a CompatRewrites rule.
+        {"java/lang/Module", JDK_PACKAGE + "Module"},
+        {"java/lang/ModuleLayer", JDK_PACKAGE + "ModuleLayer"},
+        // "Not running in OSGi", for a library that asks before it takes its
+        // class path route. These four types and no more: nothing here is an
+        // OSGi framework.
+        {"org/osgi/framework/FrameworkUtil", JDK_PACKAGE + "osgi/FrameworkUtil"},
+        {"org/osgi/framework/Bundle", JDK_PACKAGE + "osgi/Bundle"},
+        {"org/osgi/framework/BundleContext", JDK_PACKAGE + "osgi/BundleContext"},
+        {"org/osgi/framework/ServiceReference", JDK_PACKAGE + "osgi/ServiceReference"},
     };
 
     private final String name;

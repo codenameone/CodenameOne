@@ -425,7 +425,7 @@ public final class CompatRemapper {
         }
         resourcesShipped = true;
         try {
-            new CompatResources(classesDir, resourceDirectories(), handlerDirs, log).run();
+            new CompatResources(classesDir, resourceDirectories(), handlerDirs, relocator, log).run();
         } catch (BuildException e) {
             // The hooks' contract is IOException; run() reports either as
             // the build failure it is, with this message.

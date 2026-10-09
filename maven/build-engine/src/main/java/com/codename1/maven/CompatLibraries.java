@@ -23,6 +23,7 @@
 package com.codename1.maven;
 
 import com.codename1.build.Log;
+import com.codename1.compat.jdk.ResourceNames;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -67,8 +68,23 @@ import java.util.zip.ZipFile;
 ///   `java.io.File`, which the application's relocated calls spell
 ///   differently -- and checked like them, so a library that cannot work on
 ///   a device fails the build instead of the device.
-/// - **a library the application never reaches** is left out altogether. A
-///   class only a service loader would find is found by nothing on a device.
+/// - **a library the application never reaches** is left out altogether.
+///
+/// #### What comes with the classes
+///
+/// A library's resources come with it -- everything in the jar that is not
+/// a class, the jar's own `META-INF` apart, of which only
+/// `META-INF/resources/` is taken: that is a directory libraries load from
+/// by name (an icon pack keeps its fonts there). They are unpacked beside
+/// the classes and recorded, and the step that ships the application's own
+/// resources ([CompatResources]) ships them the same way, flattened and
+/// indexed, so a library's `getResource` finds its file on a device.
+///
+/// The providers a jar lists in `META-INF/services` for a service the
+/// application reaches are recorded too, in the file's order, for the
+/// generated registry that `ServiceLoader` reads on a device. The services
+/// files themselves are not unpacked: two jars routinely list providers for
+/// one service under one file name.
 ///
 /// Three kinds of jar are not touched: one written against the Codename One
 /// API, the Kotlin runtime -- the build handles both by itself -- and a jar
@@ -105,6 +121,11 @@ public final class CompatLibraries {
     private static final String JAR = "jar\t";
     private static final String FILE = "file\t";
     private static final String INFO = "info\t";
+    private static final String SERVICE = "service\t";
+
+    /// The one directory of a jar's `META-INF` that holds what the library
+    /// loads by name.
+    private static final String META_RESOURCES = "META-INF/resources/";
 
     private CompatLibraries() {
     }
@@ -146,6 +167,13 @@ public final class CompatLibraries {
             Entry entry = new Entry(jar.length() + "\t" + jar.lastModified());
             entry.describe(lib);
             Set<String> shipped = lib.shipped();
+            if (!shipped.isEmpty()) {
+                for (Map.Entry<String, List<String>> service : lib.reachedServices().entrySet()) {
+                    for (String provider : service.getValue()) {
+                        entry.services.add(service.getKey() + "\t" + provider);
+                    }
+                }
+            }
             boolean same = old != null && old.stamp.equals(entry.stamp);
             Set<String> mine = old == null ? Collections.<String>emptySet() : old.files;
             long[] written = new long[2];
@@ -260,7 +288,8 @@ public final class CompatLibraries {
                 // The manifest, signatures and the Java 9 variants of a
                 // multi-release jar describe the jar, not the application;
                 // a desktop's native libraries are nothing a device loads.
-                if (e.isDirectory() || name.startsWith("META-INF/") || name.endsWith("module-info.class")
+                if (e.isDirectory() || (name.startsWith("META-INF/") && !name.startsWith(META_RESOURCES))
+                        || name.endsWith("module-info.class")
                         || name.contains("..") || name.startsWith("/") || isNativeLibrary(name)) {
                     continue;
                 }
@@ -275,7 +304,10 @@ public final class CompatLibraries {
                     continue;
                 }
                 entry.files.add(name);
-                if (current.contains(name) && out.isFile()) {
+                // A resource the last run unpacked has since been shipped
+                // under its flat name, and its nested copy removed.
+                if (current.contains(name) && (out.isFile() || (!isClass && name.indexOf('/') >= 0
+                        && new File(classesDir, ResourceNames.flatName(name)).isFile()))) {
                     continue;
                 }
                 File parent = out.getParentFile();
@@ -317,6 +349,9 @@ public final class CompatLibraries {
     private static final class Entry {
         private final String stamp;
         private final Set<String> files = new TreeSet<String>();
+        /// The providers the jar lists for the services the application
+        /// reaches, each as `service`, a tab, `provider`, in the jar's order.
+        private final List<String> services = new ArrayList<String>();
         /// What the jar was classified as, by key: see [Library].
         private final Map<String, String> info = new TreeMap<String, String>();
 
@@ -343,7 +378,7 @@ public final class CompatLibraries {
         @Override
         public boolean equals(Object o) {
             return o instanceof Entry && ((Entry) o).stamp.equals(stamp) && ((Entry) o).files.equals(files)
-                    && ((Entry) o).info.equals(info);
+                    && ((Entry) o).info.equals(info) && ((Entry) o).services.equals(services);
         }
 
         @Override
@@ -456,6 +491,8 @@ public final class CompatLibraries {
                 }
             } else if (line.startsWith(FILE) && current != null) {
                 current.files.add(line.substring(FILE.length()));
+            } else if (line.startsWith(SERVICE) && current != null) {
+                current.services.add(line.substring(SERVICE.length()));
             } else if (line.startsWith(INFO) && current != null) {
                 int eq = line.indexOf('=');
                 if (eq > INFO.length()) {
@@ -511,6 +548,9 @@ public final class CompatLibraries {
             for (String f : e.getValue().files) {
                 text.append(FILE).append(f).append('\n');
             }
+            for (String s : e.getValue().services) {
+                text.append(SERVICE).append(s).append('\n');
+            }
         }
         File parent = record.getParentFile();
         if (!parent.isDirectory() && !parent.mkdirs()) {
@@ -555,6 +595,46 @@ public final class CompatLibraries {
                     out.put(f.substring(0, f.length() - ".class".length()), e.getKey());
                 }
             }
+        }
+        return out;
+    }
+
+    /// The resources the bundled libraries of `classesDir` brought with
+    /// them, by their path in the jar they came from, which is where they
+    /// were unpacked; empty when nothing was bundled.
+    static Set<String> resources(File classesDir) {
+        Set<String> out = new TreeSet<String>();
+        try {
+            for (Entry e : read(classesDir).values()) {
+                for (String f : e.files) {
+                    if (!f.endsWith(".class")) {
+                        out.add(f);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            return out;
+        }
+        return out;
+    }
+
+    /// The service providers the bundled libraries of `classesDir` list,
+    /// for the services the application reaches: one `{jar, service,
+    /// provider}` each, the names dotted as a services file has them, in the
+    /// order of the record and of each file.
+    static List<String[]> services(File classesDir) {
+        List<String[]> out = new ArrayList<String[]>();
+        try {
+            for (Map.Entry<String, Entry> e : read(classesDir).entrySet()) {
+                for (String s : e.getValue().services) {
+                    int tab = s.indexOf('\t');
+                    if (tab > 0) {
+                        out.add(new String[] {e.getKey(), s.substring(0, tab), s.substring(tab + 1)});
+                    }
+                }
+            }
+        } catch (IOException e) {
+            return out;
         }
         return out;
     }

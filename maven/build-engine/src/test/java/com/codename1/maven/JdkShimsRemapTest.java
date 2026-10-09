@@ -65,6 +65,117 @@ public class JdkShimsRemapTest {
                 + "out.add(bytes.toString(\"UTF-8\"));\n", 14, "Charset.forName");
     }
 
+    /// On a JDK that has `findFirst` and `stream`, which is also the one
+    /// whose iterations share what either created. The providers come from
+    /// a services file with the comments, blank lines and repeats the format
+    /// allows; the stand-in reads it itself here, where no build generated
+    /// a registry (`ServiceProvidersTest` covers that one).
+    @Test
+    public void serviceProvidersAreLoadedInFileOrderAndLazily() throws Exception {
+        RemapDifferential d = new RemapDifferential(tmp.newFolder(), 17);
+        org.junit.Assume.assumeTrue("needs a JDK 17 (JAVA17_HOME)", d.available());
+        d.source("Shape", "public interface Shape { String name(); }\n")
+                .source("Lonely", "public interface Lonely { }\n")
+                .source("Made", "public class Made { public static final List<String> LOG = new ArrayList<>(); }\n")
+                .source("Circle", "public class Circle implements Shape {\n"
+                        + "    public Circle() { Made.LOG.add(\"circle\"); }\n"
+                        + "    public String name() { return \"circle\"; }\n}\n")
+                .source("Square", "public class Square implements Shape {\n"
+                        + "    public Square() { Made.LOG.add(\"square\"); }\n"
+                        + "    public String name() { return \"square\"; }\n}\n")
+                .resource("META-INF/services/q.Shape",
+                        "# shapes\n\n  q.Square   # first\nq.Circle\n\t\nq.Square\n");
+        d.same(""
+                + "ServiceLoader<Shape> l = ServiceLoader.load(Shape.class);\n"
+                + "out.add(l.toString());\n"
+                + "out.add(new ArrayList<>(Made.LOG));\n"
+                + "Iterator<Shape> it = l.iterator();\n"
+                + "out.add(it.hasNext() + \" \" + Made.LOG);\n"
+                + "out.add(it.next().name() + \" \" + Made.LOG);\n"
+                + "Iterator<Shape> other = l.iterator();\n"
+                + "out.add(other.next().name() + \" \" + Made.LOG);\n"
+                + "out.add(other.next().name() + \" \" + Made.LOG);\n"
+                + "out.add(it.next().name() + \" \" + Made.LOG);\n"
+                + "out.add(it.hasNext() + \" \" + other.hasNext());\n"
+                + "try { it.next(); out.add(\"no\"); } catch (NoSuchElementException e) { out.add(\"ended\"); }\n"
+                + "List<String> names = new ArrayList<>();\n"
+                + "l.forEach(s -> names.add(s.name()));\n"
+                + "out.add(names + \" \" + Made.LOG);\n"
+                + "out.add(l.findFirst().get().name());\n"
+                + "out.add(l.findFirst().get() == l.iterator().next());\n"
+                + "out.add(ServiceLoader.load(Lonely.class).findFirst().isPresent());\n"
+                + "out.add(ServiceLoader.load(Lonely.class).iterator().hasNext());\n"
+                + "out.add(l.stream().map(p -> p.type().getName()).collect(Collectors.toList()) + \" \" + Made.LOG);\n"
+                + "out.add(l.stream().map(p -> p.get().name()).collect(Collectors.toList()));\n"
+                + "l.reload();\n"
+                + "Made.LOG.clear();\n"
+                + "out.add(l.iterator().next().name() + \" \" + Made.LOG);\n"
+                + "out.add(ServiceLoader.load(Shape.class, Shape.class.getClassLoader()).iterator().next().name());\n"
+                + "out.add(ServiceLoader.loadInstalled(Shape.class).iterator().hasNext());\n"
+                + "try { ServiceLoader.load(null); out.add(\"no\"); } catch (NullPointerException e) { out.add(\"npe\"); }\n",
+                18, "java/util/ServiceLoader");
+    }
+
+    @Test
+    public void aClassIsInTheUnnamedModule() throws Exception {
+        RemapDifferential d = new RemapDifferential(tmp.newFolder(), 17);
+        org.junit.Assume.assumeTrue("needs a JDK 17 (JAVA17_HOME)", d.available());
+        d.source("Here", "public class Here { }\n");
+        d.same(""
+                + "Module m = Here.class.getModule();\n"
+                + "out.add(m.isNamed());\n"
+                + "out.add(m.getName());\n"
+                + "out.add(m.getLayer() == null);\n"
+                + "out.add(m == D.class.getModule());\n"
+                + "ModuleLayer none = m.getLayer();\n"
+                + "out.add(none);\n"
+                + "try { ServiceLoader.load(none, Here.class); out.add(\"no\"); }"
+                + " catch (NullPointerException e) { out.add(\"npe\"); }\n",
+                6, "java/lang/Module", "java/lang/ModuleLayer");
+    }
+
+    @Test
+    public void aCopyOnWriteSetIteratesOverWhatItHeldWhenAsked() throws Exception {
+        java8().same(""
+                + "CopyOnWriteArraySet<String> set = new CopyOnWriteArraySet<>(Arrays.asList(\"b\", \"a\", \"b\"));\n"
+                + "out.add(set.toString() + set.size());\n"
+                + "out.add(set.add(\"a\") + \" \" + set.add(\"c\"));\n"
+                + "List<String> seen = new ArrayList<>();\n"
+                + "for (String s : set) { seen.add(s); set.add(s + s); set.remove(\"c\"); }\n"
+                + "out.add(seen);\n"
+                + "out.add(set);\n"
+                + "Iterator<String> it = set.iterator();\n"
+                + "it.next();\n"
+                + "try { it.remove(); out.add(\"no\"); } catch (UnsupportedOperationException e) { out.add(\"fixed\"); }\n"
+                + "out.add(set.contains(\"aa\") + \" \" + set.containsAll(Arrays.asList(\"a\", \"bb\")));\n"
+                + "out.add(set.addAll(Arrays.asList(\"a\", \"z\", \"z\")) + \" \" + set);\n"
+                + "out.add(set.removeAll(Arrays.asList(\"z\", \"q\")) + \" \" + set);\n"
+                + "out.add(set.retainAll(Arrays.asList(\"a\", \"b\")) + \" \" + set);\n"
+                + "out.add(set.removeIf(s -> s.equals(\"a\")) + \" \" + set);\n"
+                + "out.add(set.equals(new HashSet<>(Arrays.asList(\"b\"))) + \" \" + (set.hashCode() == \"b\".hashCode()));\n"
+                + "out.add(set.toArray());\n"
+                + "out.add(set.toArray(new String[0]));\n"
+                + "set.clear();\n"
+                + "out.add(set.isEmpty());\n"
+                + "out.add(new CopyOnWriteArraySet<Integer>().iterator().hasNext());\n",
+                13, "java/util/concurrent/CopyOnWriteArraySet");
+    }
+
+    /// The four OSGi types a library asks about before taking its class
+    /// path route are answered "not in a framework", and nothing else of
+    /// OSGi is mapped.
+    @Test
+    public void aLibraryThatAsksIsToldItIsNotInAnOsgiFramework() {
+        ClassRelocator relocator = new ClassRelocator(CompatLayers.SWING);
+        org.junit.Assert.assertEquals("com/codename1/compat/jdk/osgi/FrameworkUtil", relocator.map("org/osgi/framework/FrameworkUtil"));
+        org.junit.Assert.assertEquals("com/codename1/compat/jdk/osgi/Bundle", relocator.map("org/osgi/framework/Bundle"));
+        org.junit.Assert.assertEquals("com/codename1/compat/jdk/osgi/BundleContext", relocator.map("org/osgi/framework/BundleContext"));
+        org.junit.Assert.assertEquals("com/codename1/compat/jdk/osgi/ServiceReference",
+                relocator.map("org/osgi/framework/ServiceReference"));
+        org.junit.Assert.assertEquals("org/osgi/framework/BundleActivator", relocator.map("org/osgi/framework/BundleActivator"));
+        org.junit.Assert.assertNull(com.codename1.compat.jdk.osgi.FrameworkUtil.getBundle(String.class));
+    }
+
     @Test
     public void regularExpressionsAreTheJdks() throws Exception {
         RemapDifferential d = new RemapDifferential(tmp.newFolder(), 8);

@@ -83,6 +83,40 @@ import java.util.TreeSet;
 /// whichever of the two ships. The registrations themselves sit in part
 /// classes beside it, `CompatRegistry$Part0` onwards; see [#registry].
 ///
+/// #### Bundled libraries
+///
+/// A library unpacked into the application ([CompatLibraries]) brought its
+/// resources with it, and they are shipped by the same rule: flattened and
+/// indexed, so the library's own `getResource` finds its file. Where the
+/// application has a resource of the same path, the application's is the
+/// one that ships, as it is the first on a desktop class path. A library's
+/// resource whose flat name is taken is left out with a warning rather than
+/// failing the build: the developer cannot rename a file inside a jar.
+///
+/// #### Service providers
+///
+/// Nothing on a device lists a directory of a class path or creates a class
+/// from its name, so `ServiceLoader` is answered from the registry as well.
+/// Every `META-INF/services/<service>` file among the application's
+/// resources, and every one a bundled library has for a service the
+/// application reaches, is read here -- by the runtime's own
+/// `ServiceLoader.cn1ProviderNames`, so the two agree on what a line means --
+/// and each provider it lists is registered under the service's name with a
+/// number the registry's `cn1CreateService` turns into a `new`. The
+/// application's files come first, then the libraries' in the order they
+/// were bundled, each file in its own order; a provider listed twice for a
+/// service is registered once.
+///
+/// The names in a services file are the ones the source was written
+/// against. What ships is relocated, so both the service and the provider
+/// are mapped the way the classes were before anything is generated.
+///
+/// A listed provider that cannot be created -- the class is not among the
+/// shipped ones, or is abstract, or not public, or has no public constructor
+/// without parameters -- is left out with ONE warning naming the file and
+/// the class. It never fails the build: a library lists providers for
+/// environments the application is not in.
+///
 /// #### Running it again
 ///
 /// The flat names written are listed in a file BESIDE the classes directory
@@ -95,6 +129,8 @@ final class CompatResources {
     private static final String RESOURCES = Relocation.JDK_PACKAGE + "Resources";
     private static final String BUNDLE = Relocation.JDK_PACKAGE + "ResourceBundle";
     private static final String FACTORY = BUNDLE + "$Cn1Factory";
+    private static final String LOADER = Relocation.JDK_PACKAGE + "ServiceLoader";
+    private static final String SERVICE_FACTORY = LOADER + "$Cn1Factory";
     private static final String[] BUNDLE_BASES = {
         BUNDLE, Relocation.JDK_PACKAGE + "ListResourceBundle", Relocation.JDK_PACKAGE + "PropertyResourceBundle",
     };
@@ -108,14 +144,24 @@ final class CompatResources {
     private final List<File> resourceDirs;
     private final List<File> classDirs;
     private final Log log;
+    private final ClassRelocator relocator;
 
     /// `resourceDirs` are the desktop resource directories; `classDirs` the
     /// further class directories of the application, searched for bundle
     /// classes beside `classesDir`.
     CompatResources(File classesDir, List<File> resourceDirs, List<File> classDirs, Log log) {
+        this(classesDir, resourceDirs, classDirs, null, log);
+    }
+
+    /// As above, with the rules the classes were relocated by: a services
+    /// file names its classes as the source did. Null when nothing was
+    /// relocated.
+    CompatResources(File classesDir, List<File> resourceDirs, List<File> classDirs, ClassRelocator relocator,
+                    Log log) {
         this.classesDir = classesDir;
         this.resourceDirs = resourceDirs;
         this.classDirs = classDirs;
+        this.relocator = relocator;
         this.log = log;
     }
 
@@ -134,7 +180,38 @@ final class CompatResources {
                 collect(dir, "", resources);
             }
         }
-        flatten(resources);
+        // The services files, read before flattening moves them.
+        List<String[]> listed = new ArrayList<String[]>();
+        for (Map.Entry<String, File> e : resources.entrySet()) {
+            String path = e.getKey();
+            if (path.startsWith(DependencyClassifier.SERVICES)
+                    && path.indexOf('/', DependencyClassifier.SERVICES.length()) < 0) {
+                File built = new File(classesDir, path);
+                String text = new String(Files.readAllBytes((built.isFile() ? built : e.getValue()).toPath()),
+                        "UTF-8");
+                String service = path.substring(DependencyClassifier.SERVICES.length());
+                for (String provider : com.codename1.compat.jdk.ServiceLoader.cn1ProviderNames(text, null)) {
+                    listed.add(new String[] {path, service, provider});
+                }
+            }
+        }
+        for (String[] s : CompatLibraries.services(classesDir)) {
+            listed.add(new String[] {DependencyClassifier.SERVICES + s[1] + " of " + s[0], s[1], s[2]});
+        }
+
+        Set<String> fromLibraries = new TreeSet<String>();
+        for (String path : CompatLibraries.resources(classesDir)) {
+            if (resources.containsKey(path)) {
+                continue;
+            }
+            File nested = new File(classesDir, path);
+            File flat = new File(classesDir, ResourceNames.flatName(path));
+            if (nested.isFile() || flat.isFile()) {
+                resources.put(path, nested.isFile() ? nested : flat);
+                fromLibraries.add(path);
+            }
+        }
+        flatten(resources, fromLibraries);
 
         TreeMap<String, String> propertyBundles = new TreeMap<String, String>();
         for (String path : resources.keySet()) {
@@ -143,10 +220,50 @@ final class CompatResources {
                 propertyBundles.put(name.replace('/', '.'), "/" + path);
             }
         }
-        List<String> bundleClasses = bundleClasses();
-        writeRegistry(registry(new ArrayList<String>(resources.keySet()), propertyBundles, bundleClasses));
+        Map<String, Seen> seen = scanClasses();
+        List<String> bundleClasses = bundleClasses(seen);
+        List<String[]> services = services(listed, seen);
+        writeRegistry(registry(new ArrayList<String>(resources.keySet()), propertyBundles, bundleClasses,
+                services));
         log.debug("Shipped " + resources.size() + " desktop resources, " + propertyBundles.size()
-                + " properties bundles and " + bundleClasses.size() + " bundle classes");
+                + " properties bundles, " + bundleClasses.size() + " bundle classes and " + services.size()
+                + " service providers");
+    }
+
+    /// The providers the registry creates, each as `{service, provider}`:
+    /// the service's shipped name dotted, as `Class.getName()` answers it on
+    /// the device, and the provider's shipped internal name. `listed` holds
+    /// `{where it was listed, service, provider}` with the names as written.
+    private List<String[]> services(List<String[]> listed, Map<String, Seen> seen) {
+        List<String[]> out = new ArrayList<String[]>();
+        Set<String> done = new TreeSet<String>();
+        for (String[] l : listed) {
+            String service = shipped(l[1]);
+            String provider = shipped(l[2]);
+            if (!done.add(service + " " + provider)) {
+                continue;
+            }
+            Seen s = seen.get(provider);
+            if (s == null) {
+                log.warn("The service provider " + l[2] + ", listed in " + l[0] + ", is not among the classes "
+                        + "the application ships. ServiceLoader will not offer it on a device.");
+            } else if (!s.creatable) {
+                log.warn("The service provider " + l[2] + ", listed in " + l[0] + ", cannot be created: it has "
+                        + "to be a public class that is not abstract, with a public constructor taking nothing. "
+                        + "ServiceLoader will not offer it on a device.");
+            } else {
+                out.add(new String[] {service.replace('/', '.'), provider});
+            }
+        }
+        return out;
+    }
+
+    /// The internal name the class a services file calls `dotted` ships
+    /// under. A nested class is written there with its dollar sign, so every
+    /// dot is a package separator.
+    private String shipped(String dotted) {
+        String name = dotted.replace('.', '/');
+        return relocator == null ? name : relocator.map(name);
     }
 
     /// Every file under `dir`, by its path from the resource root. Compiled
@@ -176,7 +293,20 @@ final class CompatResources {
         }
     }
 
-    private void flatten(Map<String, File> resources) throws IOException, BuildException {
+    private void flatten(Map<String, File> resources, Set<String> fromLibraries)
+            throws IOException, BuildException {
+        List<String> leftOut = new ArrayList<String>();
+        try {
+            flatten(resources, fromLibraries, leftOut);
+        } finally {
+            for (String path : leftOut) {
+                resources.remove(path);
+            }
+        }
+    }
+
+    private void flatten(Map<String, File> resources, Set<String> fromLibraries, List<String> leftOut)
+            throws IOException, BuildException {
         File manifest = manifest(classesDir);
         Set<String> previous = new LinkedHashSet<String>();
         if (manifest.isFile()) {
@@ -194,22 +324,34 @@ final class CompatResources {
                 continue;
             }
             String flat = ResourceNames.flatName(path);
+            boolean library = fromLibraries.contains(path);
+            String taken = null;
             if (resources.containsKey(flat)) {
-                throw collision(path, flat, resources.get(flat).toString());
-            }
-            String other = flatToPath.put(flat, path);
-            if (other != null) {
-                throw collision(path, flat, "the resource " + other);
+                taken = resources.get(flat).toString();
+            } else if (flatToPath.containsKey(flat)) {
+                taken = "the resource " + flatToPath.get(flat);
             }
             File nested = new File(classesDir, path);
             // The build tool's copy, when there is one: it may have been
             // filtered, and it is the bytes the developer's build produced.
-            byte[] data = Files.readAllBytes((nested.isFile() ? nested : e.getValue()).toPath());
+            byte[] data = taken != null ? null
+                    : Files.readAllBytes((nested.isFile() ? nested : e.getValue()).toPath());
             File dest = new File(classesDir, flat);
-            if (dest.exists() && !previous.contains(flat)
+            if (taken == null && dest.exists() && !previous.contains(flat)
                     && !(dest.isFile() && Arrays.equals(Files.readAllBytes(dest.toPath()), data))) {
-                throw collision(path, flat, dest.toString());
+                taken = dest.toString();
             }
+            if (taken != null) {
+                if (!library) {
+                    throw collision(path, flat, taken);
+                }
+                // Not the developer's to rename: it is inside a jar.
+                log.warn("The library resource " + path + " is not shipped: it would ship as " + flat
+                        + ", a name already taken by " + taken + ".");
+                leftOut.add(path);
+                continue;
+            }
+            flatToPath.put(flat, path);
             ClassRelocator.writeIfDifferent(dest, data);
             written.add(flat);
             if (nested.isFile()) {
@@ -270,14 +412,7 @@ final class CompatResources {
     /// concrete, with a public constructor taking nothing, and descending
     /// from `ResourceBundle`. Anything else `getBundle` could not have
     /// created on a desktop either.
-    private List<String> bundleClasses() throws IOException {
-        final Map<String, Seen> seen = new TreeMap<String, Seen>();
-        List<File> dirs = new ArrayList<File>();
-        dirs.add(classesDir);
-        dirs.addAll(classDirs);
-        for (File dir : dirs) {
-            scan(dir, "", seen);
-        }
+    private static List<String> bundleClasses(Map<String, Seen> seen) {
         List<String> out = new ArrayList<String>();
         for (Map.Entry<String, Seen> e : seen.entrySet()) {
             if (e.getValue().creatable && isBundle(e.getValue().superName, seen)) {
@@ -285,6 +420,19 @@ final class CompatResources {
             }
         }
         return out;
+    }
+
+    /// Every class the application ships that is not a layer's runtime, by
+    /// internal name.
+    private Map<String, Seen> scanClasses() throws IOException {
+        final Map<String, Seen> seen = new TreeMap<String, Seen>();
+        List<File> dirs = new ArrayList<File>();
+        dirs.add(classesDir);
+        dirs.addAll(classDirs);
+        for (File dir : dirs) {
+            scan(dir, "", seen);
+        }
+        return seen;
     }
 
     private static boolean isBundle(String superName, Map<String, Seen> seen) {
@@ -362,9 +510,19 @@ final class CompatResources {
     /// reported as one that does not exist.
     static Map<String, byte[]> registry(List<String> resources, Map<String, String> propertyBundles,
                                         List<String> bundleClasses) {
+        return registry(resources, propertyBundles, bundleClasses, new ArrayList<String[]>());
+    }
+
+    /// As above, with the service providers: each `{service, provider}`, the
+    /// service a dotted name and the provider an internal one, in the order
+    /// `ServiceLoader` is to offer them. A provider's number is its place in
+    /// the list.
+    static Map<String, byte[]> registry(List<String> resources, Map<String, String> propertyBundles,
+                                        List<String> bundleClasses, List<String[]> services) {
         Map<String, byte[]> out = new TreeMap<String, byte[]>();
         List<Map.Entry<String, String>> files = new ArrayList<Map.Entry<String, String>>(propertyBundles.entrySet());
-        int total = resources.size() + files.size() + bundleClasses.size();
+        int firstService = resources.size() + files.size() + bundleClasses.size();
+        int total = firstService + services.size();
         List<String> parts = new ArrayList<String>();
         for (int from = 0; from < total; from += CHUNK) {
             String part = REGISTRY + PART + parts.size();
@@ -385,6 +543,20 @@ final class CompatResources {
                     mv.visitLdcInsn(file.getValue());
                     mv.visitMethodInsn(Opcodes.INVOKESTATIC, BUNDLE, "cn1RegisterProperties",
                             "(Ljava/lang/String;Ljava/lang/String;)V", false);
+                } else if (i >= firstService) {
+                    if (!hasFactory) {
+                        mv.visitTypeInsn(Opcodes.NEW, REGISTRY);
+                        mv.visitInsn(Opcodes.DUP);
+                        mv.visitMethodInsn(Opcodes.INVOKESPECIAL, REGISTRY, "<init>", "()V", false);
+                        mv.visitVarInsn(Opcodes.ASTORE, 0);
+                        hasFactory = true;
+                    }
+                    int id = i - firstService;
+                    mv.visitLdcInsn(services.get(id)[0]);
+                    mv.visitVarInsn(Opcodes.ALOAD, 0);
+                    mv.visitLdcInsn(Integer.valueOf(id));
+                    mv.visitMethodInsn(Opcodes.INVOKESTATIC, LOADER, "cn1RegisterProvider",
+                            "(Ljava/lang/String;L" + SERVICE_FACTORY + ";I)V", false);
                 } else {
                     if (!hasFactory) {
                         mv.visitTypeInsn(Opcodes.NEW, REGISTRY);
@@ -410,7 +582,7 @@ final class CompatResources {
 
         ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         cw.visit(Opcodes.V1_5, Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL | Opcodes.ACC_SUPER, REGISTRY, null,
-                "java/lang/Object", new String[] {FACTORY});
+                "java/lang/Object", new String[] {FACTORY, SERVICE_FACTORY});
 
         MethodVisitor init = cw.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
         init.visitCode();
@@ -428,6 +600,7 @@ final class CompatResources {
             install.visitMethodInsn(Opcodes.INVOKESTATIC, part, "install", "()V", false);
         }
         install.visitMethodInsn(Opcodes.INVOKESTATIC, BUNDLE, "cn1Seal", "()V", false);
+        install.visitMethodInsn(Opcodes.INVOKESTATIC, LOADER, "cn1Seal", "()V", false);
         install.visitInsn(Opcodes.RETURN);
         install.visitMaxs(0, 0);
         install.visitEnd();
@@ -456,6 +629,41 @@ final class CompatResources {
         create.visitInsn(Opcodes.ARETURN);
         create.visitMaxs(0, 0);
         create.visitEnd();
+
+        // The two halves of ServiceLoader's factory: what a provider is,
+        // which is asked without creating it, and the provider itself.
+        for (int half = 0; half < 2; half++) {
+            MethodVisitor mv = half == 0
+                    ? cw.visitMethod(Opcodes.ACC_PUBLIC, "cn1CreateService", "(I)Ljava/lang/Object;", null, null)
+                    : cw.visitMethod(Opcodes.ACC_PUBLIC, "cn1ServiceType", "(I)Ljava/lang/Class;", null, null);
+            mv.visitCode();
+            Label absent = new Label();
+            if (!services.isEmpty()) {
+                Label[] cases = new Label[services.size()];
+                for (int i = 0; i < cases.length; i++) {
+                    cases[i] = new Label();
+                }
+                mv.visitVarInsn(Opcodes.ILOAD, 1);
+                mv.visitTableSwitchInsn(0, cases.length - 1, absent, cases);
+                for (int i = 0; i < cases.length; i++) {
+                    String type = services.get(i)[1];
+                    mv.visitLabel(cases[i]);
+                    if (half == 0) {
+                        mv.visitTypeInsn(Opcodes.NEW, type);
+                        mv.visitInsn(Opcodes.DUP);
+                        mv.visitMethodInsn(Opcodes.INVOKESPECIAL, type, "<init>", "()V", false);
+                    } else {
+                        mv.visitLdcInsn(org.objectweb.asm.Type.getObjectType(type));
+                    }
+                    mv.visitInsn(Opcodes.ARETURN);
+                }
+            }
+            mv.visitLabel(absent);
+            mv.visitInsn(Opcodes.ACONST_NULL);
+            mv.visitInsn(Opcodes.ARETURN);
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
 
         cw.visitEnd();
         out.put(REGISTRY, cw.toByteArray());

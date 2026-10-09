@@ -193,7 +193,9 @@ public class CompatLibrariesTest {
 
         File panel = new File(classes, "org/fancy/FancyPanel.class");
         assertEquals("com/codename1/desktopcompat/javax/swing/JPanel", superName(panel));
-        assertTrue("A library's resources come with it", new File(classes, "org/fancy/notes.properties").isFile());
+        // Under the one name a device can find it by: a bundle has no directories.
+        assertTrue("A library's resources come with it", new File(classes, "org__fancy__notes.properties").isFile());
+        assertFalse(new File(classes, "org/fancy/notes.properties").exists());
         assertFalse("The jar's manifest is not the application's",
                 new File(classes, "META-INF/MANIFEST.MF").exists());
         // What a device lacks is redirected in the library as in the application.
@@ -202,6 +204,7 @@ public class CompatLibrariesTest {
         assertFalse("A library the application never reaches ships nothing",
                 new File(classes, "org/plain/Words.class").exists());
         assertFalse(new File(classes, "org/plain/notes.properties").exists());
+        assertFalse(new File(classes, "org__plain__notes.properties").exists());
         assertTrue(logged.toString(), logged.toString().contains(
                 "info: Bundling fancy-lib-1.0.jar with the application (1 classes, 1 KB): it is written against"));
         assertTrue(logged.toString(), logged.toString().contains(
@@ -282,7 +285,7 @@ public class CompatLibrariesTest {
         assertTrue(new File(classes, "org/plain/Words.class").isFile());
         assertTrue("What a reached class uses is reached", new File(classes, "org/plain/Splitter.class").isFile());
         assertFalse("Nothing leads to it", new File(classes, "org/plain/Shell.class").exists());
-        assertTrue(new File(classes, "org/plain/words.properties").isFile());
+        assertTrue(new File(classes, "org__plain__words.properties").isFile());
         assertFalse(new File(classes, "module-info.class").exists());
         // A pure-Java library is relocated for the JDK classes a device lacks.
         assertTrue(CompatFixtures.members(Files.readAllBytes(new File(classes, "org/plain/Splitter.class").toPath()))

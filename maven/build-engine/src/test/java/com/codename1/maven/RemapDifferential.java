@@ -67,6 +67,7 @@ final class RemapDifferential {
     private final File work;
     private final int release;
     private final List<String> sources = new ArrayList<String>();
+    private final List<String> resources = new ArrayList<String>();
 
     /// `release` is the language level the source needs: 8, 17 or 21.
     RemapDifferential(File work, int release) {
@@ -117,6 +118,15 @@ final class RemapDifferential {
     RemapDifferential source(String name, String text) {
         sources.add("q/" + name + ".java");
         sources.add("package q;\n" + IMPORTS + text);
+        return this;
+    }
+
+    /// A file on the class path of both runs, beside the classes: a
+    /// `META-INF/services` file, say. Both runs are then forked, since a
+    /// loader that only defines the fixture's classes offers no resources.
+    RemapDifferential resource(String path, String text) {
+        resources.add(path);
+        resources.add(text);
         return this;
     }
 
@@ -174,11 +184,24 @@ final class RemapDifferential {
         boolean inProcess = running() >= release;
         File jdk = inProcess ? null : otherJdk();
         compile(jdk, original, files);
+        for (int i = 0; i < resources.size(); i += 2) {
+            for (File root : new File[] {original, remapped}) {
+                File f = new File(root, resources.get(i));
+                assertTrue(f.getParentFile().isDirectory() || f.getParentFile().mkdirs());
+                Files.write(f.toPath(), resources.get(i + 1).getBytes("UTF-8"));
+            }
+        }
+        if (jdk == null && !resources.isEmpty()) {
+            // The JDK running the tests, in a process of its own.
+            File home = new File(System.getProperty("java.home"));
+            jdk = new File(home, "bin/java").isFile() ? home : home.getParentFile();
+            // Compiled above already, in this process.
+        }
 
         ClassRelocator relocator = new ClassRelocator(CompatLayers.SWING);
         File[] classes = new File(original, "q").listFiles();
         assertNotNull(classes);
-        assertTrue(new File(remapped, "q").mkdirs());
+        assertTrue(new File(remapped, "q").isDirectory() || new File(remapped, "q").mkdirs());
         for (File c : classes) {
             byte[] out = relocator.remap(Files.readAllBytes(c.toPath()));
             Files.write(new File(remapped, "q/" + c.getName()).toPath(), out);
