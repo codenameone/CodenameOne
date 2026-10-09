@@ -30,11 +30,15 @@ public final class DirectoryIteratorException extends RuntimeException {
     private final IOException cause;
 
     public DirectoryIteratorException(IOException cause) {
-        super(cause == null ? null : cause.toString());
+        super(text(cause));
+        this.cause = cause;
+    }
+
+    private static String text(IOException cause) {
         if (cause == null) {
             throw new NullPointerException();
         }
-        this.cause = cause;
+        return cause.toString();
     }
 
     @Override

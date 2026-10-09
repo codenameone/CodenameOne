@@ -119,4 +119,47 @@
         <Method name="exit"/>
         <Bug pattern="RU_INVOKE_RUN"/>
     </Match>
+
+    <!--
+        DirectoryIteratorException carries the IOException that ended an
+        iteration and hands that very object back, as the JDK's does; a
+        Throwable cannot be copied.
+    -->
+    <Match>
+        <Class name="com.codename1.compat.jdk.DirectoryIteratorException"/>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+
+    <!--
+        The two names are the JDK's own: java.io.File.toURI and
+        java.nio.file.Path.toUri. An application calls both, so neither can
+        be respelled to match the other.
+    -->
+    <Match>
+        <Class name="com.codename1.compat.jdk.File"/>
+        <Bug pattern="NM_CONFUSING"/>
+    </Match>
+
+    <!--
+        java.nio.file.Path declares compareTo(Path) itself, and code compiled
+        against the JDK calls it by that descriptor.
+    -->
+    <Match>
+        <Class name="com.codename1.compat.jdk.Path"/>
+        <Bug pattern="CO_ABSTRACT_SELF"/>
+    </Match>
+
+    <!--
+        Null is "a pattern with no groups has nothing to save", read by the
+        matcher's own backtracking loop only; an empty array there would be
+        an allocation per attempt for the commonest patterns.
+    -->
+    <Match>
+        <Class name="com.codename1.compat.jdk.Matcher"/>
+        <Method name="saveGroups"/>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
 </FindBugsFilter>

@@ -407,28 +407,35 @@ final class PathImpl implements Path {
 
     @Override
     public Iterator<Path> iterator() {
-        final String[] n = names();
-        return new Iterator<Path>() {
-            private int next;
+        return new Names(names());
+    }
 
-            @Override
-            public boolean hasNext() {
-                return next < n.length;
-            }
+    /// The names of a path, each as a path of its own.
+    private static final class Names implements Iterator<Path> {
+        private final String[] n;
+        private int next;
 
-            @Override
-            public Path next() {
-                if (next >= n.length) {
-                    throw new NoSuchElementException();
-                }
-                return new PathImpl(n[next++]);
-            }
+        Names(String[] n) {
+            this.n = n;
+        }
 
-            @Override
-            public void remove() {
-                throw new UnsupportedOperationException();
+        @Override
+        public boolean hasNext() {
+            return next < n.length;
+        }
+
+        @Override
+        public Path next() {
+            if (next >= n.length) {
+                throw new NoSuchElementException();
             }
-        };
+            return new PathImpl(n[next++]);
+        }
+
+        @Override
+        public void remove() {
+            throw new UnsupportedOperationException();
+        }
     }
 
     @Override

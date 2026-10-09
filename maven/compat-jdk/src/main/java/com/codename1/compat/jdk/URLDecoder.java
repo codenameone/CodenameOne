@@ -39,7 +39,10 @@ public final class URLDecoder {
     }
 
     public static String decode(String s, String enc) throws UnsupportedEncodingException {
-        if (enc != null && enc.length() == 0) {
+        if (enc == null) {
+            throw new NullPointerException("charsetName");
+        }
+        if (enc.length() == 0) {
             throw new UnsupportedEncodingException("URLDecoder: empty string enc parameter");
         }
         return decodeAs(s, URLEncoder.charsetName(enc));

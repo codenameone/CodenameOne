@@ -537,35 +537,33 @@ public final class JdkDates {
         throw new DateTimeException("Unable to obtain Instant from " + value);
     }
 
-    /// The order of two dates. Not `compareTo`: the JDK declares it over
-    /// `ChronoLocalDate` and a device over `LocalDate`, so a call compiled
-    /// here names a method the device does not have.
-    private static int compare(LocalDate a, LocalDate b) {
-        long x = a.toEpochDay();
-        long y = b.toEpochDay();
-        return x < y ? -1 : x > y ? 1 : 0;
+    /// The sign of the comparison of two dates. Not `compareTo`: compiled
+    /// against the JDK that is a call of `compareTo(ChronoLocalDate)`, and
+    /// the device's takes a `LocalDate`.
+    private static int order(LocalDate a, LocalDate b) {
+        long first = a.toEpochDay();
+        long second = b.toEpochDay();
+        return first < second ? -1 : first > second ? 1 : 0;
     }
 
-    /// The order of two date-times, for the reason [#compare(LocalDate, LocalDate)]
-    /// gives.
-    private static int compare(LocalDateTime a, LocalDateTime b) {
-        int dates = compare(a.toLocalDate(), b.toLocalDate());
+    private static int order(LocalDateTime a, LocalDateTime b) {
+        int dates = order(a.toLocalDate(), b.toLocalDate());
         return dates != 0 ? dates : a.toLocalTime().compareTo(b.toLocalTime());
     }
 
     /// `LocalDateTime.isBefore(ChronoLocalDateTime)`.
     public static boolean isBefore(LocalDateTime value, TemporalAccessor other) {
-        return compare(value, dateTime(other)) < 0;
+        return order(value, dateTime(other)) < 0;
     }
 
     /// `LocalDateTime.isAfter(ChronoLocalDateTime)`.
     public static boolean isAfter(LocalDateTime value, TemporalAccessor other) {
-        return compare(value, dateTime(other)) > 0;
+        return order(value, dateTime(other)) > 0;
     }
 
     /// `LocalDateTime.isEqual(ChronoLocalDateTime)`.
     public static boolean isEqual(LocalDateTime value, TemporalAccessor other) {
-        return compare(value, dateTime(other)) == 0;
+        return order(value, dateTime(other)) == 0;
     }
 
     // ---------------------------------------------------------------
@@ -814,7 +812,7 @@ public final class JdkDates {
                     end.getNano(), unit);
         }
         LocalDate endDate = end.toLocalDate();
-        int dates = compare(endDate, start.toLocalDate());
+        int dates = order(endDate, start.toLocalDate());
         int times = end.toLocalTime().compareTo(start.toLocalTime());
         if (dates > 0 && times < 0) {
             endDate = endDate.minusDays(1);

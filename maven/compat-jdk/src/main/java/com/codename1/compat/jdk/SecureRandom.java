@@ -30,6 +30,7 @@ import java.util.Random;
 /// A seed adds nothing: the platform's generator seeds itself, and
 /// `setSeed` is accepted and ignored rather than made to weaken it.
 public class SecureRandom extends Random {
+    private static final long serialVersionUID = 1L;
 
     public SecureRandom() {
         super(0);

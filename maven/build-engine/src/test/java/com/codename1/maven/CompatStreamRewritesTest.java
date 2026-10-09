@@ -342,7 +342,7 @@ public class CompatStreamRewritesTest {
         for (String there : new String[] {JDK + "JdkCollections.stream", JDK + "JdkCollections.parallelStream",
             JDK + "JdkCollections.streamOf", JDK + "JdkCollections.parallelStreamOf",
             JDK + "JdkCollections.defaultStream", JDK + "JdkCollections.forEachRemaining",
-            JDK + "JdkCollections.comparingByValue", JDK + "JdkStrings.split", JDK + "JdkStrings.chars",
+            JDK + "JdkCollections.comparingByValue", JDK + "JdkRegex.split", JDK + "JdkStrings.chars",
             JDK + "JdkFunctions.reversed", JDK + "JdkFunctions.thenComparing", JDK + "JdkFunctions.comparingInt",
             JDK + "JdkFunctions.negate", JDK + "JdkFunctions.identity", JDK + "Stream.of", JDK + "Stream.filter",
             JDK + "IntStream.range", JDK + "Collectors.groupingBy",

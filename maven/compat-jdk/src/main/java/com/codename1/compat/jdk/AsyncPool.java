@@ -74,15 +74,26 @@ final class AsyncPool implements Executor {
                 worker = holder.get();
             }
         }
-        worker.run(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    command.run();
-                } finally {
-                    count.decrementAndGet();
-                }
+        worker.run(new Counted(command, count));
+    }
+
+    /// A command that takes itself off its worker's count when it ends.
+    private static final class Counted implements Runnable {
+        private final Runnable command;
+        private final AtomicInteger count;
+
+        Counted(Runnable command, AtomicInteger count) {
+            this.command = command;
+            this.count = count;
+        }
+
+        @Override
+        public void run() {
+            try {
+                command.run();
+            } finally {
+                count.decrementAndGet();
             }
-        });
+        }
     }
 }

@@ -216,15 +216,14 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
                 signal.get((int) Math.max(1, Math.min(millis, Integer.MAX_VALUE)));
             }
         } catch (AsyncResource.AsyncExecutionException e) {
-            // The signal is only ever completed; nothing to report.
-            outcome = result.get();
+            // The signal is only ever completed; nothing to report, and the
+            // result is read below.
+            com.codename1.io.Log.p("CompletableFuture: " + e, com.codename1.io.Log.DEBUG);
         } catch (InterruptedException e) {
-            // AsyncResource reports running out of time this way.
+            // AsyncResource reports running out of time this way, and only
+            // the wait with a limit can throw it.
             if (result.get() == null) {
-                if (millis >= 0) {
-                    throw new TimeoutException();
-                }
-                throw e;
+                throw new TimeoutException();
             }
         }
         outcome = result.get();
