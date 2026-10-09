@@ -30,6 +30,7 @@ import com.codename1.ui.plaf.Style;
 
 import javafx.geometry.Bounds;
 import javafx.scene.Node;
+import javafx.scene.control.Control;
 
 /// What the peers share: stripping a component of its Codename One look,
 /// and painting a node with its opacity, scale and rotation.
@@ -75,6 +76,26 @@ public final class PeerPaint {
         }
         double det = m[0] * m[3] - m[1] * m[2];
         return !(det > 1e-12 || det < -1e-12);
+    }
+
+    /// The opacity JavaFX draws a disabled control with.
+    public static final double DISABLED_OPACITY = 0.4;
+
+    /// Returns the opacity a parent is painted with: its own, and for a
+    /// disabled control the dimming JavaFX gives one. The outermost
+    /// disabled control dims everything in it, the controls inside
+    /// included, so those do not dim a second time.
+    public static double opacity(Node node) {
+        double o = node.getOpacity();
+        if (node instanceof Control && node.isDisabled()) {
+            for (Node up = node.getParent(); up != null; up = up.getParent()) {
+                if (up instanceof Control && up.isDisabled()) {
+                    return o;
+                }
+            }
+            return o * DISABLED_OPACITY;
+        }
+        return o;
     }
 
     /// Returns the graphics alpha for a node drawn with an opacity.

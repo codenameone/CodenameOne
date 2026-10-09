@@ -83,7 +83,7 @@ public class ParentPeer extends Container implements FxPeer {
             return;
         }
         int old = g.getAlpha();
-        double opacity = node.getOpacity();
+        double opacity = PeerPaint.opacity(node);
         if (opacity < 1) {
             g.setAlpha(PeerPaint.alpha(old, opacity));
         }
@@ -144,7 +144,7 @@ public class ParentPeer extends Container implements FxPeer {
         if (Effects.has(node)) {
             Effects.paintBehind(g, node, this);
         }
-        double opacity = node.getOpacity();
+        double opacity = PeerPaint.opacity(node);
         if (opacity < 1) {
             g.setAlpha(PeerPaint.alpha(old, opacity));
         }
