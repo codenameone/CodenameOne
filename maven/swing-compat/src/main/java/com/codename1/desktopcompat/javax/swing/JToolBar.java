@@ -27,6 +27,7 @@ import com.codename1.desktopcompat.java.awt.Dimension;
 import com.codename1.desktopcompat.java.awt.Insets;
 import com.codename1.desktopcompat.java.beans.PropertyChangeEvent;
 import com.codename1.desktopcompat.java.beans.PropertyChangeListener;
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
 
 /// A row or column of buttons and other components.
 ///
@@ -35,7 +36,7 @@ import com.codename1.desktopcompat.java.beans.PropertyChangeListener;
 /// properties are recorded only. A button made from an action shows the
 /// action's icon, or its name when it has none, takes its short
 /// description as the tool tip, and follows the action's later changes.
-public class JToolBar extends JComponent implements SwingConstants {
+public class JToolBar extends JComponent implements Accessible, SwingConstants {
 
     private int orientation;
     private boolean floatable = true;

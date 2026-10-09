@@ -35,6 +35,7 @@ import com.codename1.desktopcompat.java.awt.event.ActionEvent;
 import com.codename1.desktopcompat.java.awt.event.ActionListener;
 import com.codename1.desktopcompat.java.awt.event.WindowAdapter;
 import com.codename1.desktopcompat.java.awt.event.WindowEvent;
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
 
 /// `javax.swing.JOptionPane`: the standard message, confirmation, input
 /// and option dialogs.
@@ -49,7 +50,7 @@ import com.codename1.desktopcompat.java.awt.event.WindowEvent;
 /// row of buttons at the bottom. A set of selection values is always
 /// offered in a combo box, however many there are. The internal-frame
 /// variants are not provided.
-public class JOptionPane extends JComponent {
+public class JOptionPane extends JComponent implements Accessible {
 
     public static final Object UNINITIALIZED_VALUE = "uninitializedValue";
 

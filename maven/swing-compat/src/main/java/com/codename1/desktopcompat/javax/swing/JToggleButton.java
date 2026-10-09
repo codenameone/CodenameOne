@@ -22,11 +22,12 @@
  */
 package com.codename1.desktopcompat.javax.swing;
 
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
 import com.codename1.desktopcompat.rt.CheckBoxPeer;
 
 /// A button that stays selected until clicked again, shown by a Codename
 /// One toggle button.
-public class JToggleButton extends AbstractButton {
+public class JToggleButton extends AbstractButton implements Accessible {
 
     public JToggleButton() {
         this(null, null, false);

@@ -28,6 +28,7 @@ import com.codename1.desktopcompat.java.awt.event.KeyEvent;
 import com.codename1.desktopcompat.java.awt.event.MouseEvent;
 import com.codename1.desktopcompat.java.beans.PropertyChangeEvent;
 import com.codename1.desktopcompat.java.beans.PropertyChangeListener;
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
 import com.codename1.desktopcompat.rt.MenuBridge;
 import com.codename1.desktopcompat.rt.MenuItemPeer;
 
@@ -42,7 +43,7 @@ import com.codename1.desktopcompat.rt.MenuItemPeer;
 /// enabled state and accelerator are the item's, and stay so when the
 /// action changes. The accelerator works while the item is in the menu
 /// bar of the focused window. The mnemonic is recorded only.
-public class JMenuItem extends AbstractButton implements MenuElement {
+public class JMenuItem extends AbstractButton implements Accessible, MenuElement {
 
     private KeyStroke accelerator;
     private PropertyChangeListener actionFollower;

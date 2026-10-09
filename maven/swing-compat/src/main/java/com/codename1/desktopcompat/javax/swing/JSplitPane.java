@@ -30,6 +30,7 @@ import com.codename1.desktopcompat.java.awt.Graphics;
 import com.codename1.desktopcompat.java.awt.Insets;
 import com.codename1.desktopcompat.java.awt.event.KeyEvent;
 import com.codename1.desktopcompat.java.awt.event.MouseEvent;
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
 
 /// Two components side by side, or one above the other, with a divider
 /// between them that the user drags.
@@ -50,7 +51,7 @@ import com.codename1.desktopcompat.java.awt.event.MouseEvent;
 ///
 /// Not supported: a look and feel divider component, key bindings, and
 /// nested split panes sharing one border.
-public class JSplitPane extends JComponent {
+public class JSplitPane extends JComponent implements Accessible {
 
     public static final int VERTICAL_SPLIT = 0;
     public static final int HORIZONTAL_SPLIT = 1;

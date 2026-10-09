@@ -35,6 +35,7 @@ import com.codename1.desktopcompat.java.awt.event.MouseWheelEvent;
 import com.codename1.desktopcompat.javax.swing.JComponent;
 import com.codename1.desktopcompat.javax.swing.JPopupMenu;
 import com.codename1.desktopcompat.javax.swing.JScrollPane;
+import com.codename1.desktopcompat.javax.swing.JInternalFrame;
 import com.codename1.desktopcompat.javax.swing.MenuSelectionManager;
 import com.codename1.desktopcompat.javax.swing.SwingUtilities;
 import com.codename1.ui.Display;
@@ -331,6 +332,7 @@ public final class EventBridge {
                 swallowed = false;
                 longPressed = false;
                 popupShown = false;
+                JInternalFrame.cn1PressedIn(hit);
                 Component target = mouseTarget(hit);
                 hover(w, target, x, y);
                 int button = input.button();

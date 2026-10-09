@@ -26,6 +26,7 @@ import com.codename1.desktopcompat.java.awt.Color;
 import com.codename1.desktopcompat.java.awt.Component;
 import com.codename1.desktopcompat.java.awt.Dimension;
 import com.codename1.desktopcompat.java.awt.Graphics;
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
 import com.codename1.desktopcompat.javax.swing.event.ChangeEvent;
 import com.codename1.desktopcompat.javax.swing.event.ChangeListener;
 import com.codename1.desktopcompat.rt.SliderPeer;
@@ -51,7 +52,7 @@ import java.util.Hashtable;
 /// delegate, so `getUI`, `setUI` and the client property
 /// `JSlider.isFilled` are absent; the keyboard moves the thumb only as far
 /// as the Codename One slider implements it.
-public class JSlider extends JComponent implements SwingConstants {
+public class JSlider extends JComponent implements Accessible, SwingConstants {
 
     private static final int LENGTH = 200;
     private static final int MINIMUM_LENGTH = 36;

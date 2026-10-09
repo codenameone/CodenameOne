@@ -33,6 +33,7 @@ import com.codename1.desktopcompat.java.awt.Point;
 import com.codename1.desktopcompat.java.awt.Rectangle;
 import com.codename1.desktopcompat.java.awt.event.KeyEvent;
 import com.codename1.desktopcompat.java.awt.event.MouseEvent;
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
 import com.codename1.desktopcompat.javax.swing.event.ListDataEvent;
 import com.codename1.desktopcompat.javax.swing.event.ListDataListener;
 import com.codename1.desktopcompat.javax.swing.event.ListSelectionEvent;
@@ -66,7 +67,7 @@ import java.util.Vector;
 /// many columns (or rows) as the list's width (or height) holds, and a
 /// scroll pane then scrolls it only the other way. Left and right move
 /// the selection by a column in a grid, up and down by a row.
-public class JList<E> extends JComponent implements Scrollable {
+public class JList<E> extends JComponent implements Accessible, Scrollable {
 
     public static final int VERTICAL = 0;
 

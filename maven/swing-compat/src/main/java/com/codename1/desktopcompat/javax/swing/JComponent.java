@@ -34,6 +34,7 @@ import com.codename1.desktopcompat.java.awt.event.ActionEvent;
 import com.codename1.desktopcompat.java.awt.event.ActionListener;
 import com.codename1.desktopcompat.java.awt.event.KeyEvent;
 import com.codename1.desktopcompat.java.beans.PropertyChangeListener;
+import com.codename1.desktopcompat.javax.accessibility.AccessibleContext;
 import com.codename1.desktopcompat.javax.swing.border.Border;
 import com.codename1.desktopcompat.javax.swing.event.EventListenerList;
 import com.codename1.desktopcompat.rt.EventBridge;
@@ -61,6 +62,10 @@ import java.util.HashMap;
 /// The tool tip is the tool tip of the Codename One widget behind the
 /// component, so a component without one shows none, and it appears
 /// only where the port has a pointer that hovers.
+///
+/// Every component has an accessible context. Its name becomes the
+/// accessibility text of the widget behind the component; see
+/// `javax.accessibility` for what else is kept.
 public abstract class JComponent extends Container {
 
     public static final int WHEN_FOCUSED = 0;
@@ -76,6 +81,7 @@ public abstract class JComponent extends Container {
     private float alignmentX = -1;
     private float alignmentY = -1;
     private String toolTipText;
+    private AccessibleContext cn1Accessible;
     private HashMap<Object, Object> clientProperties;
     private InputMap focusInputMap;
     private InputMap ancestorInputMap;
@@ -268,21 +274,58 @@ public abstract class JComponent extends Container {
     public void setToolTipText(String text) {
         String old = toolTipText;
         toolTipText = text;
+        cn1ApplyToolTip();
+        firePropertyChange(TOOL_TIP_TEXT_KEY, old, text);
+    }
+
+    /// Gives the widget the tool tip, or none while the tool tip manager
+    /// is disabled.
+    void cn1ApplyToolTip() {
         com.codename1.ui.Component p = cn1PeerOrNull();
         if (p != null) {
-            p.setTooltip(text);
+            p.setTooltip(ToolTipManager.sharedInstance().isEnabled() ? toolTipText : null);
         }
-        firePropertyChange(TOOL_TIP_TEXT_KEY, old, text);
     }
 
     @Override
     protected void cn1PeerCreated() {
         super.cn1PeerCreated();
         if (toolTipText != null) {
-            com.codename1.ui.Component p = cn1PeerOrNull();
-            if (p != null) {
-                p.setTooltip(toolTipText);
-            }
+            cn1ApplyToolTip();
+        }
+        cn1ApplyAccessibleName();
+    }
+
+    /// What this component tells assistive technology about itself.
+    public AccessibleContext getAccessibleContext() {
+        if (cn1Accessible == null) {
+            cn1Accessible = new Cn1Accessible(this);
+        }
+        return cn1Accessible;
+    }
+
+    /// Gives the widget the accessible name as its accessibility text.
+    void cn1ApplyAccessibleName() {
+        com.codename1.ui.Component p = cn1PeerOrNull();
+        String name = cn1Accessible == null ? null : cn1Accessible.getAccessibleName();
+        if (p != null && name != null) {
+            p.setAccessibilityText(name);
+        }
+    }
+
+    /// The context of a component: the name goes on to the widget.
+    private static final class Cn1Accessible extends AccessibleContext {
+
+        private final JComponent owner;
+
+        Cn1Accessible(JComponent owner) {
+            this.owner = owner;
+        }
+
+        @Override
+        public void setAccessibleName(String s) {
+            super.setAccessibleName(s);
+            owner.cn1ApplyAccessibleName();
         }
     }
 

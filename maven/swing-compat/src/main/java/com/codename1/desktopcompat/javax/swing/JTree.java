@@ -33,6 +33,7 @@ import com.codename1.desktopcompat.java.awt.event.KeyAdapter;
 import com.codename1.desktopcompat.java.awt.event.KeyEvent;
 import com.codename1.desktopcompat.java.awt.event.KeyListener;
 import com.codename1.desktopcompat.java.awt.event.MouseEvent;
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
 import com.codename1.desktopcompat.javax.swing.event.CellEditorListener;
 import com.codename1.desktopcompat.javax.swing.event.ChangeEvent;
 import com.codename1.desktopcompat.javax.swing.event.TreeExpansionEvent;
@@ -104,7 +105,7 @@ import java.util.Vector;
 ///    [#startEditingAtPath], F2 or a third click.
 ///  - No drag starts from the tree (`setDragEnabled` is kept as a property);
 ///    tool tips per row and type-ahead search are absent.
-public class JTree extends JComponent implements Scrollable {
+public class JTree extends JComponent implements Accessible, Scrollable {
 
     public static final String CELL_RENDERER_PROPERTY = "cellRenderer";
     public static final String TREE_MODEL_PROPERTY = "model";

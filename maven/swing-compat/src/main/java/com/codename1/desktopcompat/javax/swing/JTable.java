@@ -35,6 +35,8 @@ import com.codename1.desktopcompat.java.awt.event.KeyAdapter;
 import com.codename1.desktopcompat.java.awt.event.KeyEvent;
 import com.codename1.desktopcompat.java.awt.event.KeyListener;
 import com.codename1.desktopcompat.java.awt.event.MouseEvent;
+import com.codename1.desktopcompat.java.awt.print.PrinterException;
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
 import com.codename1.desktopcompat.javax.swing.event.CellEditorListener;
 import com.codename1.desktopcompat.javax.swing.event.ChangeEvent;
 import com.codename1.desktopcompat.javax.swing.event.ListSelectionEvent;
@@ -61,6 +63,7 @@ import com.codename1.desktopcompat.rt.CellPainter;
 import com.codename1.desktopcompat.rt.CellTheme;
 import com.codename1.desktopcompat.rt.ScrollDelegate;
 import com.codename1.desktopcompat.rt.Units;
+import java.text.MessageFormat;
 import java.util.Enumeration;
 import java.util.EventObject;
 import java.util.Hashtable;
@@ -104,9 +107,11 @@ import java.util.Vector;
 ///    F2 are handled when a key event carries them, which no port does
 ///    today: `KeyMap` cannot tell them from the printable character whose
 ///    code they share, so they arrive as that character.
-///  - Printing and tool tips per cell are absent, and no drag starts from
-///    the table (`setDragEnabled` is kept as a property).
-public class JTable extends JComponent implements TableModelListener, Scrollable, TableColumnModelListener,
+///  - There is no print service, and `print` says so with the
+///    `PrinterException` a desktop without a printer throws. Tool tips
+///    per cell are absent, and no drag starts from the table
+///    (`setDragEnabled` is kept as a property).
+public class JTable extends JComponent implements Accessible, TableModelListener, Scrollable, TableColumnModelListener,
         ListSelectionListener, CellEditorListener, RowSorterListener {
 
     public static final int AUTO_RESIZE_OFF = 0;
@@ -2249,4 +2254,31 @@ public class JTable extends JComponent implements TableModelListener, Scrollable
     }
 
     private boolean cn1DragEnabled;
+
+    // ------------------------------------------------------------ print
+
+    /// How a table is fitted to the pages it is printed on.
+    public enum PrintMode {
+        /// At its own size, across as many pages as its width takes.
+        NORMAL,
+        /// Scaled down, if it must be, to the width of one page.
+        FIT_WIDTH
+    }
+
+    /// Always throws: see [#print(PrintMode, MessageFormat, MessageFormat)].
+    public boolean print() throws PrinterException {
+        return print(PrintMode.FIT_WIDTH);
+    }
+
+    public boolean print(PrintMode printMode) throws PrinterException {
+        return print(printMode, null, null);
+    }
+
+    /// Prints the table. A device has no print service to print to, so
+    /// this always ends the way it does on a desktop without a printer:
+    /// with a `PrinterException`.
+    public boolean print(PrintMode printMode, MessageFormat headerFormat, MessageFormat footerFormat)
+            throws PrinterException {
+        throw new PrinterException("No print service found.");
+    }
 }

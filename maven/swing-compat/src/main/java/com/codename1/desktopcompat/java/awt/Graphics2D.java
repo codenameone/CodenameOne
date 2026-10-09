@@ -23,6 +23,8 @@
 package com.codename1.desktopcompat.java.awt;
 
 import com.codename1.desktopcompat.java.awt.geom.AffineTransform;
+import com.codename1.desktopcompat.java.awt.image.BufferedImage;
+import com.codename1.desktopcompat.java.awt.image.BufferedImageOp;
 import com.codename1.desktopcompat.java.awt.image.ImageObserver;
 
 import java.util.Map;
@@ -72,6 +74,15 @@ public abstract class Graphics2D extends Graphics {
     public abstract void draw(Shape s);
 
     public abstract boolean drawImage(Image img, AffineTransform xform, ImageObserver obs);
+
+    /// Draws what `op` makes of the image, or the image itself when `op`
+    /// is `null`.
+    public void drawImage(BufferedImage img, BufferedImageOp op, int x, int y) {
+        BufferedImage shown = op == null ? img : op.filter(img, null);
+        if (shown != null) {
+            drawImage(shown, x, y, null);
+        }
+    }
 
     @Override
     public abstract void drawString(String str, int x, int y);

@@ -24,6 +24,7 @@ package com.codename1.desktopcompat.java.awt;
 
 import com.codename1.desktopcompat.java.awt.event.ContainerEvent;
 import com.codename1.desktopcompat.java.awt.event.ContainerListener;
+import com.codename1.desktopcompat.java.awt.event.HierarchyEvent;
 import com.codename1.desktopcompat.rt.ContainerPeer;
 import com.codename1.desktopcompat.rt.G2D;
 import com.codename1.desktopcompat.rt.Peer;
@@ -169,6 +170,11 @@ public class Container extends Component {
         if (isDisplayable()) {
             comp.addNotify();
         }
+        if (cn1HierarchyHeard()) {
+            comp.cn1HierarchyChanged(comp, this, HierarchyEvent.PARENT_CHANGED
+                    | (comp.isDisplayable() ? HierarchyEvent.DISPLAYABILITY_CHANGED : 0)
+                    | (comp.isShowing() ? HierarchyEvent.SHOWING_CHANGED : 0));
+        }
         if (containerListeners != null && !containerListeners.isEmpty()) {
             dispatchEvent(new ContainerEvent(this, ContainerEvent.COMPONENT_ADDED, comp));
         }
@@ -176,6 +182,9 @@ public class Container extends Component {
 
     public void remove(int index) {
         Component comp = getComponent(index);
+        long changes = HierarchyEvent.PARENT_CHANGED
+                | (comp.isDisplayable() ? HierarchyEvent.DISPLAYABILITY_CHANGED : 0)
+                | (comp.isShowing() ? HierarchyEvent.SHOWING_CHANGED : 0);
         if (comp.isDisplayable()) {
             comp.removeNotify();
         }
@@ -184,6 +193,9 @@ public class Container extends Component {
         }
         children.remove(index);
         comp.cn1SetParent(null);
+        if (cn1HierarchyHeard()) {
+            comp.cn1HierarchyChanged(comp, this, changes);
+        }
         com.codename1.ui.Component p = cn1PeerOrNull();
         com.codename1.ui.Component cp = comp.cn1PeerOrNull();
         if (p instanceof ContainerPeer && cp != null) {
@@ -472,6 +484,14 @@ public class Container extends Component {
             children.get(i).removeNotify();
         }
         super.removeNotify();
+    }
+
+    @Override
+    void cn1HierarchyChanged(Component changed, Container changedParent, long flags) {
+        super.cn1HierarchyChanged(changed, changedParent, flags);
+        for (int i = 0; i < children.size(); i++) {
+            children.get(i).cn1HierarchyChanged(changed, changedParent, flags);
+        }
     }
 
     public void addContainerListener(ContainerListener l) {

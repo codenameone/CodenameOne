@@ -28,6 +28,7 @@ import com.codename1.desktopcompat.java.awt.Insets;
 import com.codename1.desktopcompat.java.awt.Window;
 import com.codename1.desktopcompat.java.awt.event.KeyEvent;
 import com.codename1.desktopcompat.java.awt.event.MouseEvent;
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
 import com.codename1.desktopcompat.rt.MenuBridge;
 import com.codename1.desktopcompat.rt.WindowHost;
 import java.util.ArrayList;
@@ -43,7 +44,7 @@ import java.util.ArrayList;
 ///
 /// The accelerators of its items work while its window is the focused
 /// one, drawn or not.
-public class JMenuBar extends JComponent implements MenuElement {
+public class JMenuBar extends JComponent implements Accessible, MenuElement {
 
     private boolean paintBorder = true;
     private Insets margin;

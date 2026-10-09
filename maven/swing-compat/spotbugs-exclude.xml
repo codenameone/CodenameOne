@@ -10,7 +10,7 @@
          the relocated JDK packages, whose signatures are not ours to
          change. -->
     <Match>
-        <Class name="~com\.codename1\.desktopcompat\.(java\.awt|java\.beans|javax\.swing)\..*"/>
+        <Class name="~com\.codename1\.desktopcompat\.(java\.awt|java\.beans|javax\.swing|javax\.accessibility)\..*"/>
         <Or>
             <Bug pattern="EI_EXPOSE_REP"/>
             <Bug pattern="EI_EXPOSE_REP2"/>
@@ -58,7 +58,7 @@
          is. A device has no object streams, so there is no serialized form
          to version and no field that could fail to be written. -->
     <Match>
-        <Class name="~com\.codename1\.desktopcompat\.(java\.awt\.event|java\.beans|javax\.swing\.event)\..*Event"/>
+        <Class name="~com\.codename1\.desktopcompat\.(java\.awt\.event|java\.beans|javax\.swing\.event|javax\.swing\.text\.html)\..*Event"/>
         <Or>
             <Bug pattern="SE_NO_SERIALVERSIONID"/>
             <Bug pattern="SE_BAD_FIELD"/>
@@ -81,6 +81,7 @@
             <Class name="com.codename1.desktopcompat.javax.swing.JFrame"/>
             <Class name="com.codename1.desktopcompat.javax.swing.JDialog"/>
             <Class name="com.codename1.desktopcompat.javax.swing.JRootPane"/>
+            <Class name="com.codename1.desktopcompat.javax.swing.JInternalFrame"/>
         </Or>
         <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR"/>
     </Match>
@@ -532,6 +533,29 @@
         <Class name="com.codename1.desktopcompat.rt.DesktopToolkit"/>
         <Method name="getSystemClipboard"/>
         <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+
+    <!-- Swing has one tool tip manager and one current Metal theme for the
+         whole application, handed out and replaced through static methods
+         by contract; both are touched on the event dispatch thread only. -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.desktopcompat.javax.swing.ToolTipManager"/>
+            <Class name="com.codename1.desktopcompat.javax.swing.plaf.metal.MetalLookAndFeel"/>
+        </Or>
+        <Or>
+            <Bug pattern="EI_EXPOSE_STATIC_REP2"/>
+            <Bug pattern="MS_EXPOSE_REP"/>
+        </Or>
+    </Match>
+
+    <!-- FileView.isTraversable answers a Boolean so that null can mean
+         "ask the file system view"; that is the JDK's signature and its
+         documented contract, and the chooser tests for null. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.javax.swing.filechooser.FileView"/>
+        <Method name="isTraversable"/>
+        <Bug pattern="NP_BOOLEAN_RETURN_NULL"/>
     </Match>
 
     <!-- END hardening slice -->

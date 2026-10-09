@@ -25,6 +25,7 @@ package com.codename1.desktopcompat.javax.swing;
 import com.codename1.desktopcompat.java.awt.Color;
 import com.codename1.desktopcompat.java.awt.Dimension;
 import com.codename1.desktopcompat.java.awt.Graphics;
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
 
 /// A dividing line, horizontal or vertical, drawn by this class one
 /// logical pixel thick in a gray half way between the foreground and the
@@ -32,7 +33,7 @@ import com.codename1.desktopcompat.java.awt.Graphics;
 ///
 /// Not supported: there is no UI delegate, so `getUI` and `setUI` are
 /// absent and the line has no highlight beside it.
-public class JSeparator extends JComponent implements SwingConstants {
+public class JSeparator extends JComponent implements Accessible, SwingConstants {
 
     private int orientation;
 

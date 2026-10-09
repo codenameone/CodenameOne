@@ -33,6 +33,7 @@ import com.codename1.desktopcompat.java.awt.event.ActionEvent;
 import com.codename1.desktopcompat.java.awt.event.ActionListener;
 import com.codename1.desktopcompat.java.beans.PropertyChangeEvent;
 import com.codename1.desktopcompat.java.beans.PropertyChangeListener;
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
 import com.codename1.desktopcompat.javax.swing.event.ChangeEvent;
 import com.codename1.desktopcompat.javax.swing.event.ChangeListener;
 import java.text.DecimalFormat;
@@ -59,7 +60,7 @@ import java.util.List;
 /// `M/d/yy h:mm a` whatever the locale; a list editor does not complete
 /// what is typed; the editor is made when it is first needed, not in the
 /// constructor; there is no UI delegate.
-public class JSpinner extends JComponent {
+public class JSpinner extends JComponent implements Accessible {
 
     private static final String NUMBER_PATTERN = "#,##0.###";
     private static final String DATE_PATTERN = "M/d/yy h:mm a";

@@ -27,6 +27,7 @@ import com.codename1.desktopcompat.java.awt.Dimension;
 import com.codename1.desktopcompat.java.awt.Insets;
 import com.codename1.desktopcompat.java.awt.Rectangle;
 import com.codename1.desktopcompat.java.awt.event.FocusEvent;
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
 import com.codename1.desktopcompat.javax.swing.Action;
 import com.codename1.desktopcompat.javax.swing.InputVerifier;
 import com.codename1.desktopcompat.javax.swing.JComponent;
@@ -64,7 +65,7 @@ import com.codename1.ui.events.DataChangedListener;
 /// input methods and printing. [#setDragEnabled] is kept as a property: no
 /// drag starts from the text on its own. The input verifier, which the
 /// desktop keeps on `JComponent`, is implemented here.
-public abstract class JTextComponent extends JComponent implements Scrollable {
+public abstract class JTextComponent extends JComponent implements Accessible, Scrollable {
 
     public static final String FOCUS_ACCELERATOR_KEY = "focusAcceleratorKey";
 

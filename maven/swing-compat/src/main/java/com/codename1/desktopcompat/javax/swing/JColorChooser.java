@@ -31,6 +31,7 @@ import com.codename1.desktopcompat.java.awt.Dimension;
 import com.codename1.desktopcompat.java.awt.Window;
 import com.codename1.desktopcompat.java.awt.event.ActionEvent;
 import com.codename1.desktopcompat.java.awt.event.ActionListener;
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
 import com.codename1.desktopcompat.javax.swing.event.ChangeEvent;
 import com.codename1.desktopcompat.javax.swing.event.ChangeListener;
 
@@ -40,7 +41,7 @@ import com.codename1.desktopcompat.javax.swing.event.ChangeListener;
 /// blue. The swatch, HSV, HSL and CMYK panels of the desktop, the color
 /// selection model and custom chooser panels are not provided, and the
 /// alpha of a color is not editable: the chosen color is opaque.
-public class JColorChooser extends JComponent {
+public class JColorChooser extends JComponent implements Accessible {
 
     public static final String SELECTION_MODEL_PROPERTY = "selectionModel";
     public static final String PREVIEW_PANEL_PROPERTY = "previewPanel";

@@ -30,6 +30,7 @@ import com.codename1.desktopcompat.java.awt.Graphics;
 import com.codename1.desktopcompat.java.awt.Insets;
 import com.codename1.desktopcompat.java.awt.Point;
 import com.codename1.desktopcompat.java.awt.Rectangle;
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
 import com.codename1.desktopcompat.javax.swing.event.ChangeEvent;
 import com.codename1.desktopcompat.javax.swing.event.ChangeListener;
 import com.codename1.desktopcompat.rt.Units;
@@ -48,7 +49,7 @@ import com.codename1.desktopcompat.rt.ViewportPeer;
 /// A view that is not [Scrollable] is stretched to fill a larger
 /// viewport; one that is follows what its `getScrollableTracks...`
 /// methods answer. Scroll modes and the backing store are recorded only.
-public class JViewport extends JComponent {
+public class JViewport extends JComponent implements Accessible {
 
     public static final int BLIT_SCROLL_MODE = 1;
 

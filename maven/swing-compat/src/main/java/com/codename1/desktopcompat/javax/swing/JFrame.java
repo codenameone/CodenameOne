@@ -27,6 +27,7 @@ import com.codename1.desktopcompat.java.awt.Component;
 import com.codename1.desktopcompat.java.awt.Container;
 import com.codename1.desktopcompat.java.awt.Frame;
 import com.codename1.desktopcompat.java.awt.Graphics;
+import com.codename1.desktopcompat.java.awt.GraphicsConfiguration;
 import com.codename1.desktopcompat.java.awt.LayoutManager;
 import com.codename1.desktopcompat.java.awt.event.WindowEvent;
 import com.codename1.desktopcompat.rt.WindowHosts;
@@ -56,6 +57,16 @@ public class JFrame extends Frame implements WindowConstants, RootPaneContainer 
     public JFrame(String title) {
         super(title);
         frameInit();
+    }
+
+    /// A frame on the screen of `gc`. There is one screen, so this is a
+    /// frame like any other.
+    public JFrame(GraphicsConfiguration gc) {
+        this("");
+    }
+
+    public JFrame(String title, GraphicsConfiguration gc) {
+        this(title);
     }
 
     protected void frameInit() {

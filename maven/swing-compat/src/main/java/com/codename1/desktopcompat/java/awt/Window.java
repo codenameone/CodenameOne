@@ -22,6 +22,7 @@
  */
 package com.codename1.desktopcompat.java.awt;
 
+import com.codename1.desktopcompat.java.awt.event.HierarchyEvent;
 import com.codename1.desktopcompat.java.awt.event.WindowEvent;
 import com.codename1.desktopcompat.java.awt.event.WindowFocusListener;
 import com.codename1.desktopcompat.java.awt.event.WindowListener;
@@ -117,7 +118,16 @@ public class Window extends Container {
         if (!isDisplayable()) {
             addNotify();
         }
+        cn1ShowingChanged();
         validate();
+    }
+
+    /// Tells the hierarchy listeners in the window that it was shown or
+    /// hidden.
+    private void cn1ShowingChanged() {
+        if (cn1HierarchyHeard()) {
+            cn1HierarchyChanged(this, null, HierarchyEvent.SHOWING_CHANGED | HierarchyEvent.DISPLAYABILITY_CHANGED);
+        }
     }
 
     /// Whether [#cn1Embed] put this window inside a component.
@@ -338,6 +348,7 @@ public class Window extends Container {
             if (!isDisplayable()) {
                 addNotify();
             }
+            cn1ShowingChanged();
             host = WindowHosts.open(this, host);
             if (host != null) {
                 host.title(cn1Title());
@@ -370,6 +381,7 @@ public class Window extends Container {
                 }
                 h.close();
             }
+            cn1ShowingChanged();
             WindowHosts.hidden(this);
         }
     }

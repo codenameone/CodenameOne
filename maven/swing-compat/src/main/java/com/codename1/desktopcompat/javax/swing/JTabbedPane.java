@@ -28,6 +28,7 @@ import com.codename1.desktopcompat.java.awt.Dimension;
 import com.codename1.desktopcompat.java.awt.FontMetrics;
 import com.codename1.desktopcompat.java.awt.Insets;
 import com.codename1.desktopcompat.java.awt.Rectangle;
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
 import com.codename1.desktopcompat.javax.swing.event.ChangeEvent;
 import com.codename1.desktopcompat.javax.swing.event.ChangeListener;
 import com.codename1.desktopcompat.rt.Fonts;
@@ -50,7 +51,7 @@ import java.util.ArrayList;
 /// though a `JLabel` given as one lends the tab its text and icon; tool
 /// tips, mnemonics and the per tab colors and disabled icons are recorded
 /// only; HTML titles are shown without their tags.
-public class JTabbedPane extends JComponent implements SwingConstants {
+public class JTabbedPane extends JComponent implements Accessible, SwingConstants {
 
     public static final int WRAP_TAB_LAYOUT = 0;
     public static final int SCROLL_TAB_LAYOUT = 1;

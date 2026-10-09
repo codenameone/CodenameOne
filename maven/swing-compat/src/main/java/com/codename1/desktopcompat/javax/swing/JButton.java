@@ -22,10 +22,11 @@
  */
 package com.codename1.desktopcompat.javax.swing;
 
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
 import com.codename1.desktopcompat.rt.ButtonPeer;
 
 /// A push button, shown by a Codename One button.
-public class JButton extends AbstractButton {
+public class JButton extends AbstractButton implements Accessible {
 
     public JButton() {
         this(null, null);

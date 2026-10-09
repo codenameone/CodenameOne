@@ -24,10 +24,11 @@ package com.codename1.desktopcompat.javax.swing;
 
 import com.codename1.desktopcompat.java.awt.FlowLayout;
 import com.codename1.desktopcompat.java.awt.LayoutManager;
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
 
 /// The plain Swing container: opaque, with a flow layout unless told
 /// otherwise. Subclasses paint in `paintComponent`.
-public class JPanel extends JComponent {
+public class JPanel extends JComponent implements Accessible {
 
     public JPanel(LayoutManager layout, boolean isDoubleBuffered) {
         setLayout(layout);

@@ -146,7 +146,10 @@ public class UIManager {
     }
 
     private static final String LOOK_NAME = "Codename One";
-    private static final String LOOK_CLASS = "javax.swing.plaf.metal.MetalLookAndFeel";
+    /// The class name of the built-in look and feel, so that the one
+    /// reported installed is the one [#getLookAndFeel] answers: programs
+    /// find the current look and feel among the installed ones by it.
+    private static final String LOOK_CLASS = ThemeLookAndFeel.class.getName();
     private static final ThemeDefaults VALUES = new ThemeDefaults();
     private static final LookAndFeel BUILT_IN = new ThemeLookAndFeel();
     /// The look and feel that was set, or `null` for the built-in one.

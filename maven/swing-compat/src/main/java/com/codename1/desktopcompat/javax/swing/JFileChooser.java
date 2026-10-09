@@ -33,10 +33,12 @@ import com.codename1.desktopcompat.java.awt.event.MouseAdapter;
 import com.codename1.desktopcompat.java.awt.event.MouseEvent;
 import com.codename1.desktopcompat.java.awt.event.WindowAdapter;
 import com.codename1.desktopcompat.java.awt.event.WindowEvent;
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
 import com.codename1.desktopcompat.javax.swing.event.ListSelectionEvent;
 import com.codename1.desktopcompat.javax.swing.event.ListSelectionListener;
 import com.codename1.desktopcompat.javax.swing.filechooser.FileFilter;
 import com.codename1.desktopcompat.javax.swing.filechooser.FileNameExtensionFilter;
+import com.codename1.desktopcompat.javax.swing.filechooser.FileView;
 import com.codename1.desktopcompat.rt.FilePicker;
 import com.codename1.io.FileSystemStorage;
 import java.io.File;
@@ -58,8 +60,18 @@ import java.util.ArrayList;
 ///   directory, which is the application's home directory unless one was
 ///   set. On a phone that is the application's own storage.
 ///
-/// The accessory, the file view and the file system view are not provided.
-public class JFileChooser extends JComponent {
+/// The platform's picker has no place for an accessory and does not ask a
+/// file view, so a chooser that has either shows the dialog of this layer
+/// for opening too. That dialog names and draws each file as the file
+/// view says, puts the accessory to the right of the list, and makes the
+/// file selected in the list the selected file as it is selected.
+///
+/// A chooser can also be added to a container like any component: it then
+/// shows the same list and fields there, without the approve and cancel
+/// buttons when `setControlButtonsAreShown(false)` took them away.
+///
+/// The file system view is not provided.
+public class JFileChooser extends JComponent implements Accessible {
 
     public static final int OPEN_DIALOG = 0;
     public static final int SAVE_DIALOG = 1;
@@ -88,6 +100,9 @@ public class JFileChooser extends JComponent {
     public static final String DIALOG_TYPE_CHANGED_PROPERTY = "DialogTypeChangedProperty";
     public static final String CHOOSABLE_FILE_FILTER_CHANGED_PROPERTY = "ChoosableFileFilterChangedProperty";
     public static final String ACCEPT_ALL_FILE_FILTER_USED_CHANGED_PROPERTY = "acceptAllFileFilterUsedChanged";
+    public static final String ACCESSORY_CHANGED_PROPERTY = "AccessoryChangedProperty";
+    public static final String FILE_VIEW_CHANGED_PROPERTY = "fileViewChanged";
+    public static final String CONTROL_BUTTONS_ARE_SHOWN_CHANGED_PROPERTY = "ControlButtonsAreShownChangedProperty";
 
     private final FileFilter acceptAll = new AcceptAll();
     private final ArrayList<FileFilter> filters = new ArrayList<FileFilter>();
@@ -105,6 +120,9 @@ public class JFileChooser extends JComponent {
     private boolean useAcceptAll = true;
     private FileFilter fileFilter;
     private int returnValue = ERROR_OPTION;
+    private FileView fileView;
+    private JComponent accessory;
+    private boolean controlButtonsShown = true;
 
     private JDialog dialog;
     private JList<String> listing;
@@ -252,7 +270,7 @@ public class JFileChooser extends JComponent {
         entries = shown.toArray(new File[shown.size()]);
         String[] names = new String[entries.length];
         for (int i = 0; i < names.length; i++) {
-            names[i] = entries[i].isDirectory() ? entries[i].getName() + "/" : entries[i].getName();
+            names[i] = entries[i].isDirectory() ? getName(entries[i]) + "/" : getName(entries[i]);
         }
         listing.setListData(names);
         where.setText(dir.getPath());
@@ -288,7 +306,8 @@ public class JFileChooser extends JComponent {
             setDialogType(CUSTOM_DIALOG);
         }
         returnValue = CANCEL_OPTION;
-        if (dialogType == OPEN_DIALOG && mode != DIRECTORIES_ONLY && FilePicker.available()) {
+        if (dialogType == OPEN_DIALOG && mode != DIRECTORIES_ONLY && accessory == null && fileView == null
+                && FilePicker.available()) {
             String path = FilePicker.pick(pickerAccept());
             if (path == null) {
                 cancelSelection();
@@ -354,6 +373,58 @@ public class JFileChooser extends JComponent {
         }
         String title = dialogTitle != null ? dialogTitle : approveText();
         JDialog d = new JDialog(owner, title, Dialog.ModalityType.APPLICATION_MODAL);
+        JButton approve = cn1BuildUi();
+
+        Container content = d.getContentPane();
+        content.setLayout(new BorderLayout());
+        content.add(this, BorderLayout.CENTER);
+        if (approve != null) {
+            d.getRootPane().setDefaultButton(approve);
+        }
+        d.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                returnValue = CANCEL_OPTION;
+            }
+        });
+        d.setSize(accessory == null ? 380 : 520, 420);
+        d.setLocationRelativeTo(parent);
+        return d;
+    }
+
+    /// A chooser that was added to a container shows its list there.
+    @Override
+    public void addNotify() {
+        if (listing == null) {
+            cn1BuildUi();
+            super.addNotify();
+            rescanCurrentDirectory();
+        } else {
+            super.addNotify();
+        }
+    }
+
+    /// Draws each entry with the icon the file view has for it.
+    private final class EntryRenderer extends DefaultListCellRenderer {
+
+        EntryRenderer() {
+        }
+
+        @Override
+        public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected,
+                boolean cellHasFocus) {
+            Component c = super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+            if (c instanceof JLabel) {
+                ((JLabel) c).setIcon(JFileChooser.this.getIcon(entryAt(index)));
+            }
+            return c;
+        }
+    }
+
+    /// Builds the list, the fields and the buttons inside this component
+    /// and answers the approve button, or `null` when the buttons are not
+    /// shown.
+    private JButton cn1BuildUi() {
         removeAll();
         setLayout(new BorderLayout(6, 6));
         setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
@@ -373,11 +444,17 @@ public class JFileChooser extends JComponent {
         add(top, BorderLayout.NORTH);
 
         listing = new JList<String>();
+        if (fileView != null) {
+            listing.setCellRenderer(new EntryRenderer());
+        }
         listing.addListSelectionListener(new ListSelectionListener() {
             @Override
             public void valueChanged(ListSelectionEvent e) {
                 File f = entryAt(listing == null ? -1 : listing.getSelectedIndex());
                 if (f != null && nameField != null && (mode != FILES_ONLY || !f.isDirectory())) {
+                    if (!f.equals(selectedFile)) {
+                        setSelectedFile(f);
+                    }
                     nameField.setText(f.getName());
                 }
             }
@@ -391,6 +468,9 @@ public class JFileChooser extends JComponent {
             }
         });
         add(new JScrollPane(listing), BorderLayout.CENTER);
+        if (accessory != null) {
+            add(accessory, BorderLayout.EAST);
+        }
 
         JPanel bottom = new JPanel();
         bottom.setLayout(new BoxLayout(bottom, BoxLayout.Y_AXIS));
@@ -426,6 +506,10 @@ public class JFileChooser extends JComponent {
             });
             bottom.add(choice);
         }
+        if (!controlButtonsShown) {
+            add(bottom, BorderLayout.SOUTH);
+            return null;
+        }
         JPanel buttons = new JPanel();
         JButton approve = new JButton(approveText());
         approve.addActionListener(new ActionListener() {
@@ -445,20 +529,7 @@ public class JFileChooser extends JComponent {
         buttons.add(cancel);
         bottom.add(buttons);
         add(bottom, BorderLayout.SOUTH);
-
-        Container content = d.getContentPane();
-        content.setLayout(new BorderLayout());
-        content.add(this, BorderLayout.CENTER);
-        d.getRootPane().setDefaultButton(approve);
-        d.addWindowListener(new WindowAdapter() {
-            @Override
-            public void windowClosing(WindowEvent e) {
-                returnValue = CANCEL_OPTION;
-            }
-        });
-        d.setSize(380, 420);
-        d.setLocationRelativeTo(parent);
-        return d;
+        return approve;
     }
 
     private static String cancelText() {
@@ -723,12 +794,82 @@ public class JFileChooser extends JComponent {
         return fileFilter == null || fileFilter.accept(f);
     }
 
+    /// The name a file is listed under: the file view's, or the file's
+    /// own.
     public String getName(File f) {
-        return f == null ? null : f.getName();
+        if (f == null) {
+            return null;
+        }
+        String name = fileView == null ? null : fileView.getName(f);
+        return name != null ? name : f.getName();
+    }
+
+    /// What the file view says about the file, or `null`.
+    public String getDescription(File f) {
+        return f == null || fileView == null ? null : fileView.getDescription(f);
+    }
+
+    public String getTypeDescription(File f) {
+        return f == null || fileView == null ? null : fileView.getTypeDescription(f);
+    }
+
+    /// The icon the file view has for the file, or `null`: this layer has
+    /// no icons of its own for files.
+    public Icon getIcon(File f) {
+        return f == null || fileView == null ? null : fileView.getIcon(f);
     }
 
     public boolean isTraversable(File f) {
-        return f != null && f.isDirectory();
+        if (f == null) {
+            return false;
+        }
+        Boolean says = fileView == null ? null : fileView.isTraversable(f);
+        return says != null ? says.booleanValue() : f.isDirectory();
+    }
+
+    // ---- file view, accessory, control buttons ----
+
+    public void setFileView(FileView fileView) {
+        FileView old = this.fileView;
+        this.fileView = fileView;
+        firePropertyChange(FILE_VIEW_CHANGED_PROPERTY, old, fileView);
+        if (listing != null) {
+            listing.setCellRenderer(fileView == null ? new DefaultListCellRenderer() : new EntryRenderer());
+            rescanCurrentDirectory();
+        }
+    }
+
+    public FileView getFileView() {
+        return fileView;
+    }
+
+    /// Sets the component shown beside the list of files, usually a
+    /// preview of the selected file. It is placed when the chooser is
+    /// next shown.
+    public void setAccessory(JComponent newAccessory) {
+        JComponent old = accessory;
+        accessory = newAccessory;
+        firePropertyChange(ACCESSORY_CHANGED_PROPERTY, old, accessory);
+    }
+
+    public JComponent getAccessory() {
+        return accessory;
+    }
+
+    /// Whether the chooser has its own approve and cancel buttons; a
+    /// chooser placed in a dialog that has buttons of its own does
+    /// without. It applies when the chooser is next shown.
+    public void setControlButtonsAreShown(boolean b) {
+        if (controlButtonsShown == b) {
+            return;
+        }
+        boolean old = controlButtonsShown;
+        controlButtonsShown = b;
+        firePropertyChange(CONTROL_BUTTONS_ARE_SHOWN_CHANGED_PROPERTY, old, b);
+    }
+
+    public boolean getControlButtonsAreShown() {
+        return controlButtonsShown;
     }
 
     // ------------------------------------------------------------ drag

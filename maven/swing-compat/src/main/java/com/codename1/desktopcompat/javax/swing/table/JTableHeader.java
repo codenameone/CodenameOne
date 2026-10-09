@@ -31,6 +31,7 @@ import com.codename1.desktopcompat.java.awt.Graphics;
 import com.codename1.desktopcompat.java.awt.Point;
 import com.codename1.desktopcompat.java.awt.Rectangle;
 import com.codename1.desktopcompat.java.awt.event.MouseEvent;
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
 import com.codename1.desktopcompat.javax.swing.JComponent;
 import com.codename1.desktopcompat.javax.swing.JTable;
 import com.codename1.desktopcompat.javax.swing.RowSorter;
@@ -51,7 +52,7 @@ import java.util.List;
 /// line between two titles resizes the column before it; a drag that
 /// starts on a title moves the column. The header paints itself the way
 /// the table does, with a renderer per column.
-public class JTableHeader extends JComponent implements TableColumnModelListener {
+public class JTableHeader extends JComponent implements Accessible, TableColumnModelListener {
 
     protected JTable table;
     protected TableColumnModel columnModel;

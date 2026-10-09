@@ -30,6 +30,7 @@ import com.codename1.desktopcompat.java.awt.Graphics;
 import com.codename1.desktopcompat.java.awt.event.AdjustmentEvent;
 import com.codename1.desktopcompat.java.awt.event.AdjustmentListener;
 import com.codename1.desktopcompat.java.awt.event.MouseEvent;
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
 import com.codename1.desktopcompat.javax.swing.event.ChangeEvent;
 import com.codename1.desktopcompat.javax.swing.event.ChangeListener;
 
@@ -43,7 +44,7 @@ import com.codename1.desktopcompat.javax.swing.event.ChangeListener;
 /// the user scrolls the content itself and Codename One draws its own
 /// scroll indicator, while the bar's model still follows and steers the
 /// view.
-public class JScrollBar extends JComponent implements Adjustable {
+public class JScrollBar extends JComponent implements Accessible, Adjustable {
 
     private static final int THICKNESS = 12;
 

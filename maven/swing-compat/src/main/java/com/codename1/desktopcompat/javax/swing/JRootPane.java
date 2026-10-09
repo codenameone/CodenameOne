@@ -29,6 +29,7 @@ import com.codename1.desktopcompat.java.awt.Dimension;
 import com.codename1.desktopcompat.java.awt.Insets;
 import com.codename1.desktopcompat.java.awt.LayoutManager;
 import com.codename1.desktopcompat.java.awt.event.KeyEvent;
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
 import com.codename1.desktopcompat.rt.MenuBridge;
 
 /// The single child of a Swing window.
@@ -42,7 +43,7 @@ import com.codename1.desktopcompat.rt.MenuBridge;
 /// no key binding used the key. A visible glass pane keeps mouse events
 /// from the components under it; the Codename One widgets under it still
 /// react to the pointer.
-public class JRootPane extends JComponent {
+public class JRootPane extends JComponent implements Accessible {
 
     public static final int NONE = 0;
     public static final int FRAME = 1;

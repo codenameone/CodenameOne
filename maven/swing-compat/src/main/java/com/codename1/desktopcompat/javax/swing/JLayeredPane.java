@@ -24,6 +24,7 @@ package com.codename1.desktopcompat.javax.swing;
 
 import com.codename1.desktopcompat.java.awt.Component;
 import com.codename1.desktopcompat.java.awt.Container;
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -32,7 +33,7 @@ import java.util.HashMap;
 /// lower one, and within a layer the child at the lower position is on
 /// top. It has no layout manager; children keep the bounds they are
 /// given.
-public class JLayeredPane extends JComponent {
+public class JLayeredPane extends JComponent implements Accessible {
 
     public static final Integer DEFAULT_LAYER = Integer.valueOf(0);
     public static final Integer PALETTE_LAYER = Integer.valueOf(100);

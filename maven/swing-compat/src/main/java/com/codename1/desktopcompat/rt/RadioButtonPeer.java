@@ -49,8 +49,23 @@ public class RadioButtonPeer extends com.codename1.ui.RadioButton implements Pee
     @Override
     public void paintNativeLook(Graphics g) {
         support.paintStyleBackground(g);
-        super.paint(g);
+        if (getIcon() != null) {
+            // In Swing an icon takes the place of the indicator; it is not
+            // drawn beside it.
+            getUIManager().getLookAndFeel().drawButton(g, this);
+        } else {
+            super.paint(g);
+        }
         super.paintBorder(g);
+    }
+
+    /// With an icon there is no indicator to make room for.
+    @Override
+    protected com.codename1.ui.geom.Dimension calcPreferredSize() {
+        if (getIcon() != null) {
+            return getUIManager().getLookAndFeel().getButtonPreferredSize(this);
+        }
+        return super.calcPreferredSize();
     }
 
     @Override

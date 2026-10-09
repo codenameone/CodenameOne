@@ -31,6 +31,7 @@ import com.codename1.desktopcompat.java.awt.LayoutManager;
 import com.codename1.desktopcompat.java.awt.Point;
 import com.codename1.desktopcompat.java.awt.event.KeyEvent;
 import com.codename1.desktopcompat.java.awt.event.MouseEvent;
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
 import com.codename1.desktopcompat.javax.swing.event.PopupMenuEvent;
 import com.codename1.desktopcompat.javax.swing.event.PopupMenuListener;
 import com.codename1.desktopcompat.rt.MenuBridge;
@@ -47,7 +48,7 @@ import com.codename1.desktopcompat.rt.MenuBridge;
 /// Set as the component popup menu of a component it opens on the popup
 /// trigger: a press of the secondary mouse button, or a long press of a
 /// finger.
-public class JPopupMenu extends JComponent implements MenuElement {
+public class JPopupMenu extends JComponent implements Accessible, MenuElement {
 
     private Component invoker;
     private String label;

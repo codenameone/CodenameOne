@@ -26,6 +26,8 @@ import com.codename1.desktopcompat.java.awt.event.ComponentEvent;
 import com.codename1.desktopcompat.java.awt.event.ComponentListener;
 import com.codename1.desktopcompat.java.awt.event.FocusEvent;
 import com.codename1.desktopcompat.java.awt.event.FocusListener;
+import com.codename1.desktopcompat.java.awt.event.HierarchyEvent;
+import com.codename1.desktopcompat.java.awt.event.HierarchyListener;
 import com.codename1.desktopcompat.java.awt.event.KeyEvent;
 import com.codename1.desktopcompat.java.awt.event.KeyListener;
 import com.codename1.desktopcompat.java.awt.event.MouseEvent;
@@ -94,6 +96,10 @@ public abstract class Component implements ImageObserver {
     private PropertyChangeSupport changeSupport;
     private ArrayList<ComponentListener> componentListeners;
     private ArrayList<FocusListener> focusListeners;
+    private ArrayList<HierarchyListener> hierarchyListeners;
+    /// How many hierarchy listeners all components have together: a tree
+    /// is walked to tell them of a change only when there is one.
+    private static int hierarchyListenerCount;
     private ArrayList<KeyListener> keyListeners;
     private ArrayList<MouseListener> mouseListeners;
     private ArrayList<MouseMotionListener> mouseMotionListeners;
@@ -313,9 +319,13 @@ public abstract class Component implements ImageObserver {
 
     public void setVisible(boolean b) {
         if (visible != b) {
+            boolean was = isShowing();
             visible = b;
             if (peer != null) {
                 peer.setVisible(b);
+            }
+            if (was != isShowing() && cn1HierarchyHeard()) {
+                cn1HierarchyChanged(this, parent, HierarchyEvent.SHOWING_CHANGED);
             }
             fireComponentEvent(b ? ComponentEvent.COMPONENT_SHOWN : ComponentEvent.COMPONENT_HIDDEN);
             if (parent != null) {
@@ -802,6 +812,52 @@ public abstract class Component implements ImageObserver {
     }
 
     // ------------------------------------------------------------ listeners
+
+    /// Hears when this component or one of its ancestors is added or
+    /// removed, becomes displayable or not, or starts or stops showing.
+    public void addHierarchyListener(HierarchyListener l) {
+        if (l != null) {
+            if (hierarchyListeners == null) {
+                hierarchyListeners = new ArrayList<HierarchyListener>();
+            }
+            hierarchyListeners.add(l);
+            cn1CountHierarchyListeners(1);
+        }
+    }
+
+    public void removeHierarchyListener(HierarchyListener l) {
+        if (hierarchyListeners != null && hierarchyListeners.remove(l)) {
+            cn1CountHierarchyListeners(-1);
+        }
+    }
+
+    public HierarchyListener[] getHierarchyListeners() {
+        return hierarchyListeners == null ? new HierarchyListener[0]
+                : hierarchyListeners.toArray(new HierarchyListener[hierarchyListeners.size()]);
+    }
+
+    private static void cn1CountHierarchyListeners(int by) {
+        hierarchyListenerCount += by;
+    }
+
+    /// Whether any component has a hierarchy listener.
+    static boolean cn1HierarchyHeard() {
+        return hierarchyListenerCount > 0;
+    }
+
+    /// Tells the hierarchy listeners of this component that `changed`
+    /// was added to or removed from `changedParent`, or started or
+    /// stopped showing there. A container passes it on to its children.
+    void cn1HierarchyChanged(Component changed, Container changedParent, long flags) {
+        if (hierarchyListeners == null || hierarchyListeners.isEmpty()) {
+            return;
+        }
+        HierarchyListener[] ls = getHierarchyListeners();
+        HierarchyEvent e = new HierarchyEvent(this, HierarchyEvent.HIERARCHY_CHANGED, changed, changedParent, flags);
+        for (int i = 0; i < ls.length; i++) {
+            ls[i].hierarchyChanged(e);
+        }
+    }
 
     public void addComponentListener(ComponentListener l) {
         if (l != null) {

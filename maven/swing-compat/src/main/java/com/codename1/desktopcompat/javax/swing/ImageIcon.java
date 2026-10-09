@@ -26,6 +26,8 @@ import com.codename1.desktopcompat.java.awt.Component;
 import com.codename1.desktopcompat.java.awt.Graphics;
 import com.codename1.desktopcompat.java.awt.Image;
 import com.codename1.desktopcompat.java.awt.image.ImageObserver;
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
+import com.codename1.desktopcompat.javax.accessibility.AccessibleContext;
 import com.codename1.desktopcompat.rt.ImageLoader;
 import com.codename1.desktopcompat.rt.NativeImage;
 import java.net.URL;
@@ -37,7 +39,9 @@ import java.net.URL;
 /// looked up among the application's resources by its last path element:
 /// the pictures a desktop application keeps beside it are resources once
 /// it is built for a device. A URL is read before the constructor returns.
-public class ImageIcon implements Icon {
+public class ImageIcon implements Icon, Accessible {
+
+    private AccessibleContext cn1Accessible;
 
     private Image image;
     private String description;
@@ -141,5 +145,22 @@ public class ImageIcon implements Icon {
     @Override
     public String toString() {
         return description != null ? description : super.toString();
+    }
+
+    /// The accessible context of the icon. Its description starts as the
+    /// description of the icon.
+    @Override
+    public AccessibleContext getAccessibleContext() {
+        if (cn1Accessible == null) {
+            cn1Accessible = new Cn1AccessibleIcon();
+            cn1Accessible.setAccessibleDescription(description);
+        }
+        return cn1Accessible;
+    }
+
+    private static final class Cn1AccessibleIcon extends AccessibleContext {
+
+        Cn1AccessibleIcon() {
+        }
     }
 }

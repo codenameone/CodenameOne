@@ -26,6 +26,7 @@ import com.codename1.desktopcompat.java.awt.Color;
 import com.codename1.desktopcompat.java.awt.Dimension;
 import com.codename1.desktopcompat.java.awt.FontMetrics;
 import com.codename1.desktopcompat.java.awt.Graphics;
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
 import com.codename1.desktopcompat.javax.swing.event.ChangeEvent;
 import com.codename1.desktopcompat.javax.swing.event.ChangeListener;
 import com.codename1.desktopcompat.rt.ProgressPeer;
@@ -37,7 +38,7 @@ import com.codename1.desktopcompat.rt.ProgressPeer;
 ///
 /// Not supported: the string of a vertical bar is drawn upright, not
 /// rotated; there is no UI delegate, so `getUI` and `setUI` are absent.
-public class JProgressBar extends JComponent implements SwingConstants {
+public class JProgressBar extends JComponent implements Accessible, SwingConstants {
 
     private static final int LENGTH = 146;
     private static final int MINIMUM_LENGTH = 10;

@@ -30,6 +30,7 @@ import com.codename1.desktopcompat.java.awt.Font;
 import com.codename1.desktopcompat.java.awt.Graphics;
 import com.codename1.desktopcompat.java.awt.Insets;
 import com.codename1.desktopcompat.java.awt.event.MouseEvent;
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
 import com.codename1.desktopcompat.rt.Align;
 import com.codename1.desktopcompat.rt.Icons;
 import com.codename1.desktopcompat.rt.LabelPeer;
@@ -51,7 +52,7 @@ import com.codename1.desktopcompat.rt.Units;
 ///
 /// The displayed mnemonic is recorded only. A click on a label focuses
 /// the component it was made the label for.
-public class JLabel extends JComponent implements SwingConstants {
+public class JLabel extends JComponent implements Accessible, SwingConstants {
 
     private String text;
     private Icon icon;

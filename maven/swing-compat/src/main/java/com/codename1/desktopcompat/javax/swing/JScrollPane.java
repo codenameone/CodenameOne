@@ -28,6 +28,7 @@ import com.codename1.desktopcompat.java.awt.Insets;
 import com.codename1.desktopcompat.java.awt.Point;
 import com.codename1.desktopcompat.java.awt.Rectangle;
 import com.codename1.desktopcompat.java.awt.event.MouseWheelEvent;
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
 import com.codename1.desktopcompat.javax.swing.border.Border;
 import com.codename1.desktopcompat.javax.swing.event.ChangeEvent;
 import com.codename1.desktopcompat.javax.swing.event.ChangeListener;
@@ -67,7 +68,7 @@ import java.util.HashMap;
 /// only wants some of the events passes the others on with
 /// `getParent().dispatchEvent(e)`; a wheel event that reaches this pane
 /// that way scrolls it.
-public class JScrollPane extends JComponent implements ScrollPaneConstants {
+public class JScrollPane extends JComponent implements Accessible, ScrollPaneConstants {
 
     protected int verticalScrollBarPolicy = VERTICAL_SCROLLBAR_AS_NEEDED;
 

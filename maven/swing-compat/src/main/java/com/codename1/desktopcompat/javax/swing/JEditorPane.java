@@ -34,6 +34,9 @@ import com.codename1.desktopcompat.javax.swing.event.HyperlinkListener;
 import com.codename1.desktopcompat.javax.swing.text.JTextComponent;
 import com.codename1.desktopcompat.javax.swing.text.PlainDocument;
 import com.codename1.desktopcompat.rt.MiniHtml;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 
@@ -58,8 +61,10 @@ import java.net.URL;
 ///    not editable, and that is the one kind there is here. Its document
 ///    holds the text without the tags, and [#getText()] answers the markup
 ///    that was set.
-///  - There are no editor kits and no styled documents, and a page is not
-///    loaded from a URL: `setPage` is not part of this layer.
+///  - There are no editor kits and no styled documents.
+///  - [#setPage(URL)] reads the whole page before it returns, where the
+///    desktop may load it in the background. A link relative to the page
+///    is resolved against it.
 ///  - Only `ACTIVATED` is fired; there is no `ENTERED` and `EXITED` as
 ///    the pointer moves over a link.
 public class JEditorPane extends JTextComponent {
@@ -70,6 +75,7 @@ public class JEditorPane extends JTextComponent {
     private String markup;
     private String shown;
     private MiniHtml.Document page;
+    private URL pageUrl;
 
     public JEditorPane() {
         setDocument(new PlainDocument());
@@ -80,6 +86,61 @@ public class JEditorPane extends JTextComponent {
         this();
         setContentType(type);
         setText(text);
+    }
+
+    /// A pane that shows the page at `initialPage`.
+    public JEditorPane(URL initialPage) throws IOException {
+        this();
+        setPage(initialPage);
+    }
+
+    public JEditorPane(String url) throws IOException {
+        this();
+        setPage(url);
+    }
+
+    public void setPage(String url) throws IOException {
+        if (url == null) {
+            throw new IOException("invalid url");
+        }
+        setPage(new URL(url));
+    }
+
+    /// Reads the page and shows it: as HTML when its name ends in `.html`
+    /// or `.htm`, and as plain text otherwise. The text is read as UTF-8.
+    public void setPage(URL page) throws IOException {
+        if (page == null) {
+            throw new IOException("invalid url");
+        }
+        InputStream in = page.openStream();
+        if (in == null) {
+            throw new IOException("cannot read " + page);
+        }
+        String text;
+        try {
+            ByteArrayOutputStream all = new ByteArrayOutputStream();
+            byte[] chunk = new byte[4096];
+            for (int n = in.read(chunk); n >= 0; n = in.read(chunk)) {
+                all.write(chunk, 0, n);
+            }
+            text = new String(all.toByteArray(), "UTF-8");
+        } finally {
+            in.close();
+        }
+        String name = page.getPath();
+        int len = name == null ? 0 : name.length();
+        boolean html = len >= 5 && name.regionMatches(true, len - 5, ".html", 0, 5)
+                || len >= 4 && name.regionMatches(true, len - 4, ".htm", 0, 4);
+        URL old = pageUrl;
+        setContentType(html ? "text/html" : "text/plain");
+        setText(text);
+        pageUrl = page;
+        firePropertyChange("page", old, page);
+    }
+
+    /// The page [#setPage(URL)] showed last, or `null`.
+    public URL getPage() {
+        return pageUrl;
     }
 
     @Override
@@ -238,11 +299,23 @@ public class JEditorPane extends JTextComponent {
         try {
             url = new URL(href);
         } catch (MalformedURLException notAbsolute) {
-            // A relative link has no base to resolve against here: the
-            // listener gets it as the description alone.
-            url = null;
+            url = cn1Relative(href);
         }
         fireHyperlinkUpdate(new HyperlinkEvent(this, HyperlinkEvent.EventType.ACTIVATED, url, href));
+    }
+
+    /// A relative link against the page that is showing; `null` when the
+    /// text was not read from a page, and the listener then gets the link
+    /// as the description alone.
+    private URL cn1Relative(String href) {
+        if (pageUrl == null) {
+            return null;
+        }
+        try {
+            return new URL(pageUrl, href);
+        } catch (MalformedURLException unusable) {
+            return null;
+        }
     }
 
     private boolean html() {

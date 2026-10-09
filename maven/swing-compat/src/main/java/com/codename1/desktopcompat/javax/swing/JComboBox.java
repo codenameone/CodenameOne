@@ -34,6 +34,7 @@ import com.codename1.desktopcompat.java.awt.event.ActionEvent;
 import com.codename1.desktopcompat.java.awt.event.ActionListener;
 import com.codename1.desktopcompat.java.awt.event.ItemEvent;
 import com.codename1.desktopcompat.java.awt.event.ItemListener;
+import com.codename1.desktopcompat.javax.accessibility.Accessible;
 import com.codename1.desktopcompat.javax.swing.event.ListDataEvent;
 import com.codename1.desktopcompat.javax.swing.event.ListDataListener;
 import com.codename1.desktopcompat.javax.swing.plaf.basic.BasicComboBoxEditor;
@@ -73,7 +74,8 @@ import java.util.Vector;
 ///    a selection, as a click outside it does.
 ///  - Typing does not select as it goes; there is no key selection manager
 ///    and no `ComboBoxUI`.
-public class JComboBox<E> extends JComponent implements ItemSelectable, ListDataListener, ActionListener {
+public class JComboBox<E> extends JComponent
+        implements Accessible, ItemSelectable, ListDataListener, ActionListener {
 
     private ComboBoxModel<E> dataModel;
     private ListCellRenderer<? super E> renderer = new DefaultListCellRenderer.UIResource();
