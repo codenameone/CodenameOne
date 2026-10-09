@@ -367,6 +367,13 @@ public final class CompatRemapper {
                 generatePropertyAccess(unmodifiable);
                 generateJavaFxResources(unmodifiable);
             }
+            if (relocator.hasDesktopLayer()) {
+                // A desktop application hands class literals to
+                // getListeners and Array.newInstance; see the generator
+                // for why that needs a class of its own on a device.
+                int arrays = new ArrayClassGenerator(classesDir).run(unmodifiable);
+                log.debug("Generated the array classes of " + arrays + " class literal(s)");
+            }
             if (names.length() > 0) {
                 log.info("Relocated " + appClasses.size() + " application classes and " + runtime + " "
                         + names + " runtime classes");
