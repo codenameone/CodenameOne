@@ -1,4 +1,8 @@
 # LanguageTool accept list for the developer guide.
+# Compiled HTML views: library names and the IEC mebibyte unit symbol.
+htmx
+Thymeleaf
+MiB
 #
 # Each non-blank, non-comment line is a Python regex matched against the
 # exact text LanguageTool flagged (m.context[offsetInContext:

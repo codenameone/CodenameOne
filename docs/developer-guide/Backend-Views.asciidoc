@@ -27,7 +27,7 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/H
 A string return value selects a compiled view. `products` selects
 `src/main/resources/templates/products.html`; `products :: rows` selects that
 file's named fragment. `redirect:/products` redirects to a local absolute path:
-303 for a normal request, or 200 with `HX-Redirect` for an htmx request. A null
+303 for normal requests, or 200 with `HX-Redirect` for requests from htmx. A null
 return is 404. Unknown view names fail the request; they never resolve file paths.
 
 `ModelAndView` carries a view name and attributes added with `addObject`.
