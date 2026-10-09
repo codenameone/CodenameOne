@@ -100,6 +100,10 @@ public final class JdkTime {
         if (temporal instanceof OffsetDateTime) {
             return ((OffsetDateTime) temporal).toLocalDateTime().toLocalTime();
         }
+        String resolved = resolved(temporal);
+        if (resolved != null && resolved.indexOf(':') > 0) {
+            return LocalTime.parse(resolved.substring(resolved.indexOf('T') + 1));
+        }
         throw unobtainable("LocalTime", temporal);
     }
 
@@ -162,6 +166,11 @@ public final class JdkTime {
         if (temporal instanceof OffsetDateTime) {
             return ((OffsetDateTime) temporal).toLocalDateTime().toLocalDate();
         }
+        String resolved = resolved(temporal);
+        if (resolved != null && resolved.indexOf('-', 1) > 0) {
+            int t = resolved.indexOf('T');
+            return LocalDate.parse(t < 0 ? resolved : resolved.substring(0, t));
+        }
         throw unobtainable("LocalDate", temporal);
     }
 
@@ -177,7 +186,32 @@ public final class JdkTime {
         if (temporal instanceof OffsetDateTime) {
             return ((OffsetDateTime) temporal).toLocalDateTime();
         }
+        String resolved = resolved(temporal);
+        if (resolved != null && resolved.indexOf('T') > 0) {
+            return LocalDateTime.parse(resolved);
+        }
         throw unobtainable("LocalDateTime", temporal);
+    }
+
+    /// What a formatter of the desktop's own class library parsed, as ISO
+    /// text: a date, a time, or both around a `T`. `null` for anything
+    /// else.
+    ///
+    /// The device's formatter answers a date or a time itself. Under the
+    /// simulator and in a desktop build the formatter is the JDK's, which
+    /// answers a holder of its own instead, and the interface it is seen
+    /// through has no member on the device to ask it anything with. Its
+    /// text is the one face both class libraries have, and it ends in
+    /// `resolved to` followed by what was parsed.
+    private static String resolved(TemporalAccessor temporal) {
+        String text = String.valueOf(temporal);
+        String mark = " resolved to ";
+        int at = text.lastIndexOf(mark);
+        if (at < 0) {
+            return null;
+        }
+        String out = text.substring(at + mark.length()).trim();
+        return out.length() == 0 ? null : out;
     }
 
     private static DateTimeException unobtainable(String type, TemporalAccessor temporal) {

@@ -414,6 +414,41 @@ public class MemberGapsDifferentialTest {
         }
     }
 
+    // ---- DateTimeFormatter.parse(text, query) ----
+
+    /// `formatter.parse(text, LocalDate::from)` is how an application reads
+    /// a date in its own pattern. Under this JVM the formatter answers the
+    /// JDK's holder rather than a date, and the three `from` methods have
+    /// to read it; an edit dialog that validates a birthday this way
+    /// threw on every OK.
+    @Test
+    public void aParsedTextIsReadAsADateATimeOrBoth() {
+        DateTimeFormatter date = DateTimeFormatter.ofPattern("dd.MM.yyyy");
+        assertEquals(date.parse("21.02.1999", java.time.LocalDate::from),
+                JdkTime.parse(date, "21.02.1999", JdkTime::localDateFrom));
+        DateTimeFormatter both = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        assertEquals(both.parse("2001-12-31 23:59:58", java.time.LocalDateTime::from),
+                JdkTime.parse(both, "2001-12-31 23:59:58", JdkTime::localDateTimeFrom));
+        assertEquals(both.parse("2001-12-31 23:59:58", java.time.LocalDate::from),
+                JdkTime.parse(both, "2001-12-31 23:59:58", JdkTime::localDateFrom));
+        assertEquals(both.parse("2001-12-31 23:59:58", LocalTime::from),
+                JdkTime.parse(both, "2001-12-31 23:59:58", JdkTime::localTimeFrom));
+        DateTimeFormatter time = DateTimeFormatter.ofPattern("HH:mm");
+        assertEquals(time.parse("07:05", LocalTime::from), JdkTime.parse(time, "07:05", JdkTime::localTimeFrom));
+        try {
+            JdkTime.parse(time, "07:05", JdkTime::localDateFrom);
+            org.junit.Assert.fail("a time is no date");
+        } catch (java.time.DateTimeException expected) {
+            org.junit.Assert.assertNotNull(expected.getMessage());
+        }
+        try {
+            JdkTime.parse(date, "21.02.1999", JdkTime::localDateTimeFrom);
+            org.junit.Assert.fail("a date is no date and time");
+        } catch (java.time.DateTimeException expected) {
+            org.junit.Assert.assertNotNull(expected.getMessage());
+        }
+    }
+
     // ---- DateTimeFormatter.withZone ----
 
     private static final String[] ZONES = {"UTC", "GMT+02:00", "GMT-05:30", "Europe/Paris", "Asia/Tokyo"};
