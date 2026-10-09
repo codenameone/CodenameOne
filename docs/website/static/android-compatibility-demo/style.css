@@ -1,0 +1,503 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+html, body {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    position: fixed; 
+    overflow: hidden;
+    width: 100%;
+    height: 100%
+}
+/* Holy Mother!!  This snippet is required so that IE 11 doesn't completely
+   block our event listeners!!! */
+@media all and (-ms-high-contrast: none), (-ms-high-contrast: active) {
+   body {
+        overflow: visible;
+        overflow-y: scroll;
+        height: auto;
+   }
+}
+body::-webkit-scrollbar { width: 0 !important }
+
+#codenameone-canvas {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    margin: 0;
+    padding: 0;
+    /* Deliver touch gestures to the app instead of letting the browser
+       claim them for native pan/zoom. Without this the canvas's touchmove
+       handler is treated as passive and the browser swallows drag gestures,
+       so touch/drag scrolling never reaches Codename One (mouse-wheel scroll
+       still works because it is a separate event). */
+    touch-action: none;
+    -ms-touch-action: none;
+}
+
+.cn1-edit-string, .cn1-string-picker {
+    position: absolute;
+    background-color: transparent;
+    z-index: 1000;
+    box-sizing: content-box;
+    -webkit-box-sizing: content-box;
+    -moz-box-sizing:content-box;
+    resize:none;
+}
+
+.cn1-native-peer {
+    position: absolute;
+    border:none;
+}
+
+.cn1-capture-dialog {
+    position: fixed;
+    /* --cn1-chrome-top is the height of the javascript.titleBar=html chrome (0 without it).
+       Fixed boxes are placed against the viewport, not the body the chrome moves down, so each
+       full-window overlay offsets itself or its top would sit under the chrome. */
+    top: calc(10px + var(--cn1-chrome-top, 0px));
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    border: 1px solid black;
+    background: rgba(33,33,33,33);
+}
+
+.cn1-capture-dialog video {
+    
+    margin: 0 auto;
+}
+.cn1-capture-preview-dialog {
+    position: fixed;
+    top: calc(10px + var(--cn1-chrome-top, 0px));
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    border: 1px solid black;
+    background: rgba(33,33,33,33);
+    z-index: 1000;
+    
+}
+
+
+
+#cn1-splash {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform:translate(-50%, -50%);
+    text-align:center;
+    font-family: sans-serif;
+    color: #666;
+    
+}
+
+#cn1-splash img.icon {
+    width: 2in;
+    max-width: 100%;
+    margin: auto;
+    display: block;
+}
+
+#cn1-splash .progress-bar {
+    width: 100%;
+    border: 1px solid #666;
+    background-color: white;
+    height: 5mm;
+    margin: 1mm;
+    position: relative;
+    padding:0;
+    background-image: none;
+    background-color:white;
+    box-shadow: 0 1px 5px #000 inset, 0 1px 0 #444; 
+    border-radius: 2.5mm;
+    overflow:hidden;
+
+}
+
+#cn1-splash .progress-bar .progress-bar-internal {
+    position:absolute;
+    top:0;
+    left:0;
+    height: 100%;
+    width:0;
+    background-image: linear-gradient(#0072ff,#00c6ff);
+    border-radius: 2.5mm;
+}
+
+#cn1-splash img.progress {
+    max-width: 50%;
+    max-height: 5mm;
+    width:auto;
+    height:auto;
+}
+
+
+div.cn1-image-capture-dialog {
+    position: fixed;
+    top: var(--cn1-chrome-top, 0px);
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: #333;
+
+    
+}
+
+div.cn1-image-capture-dialog video, div.cn1-image-capture-dialog.state-accept-snapshot > canvas {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    margin-left: -540px;
+    margin-top: -540px;
+    width: 1080px;
+    
+    
+}
+@media(max-width: 480px) {
+    div.cn1-image-capture-dialog video, div.cn1-image-capture-dialog.state-accept-snapshot > canvas {
+        
+        margin-left: -240px;
+        margin-top: -240px;
+        width: 480px;
+    }
+}
+
+@media(max-width: 640px) {
+    div.cn1-image-capture-dialog video, div.cn1-image-capture-dialog.state-accept-snapshot > canvas {
+        
+        margin-left: -320px;
+        margin-top: -320px;
+        width: 640px;
+    }
+}
+
+
+div.cn1-image-capture-dialog div.buttons {
+    position: fixed;
+    bottom: 1in;
+    left: 0;
+    width: 100%;
+    height: 20%;
+    text-align: center;
+    z-index: 1000;
+}
+
+div.cn1-image-capture-dialog button {
+    display: none;
+    background: none;
+    border: none;
+    
+
+
+}
+
+div.cn1-image-capture-dialog button span {
+    display: none;
+}
+
+div.cn1-image-capture-dialog button i {
+    color: #ccc;
+    opacity: 0.7;
+    font-size: 3em;
+}
+
+div.cn1-image-capture-dialog.state-stream button.capture-btn {
+    display:inline;
+    
+}
+div.cn1-image-capture-dialog.state-stream button.capture-btn i {
+    color: red;
+}
+
+div.cn1-image-capture-dialog.state-stream button.cancel-btn {
+    display:inline;
+}
+
+div.cn1-image-capture-dialog.state-accept-snapshot video{
+    display: none;
+}
+
+div.cn1-image-capture-dialog.state-accept-snapshot .use-btn {
+    display: inline;
+}
+
+div.cn1-image-capture-dialog.state-accept-snapshot .dontuse-btn {
+    display: inline;
+}
+
+
+#cn1-peers-container {
+    z-index: -1000;
+    padding:0;
+    margin:0;
+    position:absolute;
+    padding:0;
+    margin:0;
+
+    top:0;
+    left:0;
+
+    width: 100%;
+    height: 100%;
+    background:transparent;
+}
+
+div#cn1-video-capture {
+    position:fixed;
+    top: var(--cn1-chrome-top, 0px);
+    width: 100%;
+    height: calc(100% - var(--cn1-chrome-top, 0px));
+    background-color:black;
+    
+}
+div#cn1-video-capture > video {
+    width: 100%;
+}
+.vjs-control-bar {
+    position:fixed;
+    bottom:0;
+    left:0;
+    right:0;
+    background-color:white;
+        
+}
+
+.vjs-current-time > span.vjs-control-text, .vjs-duration > span.vjs-control-text {
+    display:block;
+    font-size: 75%;
+}
+.vjs-time-control.vjs-time-divider {
+    border: 1px dotted #cccccc;
+    
+}
+.vjs-time-control.vjs-time-divider > span {
+    display:none;
+}
+.vjs-current-time.vjs-time-control.vjs-control, .vjs-duration.vjs-time-control.vjs-control {
+    padding: 1mm;
+}
+
+
+/* The HTML title bar and menu bar of the javascript.titleBar=html build hint
+   (JavaScriptDesktopChrome). The port moves the body down by the chrome's height,
+   so the canvas and every overlay positioned inside the body start below it. The
+   heights are fixed so the port measures the chrome once. */
+.cn1-native-selection {
+    /* Vertical swipes are routed to CN1; long press and selection remain native. */
+    touch-action: pinch-zoom;
+}
+.cn1-native-selection::selection {
+    color: var(--cn1-selection-color, #ffffff);
+    background: var(--cn1-selection-background, #1967d2);
+}
+
+#cn1-desktop-chrome {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: 0;
+    z-index: 2147483647;
+    font: 13px system-ui, -apple-system, "Segoe UI", Cantarell, Ubuntu, sans-serif;
+    color: #1f1f1f;
+    background: #f3f3f3;
+    border-bottom: 1px solid #d6d6d6;
+    user-select: none;
+    -webkit-user-select: none;
+}
+#cn1-desktop-chrome .cn1-chrome-title {
+    height: 30px;
+    line-height: 30px;
+    padding: 0 12px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+#cn1-desktop-chrome .cn1-chrome-menubar {
+    display: flex;
+    height: 28px;
+    padding: 0 4px;
+    align-items: stretch;
+    /* More menu titles than the window is wide -- a narrow window, or an application with
+       several menus of its own -- would push the last ones past the edge, where the body's
+       overflow: hidden made them unreachable. The bar scrolls sideways instead (the wheel is
+       mapped onto it in browser_bridge.js), without a scrollbar eating into its fixed height.
+       Scrolling clips whatever overflows the bar, which is why the panels are fixed-positioned
+       below rather than hanging off their menu. */
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+}
+#cn1-desktop-chrome .cn1-chrome-menubar::-webkit-scrollbar {
+    display: none;
+}
+#cn1-desktop-chrome .cn1-chrome-menu {
+    flex-shrink: 0;
+}
+#cn1-desktop-chrome .cn1-chrome-menu > summary {
+    list-style: none;
+    height: 100%;
+    line-height: 28px;
+    padding: 0 10px;
+    border-radius: 4px;
+    cursor: default;
+}
+#cn1-desktop-chrome .cn1-chrome-menu > summary::-webkit-details-marker {
+    display: none;
+}
+#cn1-desktop-chrome .cn1-chrome-menu > summary:hover,
+#cn1-desktop-chrome .cn1-chrome-menu[open] > summary {
+    background: rgba(0, 0, 0, 0.07);
+}
+#cn1-desktop-chrome .cn1-chrome-menu > summary:focus-visible,
+#cn1-desktop-chrome .cn1-chrome-menu-item:focus-visible {
+    outline: 2px solid #0067c0;
+    outline-offset: -2px;
+}
+#cn1-desktop-chrome .cn1-chrome-menu-items {
+    /* Placed against the window, under its menu's title, by browser_bridge.js when the menu
+       opens; these are the fallback until it has. */
+    position: fixed;
+    left: 4px;
+    top: var(--cn1-chrome-top, 59px);
+    /* 200px, unless the window is narrower: a min-width wins over max-width, so a plain 200px
+       would push the panel past the edge of a very narrow window. */
+    min-width: min(200px, calc(100vw - 8px));
+    /* As wide as its longest item, so a label wraps only when the window is too narrow: an
+       absolutely positioned box otherwise shrinks to its min-content, and a label that may
+       wrap anywhere has almost none. */
+    width: max-content;
+    /* Never wider than the window; browser_bridge.js also moves a panel that would run off
+       the right edge (a menu near the end of a wide menu bar in a narrow window). */
+    max-width: calc(100vw - 8px);
+    box-sizing: border-box;
+    /* A long menu scrolls inside the window: the body is fixed with overflow hidden, so a
+       panel taller than the viewport would put its last commands out of reach. */
+    max-height: calc(100vh - 70px);
+    overflow-y: auto;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    background: #f9f9f9;
+    border: 1px solid #d6d6d6;
+    border-radius: 6px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.14);
+}
+#cn1-desktop-chrome .cn1-chrome-menu-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 6px 10px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: default;
+}
+#cn1-desktop-chrome .cn1-chrome-menu-item:hover:not([aria-disabled="true"]) {
+    background: rgba(0, 0, 0, 0.07);
+}
+#cn1-desktop-chrome .cn1-chrome-menu-item[aria-disabled="true"] {
+    opacity: 0.45;
+}
+#cn1-desktop-chrome .cn1-chrome-icon {
+    display: inline-flex;
+    align-items: center;
+}
+#cn1-desktop-chrome .cn1-chrome-icon canvas {
+    display: block;
+}
+#cn1-desktop-chrome .cn1-chrome-shortcut {
+    opacity: 0.6;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+/* The panel's max-width only holds if its contents can shrink: a flex item keeps
+   min-width: auto -- the width of its longest word -- so a long unbroken command name would
+   push past the panel and be clipped by the body's overflow: hidden. The item and its label may
+   shrink, and the label wraps, anywhere if it has to; the shortcut keeps its own width. */
+#cn1-desktop-chrome .cn1-chrome-menu-item {
+    min-width: 0;
+}
+#cn1-desktop-chrome .cn1-chrome-label {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+/* macOS: the title centred in a lighter bar, the system font, rounded selection. */
+#cn1-desktop-chrome.cn1-chrome-mac {
+    background: #ececec;
+    border-bottom-color: #cfcfcf;
+}
+#cn1-desktop-chrome.cn1-chrome-mac .cn1-chrome-title {
+    text-align: center;
+    font-weight: 600;
+}
+#cn1-desktop-chrome.cn1-chrome-mac .cn1-chrome-menu-item:hover:not([aria-disabled="true"]) {
+    background: #0a64d8;
+    color: #fff;
+}
+
+/* GNOME: a HeaderBar-style bar with the title centred in bold. */
+#cn1-desktop-chrome.cn1-chrome-linux {
+    background: #ebebeb;
+    border-bottom-color: #d4d4d4;
+}
+#cn1-desktop-chrome.cn1-chrome-linux .cn1-chrome-title {
+    text-align: center;
+    font-weight: 700;
+}
+#cn1-desktop-chrome.cn1-chrome-linux .cn1-chrome-menu-items {
+    border-radius: 12px;
+}
+
+/* The menu text colours below (#1f1f1f, #f0f0f0) are also the colours HTML5Implementation
+   draws material command icons in; change them together. */
+@media (prefers-color-scheme: dark) {
+    #cn1-desktop-chrome {
+        color: #f0f0f0;
+        background: #202020;
+        border-bottom-color: #3a3a3a;
+    }
+    #cn1-desktop-chrome.cn1-chrome-mac {
+        background: #2c2c2c;
+    }
+    #cn1-desktop-chrome.cn1-chrome-linux {
+        background: #303030;
+    }
+    #cn1-desktop-chrome .cn1-chrome-menu > summary:hover,
+    #cn1-desktop-chrome .cn1-chrome-menu[open] > summary,
+    #cn1-desktop-chrome .cn1-chrome-menu-item:hover:not([aria-disabled="true"]) {
+        background: rgba(255, 255, 255, 0.1);
+    }
+    #cn1-desktop-chrome .cn1-chrome-menu-items {
+        background: #2b2b2b;
+        border-color: #3f3f3f;
+    }
+}

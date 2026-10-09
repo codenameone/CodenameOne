@@ -49,7 +49,16 @@
     '  securityLevel: "loose",' +
     '  fontFamily: "Poppins, system-ui, sans-serif"' +
     '});' +
-    'mermaid.run();';
+    // Expose completion to the render gate. SVG insertion happens before
+    // layout finishes and is not evidence of a successfully rendered diagram.
+    'window.__cn1MermaidRender = (async function () {' +
+    '  if (document.readyState === "loading") {' +
+    '    await new Promise(function (resolve) {' +
+    '      document.addEventListener("DOMContentLoaded", resolve, {once:true});' +
+    '    });' +
+    '  }' +
+    '  await mermaid.run();' +
+    '})();';
   document.head.appendChild(s);
 })();
 </script>

@@ -21,8 +21,8 @@ defaultTheme = "dark"
 disableThemeToggle = false
 mainSections = ["blog"]
 author = "Codename One"
-homeTitle = "Codename One: Native Apps in Java with a UI You Control"
-description = "Build native iOS, Android, desktop, web, watch, TV, and vehicle apps in Java. One codebase, a UI you control, and cloud iOS builds without a Mac."
+homeTitle = "Codename One: 100% Native. Fast. Full-Stack Java."
+description = "Full-stack Java, compiled to native code. Share models from UI to server, bring Android apps to more platforms, and compare performance with HotSpot, Spring and Go."
 keywords = [
   "codename one",
   "cross platform app development",

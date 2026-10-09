@@ -1,0 +1,7503 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+(function(global) {
+  function shouldEnableDiag() {
+    if (global.__parparDiagEnabled != null) {
+      return !!global.__parparDiagEnabled;
+    }
+    var loc = (global.window || global).location;
+    if (!loc || !loc.search) {
+      return false;
+    }
+    var search = String(loc.search).charAt(0) === '?' ? String(loc.search).substring(1) : String(loc.search);
+    if (!search) {
+      return false;
+    }
+    var pairs = search.split('&');
+    for (var i = 0; i < pairs.length; i++) {
+      var entry = pairs[i];
+      if (!entry) {
+        continue;
+      }
+      var eq = entry.indexOf('=');
+      var key = decodeURIComponent((eq >= 0 ? entry.substring(0, eq) : entry).replace(/\+/g, ' '));
+      if (key !== 'parparDiag') {
+        continue;
+      }
+      var rawValue = decodeURIComponent((eq >= 0 ? entry.substring(eq + 1) : '1').replace(/\+/g, ' '));
+      var normalized = String(rawValue).toLowerCase();
+      return !(normalized === '0' || normalized === 'false' || normalized === 'off' || normalized === 'no');
+    }
+    return false;
+  }
+
+  var diagEnabled = shouldEnableDiag();
+  // Per-canvas-op bridge diagnostics are gated separately from the generic diag flag
+  // because they can grow to 100× the size of the rest of the log (one entry per canvas
+  // call). Enable with ?parparBridgeDiag=1 or global.__parparBridgeDiagEnabled=true.
+  var bridgeDiagEnabled = (function() {
+    if (global.__parparBridgeDiagEnabled != null) {
+      return !!global.__parparBridgeDiagEnabled;
+    }
+    var loc = (global.window || global).location;
+    if (!loc || !loc.search) {
+      return false;
+    }
+    var search = String(loc.search).charAt(0) === '?' ? String(loc.search).substring(1) : String(loc.search);
+    if (!search) {
+      return false;
+    }
+    var pairs = search.split('&');
+    for (var i = 0; i < pairs.length; i++) {
+      var entry = pairs[i];
+      if (!entry) {
+        continue;
+      }
+      var eq = entry.indexOf('=');
+      var key = decodeURIComponent((eq >= 0 ? entry.substring(0, eq) : entry).replace(/\+/g, ' '));
+      if (key !== 'parparBridgeDiag') {
+        continue;
+      }
+      var rawValue = decodeURIComponent((eq >= 0 ? entry.substring(eq + 1) : '1').replace(/\+/g, ' '));
+      var normalized = String(rawValue).toLowerCase();
+      return !(normalized === '0' || normalized === 'false' || normalized === 'off' || normalized === 'no');
+    }
+    return false;
+  })();
+
+  function diagValue(value) {
+    if (value == null) {
+      return 'null';
+    }
+    return String(value).replace(/\s+/g, '_');
+  }
+
+  function log(line) {
+    // Gate browser-bridge PARPAR:* log entries behind the same diagEnabled
+    // toggle (``?parparDiag=1``) that already gates diag(). Without this,
+    // every production page load emitted PARPAR:worker-mode /
+    // PARPAR:startParparVmApp / PARPAR:appStarter-present regardless of
+    // context. Tests that *want* these — the Playwright harness passes
+    // parparDiag=1 — still get them.
+    if (!diagEnabled) {
+      return;
+    }
+    if (global.console && typeof global.console.log === 'function') {
+      global.console.log('PARPAR:' + line);
+    }
+  }
+  function diag(phase, key, value) {
+    if (!diagEnabled) {
+      return;
+    }
+    // Suppress per-op HOST bridge diagnostics unless explicitly enabled via
+    // parparBridgeDiag=1. These outweigh everything else by a huge margin.
+    if (phase === 'HOST' && typeof key === 'string' && key.indexOf('jsoBridge') === 0 && !bridgeDiagEnabled) {
+      return;
+    }
+    log('DIAG:' + phase + ':' + key + '=' + diagValue(value));
+  }
+
+  function postHostCallback(target, id, value, errorMessage) {
+    var message;
+    if (errorMessage == null) {
+      message = { type: 'host-callback', id: id, value: value };
+    } else {
+      message = { type: 'host-callback', id: id, error: true, errorMessage: String(errorMessage) };
+    }
+    if (target && typeof target.postMessage === 'function') {
+      target.postMessage(message);
+      return;
+    }
+    if (global.jvm && typeof global.jvm.handleMessage === 'function') {
+      global.jvm.handleMessage(message);
+    }
+  }
+
+  function normalizeHostResult(result, callback) {
+    if (result && typeof result.then === 'function') {
+      result.then(function(value) {
+        callback(value, null);
+      }, function(err) {
+        callback(null, err);
+      });
+      return;
+    }
+    callback(result, null);
+  }
+
+  var hostBridge = global.cn1HostBridge = global.cn1HostBridge || {
+    handlers: {},
+    register: function(symbol, handler) {
+      this.handlers[symbol] = handler;
+    },
+    invoke: function(symbol, args, target, id) {
+      var handler = this.handlers[symbol];
+      // Fire-and-forget request: the worker passed ``__cn1_no_response``
+      // because the Java caller is a void method whose green thread
+      // shouldn't block on a HOST_CALLBACK round-trip. Run the handler
+      // and don't post a callback. (For JSO bridge requests the flag
+      // lives on ``args[0].__cn1_no_response``; ``__cn1_jso_bridge__``
+      // is the only handler that uses it, and the per-canvas-op flood
+      // it eliminates was what starved ``self.onmessage`` for incoming
+      // pointer events during a Dialog modal.)
+      var noResponse = !!(args && args[0] && args[0].__cn1_no_response);
+      if (!handler) {
+        diag('FIRST_FAILURE', 'category', 'host_call_unhandled');
+        diag('FIRST_FAILURE', 'symbol', symbol);
+        if (!noResponse) {
+          postHostCallback(target, id, null, 'Unhandled host call ' + symbol);
+        }
+        return;
+      }
+      try {
+        normalizeHostResult(handler.apply(null, args || []), function(value, err) {
+          if (noResponse && err == null) {
+            return;
+          }
+          postHostCallback(target, id, value, err);
+        });
+      } catch (err) {
+        // Errors must surface even for fire-and-forget, otherwise a bad
+        // op silently corrupts the canvas state with no signal to the
+        // worker that the chain went off the rails.
+        postHostCallback(target, id, null, err);
+      }
+    }
+  };
+
+  // ---- Native interface dispatch -------------------------------------------------
+  // Codename One NativeInterface calls arrive here (on the MAIN thread) from the
+  // worker via the generated <Iface>Impl -> NativeInterfaceBridge.call* host-hooks.
+  // We look up the developer's JS implementation in cn1_native_interfaces (the
+  // registry the stub self-registers into, populated on the main thread by the
+  // <script>-loaded stub) and invoke it with the trailing callback, returning a
+  // Promise so the worker resumes with the result once callback.complete fires.
+  //
+  // isSupported() is the NativeInterface contract's own "is this available here?"
+  // question, so an unbound interface must make it ANSWER false rather than reject.
+  // The builder generates and registers an <Iface>Impl for EVERY native interface in
+  // the app, so NativeLookup.create() never returns null on this port and isSupported()
+  // is the only signal the developer has; rejecting turned the standard
+  //     create(X.class) != null && x.isSupported()
+  // guard into a thrown RuntimeException for any app that shipped no JS stub for the
+  // interface (issue #5512). Every other method still rejects -- calling an
+  // unimplemented native is a genuine bug and must stay loud.
+  var NI_IS_SUPPORTED = 'isSupported_';
+  var niUnboundWarned = {};
+
+  function niUnsupported(iface, reason) {
+    if (!niUnboundWarned[iface]) {
+      niUnboundWarned[iface] = true;
+      if (global.console && global.console.warn) {
+        global.console.warn('Codename One: native interface ' + iface + ' is not supported in this build ('
+                + reason + '); isSupported() answers false.');
+      }
+    }
+    return Promise.resolve(false);
+  }
+
+  function cn1InvokeNativeInterface(iface, method, args) {
+    var registry = global.cn1_native_interfaces
+            || (global.window && global.window.cn1_native_interfaces);
+    var impl = registry ? registry[iface] : null;
+    if (!impl) {
+      if (method === NI_IS_SUPPORTED) {
+        return niUnsupported(iface, 'no JS implementation registered');
+      }
+      return Promise.reject(new Error('No native interface implementation registered for ' + iface));
+    }
+    var fn = impl[method];
+    if (typeof fn !== 'function') {
+      if (method === NI_IS_SUPPORTED) {
+        return niUnsupported(iface, 'the registered JS implementation defines no isSupported');
+      }
+      return Promise.reject(new Error('Native interface ' + iface + ' has no implementation for ' + method));
+    }
+    var callArgs = [];
+    if (args != null) {
+      for (var i = 0; i < args.length; i++) {
+        callArgs.push(args[i]);
+      }
+    }
+    return new Promise(function(resolve, reject) {
+      var settled = false;
+      var callback = {
+        complete: function(value) {
+          if (settled) return;
+          settled = true;
+          if (value === undefined) {
+            value = null;
+          }
+          // A returned host object (e.g. a DOM element backing a PeerComponent)
+          // is not structured-cloneable; hand the worker a host-ref handle it can
+          // use as a JSO receiver. Primitives, strings and plain arrays
+          // (String[]/primitive[]) pass through untouched for worker-side coercion.
+          if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+            value = hostResult(value);
+          }
+          resolve(value);
+        },
+        error: function(err) {
+          if (settled) return;
+          settled = true;
+          reject(err instanceof Error ? err : new Error(err == null ? 'native interface error' : String(err)));
+        }
+      };
+      callArgs.push(callback);
+      try {
+        fn.apply(impl, callArgs);
+      } catch (e) {
+        if (!settled) {
+          settled = true;
+          reject(e);
+        }
+      }
+    });
+  }
+
+  // Single host hook for every NativeInterfaceBridge.call* native. The worker-side
+  // bindNative wrappers (parparvm_runtime.js) funnel here with (iface, method, args)
+  // and coerce the resolved value to the declared Java return type, so dispatch is
+  // uniform on this side.
+  hostBridge.register('__cn1_native_interface_call__', function(iface, method, args) {
+    return cn1InvokeNativeInterface(iface, method, args);
+  });
+
+  // Web Crypto lives on the browser main thread.  The translated application
+  // runs in a Worker, so CodenameOneImplementation's crypto methods use this
+  // single async host bridge instead of pretending that secureRandom/AES/RSA
+  // are unavailable on the JavaScript port.
+  function cn1CryptoApi() {
+    var cryptoApi = global.crypto || (global.window && global.window.crypto);
+    if (!cryptoApi || !cryptoApi.subtle || typeof cryptoApi.getRandomValues !== 'function') {
+      throw new Error('Web Crypto API is unavailable in this browser context');
+    }
+    return cryptoApi;
+  }
+
+  function cn1CryptoBytes(value) {
+    if (value == null) {
+      return null;
+    }
+    return value instanceof Uint8Array ? value : new Uint8Array(value);
+  }
+
+  function cn1CryptoResult(value) {
+    return Array.prototype.slice.call(new Uint8Array(value));
+  }
+
+  function cn1CryptoHash(name) {
+    var normalized = String(name || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (normalized.indexOf('SHA512') >= 0) return 'SHA-512';
+    if (normalized.indexOf('SHA384') >= 0) return 'SHA-384';
+    if (normalized.indexOf('SHA256') >= 0) return 'SHA-256';
+    if (normalized.indexOf('SHA1') >= 0) return 'SHA-1';
+    throw new Error('Unsupported Web Crypto hash algorithm: ' + name);
+  }
+
+  function cn1RsaOaepAlgorithm(transformation) {
+    var normalized = String(transformation || '').toUpperCase();
+    if (normalized.indexOf('OAEP') < 0) {
+      throw new Error('Web Crypto only supports RSA OAEP encryption; requested ' + transformation);
+    }
+    return { name: 'RSA-OAEP', hash: cn1CryptoHash(normalized) };
+  }
+
+  function cn1RsaSignatureAlgorithm(algorithm, keyAlgorithm) {
+    if (String(keyAlgorithm || '').toUpperCase() !== 'RSA') {
+      throw new Error('Web Crypto bridge currently supports RSA signatures; requested ' + keyAlgorithm);
+    }
+    return { name: 'RSASSA-PKCS1-v1_5', hash: cn1CryptoHash(algorithm) };
+  }
+
+  hostBridge.register('__cn1_crypto__', function(request) {
+    var cryptoApi = cn1CryptoApi();
+    var subtle = cryptoApi.subtle;
+    var op = request && request.op;
+    if (op === 'random') {
+      var random = new Uint8Array(request.length | 0);
+      cryptoApi.getRandomValues(random);
+      return Array.prototype.slice.call(random);
+    }
+    if (op === 'aesEncrypt' || op === 'aesDecrypt') {
+      var transformation = String(request.transformation || '').toUpperCase();
+      var algorithm;
+      if (transformation.indexOf('/GCM/') >= 0) {
+        algorithm = { name: 'AES-GCM', iv: cn1CryptoBytes(request.iv), tagLength: 128 };
+        if (request.aad != null) algorithm.additionalData = cn1CryptoBytes(request.aad);
+      } else if (transformation.indexOf('/CBC/') >= 0) {
+        algorithm = { name: 'AES-CBC', iv: cn1CryptoBytes(request.iv) };
+      } else {
+        throw new Error('Unsupported Web Crypto AES transformation: ' + request.transformation);
+      }
+      var aesUsage = op === 'aesEncrypt' ? 'encrypt' : 'decrypt';
+      return subtle.importKey('raw', cn1CryptoBytes(request.key), { name: algorithm.name }, false, [aesUsage])
+        .then(function(key) {
+          return subtle[aesUsage](algorithm, key, cn1CryptoBytes(request.data));
+        })
+        .then(cn1CryptoResult);
+    }
+    if (op === 'rsaEncrypt' || op === 'rsaDecrypt') {
+      var rsaAlgorithm = cn1RsaOaepAlgorithm(request.transformation);
+      var rsaUsage = op === 'rsaEncrypt' ? 'encrypt' : 'decrypt';
+      var keyFormat = op === 'rsaEncrypt' ? 'spki' : 'pkcs8';
+      return subtle.importKey(keyFormat, cn1CryptoBytes(request.key), rsaAlgorithm, false, [rsaUsage])
+        .then(function(key) {
+          return subtle[rsaUsage](rsaAlgorithm, key, cn1CryptoBytes(request.data));
+        })
+        .then(cn1CryptoResult);
+    }
+    if (op === 'sign' || op === 'verify') {
+      var signatureAlgorithm = cn1RsaSignatureAlgorithm(request.algorithm, request.keyAlgorithm);
+      var signatureUsage = op === 'sign' ? 'sign' : 'verify';
+      var signatureKeyFormat = op === 'sign' ? 'pkcs8' : 'spki';
+      return subtle.importKey(signatureKeyFormat, cn1CryptoBytes(request.key), signatureAlgorithm, false, [signatureUsage])
+        .then(function(key) {
+          if (op === 'sign') {
+            return subtle.sign(signatureAlgorithm, key, cn1CryptoBytes(request.data)).then(cn1CryptoResult);
+          }
+          return subtle.verify(signatureAlgorithm, key, cn1CryptoBytes(request.signature), cn1CryptoBytes(request.data));
+        });
+    }
+    if (op === 'pbkdf2') {
+      // RFC 8018 PBKDF2, the one password KDF a browser has. The iteration
+      // count arrives already range-checked by KdfProfile -- clamping it here
+      // instead would put the bound on the side of the boundary an attacker who
+      // can edit stored bytes is on.
+      var kdfHash = cn1CryptoHash(request.hash || 'SHA-256');
+      return subtle.importKey('raw', cn1CryptoBytes(request.password), { name: 'PBKDF2' },
+          false, ['deriveBits'])
+        .then(function(key) {
+          return subtle.deriveBits({
+            name: 'PBKDF2',
+            salt: cn1CryptoBytes(request.salt),
+            iterations: request.iterations | 0,
+            hash: kdfHash
+          }, key, (request.length | 0) * 8);
+        })
+        .then(cn1CryptoResult);
+    }
+    if (op === 'generateRsaKeyPair') {
+      var generationAlgorithm = {
+        name: 'RSA-OAEP',
+        modulusLength: request.bits | 0,
+        publicExponent: new Uint8Array([1, 0, 1]),
+        hash: 'SHA-256'
+      };
+      return subtle.generateKey(generationAlgorithm, true, ['encrypt', 'decrypt'])
+        .then(function(pair) {
+          return Promise.all([
+            subtle.exportKey('spki', pair.publicKey),
+            subtle.exportKey('pkcs8', pair.privateKey)
+          ]);
+        })
+        .then(function(encoded) {
+          return [cn1CryptoResult(encoded[0]), cn1CryptoResult(encoded[1])];
+        });
+    }
+    throw new Error('Unsupported Web Crypto bridge operation: ' + op);
+  });
+
+  // CN1_VAULT_BRIDGE_BEGIN -- JavascriptVaultBridgeTest slices between these two
+  // markers and runs what is between them under Node against a stub IndexedDB.
+  // The code here therefore must not reach outside ``global``, ``hostBridge`` and
+  // ``cn1CryptoApi``; adding a dependency on something else in this file breaks
+  // the only test that executes it.
+  // --------------------------------------------------------------------------
+  // Vault device protection -- com.codename1.impl.html5.HTML5DeviceProtection.
+  //
+  // The browser has no key store, and it does have one thing that is close
+  // enough to be worth building on: a CryptoKey created with
+  // ``extractable: false``, kept in IndexedDB. The page can encrypt and decrypt
+  // with it and ``crypto.subtle.exportKey`` on it rejects, so what lands on
+  // disk in the origin's storage is ciphertext beside a key handle that never
+  // becomes bytes here. That is the whole mechanism; everything below is
+  // plumbing and failure classification.
+  //
+  // What it is not: it is not hardware backing (the browser does not say and
+  // cannot be asked), it is not protection from a copied profile (the copy
+  // contains this IndexedDB and the key works there), and it is not protection
+  // from script in this origin (which calls the same decrypt the application
+  // does). The Java side says all three in its class documentation; this
+  // comment repeats them because the temptation to overstate lives here.
+  // --------------------------------------------------------------------------
+
+  var CN1_VAULT_DB = 'cn1-vault';
+  var CN1_VAULT_STORE = 'keys';
+  var CN1_VAULT_NONCE = 12;
+
+  // Status codes, and they must stay in step with HTML5DeviceProtection.
+  var CN1V_OK = 0;
+  var CN1V_KEY_MISSING = 1;
+  var CN1V_AUTH_FAILED = 2;
+  var CN1V_CRYPTO_UNAVAILABLE = 3;
+  var CN1V_STORAGE_UNAVAILABLE = 4;
+  var CN1V_QUOTA_EXCEEDED = 5;
+  var CN1V_INSECURE_CONTEXT = 6;
+  var CN1V_TEMPORARILY_UNREADABLE = 7;
+  var CN1V_UNKNOWN = 8;
+  var CN1V_CANCELLED = 9;
+  var CN1V_POLICY_NOT_MET = 10;
+
+  var cn1VaultDbPromise = null;
+
+  function cn1VaultIndexedDb() {
+    return global.indexedDB || (global.window && global.window.indexedDB) || null;
+  }
+
+  function cn1VaultSecureContext() {
+    // ``isSecureContext`` is defined in workers as well as windows. Treated as
+    // false when absent rather than true: a runtime old enough not to define it
+    // is not one to grant a security claim to.
+    if (typeof global.isSecureContext === 'boolean') {
+      return global.isSecureContext;
+    }
+    if (global.window && typeof global.window.isSecureContext === 'boolean') {
+      return global.window.isSecureContext;
+    }
+    return false;
+  }
+
+  function cn1VaultOpenDb() {
+    // Cached, because every wrap and unwrap opens it and an IndexedDB open is
+    // not free. Dropped on failure so a browser that recovers -- site data
+    // cleared and re-granted, a private window that changed its mind -- is
+    // retried rather than remembered as broken.
+    if (cn1VaultDbPromise) {
+      return cn1VaultDbPromise;
+    }
+    var factory = cn1VaultIndexedDb();
+    if (!factory) {
+      return Promise.reject({ cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE });
+    }
+    cn1VaultDbPromise = new Promise(function(resolve, reject) {
+      var request;
+      try {
+        request = factory.open(CN1_VAULT_DB, 1);
+      } catch (e) {
+        reject({ cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE });
+        return;
+      }
+      request.onupgradeneeded = function() {
+        var db = request.result;
+        if (!db.objectStoreNames.contains(CN1_VAULT_STORE)) {
+          db.createObjectStore(CN1_VAULT_STORE, { keyPath: 'id' });
+        }
+      };
+      request.onsuccess = function() {
+        var db = request.result;
+        // A connection the browser closes under us -- the user clears site data,
+        // the origin is evicted, a version change lands in another tab -- must
+        // not stay in the cache. Every later transaction on it throws, and the
+        // cached promise would keep handing the same dead connection back.
+        db.onclose = function() { cn1VaultDbPromise = null; };
+        db.onversionchange = function() {
+          cn1VaultDbPromise = null;
+          try { db.close(); } catch (ignored) { /* already closing */ }
+        };
+        resolve(db);
+      };
+      request.onerror = function() { reject({ cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE }); };
+      request.onblocked = function() { reject({ cn1VaultStatus: CN1V_TEMPORARILY_UNREADABLE }); };
+    });
+    cn1VaultDbPromise['catch'](function() { cn1VaultDbPromise = null; });
+    return cn1VaultDbPromise;
+  }
+
+  /// Settles when the transaction actually commits.
+  ///
+  /// An IndexedDB request fires ``onsuccess`` while its transaction is still open, so a value
+  /// returned at that point describes a write that has not happened yet: the transaction can
+  /// still abort -- quota, a storage failure, the tab going away -- and everything in it is
+  /// discarded. Handing back a freshly generated key there let the caller wrap real records
+  /// under a key that never became durable, and after a reload the ciphertext beside it, up to
+  /// and including a managed database key, opened with nothing.
+  function cn1VaultCommit(tx) {
+    return new Promise(function(resolve, reject) {
+      tx.oncomplete = function() { resolve(); };
+      tx.onabort = function() {
+        reject(tx.error || { cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE });
+      };
+      // Deliberately NO tx.onerror. preventDefault on a request error stops the default action
+      // -- the abort -- but it does not stop the event PROPAGATING, so a handled ConstraintError
+      // still reaches the transaction. Rejecting there failed the commit for the very case the
+      // handling exists to allow, and the loser of two racing ensureKey calls reported a storage
+      // failure instead of adopting the winner's key. Abort is the authoritative signal: an
+      // error that was not handled aborts, and onabort fires then anyway.
+    });
+  }
+
+  function cn1VaultRequest(store, operation) {
+    return new Promise(function(resolve, reject) {
+      var request;
+      try {
+        request = operation(store);
+      } catch (e) {
+        reject(e);
+        return;
+      }
+      request.onsuccess = function() { resolve(request.result); };
+      request.onerror = function(event) {
+        // Stopped here rather than left to bubble: an unhandled IndexedDB
+        // request error aborts its transaction, which would turn a benign
+        // "this key already exists" into a failed write of everything else.
+        if (request.error && request.error.name === 'ConstraintError') {
+          // preventDefault is what actually stops it. Settling this promise says
+          // nothing to the DOM, so without this the error goes on to abort the
+          // transaction anyway -- which nothing noticed until the commit wait
+          // started observing the outcome, and then the LOSER of two racing
+          // ensureKey calls reported STORAGE_UNAVAILABLE instead of adopting the
+          // winner's key. The comment above described the intent; this line is
+          // the part that carries it out.
+          if (event && event.preventDefault) {
+            event.preventDefault();
+          }
+          resolve(undefined);
+        } else {
+          reject(request.error || { cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE });
+        }
+      };
+    });
+  }
+
+  function cn1VaultRead(keyId) {
+    return cn1VaultOpenDb().then(function(db) {
+      var tx;
+      try {
+        tx = db.transaction(CN1_VAULT_STORE, 'readonly');
+      } catch (closed) {
+        // Opening a transaction on a closed connection throws rather than
+        // calling an error handler. Caught here so the caller sees a storage
+        // failure and not "no key", which is the answer that would have the
+        // Java side create a replacement.
+        cn1VaultDbPromise = null;
+        throw closed;
+      }
+      return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+        return store.get(String(keyId));
+      });
+    });
+  }
+
+  function cn1VaultEnsureKey(keyId) {
+    var api = cn1CryptoApi();
+    return cn1VaultRead(keyId).then(function(existing) {
+      if (existing && existing.key) {
+        return existing.key;
+      }
+      return api.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])
+        .then(function(key) {
+          return cn1VaultOpenDb().then(function(db) {
+            var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+            // ``add`` and not ``put``. This is the whole of the cross-tab
+            // convergence: two tabs that both found nothing each generate a
+            // key, and the store accepts exactly one of them -- the second
+            // fails with a ConstraintError, which cn1VaultRequest turns into
+            // ``undefined`` rather than an error. The loser then re-reads and
+            // adopts the winner's key. ``put`` would let the loser overwrite
+            // the winner, and every record the winner had already wrapped
+            // would be unopenable.
+            return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+              return store.add({ id: String(keyId), key: key, created: 0 });
+            }).then(function(added) {
+              // Committed before the key is handed back. A ConstraintError has already been
+              // turned into ``undefined`` above rather than left to bubble, so the transaction
+              // is still live either way and this waits for its real outcome.
+              return cn1VaultCommit(tx).then(function() {
+                if (added !== undefined) {
+                  return key;
+                }
+                return cn1VaultRead(keyId).then(function(settled) {
+                  if (settled && settled.key) {
+                    return settled.key;
+                  }
+                  throw { cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE };
+                });
+              });
+            });
+          });
+        });
+    });
+  }
+
+  function cn1VaultBytes(value) {
+    if (value == null) {
+      return new Uint8Array(0);
+    }
+    return value instanceof Uint8Array ? value : new Uint8Array(value);
+  }
+
+  /// A string as the UTF-8 bytes a Java native expects after the status byte.
+  ///
+  /// TextEncoder where it exists, which is every browser this port supports; the manual encoder
+  /// is there because the bridge also runs under the test harness, where it may not.
+  function cn1VaultUtf8Bytes(text) {
+    var value = String(text == null ? '' : text);
+    if (typeof TextEncoder === 'function') {
+      return new TextEncoder().encode(value);
+    }
+    var out = [];
+    for (var i = 0; i < value.length; i++) {
+      var cp = value.charCodeAt(i);
+      if (cp >= 0xd800 && cp <= 0xdbff && i + 1 < value.length) {
+        var next = value.charCodeAt(i + 1);
+        if (next >= 0xdc00 && next <= 0xdfff) {
+          cp = 0x10000 + ((cp - 0xd800) << 10) + (next - 0xdc00);
+          i++;
+        }
+      }
+      if (cp < 0x80) {
+        out.push(cp);
+      } else if (cp < 0x800) {
+        out.push(0xc0 | (cp >> 6), 0x80 | (cp & 0x3f));
+      } else if (cp < 0x10000) {
+        out.push(0xe0 | (cp >> 12), 0x80 | ((cp >> 6) & 0x3f), 0x80 | (cp & 0x3f));
+      } else {
+        out.push(0xf0 | (cp >> 18), 0x80 | ((cp >> 12) & 0x3f),
+                 0x80 | ((cp >> 6) & 0x3f), 0x80 | (cp & 0x3f));
+      }
+    }
+    return new Uint8Array(out);
+  }
+
+  function cn1VaultReply(status, payload) {
+    var body = payload == null ? new Uint8Array(0) : cn1VaultBytes(payload);
+    var out = new Array(body.length + 1);
+    out[0] = status & 0xff;
+    for (var i = 0; i < body.length; i++) {
+      out[i + 1] = body[i] & 0xff;
+    }
+    return out;
+  }
+
+  function cn1VaultStatusOf(error) {
+    if (error && typeof error.cn1VaultStatus === 'number') {
+      return error.cn1VaultStatus;
+    }
+    var name = error && error.name ? String(error.name) : '';
+    if (name === 'QuotaExceededError') {
+      return CN1V_QUOTA_EXCEEDED;
+    }
+    if (name === 'OperationError') {
+      // What Web Crypto reports for a failed AES-GCM tag. It is also what it
+      // reports for some malformed inputs, and the two are not distinguishable
+      // from here -- which is fine, because telling a caller which of them it
+      // was would tell an attacker too.
+      return CN1V_AUTH_FAILED;
+    }
+    if (name === 'NotSupportedError' || name === 'InvalidAccessError') {
+      return CN1V_CRYPTO_UNAVAILABLE;
+    }
+    if (name === 'InvalidStateError' || name === 'UnknownError') {
+      return CN1V_STORAGE_UNAVAILABLE;
+    }
+    if (!cn1VaultSecureContext()) {
+      return CN1V_INSECURE_CONTEXT;
+    }
+    return CN1V_UNKNOWN;
+  }
+
+  function cn1VaultCapabilities() {
+    var bits = 0;
+    if (cn1VaultSecureContext()) {
+      bits |= 1;
+    }
+    var api = global.crypto || (global.window && global.window.crypto);
+    if (api && api.subtle) {
+      bits |= 2;
+    }
+    // Opening a database does not prove it can commit a non-extractable CryptoKey. Quota and
+    // structured-clone failures must keep remembered policies unavailable, too.
+    return cn1VaultProbeStorage().then(function() {
+      bits |= 4;
+      return cn1VaultPersisted();
+    }, function() {
+      return false;
+    }).then(function(persisted) {
+      if (persisted) {
+        bits |= 8;
+      }
+      return cn1VaultClientCapabilities.then(function(caps) {
+        if (cn1VaultPrfCapable(caps)) {
+          bits |= 16;
+        }
+        return cn1VaultReply(CN1V_OK, [bits]);
+      });
+    });
+  }
+
+  function cn1VaultProbeStorage() {
+    var id;
+    var addedProbe = false;
+    return Promise.resolve().then(function() {
+      if (!cn1VaultSecureContext()) {
+        throw { cn1VaultStatus: CN1V_INSECURE_CONTEXT };
+      }
+      var api = cn1CryptoApi();
+      var random = cn1VaultRandom(32);
+      id = 'probe:';
+      for (var i = 0; i < random.length; i++) {
+        id += ('0' + random[i].toString(16)).slice(-2);
+      }
+      return api.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false,
+        ['encrypt', 'decrypt']);
+    }).then(function(key) {
+      return cn1VaultOpenDb().then(function(db) {
+        var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+        return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+          return store.add({ id: id, key: key, created: 0 });
+        }).then(function(added) {
+          addedProbe = added !== undefined;
+          return cn1VaultCommit(tx).then(function() {
+            if (added === undefined) {
+              throw { cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE };
+            }
+            return cn1VaultRead(id);
+          });
+        });
+      }).then(function(found) {
+        if (!found || !found.key || found.key.extractable !== false) {
+          throw { cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE };
+        }
+        // The clone must remain a usable key, not just a record that resembles one.
+        var nonce = cn1VaultRandom(CN1_VAULT_NONCE);
+        return cn1CryptoApi().subtle.encrypt({ name: 'AES-GCM', iv: nonce }, found.key,
+          new Uint8Array([1])).then(function(sealed) {
+          return cn1CryptoApi().subtle.decrypt({ name: 'AES-GCM', iv: nonce }, key, sealed);
+        });
+      });
+    }).then(function() {
+      return removeProbe();
+    }, function(error) {
+      return removeProbe().then(function() { throw error; }, function() { throw error; });
+    });
+
+    function removeProbe() {
+      if (!addedProbe) {
+        return Promise.resolve();
+      }
+      return cn1VaultOpenDb().then(function(db) {
+        var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+        return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+          return store.delete(id);
+        }).then(function() {
+          return cn1VaultCommit(tx);
+        });
+      }).then(function() {
+        return cn1VaultRead(id);
+      }).then(function(remaining) {
+        if (remaining) {
+          throw { cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE };
+        }
+      });
+    }
+  }
+
+  function cn1VaultPersisted() {
+    var nav = global.navigator || (global.window && global.window.navigator);
+    if (!nav || !nav.storage || typeof nav.storage.persisted !== 'function') {
+      return Promise.resolve(false);
+    }
+    return nav.storage.persisted().then(function(value) {
+      return !!value;
+    }, function() {
+      return false;
+    });
+  }
+
+  function cn1VaultPrfCapable(caps) {
+    // Presence of the API, plus the one PRF signal a browser exposes without a
+    // ceremony. Whether a given AUTHENTICATOR implements the extension is still
+    // only discoverable by performing one -- so this bit says "worth offering"
+    // rather than "supported", and the Java side treats it the same way.
+    //
+    // What it must not do is say yes on a browser that has WebAuthn and no PRF
+    // at all: that set CAP_WEBAUTHN_PRF, VaultCapabilities then advertised
+    // REQUIRE_USER_VERIFICATION, applications offered a policy to the user, and
+    // enrolment failed later when the ceremony came back with no prf.enabled.
+    // getClientCapabilities is the browser saying so up front where it exists.
+    var w = global.window || global;
+    if (!(w.PublicKeyCredential && typeof w.PublicKeyCredential === 'function'
+        && w.navigator && w.navigator.credentials)) {
+      return false;
+    }
+    if (caps && typeof caps === 'object') {
+      // Present and false is a definite no; absent means the browser does not
+      // report this, and the ceremony stays the only way to find out.
+      if (caps.extensionPrf === false || caps['extension:prf'] === false) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // Start once at bridge load. Capability requests await the same result instead of treating
+  // a pending definitive answer as support. Missing/refused APIs leave the ceremony as the
+  // remaining signal, just as browsers without getClientCapabilities do.
+  var cn1VaultClientCapabilities = (function () {
+    try {
+      var w = global.window || global;
+      if (w.PublicKeyCredential
+          && typeof w.PublicKeyCredential.getClientCapabilities === 'function') {
+        return Promise.resolve(w.PublicKeyCredential.getClientCapabilities()).then(function (caps) {
+          return caps;
+        }, function () {
+          return null;
+        });
+      }
+    } catch (ignored) {
+      // Nothing here may prevent the bridge from loading.
+    }
+    return Promise.resolve(null);
+  })();
+
+
+  // --------------------------------------------------------------------------
+  // Passkey-derived key material, via the WebAuthn PRF extension.
+  //
+  // A passkey signature is not an encryption key, and the common mistake is to
+  // treat one as the other -- signing a fixed challenge and hashing the
+  // signature gives something that looks stable and is not: signatures are
+  // randomised, and ECDSA's are different every time. The PRF extension is the
+  // part of WebAuthn that genuinely does derive a key: the authenticator
+  // evaluates its own HMAC secret over a salt we supply, so the same credential
+  // and the same salt give the same 32 bytes every time, and no other credential
+  // can produce them.
+  //
+  // What that buys over the IndexedDB device key: the material does not exist
+  // until the user verifies to the authenticator. A copied browser profile
+  // carries the credential id, which is not a secret, and cannot produce the
+  // PRF output without the authenticator and the user. That is the one place a
+  // browser can offer something the non-extractable CryptoKey cannot.
+  //
+  // What it does not buy: anything at all once the vault is unlocked. The
+  // derived key is in the page's memory from that moment, exactly as the other
+  // path's is.
+  // --------------------------------------------------------------------------
+
+  var CN1_PRF_STORE_PREFIX = 'prf:';
+
+  function cn1VaultWebAuthn() {
+    var w = global.window || global;
+    if (!w.navigator || !w.navigator.credentials || !w.PublicKeyCredential) {
+      return null;
+    }
+    return w.navigator.credentials;
+  }
+
+  function cn1VaultRandom(length) {
+    var out = new Uint8Array(length);
+    cn1CryptoApi().getRandomValues(out);
+    return out;
+  }
+
+  // No relying-party id is set, anywhere in this file, and that is deliberate.
+  // Left unset the browser uses the origin's own effective domain, which is what
+  // a single-origin application wants; setting it from ``location.hostname``
+  // adds a way to get a subdomain deployment wrong and buys nothing.
+  //
+  // Worth knowing separately, because it looks like the same problem and is not:
+  // **WebAuthn does not work on an IP-address origin at all.** A relying-party
+  // id has to be a domain, an IP literal is not one, and Chrome answers
+  // ``SecurityError: This is an invalid domain.`` no matter what is passed --
+  // measured against 127.0.0.1. Serve the application from a hostname, which for
+  // local development means ``localhost`` rather than ``127.0.0.1``.
+
+  function cn1VaultPrfRecord(keyId) {
+    return cn1VaultRead(CN1_PRF_STORE_PREFIX + keyId);
+  }
+
+  /// Stores the credential and answers with the record that actually SETTLED.
+  ///
+  /// Not with the one passed in. ``add`` converges two tabs on a single credential, and the
+  /// loser's own record is discarded -- so a tab that asked for a device-bound passkey and lost
+  /// the race to a tab that did not would otherwise report success and then derive under the
+  /// syncable credential the winner stored. The caller has to see what won in order to judge it,
+  /// so the settled record is what comes back.
+  /// Adds one secure-storage record if its id is free, and answers whichever record settled.
+  ///
+  /// ``add`` and not ``put``, for the reason the device key gives: two tabs opening the same
+  /// managed database both find nothing, both generate a value, and the store must accept
+  /// exactly one. The loser's add fails with a ConstraintError -- which cn1VaultRequest turns
+  /// into ``undefined`` -- and it then re-reads and adopts the winner's record. With ``put`` the
+  /// loser would overwrite the winner, and the database the winner had already created under its
+  /// value would not open again.
+  function cn1SecureStoreSetIfAbsent(entry, sealed) {
+    return cn1VaultOpenDb().then(function(db) {
+      var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+      var id = CN1_SECURE_STORE_PREFIX + String(entry);
+      return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+        return store.add({ id: id, sealed: String(sealed), created: 0 });
+      }).then(function() {
+        return cn1VaultCommit(tx).then(function() {
+          // Re-read ALWAYS, not only when the add was refused. A successful add says this tab
+          // won the create; it does not say the record still holds what this tab wrote, because
+          // cn1SecureStoreSet puts into the same id and an ordinary set() from another tab can
+          // land between the add and this answer. Returning ``sealed`` there sent the caller
+          // back its own superseded ciphertext, which it then mirrored into ordinary storage
+          // over the newer value -- a lost update that the atomic create was supposed to rule
+          // out. Whatever the store actually holds is the only answer that cannot be stale.
+          // The add's own result is therefore not read at all, and the refusal path costs
+          // nothing extra: it always needed this read.
+          return cn1VaultOpenDb().then(function(again) {
+            var read = again.transaction(CN1_VAULT_STORE, 'readonly');
+            return cn1VaultRequest(read.objectStore(CN1_VAULT_STORE), function(store) {
+              return store.get(id);
+            }).then(function(found) {
+              if (found && typeof found.sealed === 'string') {
+                return found.sealed;
+              }
+              // Gone between the write and the read -- another tab removed it. Nothing is
+              // stored, and reporting this tab's own value would be a lie about what persisted.
+              throw new Error('NotFoundError');
+            });
+          });
+        });
+      });
+    });
+  }
+
+  /// Reads one secure-storage record without creating it.
+  ///
+  /// The mirror into ordinary Storage needs to know whether the record it is about to copy is
+  /// still the one the store holds. Doing that by calling the create again would be wrong in the
+  /// one case that matters -- a record deleted in between would be RE-CREATED by the probe -- so
+  /// this is its own read-only op.
+  function cn1SecureStoreRead(entry) {
+    return cn1VaultOpenDb().then(function(db) {
+      var read = db.transaction(CN1_VAULT_STORE, 'readonly');
+      return cn1VaultRequest(read.objectStore(CN1_VAULT_STORE), function(store) {
+        return store.get(CN1_SECURE_STORE_PREFIX + String(entry));
+      }).then(function(found) {
+        // An absent record answers the empty string, which the Java side treats as "nothing to
+        // agree with" rather than as a value.
+        return found && typeof found.sealed === 'string' ? found.sealed : '';
+      });
+    });
+  }
+
+  /// Writes one secure-storage record, replacing whatever was there.
+  ///
+  /// ``put`` and not ``add``, because this is set(): last write wins is what it means. What it
+  /// is FOR is that an ordinary set() has to settle in the same place a create does. It used to
+  /// write ordinary Storage only, so a tab paused inside setIfAbsent -- past its "nothing here"
+  /// check -- could create the gate afterwards and mirror its own candidate over the value this
+  /// call had already stored. With both writers going through this store, the create's re-read
+  /// sees the newer record and adopts it, and the one window left is two concurrent set() calls,
+  /// where last-write-wins is the contract rather than a lost update.
+  function cn1SecureStoreSet(entry, sealed) {
+    return cn1VaultOpenDb().then(function(db) {
+      var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+      return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+        return store.put({
+          id: CN1_SECURE_STORE_PREFIX + String(entry),
+          sealed: String(sealed),
+          created: 0
+        });
+      }).then(function() {
+        // Durable before it is called done, for the reason on cn1VaultCommit.
+        return cn1VaultCommit(tx);
+      });
+    });
+  }
+
+  /// Releases the gate for one entry ONLY while it still holds the record the caller wrote.
+  ///
+  /// A rollback deletes the gate because the value it just settled could not be mirrored. By the
+  /// time it runs, another tab may have replaced that record through cn1SecureStoreSet -- and
+  /// deleting unconditionally then discards a value whose set() has already reported success,
+  /// after which a third tab that had observed absence wins the empty gate and mirrors over it.
+  /// The comparison and the delete are in ONE transaction, so nothing can land between them.
+  ///
+  /// Declining is not a failure: it means somebody else owns the record now, which is exactly
+  /// when the caller must not remove it.
+  function cn1SecureStoreForgetIf(entry, expected) {
+    return cn1VaultOpenDb().then(function(db) {
+      var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+      var id = CN1_SECURE_STORE_PREFIX + String(entry);
+      var store = tx.objectStore(CN1_VAULT_STORE);
+      return cn1VaultRequest(store, function(s) {
+        return s.get(id);
+      }).then(function(found) {
+        if (!found || typeof found.sealed !== 'string' || found.sealed !== String(expected)) {
+          return cn1VaultCommit(tx);
+        }
+        return cn1VaultRequest(store, function(s) {
+          return s.delete(id);
+        }).then(function() {
+          return cn1VaultCommit(tx);
+        });
+      });
+    });
+  }
+
+  /// Releases the gate for one entry, so a later create can win it again.
+  ///
+  /// remove() clears the value from ordinary storage; without this the record that settled the
+  /// race would stay, and the next setIfAbsent would answer with a credential the caller had
+  /// just been told was forgotten.
+  function cn1SecureStoreForget(entry) {
+    return cn1VaultOpenDb().then(function(db) {
+      var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+      return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+        return store.delete(CN1_SECURE_STORE_PREFIX + String(entry));
+      }).then(function() {
+        // Durable before it is called done, for the reason on cn1VaultCommit: a delete that is
+        // still only in a transaction can be lost, and the gate would then outlive the value.
+        return cn1VaultCommit(tx);
+      });
+    });
+  }
+
+  /// Keeps secure-storage records from colliding with the device key and the passkey records,
+  /// which share this object store.
+  var CN1_SECURE_STORE_PREFIX = 'cn1ss.';
+
+  function cn1VaultStorePrfRecord(keyId, record) {
+    return cn1VaultOpenDb().then(function(db) {
+      var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+      return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+        // ``add`` for the same reason the device key uses it: two tabs enrolling
+        // at once must converge on one credential rather than the second
+        // replacing the first, whose wraps would then be unopenable.
+        return store.add({
+          id: CN1_PRF_STORE_PREFIX + keyId,
+          credentialId: record.credentialId,
+          salt: record.salt,
+          backupEligible: record.backupEligible,
+          deviceBound: record.deviceBound,
+          created: 0
+        });
+      }).then(function(added) {
+        // Durable before it is described as stored, for the reason on cn1VaultCommit.
+        return cn1VaultCommit(tx).then(function() {
+          if (added !== undefined) {
+            return record;
+          }
+          return cn1VaultPrfRecord(keyId);
+        });
+      });
+    });
+  }
+
+  /// Whether a created credential is allowed to leave this device.
+  ///
+  /// Attachment is the wrong thing to ask. ``authenticatorAttachment: 'platform'``
+  /// is satisfied by an iCloud Keychain passkey, which is platform-attached and
+  /// syncs to every device on the account -- so a check written against
+  /// attachment reports device-binding it does not have.
+  ///
+  /// The flag that actually answers it is BE (backup eligible) in the
+  /// authenticator data: set means the credential may be copied off this device,
+  /// whether or not it has been yet. BS (backup state) says whether it currently
+  /// is. Byte 32 of the authenticator data holds the flags; BE is 0x08, BS 0x10.
+  ///
+  /// Returns null when the browser will not hand over the authenticator data, in
+  /// which case backup eligibility is unknown -- and a caller that required
+  /// device binding must treat unknown as "not guaranteed".
+  function cn1VaultBackupFlags(credential) {
+    try {
+      var response = credential && credential.response;
+      if (!response || typeof response.getAuthenticatorData !== 'function') {
+        return null;
+      }
+      var data = new Uint8Array(response.getAuthenticatorData());
+      if (data.length < 33) {
+        return null;
+      }
+      var flags = data[32];
+      return { backupEligible: (flags & 0x08) !== 0, backedUp: (flags & 0x10) !== 0 };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Whether a stored credential satisfies a device-bound requirement.
+  ///
+  /// Both halves matter and they are different questions. ``backupEligible`` is the BE flag the
+  /// authenticator set: 1 means the credential may sync, and it is also what this port stores
+  /// when the authenticator would not say. ``deviceBound`` records that the credential was
+  /// CREATED under the platform constraint -- without it a roaming security key qualifies, since
+  /// it never syncs to a cloud and so reports backupEligible 0 while being physically carried
+  /// from device to device. Requiring only the flag accepted exactly that.
+  function cn1VaultRecordIsDeviceBound(record) {
+    return !!record && record.backupEligible === 0 && record.deviceBound === 1;
+  }
+
+  /// Creates a passkey and confirms the authenticator will actually evaluate a PRF.
+  ///
+  /// ``prf.enabled`` from the creation ceremony is the only honest signal here:
+  /// most authenticators do not return PRF *results* during creation, so a flow
+  /// that expected them would report every working authenticator as unsupported.
+  /// The salt is generated now and stored beside the credential id, because the
+  /// derived key is a function of both and a lost salt is a lost vault.
+  function cn1VaultPrfEnroll(keyId, userName, deviceBound) {
+    var credentials = cn1VaultWebAuthn();
+    if (!credentials) {
+      return Promise.resolve(cn1VaultReply(CN1V_UNKNOWN, null));
+    }
+    return cn1VaultPrfRecord(keyId).then(function(existing) {
+      if (existing && existing.credentialId) {
+        // An existing credential still has to satisfy the policy being asked for NOW.
+        // Reporting OK on its mere existence is how a vault enrolled with a syncable
+        // passkey kept being re-wrapped under it after the application added
+        // requireDeviceBoundPasskey() -- the strong name over the weaker thing, which
+        // is the one outcome that option exists to prevent. backupEligible is stored
+        // as 1 both for "may leave this device" and for "would not say", and neither
+        // is device bound, so compliance is exactly backupEligible === 0.
+        if (deviceBound && !cn1VaultRecordIsDeviceBound(existing)) {
+          return cn1VaultReply(CN1V_POLICY_NOT_MET, null);
+        }
+        return cn1VaultReply(CN1V_OK, null);
+      }
+      var userId = cn1VaultRandom(16);
+      var options = {
+        challenge: cn1VaultRandom(32),
+        rp: { name: 'Codename One' },
+        user: {
+          id: userId,
+          name: userName || 'vault',
+          displayName: userName || 'vault'
+        },
+        pubKeyCredParams: [
+          { type: 'public-key', alg: -7 },
+          { type: 'public-key', alg: -257 }
+        ],
+        authenticatorSelection: {
+          residentKey: 'required',
+          requireResidentKey: true,
+          userVerification: 'required'
+        },
+        extensions: { prf: {} }
+      };
+      if (deviceBound) {
+        // Narrows the field to authenticators built into this machine. Necessary
+        // and not sufficient -- the BE flag below is what actually decides -- but
+        // it keeps the chooser from offering a phone or a security key for a
+        // credential we are about to refuse anyway.
+        options.authenticatorSelection.authenticatorAttachment = 'platform';
+      }
+      return credentials.create({ publicKey: options }).then(function(credential) {
+        var results = credential.getClientExtensionResults
+          ? credential.getClientExtensionResults() : {};
+        if (!results || !results.prf || !results.prf.enabled) {
+          // The authenticator registered a passkey and will not evaluate a PRF.
+          // Reported as unsupported rather than kept: a credential that cannot
+          // derive is a prompt with nothing behind it.
+          return cn1VaultReply(CN1V_UNKNOWN, null);
+        }
+        var flags = cn1VaultBackupFlags(credential);
+        if (deviceBound && (flags === null || flags.backupEligible)) {
+          // Refused rather than kept. The application asked for a key that cannot
+          // leave this device, and this credential either may leave it or will
+          // not say -- and a credential kept here would silently be the weaker
+          // thing under the stronger name. The passkey itself stays on the
+          // authenticator; only this vault's reference to it is dropped.
+          return cn1VaultReply(CN1V_POLICY_NOT_MET, null);
+        }
+        var record = {
+          credentialId: new Uint8Array(credential.rawId),
+          salt: cn1VaultRandom(32),
+          backupEligible: flags === null ? 1 : (flags.backupEligible ? 1 : 0),
+          deviceBound: deviceBound ? 1 : 0
+        };
+        return cn1VaultStorePrfRecord(keyId, record).then(function(settled) {
+          // Judged against what settled, not against what this tab created. Another tab can
+          // win the add between the read at the top of this function and here, and if it was
+          // not asking for a device-bound credential its syncable one is now the vault's --
+          // which is exactly the credential requireDeviceBoundPasskey() exists to refuse.
+          if (!settled || !settled.credentialId) {
+            return cn1VaultReply(CN1V_STORAGE_UNAVAILABLE, null);
+          }
+          if (deviceBound && !cn1VaultRecordIsDeviceBound(settled)) {
+            return cn1VaultReply(CN1V_POLICY_NOT_MET, null);
+          }
+          return cn1VaultReply(CN1V_OK, null);
+        });
+      }, function(error) {
+        return cn1VaultReply(cn1VaultPrfStatusOf(error), null);
+      });
+    }, function(error) {
+      return cn1VaultReply(cn1VaultStatusOf(error), null);
+    });
+  }
+
+  /// Derives the 32 bytes for this vault, prompting the user.
+  function cn1VaultPrfDerive(keyId) {
+    var credentials = cn1VaultWebAuthn();
+    if (!credentials) {
+      return Promise.resolve(cn1VaultReply(CN1V_UNKNOWN, null));
+    }
+    return cn1VaultPrfRecord(keyId).then(function(record) {
+      if (!record || !record.credentialId) {
+        return cn1VaultReply(CN1V_KEY_MISSING, null);
+      }
+      var options = {
+        challenge: cn1VaultRandom(32),
+        allowCredentials: [{
+          type: 'public-key',
+          id: cn1VaultBytes(record.credentialId)
+        }],
+        userVerification: 'required',
+        extensions: { prf: { eval: { first: cn1VaultBytes(record.salt) } } }
+      };
+      return credentials.get({ publicKey: options }).then(function(assertion) {
+        var results = assertion.getClientExtensionResults
+          ? assertion.getClientExtensionResults() : {};
+        var first = results && results.prf && results.prf.results
+          ? results.prf.results.first : null;
+        if (!first) {
+          return cn1VaultReply(CN1V_UNKNOWN, null);
+        }
+        return cn1VaultReply(CN1V_OK, new Uint8Array(first));
+      }, function(error) {
+        return cn1VaultReply(cn1VaultPrfStatusOf(error), null);
+      });
+    }, function(error) {
+      return cn1VaultReply(cn1VaultStatusOf(error), null);
+    });
+  }
+
+  /// Whether a passkey is enrolled for this vault, asked without prompting anybody.
+  ///
+  /// Separate from deriving on purpose: a capability question must not put a
+  /// biometric prompt on screen, and a caller deciding whether to offer the
+  /// option would otherwise have to ask for the thing it is offering.
+  function cn1VaultPrfState(keyId) {
+    return cn1VaultPrfRecord(keyId).then(function(record) {
+      if (!record || !record.credentialId) {
+        return cn1VaultReply(CN1V_OK, [0, 0]);
+      }
+      // Second byte: 1 when the credential may leave this device, or when the
+      // browser would not say. Unknown is reported as "may leave" on purpose --
+      // an application describing its own protection to a user must not round a
+      // missing answer up into a guarantee.
+      return cn1VaultReply(CN1V_OK, [1, record.backupEligible ? 1 : 0]);
+    }, function(error) {
+      return cn1VaultReply(cn1VaultStatusOf(error), null);
+    });
+  }
+
+  function cn1VaultPrfForget(keyId) {
+    return cn1VaultOpenDb().then(function(db) {
+      var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+      return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+        return store['delete'](CN1_PRF_STORE_PREFIX + String(keyId));
+      }).then(function() {
+        // A deletion is not a deletion until its transaction commits, for the same reason a
+        // write is not a write. Reporting OK on the request alone let "forget this device"
+        // succeed while the record survived the abort -- and a later enrolment would then find
+        // it and adopt it.
+        return cn1VaultCommit(tx).then(function() {
+          return cn1VaultReply(CN1V_OK, null);
+        });
+      });
+      // then(null, fn) and not then(ok, fn): a handler passed as the SECOND argument sees only
+      // the rejection of the promise it is attached to, never one raised inside its own sibling
+      // -- so the commit rejection above sailed past it and became an unhandled rejection.
+    }).then(null, function(error) {
+      return cn1VaultReply(cn1VaultStatusOf(error), null);
+    });
+  }
+
+  function cn1VaultPrfStatusOf(error) {
+    var name = error && error.name ? String(error.name) : '';
+    if (name === 'NotAllowedError' || name === 'AbortError') {
+      // The user dismissed the prompt, or it timed out. Not a failure to report
+      // as one: the difference between "cancelled" and "failed" is the
+      // difference between an error dialog and no dialog.
+      return CN1V_CANCELLED;
+    }
+    if (name === 'InvalidStateError') {
+      // A credential for this relying party already exists on the authenticator.
+      return CN1V_KEY_MISSING;
+    }
+    if (name === 'NotSupportedError' || name === 'ConstraintError') {
+      return CN1V_UNKNOWN;
+    }
+    if (name === 'SecurityError') {
+      return CN1V_INSECURE_CONTEXT;
+    }
+    return cn1VaultStatusOf(error);
+  }
+
+  hostBridge.register('__cn1_vault__', function(request) {
+    var op = request && request.op;
+    try {
+      if (op === 'capabilities') {
+        return cn1VaultCapabilities();
+      }
+      if (op === 'keyState') {
+        return cn1VaultRead(request.keyId).then(function(existing) {
+          return cn1VaultReply(CN1V_OK, [existing && existing.key ? 1 : 0]);
+        }, function(error) {
+          // Deliberately not "absent". A store that could not be asked and a
+          // store that answered "nothing here" lead to opposite decisions on
+          // the Java side, and collapsing them is how a device key that was
+          // there all along gets replaced.
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+      if (op === 'secureStoreForgetIf') {
+        return cn1SecureStoreForgetIf(request.entry, request.sealed).then(function() {
+          return cn1VaultReply(CN1V_OK, null);
+        }, function(error) {
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+      if (op === 'secureStoreForget') {
+        return cn1SecureStoreForget(request.entry).then(function() {
+          return cn1VaultReply(CN1V_OK, null);
+        }, function(error) {
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+      if (op === 'secureStoreRead') {
+        return cn1SecureStoreRead(request.entry).then(function(sealed) {
+          return cn1VaultReply(CN1V_OK, cn1VaultUtf8Bytes(sealed));
+        }, function(error) {
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+      if (op === 'secureStoreSet') {
+        return cn1SecureStoreSet(request.entry, request.sealed).then(function() {
+          return cn1VaultReply(CN1V_OK, null);
+        }, function(error) {
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+      if (op === 'secureStoreSetIfAbsent') {
+        return cn1SecureStoreSetIfAbsent(request.entry, request.sealed).then(function(settled) {
+          return cn1VaultReply(CN1V_OK, cn1VaultUtf8Bytes(settled));
+        }, function(error) {
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+      if (op === 'ensureKey') {
+        return cn1VaultEnsureKey(request.keyId).then(function() {
+          return cn1VaultReply(CN1V_OK, null);
+        }, function(error) {
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+      if (op === 'wrap') {
+        var api = cn1CryptoApi();
+        return cn1VaultEnsureKey(request.keyId).then(function(key) {
+          var nonce = new Uint8Array(CN1_VAULT_NONCE);
+          // Fresh for every wrap, from the platform CSPRNG. A repeated nonce
+          // under one AES-GCM key is catastrophic rather than merely weak, and
+          // there is no code path here that can supply one from outside.
+          api.getRandomValues(nonce);
+          var algorithm = { name: 'AES-GCM', iv: nonce, tagLength: 128 };
+          if (request.aad != null) {
+            algorithm.additionalData = cn1VaultBytes(request.aad);
+          }
+          return api.subtle.encrypt(algorithm, key, cn1VaultBytes(request.data))
+            .then(function(cipher) {
+              var body = new Uint8Array(CN1_VAULT_NONCE + cipher.byteLength);
+              body.set(nonce, 0);
+              body.set(new Uint8Array(cipher), CN1_VAULT_NONCE);
+              return cn1VaultReply(CN1V_OK, body);
+            });
+        }, function(error) {
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        })['catch'](function(error) {
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+      if (op === 'unwrap') {
+        var cryptoApi = cn1CryptoApi();
+        var sealed = cn1VaultBytes(request.data);
+        if (sealed.length <= CN1_VAULT_NONCE) {
+          return cn1VaultReply(CN1V_UNKNOWN, null);
+        }
+        return cn1VaultRead(request.keyId).then(function(existing) {
+          if (!existing || !existing.key) {
+            // Definite, because the read succeeded. This is the one answer that
+            // lets the Java side create a replacement key.
+            return cn1VaultReply(CN1V_KEY_MISSING, null);
+          }
+          var algorithm = {
+            name: 'AES-GCM',
+            iv: sealed.subarray(0, CN1_VAULT_NONCE),
+            tagLength: 128
+          };
+          if (request.aad != null) {
+            algorithm.additionalData = cn1VaultBytes(request.aad);
+          }
+          return cryptoApi.subtle.decrypt(algorithm, existing.key, sealed.subarray(CN1_VAULT_NONCE))
+            .then(function(plain) {
+              return cn1VaultReply(CN1V_OK, new Uint8Array(plain));
+            }, function() {
+              // No partial result, no "here is what we got". A failed tag means
+              // the bytes are not trustworthy and there is nothing to hand back.
+              return cn1VaultReply(CN1V_AUTH_FAILED, null);
+            });
+        }, function(error) {
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+      if (op === 'prfEnroll') {
+        return cn1VaultPrfEnroll(String(request.keyId), request.userName, !!request.deviceBound);
+      }
+      if (op === 'prfDerive') {
+        return cn1VaultPrfDerive(String(request.keyId));
+      }
+      if (op === 'prfState') {
+        return cn1VaultPrfState(String(request.keyId));
+      }
+      if (op === 'prfForget') {
+        return cn1VaultPrfForget(String(request.keyId));
+      }
+      if (op === 'deleteKey') {
+        return cn1VaultOpenDb().then(function(db) {
+          var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+          return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+            return store['delete'](String(request.keyId));
+          }).then(function() {
+            // Committed before it is called deleted; see cn1VaultPrfForget.
+            return cn1VaultCommit(tx).then(function() {
+              return cn1VaultReply(CN1V_OK, null);
+            });
+          });
+          // then(null, fn); see cn1VaultPrfForget for why the second-argument form is wrong here.
+        }).then(null, function(error) {
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+    } catch (e) {
+      return cn1VaultReply(cn1VaultStatusOf(e), null);
+    }
+    return cn1VaultReply(CN1V_UNKNOWN, null);
+  });
+
+  // CN1_VAULT_BRIDGE_END
+
+  var hostRefNextId = 1;
+  var hostRefById = {};
+  var hostRefByObject = (typeof WeakMap === 'function') ? new WeakMap() : null;
+  // Count of host refs the owning-object finalizer has released (see
+  // releaseHostRefs); retained as a lightweight liveness counter.
+  var __cn1HostRefReleased = 0;
+  var canvasMetaNextId = 1;
+  var canvasMetaByObject = (typeof WeakMap === 'function') ? new WeakMap() : null;
+  var canvasMetaById = {};
+  var canvasOpSeq = 1;
+  var drawMethodNames = {
+    clearRect: true,
+    fillRect: true,
+    strokeRect: true,
+    fillText: true,
+    strokeText: true,
+    drawImage: true,
+    putImageData: true,
+    fill: true,
+    stroke: true
+  };
+  var canvasStateMemberNames = {
+    fillStyle: true,
+    strokeStyle: true,
+    globalAlpha: true,
+    lineWidth: true,
+    globalCompositeOperation: true
+  };
+
+  function describeCanvasStateValue(value) {
+    if (value == null) {
+      return 'null';
+    }
+    if (typeof value === 'string') {
+      return value.length > 40 ? (value.substring(0, 40) + '...') : value;
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return String(value);
+    }
+    if (value && typeof value === 'object') {
+      if (typeof value.width === 'number' && typeof value.height === 'number') {
+        return '[canvas ' + String(value.width | 0) + 'x' + String(value.height | 0) + ']';
+      }
+      if (value.constructor && value.constructor.name) {
+        return '[' + String(value.constructor.name) + ']';
+      }
+    }
+    return String(value);
+  }
+
+  function getCanvasMeta(canvas) {
+    if (!isCanvasLike(canvas)) {
+      return null;
+    }
+    if (canvasMetaByObject && canvasMetaByObject.has(canvas)) {
+      return canvasMetaByObject.get(canvas);
+    }
+    var meta = {
+      id: canvasMetaNextId++,
+      canvas: canvas,
+      opCount: 0,
+      setterCount: 0,
+      methodCount: 0,
+      paintCount: 0,
+      lastSeq: 0,
+      lastPaintSeq: 0,
+      lastKind: 'none',
+      lastMember: 'none',
+      fillStyle: 'unset',
+      strokeStyle: 'unset',
+      globalAlpha: 'unset',
+      lineWidth: 'unset',
+      globalCompositeOperation: 'unset'
+    };
+    canvasMetaById[meta.id] = meta;
+    if (canvasMetaByObject) {
+      canvasMetaByObject.set(canvas, meta);
+    }
+    return meta;
+  }
+
+  function debugCanvasSummary(canvas, source) {
+    if (!isCanvasLike(canvas)) {
+      return null;
+    }
+    var meta = getCanvasMeta(canvas);
+    var scoreMeta = canvasContentScore(canvas);
+    return {
+      id: meta ? (meta.id | 0) : -1,
+      source: source || 'debug',
+      width: (canvas.width | 0),
+      height: (canvas.height | 0),
+      score: scoreMeta && scoreMeta.score != null ? (scoreMeta.score | 0) : -1,
+      signature: scoreMeta && scoreMeta.signature ? String(scoreMeta.signature) : 'none',
+      opCount: meta ? (meta.opCount | 0) : 0,
+      paintCount: meta ? (meta.paintCount | 0) : 0,
+      lastSeq: meta ? (meta.lastSeq | 0) : 0,
+      lastPaintSeq: meta ? (meta.lastPaintSeq | 0) : 0,
+      lastKind: meta ? String(meta.lastKind || 'none') : 'none',
+      lastMember: meta ? String(meta.lastMember || 'none') : 'none',
+      fillStyle: meta ? String(meta.fillStyle || 'unset') : 'unset',
+      strokeStyle: meta ? String(meta.strokeStyle || 'unset') : 'unset',
+      globalAlpha: meta ? String(meta.globalAlpha || 'unset') : 'unset',
+      lineWidth: meta ? String(meta.lineWidth || 'unset') : 'unset',
+      globalCompositeOperation: meta ? String(meta.globalCompositeOperation || 'unset') : 'unset'
+    };
+  }
+
+  function noteCanvasOperation(canvas, kind, member, isPaint, assignedValue) {
+    var meta = getCanvasMeta(canvas);
+    if (!meta) {
+      return null;
+    }
+    meta.opCount++;
+    if (kind === 'setter') {
+      meta.setterCount++;
+    } else if (kind === 'method') {
+      meta.methodCount++;
+    }
+    meta.lastSeq = canvasOpSeq++;
+    meta.lastKind = String(kind || 'unknown');
+    meta.lastMember = String(member || 'unknown');
+    if (kind === 'setter' && canvasStateMemberNames[member]) {
+      meta[member] = describeCanvasStateValue(assignedValue);
+    }
+    if (isPaint) {
+      meta.paintCount++;
+      meta.lastPaintSeq = meta.lastSeq;
+      global.__cn1LastPaintCanvas = canvas;
+      global.__cn1LastPaintMember = meta.lastMember;
+    }
+    return meta;
+  }
+
+  function isHostRefMarker(value) {
+    return !!(value && typeof value === 'object'
+      && value.__cn1HostRef != null
+      && value.__cn1HostRef !== 0);
+  }
+
+  function storeHostRef(value) {
+    if (value == null || (typeof value !== 'object' && typeof value !== 'function')) {
+      return value;
+    }
+    var inferredClass = inferHostClass(value);
+    if (hostRefByObject && hostRefByObject.has(value)) {
+      var existing = { __cn1HostRef: hostRefByObject.get(value) };
+      if (inferredClass) {
+        existing.__cn1HostClass = inferredClass;
+      }
+      return existing;
+    }
+    var id = hostRefNextId++;
+    hostRefById[id] = value;
+    if (hostRefByObject) {
+      hostRefByObject.set(value, id);
+    }
+    var marker = { __cn1HostRef: id };
+    if (inferredClass) {
+      marker.__cn1HostClass = inferredClass;
+    }
+    return marker;
+  }
+
+  function fallbackHostObjectForClass(hostClass) {
+    if (!hostClass) {
+      return null;
+    }
+    if (hostClass.indexOf('com_codename1_impl_html5_JSOImplementations_Window') === 0) {
+      return global.window || null;
+    }
+    if (hostClass.indexOf('com_codename1_impl_html5_JSOImplementations_Document') === 0) {
+      if (global.document) {
+        return global.document;
+      }
+      return global.window && global.window.document ? global.window.document : null;
+    }
+    if (hostClass === 'com_codename1_html5_js_browser_Window') {
+      return global.window || null;
+    }
+    if (hostClass === 'com_codename1_html5_js_dom_HTMLDocument') {
+      if (global.document) {
+        return global.document;
+      }
+      return global.window && global.window.document ? global.window.document : null;
+    }
+    if (hostClass === 'com_codename1_html5_js_dom_HTMLBodyElement') {
+      var doc = global.document || (global.window && global.window.document);
+      return doc && doc.body ? doc.body : null;
+    }
+    return null;
+  }
+
+  function resolveHostRef(marker) {
+    if (!isHostRefMarker(marker)) {
+      return marker;
+    }
+    var id = marker.__cn1HostRef;
+    var existing = hostRefById[id];
+    if (existing != null) {
+      return existing;
+    }
+    var fallback = fallbackHostObjectForClass(marker.__cn1HostClass || null);
+    if (fallback != null) {
+      hostRefById[id] = fallback;
+      if (hostRefByObject) {
+        hostRefByObject.set(fallback, id);
+      }
+      diag('HOST', 'receiverRehydrated', String(marker.__cn1HostClass || 'unknown') + '#' + String(id));
+      return fallback;
+    }
+    return null;
+  }
+
+  // Singletons that must never be released even if the worker reports them
+  // dead: their wrappers are cached for the life of the page. Defensive -- the
+  // display canvas is held by a long-lived Java field so its wrapper never
+  // dies, but guard it anyway.
+  function isProtectedHostRef(value) {
+    // Callers (releaseHostRefs) already screen out null before reaching here.
+    if (value === global || value === global.window) {
+      return true;
+    }
+    var doc = global.document || (global.window && global.window.document);
+    if (doc && (value === doc || value === doc.body
+        || value === doc.documentElement || value === doc.head)) {
+      return true;
+    }
+    if (value.id === 'codenameone-canvas') {
+      return true;
+    }
+    return false;
+  }
+
+  // Drop the host refs the worker's Java-side finalizer reported dead. Each id
+  // belongs to a front-end resource (an image's backing canvas / HTMLImageElement)
+  // whose owning Java image has been GC'd -- the owner was the sole holder of
+  // the id (see parparvm_runtime.js registerNativeResource), so the resource is
+  // genuinely unreachable and safe to evict, freeing the element and its
+  // multi-MB backing store. We release whatever id the owner owned (canvas or
+  // image); the only guard is the never-release singleton allowlist
+  // (window/document/body/the display canvas), which a real image owner can
+  // never legitimately report.
+  function releaseHostRefs(ids) {
+    if (!ids || !ids.length || !hostRefById) {
+      return;
+    }
+    for (var i = 0; i < ids.length; i++) {
+      var id = ids[i];
+      var value = hostRefById[id];
+      if (value == null || isProtectedHostRef(value)) {
+        continue;
+      }
+      delete hostRefById[id];
+      __cn1HostRefReleased++;
+      if (hostRefByObject && typeof hostRefByObject.delete === 'function') {
+        try {
+          hostRefByObject.delete(value);
+        } catch (weakErr) {
+          void weakErr;
+        }
+      }
+    }
+  }
+
+  // Cache of worker-callback proxy functions keyed by the callback ID the
+  // worker minted. addEventListener/removeEventListener parity needs the
+  // *same* real function on both sides of the call, so we memoise here.
+  var workerCallbackProxies = Object.create(null);
+
+  // Serialise the fields of a DOM Event the worker-side EventListener
+  // wrappers in port.js actually read. Everything here is either a
+  // primitive or a host-ref marker so it round-trips through postMessage
+  // without losing information. We extend this as more event types show
+  // up in real user code; the bulk (mouse/key/wheel/resize/popstate) is
+  // covered below.
+  function serializeTouchList(list) {
+    var out = [];
+    for (var i = 0; i < list.length; i++) {
+      var t = list[i] || (typeof list.item === 'function' ? list.item(i) : null);
+      if (!t) {
+        continue;
+      }
+      out.push({
+        identifier: t.identifier | 0,
+        clientX: +t.clientX || 0,
+        clientY: +t.clientY || 0,
+        pageX: +t.pageX || 0,
+        pageY: +t.pageY || 0,
+        screenX: +t.screenX || 0,
+        screenY: +t.screenY || 0
+      });
+    }
+    return out;
+  }
+
+  function serializeEventForWorker(evt) {
+    if (evt == null || typeof evt !== 'object') {
+      return evt;
+    }
+    var out = {
+      type: evt.type || '',
+      bubbles: !!evt.bubbles,
+      cancelable: !!evt.cancelable,
+      defaultPrevented: !!evt.defaultPrevented,
+      eventPhase: evt.eventPhase | 0,
+      timeStamp: +evt.timeStamp || 0
+    };
+    if ('clientX' in evt) out.clientX = +evt.clientX || 0;
+    if ('clientY' in evt) out.clientY = +evt.clientY || 0;
+    if ('pageX'   in evt) out.pageX   = +evt.pageX   || 0;
+    if ('pageY'   in evt) out.pageY   = +evt.pageY   || 0;
+    if ('screenX' in evt) out.screenX = +evt.screenX || 0;
+    if ('screenY' in evt) out.screenY = +evt.screenY || 0;
+    if ('pointerType' in evt) out.pointerType = evt.pointerType == null ? '' : String(evt.pointerType);
+    if ('pointerId' in evt) out.pointerId = evt.pointerId | 0;
+    if ('button'  in evt) out.button  = evt.button  | 0;
+    if ('buttons' in evt) out.buttons = evt.buttons | 0;
+    if ('detail'  in evt) out.detail  = evt.detail  | 0;
+    if ('deltaX'  in evt) out.deltaX  = +evt.deltaX || 0;
+    if ('deltaY'  in evt) out.deltaY  = +evt.deltaY || 0;
+    if ('deltaZ'  in evt) out.deltaZ  = +evt.deltaZ || 0;
+    if ('deltaMode' in evt) out.deltaMode = evt.deltaMode | 0;
+    if ('key'     in evt) out.key     = evt.key == null ? '' : String(evt.key);
+    if ('code'    in evt) out.code    = evt.code == null ? '' : String(evt.code);
+    if ('keyCode' in evt) out.keyCode = evt.keyCode | 0;
+    if ('which'   in evt) out.which   = evt.which   | 0;
+    if ('charCode' in evt) out.charCode = evt.charCode | 0;
+    if ('shiftKey' in evt) out.shiftKey = !!evt.shiftKey;
+    if ('ctrlKey'  in evt) out.ctrlKey  = !!evt.ctrlKey;
+    if ('altKey'   in evt) out.altKey   = !!evt.altKey;
+    if ('metaKey'  in evt) out.metaKey  = !!evt.metaKey;
+    if ('repeat'   in evt) out.repeat   = !!evt.repeat;
+    if ('inputType' in evt) out.inputType = evt.inputType == null ? '' : String(evt.inputType);
+    if ('isComposing' in evt) out.isComposing = !!evt.isComposing;
+    if (evt.clipboardData) {
+      var clipboardTypes = ['text/plain', 'text/html', 'text/rtf', 'text/markdown', 'text/asciidoc'];
+      var clipboardDataByType = {};
+      for (var clipboardIndex = 0; clipboardIndex < clipboardTypes.length; clipboardIndex++) {
+        var clipboardType = clipboardTypes[clipboardIndex];
+        try {
+          clipboardDataByType[clipboardType] = evt.clipboardData.getData(clipboardType) || '';
+        } catch (clipboardErr) {
+          clipboardDataByType[clipboardType] = '';
+        }
+      }
+      out.clipboardDataByType = clipboardDataByType;
+      if (evt.clipboardData.files && evt.clipboardData.files.length > 0
+              && typeof storeHostRef === 'function') {
+        out.clipboardFiles = storeHostRef(evt.clipboardData.files);
+      }
+    }
+    // MessageEvent fields (window.postMessage / BrowserComponent.onMessage).
+    // Without these the worker-side MessageEvent.getDataAsString() returns null
+    // and the source-identity check (getEventSource(e) == iframe.contentWindow)
+    // always fails, so iframe->app messages are silently dropped. ``source`` is
+    // stored as a host-ref so it dedupes to the SAME worker wrapper as
+    // iframe.getContentWindow() (storeHostRef keys by object identity), making
+    // the identity check pass.
+    if ('data' in evt) {
+      var d = evt.data;
+      if (d != null && typeof d === 'object' && typeof storeHostRef === 'function') {
+        out.data = storeHostRef(d);
+      } else {
+        out.data = d;
+        // getDataAsString() resolves to the ``dataAsString`` getter on the
+        // worker side, so expose the string form under that name too.
+        out.dataAsString = d == null ? null : String(d);
+      }
+    }
+    if ('origin' in evt) out.origin = evt.origin == null ? '' : String(evt.origin);
+    if ('lastEventId' in evt) out.lastEventId = evt.lastEventId == null ? '' : String(evt.lastEventId);
+    if (evt.source && typeof storeHostRef === 'function') out.source = storeHostRef(evt.source);
+    // preventDefault / stopPropagation are fire-and-forget from the worker
+    // side (we eagerly call them on the main-thread event just in case).
+    //
+    // A TouchEvent has no clientX/clientY of its own: its coordinates live
+    // only in the three touch lists, so those are copied point by point.
+    // They used to be left out on the theory that the flat fields covered
+    // them, and they do not exist on a touch event -- the port's touch
+    // handlers read getTargetTouches(), got null and threw on every touch,
+    // so a phone could neither scroll nor reliably tap (issue #5912).
+    if (evt.touches) out.touches = serializeTouchList(evt.touches);
+    if (evt.targetTouches) out.targetTouches = serializeTouchList(evt.targetTouches);
+    if (evt.changedTouches) out.changedTouches = serializeTouchList(evt.changedTouches);
+    if (evt.target && typeof storeHostRef === 'function') {
+      out.target = storeHostRef(evt.target);
+    }
+    if (evt.type === 'copy' && evt.target && typeof evt.target.getAttribute === 'function'
+        && evt.target.getAttribute('data-cn1-self-copy') === '1') {
+      out.cn1SelfCopy = true;
+    }
+    if (evt.currentTarget && typeof storeHostRef === 'function') {
+      out.currentTarget = storeHostRef(evt.currentTarget);
+    }
+    // preventDefault / stopPropagation stubs are re-attached on the
+    // worker side (structured-clone postMessage cannot clone functions),
+    // see parparvm_runtime.js `worker-callback` message handling.
+    return out;
+  }
+
+  // Main-thread proxy for a worker-side callback. When the browser fires
+  // a DOM event, we postMessage { type: 'worker-callback', callbackId,
+  // args: [<serialised event>] } back to the worker, which runs the
+  // function that originally produced this ID. We preventDefault/stop
+  // propagation side effects happen on the main-thread event before the
+  // message round-trip, because the worker may not reply synchronously
+  // and a deferred preventDefault would miss the browser's dispatch
+  // window. Apps that depend on conditional preventDefault need to set
+  // it from the native host-bridge path instead.
+  function nativeSelectionElement(node) {
+    for (; node; node = node.parentNode) {
+      if (node.getAttribute && node.getAttribute('data-cn1-native-selection') === 'true') return node;
+    }
+    return null;
+  }
+
+  // Selection happens synchronously in the browser; only a scrolling gesture is
+  // handed back to the canvas. A stationary long press remains native selection.
+  function installNativeTextInteractions() {
+    var doc = global.document;
+    if (!doc || doc.__cn1NativeTextInteractions) return;
+    doc.__cn1NativeTextInteractions = true;
+    var touch = null;
+    var mouseOwned = false, lastMouseReleaseOwned = false, pointers = {};
+    function ownGesture(event) {
+      var type = event.type, native = !!nativeSelectionElement(event.target);
+      if (type.indexOf('pointer') === 0) {
+        if (event.pointerType === 'touch') return; // touch scrolling is relayed separately
+        if (type === 'pointerdown') pointers[event.pointerId] = native;
+        event.__cn1NativeTextGesture = !!pointers[event.pointerId];
+        if (type === 'pointerup' || type === 'pointercancel') delete pointers[event.pointerId];
+      } else {
+        if (type === 'mousedown') { mouseOwned = native; lastMouseReleaseOwned = false; }
+        event.__cn1NativeTextGesture = mouseOwned || ((type === 'click' || type === 'dblclick') && event.detail > 0 && lastMouseReleaseOwned);
+        if (type === 'mouseup') { lastMouseReleaseOwned = mouseOwned; mouseOwned = false; }
+      }
+    }
+    ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'mousedown', 'mousemove', 'mouseup', 'click', 'dblclick']
+      .forEach(function(type) { doc.addEventListener(type, ownGesture, true); });
+    if (global.addEventListener) global.addEventListener('blur', function() {
+      mouseOwned = lastMouseReleaseOwned = false; pointers = {};
+    });
+    doc.addEventListener('selectionchange', reconcileNativeTextOrder);
+    function canvas() { return doc.getElementById('codenameone-canvas'); }
+    function relayTouch(type, event) {
+      var target = canvas();
+      if (!target) return;
+      function copy(list) {
+        return Array.prototype.map.call(list || [], function(t) {
+          return new global.Touch({ identifier: t.identifier, target: target,
+            clientX: t.clientX, clientY: t.clientY, screenX: t.screenX, screenY: t.screenY,
+            pageX: t.pageX, pageY: t.pageY });
+        });
+      }
+      var relayed = new global.TouchEvent(type, { bubbles: true, cancelable: true,
+        touches: copy(event.touches), targetTouches: copy(event.touches), changedTouches: copy(event.changedTouches) });
+      relayed.__cn1TextTouchRelay = true;
+      target.dispatchEvent(relayed);
+    }
+    doc.addEventListener('wheel', function(event) {
+      if (!nativeSelectionElement(event.target) || !canvas() || event.ctrlKey || event.metaKey) return;
+      event.preventDefault();
+      canvas().dispatchEvent(new global.WheelEvent('wheel', { bubbles: true, cancelable: true,
+        clientX: event.clientX, clientY: event.clientY, deltaX: event.deltaX,
+        deltaY: event.deltaY, deltaMode: event.deltaMode, ctrlKey: event.ctrlKey,
+        shiftKey: event.shiftKey, altKey: event.altKey, metaKey: event.metaKey }));
+    }, { passive: false });
+    doc.addEventListener('touchstart', function(event) {
+      if (event.__cn1TextTouchRelay) return;
+      var el = nativeSelectionElement(event.target);
+      if (event.touches.length > 1 && (touch || el || Array.prototype.some.call(event.touches, function(t) {
+        return !!nativeSelectionElement(t.target);
+      }))) {
+        // Take over the whole sequence, even if the other finger lands on the
+        // canvas. Mark the original before worker listeners see it to avoid
+        // delivering both the original and the canvas relay.
+        touch = { scrolling: true, multi: true };
+        event.__cn1NativeTextGesture = true;
+        event.preventDefault();
+        relayTouch('touchstart', event);
+        return;
+      }
+      if (!el) return;
+      touch = null;
+      if (event.touches.length !== 1) return;
+      var selected = global.getSelection && global.getSelection();
+      if (/^(INPUT|TEXTAREA)$/.test(el.tagName)) {
+        if (doc.activeElement === el && el.selectionStart !== el.selectionEnd) return;
+      } else if (selected && !selected.isCollapsed
+          && (nativeSelectionElement(selected.anchorNode) === el || nativeSelectionElement(selected.focusNode) === el)) return;
+      var t = event.touches[0];
+      touch = { x: t.clientX, y: t.clientY, at: Date.now(), start: event, scrolling: false };
+    }, { passive: false, capture: true });
+    doc.addEventListener('touchmove', function(event) {
+      if (event.__cn1TextTouchRelay) return;
+      if (touch && touch.multi) {
+        event.__cn1NativeTextGesture = true;
+        event.preventDefault();
+        relayTouch('touchmove', event);
+        return;
+      }
+      if (!touch || !nativeSelectionElement(event.target) || event.touches.length !== 1) return;
+      var t = event.touches[0];
+      if (!touch.scrolling) {
+        if (Date.now() - touch.at > 350) { touch = null; return; }
+        if (Math.max(Math.abs(t.clientY - touch.y), Math.abs(t.clientX - touch.x)) < 8) return;
+        touch.scrolling = true;
+        relayTouch('touchstart', touch.start);
+      }
+      event.preventDefault();
+      relayTouch('touchmove', event);
+    }, { passive: false, capture: true });
+    function finishTouch(event) {
+      if (event.__cn1TextTouchRelay || !touch || (!touch.multi && !nativeSelectionElement(event.target))) return;
+      if (touch.scrolling) {
+        event.__cn1NativeTextGesture = true;
+        event.preventDefault();
+        relayTouch(event.type, event);
+      }
+      if (!touch.multi || event.touches.length === 0) touch = null;
+    }
+    doc.addEventListener('touchend', finishTouch, { passive: false, capture: true });
+    doc.addEventListener('touchcancel', finishTouch, { passive: false, capture: true });
+    doc.addEventListener('keydown', function(event) {
+      var el = nativeSelectionElement(event.target);
+      if (el && /^(INPUT|TEXTAREA)$/.test(el.tagName) && event.key === 'Tab') {
+        // The worker chooses the next CN1 component; suppress the browser's
+        // unrelated tab order before the asynchronous callback reaches it.
+        event.preventDefault();
+      }
+      if (el && el.getAttribute('data-cn1-single-line') === 'true' && event.key === 'Enter'
+          && !event.isComposing && nativeTextOwnsKey(event, el)) {
+        event.preventDefault();
+        if (el.getAttribute('data-cn1-enter-next') === 'true') {
+          el.dispatchEvent(new global.Event('cn1-next'));
+        } else {
+          el.blur();
+        }
+      }
+    }, true);
+  }
+
+  function nativeTextOwnsKey(event, nativeText) {
+    var code = event.keyCode || event.which || 0;
+    var key = event.key || '';
+    var editable = /^(INPUT|TEXTAREA)$/.test(nativeText.tagName) && !nativeText.readOnly
+        && !nativeText.disabled && nativeText.getAttribute('aria-disabled') !== 'true';
+    if (event.isComposing || code === 229 || key === 'Dead') return editable;
+    // Selection, navigation and copy remain native even in readonly controls.
+    // Editing keys belong to the app unless the native control can edit.
+    if (/^(Tab|ArrowLeft|ArrowRight|ArrowUp|ArrowDown|Home|End|PageUp|PageDown)$/.test(key)
+        || [9, 33, 34, 35, 36, 37, 38, 39, 40].indexOf(code) >= 0) return true;
+    if (/^(Enter|Backspace|Delete)$/.test(key) || [8, 13, 46].indexOf(code) >= 0) return editable;
+    if (event.ctrlKey && event.altKey) {
+      return !!(editable && event.getModifierState && event.getModifierState('AltGraph') && key.length === 1);
+    }
+    // Standard Windows/Linux clipboard alternatives also belong to the control.
+    if (key === 'Insert' || code === 45) {
+      return !!(!event.altKey && !event.metaKey
+          && (event.ctrlKey && !event.shiftKey || editable && event.shiftKey && !event.ctrlKey));
+    }
+    if (event.ctrlKey || event.metaKey) {
+      return /^[ac]$/i.test(key) || [65, 67].indexOf(code) >= 0
+          || (editable && (/^[vxyz]$/i.test(key) || [86, 88, 89, 90].indexOf(code) >= 0));
+    }
+    return editable && (key.length === 1 || (!key && (code === 0 || code >= 48 && code <= 90)));
+  }
+
+  function makeWorkerCallback(callbackId) {
+    if (workerCallbackProxies[callbackId]) {
+      return workerCallbackProxies[callbackId];
+    }
+    var fn = function(event) {
+      // Native text owns its gesture on the host. Forwarding the document/window
+      // listeners too starts CN1's selection or moves focus after the browser has
+      // already selected text. Copy must likewise stay inside this dispatch.
+      if (event && event.__cn1NativeTextGesture && !nativeSelectionElement(event.currentTarget)) return;
+      var nativeText = nativeSelectionElement(event && event.target);
+      if (!nativeText && event && event.type === 'copy' && global.getSelection) {
+        var selection = global.getSelection();
+        nativeText = selection && !selection.isCollapsed && nativeSelectionElement(selection.anchorNode);
+      }
+      if (nativeText && event && /^(mouse|pointer|touch|key|contextmenu|copy|cut|paste)/.test(event.type)
+          && event.currentTarget !== nativeText
+          // An unpressed move updates framework hover styles and tooltips. Active
+          // native-selection moves were rejected by the gesture marker above.
+          && !(/^(mouse|pointer)move$/.test(event.type) && !event.buttons)
+          && (!/^key/.test(event.type) || nativeTextOwnsKey(event, nativeText))) return;
+      // Programmatic scroll replay must not feed the model its browser-clamped
+      // value, especially while a paint or keyboard viewport change is pending.
+      if (nativeText && event.type === 'scroll'
+          && nativeText.scrollTop === nativeText.__cn1AppliedScrollTop) return;
+      if (nativeText && event.type === 'scroll') nativeText.__cn1AppliedScrollTop = nativeText.scrollTop;
+      if (event && event.type === 'contextmenu' && event.target
+          && event.target.id === 'codenameone-canvas'
+          && event.target.getAttribute('data-cn1-text-selection') === 'true') {
+        event.preventDefault();
+      }
+      var target = global.__parparWorker;
+      if (!target || typeof target.postMessage !== 'function') {
+        return;
+      }
+      var payload;
+      try {
+        payload = serializeEventForWorker(event);
+      } catch (err) {
+        payload = null;
+      }
+      try {
+        // A worker callback cannot call preventDefault() inside the browser's
+        // dispatch window.  Lightweight text input marks its hidden textarea
+        // so the small set of events consumed by Java are cancelled here,
+        // before they can also mutate the native textarea and race the editor
+        // state sent back by the worker.
+        var eventTarget = event && event.target;
+        var eventCurrentTarget = event && event.currentTarget;
+        var workerTextInput = !!((eventTarget && eventTarget.getAttribute
+                && eventTarget.getAttribute('data-cn1-worker-text-input') === 'true')
+                || (eventCurrentTarget && eventCurrentTarget.getAttribute
+                && eventCurrentTarget.getAttribute('data-cn1-worker-text-input') === 'true'));
+        var cancelWorkerTextInputEvent = false;
+        // While the lightweight text input session owns the keyboard, a press on
+        // the render canvas must not move DOM focus: the browser's default
+        // mousedown/touchstart action blurs the hidden textarea (focus falls to
+        // <body>), the window key pipeline defers to the active session, and
+        // every key goes dead until the session restarts. The worker's own
+        // preventDefault (the pointer-routing "consume" decision) arrives after
+        // the dispatch window, so cancel the focus change here, synchronously.
+        if (event && (event.type === 'mousedown' || event.type === 'touchstart')
+            && !workerTextInput
+            && ((eventTarget && eventTarget.tagName === 'CANVAS')
+                || (eventCurrentTarget && eventCurrentTarget.tagName === 'CANVAS'))) {
+          var bridgeDoc = global.document || (global.window && global.window.document);
+          var activeEl = bridgeDoc && bridgeDoc.activeElement;
+          if (activeEl && activeEl.getAttribute
+              && activeEl.getAttribute('data-cn1-worker-text-input') === 'true'
+              && typeof event.preventDefault === 'function') {
+            event.preventDefault();
+          }
+        }
+        if (workerTextInput && event) {
+          if (event.type === 'beforeinput') {
+            var inputType = event.inputType || '';
+            cancelWorkerTextInputEvent = inputType === 'insertText'
+                    || inputType === 'insertReplacementText'
+                    || inputType === 'insertLineBreak'
+                    || inputType === 'insertParagraph'
+                    || inputType === 'deleteContentBackward'
+                    || inputType === 'deleteContentForward'
+                    || inputType === 'historyUndo'
+                    || inputType === 'historyRedo';
+          } else if (event.type === 'keydown' && !event.isComposing) {
+            // isComposing keydowns navigate the IME candidate list; cancelling them
+            // would break composition on browsers that deliver real keyCodes mid-IME
+            var keyCode = event.keyCode | 0;
+            var commandModifier = !!(event.ctrlKey || event.metaKey);
+            cancelWorkerTextInputEvent = (commandModifier && (keyCode === 65 || keyCode === 89 || keyCode === 90))
+                    || keyCode === 8 || keyCode === 9 || keyCode === 27
+                    || (keyCode >= 33 && keyCode <= 40) || keyCode === 46;
+          } else if (event.type === 'copy' || event.type === 'cut' || event.type === 'paste') {
+            cancelWorkerTextInputEvent = true;
+          }
+        }
+        if (cancelWorkerTextInputEvent) {
+          if (typeof event.preventDefault === 'function') event.preventDefault();
+          if (typeof event.stopPropagation === 'function') event.stopPropagation();
+        }
+        target.postMessage({
+          type: 'worker-callback',
+          callbackId: callbackId,
+          args: [payload]
+        });
+      } catch (err) {
+        diag('FIRST_FAILURE', 'category', 'worker_callback_post_failed');
+        diag('FIRST_FAILURE', 'message', err && err.message ? err.message : String(err));
+      }
+    };
+    fn.__cn1WorkerCallbackId = callbackId;
+    workerCallbackProxies[callbackId] = fn;
+    return fn;
+  }
+
+  function mapHostArgs(args) {
+    var out = [];
+    var list = args || [];
+    for (var i = 0; i < list.length; i++) {
+      var arg = list[i];
+      if (arg && typeof arg === 'object' && typeof arg.__cn1WorkerCallback === 'number') {
+        out.push(makeWorkerCallback(arg.__cn1WorkerCallback));
+      } else {
+        out.push(resolveHostRef(arg));
+      }
+    }
+    return out;
+  }
+
+  function hostResult(value) {
+    if (value == null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      return value;
+    }
+    // Avoid per-element host RPC on large typed-array reads (e.g. ImageData.data).
+    // Returning a clone transfers data once to the worker so get(index) executes locally.
+    if (typeof Uint8ClampedArray !== 'undefined' && value instanceof Uint8ClampedArray) {
+      return new Uint8Array(value);
+    }
+    if (typeof ArrayBuffer !== 'undefined') {
+      if (value instanceof ArrayBuffer) {
+        return value.slice(0);
+      }
+      if (typeof ArrayBuffer.isView === 'function' && ArrayBuffer.isView(value)) {
+        return value.slice ? value.slice(0) : value;
+      }
+    }
+    return storeHostRef(value);
+  }
+
+  function isCanvasLike(value) {
+    return !!(value
+      && typeof value.toDataURL === 'function'
+      && typeof value.width === 'number'
+      && typeof value.height === 'number');
+  }
+
+  function noteDrawTarget(receiver, kind, member, assignedValue) {
+    if (!receiver || (kind !== 'method' && kind !== 'setter')) {
+      return;
+    }
+    var canvas = null;
+    if (isCanvasLike(receiver)) {
+      canvas = receiver;
+    } else if (receiver.canvas && isCanvasLike(receiver.canvas)) {
+      canvas = receiver.canvas;
+    }
+    if (!canvas) {
+      return;
+    }
+    var isPaint = kind === 'method' && !!drawMethodNames[member];
+    if (kind === 'method' && !isPaint) {
+      return;
+    }
+    noteCanvasOperation(canvas, kind, member, isPaint, assignedValue);
+    global.__cn1LastDrawCanvas = canvas;
+    global.__cn1LastDrawMember = String(member || 'unknown');
+  }
+
+  function inferHostClass(value) {
+    if (value === global.window) {
+      return 'com_codename1_html5_js_browser_Window';
+    }
+    if (typeof Event === 'function' && value instanceof Event) {
+      return 'com_codename1_html5_js_dom_Event';
+    }
+    if (value && value.nodeType === 9) {
+      return 'com_codename1_html5_js_dom_HTMLDocument';
+    }
+    if (value && value.canvas && typeof value.drawImage === 'function' && typeof value.fillRect === 'function') {
+      return 'com_codename1_html5_js_canvas_CanvasRenderingContext2D';
+    }
+    if (value && value.setProperty && value.removeProperty) {
+      return 'com_codename1_html5_js_dom_CSSStyleDeclaration';
+    }
+    if (value && value.tagName) {
+      var tagName = String(value.tagName).toUpperCase();
+      if (tagName === 'CANVAS') {
+        return 'com_codename1_html5_js_dom_HTMLCanvasElement';
+      }
+      if (tagName === 'IFRAME') {
+        return 'com_codename1_impl_html5_JSOImplementations_HTMLIFrameElement';
+      }
+      if (tagName === 'BODY') {
+        return 'com_codename1_html5_js_dom_HTMLBodyElement';
+      }
+      return 'com_codename1_html5_js_dom_HTMLElement';
+    }
+    if (value && value.nodeType === 1) {
+      return 'com_codename1_html5_js_dom_Element';
+    }
+    return null;
+  }
+
+  hostBridge.register('__cn1_dom_window_current__', function() {
+    if (global.window) {
+      return hostResult(global.window);
+    }
+    return null;
+  });
+
+  function cn1TimerCallback(callback) {
+    if (callback && typeof callback === 'object'
+            && typeof callback.__cn1WorkerCallback === 'number') {
+      callback = makeWorkerCallback(callback.__cn1WorkerCallback);
+    }
+    if (typeof callback !== 'function') {
+      throw new Error('Browser timer callback is not callable');
+    }
+    return callback;
+  }
+
+  hostBridge.register('__cn1_timer_set_timeout__', function(callback, delay) {
+    return global.setTimeout(cn1TimerCallback(callback), Math.max(0, delay | 0));
+  });
+
+  hostBridge.register('__cn1_timer_clear_timeout__', function(id) {
+    global.clearTimeout(id | 0);
+    return true;
+  });
+
+  hostBridge.register('__cn1_timer_set_interval__', function(callback, delay) {
+    return global.setInterval(cn1TimerCallback(callback), Math.max(1, delay | 0));
+  });
+
+  hostBridge.register('__cn1_timer_clear_interval__', function(id) {
+    global.clearInterval(id | 0);
+    return true;
+  });
+
+  // BrowserComponent JavaScript callbacks use a synthetic navigation URL to
+  // return values to Java. The iframe and its contentWindow live on the main
+  // thread, so the worker cannot install this hook with @JSBody code against
+  // its host-ref proxy. Resolve both host refs here and materialise the Java
+  // SAM callback into a worker-callback proxy.
+  hostBridge.register('__cn1_install_browser_navigation_callback__', function(iframeArg, callbackArg) {
+    var iframe = resolveHostRef(iframeArg);
+    var callback = callbackArg;
+    if (callback && typeof callback === 'object'
+            && typeof callback.__cn1WorkerCallback === 'number') {
+      callback = makeWorkerCallback(callback.__cn1WorkerCallback);
+    }
+    if (typeof callback !== 'function') {
+      throw new Error('Browser navigation callback is not callable');
+    }
+    var win = iframe && iframe.contentWindow
+            ? iframe.contentWindow
+            : (global.window || global);
+    win.cn1application = win.cn1application || {};
+    win.cn1application.shouldNavigate = function(url) {
+      callback(String(url));
+      return false;
+    };
+    return true;
+  });
+
+  // Install a `writeBuffer(arr)` method on `ImageData.prototype` so the
+  // worker can copy bytes into the live host-side `imageData.data` buffer in
+  // one shot. The worker can't write to `imageData.data` from its side
+  // because `hostResult` clones any returned `Uint8ClampedArray` to a fresh
+  // worker-local view (read perf optimization, see line ~485) — so a worker
+  // call like `((Uint8ClampedArraySetter)d.getData()).set(arr)` writes into
+  // the clone, not the original. `putImageData(d)` then sees zeros. This
+  // helper sidesteps the clone: the bridge call lands on `ImageData` itself
+  // (resolved via host-ref), and `this.data.set(host_arr)` runs entirely on
+  // the host where `this.data` is the live buffer.
+  if (typeof ImageData !== 'undefined' && ImageData.prototype && !ImageData.prototype.writeArgbBuffer) {
+    var __waFn = function(argb, offset, width, height) {
+      // ``argb`` is a Java int[] cloned via postMessage. It survives as an
+      // array-like with ``.length`` and integer-indexed entries. Unpack each
+      // 32-bit ARGB word into RGBA bytes directly into ``this.data`` — that
+      // buffer is live on host, so ``putImageData`` will see what we wrote.
+      var data = this.data;
+      var off = offset | 0;
+      var w = width | 0;
+      var h = height | 0;
+      var pixelCount = w * h;
+      var dstLen = data.length;
+      var maxPixels = (dstLen / 4) | 0;
+      if (pixelCount > maxPixels) pixelCount = maxPixels;
+      for (var i = 0; i < pixelCount; i++) {
+        var argbWord = argb[off + i] | 0;
+        var di = i * 4;
+        data[di] = (argbWord >>> 16) & 0xFF;
+        data[di + 1] = (argbWord >>> 8) & 0xFF;
+        data[di + 2] = argbWord & 0xFF;
+        data[di + 3] = (argbWord >>> 24) & 0xFF;
+      }
+    };
+    try {
+      Object.defineProperty(ImageData.prototype, 'writeArgbBuffer', {
+        value: __waFn,
+        writable: true, configurable: true, enumerable: false
+      });
+    } catch (_e) {
+      try { ImageData.prototype.writeArgbBuffer = __waFn; } catch (_e2) {}
+    }
+  }
+
+  hostBridge.register('__cn1_jso_bridge__', function(request) {
+    var payload = request || {};
+    var receiver = resolveHostRef(payload.receiver);
+    var receiverClassHint = (payload.receiver && payload.receiver.__cn1HostClass)
+      || payload.receiverClass
+      || null;
+    diag('HOST', 'jsoBridgeKind', payload.kind || 'unknown');
+    diag('HOST', 'jsoBridgeMember', payload.member || 'unknown');
+    if (payload.receiver && payload.receiver.__cn1HostRef != null) {
+      diag('HOST', 'jsoBridgeReceiverRef', payload.receiver.__cn1HostRef);
+      diag('HOST', 'jsoBridgeReceiverClass', payload.receiver.__cn1HostClass || 'unknown');
+    } else {
+      diag('HOST', 'jsoBridgeReceiverRef', 'none');
+      diag('HOST', 'jsoBridgeReceiverClass', 'none');
+    }
+    if (receiver == null) {
+      receiver = fallbackHostObjectForClass(receiverClassHint);
+      if (receiver != null) {
+        diag('HOST', 'receiverFallback', String(receiverClassHint || 'unknown'));
+      }
+    }
+    if (receiver == null) {
+      if (payload && payload.kind === 'getter' && payload.member === 'document') {
+        receiver = global.window || null;
+        if (receiver != null) {
+          diag('HOST', 'receiverFallback', 'window.document');
+        }
+      }
+    }
+    if (receiver == null) {
+      diag('FIRST_FAILURE', 'category', 'host_receiver_missing');
+      diag('FIRST_FAILURE', 'hostMember', payload.member || 'unknown');
+      diag('FIRST_FAILURE', 'hostKind', payload.kind || 'unknown');
+      diag('FIRST_FAILURE', 'hostReceiverClass', receiverClassHint || 'none');
+      throw new Error('Missing host receiver for JSO bridge');
+    }
+    var kind = payload.kind;
+    var member = payload.member;
+    var args = mapHostArgs(payload.args || []);
+    // A semantic snapshot may have been queued before the user's native focus
+    // gesture. Do not let its late focus request steal the editor's first input
+    // or selection. An intentional CN1 focus change blurs the editor first via
+    // its FocusListener, so it still reaches the semantic target normally.
+    // Read-only selection never acquires CN1 focus and has no such focusLost
+    // handoff, so it must not block the application's semantic focus requests.
+    var activeEditor = global.document && global.document.activeElement;
+    if (member === 'focus' && receiver.closest && receiver.closest('#cn1-accessibility-tree')
+        && activeEditor && /^(INPUT|TEXTAREA)$/.test(activeEditor.tagName)
+        && !activeEditor.readOnly && !activeEditor.disabled
+        && nativeSelectionElement(activeEditor)) return null;
+    var value;
+    if (kind === 'getter') {
+      value = receiver[member];
+    } else if (kind === 'setter') {
+      receiver[member] = args.length ? args[0] : null;
+      value = null;
+    } else {
+      // For array-like objects, prefer indexed get/set over native methods
+      // because TypedArray.prototype.set(array, offset) has different
+      // semantics than the JSO per-element set(index, value).
+      if (member === 'get' && args.length === 1 && receiver && typeof receiver.length === 'number') {
+        value = receiver[args[0] | 0];
+      } else if (member === 'set' && args.length === 2 && receiver && typeof receiver.length === 'number') {
+        receiver[args[0] | 0] = args[1];
+        value = null;
+      } else {
+        // WebGL bulk-data calls receive their payload as a plain JS number
+        // array (the only way a Java primitive array survives the worker->main
+        // bridge intact -- a worker-built typed array arrives here as an empty
+        // object). Re-wrap it in the typed array WebGL requires before the call.
+        // ELEMENT_ARRAY_BUFFER == 0x8893 takes Uint16Array; everything else
+        // (vertex data) takes Float32Array.
+        if (member === 'bufferData' && Array.isArray(args[1])) {
+          args[1] = (args[0] === 0x8893) ? new Uint16Array(args[1]) : new Float32Array(args[1]);
+        } else if (member === 'uniformMatrix4fv' && Array.isArray(args[2])) {
+          args[2] = new Float32Array(args[2]);
+        } else if (member === 'texImage2D' && Array.isArray(args[args.length - 1])) {
+          args[args.length - 1] = new Uint8Array(args[args.length - 1]);
+        }
+        var fn = receiver[member];
+        if (typeof fn === 'function') {
+          value = fn.apply(receiver, args);
+        } else if (!args.length && Object.prototype.hasOwnProperty.call(receiver, member)) {
+          value = receiver[member];
+        } else if (typeof receiver === 'function') {
+          // Functional-interface (SAM) receivers — see parparvm_runtime.js
+          // ``invokeJsoBridge`` for the full rationale. Plain JS function
+          // wrapped as e.g. an EventListener / Runnable / SuccessCallback
+          // gets dispatched by calling the function itself; ``handleEvent``
+          // / ``run`` / ``onSuccess`` aren't properties of a function
+          // value. Without this fallback, every ``addEventListener(type,
+          // fn)`` whose listener round-trips back into the worker as a
+          // SAM call fails with ``Missing JS member handleEvent``.
+          value = receiver.apply(null, args);
+        } else {
+          throw new Error('Missing JS member ' + member + ' for host receiver');
+        }
+      }
+    }
+    if (kind === 'getter' && member === 'data' && value && typeof value.length === 'number') {
+      if (value.slice) {
+        return value.slice(0);
+      }
+      return Array.prototype.slice.call(value);
+    }
+    noteDrawTarget(receiver, kind, member, kind === 'setter' && args.length ? args[0] : null);
+    if (isCanvasLike(receiver) && kind === 'method' && member === 'getContext') {
+      global.__cn1LastDrawCanvas = receiver;
+      global.__cn1LastDrawMember = 'getContext';
+    }
+    // SMOKING GUN DIAG: when a getter returns a number for document/getContext
+    // (the canvasContextWipe leak path), log the receiver shape so we can
+    // identify whether the receiver is the actual Window/Canvas or has been
+    // corrupted/wrong.
+    if (typeof value === 'number'
+        && (member === 'document' || member === 'getContext')) {
+      if (!global.__cn1NumberLeakLogged) global.__cn1NumberLeakLogged = 0;
+      if (global.__cn1NumberLeakLogged < 5) {
+        global.__cn1NumberLeakLogged++;
+        try {
+          var protoName = '<none>';
+          try {
+            var proto = Object.getPrototypeOf(receiver);
+            protoName = proto && proto.constructor && proto.constructor.name || '<unknown>';
+          } catch (_e1) {}
+          // receiver is guaranteed non-null here -- the earlier null-check
+          // at the top of the bridge handler throws "Missing host receiver
+          // for JSO bridge" before we ever reach this diag block.
+          var receiverDesc = 'unknown';
+          try {
+            if (receiver === global.window) receiverDesc = 'global.window';
+            else if (global.window && receiver === global.window.document) receiverDesc = 'global.window.document';
+            else if (typeof receiver === 'object' && typeof receiver.tagName === 'string') receiverDesc = 'element:' + receiver.tagName;
+            else receiverDesc = String(receiver).slice(0, 60);
+          } catch (_e2) {}
+          diag('NUMBER_LEAK', 'member', String(member));
+          diag('NUMBER_LEAK', 'kind', String(kind));
+          diag('NUMBER_LEAK', 'value', String(value));
+          diag('NUMBER_LEAK', 'receiverTypeof', typeof receiver);
+          diag('NUMBER_LEAK', 'receiverProto', protoName);
+          diag('NUMBER_LEAK', 'receiverDesc', receiverDesc);
+          diag('NUMBER_LEAK', 'receiverHasDocument', String(typeof receiver.document));
+          diag('NUMBER_LEAK', 'receiverHasGetContext', String(typeof receiver.getContext));
+        } catch (_e) {}
+      }
+    }
+    return hostResult(value);
+  });
+
+  // ===================================================================
+  // SURFACE BRIDGE  (surface-id render model)
+  // -------------------------------------------------------------------
+  // The worker (Java) side holds opaque, WORKER-ASSIGNED surface ids -- never
+  // canvas / CanvasRenderingContext2D host-refs. It records draw calls into a
+  // flat command stream (see SurfaceCommandRecorder.java) and flushes them
+  // fire-and-forget. This host keeps the id->{canvas,ctx} table and replays the
+  // stream. Only ``__cn1_surface_read__`` (getRGB) ever returns pixels. The
+  // opcodes below MUST mirror SurfaceCommandRecorder.OP_* exactly.
+  var SURF = {
+    SAVE: 1, RESTORE: 2, SCALE: 3, ROTATE: 4, TRANSLATE: 5, TRANSFORM: 6,
+    SET_TRANSFORM: 7, SET_GLOBAL_ALPHA: 8, SET_GCO: 9, SET_FILL_COLOR: 10,
+    SET_STROKE_COLOR: 11, SET_LINE_WIDTH: 12, SET_LINE_CAP: 13, SET_LINE_JOIN: 14,
+    SET_MITER_LIMIT: 15, SET_FONT: 16, SET_TEXT_ALIGN: 17, SET_TEXT_BASELINE: 18,
+    SET_SHADOW_COLOR: 19, SET_SHADOW_BLUR: 20, SET_SHADOW_OFFX: 21, SET_SHADOW_OFFY: 22,
+    SET_FILTER: 23, CLEAR_RECT: 24, FILL_RECT: 25, STROKE_RECT: 26, BEGIN_PATH: 27,
+    CLOSE_PATH: 28, MOVE_TO: 29, LINE_TO: 30, QUAD_TO: 31, BEZIER_TO: 32, ARC: 33,
+    ARC_TO: 34, ELLIPSE: 35, RECT: 36, FILL: 37, STROKE: 38, CLIP: 39,
+    FILL_TEXT: 40, STROKE_TEXT: 41, SET_LINE_DASH_OFFSET: 42, SET_LINE_DASH: 43,
+    CREATE_LINEAR_GRADIENT: 50, CREATE_RADIAL_GRADIENT: 51, ADD_COLOR_STOP: 52,
+    SET_FILL_GRADIENT: 53, SET_STROKE_GRADIENT: 54, CREATE_PATTERN: 55, SET_FILL_PATTERN: 56,
+    CREATE_PATTERN_SURFACE: 57,
+    DRAW_IMAGE_XY: 60, DRAW_IMAGE_XYWH: 61, DRAW_IMAGE_SRCDST: 62,
+    BLIT_SURFACE_XY: 70, BLIT_SURFACE_XYWH: 71, BLIT_SURFACE_SRCDST: 72,
+    BLUR_SELF_REGION: 80, LENS_SELF_REGION: 81, GLASS_SELF_REGION: 82,
+    COLOR_MATRIX_SELF_REGION: 83,
+    // Text-layer DOM mutations. They ride the draw stream so the elements and the pixels of
+    // one frame are applied in one task; see SurfaceCommandRecorder.OP_TEXT_* and TextLayerOp.
+    TEXT_ATTACH: 90, TEXT_DETACH: 91, TEXT_CLIP_CSS: 92, TEXT_RUN_CSS: 93,
+    TEXT_CONTENT: 94, TEXT_CLEAR: 95, TEXT_DISPLAY: 96, TEXT_SCROLL: 97, TEXT_ORDER: 98
+  };
+  // The display surface id. Mirrors HTML5Implementation.DISPLAY_SURFACE_ID.
+  var SURF_DISPLAY_ID = 1;
+  var surfaceTable = {};
+
+  // A text-layer mutation target: an element the worker created, carried as the host-ref
+  // marker it already is. Never a fresh lookup -- the worker owns the identity of these
+  // elements and only ever names them by reference.
+  function surfaceTextElement(marker) {
+    var resolved = resolveHostRef(marker);
+    return (resolved && resolved.nodeType === 1) ? resolved : null;
+  }
+
+  function surfaceImageSource(marker) {
+    // A drawImage source: either a host-ref marker (a loaded image / canvas
+    // that stays a host-side resource) or already a real element.
+    var resolved = resolveHostRef(marker);
+    if (resolved != null) {
+      return resolved;
+    }
+    return marker;
+  }
+
+  // Whether ctx.drawImage() can accept this source right now.
+  //
+  // A source that merely EXISTS is not enough. Per the HTML spec drawImage
+  // throws InvalidStateError for an <img> whose request is broken and for a
+  // canvas of zero width or height -- and an exception thrown inside
+  // replaySurfaceCommands unwinds the whole batch, so every op AFTER it in
+  // that surface's command buffer is silently lost. An image still decoding
+  // is not broken; it draws nothing and is skipped here so the ops after it
+  // still run.
+  //
+  // That is the shape graphics-draw-image-rect kept failing in: its two
+  // mutable-image cells came out truncated at the first EncodedImage draw
+  // while the directly-painted cells were complete, because each mutable
+  // image is its own surface with its own batch -- so the throw took out the
+  // rest of those two cells and left the display batch untouched.
+  function drawableImageSource(src) {
+    if (!src) {
+      return false;
+    }
+    // <img>: a completed decode with real intrinsic pixels.
+    if (typeof src.naturalWidth === 'number') {
+      return src.complete === true && src.naturalWidth > 0 && src.naturalHeight > 0;
+    }
+    // canvas / ImageBitmap / OffscreenCanvas: non-zero intrinsic size.
+    if (typeof src.width === 'number' && typeof src.height === 'number') {
+      return src.width > 0 && src.height > 0;
+    }
+    // <video> and anything else the spec accepts: let drawImage decide, with
+    // the per-op guard below as the backstop.
+    return true;
+  }
+
+  // One drawImage, isolated. A source that turns out to be undrawable costs
+  // its own op and nothing else -- never the remainder of the frame.
+  function safeDrawImage(ctx, src, args) {
+    if (!drawableImageSource(src)) {
+      surfaceDrawImageDropped++;
+      return;
+    }
+    try {
+      if (args.length === 2) {
+        ctx.drawImage(src, args[0], args[1]);
+      } else if (args.length === 4) {
+        ctx.drawImage(src, args[0], args[1], args[2], args[3]);
+      } else {
+        ctx.drawImage(src, args[0], args[1], args[2], args[3],
+          args[4], args[5], args[6], args[7]);
+      }
+    } catch (_edi) {
+      surfaceDrawImageDropped++;
+    }
+  }
+
+  // Dropped image ops since load. Reported with the screenshot diagnostics so
+  // a frame that lost a draw says so, instead of being read as a rendering
+  // difference.
+  var surfaceDrawImageDropped = 0;
+
+  // Drops charged to the frame currently on the canvas.
+  //
+  // A frame is the display surface's batch plus the offscreen batches flushed
+  // since the previous display batch (a mutable image flushes just before the
+  // blit that draws it), so the difference across two display flushes is what
+  // that frame lost. Non-zero means the frame on screen is missing pixels it
+  // was asked to draw -- which is a frame nothing should screenshot.
+  var surfaceFrameDropped = 0;
+  var surfaceDropsAtFrameStart = 0;
+
+  function getSurface(id, createW, createH) {
+    var s = surfaceTable[id];
+    if (s) {
+      return s;
+    }
+    if (id === SURF_DISPLAY_ID) {
+      // Bind the display surface to the real output canvas lazily.
+      var doc = global.document || (global.window && global.window.document);
+      var out = doc ? doc.getElementById('codenameone-canvas') : null;
+      if (!out) {
+        return null;
+      }
+      s = { canvas: out, ctx: out.getContext('2d') };
+      surfaceTable[id] = s;
+      return s;
+    }
+    if (createW == null) {
+      return null;
+    }
+    var d2 = global.document || (global.window && global.window.document);
+    if (!d2 || !d2.createElement) {
+      return null;
+    }
+    var cv = d2.createElement('canvas');
+    cv.width = createW | 0;
+    cv.height = createH | 0;
+    s = { canvas: cv, ctx: cv.getContext('2d') };
+    surfaceTable[id] = s;
+    return s;
+  }
+
+  // iOS-26 tab selection lens. Keep these values and the math in lock-step
+  // with JavaSEPort.applyLensBuffer(): the Simulator is the browser renderer's
+  // pixel reference for the glass-tab animation.
+  var LENS_MAG_FLAT = 0.75;
+  var LENS_TINT_HI = 150;
+  var LENS_TINT_LO = 55;
+  var LENS_LIFT_COEF = 0.40;
+  var LENS_GLARE = 0.09;
+  var LENS_RIM = 0.06;
+  var LENS_RIM_W = 0.06;
+  var LENS_REFRACT = 0.16;
+  var LENS_EDGE_SHADOW = 0.12;
+  var LENS_RIM_SCALE = 0.84;
+  var LENS_GLASS_TINT = 0xbcd8ff;
+  var LENS_GLASS_TINT_STR = 0.10;
+  var LENS_SAT_BOOST = 1.32;
+  var LENS_GLASS_START = 1.085;
+  var LENS_GLASS_FULL = 1.25;
+
+  function lensSmoothstep(a, b, x) {
+    var t = (x - a) / (b - a);
+    t = t < 0 ? 0 : (t > 1 ? 1 : t);
+    return t * t * (3 - 2 * t);
+  }
+
+  function lensBilinear(a, b, c, d, tx, ty) {
+    var top = a + (b - a) * tx;
+    var bottom = c + (d - c) * tx;
+    return (top + (bottom - top) * ty) | 0;
+  }
+
+  function lensSample(data, width, height, fx, fy, channel) {
+    if (fx < 0) { fx = 0; } else if (fx > width - 1) { fx = width - 1; }
+    if (fy < 0) { fy = 0; } else if (fy > height - 1) { fy = height - 1; }
+    var x0 = fx | 0, y0 = fy | 0;
+    var x1 = Math.min(x0 + 1, width - 1), y1 = Math.min(y0 + 1, height - 1);
+    var tx = fx - x0, ty = fy - y0;
+    var row0 = y0 * width, row1 = y1 * width;
+    return lensBilinear(
+      data[(row0 + x0) * 4 + channel], data[(row0 + x1) * 4 + channel],
+      data[(row1 + x0) * 4 + channel], data[(row1 + x1) * 4 + channel],
+      tx, ty
+    );
+  }
+
+  function lensDeviceRect(ctx, x, y, width, height) {
+    var tr = ctx.getTransform ? ctx.getTransform() : null;
+    if (!tr) {
+      return { x: Math.round(x), y: Math.round(y), w: Math.round(width), h: Math.round(height), scale: 1 };
+    }
+    // Tabs paint under translation/uniform scaling only. A pixel read ignores
+    // Canvas transforms, so resolve that axis-aligned transform explicitly.
+    // A rotated/sheared lens is outside the v1 contract and safely no-ops.
+    if (Math.abs(tr.b) > 1e-9 || Math.abs(tr.c) > 1e-9) {
+      return null;
+    }
+    var x0 = tr.a * x + tr.e, x1 = tr.a * (x + width) + tr.e;
+    var y0 = tr.d * y + tr.f, y1 = tr.d * (y + height) + tr.f;
+    return {
+      x: Math.round(Math.min(x0, x1)),
+      y: Math.round(Math.min(y0, y1)),
+      w: Math.round(Math.abs(x1 - x0)),
+      h: Math.round(Math.abs(y1 - y0)),
+      scale: Math.min(Math.abs(tr.a), Math.abs(tr.d))
+    };
+  }
+
+  function applyLensSelfRegion(ctx, x, y, width, height, cornerRadius,
+                               magnify, aberration, tintColor, tintStrength) {
+    if (!ctx.canvas || width <= 0 || height <= 0) {
+      return;
+    }
+    var rect = lensDeviceRect(ctx, x, y, width, height);
+    if (!rect || rect.w <= 0 || rect.h <= 0) {
+      return;
+    }
+    var rx = rect.x, ry = rect.y, rw = rect.w, rh = rect.h;
+    var canvasWidth = ctx.canvas.width | 0, canvasHeight = ctx.canvas.height | 0;
+    if (rx < 0) { rw += rx; rx = 0; }
+    if (ry < 0) { rh += ry; ry = 0; }
+    if (rx + rw > canvasWidth) { rw = canvasWidth - rx; }
+    if (ry + rh > canvasHeight) { rh = canvasHeight - ry; }
+    if (rw <= 0 || rh <= 0) {
+      return;
+    }
+
+    var source = ctx.getImageData(rx, ry, rw, rh);
+    var src = source.data;
+    var result = ctx.createImageData(rw, rh);
+    var out = result.data;
+    var hw = rw / 2.0, hh = rh / 2.0;
+    var scaledCorner = cornerRadius * rect.scale;
+    var radius = scaledCorner < 0 ? Math.min(hw, hh)
+                                  : Math.min(scaledCorner, Math.min(hw, hh));
+    if (radius < 0) { radius = 0; }
+    var tr = (tintColor >> 16) & 0xff;
+    var tg = (tintColor >> 8) & 0xff;
+    var tb = tintColor & 0xff;
+    var liftMax = LENS_LIFT_COEF * (magnify - 1.0) * hh;
+    // The 3D-glass cues (edge refraction / edge shadow / glare) belong to the
+    // MORPH droplet, not the settled pill (rest 1.08x, peak 1.18x): they fade
+    // in above rest so a resting selection stays a flat subtle pill.
+    var glassAmount = lensSmoothstep(LENS_GLASS_START, LENS_GLASS_FULL, magnify);
+
+    for (var yy = 0; yy < rh; yy++) {
+      var py = yy + 0.5 - hh;
+      for (var xx = 0; xx < rw; xx++) {
+        var px = xx + 0.5 - hw;
+        var index = (yy * rw + xx) * 4;
+        var dxe = Math.abs(px) - (hw - radius);
+        var dye = Math.abs(py) - (hh - radius);
+        var axx = Math.max(dxe, 0), ayy = Math.max(dye, 0);
+        var outside = Math.sqrt(axx * axx + ayy * ayy);
+        var inside = Math.min(Math.max(dxe, dye), 0);
+        var depth = -(outside + inside - radius);
+        if (depth <= 0) {
+          out[index] = src[index];
+          out[index + 1] = src[index + 1];
+          out[index + 2] = src[index + 2];
+          out[index + 3] = src[index + 3];
+          continue;
+        }
+
+        var alpha = Math.min(depth, 1.0);
+        var rd = Math.min(1.0, Math.sqrt((px * px) / (hw * hw) + (py * py) / (hh * hh)));
+        var edge = lensSmoothstep(LENS_MAG_FLAT, 1.0, rd);
+        var rimScale = 1.0 + (LENS_RIM_SCALE - 1.0) * glassAmount;
+        var mag = magnify + (rimScale - magnify) * edge;
+        if (mag < 0.2) { mag = 0.2; }
+        var abr = aberration * edge;
+        var magR = mag * (1 - abr), magB = mag * (1 + abr);
+        if (magR < 0.05) { magR = 0.05; }
+        if (magB < 0.05) { magB = 0.05; }
+        var lift = liftMax * (1 - rd * rd);
+        var refract = 1.0 + LENS_REFRACT * glassAmount * lensSmoothstep(0.70, 1.0, rd);
+        var sampleYR = hh + (py / magR) * refract + lift;
+        var sampleYG = hh + (py / mag) * refract + lift;
+        var sampleYB = hh + (py / magB) * refract + lift;
+        var sr = lensSample(src, rw, rh, hw + (px / magR) * refract, sampleYR, 0);
+        var sg = lensSample(src, rw, rh, hw + (px / mag) * refract, sampleYG, 1);
+        var sb = lensSample(src, rw, rh, hw + (px / magB) * refract, sampleYB, 2);
+        var lum = 0.2126 * sr + 0.7152 * sg + 0.0722 * sb;
+        var tint = tintStrength * lensSmoothstep(LENS_TINT_HI, LENS_TINT_LO, lum);
+        var fr = sr + (tr - sr) * tint;
+        var fg = sg + (tg - sg) * tint;
+        var fb = sb + (tb - sb) * tint;
+        var glassTint = LENS_GLASS_TINT_STR * glassAmount;
+        fr += (((LENS_GLASS_TINT >> 16) & 0xff) - fr) * glassTint;
+        fg += (((LENS_GLASS_TINT >> 8) & 0xff) - fg) * glassTint;
+        fb += ((LENS_GLASS_TINT & 0xff) - fb) * glassTint;
+        var saturationLum = 0.2126 * fr + 0.7152 * fg + 0.0722 * fb;
+        fr = saturationLum + (fr - saturationLum) * LENS_SAT_BOOST;
+        fg = saturationLum + (fg - saturationLum) * LENS_SAT_BOOST;
+        fb = saturationLum + (fb - saturationLum) * LENS_SAT_BOOST;
+        var gx = px / hw, gy = (py + 0.42 * hh) / hh;
+        var glare = LENS_GLARE * glassAmount * Math.exp(-(gx * gx * 1.15 + gy * gy * 2.6) * 2.1);
+        var rimWidth = Math.max(2.0, LENS_RIM_W * hh);
+        var rim = depth < rimWidth ? (1.0 - depth / rimWidth) * LENS_RIM : 0;
+        var bright = glare + rim;
+        if (bright > 0) {
+          fr += bright * (255 - fr);
+          fg += bright * (255 - fg);
+          fb += bright * (255 - fb);
+        }
+        var edgeShadowWidth = Math.max(2.0, 0.13 * Math.min(hw, hh));
+        if (depth < edgeShadowWidth) {
+          var edgeShadow = (1.0 - depth / edgeShadowWidth) * LENS_EDGE_SHADOW * glassAmount;
+          fr *= 1 - edgeShadow;
+          fg *= 1 - edgeShadow;
+          fb *= 1 - edgeShadow;
+        }
+        fr = fr < 0 ? 0 : (fr > 255 ? 255 : fr | 0);
+        fg = fg < 0 ? 0 : (fg > 255 ? 255 : fg | 0);
+        fb = fb < 0 ? 0 : (fb > 255 ? 255 : fb | 0);
+        out[index] = (src[index] + (fr - src[index]) * alpha) | 0;
+        out[index + 1] = (src[index + 1] + (fg - src[index + 1]) * alpha) | 0;
+        out[index + 2] = (src[index + 2] + (fb - src[index + 2]) * alpha) | 0;
+        out[index + 3] = src[index + 3];
+      }
+    }
+    ctx.putImageData(result, rx, ry);
+  }
+
+  function glassFloatMul(a, b) {
+    return Math.fround(Math.fround(a) * Math.fround(b));
+  }
+
+  function glassFloatAdd(a, b) {
+    return Math.fround(Math.fround(a) + Math.fround(b));
+  }
+
+  // Mirrors IOSImplementation.glassMaterialInPlace(). Math.fround preserves
+  // the native float evaluation points so the material does not drift by a
+  // channel value merely because JavaScript normally evaluates as double.
+  // The curve term (curve * 255 * (lum / 255 - curveMid)^2, added to every
+  // channel) is zero for every recipe but iOS 27 dark, whose material bends.
+  function glassMaterialInPlace(data, saturation, scale, offset, curve, curveMid) {
+    var sat = Math.fround(saturation), scl = Math.fround(scale), off = Math.fround(offset);
+    var crv = Math.fround(curve || 0), mid = Math.fround(curveMid || 0);
+    var curved = crv !== 0;
+    var lr = Math.fround(0.2126), lg = Math.fround(0.7152), lb = Math.fround(0.0722);
+    for (var i = 0; i < data.length; i += 4) {
+      var r = Math.fround(data[i]), g = Math.fround(data[i + 1]), b = Math.fround(data[i + 2]);
+      var lum = glassFloatAdd(glassFloatAdd(glassFloatMul(lr, r), glassFloatMul(lg, g)),
+                              glassFloatMul(lb, b));
+      r = glassFloatAdd(glassFloatMul(glassFloatAdd(lum,
+          glassFloatMul(glassFloatAdd(r, -lum), sat)), scl), off);
+      g = glassFloatAdd(glassFloatMul(glassFloatAdd(lum,
+          glassFloatMul(glassFloatAdd(g, -lum), sat)), scl), off);
+      b = glassFloatAdd(glassFloatMul(glassFloatAdd(lum,
+          glassFloatMul(glassFloatAdd(b, -lum), sat)), scl), off);
+      if (curved) {
+        var d = glassFloatAdd(Math.fround(lum / 255), -mid);
+        var k = glassFloatMul(glassFloatMul(glassFloatMul(crv, 255), d), d);
+        r = glassFloatAdd(r, k);
+        g = glassFloatAdd(g, k);
+        b = glassFloatAdd(b, k);
+      }
+      data[i] = r < 0 ? 0 : (r > 255 ? 255 : r | 0);
+      data[i + 1] = g < 0 ? 0 : (g > 255 ? 255 : g | 0);
+      data[i + 2] = b < 0 ? 0 : (b > 255 ? 255 : b | 0);
+    }
+  }
+
+  function glassBilinear(a, b, c, d, tx, ty) {
+    var ftx = Math.fround(tx), fty = Math.fround(ty);
+    var top = glassFloatAdd(a, glassFloatMul(glassFloatAdd(b, -a), ftx));
+    var bottom = glassFloatAdd(c, glassFloatMul(glassFloatAdd(d, -c), ftx));
+    return glassFloatAdd(glassFloatAdd(top,
+        glassFloatMul(glassFloatAdd(bottom, -top), fty)), 0.5) | 0;
+  }
+
+  function glassSample(data, width, height, fx, fy, channel) {
+    var x = Math.fround(fx), y = Math.fround(fy);
+    if (x < 0) { x = 0; } else if (x > width - 1) { x = width - 1; }
+    if (y < 0) { y = 0; } else if (y > height - 1) { y = height - 1; }
+    var x0 = x | 0, y0 = y | 0;
+    var x1 = x0 + 1 < width ? x0 + 1 : x0;
+    var y1 = y0 + 1 < height ? y0 + 1 : y0;
+    var tx = Math.fround(x - x0), ty = Math.fround(y - y0);
+    var row0 = y0 * width, row1 = y1 * width;
+    return glassBilinear(
+      data[(row0 + x0) * 4 + channel], data[(row0 + x1) * 4 + channel],
+      data[(row1 + x0) * 4 + channel], data[(row1 + x1) * 4 + channel],
+      tx, ty
+    );
+  }
+
+  // Mirrors IOSImplementation.applyGlassOptics(). The returned patch retains
+  // the native shape alpha and is composited with drawImage below, just like
+  // IOSImplementation draws its generated ARGB image back onto the target.
+  // One channel of the iOS 27 edge outline; mirrors
+  // IOSImplementation.glassOutlineChannel float for float.
+  function glassOutlineChannel(c, b, alpha, w) {
+    var v = glassFloatMul(c, alpha);
+    var under = glassFloatMul(b, Math.fround(1 - alpha));
+    v = glassFloatAdd(v, under);
+    var dark = glassFloatMul(76, w);
+    var alt = glassFloatMul(glassFloatMul(Math.fround(0.78), w), b);
+    if (alt < dark) {
+      dark = alt;
+    }
+    v = glassFloatAdd(v, -dark);
+    return v <= 0 ? 0 : (v >= 255 ? 255 : (glassFloatAdd(v, 0.5) | 0));
+  }
+
+  // raw: the unmaterialled backdrop under the component (RGBA, width x height),
+  // only read when outline > 0 -- the iOS 27 edge line darkens the BACKDROP.
+  function applyGlassOptics(blurred, bufferWidth, bufferHeight, pad,
+                             width, height, cornerRadius, refraction, specular,
+                             outline, raw) {
+    var result = new Uint8ClampedArray(width * height * 4);
+    var hw = Math.fround(width / 2), hh = Math.fround(height / 2);
+    var radius = cornerRadius < 0 ? Math.min(hw, hh)
+                                  : Math.min(cornerRadius, Math.min(hw, hh));
+    if (radius < 0) { radius = 0; }
+    var band = glassFloatMul(Math.min(hw, hh), Math.fround(0.6));
+    var rimWidth = Math.fround(3.0);
+    var refract = Math.fround(refraction), spec = Math.fround(specular);
+    var edgeLine = Math.fround(outline || 0);
+    for (var yy = 0; yy < height; yy++) {
+      var py = Math.fround(yy + 0.5);
+      for (var xx = 0; xx < width; xx++) {
+        var px = Math.fround(xx + 0.5);
+        var dx = Math.fround(Math.abs(Math.fround(px - hw)) - Math.fround(hw - radius));
+        var dy = Math.fround(Math.abs(Math.fround(py - hh)) - Math.fround(hh - radius));
+        var ax = dx > 0 ? dx : 0, ay = dy > 0 ? dy : 0;
+        var outside = Math.fround(Math.sqrt(glassFloatAdd(glassFloatMul(ax, ax), glassFloatMul(ay, ay))));
+        var inside = Math.min(Math.max(dx, dy), 0);
+        var sdf = glassFloatAdd(glassFloatAdd(outside, inside), -radius);
+        var depth = Math.fround(-sdf);
+        if (depth <= 0) {
+          continue;
+        }
+        var coverage = depth >= 1 ? 1 : depth;
+        var sx = Math.fround(xx), sy = Math.fround(yy);
+        if (refract > 0 && band > 0 && depth < band) {
+          var edgeT = Math.fround(1 - Math.fround(depth / band));
+          var root = Math.fround(Math.sqrt(Math.max(0,
+              glassFloatAdd(1, -glassFloatMul(edgeT, edgeT)))));
+          var distortion = glassFloatAdd(1, -root);
+          sx = Math.fround(xx - glassFloatMul(glassFloatMul(Math.fround(px - hw), distortion), refract));
+          sy = Math.fround(yy - glassFloatMul(glassFloatMul(Math.fround(py - hh), distortion), refract));
+        }
+        var red = glassSample(blurred, bufferWidth, bufferHeight,
+                              Math.fround(sx + pad), Math.fround(sy + pad), 0);
+        var green = glassSample(blurred, bufferWidth, bufferHeight,
+                                Math.fround(sx + pad), Math.fround(sy + pad), 1);
+        var blue = glassSample(blurred, bufferWidth, bufferHeight,
+                               Math.fround(sx + pad), Math.fround(sy + pad), 2);
+        if (spec > 0 && depth < rimWidth) {
+          var rim = Math.fround(1 - Math.fround(depth / rimWidth));
+          var topBias = Math.fround(0.55 + glassFloatMul(0.45,
+              Math.fround(1 - Math.fround(py / height))));
+          var add = glassFloatMul(glassFloatMul(glassFloatMul(spec, rim), topBias), 70) | 0;
+          red = Math.min(255, red + add);
+          green = Math.min(255, green + add);
+          blue = Math.min(255, blue + add);
+        }
+        var index = (yy * width + xx) * 4;
+        if (edgeLine > 0 && depth < 1 && raw) {
+          var wx;
+          if (dx > 0 && dy > 0) {
+            wx = outside > 0 ? Math.fround(ax / outside) : 0;
+          } else {
+            wx = dx >= dy ? 1 : 0;
+          }
+          var lineWeight = glassFloatMul(edgeLine, wx);
+          if (lineWeight > 0) {
+            result[index] = glassOutlineChannel(red, raw[index], coverage, lineWeight);
+            result[index + 1] = glassOutlineChannel(green, raw[index + 1], coverage, lineWeight);
+            result[index + 2] = glassOutlineChannel(blue, raw[index + 2], coverage, lineWeight);
+            result[index + 3] = 255;
+            continue;
+          }
+        }
+        result[index] = red;
+        result[index + 1] = green;
+        result[index + 2] = blue;
+        result[index + 3] = glassFloatMul(coverage, 255) | 0;
+      }
+    }
+    return result;
+  }
+
+  function createGlassScratchCanvas(width, height) {
+    if (typeof global.OffscreenCanvas === 'function') {
+      return new global.OffscreenCanvas(width, height);
+    }
+    var doc = global.document || (global.window && global.window.document);
+    if (!doc || !doc.createElement) {
+      return null;
+    }
+    var canvas = doc.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    return canvas;
+  }
+
+  function applyBlurSelfRegion(ctx, x, y, width, height, sigma, cornerRadius) {
+    if (width <= 0 || height <= 0 || !ctx.canvas) {
+      return;
+    }
+    ctx.save();
+    try {
+      ctx.beginPath();
+      if (cornerRadius) {
+        var round = cornerRadius < 0 ? Math.min(width, height) / 2
+                                     : Math.min(cornerRadius, Math.min(width, height) / 2);
+        ctx.moveTo(x + round, y);
+        ctx.arcTo(x + width, y, x + width, y + height, round);
+        ctx.arcTo(x + width, y + height, x, y + height, round);
+        ctx.arcTo(x, y + height, x, y, round);
+        ctx.arcTo(x, y, x + width, y, round);
+        ctx.closePath();
+      } else {
+        ctx.rect(x, y, width, height);
+      }
+      ctx.clip();
+      ctx.filter = 'blur(' + sigma + 'px)';
+      ctx.drawImage(ctx.canvas, 0, 0);
+    } finally {
+      ctx.restore();
+    }
+  }
+
+  function applyGlassSelfRegion(ctx, x, y, width, height, blurRadius, cornerRadius,
+                                saturation, scale, offset, refraction, specular, curve, curveMid,
+                                outline) {
+    if (!ctx.canvas || width <= 0 || height <= 0) {
+      return;
+    }
+    var rect = lensDeviceRect(ctx, x, y, width, height);
+    if (!rect || rect.w <= 0 || rect.h <= 0) {
+      return;
+    }
+    var rx = rect.x, ry = rect.y, rw = rect.w, rh = rect.h;
+    var canvasWidth = ctx.canvas.width | 0, canvasHeight = ctx.canvas.height | 0;
+    if (rx < 0) { rw += rx; rx = 0; }
+    if (ry < 0) { rh += ry; ry = 0; }
+    if (rx + rw > canvasWidth) { rw = canvasWidth - rx; }
+    if (ry + rh > canvasHeight) { rh = canvasHeight - ry; }
+    if (rw <= 0 || rh <= 0) {
+      return;
+    }
+
+    // CSS blur() accepts Gaussian sigma while the CN1/iOS recipe carries the
+    // calibrated blur radius. Keep the same radius-to-sigma conversion used
+    // by BlurRegion; the material transform is the missing opacity, not a
+    // stronger blur.
+    var sigma = Math.max(1, blurRadius * rect.scale / 2);
+    var pad = Math.ceil(sigma) * 3 + 1;
+    var bufferWidth = rw + pad * 2, bufferHeight = rh + pad * 2;
+    var ax0 = Math.max(0, rx - pad), ay0 = Math.max(0, ry - pad);
+    var ax1 = Math.min(canvasWidth, rx + rw + pad), ay1 = Math.min(canvasHeight, ry + rh + pad);
+    var availableWidth = ax1 - ax0, availableHeight = ay1 - ay0;
+    if (availableWidth <= 0 || availableHeight <= 0) {
+      return;
+    }
+    var available = ctx.getImageData(ax0, ay0, availableWidth, availableHeight).data;
+    var padded = new Uint8ClampedArray(bufferWidth * bufferHeight * 4);
+    for (var by = 0; by < bufferHeight; by++) {
+      var sourceY = ry - pad + by - ay0;
+      if (sourceY < 0) { sourceY = 0; }
+      if (sourceY >= availableHeight) { sourceY = availableHeight - 1; }
+      for (var bx = 0; bx < bufferWidth; bx++) {
+        var sourceX = rx - pad + bx - ax0;
+        if (sourceX < 0) { sourceX = 0; }
+        if (sourceX >= availableWidth) { sourceX = availableWidth - 1; }
+        var sourceIndex = (sourceY * availableWidth + sourceX) * 4;
+        var targetIndex = (by * bufferWidth + bx) * 4;
+        padded[targetIndex] = available[sourceIndex];
+        padded[targetIndex + 1] = available[sourceIndex + 1];
+        padded[targetIndex + 2] = available[sourceIndex + 2];
+        padded[targetIndex + 3] = available[sourceIndex + 3];
+      }
+    }
+    var raw = null;
+    if (outline > 0) {
+      raw = new Uint8ClampedArray(rw * rh * 4);
+      for (var rowY = 0; rowY < rh; rowY++) {
+        var from = ((rowY + pad) * bufferWidth + pad) * 4;
+        raw.set(padded.subarray(from, from + rw * 4), rowY * rw * 4);
+      }
+    }
+    glassMaterialInPlace(padded, saturation, scale, offset, curve, curveMid);
+
+    var materialCanvas = createGlassScratchCanvas(bufferWidth, bufferHeight);
+    var blurredCanvas = createGlassScratchCanvas(bufferWidth, bufferHeight);
+    if (!materialCanvas || !blurredCanvas) {
+      applyBlurSelfRegion(ctx, x, y, width, height, sigma, cornerRadius);
+      return;
+    }
+    var materialContext = materialCanvas.getContext('2d');
+    var blurredContext = blurredCanvas.getContext('2d');
+    if (!materialContext || !blurredContext) {
+      applyBlurSelfRegion(ctx, x, y, width, height, sigma, cornerRadius);
+      return;
+    }
+    var materialImage = materialContext.createImageData(bufferWidth, bufferHeight);
+    materialImage.data.set(padded);
+    materialContext.putImageData(materialImage, 0, 0);
+    blurredContext.filter = 'blur(' + sigma + 'px)';
+    blurredContext.drawImage(materialCanvas, 0, 0);
+    var blurred = blurredContext.getImageData(0, 0, bufferWidth, bufferHeight).data;
+    var scaledCorner = cornerRadius * rect.scale;
+    var output = applyGlassOptics(blurred, bufferWidth, bufferHeight, pad,
+                                   rw, rh, scaledCorner, refraction, specular, outline, raw);
+    var outputCanvas = createGlassScratchCanvas(rw, rh);
+    var outputContext = outputCanvas && outputCanvas.getContext('2d');
+    if (!outputContext) {
+      return;
+    }
+    var result = outputContext.createImageData(rw, rh);
+    result.data.set(output);
+    outputContext.putImageData(result, 0, 0);
+    ctx.save();
+    try {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(outputCanvas, rx, ry);
+    } finally {
+      ctx.restore();
+    }
+  }
+
+  // Graphics.colorMatrixRegion. colorMatrixBlendInPlace is a line-for-line
+  // mirror of com.codename1.ui.plaf.ColorMatrixBlend.apply (the reference every
+  // port matches) over RGBA ImageData instead of packed ARGB. Every float
+  // operation is Math.fround-ed in Java's evaluation order so the result is
+  // bit-identical to the Java reference, not merely close; the parity gate in
+  // scripts/verify-javascript-lens-parity.mjs pins that with checksums.
+  // maskAlpha is one byte per mask pixel (the mask's alpha), or null.
+  function colorMatrixBlendInPlace(data, w, h, matrix, maskAlpha, maskW, maskH,
+                                   cornerRadius, amount) {
+    var f = Math.fround;
+    amount = f(amount);
+    cornerRadius = f(cornerRadius);
+    if (amount <= 0 || w <= 0 || h <= 0) {
+      return;
+    }
+    var m = [];
+    for (var mi = 0; mi < 12; mi++) {
+      m.push(f(matrix[mi]));
+    }
+    var hw = f(w / 2);
+    var hh = f(h / 2);
+    var r = 0;
+    if (cornerRadius !== 0) {
+      r = cornerRadius < 0 ? Math.min(hw, hh) : Math.min(cornerRadius, Math.min(hw, hh));
+    }
+    var inset = f(0.5);
+    var hwr = f(hw - r), hhr = f(hh - r);
+    for (var y = 0; y < h; y++) {
+      var py = f(f(y + inset) - hh);
+      for (var x = 0; x < w; x++) {
+        var k = amount;
+        if (r > 0) {
+          var px = f(f(x + inset) - hw);
+          var dx = f(Math.abs(px) - hwr);
+          var dy = f(Math.abs(py) - hhr);
+          var ax = dx > 0 ? dx : 0;
+          var ay = dy > 0 ? dy : 0;
+          var sdf = f(f(f(Math.sqrt(f(f(ax * ax) + f(ay * ay))))
+                        + Math.min(Math.max(dx, dy), 0)) - r);
+          var cov = f(inset - sdf);
+          k = f(k * (cov < 0 ? 0 : (cov > 1 ? 1 : cov)));
+        }
+        if (maskAlpha) {
+          var mx = Math.floor(x * maskW / w);
+          var my = Math.floor(y * maskH / h);
+          k = f(k * f(maskAlpha[my * maskW + mx] / 255));
+        }
+        if (k <= 0) {
+          continue;
+        }
+        var i = (y * w + x) * 4;
+        var pr = f(data[i] / 255);
+        var pg = f(data[i + 1] / 255);
+        var pb = f(data[i + 2] / 255);
+        for (var row = 0; row < 3; row++) {
+          var o4 = row * 4;
+          var v = f(f(f(f(m[o4] * pr) + f(m[o4 + 1] * pg)) + f(m[o4 + 2] * pb)) + m[o4 + 3]);
+          v = v < 0 ? 0 : (v > 1 ? 1 : v);
+          var src = row === 0 ? pr : (row === 1 ? pg : pb);
+          var o = f(src + f(f(v - src) * k));
+          data[i + row] = Math.round(f(o * 255));
+        }
+        // data[i + 3], the destination alpha, is kept.
+      }
+    }
+  }
+
+  // The alpha channel of a colorMatrixRegion mask at its own pixel size, or
+  // null when the source cannot be read (not decoded yet, zero sized, or a
+  // cross-origin image that taints the scratch canvas).
+  function colorMatrixMaskAlpha(source) {
+    if (!drawableImageSource(source)) {
+      return null;
+    }
+    var mw = (typeof source.naturalWidth === 'number' ? source.naturalWidth : source.width) | 0;
+    var mh = (typeof source.naturalHeight === 'number' ? source.naturalHeight : source.height) | 0;
+    if (mw <= 0 || mh <= 0) {
+      return null;
+    }
+    var scratch = createGlassScratchCanvas(mw, mh);
+    var scratchContext = scratch && scratch.getContext('2d');
+    if (!scratchContext) {
+      return null;
+    }
+    scratchContext.drawImage(source, 0, 0, mw, mh);
+    var rgba = scratchContext.getImageData(0, 0, mw, mh).data;
+    var alpha = new Uint8ClampedArray(mw * mh);
+    for (var ai = 0; ai < alpha.length; ai++) {
+      alpha[ai] = rgba[ai * 4 + 3];
+    }
+    return { alpha: alpha, w: mw, h: mh };
+  }
+
+  // In-place colour matrix over this surface's own pixels. The region is in
+  // device pixels as given: Graphics.colorMatrixRegion does not apply the
+  // current transform (core has already added its translation, and callers such
+  // as Tabs scale the region themselves), so the context transform -- the user
+  // transform -- is ignored here, as on iOS and JavaSE. Pixels off
+  // the canvas are left out but the shape and the mask stay anchored to the
+  // FULL region (as JavaSEPort.colorMatrixRegion does), so a region that is
+  // partly scrolled off does not squeeze its rounded corners or its glyphs.
+  // The result is drawn back through clearRect + drawImage rather than
+  // putImageData so the current clip is honoured (putImageData ignores it),
+  // matching the Metal draw on iOS.
+  // mask: null, or { alpha, w, h } from colorMatrixMaskAlpha.
+  function applyColorMatrixSelfRegion(ctx, x, y, width, height, matrix, mask,
+                                      cornerRadius, amount) {
+    if (!ctx.canvas || width <= 0 || height <= 0 || amount <= 0) {
+      return;
+    }
+    var rect = { x: Math.round(x), y: Math.round(y), w: Math.round(width), h: Math.round(height), scale: 1 };
+    if (rect.w <= 0 || rect.h <= 0) {
+      return;
+    }
+    var fullW = rect.w, fullH = rect.h;
+    var rx = rect.x, ry = rect.y, rw = fullW, rh = fullH, ox = 0, oy = 0;
+    var canvasWidth = ctx.canvas.width | 0, canvasHeight = ctx.canvas.height | 0;
+    if (rx < 0) { ox = -rx; rw += rx; rx = 0; }
+    if (ry < 0) { oy = -ry; rh += ry; ry = 0; }
+    if (rx + rw > canvasWidth) { rw = canvasWidth - rx; }
+    if (ry + rh > canvasHeight) { rh = canvasHeight - ry; }
+    if (rw <= 0 || rh <= 0) {
+      return;
+    }
+    var part = ctx.getImageData(rx, ry, rw, rh).data;
+    var full = new Uint8ClampedArray(fullW * fullH * 4);
+    var row;
+    for (row = 0; row < rh; row++) {
+      full.set(part.subarray(row * rw * 4, (row + 1) * rw * 4), ((row + oy) * fullW + ox) * 4);
+    }
+    var scaledCorner = cornerRadius < 0 ? cornerRadius : Math.fround(cornerRadius * rect.scale);
+    colorMatrixBlendInPlace(full, fullW, fullH, matrix, mask ? mask.alpha : null,
+                            mask ? mask.w : 0, mask ? mask.h : 0, scaledCorner, amount);
+    var outputCanvas = createGlassScratchCanvas(rw, rh);
+    var outputContext = outputCanvas && outputCanvas.getContext('2d');
+    if (!outputContext) {
+      return;
+    }
+    var result = outputContext.createImageData(rw, rh);
+    for (row = 0; row < rh; row++) {
+      var from = ((row + oy) * fullW + ox) * 4;
+      result.data.set(full.subarray(from, from + rw * 4), row * rw * 4);
+    }
+    outputContext.putImageData(result, 0, 0);
+    ctx.save();
+    try {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+      try { ctx.filter = 'none'; } catch (_ecf) {}
+      ctx.shadowColor = 'rgba(0,0,0,0)';
+      // Clear first: the output keeps the destination alpha, and drawing a
+      // translucent pixel source-over would blend it with the original
+      // instead of replacing it. Both calls are clipped, so pixels outside the
+      // clip are untouched.
+      ctx.clearRect(rx, ry, rw, rh);
+      ctx.drawImage(outputCanvas, rx, ry);
+    } finally {
+      ctx.restore();
+    }
+  }
+
+  // Replay one command stream (opcodes + nums + objs) onto ``ctx``.
+  function reconcileNativeTextOrder() {
+    var doc = global.document;
+    var layer = doc && doc.getElementById('cn1-text-layer');
+    if (!layer || !layer.__cn1OrderDirty) return;
+    var selection = global.getSelection && global.getSelection();
+    if (selection && !selection.isCollapsed
+        && (layer.contains(selection.anchorNode) || layer.contains(selection.focusNode))) return;
+    var ordered = Array.prototype.slice.call(layer.children).sort(function(a, b) {
+      return Number(a.__cn1TextOrder || 0) - Number(b.__cn1TextOrder || 0);
+    });
+    for (var i = 0; i < ordered.length; i++) {
+      if (layer.children[i] !== ordered[i]) layer.insertBefore(ordered[i], layer.children[i] || null);
+    }
+    layer.__cn1OrderDirty = false;
+  }
+
+  function replaySurfaceCommands(ctx, ops, opCount, nums, objs) {
+    var ni = 0; // num cursor
+    var oi = 0; // obj cursor
+    var curGradient = null;
+    var curPattern = null;
+    for (var k = 0; k < opCount; k++) {
+      var code = ops[k];
+      switch (code) {
+        case SURF.SAVE: ctx.save(); break;
+        case SURF.RESTORE: ctx.restore(); break;
+        case SURF.SCALE: ctx.scale(nums[ni++], nums[ni++]); break;
+        case SURF.ROTATE: ctx.rotate(nums[ni++]); break;
+        case SURF.TRANSLATE: ctx.translate(nums[ni++], nums[ni++]); break;
+        case SURF.TRANSFORM: ctx.transform(nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.SET_TRANSFORM: ctx.setTransform(nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.SET_GLOBAL_ALPHA: ctx.globalAlpha = nums[ni++]; break;
+        case SURF.SET_GCO: ctx.globalCompositeOperation = objs[oi++]; break;
+        case SURF.SET_FILL_COLOR: ctx.fillStyle = objs[oi++]; break;
+        case SURF.SET_STROKE_COLOR: ctx.strokeStyle = objs[oi++]; break;
+        case SURF.SET_LINE_WIDTH: ctx.lineWidth = nums[ni++]; break;
+        case SURF.SET_LINE_CAP: ctx.lineCap = objs[oi++]; break;
+        case SURF.SET_LINE_JOIN: ctx.lineJoin = objs[oi++]; break;
+        case SURF.SET_MITER_LIMIT: ctx.miterLimit = nums[ni++]; break;
+        case SURF.SET_FONT: ctx.font = objs[oi++]; break;
+        case SURF.SET_TEXT_ALIGN: ctx.textAlign = objs[oi++]; break;
+        case SURF.SET_TEXT_BASELINE: ctx.textBaseline = objs[oi++]; break;
+        case SURF.SET_SHADOW_COLOR: ctx.shadowColor = objs[oi++]; break;
+        case SURF.SET_SHADOW_BLUR: ctx.shadowBlur = nums[ni++]; break;
+        case SURF.SET_SHADOW_OFFX: ctx.shadowOffsetX = nums[ni++]; break;
+        case SURF.SET_SHADOW_OFFY: ctx.shadowOffsetY = nums[ni++]; break;
+        case SURF.SET_FILTER: try { ctx.filter = objs[oi++]; } catch (_ef) {} break;
+        case SURF.CLEAR_RECT: ctx.clearRect(nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.FILL_RECT: ctx.fillRect(nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.STROKE_RECT: ctx.strokeRect(nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.BEGIN_PATH: ctx.beginPath(); break;
+        case SURF.CLOSE_PATH: ctx.closePath(); break;
+        case SURF.MOVE_TO: ctx.moveTo(nums[ni++], nums[ni++]); break;
+        case SURF.LINE_TO: ctx.lineTo(nums[ni++], nums[ni++]); break;
+        case SURF.QUAD_TO: ctx.quadraticCurveTo(nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.BEZIER_TO: ctx.bezierCurveTo(nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.ARC: {
+          var ax = nums[ni++], ay = nums[ni++], ar = nums[ni++], a0 = nums[ni++], a1 = nums[ni++], accw = nums[ni++];
+          ctx.arc(ax, ay, ar, a0, a1, accw !== 0);
+          break;
+        }
+        case SURF.ARC_TO: ctx.arcTo(nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.ELLIPSE: ctx.ellipse(nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.RECT: ctx.rect(nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.FILL: ctx.fill(); break;
+        case SURF.STROKE: ctx.stroke(); break;
+        case SURF.CLIP: ctx.clip(); break;
+        case SURF.FILL_TEXT: {
+          var fx = nums[ni++], fy = nums[ni++], fmw = nums[ni++], ftext = objs[oi++];
+          if (fmw >= 0) { ctx.fillText(ftext, fx, fy, fmw); } else { ctx.fillText(ftext, fx, fy); }
+          break;
+        }
+        case SURF.STROKE_TEXT: {
+          var sx0 = nums[ni++], sy0 = nums[ni++], smw = nums[ni++], stext = objs[oi++];
+          if (smw >= 0) { ctx.strokeText(stext, sx0, sy0, smw); } else { ctx.strokeText(stext, sx0, sy0); }
+          break;
+        }
+        case SURF.SET_LINE_DASH_OFFSET: ctx.lineDashOffset = nums[ni++]; break;
+        case SURF.SET_LINE_DASH: {
+          var dn = nums[ni++] | 0, seg = new Array(dn);
+          for (var di = 0; di < dn; di++) { seg[di] = nums[ni++]; }
+          if (ctx.setLineDash) { ctx.setLineDash(seg); }
+          break;
+        }
+        case SURF.CREATE_LINEAR_GRADIENT:
+          curGradient = ctx.createLinearGradient(nums[ni++], nums[ni++], nums[ni++], nums[ni++]);
+          break;
+        case SURF.CREATE_RADIAL_GRADIENT:
+          curGradient = ctx.createRadialGradient(nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++]);
+          break;
+        case SURF.ADD_COLOR_STOP: {
+          var off = nums[ni++], col = objs[oi++];
+          if (curGradient) { curGradient.addColorStop(off, col); }
+          break;
+        }
+        case SURF.SET_FILL_GRADIENT: if (curGradient) { ctx.fillStyle = curGradient; } break;
+        case SURF.SET_STROKE_GRADIENT: if (curGradient) { ctx.strokeStyle = curGradient; } break;
+        case SURF.CREATE_PATTERN: {
+          var pimg = surfaceImageSource(objs[oi++]), prep = objs[oi++];
+          try { curPattern = ctx.createPattern(pimg, prep); } catch (_ep) { curPattern = null; }
+          break;
+        }
+        case SURF.CREATE_PATTERN_SURFACE: {
+          var psurf = surfaceTable[nums[ni++]], prep2 = objs[oi++];
+          try { curPattern = (psurf && psurf.canvas) ? ctx.createPattern(psurf.canvas, prep2) : null; } catch (_eps) { curPattern = null; }
+          break;
+        }
+        case SURF.SET_FILL_PATTERN: if (curPattern) { ctx.fillStyle = curPattern; } break;
+        // The argument cursors advance whether or not the draw happens, so a
+        // skipped op can never desync the ops behind it.
+        case SURF.DRAW_IMAGE_XY: {
+          var i1 = surfaceImageSource(objs[oi++]);
+          var i1a = [nums[ni++], nums[ni++]];
+          safeDrawImage(ctx, i1, i1a);
+          break;
+        }
+        case SURF.DRAW_IMAGE_XYWH: {
+          var i2 = surfaceImageSource(objs[oi++]);
+          var i2a = [nums[ni++], nums[ni++], nums[ni++], nums[ni++]];
+          safeDrawImage(ctx, i2, i2a);
+          break;
+        }
+        case SURF.DRAW_IMAGE_SRCDST: {
+          var i3 = surfaceImageSource(objs[oi++]);
+          var i3a = [nums[ni++], nums[ni++], nums[ni++], nums[ni++],
+            nums[ni++], nums[ni++], nums[ni++], nums[ni++]];
+          safeDrawImage(ctx, i3, i3a);
+          break;
+        }
+        case SURF.BLUR_SELF_REGION: {
+          // In-place backdrop blur (backdrop-filter): clip to the region and
+          // redraw this surface's own canvas through ctx.filter = blur(sigma).
+          // drawImage(self) snapshots the source bitmap per the HTML spec, so
+          // this is a well-defined self-referential draw. cornerRadius: 0 =
+          // rect, -1 = capsule (fully rounded sides), >0 = rounded rect px.
+          var _bx = nums[ni++], _by = nums[ni++], _bw = nums[ni++], _bh = nums[ni++];
+          var _bsig = nums[ni++], _bcr = nums[ni++];
+          if (_bw > 0 && _bh > 0 && ctx.canvas) {
+            try {
+              applyBlurSelfRegion(ctx, _bx, _by, _bw, _bh, _bsig, _bcr);
+            } catch (_ebr) {
+            }
+          }
+          break;
+        }
+        case SURF.LENS_SELF_REGION: {
+          // iOS-26 selection DROP: run the Simulator-equivalent per-pixel lens
+          // over this surface's own pixels. cornerRadius: 0 = rect, -1 =
+          // capsule, >0 = rounded px.
+          var _lx = nums[ni++], _ly = nums[ni++], _lw = nums[ni++], _lh = nums[ni++];
+          var _lcr = nums[ni++], _lmag = nums[ni++];
+          var _lab = nums[ni++], _ltint = nums[ni++] | 0, _ltintStrength = nums[ni++];
+          if (_lw > 0 && _lh > 0 && ctx.canvas) {
+            try {
+              applyLensSelfRegion(ctx, _lx, _ly, _lw, _lh, _lcr,
+                                  _lmag, _lab, _ltint, _ltintStrength);
+            } catch (_elr) {
+            }
+          }
+          break;
+        }
+        case SURF.GLASS_SELF_REGION: {
+          var _gx = nums[ni++], _gy = nums[ni++], _gw = nums[ni++], _gh = nums[ni++];
+          var _gblur = nums[ni++], _gcr = nums[ni++], _gsat = nums[ni++];
+          var _gscale = nums[ni++], _goffset = nums[ni++], _grefract = nums[ni++];
+          var _gspecular = nums[ni++], _gcurve = nums[ni++], _gcurveMid = nums[ni++];
+          var _goutline = nums[ni++];
+          if (_gw > 0 && _gh > 0 && ctx.canvas) {
+            try {
+              applyGlassSelfRegion(ctx, _gx, _gy, _gw, _gh, _gblur, _gcr,
+                                   _gsat, _gscale, _goffset, _grefract, _gspecular,
+                                   _gcurve, _gcurveMid, _goutline);
+            } catch (_egr) {
+            }
+          }
+          break;
+        }
+        case SURF.COLOR_MATRIX_SELF_REGION: {
+          // Graphics.colorMatrixRegion. 20 nums: x, y, w, h, cornerRadius,
+          // amount, the 12 matrix floats, maskKind (0 none, 1 image in the obj
+          // slot, 2 surface), maskSurfaceId. Always 1 obj: the image marker, or
+          // null. Every argument is consumed before anything can fail, so a
+          // skipped op never desyncs the ops behind it.
+          var _cx = nums[ni++], _cy = nums[ni++], _cw = nums[ni++], _ch = nums[ni++];
+          var _ccr = nums[ni++], _camount = nums[ni++];
+          var _cmatrix = [];
+          for (var _cmi = 0; _cmi < 12; _cmi++) {
+            _cmatrix.push(nums[ni++]);
+          }
+          var _cmaskKind = nums[ni++] | 0, _cmaskSurface = nums[ni++] | 0;
+          var _cmaskImage = objs[oi++];
+          if (_cw > 0 && _ch > 0 && _camount > 0 && ctx.canvas) {
+            try {
+              var _cmask = null;
+              var _cmaskOk = true;
+              if (_cmaskKind === 1 || _cmaskKind === 2) {
+                var _cmsrc = _cmaskKind === 1 ? surfaceImageSource(_cmaskImage)
+                    : (surfaceTable[_cmaskSurface] ? surfaceTable[_cmaskSurface].canvas : null);
+                _cmask = colorMatrixMaskAlpha(_cmsrc);
+                // A mask that cannot be read yet paints nothing: applying the
+                // matrix unmasked would recolour the whole region.
+                _cmaskOk = _cmask != null;
+              }
+              if (_cmaskOk) {
+                applyColorMatrixSelfRegion(ctx, _cx, _cy, _cw, _ch, _cmatrix, _cmask,
+                                           _ccr, _camount);
+              }
+            } catch (_ecm) {
+            }
+          }
+          break;
+        }
+        // Blitting one surface onto another goes through the same guard: a
+        // zero-sized backing canvas throws exactly like a broken image, and
+        // taking the rest of the batch with it is what truncates a frame.
+        case SURF.BLIT_SURFACE_XY: {
+          var b1 = surfaceTable[nums[ni++]];
+          var b1a = [nums[ni++], nums[ni++]];
+          safeDrawImage(ctx, b1 ? b1.canvas : null, b1a);
+          break;
+        }
+        case SURF.BLIT_SURFACE_XYWH: {
+          var b2 = surfaceTable[nums[ni++]];
+          var b2a = [nums[ni++], nums[ni++], nums[ni++], nums[ni++]];
+          safeDrawImage(ctx, b2 ? b2.canvas : null, b2a);
+          break;
+        }
+        case SURF.BLIT_SURFACE_SRCDST: {
+          var b3 = surfaceTable[nums[ni++]];
+          var b3a = [nums[ni++], nums[ni++], nums[ni++], nums[ni++],
+            nums[ni++], nums[ni++], nums[ni++], nums[ni++]];
+          safeDrawImage(ctx, b3 ? b3.canvas : null, b3a);
+          break;
+        }
+        case SURF.TEXT_ATTACH: {
+          var taParent = surfaceTextElement(objs[oi++]);
+          var taChild = surfaceTextElement(objs[oi++]);
+          // parentNode is checked so a re-attach of a run already in place is not a move: an
+          // appendChild on a node that is already the last child still detaches and re-inserts
+          // it, which drops any selection or focus inside it.
+          if (taParent && taChild && taChild.parentNode !== taParent) {
+            taParent.appendChild(taChild);
+            taParent.__cn1OrderDirty = true;
+          }
+          break;
+        }
+        case SURF.TEXT_DETACH: {
+          var tdParent = surfaceTextElement(objs[oi++]);
+          var tdChild = surfaceTextElement(objs[oi++]);
+          if (tdParent && tdChild && tdChild.parentNode === tdParent) {
+            tdParent.removeChild(tdChild);
+          }
+          break;
+        }
+        case SURF.TEXT_CLIP_CSS:
+        case SURF.TEXT_RUN_CSS: {
+          var tcEl = surfaceTextElement(objs[oi++]);
+          var tcCss = objs[oi++];
+          if (tcEl && tcEl.style) {
+            tcEl.style.cssText = tcCss == null ? '' : String(tcCss);
+          }
+          break;
+        }
+        case SURF.TEXT_ORDER: {
+          var toEl = surfaceTextElement(objs[oi++]);
+          var toOrder = Number(objs[oi++]);
+          if (toEl) {
+            toEl.__cn1TextOrder = toOrder;
+            if (toEl.parentNode) toEl.parentNode.__cn1OrderDirty = true;
+          }
+          break;
+        }
+        case SURF.TEXT_CONTENT: {
+          var ttEl = surfaceTextElement(objs[oi++]);
+          var ttText = objs[oi++];
+          if (ttEl) {
+            ttEl.textContent = ttText == null ? '' : String(ttText);
+          }
+          break;
+        }
+        case SURF.TEXT_CLEAR: {
+          var tclEl = surfaceTextElement(objs[oi++]);
+          if (tclEl) {
+            tclEl.innerHTML = '';
+          }
+          break;
+        }
+        case SURF.TEXT_SCROLL: {
+          var tsEl = surfaceTextElement(objs[oi++]);
+          var tsY = Number(objs[oi++]);
+          if (tsEl) {
+            tsEl.scrollTop = tsY;
+            tsEl.__cn1AppliedScrollTop = tsEl.scrollTop;
+          }
+          break;
+        }
+        case SURF.TEXT_DISPLAY: {
+          var tdsEl = surfaceTextElement(objs[oi++]);
+          var tdsVal = objs[oi++];
+          if (tdsEl && tdsEl.style) {
+            tdsEl.style.display = tdsVal == null ? '' : String(tdsVal);
+          }
+          break;
+        }
+        default:
+          if (global.console && global.console.warn) {
+            global.console.warn('surface replay: unknown opcode ' + code);
+          }
+          break;
+      }
+    }
+    reconcileNativeTextOrder();
+  }
+
+  // Create / resize a surface. Fire-and-forget. Idempotent: an existing surface
+  // of the same id is resized (which also clears it, matching a fresh image).
+  hostBridge.register('__cn1_surface_create__', function(request) {
+    var r = request || {};
+    var id = r.id | 0;
+    var w = r.w | 0;
+    var h = r.h | 0;
+    var s = surfaceTable[id];
+    if (!s) {
+      getSurface(id, w, h);
+    } else if (s.canvas && (s.canvas.width !== w || s.canvas.height !== h)) {
+      s.canvas.width = w;
+      s.canvas.height = h;
+    }
+    return null;
+  });
+
+  // Replay a command batch onto a surface. Fire-and-forget.
+  hostBridge.register('__cn1_surface_flush__', function(request) {
+    var r = request || {};
+    var id = r.id | 0;
+    var s = getSurface(id, r.w | 0, r.h | 0);
+    if (!s || !s.ctx) {
+      return null;
+    }
+    var ops = r.ops || [];
+    var opCount = r.opCount | 0;
+    if (id === SURF_DISPLAY_ID) {
+      // Give the DISPLAY context a clean baseline before replaying this frame.
+      // A draw op (e.g. a decorated drawString or a gradient) can record an
+      // unbalanced save/clip/transform; the recorded frame's single save/restore
+      // then pops the wrong level and leaks a clip that INTERSECTS into every
+      // later frame -- the drawable region shrinks to nothing and the display
+      // freezes (observed: the whole graphics/chart/theme block captured a stale
+      // frame after DrawStringDecorated). Popping any outstanding saves and
+      // forcing identity here defeats that leak; the recorded ops re-establish
+      // the crop. restore() on an empty stack is a no-op, and this resets context
+      // STATE only -- pixels are untouched so partial-frame updates still
+      // composite correctly.
+      for (var __ri = 0; __ri < 64; __ri++) {
+        s.ctx.restore();
+      }
+      s.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
+    replaySurfaceCommands(s.ctx, ops, opCount, r.nums || [], r.objs || []);
+    // Surface flushes replay straight onto the canvas context, bypassing the
+    // jso-bridge ``noteDrawTarget`` path that tracks per-canvas paintCount /
+    // lastPaintSeq. The screenshot capture + UI-settle heuristics rely on those
+    // counters to know the display painted; without this nudge they wait forever
+    // for a paint that "never happened" (the display surface renders but reads as
+    // paintCount=0). Mark the display canvas painted and advance the render-queue
+    // sequence so canvas-pick / settle see the frame.
+    if (id === SURF_DISPLAY_ID && opCount > 0) {
+      noteCanvasOperation(s.canvas, 'method', 'fill', true, null);
+      global.__cn1RenderQueueSeq = (global.__cn1RenderQueueSeq | 0) + 1;
+    }
+    if (id === SURF_DISPLAY_ID) {
+      // Close the frame: everything dropped since the previous display batch
+      // belongs to the one just replayed, offscreen batches included.
+      surfaceFrameDropped = (surfaceDrawImageDropped | 0) - (surfaceDropsAtFrameStart | 0);
+      surfaceDropsAtFrameStart = surfaceDrawImageDropped | 0;
+    }
+    return null;
+  });
+
+  // Read back pixels as ARGB ints (getRGB). The ONE surface op that returns
+  // data. ``dest`` is filled in place to avoid re-allocating a large array.
+  hostBridge.register('__cn1_surface_read__', function(request) {
+    var r = request || {};
+    var s = surfaceTable[r.id | 0];
+    if (!s || !s.ctx) {
+      return null;
+    }
+    var x = r.x | 0, y = r.y | 0, w = r.w | 0, h = r.h | 0;
+    var img;
+    try {
+      img = s.ctx.getImageData(x, y, w, h);
+    } catch (_er) {
+      return null;
+    }
+    var data = img.data;
+    var n = w * h;
+    var out = new Array(n);
+    for (var i = 0; i < n; i++) {
+      var p = i << 2;
+      out[i] = ((data[p + 3] & 0xff) << 24)
+        | ((data[p] & 0xff) << 16)
+        | ((data[p + 1] & 0xff) << 8)
+        | (data[p + 2] & 0xff);
+    }
+    return out;
+  });
+
+  // Encode a surface's backing canvas to a base64 data URL (PNG/JPEG export +
+  // the animation-grid screenshot path). The image bytes read-back path.
+  hostBridge.register('__cn1_surface_to_dataurl__', function(request) {
+    var r = request || {};
+    var s = surfaceTable[r.id | 0];
+    if (!s || !s.canvas || typeof s.canvas.toDataURL !== 'function') {
+      return null;
+    }
+    try {
+      var q = (typeof r.quality === 'number' && r.quality >= 0 && r.quality <= 1) ? r.quality : undefined;
+      var url = s.canvas.toDataURL(r.mime || 'image/png', q);
+      if (!url || url.length < 32) {
+        return null;
+      }
+      return url;
+    } catch (e) {
+      return null;
+    }
+  });
+
+  // Release a surface's backing canvas when its owning Java image is GC'd.
+  hostBridge.register('__cn1_surface_dispose__', function(request) {
+    var r = request || {};
+    var id = r.id | 0;
+    if (id !== SURF_DISPLAY_ID) {
+      delete surfaceTable[id];
+    }
+    return null;
+  });
+
+  // Write a raw ARGB pixel rectangle onto a surface (createImage(int[])).
+  hostBridge.register('__cn1_surface_write__', function(request) {
+    var r = request || {};
+    var w = r.w | 0, h = r.h | 0;
+    var s = getSurface(r.id | 0, w, h);
+    if (!s || !s.ctx || w <= 0 || h <= 0) {
+      return null;
+    }
+    var argb = r.argb || [];
+    var img = s.ctx.createImageData(w, h);
+    var data = img.data;
+    var n = w * h;
+    for (var i = 0; i < n; i++) {
+      var v = argb[i] | 0;
+      var p = i << 2;
+      data[p] = (v >>> 16) & 0xff;
+      data[p + 1] = (v >>> 8) & 0xff;
+      data[p + 2] = v & 0xff;
+      data[p + 3] = (v >>> 24) & 0xff;
+    }
+    s.ctx.putImageData(img, 0, 0);
+    return null;
+  });
+
+  // Read back an ARGB pixel rectangle from a LOADED image host resource. The
+  // image is drawn onto a scratch canvas (the worker holds no canvas) and its
+  // pixels read + packed ARGB. The one read-back for loaded-image getRGB.
+  hostBridge.register('__cn1_image_read__', function(request) {
+    var r = request || {};
+    var image = resolveHostRef(r.image);
+    var w = r.w | 0, h = r.h | 0;
+    if (!image || w <= 0 || h <= 0) {
+      return null;
+    }
+    var doc = global.document || (global.window && global.window.document);
+    if (!doc || !doc.createElement) {
+      return null;
+    }
+    var cv = doc.createElement('canvas');
+    cv.width = w;
+    cv.height = h;
+    var ctx = cv.getContext('2d');
+    var data;
+    try {
+      ctx.drawImage(image, r.x | 0, r.y | 0, w, h, 0, 0, w, h);
+      data = ctx.getImageData(0, 0, w, h).data;
+    } catch (_eir) {
+      return null;
+    }
+    var n = w * h;
+    var out = new Array(n);
+    for (var i = 0; i < n; i++) {
+      var p = i << 2;
+      out[i] = ((data[p + 3] & 0xff) << 24)
+        | ((data[p] & 0xff) << 16)
+        | ((data[p + 1] & 0xff) << 8)
+        | (data[p + 2] & 0xff);
+    }
+    return out;
+  });
+
+  // Gaussian blur from a loaded image (srcSurfaceId < 0) or another surface,
+  // onto a destination surface, in one canvas2d filter:blur op.
+  hostBridge.register('__cn1_surface_blur__', function(request) {
+    var r = request || {};
+    var w = r.w | 0, h = r.h | 0;
+    var dst = getSurface(r.dstId | 0, w, h);
+    if (!dst || !dst.ctx) {
+      return null;
+    }
+    var src;
+    if ((r.srcSurfaceId | 0) >= 0) {
+      var ss = surfaceTable[r.srcSurfaceId | 0];
+      src = ss && ss.canvas;
+    } else {
+      src = resolveHostRef(r.srcImage);
+    }
+    if (!src) {
+      return null;
+    }
+    try {
+      dst.ctx.save();
+      dst.ctx.clearRect(0, 0, w, h);
+      dst.ctx.filter = 'blur(' + (+r.radius) + 'px)';
+      dst.ctx.drawImage(src, 0, 0, w, h);
+      dst.ctx.restore();
+    } catch (_eb) {}
+    return null;
+  });
+
+  // Append a surface's backing canvas into a DOM element and style it (native
+  // widgets that embed a CN1-rendered image directly in the page).
+  hostBridge.register('__cn1_attach_surface_to_element__', function(request) {
+    var r = request || {};
+    var s = surfaceTable[r.id | 0];
+    var el = resolveHostRef(r.element);
+    if (!s || !s.canvas || !el) {
+      return null;
+    }
+    // These are CSSOM property writes, not inline CSS, and a generated Content-Security-Policy
+    // does not govern them: style-src covers <style> elements and style="" attributes, and the
+    // spec has no hook in CSSStyleDeclaration's setters. A review round read this as blocked
+    // under the generated policy; the thing that really was blocked was the style="" attribute
+    // the page itself carried, which index.html now sets from its stylesheet instead.
+    if (r.cssWidth != null && s.canvas.style) {
+      s.canvas.style.width = r.cssWidth;
+    }
+    if (r.cssHeight != null && s.canvas.style) {
+      s.canvas.style.height = r.cssHeight;
+    }
+    try { el.appendChild(s.canvas); } catch (_ea) {}
+    return null;
+  });
+
+  // Hide the splash element on the main thread. The translated
+  // ``HTML5Implementation.hideSplash`` body uses ``jQuery(...)``
+  // directly, but the worker context has no jQuery (and no DOM).
+  // The corresponding worker-side ``bindCiFallback`` in port.js
+  // detects the missing jQuery and routes to this host handler so
+  // the actual splash removal happens on the main thread where
+  // jQuery / the DOM are available. Falls back to a manual remove
+  // when jQuery isn't loaded on the main thread either (e.g. when
+  // the bundle is served standalone without the website wrapper).
+  hostBridge.register('__cn1_hide_splash__', function() {
+    var doc = (global.window || global).document || global.document;
+    if (!doc) {
+      return null;
+    }
+    // Tell an embedding page (e.g. the website's Playground wrapper) that the
+    // app is fully up, so its own overlay loader can fade out exactly when ours
+    // does -- avoiding the visible "switch" from the host loader to this splash.
+    try {
+      var w = (global.window || global);
+      if (w.parent && w.parent !== w && typeof w.parent.postMessage === 'function') {
+        w.parent.postMessage({ type: 'cn1-app-ready' }, '*');
+      }
+    } catch (_pmErr) { /* cross-origin parent -- ignore */ }
+    var splash = doc.getElementById('cn1-splash');
+    if (!splash) {
+      return null;
+    }
+    var jq = (global.window || global).jQuery || global.jQuery;
+    if (typeof jq === 'function') {
+      try {
+        jq(splash).fadeOut(100, function() { jq(this).remove(); });
+        return null;
+      } catch (_e) {
+        // Fall through to manual remove on jQuery error.
+      }
+    }
+    if (splash.parentNode) {
+      splash.parentNode.removeChild(splash);
+    }
+    return null;
+  });
+
+  // Save-blob handler (used by HTML5Implementation.execute for downloads).
+  // The worker can't touch ``document`` so all the link-creation +
+  // .click() driving the actual file save has to live on the main thread.
+  // We stash the pending handler here and the cn1NativeBacksideHooks
+  // user-gesture poll fires ``__cn1_fire_save_blob__`` which invokes it
+  // -- preserving the "download must be inside a user-gesture event"
+  // browser contract.
+  var __cn1PendingSaveBlobHandler = null;
+
+  function __cn1MakeBlobDownloader(blob, fileName) {
+    return function() {
+      var doc = (global.window || global).document || global.document;
+      var win = global.window || global;
+      if (!doc) {
+        return;
+      }
+      if (win.navigator && win.navigator.msSaveOrOpenBlob) {
+        win.navigator.msSaveOrOpenBlob(blob, fileName);
+        return;
+      }
+      var a = doc.createElement('a');
+      a.href = (win.URL || URL).createObjectURL(blob);
+      a.download = fileName;
+      doc.body.appendChild(a);
+      a.click();
+      doc.body.removeChild(a);
+    };
+  }
+
+  hostBridge.register('__cn1_register_save_blob__', function(request) {
+    var payload = request || {};
+    var blob = resolveHostRef(payload.blob);
+    var fileName = String(payload.fileName == null ? 'download' : payload.fileName);
+    if (global.console && typeof global.console.log === 'function') {
+      try { global.console.log('CN1INIT:save-blob:register fileName=' + fileName + ' blob=' + (blob ? 'ok' : 'missing')); } catch (_le) {}
+    }
+    if (!blob) {
+      __cn1PendingSaveBlobHandler = null;
+      return null;
+    }
+    // Fire the download immediately. The Generate flow is a clear user-
+    // intent path so most browsers allow the programmatic ``a.click()``
+    // even though the original ``mousedown`` was ~10s ago (cooperative
+    // scheduler had to walk the zip template). Backside-hook timing
+    // becomes irrelevant.
+    var handler = __cn1MakeBlobDownloader(blob, fileName);
+    try { handler(); } catch (e) {
+      if (global.console && typeof global.console.warn === 'function') {
+        try { global.console.warn('PARPAR:save-blob-immediate-failed:' + (e && e.message ? e.message : String(e))); } catch (_le) {}
+      }
+    }
+    // Also stash for the existing backside-hook fire path in case the
+    // immediate click was blocked by user-gesture policy.
+    __cn1PendingSaveBlobHandler = __cn1MakeBlobDownloader(blob, fileName);
+    return null;
+  });
+
+  hostBridge.register('__cn1_register_save_blob_dataurl__', function(request) {
+    var payload = request || {};
+    var dataUrl = String(payload.dataUrl == null ? '' : payload.dataUrl);
+    var fileName = String(payload.fileName == null ? 'download' : payload.fileName);
+    if (global.console && typeof global.console.log === 'function') {
+      try { global.console.log('CN1INIT:save-blob:register-dataurl fileName=' + fileName + ' len=' + dataUrl.length); } catch (_le) {}
+    }
+    if (!dataUrl) {
+      __cn1PendingSaveBlobHandler = null;
+      return null;
+    }
+    var makeHandler = function() {
+      return function() {
+        var doc = (global.window || global).document || global.document;
+        if (!doc) {
+          return;
+        }
+        var a = doc.createElement('a');
+        a.href = dataUrl;
+        a.download = fileName;
+        doc.body.appendChild(a);
+        a.click();
+        doc.body.removeChild(a);
+      };
+    };
+    // Fire immediately -- same rationale as __cn1_register_save_blob__: the
+    // Generate flow is a clear user-intent path, so most browsers allow the
+    // programmatic a.click() even though the original click was seconds ago
+    // while the cooperative scheduler built the zip. Backside-hook timing
+    // becomes irrelevant. Also stash for the backside-hook fire path in case
+    // the immediate click was blocked by user-gesture policy.
+    try { makeHandler()(); } catch (e) {
+      if (global.console && typeof global.console.warn === 'function') {
+        try { global.console.warn('PARPAR:save-blob-dataurl-immediate-failed:' + (e && e.message ? e.message : String(e))); } catch (_le) {}
+      }
+    }
+    __cn1PendingSaveBlobHandler = makeHandler();
+    return null;
+  });
+
+  hostBridge.register('__cn1_deregister_save_blob__', function() {
+    __cn1PendingSaveBlobHandler = null;
+    return null;
+  });
+
+  hostBridge.register('__cn1_fire_save_blob__', function() {
+    var handler = __cn1PendingSaveBlobHandler;
+    __cn1PendingSaveBlobHandler = null;
+    if (global.console && typeof global.console.log === 'function') {
+      try { global.console.log('CN1INIT:save-blob:fire handler=' + (typeof handler === 'function' ? 'present' : 'absent')); } catch (_le) {}
+    }
+    if (typeof handler === 'function') {
+      try { handler(); } catch (e) {
+        if (global.console && typeof global.console.warn === 'function') {
+          try { global.console.warn('PARPAR:save-blob-failed:' + (e && e.message ? e.message : String(e))); } catch (_le) {}
+        }
+      }
+    }
+    return null;
+  });
+
+  // Apply a CSS canvas2d ``filter: blur(<radius>px)`` to ``dst`` from
+  // ``src`` in a single host-side call. The worker invokes this once per
+  // ``gaussianBlurImage`` so the cooperative scheduler doesn't have to
+  // round-trip six separate ctx.save/setFilter/drawImage/setFilter/restore
+  // ops -- the earlier per-op Java-typed dispatch path was correct but
+  // slow enough to hang Sheet/Dialog backdrop renders against the screenshot
+  // test budget (see fa18f0301..153d971dc). Returns null; callers don't
+  // need the result, just the side effect on ``dst``.
+  hostBridge.register('__cn1_apply_canvas_blur__', function(request) {
+    var payload = request || {};
+    var dst = resolveHostRef(payload.dst);
+    var src = resolveHostRef(payload.src);
+    if (!dst || !src || typeof dst.getContext !== 'function') {
+      return null;
+    }
+    var w = (payload.w | 0);
+    var h = (payload.h | 0);
+    if (w <= 0 || h <= 0) {
+      return null;
+    }
+    var radius = +payload.radius;
+    if (!(radius >= 0)) {
+      radius = 0;
+    }
+    var ctx = dst.getContext('2d');
+    if (!ctx) {
+      return null;
+    }
+    ctx.save();
+    try {
+      ctx.filter = 'blur(' + radius + 'px)';
+      ctx.drawImage(src, 0, 0, w, h);
+    } finally {
+      ctx.filter = 'none';
+      ctx.restore();
+    }
+    return null;
+  });
+
+  hostBridge.register('__cn1_create_custom_event__', function(request) {
+    var payload = request || {};
+    var type = payload.type == null ? '' : String(payload.type);
+    var detail = payload.detail == null ? null : payload.detail;
+    var code = payload.code == null ? 0 : (payload.code | 0);
+    var targetWindow = global.window || global.self || global;
+    var event;
+    if (typeof targetWindow.CustomEvent === 'function') {
+      event = new targetWindow.CustomEvent(type, {
+        detail: detail,
+        bubbles: false,
+        cancelable: false
+      });
+    } else if (typeof targetWindow.Event === 'function') {
+      event = new targetWindow.Event(type);
+      event.detail = detail;
+    } else {
+      throw new Error('CustomEvent is not available in host environment');
+    }
+    if (event && event.code == null) {
+      try {
+        Object.defineProperty(event, 'code', {
+          configurable: true,
+          enumerable: false,
+          writable: true,
+          value: code
+        });
+      } catch (err) {
+        event.code = code;
+      }
+    }
+    return hostResult(event);
+  });
+
+  // Copy text to the system clipboard ON THE MAIN THREAD. The worker that runs
+  // the translated Java cannot reach the clipboard itself: document/execCommand
+  // do not exist in a Web Worker and navigator.clipboard is a Window-only API.
+  // The Java copyToClipboard() therefore routes the actual write here, where it
+  // still runs inside the transient user-activation window carried by the
+  // forwarded click that triggered it. Returns 1 on success, 0 on failure so the
+  // worker can fall back to its permission-prompt path.
+  function execCommandClipboardFallback(text) {
+    var doc = global.document || (global.window && global.window.document);
+    if (!doc || !doc.body) {
+      return false;
+    }
+    var textArea = doc.createElement('textarea');
+    textArea.setAttribute('readonly', '');
+    // Marks the copy event execCommand raises below as ours: serializeEventForWorker reports it
+    // as cn1SelfCopy, and the port's document copy listener leaves it alone instead of copying
+    // again -- which would fall back here again and cycle.
+    textArea.setAttribute('data-cn1-self-copy', '1');
+    textArea.style.position = 'fixed';
+    textArea.style.top = '-1000px';
+    textArea.style.left = '0';
+    textArea.style.opacity = '0';
+    doc.body.appendChild(textArea);
+    textArea.value = text;
+    var ok = false;
+    try {
+      textArea.focus();
+      textArea.select();
+      ok = !!doc.execCommand('copy');
+    } catch (err) {
+      ok = false;
+    }
+    doc.body.removeChild(textArea);
+    return ok;
+  }
+
+  // ``window.cn1NativeBacksideHooks`` is the queue fed by
+  // ``window.cn1RunOnMainThread(cb)`` in js/fontmetrics.js -- a MAIN-THREAD
+  // script. The callbacks in it are main-thread closures (they touch the DOM,
+  // drive downloads inside a user gesture, ...), so the queue only exists here
+  // and can only be drained here. HTML5Implementation.runPendingNativeBacksideHooks
+  // used to drain it from inside the worker, where `window` is the worker
+  // global and the array is undefined -- that threw
+  // "Cannot read properties of undefined (reading 'length')" out of every
+  // backside-hook poll.
+  hostBridge.register('__cn1_run_backside_hooks__', function() {
+    var win = global.window || global;
+    var hooks = win ? win.cn1NativeBacksideHooks : null;
+    if (!hooks || typeof hooks.length !== 'number') {
+      return null;
+    }
+    while (hooks.length > 0) {
+      var f = hooks.shift();
+      try {
+        if (typeof f === 'function') {
+          f();
+        }
+      } catch (err) {
+        try {
+          console.log(err);
+        } catch (ignored) { /* console unavailable */ }
+      }
+    }
+    return null;
+  });
+
+  // Display.execute("javascript:...") has to run in the PAGE, not in the
+  // worker: the worker has no document and its `window` is the worker global,
+  // so evaluating there breaks every script that touches the DOM -- which is
+  // most of what the javascript: form is used for. Evaluate on the main thread
+  // and hand back a string form of the result when there is one.
+  hostBridge.register('__cn1_eval_on_main__', function(request) {
+    var src = (request && request.script != null) ? String(request.script) : '';
+    if (!src) {
+      return null;
+    }
+    try {
+      // Indirect eval so the script runs in global scope, exactly like a
+      // <script> in the page would (var/function declarations land on window).
+      var result = (0, eval)(src);
+      return result == null ? null : String(result);
+    } catch (err) {
+      // Log for the developer, then rethrow. The old in-worker
+      // ``@JSBody(script="eval(js)")`` let a broken script propagate into
+      // Java, and the host-call dispatcher turns a thrown handler error into
+      // an error callback -- so rethrowing keeps that contract instead of
+      // silently reporting success for a script that never ran.
+      try {
+        console.error('cn1 execute("javascript:") failed: '
+            + (err && err.message ? err.message : err));
+      } catch (ignored) { /* console unavailable */ }
+      throw err;
+    }
+  });
+
+  hostBridge.register('__cn1_copy_to_clipboard__', function(request) {
+    var text = (request && request.text != null) ? String(request.text) : '';
+    var nav = global.navigator || (global.window && global.window.navigator);
+    try {
+      if (nav && nav.clipboard && typeof nav.clipboard.write === 'function'
+          && typeof global.ClipboardItem === 'function' && request) {
+        var values = {'text/plain': new global.Blob([text], {type: 'text/plain'})};
+        var supports = typeof global.ClipboardItem.supports === 'function'
+          ? function(type) { return global.ClipboardItem.supports(type); }
+          : function(type) { return type === 'text/plain' || type === 'text/html'; };
+        if (request.html != null && supports('text/html')) values['text/html'] = new global.Blob([String(request.html)], {type: 'text/html'});
+        if (request.rtf != null && supports('text/rtf')) values['text/rtf'] = new global.Blob([String(request.rtf)], {type: 'text/rtf'});
+        if (request.markdown != null && supports('text/markdown')) values['text/markdown'] = new global.Blob([String(request.markdown)], {type: 'text/markdown'});
+        if (request.asciidoc != null && supports('text/asciidoc')) values['text/asciidoc'] = new global.Blob([String(request.asciidoc)], {type: 'text/asciidoc'});
+        return nav.clipboard.write([new global.ClipboardItem(values)]).then(function() {
+          return 1;
+        }, function() {
+          return execCommandClipboardFallback(text) ? 1 : 0;
+        });
+      }
+      if (nav && nav.clipboard && typeof nav.clipboard.writeText === 'function') {
+        return nav.clipboard.writeText(text).then(function() { return 1; }, function() {
+          return execCommandClipboardFallback(text) ? 1 : 0;
+        });
+      }
+    } catch (err) {
+      // navigator.clipboard can throw synchronously in insecure contexts.
+    }
+    return execCommandClipboardFallback(text) ? 1 : 0;
+  });
+
+  // Image copy: the worker routes here because navigator.clipboard + ClipboardItem
+  // are Window-only. Best-effort and permission-gated -- clipboard.write REPLACES
+  // the whole clipboard. The argument is a "data:<mime>;base64,<...>" URL; the blob
+  // MIME is derived from its header. Resolves 1 on success, 0 on any failure.
+  hostBridge.register('__cn1_copy_image_to_clipboard__', function(dataUrl) {
+    var nav = global.navigator || (global.window && global.window.navigator);
+    try {
+      if (!dataUrl || !nav || !nav.clipboard || typeof nav.clipboard.write !== 'function'
+          || typeof global.ClipboardItem !== 'function') {
+        return 0;
+      }
+      var str = String(dataUrl);
+      var comma = str.indexOf(',');
+      if (comma < 0) {
+        return 0;
+      }
+      var header = str.substring(0, comma);
+      var colon = header.indexOf(':');
+      var semi = header.indexOf(';');
+      var mime = (colon >= 0 && semi > colon) ? header.substring(colon + 1, semi) : 'image/png';
+      var byteString = global.atob(str.substring(comma + 1));
+      var len = byteString.length;
+      var bytes = new global.Uint8Array(len);
+      for (var i = 0; i < len; i++) {
+        bytes[i] = byteString.charCodeAt(i);
+      }
+      var blob = new global.Blob([bytes], {type: mime});
+      var item = {};
+      item[mime] = blob;
+      return nav.clipboard.write([new global.ClipboardItem(item)]).then(function() {
+        return 1;
+      }, function() {
+        return 0;
+      });
+    } catch (err) {
+      return 0;
+    }
+  });
+
+  // Web Share API (navigator.share / navigator.canShare) is Window-only and so
+  // is unreachable from the worker that runs the translated Java. Both the
+  // capability check and the share invocation are routed here to the main
+  // thread, where navigator.share lives and the forwarded click's user
+  // activation is still valid. Mirrors the clipboard handlers above.
+  hostBridge.register('__cn1_native_share_supported__', function() {
+    var nav = global.navigator || (global.window && global.window.navigator);
+    var loc = (global.window || global).location;
+    var secure = !!(loc && (loc.protocol === 'https:'
+      || loc.hostname === 'localhost' || loc.hostname === '127.0.0.1'));
+    return (nav && typeof nav.share === 'function' && secure) ? 1 : 0;
+  });
+
+  hostBridge.register('__cn1_native_share__', function(request) {
+    var nav = global.navigator || (global.window && global.window.navigator);
+    if (!nav || typeof nav.share !== 'function') {
+      return 0;
+    }
+    var data = {};
+    if (request && request.text != null && String(request.text).length) {
+      data.text = String(request.text);
+    }
+    if (request && request.url != null && String(request.url).length) {
+      data.url = String(request.url);
+    }
+    try {
+      // Resolves 0 on user-cancel/abort -- a rejection here is not an error.
+      return nav.share(data).then(function() {
+        return 1;
+      }, function() {
+        return 0;
+      });
+    } catch (err) {
+      return 0;
+    }
+  });
+
+  // The build version is published as the data-cn1-app-version attribute on the
+  // host page's <html> element, which the worker can't read (no document). Used
+  // for cache-busting resource URLs; returns null when absent.
+  hostBridge.register('__cn1_build_version__', function() {
+    var doc = global.document || (global.window && global.window.document);
+    if (!doc || !doc.documentElement) {
+      return null;
+    }
+    return doc.documentElement.getAttribute('data-cn1-app-version');
+  });
+
+  // ======================== Web Bluetooth ========================
+  // Main-thread backend for the JS port's Bluetooth API
+  // (com.codename1.impl.html5.JSBluetooth). navigator.bluetooth is a
+  // Window-only API, so the worker natives route here; this side owns the
+  // BluetoothDevice / GATT object handles (the worker only ever sees the
+  // per-origin device.id string and small integer attribute handle ids
+  // assigned during discovery). Handlers never reject: every failure
+  // resolves to {ok:0, code:<BluetoothError name>, message} so the worker
+  // can surface typed errors without string matching.
+
+  var btDevices = {};          // deviceId -> {id, device, chars, descs, nextIid, notifyHandlers, disconnectHooked}
+  var btAnonDeviceSeq = 0;
+  var btEventCallbackId = null;
+  var btAvailabilityHooked = false;
+
+  function btBluetooth() {
+    var nav = global.navigator || (global.window && global.window.navigator);
+    return nav && nav.bluetooth ? nav.bluetooth : null;
+  }
+
+  function btErr(code, message) {
+    return { ok: 0, code: String(code || 'UNKNOWN'), message: message == null ? '' : String(message) };
+  }
+
+  // Streams host-initiated events (adapter state, disconnects,
+  // notifications) back to the worker through the standard
+  // worker-callback channel; the payload is structured-clone friendly
+  // (plain fields + a COPIED Uint8Array for notification values).
+  function btPostEvent(payload) {
+    var target = global.__parparWorker;
+    if (btEventCallbackId == null || !target || typeof target.postMessage !== 'function') {
+      return;
+    }
+    try {
+      target.postMessage({ type: 'worker-callback', callbackId: btEventCallbackId, args: [payload] });
+    } catch (_e) {}
+  }
+
+  // Maps DOMException names onto core BluetoothError names. context is
+  // 'chooser' | 'connect' | 'gatt' -- the same DOMException means
+  // different things per API (NotFoundError from requestDevice is the
+  // user dismissing the chooser; from a GATT call it's a missing
+  // service/characteristic).
+  function btMapDomError(err, context) {
+    var name = err && err.name ? String(err.name) : '';
+    var message = String((err && err.message) || '');
+    if (name === 'NotFoundError') {
+      return context === 'chooser' ? 'USER_CANCELED' : 'GATT_ERROR';
+    }
+    if (name === 'SecurityError') {
+      return 'UNAUTHORIZED';
+    }
+    if (name === 'NotSupportedError') {
+      return 'NOT_SUPPORTED';
+    }
+    if (name === 'InvalidStateError') {
+      return 'NOT_CONNECTED';
+    }
+    if (name === 'NetworkError') {
+      if (context === 'connect') {
+        return 'CONNECTION_FAILED';
+      }
+      return /disconnect/i.test(message) ? 'NOT_CONNECTED' : 'IO_ERROR';
+    }
+    if (name === 'AbortError') {
+      return 'USER_CANCELED';
+    }
+    if (name === 'TypeError') {
+      return context === 'chooser' ? 'SCAN_FAILED' : 'UNKNOWN';
+    }
+    return 'UNKNOWN';
+  }
+
+  function btIsGestureError(err) {
+    return !!(err && err.name === 'SecurityError'
+      && /user (gesture|activation)/i.test(String(err.message || '')));
+  }
+
+  function btStoreDevice(device) {
+    var id = device.id != null && String(device.id).length
+      ? String(device.id) : ('cn1-bt-' + (++btAnonDeviceSeq));
+    var entry = btDevices[id];
+    if (!entry) {
+      entry = { id: id, device: device, chars: {}, descs: {}, nextIid: 1, notifyHandlers: {}, disconnectHooked: false };
+      btDevices[id] = entry;
+    } else {
+      entry.device = device;
+    }
+    return entry;
+  }
+
+  function btEntry(request) {
+    var id = request && request.id != null ? String(request.id) : null;
+    return id ? btDevices[id] : null;
+  }
+
+  function btDataViewToBase64(dv) {
+    if (!dv || !dv.byteLength) {
+      return '';
+    }
+    var bytes = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
+    var binary = '';
+    for (var i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    var b64 = global.btoa || (global.window && global.window.btoa);
+    return typeof b64 === 'function' ? b64(binary) : '';
+  }
+
+  function btToUint8(value) {
+    if (value == null) {
+      return null;
+    }
+    if (typeof Uint8Array !== 'undefined' && value instanceof Uint8Array) {
+      return value;
+    }
+    if (typeof value.length === 'number') {
+      var out = new Uint8Array(value.length | 0);
+      for (var i = 0; i < out.length; i++) {
+        out[i] = value[i] & 0xff;
+      }
+      return out;
+    }
+    return null;
+  }
+
+  // requestDevice options from the worker's pre-built dictionary. The
+  // manufacturerData dataPrefix/mask arrive as plain number arrays (the
+  // only Web Bluetooth option field that needs a typed-array re-wrap).
+  function btBuildRequestOptions(request) {
+    var r = request || {};
+    var options = {};
+    var built = [];
+    var filters = r.filters || [];
+    for (var i = 0; i < filters.length; i++) {
+      var f = filters[i] || {};
+      var o = {};
+      if (f.services && f.services.length) {
+        var services = [];
+        for (var j = 0; j < f.services.length; j++) {
+          services.push(String(f.services[j]));
+        }
+        o.services = services;
+      }
+      if (f.name != null) {
+        o.name = String(f.name);
+      }
+      if (f.namePrefix != null) {
+        o.namePrefix = String(f.namePrefix);
+      }
+      if (f.manufacturerData && f.manufacturerData.length) {
+        var mans = [];
+        for (var k = 0; k < f.manufacturerData.length; k++) {
+          var m = f.manufacturerData[k] || {};
+          var entry = { companyIdentifier: m.companyIdentifier | 0 };
+          var prefix = btToUint8(m.dataPrefix);
+          if (prefix) {
+            entry.dataPrefix = prefix;
+          }
+          var mask = btToUint8(m.mask);
+          if (mask) {
+            entry.mask = mask;
+          }
+          mans.push(entry);
+        }
+        o.manufacturerData = mans;
+      }
+      var hasCriteria = false;
+      for (var key in o) {
+        if (Object.prototype.hasOwnProperty.call(o, key)) {
+          hasCriteria = true;
+          break;
+        }
+      }
+      if (hasCriteria) {
+        built.push(o);
+      }
+    }
+    if (built.length) {
+      options.filters = built;
+    } else {
+      options.acceptAllDevices = true;
+    }
+    if (r.optionalServices && r.optionalServices.length) {
+      var opt = [];
+      for (var s = 0; s < r.optionalServices.length; s++) {
+        opt.push(String(r.optionalServices[s]));
+      }
+      options.optionalServices = opt;
+    }
+    return options;
+  }
+
+  // ---- user-gesture relay -------------------------------------------
+  // requestDevice must run inside a user gesture. When the forwarded
+  // click's transient activation already expired by the time the worker
+  // round-trip lands here, the attempt is parked and re-fired from the
+  // next REAL user gesture (mirrors the pending-handler idea of
+  // __cn1_register_save_blob__ / __cn1_fire_save_blob__, but hooks actual
+  // DOM gestures because a chooser -- unlike a download click -- can only
+  // open inside genuine user activation). A parked attempt that sees no
+  // gesture within 30s resolves as a typed USER_CANCELED, never a hang.
+  var btPendingGestureJobs = [];
+  var btGestureRelayInstalled = false;
+
+  function btInstallGestureRelay() {
+    if (btGestureRelayInstalled) {
+      return;
+    }
+    var doc = global.document || (global.window && global.window.document);
+    if (!doc || typeof doc.addEventListener !== 'function') {
+      return;
+    }
+    btGestureRelayInstalled = true;
+    var run = function() {
+      if (!btPendingGestureJobs.length) {
+        return;
+      }
+      var jobs = btPendingGestureJobs;
+      btPendingGestureJobs = [];
+      for (var i = 0; i < jobs.length; i++) {
+        try { jobs[i](); } catch (_e) {}
+      }
+    };
+    var types = ['pointerup', 'touchend', 'mouseup', 'keyup'];
+    for (var i = 0; i < types.length; i++) {
+      doc.addEventListener(types[i], run, true);
+    }
+  }
+
+  hostBridge.register('__cn1_bt_support__', function() {
+    var bt = btBluetooth();
+    return { ok: 1, supported: bt && typeof bt.requestDevice === 'function' ? 1 : 0 };
+  });
+
+  hostBridge.register('__cn1_bt_adapter_state__', function() {
+    var bt = btBluetooth();
+    if (!bt) {
+      return { ok: 1, state: 'UNSUPPORTED' };
+    }
+    if (typeof bt.getAvailability !== 'function') {
+      return { ok: 1, state: 'UNKNOWN' };
+    }
+    return bt.getAvailability().then(function(available) {
+      return { ok: 1, state: available ? 'POWERED_ON' : 'POWERED_OFF' };
+    }, function() {
+      return { ok: 1, state: 'UNKNOWN' };
+    });
+  });
+
+  hostBridge.register('__cn1_bt_set_event_callback__', function(cb) {
+    // hostBridge.invoke passes args raw, so the worker's callback arrives
+    // as a {__cn1WorkerCallback: id} token (or as an already-materialised
+    // proxy carrying __cn1WorkerCallbackId).
+    if (cb && typeof cb.__cn1WorkerCallback === 'number') {
+      btEventCallbackId = cb.__cn1WorkerCallback;
+    } else if (typeof cb === 'function' && typeof cb.__cn1WorkerCallbackId === 'number') {
+      btEventCallbackId = cb.__cn1WorkerCallbackId;
+    } else {
+      return btErr('UNKNOWN', 'No callback token supplied');
+    }
+    if (!btAvailabilityHooked) {
+      var bt = btBluetooth();
+      if (bt && typeof bt.addEventListener === 'function') {
+        btAvailabilityHooked = true;
+        try {
+          bt.addEventListener('availabilitychanged', function(evt) {
+            btPostEvent({ kind: 'adapter', detail: (evt && evt.value) ? 'POWERED_ON' : 'POWERED_OFF' });
+          });
+        } catch (_e) {
+          btAvailabilityHooked = false;
+        }
+      }
+    }
+    return { ok: 1 };
+  });
+
+  hostBridge.register('__cn1_bt_request_device__', function(request) {
+    var bt = btBluetooth();
+    if (!bt || typeof bt.requestDevice !== 'function') {
+      return btErr('NOT_SUPPORTED', 'Web Bluetooth is not available in this browser/context (requires Chromium + HTTPS)');
+    }
+    var options = btBuildRequestOptions(request);
+    return new Promise(function(resolve) {
+      var settled = false;
+      var deferred = false;
+      function finish(value) {
+        if (!settled) {
+          settled = true;
+          resolve(value);
+        }
+      }
+      function attempt() {
+        if (settled) {
+          return;
+        }
+        var p;
+        try {
+          p = bt.requestDevice(options);
+        } catch (e) {
+          onFailure(e);
+          return;
+        }
+        p.then(function(device) {
+          var entry = btStoreDevice(device);
+          finish({ ok: 1, id: entry.id, name: device.name == null ? null : String(device.name) });
+        }, onFailure);
+      }
+      function onFailure(err) {
+        if (!deferred && btIsGestureError(err)) {
+          // transient activation of the forwarded click already expired:
+          // park the attempt for the next real gesture, bounded by 30s
+          deferred = true;
+          btPendingGestureJobs.push(attempt);
+          btInstallGestureRelay();
+          setTimeout(function() {
+            var idx = btPendingGestureJobs.indexOf(attempt);
+            if (idx >= 0) {
+              btPendingGestureJobs.splice(idx, 1);
+            }
+            finish(btErr('USER_CANCELED', 'requestDevice needs a user gesture and none arrived within 30s'));
+          }, 30000);
+          return;
+        }
+        finish(btErr(btMapDomError(err, 'chooser'), err && err.message));
+      }
+      attempt();
+    });
+  });
+
+  hostBridge.register('__cn1_bt_connect__', function(request) {
+    var entry = btEntry(request);
+    if (!entry) {
+      return btErr('UNKNOWN', 'Unknown Bluetooth device handle -- run the chooser first');
+    }
+    var device = entry.device;
+    if (!device.gatt) {
+      return btErr('NOT_SUPPORTED', 'The selected device exposes no GATT server');
+    }
+    if (!entry.disconnectHooked) {
+      entry.disconnectHooked = true;
+      try {
+        device.addEventListener('gattserverdisconnected', function() {
+          btPostEvent({ kind: 'disconnect', deviceId: entry.id });
+        });
+      } catch (_e) {
+        entry.disconnectHooked = false;
+      }
+    }
+    return device.gatt.connect().then(function() {
+      return { ok: 1 };
+    }, function(err) {
+      return btErr(btMapDomError(err, 'connect'), err && err.message);
+    });
+  });
+
+  hostBridge.register('__cn1_bt_disconnect__', function(request) {
+    var entry = btEntry(request);
+    if (!entry) {
+      return btErr('UNKNOWN', 'Unknown Bluetooth device handle');
+    }
+    try {
+      if (entry.device.gatt && entry.device.gatt.connected) {
+        entry.device.gatt.disconnect();
+      }
+    } catch (_e) {}
+    return { ok: 1 };
+  });
+
+  // One-shot full GATT database dump: services -> characteristics ->
+  // descriptors in a single host call (bridge round-trips are expensive;
+  // the worker gets the whole tree as one JSON payload). Also (re)builds
+  // the per-device attribute handle tables the read/write/subscribe
+  // handlers resolve against.
+  hostBridge.register('__cn1_bt_discover__', function(request) {
+    var entry = btEntry(request);
+    if (!entry) {
+      return btErr('UNKNOWN', 'Unknown Bluetooth device handle');
+    }
+    var gatt = entry.device.gatt;
+    if (!gatt || !gatt.connected) {
+      return btErr('NOT_CONNECTED', 'GATT server is not connected');
+    }
+    entry.chars = {};
+    entry.descs = {};
+    entry.nextIid = 1;
+    entry.notifyHandlers = {};
+
+    function collectCharacteristic(ch, cRecs) {
+      var iid = entry.nextIid++;
+      entry.chars[iid] = ch;
+      var props = ch.properties || {};
+      var mask = 0;
+      if (props.broadcast) { mask |= 0x01; }
+      if (props.read) { mask |= 0x02; }
+      if (props.writeWithoutResponse) { mask |= 0x04; }
+      if (props.write) { mask |= 0x08; }
+      if (props.notify) { mask |= 0x10; }
+      if (props.indicate) { mask |= 0x20; }
+      if (props.authenticatedSignedWrites) { mask |= 0x40; }
+      var cRec = { uuid: String(ch.uuid), iid: iid, properties: mask, descriptors: [] };
+      cRecs.push(cRec);
+      // getDescriptors rejects with NotFoundError when there are none
+      return ch.getDescriptors().then(function(ds) { return ds; }, function() { return []; })
+        .then(function(ds) {
+          for (var i = 0; i < ds.length; i++) {
+            var dIid = entry.nextIid++;
+            entry.descs[dIid] = ds[i];
+            cRec.descriptors.push({ uuid: String(ds[i].uuid), iid: dIid });
+          }
+          return null;
+        });
+    }
+
+    function collectService(svc, out) {
+      var sRec = {
+        uuid: String(svc.uuid),
+        primary: svc.isPrimary === false ? 0 : 1,
+        iid: entry.nextIid++,
+        characteristics: []
+      };
+      out.push(sRec);
+      return svc.getCharacteristics().then(function(chars) { return chars; }, function() { return []; })
+        .then(function(chars) {
+          var chain = Promise.resolve();
+          for (var i = 0; i < chars.length; i++) {
+            (function(ch) {
+              chain = chain.then(function() {
+                return collectCharacteristic(ch, sRec.characteristics);
+              });
+            })(chars[i]);
+          }
+          return chain;
+        });
+    }
+
+    return gatt.getPrimaryServices().then(function(services) {
+      var out = [];
+      var chain = Promise.resolve();
+      for (var i = 0; i < services.length; i++) {
+        (function(svc) {
+          chain = chain.then(function() {
+            return collectService(svc, out);
+          });
+        })(services[i]);
+      }
+      return chain.then(function() {
+        return { ok: 1, services: out };
+      });
+    }, function(err) {
+      return btErr(btMapDomError(err, 'gatt'), err && err.message);
+    }).then(null, function(err) {
+      return btErr(btMapDomError(err, 'gatt'), err && err.message);
+    });
+  });
+
+  function btCharacteristic(request) {
+    var entry = btEntry(request);
+    return entry ? entry.chars[request.iid | 0] : null;
+  }
+
+  hostBridge.register('__cn1_bt_read_char__', function(request) {
+    var ch = btCharacteristic(request);
+    if (!ch) {
+      return btErr('UNKNOWN', 'Unknown characteristic handle -- re-run discoverServices()');
+    }
+    return ch.readValue().then(function(dv) {
+      return { ok: 1, value: btDataViewToBase64(dv) };
+    }, function(err) {
+      return btErr(btMapDomError(err, 'gatt'), err && err.message);
+    });
+  });
+
+  hostBridge.register('__cn1_bt_write_char__', function(request) {
+    var ch = btCharacteristic(request);
+    if (!ch) {
+      return btErr('UNKNOWN', 'Unknown characteristic handle -- re-run discoverServices()');
+    }
+    var data = btToUint8(request && request.value) || new Uint8Array(0);
+    var p;
+    try {
+      if (request && request.withResponse) {
+        p = typeof ch.writeValueWithResponse === 'function'
+          ? ch.writeValueWithResponse(data) : ch.writeValue(data);
+      } else {
+        p = typeof ch.writeValueWithoutResponse === 'function'
+          ? ch.writeValueWithoutResponse(data) : ch.writeValue(data);
+      }
+    } catch (e) {
+      return btErr(btMapDomError(e, 'gatt'), e && e.message);
+    }
+    return p.then(function() {
+      return { ok: 1 };
+    }, function(err) {
+      return btErr(btMapDomError(err, 'gatt'), err && err.message);
+    });
+  });
+
+  hostBridge.register('__cn1_bt_read_desc__', function(request) {
+    var entry = btEntry(request);
+    var d = entry ? entry.descs[request.iid | 0] : null;
+    if (!d) {
+      return btErr('UNKNOWN', 'Unknown descriptor handle -- re-run discoverServices()');
+    }
+    return d.readValue().then(function(dv) {
+      return { ok: 1, value: btDataViewToBase64(dv) };
+    }, function(err) {
+      return btErr(btMapDomError(err, 'gatt'), err && err.message);
+    });
+  });
+
+  hostBridge.register('__cn1_bt_write_desc__', function(request) {
+    var entry = btEntry(request);
+    var d = entry ? entry.descs[request.iid | 0] : null;
+    if (!d) {
+      return btErr('UNKNOWN', 'Unknown descriptor handle -- re-run discoverServices()');
+    }
+    var data = btToUint8(request && request.value) || new Uint8Array(0);
+    return d.writeValue(data).then(function() {
+      return { ok: 1 };
+    }, function(err) {
+      return btErr(btMapDomError(err, 'gatt'), err && err.message);
+    });
+  });
+
+  hostBridge.register('__cn1_bt_set_notify__', function(request) {
+    var entry = btEntry(request);
+    var iid = request ? (request.iid | 0) : 0;
+    var ch = entry ? entry.chars[iid] : null;
+    if (!ch) {
+      return btErr('UNKNOWN', 'Unknown characteristic handle -- re-run discoverServices()');
+    }
+    if (request && request.enable) {
+      if (!entry.notifyHandlers[iid]) {
+        entry.notifyHandlers[iid] = function() {
+          var dv = ch.value;
+          if (!dv) {
+            return;
+          }
+          var copy;
+          try {
+            // COPY the DataView's bytes before posting -- the underlying
+            // buffer is reused by the UA for the next notification
+            copy = new Uint8Array(dv.buffer.slice(dv.byteOffset, dv.byteOffset + dv.byteLength));
+          } catch (_e) {
+            return;
+          }
+          btPostEvent({ kind: 'notify', deviceId: entry.id, detail: String(iid), bytes: copy });
+        };
+      }
+      try {
+        ch.addEventListener('characteristicvaluechanged', entry.notifyHandlers[iid]);
+      } catch (_e) {}
+      return ch.startNotifications().then(function() {
+        return { ok: 1 };
+      }, function(err) {
+        try {
+          ch.removeEventListener('characteristicvaluechanged', entry.notifyHandlers[iid]);
+        } catch (_e) {}
+        return btErr(btMapDomError(err, 'gatt'), err && err.message);
+      });
+    }
+    var handler = entry.notifyHandlers[iid];
+    var stop;
+    try {
+      stop = typeof ch.stopNotifications === 'function' ? ch.stopNotifications() : Promise.resolve();
+    } catch (e) {
+      stop = Promise.resolve();
+    }
+    return stop.then(function() {
+      if (handler) {
+        try { ch.removeEventListener('characteristicvaluechanged', handler); } catch (_e) {}
+      }
+      return { ok: 1 };
+    }, function() {
+      // disarm is best-effort: the subscription bookkeeping on the Java
+      // side already dropped the listeners
+      if (handler) {
+        try { ch.removeEventListener('characteristicvaluechanged', handler); } catch (_e) {}
+      }
+      return { ok: 1 };
+    });
+  });
+
+  // Create a DOM element on the MAIN thread and return its host-ref. The worker
+  // cannot create DOM nodes (no document, and jQuery isn't loaded there), so the
+  // jQuery/`createElement`-based @JSBody helpers (showButton_, FileChooser's
+  // file inputs + buttons) route here. ``spec`` = {tag, attrs, text, appendToBody};
+  // ``clickCallback`` (optional, a separate top-level arg so mapHostArgs
+  // materialises it into a worker-callback proxy) is wired as a click listener.
+  // text is set via textContent, never innerHTML -- no markup injection from
+  // user-controlled labels.
+  hostBridge.register('__cn1_create_dom_element__', function(spec, clickCallback) {
+    var doc = global.document || (global.window && global.window.document);
+    if (!doc || typeof doc.createElement !== 'function') {
+      return null;
+    }
+    spec = spec || {};
+    var el = doc.createElement(String(spec.tag || 'div'));
+    if (spec.attrs) {
+      for (var k in spec.attrs) {
+        if (Object.prototype.hasOwnProperty.call(spec.attrs, k)) {
+          el.setAttribute(k, String(spec.attrs[k]));
+        }
+      }
+    }
+    if (spec.text != null) {
+      el.textContent = String(spec.text);
+    }
+    // hostBridge.invoke passes args raw (no mapHostArgs), so a worker-side
+    // EventListener arrives as a {__cn1WorkerCallback} marker -- materialise it
+    // into a proxy that posts the click back to the worker.
+    var cb = clickCallback;
+    if (cb && typeof cb === 'object' && typeof cb.__cn1WorkerCallback === 'number') {
+      cb = makeWorkerCallback(cb.__cn1WorkerCallback);
+    }
+    if (typeof cb === 'function') {
+      el.addEventListener('click', cb);
+    }
+    if (spec.appendToBody && doc.body) {
+      doc.body.appendChild(el);
+    }
+    // hostResult stores the element as a host-ref and returns a cloneable
+    // {__cn1HostRef} marker -- returning the raw element makes postHostCallback's
+    // structured-clone postMessage throw DataCloneError.
+    return hostResult(el);
+  });
+
+  // Fullscreen lives on the main-thread document. The worker routes the
+  // capability/state queries and the enter/exit requests here; enter/exit
+  // resolve to 1/0 once the browser's requestFullscreen()/exitFullscreen()
+  // promise settles, and the worker invokes the Java callback with that result.
+  function fullscreenDoc() {
+    return global.document || (global.window && global.window.document);
+  }
+  hostBridge.register('__cn1_fullscreen_supported__', function() {
+    var doc = fullscreenDoc();
+    return (doc && doc.body && typeof doc.body.requestFullscreen === 'function') ? 1 : 0;
+  });
+  hostBridge.register('__cn1_is_fullscreen__', function() {
+    var doc = fullscreenDoc();
+    return (doc && doc.fullscreenElement) ? 1 : 0;
+  });
+  hostBridge.register('__cn1_request_fullscreen__', function() {
+    var doc = fullscreenDoc();
+    if (!doc || !doc.body || typeof doc.body.requestFullscreen !== 'function') {
+      return 0;
+    }
+    try {
+      var p = doc.body.requestFullscreen();
+      if (p && typeof p.then === 'function') {
+        return p.then(function() { return 1; }, function() { return 0; });
+      }
+      return 1;
+    } catch (err) {
+      return 0;
+    }
+  });
+  // Print: build the Blob + object URL on the MAIN thread from the base64
+  // document bytes the worker sent (a worker-created blob: URL is invalid in a
+  // main-thread iframe, and document/iframe don't exist in the worker), load it
+  // into a hidden iframe and invoke the browser print dialog. Resolves {ok,
+  // error} once afterprint fires or the 1s fallback elapses; the worker then
+  // invokes the Java PrintFrameCallback with the outcome.
+  // FileChooser: read the file the user picked in the <input type=file>. The
+  // input host-ref is resolved here; the worker only ever sees the bytes.
+  hostBridge.register('__cn1_input_file_count__', function(request) {
+    var el = resolveHostRef(request && request.el);
+    return (el && el.files) ? el.files.length : 0;
+  });
+
+  hostBridge.register('__cn1_read_input_file__', function(request) {
+    var el = resolveHostRef(request && request.el);
+    var index = (request && request.index) | 0;
+    var f = (el && el.files) ? el.files[index] : null;
+    if (!f) {
+      return null;
+    }
+    return new Promise(function(resolve) {
+      try {
+        var fr = new FileReader();
+        fr.onload = function() {
+          var res = String(fr.result || '');
+          var comma = res.indexOf(',');
+          var b64 = comma >= 0 ? res.substring(comma + 1) : res;
+          resolve((f.name || '') + '\n' + b64);
+        };
+        fr.onerror = function() { resolve(null); };
+        fr.readAsDataURL(f);
+      } catch (e) {
+        resolve(null);
+      }
+    });
+  });
+
+  // Live camera (com.codename1.camera.Camera). The whole getUserMedia/<video>/
+  // capture-<canvas> session runs here on the main thread; the worker only holds
+  // the opaque <video> host-ref.
+  hostBridge.register('__cn1_camera_supported__', function() {
+    return (typeof navigator !== 'undefined' && navigator.mediaDevices
+      && navigator.mediaDevices.getUserMedia) ? 1 : 0;
+  });
+
+  hostBridge.register('__cn1_camera_last_error__', function() {
+    return global.__cn1_camera_error || '';
+  });
+
+  hostBridge.register('__cn1_camera_open__', function(request) {
+    var facing = (request && request.facing) ? String(request.facing) : 'environment';
+    var audio = !!(request && request.audio);
+    var doc = global.document || (global.window && global.window.document);
+    if (!doc || typeof navigator === 'undefined' || !navigator.mediaDevices
+        || !navigator.mediaDevices.getUserMedia) {
+      global.__cn1_camera_error = 'NotSupportedError';
+      return null;
+    }
+    return navigator.mediaDevices.getUserMedia({ video: { facingMode: facing }, audio: audio })
+      .then(function(stream) {
+        var v = doc.createElement('video');
+        v.autoplay = true;
+        v.muted = true;
+        v.setAttribute('muted', '');
+        v.setAttribute('playsinline', '');
+        v.setAttribute('autoplay', '');
+        v.srcObject = stream;
+        try { var p = v.play(); if (p && p.catch) { p.catch(function() {}); } } catch (e) {}
+        global.__cn1_camera_error = '';
+        return hostResult(v);
+      })
+      .catch(function(e) {
+        global.__cn1_camera_error = (e && e.name) ? e.name : ('' + e);
+        return null;
+      });
+  });
+
+  hostBridge.register('__cn1_camera_grab__', function(request) {
+    var v = resolveHostRef(request && request.video);
+    if (!v) { return null; }
+    var w = (request && request.w) | 0;
+    var h = (request && request.h) | 0;
+    if (w <= 0) { w = v.videoWidth || 640; }
+    if (h <= 0) { h = v.videoHeight || 480; }
+    var quality = (request && typeof request.quality === 'number') ? request.quality : 0.9;
+    var doc = global.document || (global.window && global.window.document);
+    if (!doc) { return null; }
+    try {
+      var c = doc.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      var ctx = c.getContext('2d');
+      ctx.drawImage(v, 0, 0, w, h);
+      var dataUrl = c.toDataURL('image/jpeg', quality);
+      var comma = dataUrl.indexOf(',');
+      var b64 = comma >= 0 ? dataUrl.substring(comma + 1) : dataUrl;
+      return w + ',' + h + ',' + b64;
+    } catch (e) {
+      return null;
+    }
+  });
+
+  hostBridge.register('__cn1_camera_close__', function(request) {
+    var v = resolveHostRef(request && request.video);
+    if (!v) { return 0; }
+    try {
+      if (v.srcObject) {
+        var t = v.srcObject.getTracks();
+        for (var i = 0; i < t.length; i++) { t[i].stop(); }
+      }
+    } catch (e) {}
+    try { v.pause(); } catch (e) {}
+    try { if (v.parentNode) { v.parentNode.removeChild(v); } } catch (e) {}
+    try { v.srcObject = null; } catch (e) {}
+    return 1;
+  });
+
+  // VideoIO lives entirely on the browser host.  The translated application
+  // runs in a Worker, where document, HTMLVideoElement and (on some browsers)
+  // WebCodecs are absent.  A single host-owned session table prevents the
+  // previous mixed worker/window state and lets asynchronous loads and flushes
+  // complete through the host bridge Promise protocol.
+  var cn1VideoIoVideos = Object.create(null);
+  var cn1VideoIoEncoders = Object.create(null);
+  var cn1VideoIoVideoSeq = 0;
+  var cn1VideoIoEncoderSeq = 0;
+  var cn1VideoIoMuxerPromise = null;
+  var cn1VideoIoLastEncoderError = null;
+
+  function cn1VideoIoDocument() {
+    return global.document || (global.window && global.window.document) || null;
+  }
+
+  function cn1VideoIoBase64Bytes(value) {
+    var binary = global.atob(String(value || ''));
+    var bytes = new Uint8Array(binary.length);
+    for (var i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i) & 0xff;
+    }
+    return bytes;
+  }
+
+  function cn1VideoIoBytesBase64(value) {
+    var bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
+    var output = '';
+    var chunkSize = 0x8000;
+    for (var i = 0; i < bytes.length; i += chunkSize) {
+      output += String.fromCharCode.apply(null,
+        bytes.subarray(i, Math.min(i + chunkSize, bytes.length)));
+    }
+    return global.btoa(output);
+  }
+
+  function cn1VideoIoLoadScript(symbol, urls) {
+    if (global[symbol]) {
+      return Promise.resolve();
+    }
+    var doc = cn1VideoIoDocument();
+    if (!doc || !doc.head) {
+      return Promise.reject(new Error('VideoIO requires a browser document'));
+    }
+    var attempt = function(index) {
+      if (global[symbol]) {
+        return Promise.resolve();
+      }
+      if (index >= urls.length) {
+        return Promise.reject(new Error('Unable to load VideoIO dependency ' + symbol));
+      }
+      return new Promise(function(resolve, reject) {
+        var script = doc.createElement('script');
+        var settled = false;
+        var timer = global.setTimeout(function() {
+          if (settled) { return; }
+          settled = true;
+          try { if (script.parentNode) { script.parentNode.removeChild(script); } } catch (_removeError) {}
+          reject(new Error('Timed out loading ' + urls[index]));
+        }, 8000);
+        var finish = function(error) {
+          if (settled) { return; }
+          settled = true;
+          global.clearTimeout(timer);
+          if (!error && global[symbol]) {
+            resolve();
+          } else {
+            try { if (script.parentNode) { script.parentNode.removeChild(script); } } catch (_removeError) {}
+            reject(error || new Error(urls[index] + ' did not define ' + symbol));
+          }
+        };
+        script.src = urls[index];
+        script.async = true;
+        script.onload = function() { finish(null); };
+        script.onerror = function() { finish(new Error('Failed to load ' + urls[index])); };
+        doc.head.appendChild(script);
+      }).catch(function() {
+        return attempt(index + 1);
+      });
+    };
+    return attempt(0);
+  }
+
+  function cn1VideoIoEnsureMuxers() {
+    if (global.Mp4Muxer && global.WebMMuxer) {
+      return Promise.resolve();
+    }
+    if (!cn1VideoIoMuxerPromise) {
+      cn1VideoIoMuxerPromise = Promise.all([
+        cn1VideoIoLoadScript('Mp4Muxer', [
+          'https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.5/build/mp4-muxer.min.js',
+          'https://unpkg.com/mp4-muxer@5.1.5/build/mp4-muxer.min.js'
+        ]),
+        cn1VideoIoLoadScript('WebMMuxer', [
+          'https://cdn.jsdelivr.net/npm/webm-muxer@5.0.3/build/webm-muxer.min.js',
+          'https://unpkg.com/webm-muxer@5.0.3/build/webm-muxer.min.js'
+        ])
+      ]).catch(function(error) {
+        // A later VideoIO request may retry after a transient network failure.
+        cn1VideoIoMuxerPromise = null;
+        throw error;
+      });
+    }
+    return cn1VideoIoMuxerPromise;
+  }
+
+  function cn1VideoIoVideo(id) {
+    return cn1VideoIoVideos[id | 0] || null;
+  }
+
+  function cn1VideoIoEncoder(id) {
+    return cn1VideoIoEncoders[id | 0] || null;
+  }
+
+  function cn1VideoIoResamplePcm(samples, inputRate, outputRate, channels) {
+    if (inputRate === outputRate || inputRate <= 0 || outputRate <= 0 || channels <= 0) {
+      return samples;
+    }
+    var inputFrames = (samples.length / channels) | 0;
+    var outputFrames = Math.max(1, Math.round(inputFrames * outputRate / inputRate));
+    var output = new Int16Array(outputFrames * channels);
+    for (var frame = 0; frame < outputFrames; frame++) {
+      var sourcePosition = frame * inputRate / outputRate;
+      var leftFrame = Math.min(inputFrames - 1, Math.floor(sourcePosition));
+      var rightFrame = Math.min(inputFrames - 1, leftFrame + 1);
+      var fraction = sourcePosition - leftFrame;
+      for (var channel = 0; channel < channels; channel++) {
+        var left = samples[leftFrame * channels + channel];
+        var right = samples[rightFrame * channels + channel];
+        output[frame * channels + channel] = Math.round(left + (right - left) * fraction);
+      }
+    }
+    return output;
+  }
+
+  // Capability discovery is intentionally destructive: unlike
+  // isConfigSupported(), these probes create a real encoder and require it to
+  // produce output. Cache each Promise for the lifetime of the page so callers
+  // such as isEncoderSupported() don't repeatedly allocate codec sessions.
+  // Repeated create/close cycles can temporarily exhaust Chromium's Linux
+  // software codec factories and make the immediately following real writer
+  // fail with NotSupportedError even though the probe just succeeded.
+  var cn1VideoIoVideoEncoderSupport = Object.create(null);
+  var cn1VideoIoAudioEncoderSupport = Object.create(null);
+
+  function cn1VideoIoCachedEncoderSupport(cache, codec, probe) {
+    var key = String(codec || '');
+    if (!Object.prototype.hasOwnProperty.call(cache, key)) {
+      cache[key] = probe(key);
+    }
+    return cache[key];
+  }
+
+  // isConfigSupported() only validates the shape of a WebCodecs configuration
+  // in some Chromium builds.  Linux headless Chromium can report H.264 as
+  // supported there and then deliver NotSupportedError through the encoder's
+  // asynchronous error callback.  Probe the operation we actually depend on:
+  // configure, encode one frame, and flush it successfully.
+  function cn1VideoIoProbeVideoEncoder(codec) {
+    if (!global.VideoEncoder || !global.VideoFrame) {
+      return Promise.resolve(false);
+    }
+    return new Promise(function(resolve) {
+      var encoder = null;
+      var frame = null;
+      var timer = null;
+      var settled = false;
+      var producedOutput = false;
+      var finish = function(supported) {
+        if (settled) { return; }
+        settled = true;
+        if (timer !== null) { global.clearTimeout(timer); }
+        try { if (frame) { frame.close(); } } catch (_frameCloseError) {}
+        try {
+          if (encoder && encoder.state !== 'closed') { encoder.close(); }
+        } catch (_encoderCloseError) {}
+        // WebCodecs close() initiates teardown of the platform encoder. Give
+        // Chromium a macrotask to release that session before discovery moves
+        // on to another codec or the application opens its real writer.
+        global.setTimeout(function() { resolve(!!supported); }, 0);
+      };
+      timer = global.setTimeout(function() { finish(false); }, 5000);
+      try {
+        encoder = new global.VideoEncoder({
+          output: function() { producedOutput = true; },
+          error: function() { finish(false); }
+        });
+        var config = {
+          codec: String(codec || ''),
+          width: 128,
+          height: 96,
+          bitrate: 800000,
+          framerate: 6
+        };
+        if (config.codec.indexOf('avc1.') === 0) {
+          config.avc = { format: 'avc' };
+        }
+        encoder.configure(config);
+        frame = new global.VideoFrame(new Uint8Array(128 * 96 * 4), {
+          format: 'RGBA',
+          codedWidth: 128,
+          codedHeight: 96,
+          timestamp: 0
+        });
+        encoder.encode(frame, { keyFrame: true });
+        frame.close();
+        frame = null;
+        encoder.flush().then(function() {
+          finish(producedOutput);
+        }, function() {
+          finish(false);
+        });
+      } catch (_probeError) {
+        finish(false);
+      }
+    });
+  }
+
+  function cn1VideoIoProbeAudioEncoder(codec) {
+    if (!global.AudioEncoder || !global.AudioData) {
+      return Promise.resolve(false);
+    }
+    return new Promise(function(resolve) {
+      var encoder = null;
+      var audio = null;
+      var timer = null;
+      var settled = false;
+      var producedOutput = false;
+      var finish = function(supported) {
+        if (settled) { return; }
+        settled = true;
+        if (timer !== null) { global.clearTimeout(timer); }
+        try { if (audio) { audio.close(); } } catch (_audioCloseError) {}
+        try {
+          if (encoder && encoder.state !== 'closed') { encoder.close(); }
+        } catch (_audioEncoderCloseError) {}
+        global.setTimeout(function() { resolve(!!supported); }, 0);
+      };
+      timer = global.setTimeout(function() { finish(false); }, 5000);
+      try {
+        encoder = new global.AudioEncoder({
+          output: function() { producedOutput = true; },
+          error: function() { finish(false); }
+        });
+        encoder.configure({
+          codec: String(codec || ''),
+          sampleRate: 48000,
+          numberOfChannels: 1,
+          bitrate: 128000
+        });
+        audio = new global.AudioData({
+          format: 's16',
+          sampleRate: 48000,
+          numberOfFrames: 4800,
+          numberOfChannels: 1,
+          timestamp: 0,
+          data: new Int16Array(4800)
+        });
+        encoder.encode(audio);
+        audio.close();
+        audio = null;
+        encoder.flush().then(function() {
+          finish(producedOutput);
+        }, function() {
+          finish(false);
+        });
+      } catch (_probeError) {
+        finish(false);
+      }
+    });
+  }
+
+  hostBridge.register('__cn1_video_io__', function(request) {
+    var payload = request || {};
+    var op = String(payload.op || '');
+    var doc = cn1VideoIoDocument();
+
+    if (op === 'webCodecsAvailable') {
+      return !!(doc && global.VideoEncoder && global.VideoDecoder && global.VideoFrame);
+    }
+    if (op === 'audioWebCodecsAvailable') {
+      return !!(global.AudioEncoder && global.AudioData);
+    }
+    if (op === 'videoEncoderSupported') {
+      return cn1VideoIoCachedEncoderSupport(cn1VideoIoVideoEncoderSupport,
+        payload.codec, cn1VideoIoProbeVideoEncoder);
+    }
+    if (op === 'audioEncoderSupported') {
+      return cn1VideoIoCachedEncoderSupport(cn1VideoIoAudioEncoderSupport,
+        payload.codec, cn1VideoIoProbeAudioEncoder);
+    }
+    if (op === 'videoBlobUrl') {
+      var blobBytes = cn1VideoIoBase64Bytes(payload.b64);
+      var blob = new global.Blob([blobBytes], {
+        type: payload.mime == null ? 'video/mp4' : String(payload.mime)
+      });
+      return global.URL.createObjectURL(blob);
+    }
+    if (op === 'videoOpen') {
+      if (!doc) { return 0; }
+      var video = doc.createElement('video');
+      video.muted = true;
+      video.crossOrigin = 'anonymous';
+      video.preload = 'auto';
+      video.src = String(payload.url || '');
+      var videoId = ++cn1VideoIoVideoSeq;
+      var videoState = { el: video, ready: false, seeked: false, sameTime: false, error: null };
+      cn1VideoIoVideos[videoId] = videoState;
+      video.addEventListener('loadedmetadata', function() { videoState.ready = true; });
+      video.addEventListener('seeked', function() { videoState.seeked = true; });
+      video.addEventListener('error', function() {
+        videoState.error = video.error ? ('MediaError ' + video.error.code) : 'Video load failed';
+      });
+      video.load();
+      return videoId;
+    }
+    if (op === 'videoReady') {
+      var readyVideo = cn1VideoIoVideo(payload.id);
+      if (readyVideo && readyVideo.error) { throw new Error(readyVideo.error); }
+      return !!(readyVideo && readyVideo.ready);
+    }
+    if (op === 'videoWidth') {
+      var widthVideo = cn1VideoIoVideo(payload.id);
+      return widthVideo ? (widthVideo.el.videoWidth | 0) : 0;
+    }
+    if (op === 'videoHeight') {
+      var heightVideo = cn1VideoIoVideo(payload.id);
+      return heightVideo ? (heightVideo.el.videoHeight | 0) : 0;
+    }
+    if (op === 'videoDuration') {
+      var durationVideo = cn1VideoIoVideo(payload.id);
+      return durationVideo ? Math.round((durationVideo.el.duration || 0) * 1000) : 0;
+    }
+    if (op === 'videoSeek') {
+      var seekVideo = cn1VideoIoVideo(payload.id);
+      if (!seekVideo) { return null; }
+      var time = (payload.ms | 0) / 1000;
+      if (Math.abs((seekVideo.el.currentTime || 0) - time) < 0.001) {
+        seekVideo.sameTime = true;
+        seekVideo.seeked = seekVideo.el.readyState >= 2;
+      } else {
+        seekVideo.sameTime = false;
+        seekVideo.seeked = false;
+        seekVideo.el.currentTime = time;
+      }
+      return null;
+    }
+    if (op === 'videoSeeked') {
+      var seekedVideo = cn1VideoIoVideo(payload.id);
+      if (!seekedVideo) { return false; }
+      if (seekedVideo.error) { throw new Error(seekedVideo.error); }
+      if (!seekedVideo.seeked && seekedVideo.sameTime && seekedVideo.el.readyState >= 2) {
+        seekedVideo.seeked = true;
+      }
+      return !!seekedVideo.seeked;
+    }
+    if (op === 'videoCapture') {
+      var captureVideo = cn1VideoIoVideo(payload.id);
+      if (!captureVideo || !doc) { return null; }
+      var canvas = doc.createElement('canvas');
+      canvas.width = payload.w | 0;
+      canvas.height = payload.h | 0;
+      var context = canvas.getContext('2d');
+      context.drawImage(captureVideo.el, 0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL('image/png');
+    }
+    if (op === 'videoClose') {
+      var closeVideoId = payload.id | 0;
+      var closeVideo = cn1VideoIoVideo(closeVideoId);
+      if (closeVideo) {
+        try { closeVideo.el.removeAttribute('src'); closeVideo.el.load(); } catch (_videoCloseError) {}
+        delete cn1VideoIoVideos[closeVideoId];
+      }
+      return null;
+    }
+    if (op === 'encEnsureLibs') {
+      return cn1VideoIoEnsureMuxers();
+    }
+    if (op === 'encLibsReady') {
+      return String(payload.container) === 'webm' ? !!global.WebMMuxer : !!global.Mp4Muxer;
+    }
+    if (op === 'encOpen') {
+      try {
+        var webm = String(payload.container) === 'webm';
+        var muxApi = webm ? global.WebMMuxer : global.Mp4Muxer;
+        if (!muxApi) { throw new Error('VideoIO muxer library is not loaded'); }
+        var videoMuxCodec = webm
+          ? (String(payload.videoCodec) === 'vp8' ? 'V_VP8' : 'V_VP9')
+          : (String(payload.videoCodec) === 'hevc' ? 'hevc' : 'avc');
+        var videoConfigCodec = webm
+          ? (String(payload.videoCodec) === 'vp8' ? 'vp8' : 'vp09.00.10.08')
+          : (String(payload.videoCodec) === 'hevc' ? 'hev1.1.6.L93.B0' : 'avc1.42001f');
+        var audioMuxCodec = webm ? 'A_OPUS' : 'aac';
+        var audioConfigCodec = webm ? 'opus' : 'mp4a.40.2';
+        var audioSampleRate = payload.sampleRate | 0;
+        // Chromium's WebCodecs AAC/Opus encoders accept the standard media
+        // rates. VideoWriter accepts arbitrary PCM rates, so resample other
+        // inputs on the host instead of advertising a codec and then failing
+        // at configure() (the round-trip suite intentionally exercises 8 kHz).
+        if (audioSampleRate !== 44100 && audioSampleRate !== 48000) {
+          audioSampleRate = 48000;
+        }
+        var target = new muxApi.ArrayBufferTarget();
+        var muxOptions = {
+          target: target,
+          video: { codec: videoMuxCodec, width: payload.w | 0, height: payload.h | 0 },
+          firstTimestampBehavior: 'offset'
+        };
+        if (!webm) { muxOptions.fastStart = 'in-memory'; }
+        if (payload.hasAudio) {
+          muxOptions.audio = {
+            codec: audioMuxCodec,
+            sampleRate: audioSampleRate,
+            numberOfChannels: payload.channels | 0
+          };
+        }
+        var muxer = new muxApi.Muxer(muxOptions);
+        var encoderState = {
+          muxer: muxer,
+          target: target,
+          error: null,
+          done: false,
+          result: null,
+          flushPromise: null,
+          audioSampleRate: audioSampleRate,
+          audioChannels: payload.channels | 0
+        };
+        encoderState.videoEncoder = new global.VideoEncoder({
+          output: function(chunk, meta) {
+            try { muxer.addVideoChunk(chunk, meta); }
+            catch (error) { encoderState.error = 'video muxer: ' + String(error); }
+          },
+          error: function(error) { encoderState.error = 'video encoder: ' + String(error); }
+        });
+        var videoConfig = {
+          codec: videoConfigCodec,
+          width: payload.w | 0,
+          height: payload.h | 0,
+          bitrate: payload.videoBitRate | 0,
+          framerate: payload.fps | 0
+        };
+        if (!webm) { videoConfig.avc = { format: 'avc' }; }
+        encoderState.videoEncoder.configure(videoConfig);
+        if (payload.hasAudio) {
+          if (!global.AudioEncoder || !global.AudioData) {
+            throw new Error('Audio WebCodecs are unavailable');
+          }
+          encoderState.audioEncoder = new global.AudioEncoder({
+            output: function(chunk, meta) {
+              try { muxer.addAudioChunk(chunk, meta); }
+              catch (error) { encoderState.error = 'audio muxer: ' + String(error); }
+            },
+            error: function(error) { encoderState.error = 'audio encoder: ' + String(error); }
+          });
+          encoderState.audioEncoder.configure({
+            codec: audioConfigCodec,
+            sampleRate: audioSampleRate,
+            numberOfChannels: payload.channels | 0,
+            bitrate: payload.audioBitRate | 0
+          });
+        }
+        var encoderId = ++cn1VideoIoEncoderSeq;
+        cn1VideoIoEncoders[encoderId] = encoderState;
+        cn1VideoIoLastEncoderError = null;
+        return encoderId;
+      } catch (error) {
+        cn1VideoIoLastEncoderError = String(error);
+        return 0;
+      }
+    }
+    if (op === 'encError') {
+      var errorEncoder = cn1VideoIoEncoder(payload.peer);
+      return errorEncoder ? errorEncoder.error : cn1VideoIoLastEncoderError;
+    }
+    if (op === 'encFrame') {
+      var frameEncoder = cn1VideoIoEncoder(payload.peer);
+      if (!frameEncoder || !frameEncoder.videoEncoder) { return null; }
+      try {
+        var rgba = cn1VideoIoBase64Bytes(payload.b64);
+        var frame = new global.VideoFrame(rgba, {
+          format: 'RGBA',
+          codedWidth: payload.w | 0,
+          codedHeight: payload.h | 0,
+          timestamp: +payload.ptsUs
+        });
+        frameEncoder.videoEncoder.encode(frame);
+        frame.close();
+      } catch (error) {
+        frameEncoder.error = 'video frame: ' + String(error);
+      }
+      return null;
+    }
+    if (op === 'encAudio') {
+      var audioEncoder = cn1VideoIoEncoder(payload.peer);
+      if (!audioEncoder || !audioEncoder.audioEncoder) { return null; }
+      try {
+        var pcmBytes = cn1VideoIoBase64Bytes(payload.b64);
+        var samples = new Int16Array(pcmBytes.buffer);
+        samples = cn1VideoIoResamplePcm(samples, payload.sampleRate | 0,
+          audioEncoder.audioSampleRate, payload.channels | 0);
+        var audioData = new global.AudioData({
+          format: 's16',
+          sampleRate: audioEncoder.audioSampleRate,
+          numberOfFrames: (samples.length / (payload.channels | 0)) | 0,
+          numberOfChannels: payload.channels | 0,
+          timestamp: +payload.ptsUs,
+          data: samples
+        });
+        audioEncoder.audioEncoder.encode(audioData);
+        audioData.close();
+      } catch (error) {
+        audioEncoder.error = 'audio frame: ' + String(error);
+      }
+      return null;
+    }
+    if (op === 'encFlush') {
+      var flushEncoder = cn1VideoIoEncoder(payload.peer);
+      if (!flushEncoder) { return null; }
+      if (!flushEncoder.flushPromise) {
+        flushEncoder.done = false;
+        flushEncoder.flushPromise = flushEncoder.videoEncoder.flush()
+          .then(function() {
+            return flushEncoder.audioEncoder ? flushEncoder.audioEncoder.flush() : null;
+          })
+          .then(function() {
+            flushEncoder.muxer.finalize();
+            flushEncoder.result = flushEncoder.target.buffer;
+          })
+          .catch(function(error) {
+            flushEncoder.error = 'encoder flush: ' + String(error);
+          })
+          .then(function() {
+            flushEncoder.done = true;
+          });
+      }
+      return flushEncoder.flushPromise;
+    }
+    if (op === 'encDone') {
+      var doneEncoder = cn1VideoIoEncoder(payload.peer);
+      return !doneEncoder || !!doneEncoder.done;
+    }
+    if (op === 'encResult') {
+      var resultEncoder = cn1VideoIoEncoder(payload.peer);
+      return resultEncoder && resultEncoder.result
+        ? cn1VideoIoBytesBase64(resultEncoder.result) : null;
+    }
+    if (op === 'encClose') {
+      var closeEncoderId = payload.peer | 0;
+      var closeEncoder = cn1VideoIoEncoder(closeEncoderId);
+      if (closeEncoder) {
+        try {
+          if (closeEncoder.videoEncoder && closeEncoder.videoEncoder.state !== 'closed') {
+            closeEncoder.videoEncoder.close();
+          }
+        } catch (_videoEncoderCloseError) {}
+        try {
+          if (closeEncoder.audioEncoder && closeEncoder.audioEncoder.state !== 'closed') {
+            closeEncoder.audioEncoder.close();
+          }
+        } catch (_audioEncoderCloseError) {}
+        delete cn1VideoIoEncoders[closeEncoderId];
+      }
+      return null;
+    }
+    throw new Error('Unknown VideoIO host operation: ' + op);
+  });
+
+  hostBridge.register('__cn1_print_data__', function(request) {
+    var b64 = (request && request.b64 != null) ? String(request.b64) : '';
+    var mimeType = (request && request.mimeType != null) ? String(request.mimeType) : 'application/octet-stream';
+    var doc = global.document || (global.window && global.window.document);
+    if (!doc || !doc.body) {
+      return { ok: 0, error: 'Printing requires a browser document context' };
+    }
+    var isImage = mimeType.indexOf('image/') === 0;
+    var urlApi = (typeof URL !== 'undefined' && URL) ? URL
+      : ((global.window && global.window.webkitURL) ? global.window.webkitURL : null);
+    var url = null;
+    if (!isImage) {
+      // PDF and other binary formats the browser can render natively go through
+      // an object URL loaded directly into the iframe.
+      try {
+        var bin = atob(b64);
+        var u8 = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) { u8[i] = bin.charCodeAt(i); }
+        var blob = new Blob([u8], { type: mimeType });
+        url = urlApi ? urlApi.createObjectURL(blob) : null;
+      } catch (err) {
+        return { ok: 0, error: 'Failed to decode document for printing: ' + err };
+      }
+      if (!url) {
+        return { ok: 0, error: 'Object URLs are not supported in this browser' };
+      }
+    }
+    return new Promise(function(resolve) {
+      var done = false, cleaned = false, iframe = null;
+      var finish = function(ok, msg) {
+        if (done) { return; }
+        done = true;
+        resolve({ ok: ok ? 1 : 0, error: msg == null ? null : String(msg) });
+      };
+      var cleanup = function() {
+        if (cleaned) { return; }
+        cleaned = true;
+        try { if (urlApi && url) { urlApi.revokeObjectURL(url); } } catch (e) {}
+        try { if (iframe && iframe.parentNode) { iframe.parentNode.removeChild(iframe); } } catch (e) {}
+      };
+      iframe = doc.createElement('iframe');
+      // Off-screen but laid out and rendered. A zero-size or visibility:hidden
+      // iframe prints blank in several browsers (the "white page" symptom).
+      iframe.style.cssText = 'position:fixed;left:-100000px;top:0;width:794px;height:1123px;border:0;background:#fff';
+      iframe.onload = function() {
+        try {
+          var win = iframe.contentWindow;
+          try { win.addEventListener('afterprint', function() { finish(1, null); setTimeout(cleanup, 0); }); } catch (e) {}
+          var doPrint = function() {
+            try { win.focus(); win.print(); }
+            catch (e) { finish(0, '' + e); cleanup(); return; }
+            setTimeout(function() { finish(1, null); }, 1000);
+          };
+          if (isImage) {
+            // Wait for the (data-URL) image to decode/paint before printing,
+            // otherwise the print captures an empty page.
+            var idoc = null;
+            try { idoc = iframe.contentDocument || win.document; } catch (e) {}
+            var img = (idoc && idoc.images && idoc.images.length) ? idoc.images[0] : null;
+            if (img && !(img.complete && img.naturalWidth > 0)) {
+              var tries = 0;
+              var waitImg = function() {
+                if ((img.complete && img.naturalWidth > 0) || tries++ > 100) { doPrint(); }
+                else { setTimeout(waitImg, 20); }
+              };
+              waitImg();
+              return;
+            }
+          }
+          doPrint();
+        } catch (e) {
+          finish(0, '' + e);
+          cleanup();
+        }
+      };
+      iframe.onerror = function() { finish(0, 'Failed to load document for printing'); cleanup(); };
+      if (isImage) {
+        // Printing a raw image blob as the iframe src yields a tiny centred
+        // thumbnail on a white page in most browsers. Wrap it in a page-filling
+        // <img> so the printout actually shows the image.
+        var dataUrl = 'data:' + mimeType + ';base64,' + b64;
+        // A srcdoc document inherits the embedder's CSP, so this <style> is governed by
+        // the generated style-src and would be dropped -- taking the page-filling layout
+        // with it -- unless its hash is listed. The marker below is what
+        // JavascriptSecurityHeaders scans for: it hashes the literal out of the bridge as
+        // it was emitted, so the policy always describes the text that actually ships.
+        // Keep it a single-line, single-quoted literal with no escapes; the generator
+        // fails the build rather than guess if that stops being true.
+        var printStyle = /* cn1-csp-style */ '@page{margin:0}html,body{margin:0;padding:0;background:#fff}img{display:block;width:100%;height:auto}';
+        var html = '<!DOCTYPE html><html><head><meta charset="utf-8">'
+          + '<style>' + printStyle + '</style></head>'
+          + '<body><img src="' + dataUrl + '"></body></html>';
+        try { iframe.srcdoc = html; }
+        catch (e) { iframe.src = 'data:text/html;charset=utf-8,' + encodeURIComponent(html); }
+      } else {
+        iframe.src = url;
+      }
+      doc.body.appendChild(iframe);
+      // afterprint doesn't fire reliably for an off-screen iframe, which would
+      // leave the promise -- and the caller's listener -- hanging. Resolve as
+      // completed after a grace period regardless; the print dialog still
+      // triggers from onload when it fires.
+      setTimeout(function() { finish(1, null); }, 3000);
+      setTimeout(cleanup, 60000);
+    });
+  });
+
+  hostBridge.register('__cn1_exit_fullscreen__', function() {
+    var doc = fullscreenDoc();
+    if (!doc || typeof doc.exitFullscreen !== 'function') {
+      return 0;
+    }
+    try {
+      var p = doc.exitFullscreen();
+      if (p && typeof p.then === 'function') {
+        return p.then(function() { return 1; }, function() { return 0; });
+      }
+      return 1;
+    } catch (err) {
+      return 0;
+    }
+  });
+
+  function afterPaint(frames) {
+    return new Promise(function(resolve) {
+      var win = global.window || global;
+      var raf = win && typeof win.requestAnimationFrame === 'function' ? win.requestAnimationFrame.bind(win) : null;
+      var remaining = Math.max(1, frames | 0);
+      if (!raf) {
+        setTimeout(resolve, 16 * remaining);
+        return;
+      }
+      function step() {
+        // Race rAF against a setTimeout fallback. Headless Chromium throttles
+        // and ultimately STOPS firing requestAnimationFrame when the page idles
+        // (no compositing) -- which happens right after a form transition
+        // completes and the worker's EDT parks on __cn1_wait_for_ui_settle__,
+        // leaving nothing to drive a frame. Without the fallback this runFrame
+        // chain never resolves, the host never replies, and the EDT parks
+        // forever (the SlideHorizontalTransitionTest wall). The fallback
+        // guarantees forward progress; when rAF is healthy it wins the race so
+        // steady-state timing is unchanged.
+        var advanced = false;
+        function tick() {
+          if (advanced) {
+            return;
+          }
+          advanced = true;
+          var idx = pendingFrameTicks.indexOf(tick);
+          if (idx >= 0) {
+            pendingFrameTicks.splice(idx, 1);
+          }
+          remaining--;
+          if (remaining <= 0) {
+            resolve();
+            return;
+          }
+          step();
+        }
+        // Hidden/headless pages throttle BOTH rAF (stops entirely) and the
+        // setTimeout fallback (intensive wake-up batching), so register the
+        // tick for the external __cn1NudgeVm driver too -- a CDP-driven
+        // nudge resolves pending frame waits within its interval instead of
+        // stalling each settle for seconds.
+        pendingFrameTicks.push(tick);
+        raf(tick);
+        setTimeout(tick, 32);
+      }
+      step();
+    });
+  }
+  var pendingFrameTicks = [];
+  global.__cn1FlushFrameTicks = function() {
+    var ticks = pendingFrameTicks.splice(0, pendingFrameTicks.length);
+    for (var i = 0; i < ticks.length; i++) {
+      try { ticks[i](); } catch (_e) { /* tick is self-guarding */ }
+    }
+  };
+
+  function shortSignatureFromImageData(img) {
+    if (!img || !img.data || !img.data.length) {
+      return 'none';
+    }
+    var data = img.data;
+    var hash = 2166136261 >>> 0;
+    for (var i = 0; i < data.length; i += 17) {
+      hash ^= data[i] | 0;
+      hash = Math.imul(hash, 16777619);
+    }
+    return String((hash >>> 0).toString(16));
+  }
+
+  function canvasContentScore(canvas) {
+    if (!canvas || typeof canvas.getContext !== 'function') {
+      return null;
+    }
+    var w = canvas.width | 0;
+    var h = canvas.height | 0;
+    if (w <= 0 || h <= 0) {
+      return null;
+    }
+    // Cache the score per canvas, keyed on its last draw-op sequence. The
+    // scoring below does 9 getImageData() GPU readbacks; pickBestCanvasSnapshot
+    // runs it over EVERY tracked canvas, and the suite leaks hundreds of
+    // off-screen mutable-image canvases (FinalizationRegistry release never
+    // fires under back-to-back load), so a late capture would otherwise pay
+    // ~700x9 readbacks -- slow captures that pressure the worker<->host channel
+    // into the lost-response wedge. A canvas not drawn since its last score
+    // (stable lastSeq) returns the cached value; the display canvas is painted
+    // every frame so its lastSeq advances and it is always freshly scored.
+    var meta = getCanvasMeta(canvas);
+    if (meta && meta.__cn1ScoreSeq === meta.lastSeq && '__cn1ScoreVal' in meta) {
+      return meta.__cn1ScoreVal;
+    }
+    var result = canvasContentScoreCompute(canvas, w, h);
+    if (meta) {
+      meta.__cn1ScoreSeq = meta.lastSeq;
+      meta.__cn1ScoreVal = result;
+    }
+    return result;
+  }
+  function canvasContentScoreCompute(canvas, w, h) {
+    var ctx = null;
+    try {
+      ctx = canvas.getContext('2d');
+    } catch (_err) {
+      ctx = null;
+    }
+    if (!ctx || typeof ctx.getImageData !== 'function') {
+      return null;
+    }
+    var sampleW = Math.min(48, w);
+    var sampleH = Math.min(48, h);
+    var regions = [
+      [0.5, 0.5],
+      [0.2, 0.2], [0.8, 0.2], [0.2, 0.8], [0.8, 0.8],
+      [0.5, 0.2], [0.5, 0.8], [0.2, 0.5], [0.8, 0.5]
+    ];
+    var opaqueCount = 0;
+    var signature = 'none';
+    var sigHash = 2166136261 >>> 0;
+    var sampled = 0;
+    var bucketMask = 0;
+    var transitionCount = 0;
+    var minLuma = 255;
+    var maxLuma = 0;
+    for (var ri = 0; ri < regions.length; ri++) {
+      var rx = regions[ri][0];
+      var ry = regions[ri][1];
+      var startX = Math.max(0, Math.min(w - sampleW, (((w - sampleW) * rx) | 0)));
+      var startY = Math.max(0, Math.min(h - sampleH, (((h - sampleH) * ry) | 0)));
+      var img;
+      try {
+        img = ctx.getImageData(startX, startY, sampleW, sampleH);
+      } catch (_err) {
+        continue;
+      }
+      if (!img || !img.data || !img.data.length) {
+        continue;
+      }
+      sampled++;
+      var data = img.data;
+      var prevLuma = -1;
+      var prevAlpha = -1;
+      for (var i = 0; i < data.length; i += 4) {
+        var r = data[i] | 0;
+        var g = data[i + 1] | 0;
+        var b = data[i + 2] | 0;
+        var a = data[i + 3] | 0;
+        if (a > 12) {
+          var luma = (((r * 3) + (g * 4) + b) >> 3) | 0;
+          opaqueCount++;
+          bucketMask |= (1 << ((luma >> 4) & 15));
+          if (luma < minLuma) {
+            minLuma = luma;
+          }
+          if (luma > maxLuma) {
+            maxLuma = luma;
+          }
+          if (prevLuma >= 0 && (Math.abs(luma - prevLuma) > 12 || Math.abs(a - prevAlpha) > 12)) {
+            transitionCount++;
+          }
+          prevLuma = luma;
+          prevAlpha = a;
+        }
+        if ((i & 31) === 0) {
+          sigHash ^= r;
+          sigHash = Math.imul(sigHash, 16777619);
+          sigHash ^= g;
+          sigHash = Math.imul(sigHash, 16777619);
+          sigHash ^= b;
+          sigHash = Math.imul(sigHash, 16777619);
+          sigHash ^= a;
+          sigHash = Math.imul(sigHash, 16777619);
+        }
+      }
+    }
+    if (sampled === 0) {
+      return null;
+    }
+    signature = String((sigHash >>> 0).toString(16));
+    var distinctBuckets = 0;
+    for (var bi = 0; bi < 16; bi++) {
+      if ((bucketMask & (1 << bi)) !== 0) {
+        distinctBuckets++;
+      }
+    }
+    var variation = maxLuma >= minLuma ? (maxLuma - minLuma) : 0;
+    return {
+      score: (transitionCount * 8)
+        + (Math.max(0, distinctBuckets - 1) * 1024)
+        + (Math.max(0, variation - 8) * 4),
+      signature: signature
+    };
+  }
+
+  function getViewportMeta(doc) {
+    var win = global.window || global;
+    var width = 0;
+    var height = 0;
+    if (win) {
+      width = Math.max(width, win.innerWidth | 0);
+      height = Math.max(height, win.innerHeight | 0);
+    }
+    if (doc) {
+      var root = doc.documentElement || null;
+      var body = doc.body || null;
+      if (root) {
+        width = Math.max(width, root.clientWidth | 0);
+        height = Math.max(height, root.clientHeight | 0);
+      }
+      if (body) {
+        width = Math.max(width, body.clientWidth | 0);
+        height = Math.max(height, body.clientHeight | 0);
+      }
+    }
+    return {
+      width: Math.max(0, width | 0),
+      height: Math.max(0, height | 0)
+    };
+  }
+
+  function getCanvasDisplayMeta(canvas, doc, viewportMeta) {
+    var meta = {
+      domAttached: 0,
+      domVisible: 0,
+      rootMatch: 0,
+      viewportFit: 0,
+      rectWidth: 0,
+      rectHeight: 0,
+      domId: 'none',
+      displayAffinity: 0
+    };
+    if (!canvas || !doc || canvas.nodeType !== 1) {
+      return meta;
+    }
+    var attached = !!(canvas.isConnected || (doc.documentElement && typeof doc.documentElement.contains === 'function' && doc.documentElement.contains(canvas)));
+    meta.domAttached = attached ? 1 : 0;
+    if (canvas.id) {
+      meta.domId = String(canvas.id);
+    }
+    meta.rootMatch = meta.domId === 'codenameone-canvas' ? 1 : 0;
+    var rect = null;
+    if (typeof canvas.getBoundingClientRect === 'function') {
+      try {
+        rect = canvas.getBoundingClientRect();
+      } catch (_err) {
+        rect = null;
+      }
+    }
+    var rectWidth = rect && isFinite(rect.width) ? Math.max(0, Math.round(rect.width)) : 0;
+    var rectHeight = rect && isFinite(rect.height) ? Math.max(0, Math.round(rect.height)) : 0;
+    meta.rectWidth = rectWidth;
+    meta.rectHeight = rectHeight;
+    var visible = attached && rectWidth > 1 && rectHeight > 1;
+    if (visible && typeof global.getComputedStyle === 'function') {
+      try {
+        var style = global.getComputedStyle(canvas);
+        if (style) {
+          if (style.display === 'none' || style.visibility === 'hidden' || String(style.opacity || '1') === '0') {
+            visible = false;
+          }
+        }
+      } catch (_err2) {
+        // Ignore style lookup failures in non-DOM hosts.
+      }
+    }
+    meta.domVisible = visible ? 1 : 0;
+    var viewportWidth = viewportMeta ? (viewportMeta.width | 0) : 0;
+    var viewportHeight = viewportMeta ? (viewportMeta.height | 0) : 0;
+    if (viewportWidth > 0 && viewportHeight > 0) {
+      var scaleX = rectWidth > 0 ? (rectWidth / viewportWidth) : ((canvas.width | 0) / viewportWidth);
+      var scaleY = rectHeight > 0 ? (rectHeight / viewportHeight) : ((canvas.height | 0) / viewportHeight);
+      if (scaleX > 0 && scaleY > 0) {
+        var scaleBalance = Math.abs(Math.log(scaleX / scaleY));
+        var minScale = Math.min(scaleX, scaleY);
+        var maxScale = Math.max(scaleX, scaleY);
+        if (scaleBalance < 0.35 && minScale >= 0.45 && maxScale <= 4.5) {
+          meta.viewportFit = Math.max(1, 1000 - Math.round(scaleBalance * 1200));
+        }
+      }
+    }
+    var affinity = 0;
+    if (meta.domAttached) {
+      affinity += 2000;
+    }
+    if (meta.domVisible) {
+      affinity += 2000;
+    }
+    if (meta.rootMatch) {
+      affinity += 4000;
+    }
+    affinity += meta.viewportFit | 0;
+    meta.displayAffinity = affinity;
+    return meta;
+  }
+
+  // 3D RenderView peers render to their own WebGL canvas overlaid on the output
+  // canvas; they are DOM overlays, so the output canvas the screenshot scores and
+  // encodes does not contain them. Before each capture, draw every such canvas
+  // (marked data-cn1gl3d, created with preserveDrawingBuffer so its frame is
+  // readable) onto the main output canvas IN PLACE at its on-screen position.
+  // Doing it before candidate scoring means the output canvas scores as non-empty
+  // and the encoded snapshot includes the 3D content. No-op when there are no GL
+  // peers; failures are swallowed so a normal capture is never affected. (The
+  // output canvas is repainted on the next frame, so this only affects capture.)
+  function cn1CompositeGLPeersOntoOutput() {
+    try {
+      var doc = global.document;
+      if (!doc || typeof doc.querySelectorAll !== 'function') {
+        return;
+      }
+      var gls = doc.querySelectorAll('canvas[data-cn1gl3d]');
+      if (!gls || !gls.length) {
+        return;
+      }
+      var base = global.__cn1LastPaintCanvas || global.__cn1LastDrawCanvas || null;
+      if (!base && typeof doc.querySelector === 'function') {
+        base = doc.querySelector('canvas:not([data-cn1gl3d])');
+      }
+      if (!base || typeof base.getContext !== 'function') {
+        return;
+      }
+      var ctx = base.getContext('2d');
+      if (!ctx) {
+        return;
+      }
+      var baseRect = (typeof base.getBoundingClientRect === 'function') ? base.getBoundingClientRect() : null;
+      var sx = (baseRect && baseRect.width) ? (base.width / baseRect.width) : 1;
+      var sy = (baseRect && baseRect.height) ? (base.height / baseRect.height) : 1;
+      for (var i = 0; i < gls.length; i++) {
+        var g = gls[i];
+        if (!g || !(g.width | 0) || !(g.height | 0)) {
+          continue;
+        }
+        // Only composite canvases rendered for this capture cycle. A peer left in
+        // the DOM by a torn-down form is not re-rendered, so it lacks the fresh
+        // flag and must not bleed its stale frame (e.g. the 3D animation showing
+        // up in a later DesktopMode capture). Consume the flag after drawing.
+        if (!g.hasAttribute || !g.hasAttribute('data-cn1gl3d-fresh')) {
+          continue;
+        }
+        g.removeAttribute('data-cn1gl3d-fresh');
+        var dx = 0;
+        var dy = 0;
+        var dw = g.width;
+        var dh = g.height;
+        if (baseRect && typeof g.getBoundingClientRect === 'function') {
+          var gr = g.getBoundingClientRect();
+          dx = (gr.left - baseRect.left) * sx;
+          dy = (gr.top - baseRect.top) * sy;
+          dw = gr.width * sx;
+          dh = gr.height * sy;
+        }
+        try {
+          ctx.drawImage(g, dx, dy, dw, dh);
+        } catch (_drawErr) {
+          // Skip an unreadable GL canvas rather than fail the whole capture.
+        }
+      }
+    } catch (_compositeErr) {
+      // Never let GL compositing break a normal screenshot.
+    }
+  }
+
+  function pickBestCanvasSnapshot(includeDataUrl, previousSignature) {
+    cn1CompositeGLPeersOntoOutput();
+    function pushCanvas(list, seen, canvas, source) {
+      if (!canvas || !isCanvasLike(canvas)) {
+        return;
+      }
+      if (seen.indexOf(canvas) >= 0) {
+        return;
+      }
+      seen.push(canvas);
+      list.push({ canvas: canvas, source: source });
+    }
+    function sourcePriority(source) {
+      switch (source) {
+        case 'lastPaint':
+          return 5;
+        case 'lastDraw':
+          return 4;
+        case 'hostRefCanvas':
+          return 3;
+        case 'hostRef':
+          return 2;
+        case 'dom':
+          return 1;
+        default:
+          return 0;
+      }
+    }
+    function changedFromPrevious(signature, previous) {
+      if (!signature || signature === 'none') {
+        return 0;
+      }
+      if (!previous) {
+        return 1;
+      }
+      return signature !== previous ? 1 : 0;
+    }
+    var previous = previousSignature == null ? '' : String(previousSignature || '');
+    var candidates = [];
+    var seenCanvases = [];
+    pushCanvas(candidates, seenCanvases, global.__cn1LastPaintCanvas || null, 'lastPaint');
+    pushCanvas(candidates, seenCanvases, global.__cn1LastDrawCanvas || null, 'lastDraw');
+    if (hostRefById) {
+      var refKeys = Object.keys(hostRefById);
+      for (var rk = 0; rk < refKeys.length; rk++) {
+        var refVal = hostRefById[refKeys[rk]];
+        if (refVal && refVal.canvas && isCanvasLike(refVal.canvas)) {
+          pushCanvas(candidates, seenCanvases, refVal.canvas, 'hostRefCanvas');
+          continue;
+        }
+        if (isCanvasLike(refVal)) {
+          pushCanvas(candidates, seenCanvases, refVal, 'hostRef');
+        }
+      }
+    }
+    var doc = global.document || (global.window && global.window.document) || null;
+    if (doc && typeof doc.querySelectorAll === 'function') {
+      var domCanvases = doc.querySelectorAll('canvas');
+      if (domCanvases && domCanvases.length) {
+        for (var di = 0; di < domCanvases.length; di++) {
+          pushCanvas(candidates, seenCanvases, domCanvases[di], 'dom');
+        }
+      }
+    }
+    if (!candidates.length) {
+      return null;
+    }
+    var viewportMeta = getViewportMeta(doc);
+    var evaluated = [];
+    var maxArea = -1;
+    for (var i = 0; i < candidates.length; i++) {
+      var c = candidates[i].canvas;
+      if (!c || (includeDataUrl && typeof c.toDataURL !== 'function')) {
+        continue;
+      }
+      var w = (c.width | 0);
+      var h = (c.height | 0);
+      var area = w * h;
+      var scoreMeta = canvasContentScore(c);
+      var canvasMeta = getCanvasMeta(c);
+      var displayMeta = getCanvasDisplayMeta(c, doc, viewportMeta);
+      var score = scoreMeta && scoreMeta.score != null ? (scoreMeta.score | 0) : -1;
+      var signature = scoreMeta && scoreMeta.signature ? String(scoreMeta.signature) : 'none';
+      evaluated.push({
+        canvas: c,
+        index: i,
+        source: candidates[i].source || 'unknown',
+        sourcePriority: sourcePriority(candidates[i].source || 'unknown'),
+        changedFromPrevious: changedFromPrevious(signature, previous),
+        area: area,
+        score: score,
+        signature: signature,
+        canvasId: canvasMeta ? canvasMeta.id : -1,
+        opCount: canvasMeta ? (canvasMeta.opCount | 0) : 0,
+        paintCount: canvasMeta ? (canvasMeta.paintCount | 0) : 0,
+        lastSeq: canvasMeta ? (canvasMeta.lastSeq | 0) : 0,
+        lastPaintSeq: canvasMeta ? (canvasMeta.lastPaintSeq | 0) : 0,
+        lastMember: canvasMeta ? String(canvasMeta.lastMember || 'none') : 'none',
+        lastKind: canvasMeta ? String(canvasMeta.lastKind || 'none') : 'none',
+        fillStyle: canvasMeta ? String(canvasMeta.fillStyle || 'unset') : 'unset',
+        strokeStyle: canvasMeta ? String(canvasMeta.strokeStyle || 'unset') : 'unset',
+        globalAlpha: canvasMeta ? String(canvasMeta.globalAlpha || 'unset') : 'unset',
+        lineWidth: canvasMeta ? String(canvasMeta.lineWidth || 'unset') : 'unset',
+        globalCompositeOperation: canvasMeta ? String(canvasMeta.globalCompositeOperation || 'unset') : 'unset',
+        domAttached: displayMeta ? (displayMeta.domAttached | 0) : 0,
+        domVisible: displayMeta ? (displayMeta.domVisible | 0) : 0,
+        rootMatch: displayMeta ? (displayMeta.rootMatch | 0) : 0,
+        viewportFit: displayMeta ? (displayMeta.viewportFit | 0) : 0,
+        displayAffinity: displayMeta ? (displayMeta.displayAffinity | 0) : 0,
+        domId: displayMeta ? String(displayMeta.domId || 'none') : 'none',
+        rectWidth: displayMeta ? (displayMeta.rectWidth | 0) : 0,
+        rectHeight: displayMeta ? (displayMeta.rectHeight | 0) : 0,
+        width: w,
+        height: h
+      });
+      if (area > maxArea) {
+        maxArea = area;
+      }
+    }
+    if (!evaluated.length) {
+      return null;
+    }
+    var minLargeArea = Math.max(65536, Math.floor(maxArea * 0.45));
+    var minMeaningfulArea = Math.max(4096, Math.floor(maxArea * 0.005));
+    var largePool = [];
+    for (var p = 0; p < evaluated.length; p++) {
+      if (evaluated[p].area >= minLargeArea) {
+        largePool.push(evaluated[p]);
+      }
+    }
+    var pool = largePool.slice();
+    for (var q = 0; q < evaluated.length; q++) {
+      var mediumCandidate = evaluated[q];
+      if (mediumCandidate.area >= minLargeArea) {
+        continue;
+      }
+      if (mediumCandidate.area < minMeaningfulArea) {
+        continue;
+      }
+      if ((mediumCandidate.score | 0) <= 128) {
+        continue;
+      }
+      pool.push(mediumCandidate);
+    }
+    if (!pool.length) {
+      for (var r = 0; r < evaluated.length; r++) {
+        if (evaluated[r].area >= minMeaningfulArea) {
+          pool.push(evaluated[r]);
+        }
+      }
+    }
+    if (!pool.length) {
+      pool = evaluated;
+    }
+    var candidateSummary = [];
+    for (var s = 0; s < evaluated.length && s < 8; s++) {
+      var summaryEntry = evaluated[s];
+      candidateSummary.push(
+        String(summaryEntry.index)
+        + ':id=' + String(summaryEntry.canvasId | 0)
+        + ':' + String(summaryEntry.source || 'unknown')
+        + ':' + String(summaryEntry.width | 0) + 'x' + String(summaryEntry.height | 0)
+        + ':score=' + String(summaryEntry.score | 0)
+        + ':sig=' + String(summaryEntry.signature || 'none')
+        + ':paint=' + String(summaryEntry.paintCount | 0)
+        + ':ops=' + String(summaryEntry.opCount | 0)
+        + ':last=' + String(summaryEntry.lastKind || 'none') + '.' + String(summaryEntry.lastMember || 'none')
+        + ':alpha=' + String(summaryEntry.globalAlpha || 'unset')
+        + ':fill=' + String(summaryEntry.fillStyle || 'unset')
+        + ':stroke=' + String(summaryEntry.strokeStyle || 'unset')
+        + ':changed=' + String(summaryEntry.changedFromPrevious | 0)
+        + ':aff=' + String(summaryEntry.displayAffinity | 0)
+        + ':dom=' + String(summaryEntry.domAttached | 0)
+        + ':vis=' + String(summaryEntry.domVisible | 0)
+        + ':root=' + String(summaryEntry.rootMatch | 0)
+        + ':fit=' + String(summaryEntry.viewportFit | 0)
+        + ':large=' + String(summaryEntry.area >= minLargeArea ? 1 : 0)
+        + ':keep=' + String(pool.indexOf(summaryEntry) >= 0 ? 1 : 0)
+      );
+    }
+    var best = null;
+    var bestArea = -1;
+    var bestScore = -1;
+    var bestIndex = -1;
+    var bestSource = 'none';
+    var bestSignature = 'none';
+    var bestSourcePriority = -1;
+    var bestChangedFromPrevious = -1;
+    var bestMeaningful = -1;
+    var bestHasPaint = -1;
+    var bestPaintCount = -1;
+    var bestLastPaintSeq = -1;
+    var bestDisplayAffinity = -1;
+    for (var j = 0; j < pool.length; j++) {
+      var pick = pool[j];
+      var pickMeaningful = (pick.score | 0) > 128 ? 1 : 0;
+      var pickHasPaint = (pick.paintCount | 0) > 0 ? 1 : 0;
+      if (!best
+          || pick.displayAffinity > bestDisplayAffinity
+          || (pick.displayAffinity === bestDisplayAffinity && pickMeaningful > bestMeaningful)
+          || (pick.displayAffinity === bestDisplayAffinity && pickMeaningful === bestMeaningful && pickHasPaint > bestHasPaint)
+          || (pick.displayAffinity === bestDisplayAffinity && pickMeaningful === bestMeaningful && pickHasPaint === bestHasPaint && pick.changedFromPrevious > bestChangedFromPrevious)
+          || (pick.displayAffinity === bestDisplayAffinity && pickMeaningful === bestMeaningful && pickHasPaint === bestHasPaint && pick.changedFromPrevious === bestChangedFromPrevious && pick.score > bestScore)
+          || (pick.displayAffinity === bestDisplayAffinity && pickMeaningful === bestMeaningful && pickHasPaint === bestHasPaint && pick.changedFromPrevious === bestChangedFromPrevious && pick.score === bestScore && pick.paintCount > bestPaintCount)
+          || (pick.displayAffinity === bestDisplayAffinity && pickMeaningful === bestMeaningful && pickHasPaint === bestHasPaint && pick.changedFromPrevious === bestChangedFromPrevious && pick.score === bestScore && pick.paintCount === bestPaintCount && pick.lastPaintSeq > bestLastPaintSeq)
+          || (pick.displayAffinity === bestDisplayAffinity && pickMeaningful === bestMeaningful && pickHasPaint === bestHasPaint && pick.changedFromPrevious === bestChangedFromPrevious && pick.score === bestScore && pick.paintCount === bestPaintCount && pick.lastPaintSeq === bestLastPaintSeq && pick.sourcePriority > bestSourcePriority)
+          || (pick.displayAffinity === bestDisplayAffinity && pickMeaningful === bestMeaningful && pickHasPaint === bestHasPaint && pick.changedFromPrevious === bestChangedFromPrevious && pick.score === bestScore && pick.paintCount === bestPaintCount && pick.lastPaintSeq === bestLastPaintSeq && pick.sourcePriority === bestSourcePriority && pick.area > bestArea)) {
+        bestDisplayAffinity = pick.displayAffinity | 0;
+        bestMeaningful = pickMeaningful;
+        bestHasPaint = pickHasPaint;
+        bestChangedFromPrevious = pick.changedFromPrevious;
+        bestSourcePriority = pick.sourcePriority;
+        bestPaintCount = pick.paintCount | 0;
+        bestLastPaintSeq = pick.lastPaintSeq | 0;
+        bestScore = pick.score;
+        bestArea = pick.area;
+        best = pick.canvas;
+        bestIndex = pick.index;
+        bestSource = pick.source;
+        bestSignature = pick.signature;
+      }
+    }
+    if (!best) {
+      return null;
+    }
+    var out = {
+      canvasCount: candidates.length,
+      canvasConsidered: evaluated.length,
+      canvasLargeCount: largePool.length,
+      canvasSelectionCount: pool.length,
+      canvasMinLargeArea: minLargeArea,
+      canvasMinMeaningfulArea: minMeaningfulArea,
+      canvasPick: bestIndex,
+      canvasArea: bestArea,
+      canvasScore: bestScore,
+      canvasSource: bestSource,
+      canvasSignature: bestSignature,
+      canvasDisplayAffinity: bestDisplayAffinity,
+      canvasPaintCount: bestPaintCount,
+      canvasLastPaintSeq: bestLastPaintSeq,
+      canvasCandidatesSummary: candidateSummary.join('|'),
+      changedFromPrevious: bestChangedFromPrevious,
+      sourcePriority: bestSourcePriority
+    };
+    var bestEntry = evaluated[bestIndex] || null;
+    if (bestEntry) {
+      out.canvasPickSummary = String(bestEntry.index)
+        + ':id=' + String(bestEntry.canvasId | 0)
+        + ':' + String(bestEntry.source || 'unknown')
+        + ':' + String(bestEntry.width | 0) + 'x' + String(bestEntry.height | 0)
+        + ':score=' + String(bestEntry.score | 0)
+        + ':sig=' + String(bestEntry.signature || 'none')
+        + ':paint=' + String(bestEntry.paintCount | 0)
+        + ':aff=' + String(bestEntry.displayAffinity | 0)
+        + ':dom=' + String(bestEntry.domAttached | 0)
+        + ':vis=' + String(bestEntry.domVisible | 0)
+        + ':root=' + String(bestEntry.rootMatch | 0)
+        + ':fit=' + String(bestEntry.viewportFit | 0)
+        + ':domId=' + String(bestEntry.domId || 'none')
+        + ':rect=' + String(bestEntry.rectWidth | 0) + 'x' + String(bestEntry.rectHeight | 0);
+    }
+    if (!includeDataUrl) {
+      return out;
+    }
+    try {
+      out.dataUrl = String(best.toDataURL('image/png') || '');
+      return out;
+    } catch (_err) {
+      return null;
+    }
+  }
+
+  hostBridge.register('__cn1_wait_for_ui_settle__', function(request) {
+    var payload = request || {};
+    var reason = payload.reason == null ? 'unknown' : String(payload.reason);
+    // Honour the caller's budget rather than quietly halving it. The
+    // graphics tests that render into an offscreen image and composite it
+    // ask for 120 frames precisely because they are the slowest to settle,
+    // and the old ceiling of 96 silently returned whatever had been drawn
+    // so far -- which is how DrawImage shipped a capture with its two
+    // offscreen-image cells still half-painted. The bound stays, well above
+    // any current request, so a bad value cannot spin forever.
+    var maxFrames = Math.max(1, Math.min(240, (payload.maxFrames | 0) || 14));
+    var stableFrames = Math.max(1, Math.min(6, (payload.stableFrames | 0) || 2));
+    var quietFramesRequired = Math.max(1, Math.min(12, (payload.quietFrames | 0) || stableFrames));
+    var previousSignature = String(global.__cn1LastScreenshotSignature || '');
+    var changed = false;
+    var stableCount = 0;
+    var lastSignature = '';
+    var best = null;
+    var startRenderSeq = global.__cn1RenderQueueSeq | 0;
+    var seenRenderSeq = startRenderSeq;
+    var renderAdvanced = false;
+    var quietFrames = 0;
+    var settleExhausted = false;
+    function chooseBetter(a, b) {
+      if (!a) {
+        return b;
+      }
+      if (!b) {
+        return a;
+      }
+      if (!!b.paintedSinceStart !== !!a.paintedSinceStart) {
+        return b.paintedSinceStart ? b : a;
+      }
+      if ((b.canvasDisplayAffinity | 0) !== (a.canvasDisplayAffinity | 0)) {
+        return (b.canvasDisplayAffinity | 0) > (a.canvasDisplayAffinity | 0) ? b : a;
+      }
+      if ((b.canvasScore | 0) !== (a.canvasScore | 0)) {
+        return (b.canvasScore | 0) > (a.canvasScore | 0) ? b : a;
+      }
+      if ((b.canvasArea | 0) !== (a.canvasArea | 0)) {
+        return (b.canvasArea | 0) > (a.canvasArea | 0) ? b : a;
+      }
+      return b;
+    }
+    function runFrame(index) {
+      return afterPaint(1).then(function() {
+        var currentRenderSeq = global.__cn1RenderQueueSeq | 0;
+        if ((currentRenderSeq | 0) !== (seenRenderSeq | 0)) {
+          renderAdvanced = true;
+          seenRenderSeq = currentRenderSeq | 0;
+          quietFrames = 0;
+          stableCount = 0;
+          lastSignature = '';
+        } else {
+          quietFrames++;
+        }
+        var sample = pickBestCanvasSnapshot(false, previousSignature);
+        best = chooseBetter(best, sample);
+        if (sample && sample.canvasSignature && sample.canvasSignature !== 'none') {
+          var sig = String(sample.canvasSignature);
+          if (sig !== previousSignature) {
+            changed = true;
+          }
+          if (sig === lastSignature) {
+            stableCount++;
+          } else {
+            stableCount = 1;
+            lastSignature = sig;
+          }
+          if ((sample.canvasScore | 0) > 0
+              && quietFrames >= quietFramesRequired
+              && stableCount >= stableFrames) {
+            return sample;
+          }
+        }
+        if (index + 1 >= maxFrames) {
+          // Out of budget without ever meeting the quiet + stable condition.
+          // The capture still proceeds with the best frame seen, but say so:
+          // an exhausted settle is the difference between "the UI was ready"
+          // and "we stopped waiting", and only one of those explains a
+          // half-drawn screenshot afterwards.
+          settleExhausted = true;
+          return best;
+        }
+        return runFrame(index + 1);
+      });
+    }
+    return runFrame(0).then(function(result) {
+      var meta = result || {
+        canvasCount: 0,
+        canvasPick: -1,
+        canvasArea: -1,
+        canvasScore: -1,
+        canvasSignature: 'none'
+      };
+      global.__cn1LastUiSettleSignature = meta.canvasSignature || '';
+      diag('SCREENSHOT_START', 'settleReason', reason);
+      diag('SCREENSHOT_START', 'settleFrames', maxFrames);
+      diag('SCREENSHOT_START', 'settleStableFrames', stableFrames);
+      diag('SCREENSHOT_START', 'settleQuietFrames', quietFramesRequired);
+      diag('SCREENSHOT_START', 'settleChanged', changed ? 1 : 0);
+      diag('SCREENSHOT_START', 'settleSig', meta.canvasSignature || 'none');
+      diag('SCREENSHOT_START', 'settleScore', meta.canvasScore | 0);
+      diag('SCREENSHOT_START', 'settleRenderStartSeq', startRenderSeq | 0);
+      diag('SCREENSHOT_START', 'settleRenderEndSeq', seenRenderSeq | 0);
+      diag('SCREENSHOT_START', 'settleRenderAdvanced', renderAdvanced ? 1 : 0);
+      diag('SCREENSHOT_START', 'settleQuietObserved', quietFrames | 0);
+      diag('SCREENSHOT_START', 'settleExhausted', settleExhausted ? 1 : 0);
+      return {
+        changedFromPrevious: changed ? 1 : 0,
+        canvasSignature: meta.canvasSignature || 'none',
+        canvasScore: meta.canvasScore | 0,
+        canvasArea: meta.canvasArea | 0,
+        canvasCount: meta.canvasCount | 0,
+        canvasPick: meta.canvasPick | 0,
+        renderStartSeq: startRenderSeq | 0,
+        renderEndSeq: seenRenderSeq | 0,
+        renderAdvanced: renderAdvanced ? 1 : 0,
+        settleExhausted: settleExhausted ? 1 : 0
+      };
+    });
+  });
+
+  hostBridge.register('__cn1_load_truetype_font__', function(request) {
+    // Loads a TrueType/OpenType font into the host document so the browser can
+    // resolve 'font-family: <fontName>' at paint time. Called from the worker
+    // (HTML5Implementation.loadTrueTypeFont_ via the port.js native binding)
+    // because document/FontFace/WebFont are not reachable from the worker.
+    //
+    // Prefers the CSS FontFace API (covers every browser this port targets)
+    // and falls back to <style>@font-face injection + the WebFont loader so a
+    // Chromium/Firefox FontFace regression doesn't strand the load path.
+    var payload = request || {};
+    var fontName = payload.fontName == null ? '' : String(payload.fontName);
+    var rawPath = payload.fontUrl == null ? '' : String(payload.fontUrl);
+    var fontFormat = payload.fontFormat == null ? 'truetype' : String(payload.fontFormat);
+    // Match HTML5Implementation.getResourceAsStream: relative resource names
+    // are rooted at "assets/" in the bundle layout, and file paths with a
+    // directory portion get collapsed to their basename first. Absolute URLs
+    // (data:, http:, /...) pass through untouched.
+    var fontUrl = rawPath;
+    if (fontUrl) {
+      if (!/^(?:data:|https?:|\/)/i.test(fontUrl)) {
+        var lastSlash = fontUrl.lastIndexOf('/');
+        if (lastSlash >= 0) {
+          fontUrl = fontUrl.substring(lastSlash + 1);
+        }
+        if (fontUrl !== 'icon.png' && fontUrl.indexOf('assets/') !== 0) {
+          fontUrl = 'assets/' + fontUrl;
+        }
+      }
+    }
+    return new Promise(function(resolve) {
+      if (!fontName || !fontUrl) {
+        resolve({ loaded: false, reason: 'missing-args' });
+        return;
+      }
+      try {
+        // Escape backslashes *before* single quotes so a pathological input
+        // like `foo\` can't close the CSS string and smuggle in extra tokens.
+        var cssStringEscape = function (s) {
+          return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        };
+        if (typeof FontFace !== 'undefined'
+            && typeof document !== 'undefined'
+            && document.fonts
+            && typeof document.fonts.add === 'function') {
+          // App-resource fonts (theme .ttf files) land at the bundle ROOT
+          // (the translator copies app resources top-level), while the
+          // port's own webapp fonts live under assets/. Try assets/ first
+          // (the historical layout), then fall back to the bare basename so
+          // root-level app fonts don't 404 (observed: Initializr's
+          // Inter-*.ttf 404ing under assets/ and the UI falling back to
+          // system fonts).
+          var candidates = [fontUrl];
+          if (fontUrl.indexOf('assets/') === 0) {
+            candidates.push(fontUrl.substring('assets/'.length));
+          }
+          var tryLoad = function(idx) {
+            if (idx >= candidates.length) {
+              resolve({ loaded: false, path: 'FontFace', error: 'all candidate paths failed' });
+              return;
+            }
+            var candidate = candidates[idx];
+            var descriptor = "url('" + cssStringEscape(candidate) + "') format('"
+              + cssStringEscape(fontFormat) + "')";
+            var ff = new FontFace(fontName, descriptor);
+            ff.load().then(function(loaded) {
+              try { document.fonts.add(loaded); } catch (_err) {}
+              resolve({ loaded: true, path: 'FontFace' });
+            }, function(err) {
+              if (typeof console !== 'undefined' && typeof console.warn === 'function') {
+                console.warn('PARPAR:DIAG:HOST:loadTrueTypeFont:FontFace:fail:fontName=' + fontName
+                  + ':url=' + candidate
+                  + ':error=' + String(err && err.message ? err.message : err));
+              }
+              tryLoad(idx + 1);
+            });
+          };
+          tryLoad(0);
+          return;
+        }
+        // Legacy path, reached only where the CSS Font Loading API above is missing. The
+        // rule is built from the font's own name and URL, so it has no fixed text and
+        // cannot be hashed into style-src the way the print style above is -- a generated
+        // CSP therefore blocks it. That is detectable rather than silent: a <style> the
+        // policy refused never gets a CSSOM sheet, so styleEl.sheet stays null, and this
+        // reports the font as not loaded instead of claiming success for a rule that was
+        // dropped.
+        var styleBlocked = false;
+        if (typeof document !== 'undefined' && document.head) {
+          var styleEl = document.createElement('style');
+          var escapedName = cssStringEscape(fontName);
+          var escapedUrl = cssStringEscape(fontUrl);
+          var escapedFormat = cssStringEscape(fontFormat);
+          styleEl.appendChild(document.createTextNode(
+            "@font-face { font-family: '" + escapedName + "'; "
+              + "src: url('" + escapedUrl + "') format('" + escapedFormat + "'); }"
+          ));
+          document.head.appendChild(styleEl);
+          styleBlocked = !styleEl.sheet;
+        }
+        if (styleBlocked) {
+          resolve({ loaded: false, path: 'styleOnly',
+            error: 'the @font-face rule was blocked by the page Content-Security-Policy; '
+              + 'this browser has no CSS Font Loading API to use instead' });
+          return;
+        }
+        if (typeof WebFont !== 'undefined' && typeof WebFont.load === 'function') {
+          WebFont.load({
+            custom: { families: [fontName] },
+            active: function() { resolve({ loaded: true, path: 'WebFont' }); },
+            inactive: function() { resolve({ loaded: false, path: 'WebFont' }); }
+          });
+        } else {
+          setTimeout(function() {
+            resolve({ loaded: true, path: 'styleOnly' });
+          }, 50);
+        }
+      } catch (err) {
+        resolve({ loaded: false, error: String(err && err.message ? err.message : err) });
+      }
+    });
+  });
+
+  hostBridge.register('__cn1_decode_image_from_url__', function(request) {
+    // Creates an <img> on the main thread, sets its src, and awaits
+    // HTMLImageElement.decode() so the worker can be handed an
+    // already-decoded HTMLImageElement. Without this, the worker's Java
+    // code returns from createCrossOriginImageElement as soon as setSrc
+    // runs but before the browser has actually fetched/decoded the
+    // picture — so NativeImage.isComplete() returns false on the first
+    // paint, NativeImage.draw silently no-ops, and theme 9-patch borders
+    // / EncodedImage-backed draws end up painting zero bytes.
+    var payload = request || {};
+    var sourceUrl = payload && payload.sourceUrl != null ? String(payload.sourceUrl) : null;
+    var crossOrigin = payload && payload.crossOrigin != null ? String(payload.crossOrigin) : 'anonymous';
+    if (!sourceUrl) {
+      return null;
+    }
+    return new Promise(function(resolve) {
+      if (typeof document === 'undefined' || !document.createElement) {
+        resolve(null);
+        return;
+      }
+      var img;
+      try {
+        img = document.createElement('img');
+      } catch (e) {
+        resolve(null);
+        return;
+      }
+      try { img.setAttribute('crossorigin', crossOrigin); } catch (_ignored) {}
+      img.src = sourceUrl;
+      // HTMLImageElement cannot be structured-cloned back to the worker —
+      // wrap it in a host-ref marker (like __cn1_jso_bridge__ does for
+      // createElement results) so the worker receives an opaque handle
+      // that re-hydrates to the same main-thread element on subsequent
+      // bridge calls.
+      var settle = function() { resolve(hostResult(img)); };
+      // decode() may reject on a decoding error or if the browser has
+      // detached the image before it settles; treat either path as
+      // "decode done" so the worker still gets the element back and the
+      // existing NativeImage error-handling takes over (it'll just paint
+      // nothing for broken bytes, matching pre-barrier behaviour).
+      if (typeof img.decode === 'function') {
+        try {
+          img.decode().then(settle, settle);
+          return;
+        } catch (e) { /* fall through */ }
+      }
+      // Browsers without HTMLImageElement.decode fall back to the load
+      // event (plus a timeout safety net so we don't hang forever on a
+      // mis-typed path).
+      var done = false;
+      var finish = function() {
+        if (done) return;
+        done = true;
+        settle();
+      };
+      img.addEventListener('load', finish);
+      img.addEventListener('error', finish);
+      setTimeout(finish, 10000);
+    });
+  });
+
+  hostBridge.register('__cn1_delay__', function(request) {
+    var millis = 0;
+    if (request && typeof request === 'object' && request.millis != null) {
+      millis = request.millis | 0;
+    } else if (request != null) {
+      millis = request | 0;
+    }
+    millis = Math.max(0, Math.min(10000, millis));
+    return new Promise(function(resolve) {
+      setTimeout(function() {
+        resolve(millis);
+      }, millis);
+    });
+  });
+
+  hostBridge.register('__cn1_capture_canvas_png__', function(request) {
+    var payload = request || {};
+    var includeMeta = !!(payload && payload.includeMeta);
+    function captureNow() {
+      return pickBestCanvasSnapshot(true, previousSignature);
+    }
+    var previousSignature = String(global.__cn1LastScreenshotSignature || '');
+    var baseline = pickBestCanvasSnapshot(false, previousSignature) || null;
+    var baselinePaintSeq = baseline ? (baseline.canvasLastPaintSeq | 0) : 0;
+    var baselinePaintCount = baseline ? (baseline.canvasPaintCount | 0) : 0;
+    var attempts = 24;
+    // A frame that is missing draws gets a much longer budget, because the
+    // thing it waits for is known and bounded: an image decode, after which
+    // the port repaints and the next frame drops nothing. 24 frames is ~0.4s,
+    // and the Java side already allows this content 4s to arrive -- so the
+    // capture used to give up long before the decode it was waiting for could
+    // land, and ship the incomplete frame. The loop still exits the moment a
+    // clean frame appears, so a healthy capture pays nothing for this.
+    var attemptsIncompleteFrame = 240;
+    var lastFrameDropped = 0;
+    var best = null;
+    var startRenderSeq = global.__cn1RenderQueueSeq | 0;
+    var seenRenderSeq = startRenderSeq;
+    var renderAdvanced = false;
+    var quietFrames = 0;
+    var quietFramesRequired = 3;
+    function chooseBetter(a, b) {
+      if (!a) {
+        return b;
+      }
+      if (!b) {
+        return a;
+      }
+      if ((b.canvasDisplayAffinity | 0) !== (a.canvasDisplayAffinity | 0)) {
+        return (b.canvasDisplayAffinity | 0) > (a.canvasDisplayAffinity | 0) ? b : a;
+      }
+      // A frame that drew everything beats one that lost an image, so the
+      // bounded fallback below cannot prefer an incomplete frame that happens
+      // to score higher.
+      if (((b.frameDropped | 0) === 0) !== ((a.frameDropped | 0) === 0)) {
+        return (b.frameDropped | 0) === 0 ? b : a;
+      }
+      if (!!b.changedFromPrevious !== !!a.changedFromPrevious) {
+        return b.changedFromPrevious ? b : a;
+      }
+      if ((b.canvasScore | 0) !== (a.canvasScore | 0)) {
+        return (b.canvasScore | 0) > (a.canvasScore | 0) ? b : a;
+      }
+      if ((b.canvasArea | 0) !== (a.canvasArea | 0)) {
+        return (b.canvasArea | 0) > (a.canvasArea | 0) ? b : a;
+      }
+      return (String(b.dataUrl || '').length > String(a.dataUrl || '').length) ? b : a;
+    }
+    function runAttempt(index) {
+      return afterPaint(index === 0 ? 2 : 1).then(function() {
+        var currentRenderSeq = global.__cn1RenderQueueSeq | 0;
+        if ((currentRenderSeq | 0) !== (seenRenderSeq | 0)) {
+          renderAdvanced = true;
+          seenRenderSeq = currentRenderSeq | 0;
+          quietFrames = 0;
+        } else {
+          quietFrames++;
+        }
+        var sample = captureNow();
+        if (sample) {
+          sample.attempt = index;
+          sample.changedFromPrevious = !!(sample.canvasSignature && sample.canvasSignature !== previousSignature);
+          sample.paintedSinceStart =
+            ((sample.canvasLastPaintSeq | 0) > (baselinePaintSeq | 0))
+            || ((sample.canvasPaintCount | 0) > (baselinePaintCount | 0));
+          sample.frameDropped = surfaceFrameDropped | 0;
+          // A frame that could not draw one of its images is incomplete, and
+          // no amount of stillness makes it complete: an image still decoding
+          // leaves the canvas idle, so the quiet-frame test reads "settled"
+          // while pixels are missing. That is the rest of the
+          // graphics-draw-image-rect failure -- with the batch truncation
+          // fixed, the capture still shipped the frame painted before the
+          // EncodedImage decodes landed. Wait for a frame that drew everything
+          // it was asked to draw; the attempt budget below still bounds it, so
+          // an image that never decodes captures and fails as it does today
+          // rather than hanging the suite.
+          lastFrameDropped = sample.frameDropped | 0;
+          if (sample.frameDropped > 0) {
+            quietFrames = 0;
+          }
+          best = chooseBetter(best, sample);
+          if (quietFrames >= quietFramesRequired
+              && (sample.frameDropped | 0) === 0
+              && (sample.canvasScore | 0) > 0
+              && (sample.paintedSinceStart || renderAdvanced || sample.changedFromPrevious)) {
+            return sample;
+          }
+          if ((sample.canvasScore | 0) <= 0 && !sample.paintedSinceStart) {
+            // Keep waiting when we are still looking at the same blank frame.
+            sample = null;
+          }
+        }
+        var limit = lastFrameDropped > 0 ? attemptsIncompleteFrame : attempts;
+        if (index + 1 >= limit) {
+          return best;
+        }
+        return runAttempt(index + 1);
+      });
+    }
+    // The port promotes text into a DOM layer above the canvas, so a canvas readback is no
+    // longer the whole frame. When a test harness installs a composited capture hook, let it
+    // supply the image instead and return THAT as the screenshot: the bytes then travel the
+    // normal path to the cn1ss server, so there is exactly one writer of the PNG and no
+    // ordering to get wrong. Writing the composite to disk from the harness instead would be
+    // overwritten moments later by the canvas-only bytes this call is about to return.
+    //
+    // The hook is awaited inside this host call, and the worker is blocked on the call, so the
+    // suite cannot advance to the next test while the screenshot is being taken. Driving it
+    // from a console marker instead would race the next test's form onto the screen.
+    // A frame reaches the canvas as a batch of commands replayed on the main thread, and the
+    // page screenshot below reads whatever is on it at that instant -- including a frame that
+    // is only half replayed. That is how a tab lens came out as the plain rectangle of its
+    // backdrop, captured after the rectangle was drawn and before the rounded shape that masks
+    // it. Waiting for the canvas to go quiet puts the capture on a frame boundary. It is
+    // bounded: a screen that never stops drawing is still captured, as it was before.
+    function awaitQuietCanvas() {
+      return new Promise(function(resolve) {
+        if (typeof global.requestAnimationFrame !== 'function') {
+          resolve();
+          return;
+        }
+        var seen = -1;
+        var quiet = 0;
+        var frames = 0;
+        function tick() {
+          var seq = canvasOpSeq | 0;
+          if (seq === seen) {
+            quiet++;
+          } else {
+            quiet = 0;
+            seen = seq;
+          }
+          frames++;
+          // A good many quiet frames, not one or two: a screen is often painted over a series
+          // of frames with pauses between them -- a grid of gradients or images drawn cell by
+          // cell, an EDT tick apart -- and a capture taken in one of those pauses records a
+          // half-finished screen. The pauses seen in practice run to a tenth of a second, so
+          // the wait has to outlast them. Still bounded, so a screen that never stops drawing
+          // is captured as it was before.
+          if (quiet >= 12 || frames >= 120) {
+            resolve();
+            return;
+          }
+          global.requestAnimationFrame(tick);
+        }
+        global.requestAnimationFrame(tick);
+      });
+    }
+
+    function withCompositedCapture(makeResult) {
+      var hook = global.__cn1CompositeCapture;
+      if (typeof hook !== 'function') {
+        return makeResult(null);
+      }
+      return awaitQuietCanvas().then(hook).then(function(dataUrl) {
+        var composited = (typeof dataUrl === 'string'
+            && dataUrl.indexOf('data:image/') === 0) ? dataUrl : null;
+        return makeResult(composited);
+      }, function() {
+        return makeResult(null);
+      });
+    }
+    return runAttempt(0).then(function(result) {
+      if (!result || !result.dataUrl) {
+        global.__cn1LastCaptureMeta = null;
+        return withCompositedCapture(function(composited) {
+          // A composited capture stands on its own: the canvas readback found nothing usable,
+          // but the page still has a frame worth recording.
+          return includeMeta ? {
+            dataUrl: composited || '',
+            canvasScore: composited ? 0 : -1,
+            canvasLastPaintSeq: baselinePaintSeq | 0,
+            canvasPaintedSinceStart: 0
+          } : (composited || '');
+        });
+      }
+      global.__cn1LastScreenshotSignature = result.canvasSignature || '';
+      diag('SCREENSHOT_START', 'canvasCount', result.canvasCount);
+      diag('SCREENSHOT_START', 'canvasConsidered', result.canvasConsidered | 0);
+      diag('SCREENSHOT_START', 'canvasLargeCount', result.canvasLargeCount | 0);
+      diag('SCREENSHOT_START', 'canvasSelectionCount', result.canvasSelectionCount | 0);
+      diag('SCREENSHOT_START', 'canvasMinLargeArea', result.canvasMinLargeArea | 0);
+      diag('SCREENSHOT_START', 'canvasMinMeaningfulArea', result.canvasMinMeaningfulArea | 0);
+      diag('SCREENSHOT_START', 'canvasPick', result.canvasPick);
+      diag('SCREENSHOT_START', 'canvasArea', result.canvasArea);
+      diag('SCREENSHOT_START', 'canvasScore', result.canvasScore);
+      diag('SCREENSHOT_START', 'canvasDisplayAffinity', result.canvasDisplayAffinity | 0);
+      diag('SCREENSHOT_START', 'canvasSource', result.canvasSource || 'unknown');
+      diag('SCREENSHOT_START', 'canvasSig', result.canvasSignature || 'none');
+      diag('SCREENSHOT_START', 'canvasBaselinePaintSeq', baselinePaintSeq | 0);
+      diag('SCREENSHOT_START', 'canvasBaselinePaintCount', baselinePaintCount | 0);
+      diag('SCREENSHOT_START', 'canvasPaintCount', result.canvasPaintCount | 0);
+      diag('SCREENSHOT_START', 'canvasLastPaintSeq', result.canvasLastPaintSeq | 0);
+      diag('SCREENSHOT_START', 'canvasPaintedSinceStart', result.paintedSinceStart ? 1 : 0);
+      diag('SCREENSHOT_START', 'canvasCandidates', result.canvasCandidatesSummary || 'none');
+      diag('SCREENSHOT_START', 'canvasPickSummary', result.canvasPickSummary || 'none');
+      diag('SCREENSHOT_START', 'canvasRenderStartSeq', startRenderSeq | 0);
+      diag('SCREENSHOT_START', 'canvasRenderEndSeq', seenRenderSeq | 0);
+      diag('SCREENSHOT_START', 'canvasRenderAdvanced', renderAdvanced ? 1 : 0);
+      diag('SCREENSHOT_START', 'canvasQuietObserved', quietFrames | 0);
+      diag('SCREENSHOT_START', 'attempt', result.attempt | 0);
+      // Image ops the replay could not draw. A capture with a non-zero count
+      // is missing pixels for a reason the screenshot diff cannot show, so it
+      // must not be read as a rendering difference.
+      diag('SCREENSHOT_START', 'drawImageDropped', surfaceDrawImageDropped | 0);
+      // Drops charged to the captured frame itself. Zero is the condition the
+      // capture waits for; a non-zero value here means the wait was exhausted
+      // and the screenshot is knowingly incomplete.
+      diag('SCREENSHOT_START', 'frameDropped', result.frameDropped | 0);
+      diag('SCREENSHOT_START', 'changed', result.changedFromPrevious ? 1 : 0);
+      diag('SCREENSHOT_START', 'pngLen', String(result.dataUrl || '').length);
+      global.__cn1LastCaptureMeta = {
+        dataUrl: String(result.dataUrl || ''),
+        canvasScore: result.canvasScore | 0,
+        canvasLastPaintSeq: result.canvasLastPaintSeq | 0,
+        canvasPaintedSinceStart: result.paintedSinceStart ? 1 : 0,
+        canvasSignature: result.canvasSignature || 'none'
+      };
+      return withCompositedCapture(function(composited) {
+        if (composited) {
+          global.__cn1LastCaptureMeta.dataUrl = composited;
+          diag('SCREENSHOT_START', 'compositedLen', composited.length);
+        }
+        if (includeMeta) {
+          return global.__cn1LastCaptureMeta;
+        }
+        return String(global.__cn1LastCaptureMeta.dataUrl || '');
+      });
+    });
+  });
+
+  hostBridge.register('__cn1_debug_list_canvases__', function() {
+    var out = [];
+    var keys = Object.keys(canvasMetaById);
+    for (var i = 0; i < keys.length; i++) {
+      var meta = canvasMetaById[keys[i]];
+      if (!meta || !meta.canvas || !isCanvasLike(meta.canvas)) {
+        continue;
+      }
+      var summary = debugCanvasSummary(meta.canvas, 'meta');
+      if (summary) {
+        out.push(summary);
+      }
+    }
+    out.sort(function(a, b) {
+      return (a.id | 0) - (b.id | 0);
+    });
+    return out;
+  });
+
+  hostBridge.register('__cn1_debug_capture_canvas_by_id__', function(request) {
+    var id = request;
+    if (request && typeof request === 'object' && request.id != null) {
+      id = request.id;
+    }
+    id = id | 0;
+    var meta = canvasMetaById[id];
+    if (!meta || !meta.canvas || !isCanvasLike(meta.canvas) || typeof meta.canvas.toDataURL !== 'function') {
+      return '';
+    }
+    return String(meta.canvas.toDataURL('image/png') || '');
+  });
+
+  global.__parparMessages = [];
+  global.cn1Initialized = false;
+  global.cn1Started = false;
+  global.__parparWorker = null;
+
+  function handleVmMessage(data, target) {
+    global.__parparMessages.push(data);
+    if (!data) {
+      return;
+    }
+    if (data.type === 'releaseHostRef') {
+      releaseHostRefs(data.ids);
+      return;
+    }
+    if (data.type === 'host-call') {
+      hostBridge.invoke(data.symbol, data.args || [], target || global.__parparWorker, data.id);
+      return;
+    }
+    if (data.type === 'host-call-batch') {
+      // Batched fire-and-forget JSO bridge ops. The worker emits these
+      // at end-of-drain to amortise structured-clone postMessage cost
+      // across all canvas/DOM setters or void method calls in a paint
+      // burst. Each op carries its own ``__cn1_no_response`` flag, so
+      // hostBridge.invoke skips the postHostCallback path naturally.
+      var ops = data.ops || [];
+      for (var oi = 0; oi < ops.length; oi++) {
+        try {
+          hostBridge.invoke('__cn1_jso_bridge__', [ops[oi]], target || global.__parparWorker, 0);
+        } catch (e) {
+          if (global.console && typeof global.console.error === 'function') {
+            global.console.error('host-call-batch op[' + oi + '] failed: ' + (e && e.message || e));
+          }
+        }
+      }
+      return;
+    }
+    if (data.type === 'result') {
+      global.__parparResult = data;
+      global.cn1Started = true;
+      return;
+    }
+    if (data.type === 'lifecycle' && data.phase === 'started') {
+      // Worker emits this once when the main bytecode generator
+      // completes — Lifecycle.init and Lifecycle.start both
+      // returned. The pre-existing fallbacks (CN1JS:.runApp log
+      // probe + ``type: result`` System.exit hook) only fire for
+      // the screenshot test fixtures (which run an explicit suite)
+      // and the unit-test System.exit pattern. A regular app that
+      // reaches its first form and waits for input never produced
+      // either signal — manifested as ``cn1Started`` staying false
+      // forever in the lifecycle test harness.
+      global.cn1Started = true;
+      return;
+    }
+    if (data.type === 'error') {
+      global.__parparError = data;
+      // ALWAYS surface runtime errors to the main-thread console — this is
+      // unrelated to the diagEnabled diagnostics toggle. Without this, an
+      // app crash inside the worker vanishes silently because diag() is
+      // gated, and users only see the "Loading..." splash hang forever.
+      if (global.console && typeof global.console.error === 'function') {
+        var errorText = 'PARPAR:ERROR: ' + (data.message || 'unknown');
+        if (data.stack) {
+          errorText += '\n' + data.stack;
+        }
+        if (data.virtualFailure) {
+          try {
+            errorText += '\n  virtualFailure=' + JSON.stringify(data.virtualFailure);
+          } catch (_jse) {
+            errorText += '\n  virtualFailure=[unserialisable]';
+          }
+        }
+        global.console.error(errorText);
+      }
+      var failure = data.virtualFailure || null;
+      if (failure) {
+        diag('FIRST_FAILURE', 'category', failure.category || 'runtime_error');
+        diag('FIRST_FAILURE', 'methodId', failure.methodId || 'none');
+        diag('FIRST_FAILURE', 'receiverClass', failure.receiverClass || 'none');
+      } else {
+        diag('FIRST_FAILURE', 'category', 'runtime_error');
+        diag('FIRST_FAILURE', 'message', data.message || 'unknown');
+      }
+      return;
+    }
+    if (data.type === 'log' && data.message) {
+      // Forwarded log messages from the worker. We still have to inspect
+      // the message body below (CN1SS:INFO:suite starting drives the
+      // screenshot harness state, and CN1JS:RenderQueue.* updates the
+      // paint-seq counter) so the *detection* path is unconditional; we
+      // only suppress the main-thread console echo unless diagnostics
+      // are enabled. That echo was the source of the doubled
+      // PARPAR:DIAG:* lines in the production browser console.
+      if (diagEnabled && global.console && typeof global.console.log === 'function') {
+        global.console.log(String(data.message));
+      } else if (global.console && typeof global.console.log === 'function') {
+        // Allowlist a small set of high-value diagnostic prefixes so they
+        // surface on the main-thread console even without ?parparDiag=1.
+        // System.out.println from user / framework code uses these tags
+        // exactly because the diag-gated echo above swallows everything;
+        // app-level breadcrumbs and the raw-JS-error catch warning need
+        // to be visible in production deployments to be useful.
+        var rawMsg = String(data.message);
+        if (rawMsg.indexOf('CN1INIT:') === 0
+                || rawMsg.indexOf('PARPAR:CAUGHT_RAW_JS_ERROR') === 0
+                || rawMsg.indexOf('PARPAR:ERROR') === 0
+                || rawMsg.indexOf('CN1SS:ERR:') === 0) {
+          global.console.log(rawMsg);
+        }
+      }
+      if (String(data.message).indexOf('CN1SS:INFO:suite starting test=') >= 0) {
+        diag('SCREENSHOT_START', 'source', 'vm_log');
+      }
+      // Detect app lifecycle start from worker-side log messages so the
+      // main-thread cn1Started flag is set even when @JSBody runs in the
+      // worker where window === self.
+      var msg = String(data.message);
+      if (msg.indexOf('CN1JS:RenderQueue.flush ops=') >= 0) {
+        global.__cn1RenderQueueSeq = (global.__cn1RenderQueueSeq | 0) + 1;
+        global.__cn1RenderQueueLastType = 'flush';
+        global.__cn1RenderQueueLastLog = msg;
+      } else if (msg.indexOf('CN1JS:RenderQueue.drain ops=') >= 0) {
+        global.__cn1RenderQueueSeq = (global.__cn1RenderQueueSeq | 0) + 1;
+        global.__cn1RenderQueueLastType = 'drain';
+        global.__cn1RenderQueueLastLog = msg;
+      }
+      if (!global.cn1Started && msg.indexOf('CN1JS:') >= 0 && msg.indexOf('.runApp') >= 0) {
+        global.cn1Started = true;
+      }
+    }
+  }
+
+  function installWorkerMode() {
+    installNativeTextInteractions();
+    log('worker-mode');
+    diag('BOOT', 'bridgeMode', 'worker');
+    var workerUrl = 'worker.js';
+    if (global.location && global.location.search) {
+      workerUrl += String(global.location.search);
+    }
+    var worker = new Worker(workerUrl);
+    global.__parparWorker = worker;
+    // External liveness nudge. Hidden/headless Chromium throttles BOTH the
+    // page's and the worker's timers (intensive wake-up throttling batches
+    // re-armed chains to ~1/min), which starves the VM scheduler's
+    // sleep/wait wakeups -- observed as every green thread parked 12-60s
+    // past its deadline while the worker idles. postMessage delivery is
+    // never throttled, and a 'timer-wake' makes the worker drain(), which
+    // opportunistically fires any due timed wakeups. Test harnesses (or
+    // embedders that detect background stalls) call this from an
+    // un-throttled context, e.g. CDP Runtime.evaluate.
+    global.__cn1NudgeVm = function() {
+      try {
+        worker.postMessage({ type: 'timer-wake' });
+      } catch (e) { /* worker torn down */ }
+      try {
+        if (typeof global.__cn1FlushFrameTicks === 'function') {
+          global.__cn1FlushFrameTicks();
+        }
+      } catch (e) { /* frame ticks are self-guarding */ }
+    };
+    worker.onmessage = function(event) {
+      handleVmMessage(event.data, worker);
+    };
+    worker.onerror = function(error) {
+      global.__parparError = {
+        type: 'error',
+        message: error && error.message ? error.message : String(error)
+      };
+    };
+    return worker;
+  }
+
+  var appStarter = null;
+
+  // Peer interactivity: the app renders to #codenameone-canvas which sits ON TOP
+  // (z-index 0) of native peer components (BrowserComponent iframes, GL/video
+  // surfaces) parked behind it at z-index -1000 and shown through transparent
+  // ("punched") regions of the canvas. With the canvas at pointer-events:auto it
+  // captures EVERY pointer event, so interactive iframe peers
+  // never receive clicks/keys -- they look live but can't be interacted with.
+  // Fix on the main thread (no per-move worker round-trip): on pointer move,
+  // flip the canvas to pointer-events:none whenever a real peer element is under
+  // the cursor, so the browser delivers the event straight to the peer; restore
+  // auto over CN1-painted content so the canvas keeps receiving app input. The
+  // window-level capture listener still fires while the canvas is "none" (the
+  // event lands on a sibling, not inside an iframe), so it re-evaluates as the
+  // cursor leaves the peer. Apps with no peers never see an iframe under the
+  // cursor, so the canvas stays auto and behaviour is unchanged.
+  //
+  // CRITICAL: a peer's box can be under the cursor while the canvas paints OPAQUE
+  // UI on top of it -- e.g. the Playground's "Samples" sheet slides over the
+  // editor iframe. The iframe still occupies that region (it's only hidden behind
+  // the canvas), so a box-only test would wrongly route the panel's clicks to the
+  // hidden editor. The canvas only lets a peer through where it is genuinely
+  // TRANSPARENT (an actual punched hole), so we additionally require the canvas
+  // pixel under the cursor to be (near-)transparent before yielding to the peer.
+  function installPeerPointerToggle() {
+    var alphaCtx = null;
+    function canvasAlphaAt(canvas, x, y) {
+      // Returns the canvas' painted alpha (0-255) at client point (x,y), or -1 if
+      // it cannot be read. Maps CSS coords -> backing-store pixels (devicePixelRatio).
+      try {
+        var rect = canvas.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) { return -1; }
+        var px = Math.round((x - rect.left) * (canvas.width / rect.width));
+        var py = Math.round((y - rect.top) * (canvas.height / rect.height));
+        if (px < 0 || py < 0 || px >= canvas.width || py >= canvas.height) { return -1; }
+        if (!alphaCtx) {
+          alphaCtx = canvas.getContext('2d', { willReadFrequently: true })
+                  || canvas.getContext('2d');
+        }
+        if (!alphaCtx || typeof alphaCtx.getImageData !== 'function') { return -1; }
+        return alphaCtx.getImageData(px, py, 1, 1).data[3];
+      } catch (e) { return -1; }
+    }
+    function pointerOverPeer(x, y) {
+      var canvas = document.getElementById('codenameone-canvas');
+      if (!canvas) { return null; }
+      if (typeof document.elementsFromPoint !== 'function') { return null; }
+      var els = document.elementsFromPoint(x, y);
+      var peerUnder = false;
+      for (var i = 0; i < els.length; i++) {
+        var el = els[i];
+        if (el === canvas) { continue; }
+        if (el === document.body || el === document.documentElement) { break; }
+        if (el.tagName === 'IFRAME') { peerUnder = true; break; }
+        // A peer element nested inside the peers container (but not the empty
+        // full-screen container itself).
+        if (el.closest) {
+          var pc = el.closest('#cn1-peers-container');
+          if (pc && pc !== el) { peerUnder = true; break; }
+        }
+      }
+      if (!peerUnder) { return false; }
+      // A peer box is under the cursor -- only yield to it where the canvas is an
+      // actual transparent hole. If the canvas paints opaque content here (a sheet
+      // or panel over the peer), keep the click on the canvas. When the alpha can't
+      // be read we fall back to box-only behaviour (yield to the peer).
+      var alpha = canvasAlphaAt(canvas, x, y);
+      if (alpha < 0) { return true; }
+      return alpha < 16;
+    }
+    function evaluate(e) {
+      var canvas = document.getElementById('codenameone-canvas');
+      if (!canvas) { return; }
+      var over = pointerOverPeer(e.clientX, e.clientY);
+      if (over === null) { return; }
+      var want = over ? 'none' : 'auto';
+      if (canvas.style.pointerEvents !== want) {
+        canvas.style.pointerEvents = want;
+      }
+    }
+    window.addEventListener('pointermove', evaluate, true);
+    window.addEventListener('mousemove', evaluate, true);
+    // Also evaluate on pointerdown so a press immediately following a move
+    // (or a synthesized tap) routes to the right layer before dispatch settles.
+    window.addEventListener('pointerdown', evaluate, true);
+  }
+  try { installPeerPointerToggle(); } catch (e) { /* non-fatal */ }
+
+  // Keyboard accelerators of the HTML menu bar (javascript.titleBar=html). The menu items carry
+  // data-cn1-accel ("primary[+alt][+shift]+<key>"); a matching key press activates the item with
+  // a click, which reaches the app through the item's ordinary listener. Matched HERE, on the main
+  // thread and in the capture phase, because only here can the default be prevented: the worker
+  // sees the event after the browser has acted on it, so Ctrl/Cmd+S would have opened the
+  // browser's Save dialog as well. Only primary-modifier combinations are claimed, so ordinary
+  // typing is never intercepted.
+  function installMenuAccelerators() {
+    // The unshifted character on a physical key, for the keys whose typed character a modifier
+    // changes: Shift+1 reports e.key "!" and Option+S on a Mac reports "\u00df", while the
+    // command was configured with "1" and "s".
+    var CODE_KEYS = { Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']',
+      Semicolon: ';', Quote: "'", Backquote: '`', Comma: ',', Period: '.', Slash: '/',
+      Backslash: '\\' };
+    function baseKey(code) {
+      if (!code) {
+        return '';
+      }
+      if (/^Key[A-Z]$/.test(code)) {
+        return code.charAt(3).toLowerCase();
+      }
+      if (/^(Digit|Numpad)[0-9]$/.test(code)) {
+        return code.charAt(code.length - 1);
+      }
+      return CODE_KEYS[code] || '';
+    }
+    function editable(t) {
+      return !!t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || ''));
+    }
+    document.addEventListener('keydown', function(e) {
+      if (!(e.ctrlKey || e.metaKey || e.altKey) || e.repeat) {
+        return;
+      }
+      // AltGr is how many layouts type characters (@ is AltGr+Q on a German keyboard), and on
+      // Windows and Linux it reports ctrlKey AND altKey -- a Ctrl+Alt shortcut to everything
+      // below. A key typed with it is text, never a command.
+      if (e.getModifierState && e.getModifierState('AltGraph')) {
+        return;
+      }
+      var chrome = document.getElementById('cn1-desktop-chrome');
+      if (!chrome) {
+        return;
+      }
+      // The primary modifier is Command on a Mac and Control everywhere else, as the menu
+      // displays it (the chrome's class names the OS). Accepting either would claim Ctrl+S on a
+      // Mac, or Win+S on Windows, for a command shown as the other.
+      var mac = (' ' + chrome.className + ' ').indexOf(' cn1-chrome-mac ') >= 0;
+      var primary = mac ? (e.metaKey && !e.ctrlKey) : (e.ctrlKey && !e.metaKey);
+      var altOnly = e.altKey && !e.ctrlKey && !e.metaKey;
+      if (!primary && !altOnly) {
+        return;
+      }
+      // Option is how a Mac keyboard types accented and special characters, so an Alt-only
+      // shortcut is left alone while the user is typing into a field there.
+      if (altOnly && mac && editable(e.target)) {
+        return;
+      }
+      var prefix = (primary ? 'primary' + (e.altKey ? '+alt' : '') : 'alt') + (e.shiftKey ? '+shift' : '');
+      // The typed character is the key: it is what the user's layout puts there, and on AZERTY
+      // the key typing "a" reports code "KeyQ". The physical key's US character is only a
+      // fallback when the typed character cannot be what the command was configured with:
+      // Shift or Alt turned it into something that is not a letter or a digit ("!" for
+      // Shift+1, a symbol for Option+S), or the layout is not Latin (Ctrl+S types a Cyrillic
+      // letter on a Russian layout, where desktop apps fall back to the key's Latin letter).
+      // Never for a Latin layout difference, where it would run the Ctrl+Q command for a
+      // press of Ctrl+A.
+      var keys = [];
+      var typed = e.key && e.key.length === 1 ? e.key.toLowerCase() : '';
+      if (typed) {
+        keys.push(typed);
+      }
+      if (!/^[a-z0-9]$/.test(typed)
+          && (e.shiftKey || e.altKey || !/^[\x20-\x7e]$/.test(typed))) {
+        var base = baseKey(e.code);
+        if (base && base !== typed) {
+          keys.push(base);
+        }
+      }
+      var item = null;
+      for (var k = 0; k < keys.length && !item; k++) {
+        var binding = prefix + '+' + keys[k];
+        var sel = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(binding)
+            : (/["\\]/.test(binding) ? null : binding);
+        if (sel !== null) {
+          item = chrome.querySelector('[data-cn1-accel="' + sel + '"]');
+        }
+      }
+      // Not rejected on aria-disabled: that marker is refreshed when the menu opens, so it can
+      // be stale after Command.setEnabled(). dispatchNativeMenuCommand checks the command's
+      // CURRENT state when the click arrives, which is the authority.
+      if (!item) {
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      item.click();
+    }, true);
+  }
+  try { installMenuAccelerators(); } catch (e) { /* non-fatal */ }
+
+  // An open HTML menu closes on a press anywhere else -- the app's canvas, the title bar, a
+  // native text field, a DOM peer such as a BrowserComponent. Listening on the canvas alone
+  // missed all but the first: peer routing sets the canvas to pointer-events: none over peers,
+  // and the rest are not the canvas at all. Main thread and capture phase, so nothing the app
+  // does with the press can stop it; closing a <details> fires its toggle, which is how the
+  // port's menu state follows.
+  function installMenuDismissal() {
+    document.addEventListener('pointerdown', function(e) {
+      var chrome = document.getElementById('cn1-desktop-chrome');
+      if (!chrome) {
+        return;
+      }
+      var open = chrome.querySelectorAll('details[open]');
+      for (var i = 0; i < open.length; i++) {
+        if (!open[i].contains(e.target)) {
+          open[i].removeAttribute('open');
+        }
+      }
+    }, true);
+    // An opened panel starts under its menu title; one that would cross the window's right
+    // edge is shifted left until it fits (or reaches the left edge, where max-width keeps it
+    // inside). Measured here, on the main thread, because that is where layout is.
+    document.addEventListener('toggle', function(e) {
+      var details = e.target;
+      if (!details || !details.open || !details.classList
+          || !details.classList.contains('cn1-chrome-menu')) {
+        return;
+      }
+      var panel = details.querySelector('.cn1-chrome-menu-items');
+      if (!panel) {
+        return;
+      }
+      // The panel is fixed-positioned (the menu bar scrolls, and would clip one hanging off
+      // its menu), so it is put under its title here, from where that title is right now.
+      var summary = details.querySelector('summary');
+      var anchor = (summary || details).getBoundingClientRect();
+      panel.style.top = anchor.bottom + 'px';
+      panel.style.left = anchor.left + 'px';
+      var rect = panel.getBoundingClientRect();
+      var limit = document.documentElement.clientWidth - 4;
+      if (rect.right > limit) {
+        panel.style.left = Math.max(4, anchor.left - (rect.right - limit)) + 'px';
+      }
+    }, true);
+    // The menu bar scrolls sideways when its titles do not fit. A mouse wheel only scrolls
+    // vertically, so over the bar it is turned into the sideways scroll -- otherwise the titles
+    // past the edge would need a trackpad or Shift+wheel to reach. And since an open panel was
+    // placed under where its title was, scrolling the bar closes it rather than leaving it
+    // under some other title.
+    document.addEventListener('wheel', function(e) {
+      var bar = e.target && e.target.closest ? e.target.closest('.cn1-chrome-menubar') : null;
+      if (!bar || bar.scrollWidth <= bar.clientWidth) {
+        return;
+      }
+      var delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (e.deltaMode === 1) {
+        delta *= 16;
+      }
+      bar.scrollLeft += delta;
+      e.preventDefault();
+    }, { capture: true, passive: false });
+    document.addEventListener('scroll', function(e) {
+      var bar = e.target;
+      if (!bar || !bar.classList || !bar.classList.contains('cn1-chrome-menubar')) {
+        return;
+      }
+      var open = bar.querySelectorAll('details[open]');
+      for (var i = 0; i < open.length; i++) {
+        open[i].removeAttribute('open');
+      }
+    }, true);
+  }
+  try { installMenuDismissal(); } catch (e) { /* non-fatal */ }
+
+  global.startParparVmApp = function() {
+    log('startParparVmApp');
+    diag('INIT', 'startParparVmApp', 'entered');
+    global.cn1Initialized = true;
+    if (appStarter) {
+      log('appStarter-present');
+      appStarter();
+    }
+  };
+
+  if (typeof Worker !== 'function') {
+    var missingWorkerMessage = 'ParparVM requires Worker support; non-worker mode is not supported';
+    log('worker-mode-required');
+    diag('BOOT', 'bridgeMode', 'worker-only');
+    diag('FIRST_FAILURE', 'category', 'worker_missing');
+    diag('FIRST_FAILURE', 'message', missingWorkerMessage);
+    global.__parparError = { type: 'error', message: missingWorkerMessage };
+    return;
+  }
+  var worker = installWorkerMode();
+  appStarter = function() {
+    // devicePixelRatio lives only on the main-thread window — workers see
+    // `self.devicePixelRatio` as undefined and fall back to 1.0, which in
+    // turn drives CN1's density picker to DENSITY_MEDIUM on real retina
+    // devices. Ship the current ratio over with the boot message so the
+    // worker can surface it through getDevicePixelRatio() without needing
+    // a round-trip host-bridge call on every read.
+    var dpr = 1.0;
+    try {
+      if (global.devicePixelRatio && global.devicePixelRatio > 0) {
+        dpr = Number(global.devicePixelRatio);
+      }
+    } catch (e) { /* ignore */ }
+    worker.postMessage({
+      type: 'start',
+      locationSearch: (global.location && global.location.search) ? String(global.location.search) : '',
+      // Full host-page URL so the worker's getProperty("browser.window.location.*")
+      // reflects the PAGE (deep links / ?sample= / ?code= share links) rather than
+      // the worker script's own URL. See HTML5Implementation.mainLocationHref.
+      locationHref: (global.location && global.location.href) ? String(global.location.href) : '',
+      devicePixelRatio: dpr
+    });
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', global.startParparVmApp);
+  } else {
+    global.startParparVmApp();
+  }
+  diag('BOOT', 'bridge', 'loaded');
+})(self);

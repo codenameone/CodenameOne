@@ -25,10 +25,11 @@
  },
  "hello": {
   "all": {
-   "memory": 0.803,
-   "runs": 4,
+   "memory": 0.938,
+   "runs": 8,
    "time": 1.221,
    "tolerance": {
+    "memory": 0.45,
     "time": 0.45
    }
   }

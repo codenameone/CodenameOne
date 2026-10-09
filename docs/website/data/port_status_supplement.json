@@ -293,6 +293,62 @@
           ]
         }
       ]
+    },
+    {
+      "test": "BackendAuthTest",
+      "reason": "The backend sign-in flows send credentials, read the server's redirects and keep its session cookie by hand, the way OidcClient does minus the system browser. In a browser those three belong to the browser itself: it follows redirects without showing them, withholds the Location header, and owns the cookie jar, so the test cannot observe the steps it asserts on.",
+      "platform_support": "A skipped backend sign-in test does not mean sign-in is unsupported in the browser. A web app signs in through the browser's own redirect flow, which is what OidcClient uses there.",
+      "verification": "The same flows run against the test server on every other port in this table; the networking half of the backend suite (BackendRestTest, BackendConnectionRequestTest and the rest) runs in the browser too.",
+      "reason_codes": [
+        {
+          "prefix": "credentials-redirects-and-cookies-belong-to-the-browser",
+          "ports": [
+            "javascript"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "BackendDeviceGrantTest",
+      "reason": "The backend sign-in flows send credentials, read the server's redirects and keep its session cookie by hand, the way OidcClient does minus the system browser. In a browser those three belong to the browser itself: it follows redirects without showing them, withholds the Location header, and owns the cookie jar, so the test cannot observe the steps it asserts on.",
+      "platform_support": "A skipped backend sign-in test does not mean sign-in is unsupported in the browser. A web app signs in through the browser's own redirect flow, which is what OidcClient uses there.",
+      "verification": "The same flows run against the test server on every other port in this table; the networking half of the backend suite (BackendRestTest, BackendConnectionRequestTest and the rest) runs in the browser too.",
+      "reason_codes": [
+        {
+          "prefix": "credentials-redirects-and-cookies-belong-to-the-browser",
+          "ports": [
+            "javascript"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "BackendTokenRefreshTest",
+      "reason": "The backend sign-in flows send credentials, read the server's redirects and keep its session cookie by hand, the way OidcClient does minus the system browser. In a browser those three belong to the browser itself: it follows redirects without showing them, withholds the Location header, and owns the cookie jar, so the test cannot observe the steps it asserts on.",
+      "platform_support": "A skipped backend sign-in test does not mean sign-in is unsupported in the browser. A web app signs in through the browser's own redirect flow, which is what OidcClient uses there.",
+      "verification": "The same flows run against the test server on every other port in this table; the networking half of the backend suite (BackendRestTest, BackendConnectionRequestTest and the rest) runs in the browser too.",
+      "reason_codes": [
+        {
+          "prefix": "credentials-redirects-and-cookies-belong-to-the-browser",
+          "ports": [
+            "javascript"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "BackendTotpTest",
+      "reason": "The backend sign-in flows send credentials, read the server's redirects and keep its session cookie by hand, the way OidcClient does minus the system browser. In a browser those three belong to the browser itself: it follows redirects without showing them, withholds the Location header, and owns the cookie jar, so the test cannot observe the steps it asserts on.",
+      "platform_support": "A skipped backend sign-in test does not mean sign-in is unsupported in the browser. A web app signs in through the browser's own redirect flow, which is what OidcClient uses there.",
+      "verification": "The same flows run against the test server on every other port in this table; the networking half of the backend suite (BackendRestTest, BackendConnectionRequestTest and the rest) runs in the browser too.",
+      "reason_codes": [
+        {
+          "prefix": "credentials-redirects-and-cookies-belong-to-the-browser",
+          "ports": [
+            "javascript"
+          ]
+        }
+      ]
     }
   ],
   "features": [

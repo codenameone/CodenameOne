@@ -205,6 +205,11 @@ public final class CodeScanner {
 
         private Container buildFooter() {
             Container footer = new Container(new BorderLayout());
+            // The footer sits on the bottom edge, which the system navigation
+            // bar (Android) or the home indicator (iOS) draws over on an
+            // edge-to-edge display. Without this the torch button is under
+            // the bar and cannot be tapped.
+            footer.setSafeArea(true);
             boolean populated = false;
             if (options.getHint() != null) {
                 footer.add(BorderLayout.CENTER, new SpanLabel(options.getHint()));

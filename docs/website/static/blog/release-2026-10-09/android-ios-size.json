@@ -1,0 +1,24 @@
+{
+  "source_commit": "ebe0e64be3b77e7b098a2e152c97549cc7b7c8ac",
+  "sample": "scripts/android-compat-samples/gallery",
+  "configuration": "Release",
+  "sdk": "iPhoneOS 27.0",
+  "architecture": "arm64",
+  "signing": false,
+  "binary_bytes": 20118960,
+  "app_file_bytes": 23419393,
+  "app_zip_bytes": 9153790,
+  "binary_sha256": "7e2de7e1708a0502ac87ad4417b4790747dfa40caf4d603a9b33f300fadea30f",
+  "xcode": "Xcode 27.0\nBuild version 27A266a",
+  "notes": [
+    "Unsigned local device build; not installed or run on a physical iPhone.",
+    "App size is sum of regular file bytes; ZIP is not an IPA or App Store download estimate.",
+    "Android gallery source refreshed from this commit; Maven imported-project scaffold and Java 8 bytecode target.",
+    "No PGO; standard generated Release configuration."
+  ],
+  "stripping": "DEPLOYMENT_POSTPROCESSING=YES STRIP_INSTALLED_PRODUCT=YES STRIP_STYLE=all",
+  "translated_compatibility_classes": 862,
+  "relocated_compatibility_classes": 1316,
+  "removed_methods_whole_app": 24616,
+  "removed_never_read_instance_fields_whole_app": 220
+}
