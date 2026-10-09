@@ -75,6 +75,11 @@ import javafx.scene.input.ScrollEvent;
 import javafx.scene.input.SwipeEvent;
 import javafx.scene.input.TouchEvent;
 import javafx.scene.transform.Transform;
+import javafx.geometry.Rectangle2D;
+import javafx.scene.image.WritableImage;
+import javafx.scene.paint.Color;
+import javafx.scene.paint.Paint;
+import java.util.List;
 
 /// The base of everything in a scene graph.
 ///
@@ -323,6 +328,91 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
         m[4] += tx;
         m[5] += ty;
         return m;
+    }
+
+    // ---------------------------------------------------------- snapshot
+
+    /// Renders this node and what is under it into an image and returns
+    /// the image.
+    ///
+    /// The image is the node's bounds in its parent after the transform
+    /// of the parameters, or the viewport when the parameters name one;
+    /// an image handed in is drawn into and keeps its size. One pixel is
+    /// one logical pixel, as in JavaFX. `null` parameters are the default
+    /// ones: no transform, a white fill.
+    ///
+    /// What is rendered is what the layer draws itself: shapes, text,
+    /// canvases, images and the backgrounds and borders of regions, each
+    /// under its transforms and inside its clip. A control drawn by the
+    /// platform's theme is not in the picture, and neither are opacity
+    /// and effects.
+    public WritableImage snapshot(SnapshotParameters params, WritableImage image) {
+        double[] m = localToParentMatrix();
+        Transform extra = params == null ? null : params.getTransform();
+        if (extra != null && !extra.isIdentity()) {
+            m = Matrix2D.multiply(new double[] {extra.getMxx(), extra.getMyx(), extra.getMxy(), extra.getMyy(),
+                extra.getTx(), extra.getTy()}, m);
+        }
+        Bounds local = getBoundsInLocal();
+        double[] box = Matrix2D.bounds(m, local.getMinX(), local.getMinY(), Math.max(0, local.getWidth()),
+                Math.max(0, local.getHeight()));
+        double x = box[0];
+        double y = box[1];
+        double w = box[2] - box[0];
+        double h = box[3] - box[1];
+        Rectangle2D viewport = params == null ? null : params.getViewport();
+        if (viewport != null) {
+            x = viewport.getMinX();
+            y = viewport.getMinY();
+            w = viewport.getWidth();
+            h = viewport.getHeight();
+        }
+        WritableImage out = image;
+        if (out == null) {
+            out = new WritableImage(Math.max(1, (int) Math.ceil(w - 1e-6)), Math.max(1, (int) Math.ceil(h - 1e-6)));
+        }
+        int iw = (int) out.getWidth();
+        int ih = (int) out.getHeight();
+        double s = Units.scale();
+        int pw = Math.max(1, (int) Math.ceil(iw * s - 1e-6));
+        int ph = Math.max(1, (int) Math.ceil(ih * s - 1e-6));
+        com.codename1.ui.Image surface = com.codename1.ui.Image.createImage(pw, ph, 0);
+        Renderer r = new Renderer(surface.getGraphics(), 0, 0);
+        Paint fill = params == null ? null : params.getFill();
+        r.fillRect(0, 0, iw, ih, fill == null ? Color.WHITE : fill);
+        r.translate(-x, -y);
+        if (extra != null && !extra.isIdentity()) {
+            r.concat(extra.getMxx(), extra.getMyx(), extra.getMxy(), extra.getMyy(), extra.getTx(), extra.getTy());
+        }
+        snapshot(r, this);
+        // The surface is in device pixels; the image is in logical ones.
+        com.codename1.ui.Image sized = pw == iw && ph == ih ? surface : surface.scaled(iw, ih);
+        int[] pixels = sized.getRGB();
+        if (pixels != null && pixels.length == iw * ih) {
+            out.cn1SetPixels(pixels);
+        }
+        return out;
+    }
+
+    private static void snapshot(Renderer r, Node node) {
+        if (!node.isVisible()) {
+            return;
+        }
+        r.save();
+        double[] m = node.localToParentMatrix();
+        r.concat(m[0], m[1], m[2], m[3], m[4], m[5]);
+        FxPath clip = node.cn1ClipPath();
+        if (clip != null) {
+            r.clip(clip);
+        }
+        node.cn1Paint(r);
+        if (node instanceof Parent) {
+            List<Node> children = ((Parent) node).getChildrenUnmodifiable();
+            for (int i = 0; i < children.size(); i++) {
+                snapshot(r, children.get(i));
+            }
+        }
+        r.restore();
     }
 
     // --------------------------------------------------------- dirtiness
@@ -1423,6 +1513,49 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
             up = up.getParent();
         }
         return b;
+    }
+
+    /// The position of the scene on the screen: where the window is plus
+    /// where the scene is in it. Zero for a node in no window.
+    private double[] sceneOnScreen() {
+        Scene sc = getScene();
+        if (sc == null || sc.getWindow() == null) {
+            return null;
+        }
+        double wx = sc.getWindow().getX();
+        double wy = sc.getWindow().getY();
+        return new double[] {(Double.isNaN(wx) ? 0 : wx) + sc.getX(), (Double.isNaN(wy) ? 0 : wy) + sc.getY()};
+    }
+
+    /// Converts a local point to the coordinates of the screen, or
+    /// `null` for a node that is in no window.
+    public Point2D localToScreen(double localX, double localY) {
+        double[] origin = sceneOnScreen();
+        if (origin == null) {
+            return null;
+        }
+        Point2D p = localToScene(localX, localY);
+        return new Point2D(p.getX() + origin[0], p.getY() + origin[1]);
+    }
+
+    /// Converts a local point to the coordinates of the screen.
+    public Point2D localToScreen(Point2D localPoint) {
+        return localToScreen(localPoint.getX(), localPoint.getY());
+    }
+
+    /// Converts a point of the screen to local coordinates, or `null`
+    /// for a node that is in no window.
+    public Point2D screenToLocal(double screenX, double screenY) {
+        double[] origin = sceneOnScreen();
+        if (origin == null) {
+            return null;
+        }
+        return sceneToLocal(screenX - origin[0], screenY - origin[1]);
+    }
+
+    /// Converts a point of the screen to local coordinates.
+    public Point2D screenToLocal(Point2D screenPoint) {
+        return screenToLocal(screenPoint.getX(), screenPoint.getY());
     }
 
     /// Converts a point from the scene's coordinates to this node's.

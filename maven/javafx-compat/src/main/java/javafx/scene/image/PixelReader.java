@@ -20,8 +20,17 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-/// Images and the node that shows one. Pictures are decoded by Codename
-/// One. Pixels are read and written one at a time or as a rectangle
-/// copied from a reader; the `java.nio` buffer forms are not part of
-/// this layer.
 package javafx.scene.image;
+
+import javafx.scene.paint.Color;
+
+/// Reads the pixels of an image, one at a time. The buffer forms of
+/// JavaFX, which need `java.nio`, are not part of this layer.
+public interface PixelReader {
+
+    /// Returns a pixel as `0xAARRGGBB`, not premultiplied.
+    int getArgb(int x, int y);
+
+    /// Returns a pixel as a colour.
+    Color getColor(int x, int y);
+}

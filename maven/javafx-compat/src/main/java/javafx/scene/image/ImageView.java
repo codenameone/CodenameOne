@@ -62,6 +62,13 @@ public class ImageView extends Node {
 
     private com.codename1.ui.Image shown;
     private boolean shownValid;
+    private Image heard;
+    private final Runnable pixelsChanged = new Runnable() {
+        @Override
+        public void run() {
+            pixelsChanged();
+        }
+    };
 
     /// Creates a view without an image.
     public ImageView() {
@@ -83,8 +90,25 @@ public class ImageView extends Node {
         if ((what & Dirty.GEOMETRY) != 0) {
             shown = null;
             shownValid = false;
+            // An image that is written to tells the view it is shown in.
+            Image now = image == null ? null : image.get();
+            if (now != heard) {
+                if (heard != null) {
+                    heard.removePixelListener(pixelsChanged);
+                }
+                heard = now;
+                if (now != null) {
+                    now.addPixelListener(pixelsChanged);
+                }
+            }
         }
         super.cn1Invalidated(what);
+    }
+
+    private void pixelsChanged() {
+        shown = null;
+        shownValid = false;
+        super.cn1Invalidated(Dirty.PAINT);
     }
 
     /// Returns the image, or `null`.

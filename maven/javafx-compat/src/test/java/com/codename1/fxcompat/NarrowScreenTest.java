@@ -95,6 +95,19 @@ public class NarrowScreenTest {
         assertEquals(content.getHeight(), root.getHeight(), 0.01);
         assertFalse(content.isScrollableX());
         assertFalse(content.isScrollableY());
+        // A point of a node on the screen is its point in the scene moved
+        // by where the window is; a node in no window has none.
+        Pane child = new Pane();
+        child.relocate(30, 40);
+        root.getChildren().add(child);
+        javafx.geometry.Point2D scene = child.localToScene(1, 2);
+        javafx.geometry.Point2D screen = child.localToScreen(1, 2);
+        assertEquals(scene.getX() + stage.getX() + root.getScene().getX(), screen.getX(), 0.01);
+        assertEquals(scene.getY() + stage.getY() + root.getScene().getY(), screen.getY(), 0.01);
+        javafx.geometry.Point2D back = child.screenToLocal(screen);
+        assertEquals(1, back.getX(), 0.01);
+        assertEquals(2, back.getY(), 0.01);
+        assertEquals(null, new Pane().localToScreen(0, 0));
     }
 
     @Test

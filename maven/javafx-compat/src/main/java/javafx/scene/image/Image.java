@@ -36,6 +36,7 @@ import javafx.beans.property.ReadOnlyDoubleProperty;
 import javafx.beans.property.ReadOnlyDoubleWrapper;
 import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.beans.property.ReadOnlyObjectWrapper;
+import javafx.scene.paint.Color;
 
 /// A picture decoded by Codename One, for an [ImageView] or a canvas.
 ///
@@ -82,6 +83,8 @@ public class Image {
     private final ReadOnlyObjectWrapper<Exception> exception = new ReadOnlyObjectWrapper<Exception>(this,
             "exception");
     private com.codename1.ui.Image nativeImage;
+    private int[] argb;
+    private PixelReader reader;
 
     /// Loads an image from a URL at its own size.
     public Image(@NamedArg("url") String url) {
@@ -151,6 +154,74 @@ public class Image {
         } catch (IOException failed) {
             fail(failed);
         }
+    }
+
+    /// Creates an image with no picture yet, of a size: what an image
+    /// that is written to starts as.
+    Image(int width, int height) {
+        if (width <= 0 || height <= 0) {
+            throw new IllegalArgumentException("Image dimensions must be positive (w,h > 0)");
+        }
+        this.url = null;
+        this.requestedWidth = 0;
+        this.requestedHeight = 0;
+        this.preserveRatio = false;
+        this.smooth = false;
+        this.backgroundLoading = false;
+        this.width.set(width);
+        this.height.set(height);
+        this.progress.set(1);
+    }
+
+    /// The Codename One image as it is now.
+    com.codename1.ui.Image current() {
+        return nativeImage;
+    }
+
+    /// The pixels as `0xAARRGGBB`, row after row, or `null` when there is
+    /// no picture. Not to be written to.
+    int[] pixels() {
+        if (argb == null && nativeImage != null) {
+            argb = nativeImage.getRGB();
+        }
+        return argb;
+    }
+
+    /// Has a view told when the pixels change; an image that was decoded
+    /// never changes.
+    void addPixelListener(Runnable listener) {
+    }
+
+    /// Stops telling a view.
+    void removePixelListener(Runnable listener) {
+    }
+
+    /// Returns what reads the pixels of the image, or `null` for an
+    /// image that failed to load.
+    public final PixelReader getPixelReader() {
+        if (pixels() == null) {
+            return null;
+        }
+        if (reader == null) {
+            reader = new PixelReader() {
+                @Override
+                public int getArgb(int x, int y) {
+                    int w = (int) getWidth();
+                    int h = (int) getHeight();
+                    if (x < 0 || y < 0 || x >= w || y >= h) {
+                        throw new IndexOutOfBoundsException(x + ", " + y);
+                    }
+                    return pixels()[y * w + x];
+                }
+
+                @Override
+                public Color getColor(int x, int y) {
+                    int v = getArgb(x, y);
+                    return Color.rgb((v >> 16) & 0xff, (v >> 8) & 0xff, v & 0xff, ((v >>> 24) & 0xff) / 255.0);
+                }
+            };
+        }
+        return reader;
     }
 
     private static void close(InputStream in) {
@@ -269,7 +340,7 @@ public class Image {
 
     /// Returns the Codename One image, or `null` when loading failed.
     public final com.codename1.ui.Image cn1Native() {
-        return nativeImage;
+        return current();
     }
 
     /// Returns the URL the image was loaded from; `null` for a stream.

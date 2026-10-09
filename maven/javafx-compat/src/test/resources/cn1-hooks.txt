@@ -63,6 +63,7 @@ javafx.scene.control.Control#cn1NativePreferredSize
 javafx.scene.control.Control#cn1NativeSizeChanged
 javafx.scene.control.Control#cn1SyncNative
 javafx.scene.image.Image#cn1Native
+javafx.scene.image.WritableImage#cn1SetPixels
 javafx.scene.input.PickResult#cn1SceneX
 javafx.scene.input.PickResult#cn1SceneY
 javafx.scene.paint.Color#cn1Argb
