@@ -135,7 +135,9 @@ final class RowFlow extends Region {
     public void cn1Paint(com.codename1.fxcompat.runtime.Renderer renderer) {
         super.cn1Paint(renderer);
         double rh = rowHeight();
-        if (!stripes || !(rh > 0)) {
+        // A view with no rows at all is left plain: JavaFX makes no cells
+        // for it, so there is nothing for the theme's odd rows to match.
+        if (!stripes || !(rh > 0) || rows.rowCount() <= 0) {
             return;
         }
         // From the first row in view: a row is shaded to the edge of the
