@@ -130,7 +130,7 @@ The `Default` selector is special in that it will set properties on the theme's 
 
 A UIID takes a property from `Default` only when no rule sets that property for the UIID itself. That includes the rules of the native theme the app builds on, so `Default` doesn't override a native `Button` or `TextField`. It fills in the UIIDs that nothing else styles, which are mostly the ones you create.
 
-Backgrounds follow the same rule. A UIID that declares no background paints none, and whatever is behind the component shows through. To give every unstyled UIID the same background, set `background-color` on `Default`. To make one UIID opaque, set `background-color` on that UIID.
+Backgrounds follow the same rule, and the native theme decides what an unstyled UIID looks like. `Container` is always transparent with no padding or margin, but a UIID of your own that sets no background can paint an opaque one under some themes. If such a UIID shows a band of color over its parent, give it `background-color: transparent`, or set that on `Default` to cover every UIID you leave unstyled.
 
 The universal selector `*` isn't supported. The compiler ignores its declarations and prints a warning. Use `Default` instead.
 
