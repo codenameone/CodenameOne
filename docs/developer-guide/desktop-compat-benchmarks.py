@@ -178,7 +178,7 @@ def tally(pairs, better, worse, baseline):
     if lost:
         parts.append("%s in %s" % (worse, count(len(lost), "application")))
     if level:
-        parts.append("within 5% of it in %s" % count(level, "application"))
+        parts.append("within 5%% of it in %s" % count(level, "application"))
     out = "Against %s the native build is %s, of the %d measured." % (
         baseline, ", ".join(parts[:-1]) + (" and " if len(parts) > 1 else "") + parts[-1], len(measured))
     top = max(measured, key=lambda p: p[1])
