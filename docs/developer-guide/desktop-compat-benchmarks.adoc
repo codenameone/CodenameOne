@@ -1,6 +1,10 @@
 // Written by desktop-compat-benchmarks.py from measured results. Change the results and run it again;
 // an edit made here is lost. Desktop-Interop.asciidoc includes this file once, whole.
 
+image::img/desktop-compat-linux-size.svg["Bar chart of the installed size of each application on Linux: the native build beside the jlink image",scaledwidth=90%]
+
+image::img/desktop-compat-linux-size-zipped.svg["Bar chart of the zipped size of each application on Linux: the native build beside the jlink image",scaledwidth=90%]
+
 .Linux: the distributed application (MB)
 [cols="<3,<1,>1,>1,>1,>1,>1,>1,>1",options="header"]
 |===
@@ -29,27 +33,33 @@ Against the `jlink` image as installed the native build is smaller in 8 applicat
 
 Against the zipped `jlink` image the native build is smaller in 8 applications, of the 8 measured. Its best result is 6.0x for Mandelbrot explorer (6.5 MB against 38.9 MB).
 
+image::img/desktop-compat-macos-size.svg["Bar chart of the installed size of each application on macOS: the universal native application beside the jlink image",scaledwidth=90%]
+
 .macOS: the distributed application (MB)
-[cols="<3,>2,>2,>2,>2,>2,>2",options="header"]
+[cols="<3,>1,>1,>1,>1,>1,>1,>1,>1",options="header"]
 |===
-|Application |`jlink` image, zipped |Native `.app` |arm64 slice |x86_64 slice |Native `.app`, zipped |JVM zip / native zip
+|Application |`jlink` image |`jlink` image, zipped |Native `.app` |arm64 slice |x86_64 slice |Native `.app`, zipped |JVM image / native `.app` |JVM zip / native zip
 
-|`swing-gallery` sample |32.5 |49.6 |23.3 |23.9 |16.6 |2.0x
+|`swing-gallery` sample |51.4 |32.5 |49.6 |23.3 |23.9 |16.6 |1.0x |2.0x
 
-|SwingSet2, the JDK demo |32.0 |49.5 |22.5 |23.1 |17.4 |1.8x
+|SwingSet2, the JDK demo |50.7 |32.0 |49.5 |22.5 |23.1 |17.4 |1.0x |1.8x
 
-|Notepad, the JDK demo |30.7 |44.9 |21.0 |21.5 |15.1 |2.0x
+|Notepad, the JDK demo |49.4 |30.7 |44.9 |21.0 |21.5 |15.1 |1.1x |2.0x
 
-|Falling-blocks game |30.6 |44.2 |20.6 |21.2 |14.8 |2.1x
+|Falling-blocks game |49.3 |30.6 |44.2 |20.6 |21.2 |14.8 |1.1x |2.1x
 
-|`javafx-gallery` sample |37.1 |49.2 |23.0 |23.8 |16.4 |2.3x
+|`javafx-gallery` sample |57.1 |37.1 |49.2 |23.0 |23.8 |16.4 |1.2x |2.3x
 
-|Open-source 2048 game |37.1 |46.0 |21.3 |21.9 |15.4 |2.4x
+|Open-source 2048 game |57.1 |37.1 |46.0 |21.3 |21.9 |15.4 |1.2x |2.4x
 
-|Address book |37.0 |45.0 |20.9 |21.6 |15.1 |2.5x
+|Address book |57.0 |37.0 |45.0 |20.9 |21.6 |15.1 |1.3x |2.5x
 
-|Mandelbrot explorer |36.9 |44.6 |20.8 |21.4 |14.9 |2.5x
+|Mandelbrot explorer |56.8 |36.9 |44.6 |20.8 |21.4 |14.9 |1.3x |2.5x
 |===
+
+The native `.app` is universal: it holds an arm64 and an x86_64 slice and runs on both. The `jlink` image holds the runtime of one architecture, so a JVM application that runs on both ships two of them.
+
+Against the `jlink` image as installed the native build is smaller in 6 applications and within 5% of it in 2 applications, of the 8 measured. Its best result is 1.3x for Mandelbrot explorer (44.6 MB against 56.8 MB).
 
 Against the zipped `jlink` image the native build is smaller in 8 applications, of the 8 measured. Its best result is 2.5x for Mandelbrot explorer (14.9 MB against 36.9 MB).
 
@@ -139,6 +149,8 @@ Against the default JVM the native build is quicker in 8 applications, of the 8 
 
 Against the tuned JVM the native build is quicker in 7 applications and slower in 1 application, of the 8 measured. Its best result is 4.4x for `javafx-gallery` sample (130 ms against 572 ms). Its worst is 0.9x for Falling-blocks game (115 ms against 104 ms).
 
+image::img/desktop-compat-linux-startup-cold.svg["Bar chart of the cold start of each application on Linux: the native build beside the default and the tuned JVM",scaledwidth=90%]
+
 .Linux: cold start, from process start to the first painted frame (ms, median with the range)
 [cols="<3,>2,>2,>2,>2,>2",options="header"]
 |===
@@ -164,6 +176,8 @@ Against the tuned JVM the native build is quicker in 7 applications and slower i
 Against the default JVM the native build is quicker in 8 applications, of the 8 measured. Its best result is 7.6x for `javafx-gallery` sample (159 ms against 1206 ms).
 
 Against the tuned JVM the native build is quicker in 7 applications and slower in 1 application, of the 8 measured. Its best result is 3.9x for `javafx-gallery` sample (159 ms against 615 ms). Its worst is 0.9x for Falling-blocks game (149 ms against 132 ms).
+
+image::img/desktop-compat-linux-memory-idle.svg["Bar chart of the resident memory of each application on Linux once it is idle: the native build beside the default and the tuned JVM",scaledwidth=90%]
 
 .Linux: memory 10 seconds after the first frame (MB, RSS / PSS)
 [cols="<3,>2,>2,>2,>2,>2",options="header"]

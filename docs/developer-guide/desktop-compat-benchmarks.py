@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render the measured tables of the Swing and JavaFX chapter.
+"""Render the measured tables and charts of the Swing and JavaFX chapter.
 
   docs/developer-guide/desktop-compat-benchmarks.py \\
       --linux DIR --macos DIR --mobile DIR \\
@@ -18,7 +18,8 @@ Everything the chapter says about a number is written here, from the results:
 the tables, the sentence under each that counts where the native build won and
 where it lost, and the description of the machine. Desktop-Interop.asciidoc
 includes the file once, whole, and quotes no figure of its own, so new results
-are published by running this again and committing the one file it writes.
+are published by running this again and committing what it writes: that file
+and the charts beside it, img/desktop-compat-*.svg, drawn from the same figures.
 
 Nothing is estimated. A cell with no measurement behind it is printed as "--",
 and the cells that were attempted and failed are listed with the harness's
@@ -30,7 +31,8 @@ An application is published under the description in LABELS, never under the
 directory name the harness gave it. A result with no entry there stops the run:
 add the line, with a description that names no third party.
 
-Python 3.9 compatible, standard library only. The arithmetic and the cell
+Python 3.9 compatible. The tables need the standard library only; the charts
+need matplotlib, and the same figures draw the same bytes. The arithmetic and the cell
 formats are scripts/desktop-compat-benchmarks/report.py's own.
 """
 
@@ -129,6 +131,82 @@ def show_ratio(value):
     return EMPTY if value is None else "%.1fx" % value
 
 
+# The series of a chart, in the colours the comparison charts of the website
+# use: the native build, the default JVM, the tuned JVM.
+NATIVE_SERIES = ("Native build", "#55d4d0")
+DEFAULT_SERIES = ("JVM, default", "#f4ad55")
+TUNED_SERIES = ("JVM, tuned", "#9eafff")
+CHART_DIRECTORY = "img"
+CHARTS = []
+
+
+def chart(tag, title, alt, unit, labels, series, note):
+    """Queues a chart of horizontal bars, one group for each application, and
+    answers the line that places it. `series` is a list of
+    ((name, colour), values); a value that was not measured is None."""
+    rows = [(label, [values[i] for _s, values in series]) for i, label in enumerate(labels)]
+    rows = [row for row in rows if any(v is not None for v in row[1])]
+    if not rows:
+        return ""
+    CHARTS.append((tag, title, unit, rows, [s for s, _v in series], note))
+    return 'image::%s/desktop-compat-%s.svg["%s",scaledwidth=90%%]' % (CHART_DIRECTORY, tag, alt)
+
+
+def draw_charts(directory):
+    """Writes the queued charts. matplotlib is needed for this and for nothing
+    else, so it is imported here: the tables are written without it."""
+    if not CHARTS:
+        return
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    ground, ink, faint, rule = "#0b132b", "#eef2ff", "#c3cbe6", "#2a3350"
+    # The same bytes for the same figures: no date, and ids that do not
+    # change from one run to the next.
+    plt.rcParams.update({"font.family": "DejaVu Sans", "font.size": 11, "svg.fonttype": "path",
+                         "svg.hashsalt": "desktop-compat-benchmarks"})
+    if not os.path.isdir(directory):
+        os.makedirs(directory)
+    for tag, title, unit, rows, series, note in CHARTS:
+        step = 0.8 / len(series)
+        figure, axes = plt.subplots(figsize=(10, 1.5 + len(rows) * (0.34 * len(series) + 0.3)))
+        figure.patch.set_facecolor(ground)
+        axes.set_facecolor(ground)
+        most = max(v for _l, values in rows for v in values if v is not None)
+        for at, (_label, values) in enumerate(rows):
+            for index, value in enumerate(values):
+                y = at + (index - (len(series) - 1) / 2.0) * step
+                if value is None:
+                    axes.text(most * 0.012, y, "not measured", va="center", color=faint, fontsize=9)
+                    continue
+                axes.barh(y, value, height=step * 0.86, color=series[index][1],
+                          label=series[index][0] if at == 0 else None)
+                axes.text(value + most * 0.012, y, ("%.0f" if value >= 100 else "%.1f") % value,
+                          va="center", color=ink, fontsize=9)
+        axes.set_yticks(range(len(rows)))
+        axes.set_yticklabels([label.replace("`", "") for label, _v in rows], color=ink)
+        axes.invert_yaxis()
+        axes.set_xlim(0, most * 1.12)
+        axes.set_xlabel(unit, color=faint)
+        axes.tick_params(colors=faint, length=0)
+        axes.xaxis.grid(True, color=rule, linewidth=0.8)
+        axes.set_axisbelow(True)
+        for side in ("top", "right", "left"):
+            axes.spines[side].set_visible(False)
+        axes.spines["bottom"].set_color(rule)
+        axes.set_title(title + "\nLower is better", loc="left", color=ink, fontsize=15, pad=30)
+        # Above the bars, under the title: inside the plot it covers the longest bar.
+        legend = axes.legend(loc="lower left", bbox_to_anchor=(-0.01, 1.0), frameon=False, fontsize=10,
+                             ncol=len(series), columnspacing=1.4, handlelength=1.2)
+        for text in legend.get_texts():
+            text.set_color(ink)
+        figure.text(0.99, 0.01, note, ha="right", va="bottom", color=faint, fontsize=8)
+        figure.tight_layout(rect=(0, 0.03, 1, 1))
+        figure.savefig(os.path.join(directory, "desktop-compat-%s.svg" % tag), facecolor=ground,
+                       metadata={"Date": None})
+        plt.close(figure)
+
+
 class Table(object):
     def __init__(self, tag, title, header, widths=None):
         self.tag = tag
@@ -138,6 +216,8 @@ class Table(object):
         self.rows = []
         self.after = []
 
+    pictures = ()
+
     def add(self, *cells):
         self.rows.append([str(cell) for cell in cells])
 
@@ -145,9 +225,17 @@ class Table(object):
         if paragraph:
             self.after.append(paragraph)
 
+    def show(self, line):
+        """Places a chart above the table; `line` is what [chart] answered."""
+        if line:
+            self.pictures = list(self.pictures) + [line]
+
     def render(self):
         widths = self.widths or ["<3"] + [">2"] * (len(self.header) - 1)
-        lines = ["." + self.title, '[cols="%s",options="header"]' % ",".join(widths), "|==="]
+        lines = []
+        for picture in self.pictures:
+            lines += [picture, ""]
+        lines += ["." + self.title, '[cols="%s",options="header"]' % ",".join(widths), "|==="]
         lines.append(" ".join("|" + cell for cell in self.header))
         for row in self.rows:
             lines.append("")
@@ -204,8 +292,25 @@ def unmeasured(results):
     return "Not measured, and shown as `--`: " + "; ".join(lines) + "."
 
 
+def megabytes_of(value, unit=1048576.0):
+    return None if value is None else value / unit
+
+
+def where_measured(results):
+    """The line under a chart: what the figures were measured on."""
+    facts = (dig(results[0], "environment") or {}) if results else {}
+    parts = [str(facts[k]) for k in ("os", "machine") if usable(facts.get(k))]
+    if usable(facts.get("host_cpu")):
+        parts.append("in a container on " + str(facts["host_cpu"]).split("(")[0].strip())
+    elif usable(facts.get("cpu")) and not str(facts["cpu"]).startswith("0x"):
+        parts.append(str(facts["cpu"]))
+    return ", ".join(parts)
+
+
 def linux_tables(results):
     tables = []
+    note = where_measured(results)
+    names = [LABEL[name_of(r)] for r in results]
     missing = unmeasured(results)
 
     size = Table("linux-size", "Linux: the distributed application (MB)",
@@ -228,6 +333,15 @@ def linux_tables(results):
                  megabytes(jlink_disk), megabytes(jlink),
                  megabytes(dig(result, "size", "baseline_jpackage", "zip_bytes")),
                  megabytes(native_disk), megabytes(native), show_ratio(disk_ratio), show_ratio(ratio))
+    for tag, key, title, alt in (
+            ("linux-size", "bytes", "Linux: the application as installed",
+             "Bar chart of the installed size of each application on Linux: the native build beside the jlink image"),
+            ("linux-size-zipped", "zip_bytes", "Linux: the application as downloaded, zipped",
+             "Bar chart of the zipped size of each application on Linux: the native build beside the jlink image")):
+        size.show(chart(tag, title, alt, "MB", names, [
+            (NATIVE_SERIES, [megabytes_of(dig(r, "size", "cn1_linux", key)) for r in results]),
+            (("JVM image, jlink", DEFAULT_SERIES[1]),
+             [megabytes_of(dig(r, "size", "baseline_jlink", key)) for r in results])], note))
     size.say("The `jlink` image is the application with the smallest Java runtime that runs it: the "
              "application's jars and the modules `jlink` found it to need. The native build is one "
              "executable file with nothing beside it. Both rely on the desktop libraries of the system, "
@@ -263,6 +377,16 @@ def linux_tables(results):
             against_default.append((label, first, megabytes_kb(rss["jvm_default"]) + " MB", native))
             against_tuned.append((label, second, megabytes_kb(rss["jvm_tuned"]) + " MB", native))
             table.add(label, cells[0], cells[1], cells[2], show_ratio(first), show_ratio(second))
+        if section == "idle":
+            table.show(chart(tag, "Linux: memory %g seconds after the first frame" % idle_seconds,
+                             "Bar chart of the resident memory of each application on Linux once it is idle: "
+                             "the native build beside the default and the tuned JVM", "MB of RSS",
+                             [LABEL[name_of(r)] for r in measured],
+                             [(series, [megabytes_of(dig(r, "run", variant, section, "rss_kb"), 1024.0)
+                                        for r in measured])
+                              for series, variant in ((NATIVE_SERIES, "cn1_native"),
+                                                      (DEFAULT_SERIES, "jvm_default"),
+                                                      (TUNED_SERIES, "jvm_tuned"))], note))
         table.say(tally(against_default, "smaller", "larger", "the default JVM"))
         table.say(tally(against_tuned, "smaller", "larger", "the tuned JVM"))
         table.say(missing)
@@ -301,6 +425,16 @@ def linux_tables(results):
             against_tuned.append((label, second, text("jvm_tuned"), text("cn1_native")))
             table.add(label, timing(times["jvm_default"]), timing(times["jvm_tuned"]),
                       timing(times["cn1_native"]), show_ratio(first), show_ratio(second))
+        if mode == "cold":
+            table.show(chart("linux-startup-cold", "Linux: cold start, to the first painted frame",
+                             "Bar chart of the cold start of each application on Linux: the native build "
+                             "beside the default and the tuned JVM", "ms, median",
+                             [LABEL[name_of(r)] for r in measured],
+                             [(series, [dig(r, "run", variant, "startup_cold", "first_paint_ms", "median")
+                                        for r in measured])
+                              for series, variant in ((NATIVE_SERIES, "cn1_native"),
+                                                      (DEFAULT_SERIES, "jvm_default"),
+                                                      (TUNED_SERIES, "jvm_tuned"))], note))
         table.say(tally(against_default, "quicker", "slower", "the default JVM"))
         table.say(tally(against_tuned, "quicker", "slower", "the tuned JVM"))
         tables.append(table)
@@ -345,9 +479,11 @@ def linux_tables(results):
 
 def macos_tables(results):
     table = Table("macos-size", "macOS: the distributed application (MB)",
-                  ["Application", "`jlink` image, zipped", "Native `.app`", "arm64 slice", "x86_64 slice",
-                   "Native `.app`, zipped", "JVM zip / native zip"])
+                  ["Application", "`jlink` image", "`jlink` image, zipped", "Native `.app`", "arm64 slice",
+                   "x86_64 slice", "Native `.app`, zipped", "JVM image / native `.app`", "JVM zip / native zip"],
+                  ["<3", ">1", ">1", ">1", ">1", ">1", ">1", ">1", ">1"])
     pairs = []
+    installed = []
     for result in results:
         label = LABEL[name_of(result)]
         jlink = dig(result, "size", "baseline_jlink", "zip_bytes")
@@ -355,9 +491,28 @@ def macos_tables(results):
         slices = dig(result, "cn1_macos", "slice_bytes") or {}
         ratio = value_ratio(jlink, native)
         pairs.append((label, ratio, megabytes(jlink) + " MB", megabytes(native) + " MB"))
-        table.add(label, megabytes(jlink), megabytes(dig(result, "size", "cn1_macos", "bytes")),
+        jlink_disk = dig(result, "size", "baseline_jlink", "bytes")
+        native_disk = dig(result, "size", "cn1_macos", "bytes")
+        disk_ratio = value_ratio(jlink_disk, native_disk)
+        installed.append((label, disk_ratio, megabytes(jlink_disk) + " MB", megabytes(native_disk) + " MB"))
+        table.add(label, megabytes(jlink_disk), megabytes(jlink), megabytes(native_disk),
                   megabytes(slices.get("arm64")), megabytes(slices.get("x86_64")), megabytes(native),
-                  show_ratio(ratio))
+                  show_ratio(disk_ratio), show_ratio(ratio))
+    table.show(chart("macos-size", "macOS: the application as installed",
+                     "Bar chart of the installed size of each application on macOS: the universal native "
+                     "application beside the jlink image", "MB", [LABEL[name_of(r)] for r in results], [
+                         (("Native .app, universal", NATIVE_SERIES[1]),
+                          [megabytes_of(dig(r, "size", "cn1_macos", "bytes")) for r in results]),
+                         (("arm64 slice of the native .app", TUNED_SERIES[1]),
+                          [megabytes_of((dig(r, "cn1_macos", "slice_bytes") or {}).get("arm64"))
+                           for r in results]),
+                         (("JVM image, one architecture", DEFAULT_SERIES[1]),
+                          [megabytes_of(dig(r, "size", "baseline_jlink", "bytes")) for r in results])],
+                     where_measured(results)))
+    table.say("The native `.app` is universal: it holds an arm64 and an x86_64 slice and runs on both. "
+              "The `jlink` image holds the runtime of one architecture, so a JVM application that runs "
+              "on both ships two of them.")
+    table.say(tally(installed, "smaller", "larger", "the `jlink` image as installed"))
     table.say(tally(pairs, "smaller", "larger", "the zipped `jlink` image"))
     return [table] if results else []
 
@@ -445,6 +600,7 @@ def main():
         if tag in tables:
             out.append(tables[tag].render())
     out.append(environment(linux, macos))
+    draw_charts(os.path.join(os.path.dirname(os.path.abspath(args.out)), CHART_DIRECTORY))
     with open(args.out, "w") as handle:
         handle.write("\n".join(out).rstrip("\n") + "\n")
     sys.stderr.write("wrote %s\n" % args.out)
