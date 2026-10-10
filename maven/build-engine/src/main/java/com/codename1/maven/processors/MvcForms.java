@@ -110,8 +110,7 @@ final class MvcForms {
                 s.append("if (raw == null && request.param(")
                         .append(q("_" + field))
                         .append(") != null) raw = \"false\";\n");
-            boolean primitive = !t.startsWith("java.lang.");
-            if (primitive) s.append("if (raw != null) {\n");
+            s.append("if (raw != null) {\n");
             s.append(local).append("Errors.submitted(").append(q(field)).append(", raw);\ntry {\n");
             if (!"java.lang.String".equals(t)) {
                 if (t.startsWith("java.lang."))
@@ -137,7 +136,7 @@ final class MvcForms {
                     .append("Errors.rejectValue(")
                     .append(q(field))
                     .append(", \"Invalid value\"); }\n");
-            if (primitive) s.append("}\n");
+            s.append("}\n");
             s.append("}\n");
         }
         s.append(

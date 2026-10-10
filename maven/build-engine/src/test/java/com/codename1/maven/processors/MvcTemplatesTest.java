@@ -1038,6 +1038,172 @@ public class MvcTemplatesTest {
         assertTrue(render("safe", new Model()).contains("p {color: red}"));
     }
 
+    @Test
+    public void omittedReferenceFieldsPreserveDefaultsButExplicitEmptyValuesBind()
+            throws Exception {
+        setup();
+        fixtureSources(
+                Collections.singletonMap(
+                        "sample.BoxedForm",
+                        "package sample; public class BoxedForm { public Byte b=1; public Short"
+                            + " s=2; public Integer n=3; public Long l=4L; public Float f=5F;"
+                            + " public Double d=6D; public Character c='Q'; public Boolean"
+                            + " active=true; public String name=\"default\"; private Integer"
+                            + " count=7; public int calls; public void setCount(Integer"
+                            + " v){count=v;calls++;} public String summary(){return"
+                            + " b+\"|\"+s+\"|\"+n+\"|\"+l+\"|\"+f+\"|\"+d+\"|\"+c+\"|\"+active+\"|\"+name+\"|\"+count+\"|\"+calls;}"
+                            + " }"));
+        HttpServer.Handler handler =
+                controller(
+                        "package sample; import com.codename1.backend.annotations.*; import"
+                            + " com.codename1.backend.mvc.*; @Controller public class Pages {"
+                            + " @PostMapping(\"/bind\") @ResponseBody public String"
+                            + " bind(@ModelAttribute(\"form\") BoxedForm form, BindingResult"
+                            + " errors) { return"
+                            + " form.summary()+\"|\"+errors.hasErrors()+\"|\"+errors.fieldValue(\"n\",form.n);"
+                            + " } }");
+        assertEquals(
+                "1|2|3|4|5.0|6.0|Q|true|default|7|0|false|3",
+                body(handler.handle(request("POST", "/bind", "", false))));
+        assertEquals(
+                "1|2|3|4|5.0|6.0|Q|false|default|7|0|false|3",
+                body(handler.handle(request("POST", "/bind", "_active=on", false))));
+        assertEquals(
+                "1|2|null|4|5.0|6.0|null|true||null|1|false|",
+                body(handler.handle(request("POST", "/bind", "n=&c=&name=&count=", false))));
+    }
+
+    @Test
+    public void htmxDescendantsAndAssociatedControlsCarryCsrf() throws Exception {
+        setup();
+        template(
+                "hx",
+                "<!-- cn1:model target java.lang.String --><form id=\"post\"><button"
+                    + " hx-post=\"/save\">Save</button></form><form id=\"put\"><a"
+                    + " hx-put=\"/save\">Save</a></form><form id=\"patch\"><div"
+                    + " th:replace=\"~{hxparts :: save}\"></div></form><form id=\"delete\"><input"
+                    + " th:attr=\"hx-delete=${target}\"></form><form id=\"external\"></form><button"
+                    + " form=\"external\" hx-post=\"/save\">Save</button><form id=\"get\"><button"
+                    + " hx-get=\"/search\">Search</button></form>");
+        template("hxparts", "<button th:fragment=\"save\" hx-patch=\"/save\">Save</button>");
+        compile();
+        Model model =
+                new Model()
+                        .addAttribute("target", "/save")
+                        .addAttribute(
+                                "_csrf",
+                                new com.codename1.backend.security.DefaultCsrfToken(
+                                        "X-CSRF-TOKEN", "_csrf", "token<&"));
+        org.jsoup.nodes.Document html = org.jsoup.Jsoup.parse(render("hx", model));
+        for (String id : Arrays.asList("post", "put", "patch", "delete")) {
+            assertEquals(id, "token<&", html.select("form#" + id + " input[name=_csrf]").val());
+        }
+        assertEquals("token<&", html.select("input[name=_csrf][form=external]").val());
+        assertTrue(html.select("form#get input[name=_csrf]").isEmpty());
+        model.addAttribute("target", null);
+        assertTrue(
+                org.jsoup.Jsoup.parse(render("hx", model))
+                        .select("form#delete input[name=_csrf]")
+                        .isEmpty());
+    }
+
+    @Test
+    public void urlExpressionsPreserveRepeatedQueryNames() throws Exception {
+        setup();
+        template(
+                "repeat",
+                "<a th:href=\"@{/search#list(tag='a b',tag='c&d',page=2)}\">Search</a><a"
+                    + " th:href=\"@{/products/{id}/{id}#{section}(id=7,tag='a',section='details',tag='b')}\">Product</a>");
+        compile();
+        org.jsoup.select.Elements links =
+                org.jsoup.Jsoup.parse(render("repeat", new Model())).select("a");
+        assertEquals("/search?tag=a%20b&tag=c%26d&page=2#list", links.get(0).attr("href"));
+        assertEquals("/products/7/7?tag=a&tag=b#details", links.get(1).attr("href"));
+        template("repeat", "<a th:href=\"@{/products/{id}(id=1,id=2)}\">Ambiguous</a>");
+        try {
+            new MvcTemplates(context).sources();
+            fail("Ambiguous path parameter accepted");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("one value"));
+        }
+    }
+
+    @Test
+    public void dynamicInputTypesBindCheckboxRadioAndText() throws Exception {
+        setup();
+        template(
+                "type",
+                DECL
+                        + "<!-- cn1:model kind java.lang.String --><form"
+                        + " th:object=\"${product}\"><input type=\"text\" th:field=\"*{active}\""
+                        + " th:attr=\"TYPE=${kind}\"></form>");
+        compile();
+        Object p = product("test", 1);
+        p.getClass().getField("active").setBoolean(p, true);
+        Model model = new Model().addAttribute("product", p);
+        for (String kind : Arrays.asList("checkbox", "RADIO", "text")) {
+            model.addAttribute("kind", kind);
+            org.jsoup.nodes.Document html = org.jsoup.Jsoup.parse(render("type", model));
+            assertEquals(
+                    !kind.equals("text"),
+                    html.select("input[name=active]").first().hasAttr("checked"));
+            assertEquals(
+                    kind.equals("checkbox") ? 1 : 0, html.select("input[name=_active]").size());
+            assertEquals("true", html.select("input[name=active]").val());
+        }
+        p.getClass().getField("active").setBoolean(p, false);
+        model.addAttribute("kind", "checkbox");
+        org.jsoup.nodes.Document html = org.jsoup.Jsoup.parse(render("type", model));
+        assertFalse(html.select("input[name=active]").first().hasAttr("checked"));
+        assertEquals("true", html.select("input[name=active]").val());
+    }
+
+    @Test
+    public void hugeAssetsAreRejectedBeforeAllocation() throws Exception {
+        setup();
+        File file = new File(project, "src/main/resources/static/huge.bin");
+        assertTrue(file.getParentFile().mkdirs());
+        try (RandomAccessFile sparse = new RandomAccessFile(file, "rw")) {
+            sparse.setLength((long) Integer.MAX_VALUE + 1);
+        }
+        try {
+            MvcAssets.sources(project);
+            fail("Oversize asset accepted");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("2 MiB"));
+        } catch (OutOfMemoryError allocation) {
+            fail("Asset size was not checked before allocation");
+        }
+    }
+
+    @Test
+    public void truthConversionMatchesSupportedThymeleafScalars() throws Exception {
+        setup();
+        template(
+                "truth",
+                "<!-- cn1:model value java.lang.String -->"
+                        + "<b th:if=\"${value}\">if</b><i th:unless=\"${value}\">unless</i>"
+                        + "<input th:disabled=\"${value}\"><em th:text=\"${value and true}\"></em>"
+                        + "<strong th:text=\"${not value}\"></strong>");
+        compile();
+        for (String value : Arrays.asList("false", "NO", " Off ", null)) {
+            org.jsoup.nodes.Document html =
+                    org.jsoup.Jsoup.parse(
+                            render("truth", new Model().addAttribute("value", value)));
+            assertTrue(html.select("b").isEmpty());
+            assertEquals("unless", html.select("i").text());
+            assertFalse(html.select("input").first().hasAttr("disabled"));
+            assertEquals("false", html.select("em").text());
+            assertEquals("true", html.select("strong").text());
+        }
+        for (String value : Arrays.asList("true", "yes", "on", "", "0"))
+            assertTrue(Html.truth(value));
+        for (Object value : Arrays.<Object>asList(false, 0, 0L, 0.0, '\0'))
+            assertFalse(Html.truth(value));
+        for (Object value : Arrays.<Object>asList(true, 1, -1L, 0.5, 'x'))
+            assertTrue(Html.truth(value));
+    }
+
     private static volatile int benchmarkSink;
 
     @Test

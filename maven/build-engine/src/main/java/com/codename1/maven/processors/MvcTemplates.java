@@ -514,7 +514,23 @@ final class MvcTemplates {
                 dynamic.put("id", new MvcExpression.Value(q(field), "java.lang.String"));
             if (tag.equals("select")) select = fieldValue;
             else if (tag.equals("input")) {
-                if (e.attr("type").equalsIgnoreCase("checkbox")
+                MvcExpression.Value inputType = dynamic.get("type");
+                String checkbox =
+                        inputType == null
+                                ? Boolean.toString(e.attr("type").equalsIgnoreCase("checkbox"))
+                                : "\"checkbox\".equalsIgnoreCase(Html.string("
+                                        + inputType.code
+                                        + "))";
+                String choice =
+                        inputType == null
+                                ? "true"
+                                : "("
+                                        + checkbox
+                                        + " || \"radio\".equalsIgnoreCase(Html.string("
+                                        + inputType.code
+                                        + ")))";
+                if (inputType != null
+                        || e.attr("type").equalsIgnoreCase("checkbox")
                         || e.attr("type").equalsIgnoreCase("radio")) {
                     MvcExpression.Value candidate = dynamic.get("value");
                     if (candidate == null)
@@ -522,16 +538,37 @@ final class MvcTemplates {
                                 new MvcExpression.Value(
                                         q(e.hasAttr("value") ? e.attr("value") : "true"),
                                         "java.lang.String");
-                    dynamic.put("value", candidate);
+                    dynamic.put(
+                            "value",
+                            inputType == null
+                                    ? candidate
+                                    : new MvcExpression.Value(
+                                            "("
+                                                    + choice
+                                                    + " ? (Object)("
+                                                    + candidate.code
+                                                    + ") : "
+                                                    + fieldValue
+                                                    + ")",
+                                            "java.lang.Object"));
                     dynamic.put(
                             "checked",
                             new MvcExpression.Value(
-                                    HTML + "checked(" + fieldValue + ", " + candidate.code + ")",
+                                    choice
+                                            + " && "
+                                            + HTML
+                                            + "checked("
+                                            + fieldValue
+                                            + ", "
+                                            + candidate.code
+                                            + ")",
                                     "boolean"));
-                    if (e.attr("type").equalsIgnoreCase("checkbox"))
+                    if (inputType != null) out.append("if (").append(checkbox).append(") {\n");
+                    if (inputType != null || e.attr("type").equalsIgnoreCase("checkbox"))
                         literal(
                                 out,
                                 "<input type=\"hidden\" name=\"_" + field + "\" value=\"on\">");
+                    if (inputType != null) out.append("}\n");
                 } else
                     dynamic.put("value", new MvcExpression.Value(fieldValue, "java.lang.Object"));
             } else if (!tag.equals("textarea"))
@@ -557,17 +594,27 @@ final class MvcTemplates {
                     new MvcExpression.Value(
                             HTML + "checked(" + select + ", " + candidate.code + ")", "boolean"));
         }
-        if (tag.equals("button") || tag.equals("input")) {
+        String unsafeHtmx = unsafeHtmx(e, dynamic);
+        if (!block && !tag.equals("form")) {
             MvcExpression.Value method = dynamic.get("formmethod");
-            if (method != null || e.hasAttr("formmethod")) {
+            boolean submitControl = tag.equals("button") || tag.equals("input");
+            String unsafeMethod =
+                    submitControl && (method != null || e.hasAttr("formmethod"))
+                            ? "\"post\".equalsIgnoreCase(Html.string("
+                                    + (method == null ? q(e.attr("formmethod")) : method.code)
+                                    + "))"
+                            : "false";
+            if (!unsafeHtmx.equals("false") || !unsafeMethod.equals("false")) {
                 MvcExpression.Value owner = dynamic.get("form");
                 String ownerCode =
                         owner != null ? owner.code : e.hasAttr("form") ? q(e.attr("form")) : "null";
-                // Emit beside the submit control so fragments and conditional controls retain
-                // their rendering scope. Preserve explicit form ownership for external controls.
-                out.append("if(\"post\".equalsIgnoreCase(Html.string(")
-                        .append(method == null ? q(e.attr("formmethod")) : method.code)
-                        .append("))) Html.csrf(out, model, ")
+                // Sibling fields belong to the enclosing form, including when a fragment
+                // renders the control. Explicit form ownership also works outside the form.
+                out.append("if(")
+                        .append(unsafeMethod)
+                        .append(" || ")
+                        .append(unsafeHtmx)
+                        .append(") Html.csrf(out, model, ")
                         .append(ownerCode)
                         .append(");\n");
             }
@@ -598,15 +645,7 @@ final class MvcTemplates {
             out.append("if(!\"get\".equalsIgnoreCase(Html.string(")
                     .append(methodCode)
                     .append(")) || ")
-                    .append(
-                            e.hasAttr("hx-post")
-                                    || e.hasAttr("hx-put")
-                                    || e.hasAttr("hx-patch")
-                                    || e.hasAttr("hx-delete")
-                                    || dynamic.containsKey("hx-post")
-                                    || dynamic.containsKey("hx-put")
-                                    || dynamic.containsKey("hx-patch")
-                                    || dynamic.containsKey("hx-delete"))
+                    .append(unsafeHtmx)
                     .append(") Html.csrf(out, model);\n");
         }
         if (e.hasAttr("th:insert")) include(t, e.attr("th:insert"), out);
@@ -628,6 +667,16 @@ final class MvcTemplates {
         else for (Node child : e.childNodes()) render(t, child, env, form, select, out);
         if (!block && !e.tag().isEmpty()) literal(out, "</" + tag + ">");
         close(out, braces);
+    }
+
+    private static String unsafeHtmx(Element e, Map<String, MvcExpression.Value> dynamic) {
+        List<String> conditions = new ArrayList<String>();
+        for (String name : Arrays.asList("hx-post", "hx-put", "hx-patch", "hx-delete")) {
+            MvcExpression.Value value = dynamic.get(name);
+            if (value != null) conditions.add("((Object)(" + value.code + ") != null)");
+            else if (e.hasAttr(name)) return "true";
+        }
+        return conditions.isEmpty() ? "false" : "(" + String.join(" || ", conditions) + ")";
     }
 
     private void include(Template current, String reference, StringBuilder out) {
@@ -672,7 +721,8 @@ final class MvcTemplates {
                 || path.indexOf('\\') >= 0
                 || path.matches(".*[\\s\"<>].*"))
             throw new IllegalArgumentException("URL expressions require a local absolute path");
-        Map<String, MvcExpression.Value> args = new LinkedHashMap<String, MvcExpression.Value>();
+        List<Map.Entry<String, MvcExpression.Value>> args =
+                new ArrayList<Map.Entry<String, MvcExpression.Value>>();
         if (open >= 0) {
             if (!value.endsWith(")")) throw new IllegalArgumentException("Invalid URL expression");
             for (String assignment : split(value.substring(open + 1, value.length() - 1), ',')) {
@@ -681,17 +731,21 @@ final class MvcTemplates {
                 String name = assignment.substring(0, eq).trim();
                 if (!name.matches("[A-Za-z][A-Za-z0-9_]*"))
                     throw new IllegalArgumentException("Invalid URL parameter");
-                args.put(name, expression(assignment.substring(eq + 1), env, form));
+                args.add(
+                        new AbstractMap.SimpleImmutableEntry<String, MvcExpression.Value>(
+                                name, expression(assignment.substring(eq + 1), env, form)));
             }
         }
         int hash = path.indexOf('#');
         String fragment = hash < 0 ? "" : path.substring(hash);
         if (hash >= 0) path = path.substring(0, hash);
-        StringBuilder code = new StringBuilder(urlPath(path, args));
+        Set<String> pathParameters = new HashSet<String>();
+        StringBuilder code = new StringBuilder(urlPath(path, args, pathParameters));
         // Consume fragment placeholders before turning the remaining arguments into a query.
-        String fragmentCode = urlPath(fragment, args);
+        String fragmentCode = urlPath(fragment, args, pathParameters);
         boolean query = path.contains("?");
-        for (Map.Entry<String, MvcExpression.Value> arg : args.entrySet()) {
+        for (Map.Entry<String, MvcExpression.Value> arg : args) {
+            if (pathParameters.contains(arg.getKey())) continue;
             code.append(" + ")
                     .append(q((query ? "&" : "?") + arg.getKey() + "="))
                     .append(" + Html.urlPart(")
@@ -703,12 +757,24 @@ final class MvcTemplates {
         return new MvcExpression.Value("(" + code + ")", "java.lang.String");
     }
 
-    private static String urlPath(String path, Map<String, MvcExpression.Value> args) {
+    private static String urlPath(
+            String path,
+            List<Map.Entry<String, MvcExpression.Value>> args,
+            Set<String> pathParameters) {
         StringBuilder code = new StringBuilder();
         Matcher placeholders = Pattern.compile("\\{([A-Za-z][A-Za-z0-9_]*)}").matcher(path);
         int pos = 0;
         while (placeholders.find()) {
-            MvcExpression.Value arg = args.remove(placeholders.group(1));
+            String name = placeholders.group(1);
+            MvcExpression.Value arg = null;
+            for (Map.Entry<String, MvcExpression.Value> entry : args) {
+                if (!entry.getKey().equals(name)) continue;
+                if (arg != null)
+                    throw new IllegalArgumentException(
+                            "URL path parameter requires one value: " + name);
+                arg = entry.getValue();
+            }
+            pathParameters.add(name);
             if (arg == null)
                 throw new IllegalArgumentException(
                         "Missing URL path parameter " + placeholders.group(1));

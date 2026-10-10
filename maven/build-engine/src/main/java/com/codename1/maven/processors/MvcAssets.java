@@ -74,15 +74,12 @@ final class MvcAssets {
                         "Asset path requires ASCII URL-safe characters: " + path);
             byte[] data;
             try {
+                checkSize(Files.size(file.toPath()), file);
                 data = Files.readAllBytes(file.toPath());
             } catch (IOException e) {
                 throw new IllegalArgumentException("Cannot read asset " + file, e);
             }
-            if (data.length > 2 * 1024 * 1024)
-                throw new IllegalArgumentException(
-                        "Embedded MVC assets must be at most 2 MiB; serve larger files with"
-                                + " cn1.static.root: "
-                                + file);
+            checkSize(data.length, file);
             String name = "Asset" + sources.size();
             StringBuilder s =
                     new StringBuilder(
@@ -127,6 +124,14 @@ final class MvcAssets {
                                     + " \"no-cache\").header(\"X-Content-Type-Options\","
                                     + " \"nosniff\");\n");
         }
+    }
+
+    private static void checkSize(long size, File file) {
+        if (size > 2 * 1024 * 1024)
+            throw new IllegalArgumentException(
+                    "Embedded MVC assets must be at most 2 MiB; serve larger files with"
+                            + " cn1.static.root: "
+                            + file);
     }
 
     private static String mime(String path) {

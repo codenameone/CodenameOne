@@ -49,7 +49,22 @@ public final class Html {
     }
 
     public static boolean truth(Object value) {
-        return value != null && !Boolean.FALSE.equals(value) && !"".equals(value);
+        if (value == null || Boolean.FALSE.equals(value)) {
+            return false;
+        }
+        if (value instanceof Number) {
+            return ((Number) value).doubleValue() != 0.0;
+        }
+        if (value instanceof Character) {
+            return ((Character) value).charValue() != 0;
+        }
+        if (value instanceof String) {
+            String text = ((String) value).trim();
+            return !"false".equalsIgnoreCase(text)
+                    && !"no".equalsIgnoreCase(text)
+                    && !"off".equalsIgnoreCase(text);
+        }
+        return true;
     }
 
     public static boolean equal(Object a, Object b) {
