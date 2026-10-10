@@ -2106,6 +2106,25 @@ public class LinuxImplementation extends CodenameOneImplementation {
         LinuxNative.drawImage(peer(graphics), peer(img), x, y);
     }
 
+    /// Cairo scales an image as it draws it, and `drawImageScaled` has done so
+    /// since the port was written -- but nothing called it. Without this answer the
+    /// core scales for the port: `Image.scaled` makes a second surface of the size
+    /// asked for and keeps it in the image's scale cache for as long as the image
+    /// lives, one per size. An application that zooms a picture draws it at a new
+    /// size every frame, so every frame left a surface behind, each larger than the
+    /// last: a JavaFX canvas zooming an 800x600 snapshot was measured holding 156
+    /// surfaces, 1.8 GB, by the end of a one second animation, none of them garbage
+    /// until the snapshot itself was replaced.
+    @Override
+    public boolean isScaledImageDrawingSupported() {
+        return true;
+    }
+
+    @Override
+    public void drawImage(Object graphics, Object img, int x, int y, int w, int h) {
+        LinuxNative.drawImageScaled(peer(graphics), peer(img), x, y, w, h);
+    }
+
     @Override
     public void drawRGB(Object graphics, int[] rgbData, int offset, int x, int y, int w, int h, boolean processAlpha) {
         LinuxNative.drawRGB(peer(graphics), rgbData, offset, x, y, w, h, processAlpha);
