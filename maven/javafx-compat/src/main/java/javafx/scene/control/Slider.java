@@ -274,12 +274,12 @@ public class Slider extends Control {
     }
 
     @Override
-    protected double[] cn1NativeBand() {
-        double band = isShowTickMarks() || isShowTickLabels() ? tickBand() : 0;
-        if (!(band > 0)) {
-            return null;
+    protected double cn1NativeBand(boolean below) {
+        if (below == (getOrientation() == Orientation.VERTICAL)) {
+            return 0;
         }
-        return getOrientation() == Orientation.VERTICAL ? new double[] {0, band} : new double[] {band, 0};
+        double band = isShowTickMarks() || isShowTickLabels() ? tickBand() : 0;
+        return band > 0 ? band : 0;
     }
 
     /// Draws the tick marks and the tick labels the application asked
