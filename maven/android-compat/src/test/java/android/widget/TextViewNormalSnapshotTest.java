@@ -28,7 +28,7 @@ import android.text.Spanned;
 import android.text.style.ForegroundColorSpan;
 
 import com.codename1.androidcompat.testing.AndroidTestSupport;
-import com.codename1.androidcompat.testing.MainThreadRule;
+import com.codename1.compat.testing.MainThreadRule;
 
 import org.junit.Rule;
 import org.junit.Test;

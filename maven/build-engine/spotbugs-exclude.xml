@@ -291,4 +291,22 @@
         <Class name="com.codename1.maven.AndroidProjectImporter$Result" />
         <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
     </Match>
+    <!--
+    DesktopProjectImporter.Result, likewise: the Maven goal reports the
+    copied file count, the entry point and its kind, and whether the project
+    has Kotlin, and it lives in another module this analysis cannot see.
+    -->
+    <Match>
+        <Class name="com.codename1.maven.DesktopProjectImporter$Result" />
+        <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
+    </Match>
+    <!--
+    DesktopProjectImporter.Library, for the same reason: the version and the
+    scope of an imported project's dependency are read by the Maven goal's
+    DesktopPomUpdater, which writes the dependency into the project's pom.
+    -->
+    <Match>
+        <Class name="com.codename1.maven.DesktopProjectImporter$Library" />
+        <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
+    </Match>
 </FindBugsFilter>

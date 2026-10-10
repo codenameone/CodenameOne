@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.codenameone.developerguide</groupId>
+    <artifactId>democode</artifactId>
+    <version>1.0-SNAPSHOT</version>
+  </parent>
+  <artifactId>desktopinteropsnippets</artifactId>
+  <name>desktopinteropsnippets</name>
+  <!--
+       Compiles the desktop interop chapter's snippets. The Swing ones use
+       java.awt and javax.swing, which a desktop application compiles against
+       in the JDK itself, and the JavaFX ones use the javafx.* API of the
+       compatibility runtime, so they compile here rather than in the common
+       module, which is an ordinary Codename One client.
+  -->
+  <dependencies>
+    <dependency>
+      <groupId>com.codenameone</groupId>
+      <artifactId>codenameone-core</artifactId>
+      <version>${cn1.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.codenameone</groupId>
+      <artifactId>codenameone-swing-compat</artifactId>
+      <version>${cn1.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.codenameone</groupId>
+      <artifactId>codenameone-javafx-compat</artifactId>
+      <version>${cn1.version}</version>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+</project>

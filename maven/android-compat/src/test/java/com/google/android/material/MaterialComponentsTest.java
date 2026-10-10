@@ -53,7 +53,7 @@ import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 import com.google.android.material.theme.MaterialComponentsViewInflater;
 
-import com.codename1.androidcompat.testing.MainThreadRule;
+import com.codename1.compat.testing.MainThreadRule;
 import org.junit.Rule;
 import org.junit.Test;
 

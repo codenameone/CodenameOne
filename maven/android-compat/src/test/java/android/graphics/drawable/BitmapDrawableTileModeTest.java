@@ -30,8 +30,8 @@ import android.graphics.RectF;
 import android.graphics.Shader;
 
 import com.codename1.androidcompat.testing.AndroidTestSupport;
-import com.codename1.androidcompat.testing.HeadlessImplementation;
-import com.codename1.androidcompat.testing.MainThreadRule;
+import com.codename1.compat.testing.HeadlessImplementation;
+import com.codename1.compat.testing.MainThreadRule;
 import com.codename1.ui.Image;
 
 import java.util.ArrayList;

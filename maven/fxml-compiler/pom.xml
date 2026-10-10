@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <parent>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone</artifactId>
+        <version>8.0-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>codenameone-fxml-compiler</artifactId>
+    <version>8.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    <name>codenameone-fxml-compiler</name>
+    <description>
+        Build-time compiler for the FXML documents and JavaFX style sheets of
+        an application that uses the JavaFX compatibility layer. An FXML
+        document becomes Java source that builds the same tree with plain
+        constructors and setters; a style sheet becomes the binary table the
+        layer's style engine reads; and the members a controller marks @FXML
+        are reached by a generated dispatcher instead of by reflection.
+    </description>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <fxml.shared.css.source>${project.basedir}/../javafx-compat/src/main/java/com/codename1/fxcompat/runtime/css</fxml.shared.css.source>
+        <fxml.shared.css.dir>${project.build.directory}/generated-sources/fxml-shared-css</fxml.shared.css.dir>
+    </properties>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <!--
+                             The style value parser and the compiled sheet's
+                             reader and writer have ONE copy, in javafx-compat,
+                             where the device runs them. The compiler runs the
+                             same sources: they are copied here under a package
+                             of this module's own rather than depended on,
+                             because the build tools must not have the JavaFX
+                             layer on their class path (the Maven plugin keeps
+                             it "provided" so that an application's own version
+                             is the only one there is).
+                        -->
+                        <id>copy-shared-css-sources</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <copy todir="${fxml.shared.css.dir}/com/codename1/fxml/css" overwrite="false"
+                                      encoding="UTF-8">
+                                    <fileset dir="${fxml.shared.css.source}" includes="*.java"
+                                             excludes="package-info.java"/>
+                                    <filterchain>
+                                        <replacestring from="com.codename1.fxcompat.runtime.css"
+                                                       to="com.codename1.fxml.css"/>
+                                    </filterchain>
+                                </copy>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>add-shared-css-sources</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${fxml.shared.css.dir}</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>4.7.3.4</version>
+                <configuration>
+                    <effort>Max</effort>
+                    <threshold>Low</threshold>
+                    <failOnError>false</failOnError>
+                    <xmlOutput>true</xmlOutput>
+                    <xmlOutputDirectory>${project.build.directory}</xmlOutputDirectory>
+                    <excludeFilterFile>${project.basedir}/spotbugs-exclude.xml</excludeFilterFile>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>spotbugs</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>spotbugs</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <!-- Some JDK 8 distributions bundle JavaFX as an extension
+             (jre/lib/ext/jfxrt.jar), and an extension is found before the
+             class path. The main sources still compile there, because they
+             ARE the javafx classes, but the tests then meet the JDK's
+             javafx.scene.control.Control in place of this module's, at
+             compile time and again when they run. The extension directory
+             is pointed at nothing; the option does not exist after JDK 8,
+             where JavaFX is not part of the JDK either. -->
+        <profile>
+            <id>jdk8-without-bundled-javafx</id>
+            <activation>
+                <jdk>1.8</jdk>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <configuration>
+                            <compilerArgs>
+                                <arg>-extdirs</arg>
+                                <arg>${project.build.directory}/no-jdk-extensions</arg>
+                            </compilerArgs>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <argLine>-Djava.ext.dirs=${project.build.directory}/no-jdk-extensions</argLine>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
+    <dependencies>
+        <!-- ResourceNames: the one rule for the flat name a resource ships
+             under, which the compiled style sheets are named by. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-compat-jdk</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Test scope only: the tests compile what the compiler generates
+             against the layer and run it. The compiler itself reads the
+             layer's class files as data, from the application's class path. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-javafx-compat</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-compat-testing</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

@@ -112,9 +112,26 @@
             <artifactId>codenameone-lottie-transcoder</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- For ResourceNames alone: the one rule that turns a nested resource
+             path into the flat name it ships under. CompatResources applies it
+             when it flattens a desktop application's resources and the runtime
+             applies the same method when it looks one up. -->
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>codenameone-compat-jdk</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>codenameone-android-res-compiler</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- The FXML and style sheet compiler of the JavaFX layer: the build
+             plugins call it before javac, and CompatRemapper calls its
+             dispatch generator after relocation. -->
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>codenameone-fxml-compiler</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
@@ -267,6 +284,65 @@
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-backend-test</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- The desktop layers' real runtimes: DesktopEntryPointsTest compiles a
+             Swing and a JavaFX fixture against them, remaps it and loads the
+             main class the remap generated. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-swing-compat</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-javafx-compat</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- SwingGallerySampleTest compiles scripts/desktop-compat-samples/swing-gallery
+             the way that project's own build does: against the real SwingX,
+             which the layer replaces, and the real MigLayout, which is bundled
+             and relocated with the application. -->
+        <dependency>
+            <groupId>org.swinglabs.swingx</groupId>
+            <artifactId>swingx-all</artifactId>
+            <version>1.6.5-1</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- IkonliFontIconTest: a library that finds its parts with
+             ServiceLoader and loads a font out of META-INF/resources, bundled
+             and relocated with an application the way a project's build
+             does it. -->
+        <dependency>
+            <groupId>org.kordamp.ikonli</groupId>
+            <artifactId>ikonli-swing</artifactId>
+            <version>12.4.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.kordamp.ikonli</groupId>
+            <artifactId>ikonli-fontawesome5-pack</artifactId>
+            <version>12.4.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.miglayout</groupId>
+            <artifactId>miglayout-swing</artifactId>
+            <version>5.3</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- The headless implementation that test runs the remapped sample on.
+             KEEP THIS LAST. The jar holds a com.codename1.impl.ImplementationFactory
+             of its own, which a class loader that finds it before the core's
+             starts Codename One on; the test builds such a loader from the jar
+             file. On this module's own test classpath the core comes first, so
+             every other test keeps the real factory. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-compat-testing</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>

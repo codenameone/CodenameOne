@@ -23,7 +23,7 @@
 package com.codename1.androidcompat.runtime;
 import android.content.res.Resources;
 import android.util.TypedValue;
-import com.codename1.androidcompat.testing.MainThreadRule;
+import com.codename1.compat.testing.MainThreadRule;
 import org.junit.Rule;
 import org.junit.Test;
 import static org.junit.Assert.*;

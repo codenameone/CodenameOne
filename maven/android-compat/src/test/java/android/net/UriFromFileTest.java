@@ -22,8 +22,8 @@
  */
 package android.net;
 
-import com.codename1.androidcompat.jdk.File;
-import com.codename1.androidcompat.testing.MainThreadRule;
+import com.codename1.compat.jdk.File;
+import com.codename1.compat.testing.MainThreadRule;
 
 import org.junit.Rule;
 import org.junit.Test;

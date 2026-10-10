@@ -96,7 +96,7 @@
         <!-- Android compatibility: an Android application's AndroidManifest.xml,
              res/, assets/ and java/ placed in src/main/android build and run
              unchanged on every Codename One target. The compile-android-res
-             and remap-android goals below are no-ops without this directory. -->
+             and remap-compat goals below are no-ops without this directory. -->
         <profile>
             <id>android-compat</id>
             <activation>
@@ -108,6 +108,32 @@
                 <dependency>
                     <groupId>com.codenameone</groupId>
                     <artifactId>codenameone-android-compat</artifactId>
+                    <scope>provided</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+        <!-- Swing and JavaFX compatibility: a desktop application's java/,
+             kotlin/ and resources/ placed in src/main/desktop build and run
+             unchanged on every Codename One target. Both runtimes are on the
+             compile classpath; the remap-compat goal ships only the one the
+             sources actually use. The prepare-desktop-sources and remap-compat
+             goals below are no-ops without this directory. -->
+        <profile>
+            <id>desktop-compat</id>
+            <activation>
+                <file>
+                    <exists>${basedir}/src/main/desktop</exists>
+                </file>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-swing-compat</artifactId>
+                    <scope>provided</scope>
+                </dependency>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-javafx-compat</artifactId>
                     <scope>provided</scope>
                 </dependency>
             </dependencies>
@@ -194,6 +220,10 @@
                                         <sourceDir>${project.basedir}/src/main/android/kotlin</sourceDir>
                                         <sourceDir>${project.basedir}/src/main/android/java</sourceDir>
                                         <sourceDir>${project.build.directory}/generated-sources/android</sourceDir>
+                                        <!-- Desktop sources (src/main/desktop): a Swing or JavaFX
+                                             application's Kotlin, and the Java it refers to. -->
+                                        <sourceDir>${project.basedir}/src/main/desktop/kotlin</sourceDir>
+                                        <sourceDir>${project.basedir}/src/main/desktop/java</sourceDir>
                                     </sourceDirs>
                                     <args>
                                         <arg>-no-reflect</arg>
@@ -404,6 +434,15 @@
                         </goals>
                     </execution>
                     <execution>
+                        <!-- Desktop sources (src/main/desktop): adds its java/
+                             and resources/ to the build. -->
+                        <id>prepare-desktop-sources</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>prepare-desktop-sources</goal>
+                        </goals>
+                    </execution>
+                    <execution>
                         <id>generate-gui-sources</id>
                         <phase>process-sources</phase>
                         <goals>
@@ -414,9 +453,10 @@
                         <id>cn1-process-classes</id>
                         <phase>process-classes</phase>
                         <goals>
-                            <!-- Relocates Android code onto the compatibility
-                                 runtime; must precede bytecode-compliance. -->
-                            <goal>remap-android</goal>
+                            <!-- Relocates Android, Swing and JavaFX code onto
+                                 the compatibility runtimes; must precede
+                                 bytecode-compliance. -->
+                            <goal>remap-compat</goal>
                             <goal>bytecode-compliance</goal>
                             <goal>css</goal>
                             <!-- Scans the project's compiled bytecode for

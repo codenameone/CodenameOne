@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Intentional SpotBugs exceptions for the shared JDK classes. The report is
+     a zero-findings gate, so every entry is scoped and explained. -->
+<FindBugsFilter>
+    <!--
+        A wrapping stream or writer holds the one it was given; that is the
+        whole contract of java.io's BufferedWriter, FilterOutputStream and
+        PrintWriter, and copying a stream is not possible.
+    -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.compat.jdk.BufferedWriter"/>
+            <Class name="com.codename1.compat.jdk.FilterOutputStream"/>
+            <Class name="com.codename1.compat.jdk.PrintWriter"/>
+        </Or>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!--
+        java.io.File documents null, not an empty array, from list() and
+        listFiles() when the path is not a directory, and callers test for it.
+    -->
+    <Match>
+        <Class name="com.codename1.compat.jdk.File"/>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
+
+    <!--
+        Object.clone() answers null on the device for anything but an array,
+        so these copy field by field instead of calling super.clone(). Each
+        clone() builds an instance of its own class, so a subclass that adds
+        state has to override it rather than rely on super.clone().
+    -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.compat.jdk.ChoiceFormat"/>
+            <Class name="com.codename1.compat.jdk.CopyOnWriteArrayList"/>
+            <Class name="com.codename1.compat.jdk.DecimalFormat"/>
+            <Class name="com.codename1.compat.jdk.DecimalFormatSymbols"/>
+            <Class name="com.codename1.compat.jdk.MessageFormat"/>
+        </Or>
+        <Method name="clone"/>
+        <Bug pattern="CN_IDIOM_NO_SUPER_CALL"/>
+    </Match>
+
+    <!--
+        KeySetView.getMap() is documented to return the map the view is
+        backed by; a copy would not be that map.
+    -->
+    <Match>
+        <Class name="com.codename1.compat.jdk.ConcurrentHashMap$KeySetView"/>
+        <Method name="getMap"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+
+    <!--
+        java.util.EventObject declares its source "protected transient", and
+        subclasses compiled against the JDK read the field by that name. The
+        device has no object serialization to restore it after.
+    -->
+    <Match>
+        <Class name="com.codename1.compat.jdk.EventObject"/>
+        <Field name="source"/>
+        <Bug pattern="SE_TRANSIENT_FIELD_NOT_RESTORED"/>
+    </Match>
+
+    <!--
+        java.util.Properties is handed its defaults table and consults that
+        very object from then on: a later change to the defaults is visible
+        through every table built on them. A copy would break that.
+    -->
+    <Match>
+        <Class name="com.codename1.compat.jdk.Properties"/>
+        <Method name="&lt;init&gt;"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!--
+        java.util.Properties does not override equals either: two tables are
+        equal when their own entries are, whatever their defaults, which is
+        what Hashtable.equals already answers.
+    -->
+    <Match>
+        <Class name="com.codename1.compat.jdk.Properties"/>
+        <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS"/>
+    </Match>
+
+    <!--
+        Thread.setContextClassLoader exists to remember the loader it is
+        given, so that getContextClassLoader hands the same object back. A
+        ClassLoader cannot be copied.
+    -->
+    <Match>
+        <Class name="com.codename1.compat.jdk.Resources"/>
+        <Method name="setContextClassLoader"/>
+        <Bug pattern="EI_EXPOSE_STATIC_REP2"/>
+    </Match>
+
+    <!--
+        InvocationTargetException exists to carry the exception it wraps and
+        hand that very object back; a Throwable cannot be copied.
+    -->
+    <Match>
+        <Class name="com.codename1.compat.jdk.InvocationTargetException"/>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+
+    <!--
+        A shutdown hook is a Thread only because Runtime.addShutdownHook
+        takes one. System.exit runs each hook's body in turn on the calling
+        thread, deliberately: the application is about to be closed by the
+        platform, and a hook started as a thread would race that.
+    -->
+    <Match>
+        <Class name="com.codename1.compat.jdk.JdkSystem"/>
+        <Method name="runShutdownHooks"/>
+        <Bug pattern="RU_INVOKE_RUN"/>
+    </Match>
+
+    <!--
+        DirectoryIteratorException carries the IOException that ended an
+        iteration and hands that very object back, as the JDK's does; a
+        Throwable cannot be copied.
+    -->
+    <Match>
+        <Class name="com.codename1.compat.jdk.DirectoryIteratorException"/>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+
+    <!--
+        The two names are the JDK's own: java.io.File.toURI and
+        java.nio.file.Path.toUri. An application calls both, so neither can
+        be respelled to match the other.
+    -->
+    <Match>
+        <Class name="com.codename1.compat.jdk.File"/>
+        <Bug pattern="NM_CONFUSING"/>
+    </Match>
+
+    <!--
+        java.nio.file.Path declares compareTo(Path) itself, and code compiled
+        against the JDK calls it by that descriptor.
+    -->
+    <Match>
+        <Class name="com.codename1.compat.jdk.Path"/>
+        <Bug pattern="CO_ABSTRACT_SELF"/>
+    </Match>
+
+    <!--
+        Null is "a pattern with no groups has nothing to save", read by the
+        matcher's own backtracking loop only; an empty array there would be
+        an allocation per attempt for the commonest patterns.
+    -->
+    <Match>
+        <Class name="com.codename1.compat.jdk.Matcher"/>
+        <Method name="saveGroups"/>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
+</FindBugsFilter>

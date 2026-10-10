@@ -1,0 +1,740 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Intentional SpotBugs exceptions for this module. The report is a
+     zero-findings gate, so every entry is scoped and explained. -->
+<FindBugsFilter>
+
+    <!-- AWT and Swing are an object graph by contract: getParent(),
+         getLayout(), getModel(), getContentPane(), an event's getChild()
+         return THE object, and a setter or constructor keeps the one it is
+         given. A defensive copy would be a different component. Scoped to
+         the relocated JDK packages, whose signatures are not ours to
+         change. -->
+    <Match>
+        <Class name="~com\.codename1\.desktopcompat\.(java\.awt|java\.beans|javax\.swing|javax\.accessibility)\..*"/>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+
+    <!-- The runtime's wiring objects exist to hold a reference to the
+         component, form, image or graphics they bridge to. -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.desktopcompat.rt.PeerSupport"/>
+            <Class name="com.codename1.desktopcompat.rt.FrameForm"/>
+            <Class name="com.codename1.desktopcompat.rt.EmbedHost"/>
+            <Class name="com.codename1.desktopcompat.rt.LayoutBridge"/>
+            <Class name="com.codename1.desktopcompat.rt.NativeImage"/>
+            <Class name="com.codename1.desktopcompat.rt.G2D"/>
+        </Or>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+
+    <!-- The focus owner is one component for the whole application, as in
+         AWT's KeyboardFocusManager; it is read and written on the event
+         dispatch thread only. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.rt.EventBridge"/>
+        <Or>
+            <Bug pattern="EI_EXPOSE_STATIC_REP2"/>
+            <Bug pattern="MS_EXPOSE_REP"/>
+        </Or>
+    </Match>
+
+    <!-- Object.clone() returns null for anything but an array on ParparVM
+         and in the CLDC class library, so no clone() here may call
+         super.clone(); each one copies its fields explicitly. -->
+    <Match>
+        <Class name="~com\.codename1\.desktopcompat\.java\.awt\..*"/>
+        <Method name="clone"/>
+        <Bug pattern="CN_IDIOM_NO_SUPER_CALL"/>
+    </Match>
+
+    <!-- The event classes are Serializable only because java.util.EventObject
+         is. A device has no object streams, so there is no serialized form
+         to version and no field that could fail to be written. -->
+    <Match>
+        <Class name="~com\.codename1\.desktopcompat\.(java\.awt\.event|java\.beans|javax\.swing\.event|javax\.swing\.text\.html)\..*Event"/>
+        <Or>
+            <Bug pattern="SE_NO_SERIALVERSIONID"/>
+            <Bug pattern="SE_BAD_FIELD"/>
+        </Or>
+    </Match>
+
+    <!-- The four public arrays are GridBagLayout's API: the application
+         assigns them to set minimum sizes and weights, the layout only
+         reads them. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.java.awt.GridBagLayout"/>
+        <Bug pattern="UWF_UNWRITTEN_PUBLIC_OR_PROTECTED_FIELD"/>
+    </Match>
+
+    <!-- Swing's constructors build the root pane through overridable
+         methods (setRootPane, setContentPane, setLayout), and applications
+         override them counting on that. -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.desktopcompat.javax.swing.JFrame"/>
+            <Class name="com.codename1.desktopcompat.javax.swing.JDialog"/>
+            <Class name="com.codename1.desktopcompat.javax.swing.JRootPane"/>
+            <Class name="com.codename1.desktopcompat.javax.swing.JInternalFrame"/>
+        </Or>
+        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR"/>
+    </Match>
+
+    <!-- The JDK documents null, not an empty array, as the answer of these
+         three when there is nothing selected or no key defined, and callers
+         test for it. -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.AbstractAction"/>
+                <Method name="getKeys"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.AbstractButton"/>
+                <Method name="getSelectedObjects"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.DefaultButtonModel"/>
+                <Method name="getSelectedObjects"/>
+            </And>
+        </Or>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
+
+    <!-- Point and Rectangle define equals and inherit hashCode from Point2D
+         and Rectangle2D, exactly as the JDK's do; the inherited hash is
+         computed from the same coordinates and is consistent with both. -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.desktopcompat.java.awt.Point"/>
+            <Class name="com.codename1.desktopcompat.java.awt.Rectangle"/>
+        </Or>
+        <Bug pattern="HE_EQUALS_NO_HASHCODE"/>
+    </Match>
+
+    <!-- Rectangle is declared "implements Shape, Serializable" in the JDK
+         although Rectangle2D already implements Shape; the declaration is
+         kept so the class has the JDK's shape. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.java.awt.Rectangle"/>
+        <Bug pattern="RI_REDUNDANT_INTERFACES"/>
+    </Match>
+
+    <!-- Exact comparison is the specification here: two transforms are
+         equal when their six entries are, and the type flags ask whether an
+         entry IS 0 or 1, not whether it is near it. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.java.awt.geom.AffineTransform"/>
+        <Or>
+            <Method name="equals"/>
+            <Method name="getType"/>
+        </Or>
+        <Bug pattern="FE_FLOATING_POINT_EQUALITY"/>
+    </Match>
+
+    <!-- Created on first use by the event dispatch thread, which is the
+         only thread that touches the toolkit; the layer takes no locks. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.java.awt.Toolkit"/>
+        <Method name="getDefaultToolkit"/>
+        <Bug pattern="LI_LAZY_INIT_STATIC"/>
+    </Match>
+
+    <!-- EventQueue has a public constructor in the JDK and
+         Toolkit.getSystemEventQueue() must return an instance, even though
+         everything the layer implements on it is static. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.rt.DesktopToolkit"/>
+        <Bug pattern="ISC_INSTANTIATE_STATIC_CLASS"/>
+    </Match>
+    <!-- BEGIN widgets slice -->
+
+    <!-- Swing's own contract: each of these constructors builds a part of
+         the component through a protected factory method a subclass may
+         replace (createViewport and the scroll bars, createSelectionModel,
+         createDefaultModel), or installs the document through the public
+         setDocument. Calling them from the constructor is the documented
+         extension point, so it cannot be made final or private here. -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.desktopcompat.javax.swing.JScrollPane"/>
+            <Class name="com.codename1.desktopcompat.javax.swing.JList"/>
+            <Class name="com.codename1.desktopcompat.javax.swing.JTextArea"/>
+            <Class name="com.codename1.desktopcompat.javax.swing.JTextField"/>
+        </Or>
+        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR"/>
+    </Match>
+
+    <!-- The stamp exists to paint a component somebody else owns: the
+         renderer hands it the cell for one paint and takes it back. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.rt.CellStamp"/>
+        <Method name="setCell"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- END widgets slice -->
+
+    <!-- BEGIN table-tree slice -->
+
+    <!-- The JDK builds a table, its header, a column model and a tree
+         editor through protected factory and setter methods
+         (createDefaultColumnModel, setColumnModel, createDefaultRenderers,
+         createTreeCellEditor, ...) called from the constructor, and
+         applications override them counting on that. -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.desktopcompat.javax.swing.JTable"/>
+            <Class name="com.codename1.desktopcompat.javax.swing.table.JTableHeader"/>
+            <Class name="com.codename1.desktopcompat.javax.swing.table.DefaultTableColumnModel"/>
+            <Class name="com.codename1.desktopcompat.javax.swing.tree.DefaultTreeCellEditor"/>
+        </Or>
+        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR"/>
+    </Match>
+
+    <!-- The JDK documents null, not an empty array, as the answer of
+         these: no selection, no rows between two indexes, a structure event
+         that names no children, a path of no node. Callers test for it. -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.JTree"/>
+                <Or>
+                    <Method name="getSelectionPaths"/>
+                    <Method name="getPathBetweenRows"/>
+                </Or>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.tree.DefaultTreeSelectionModel"/>
+                <Method name="getSelectionPaths"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.event.TreeModelEvent"/>
+                <Or>
+                    <Method name="getChildIndices"/>
+                    <Method name="getChildren"/>
+                </Or>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.tree.DefaultMutableTreeNode"/>
+                <Method name="getPathToRoot"/>
+            </And>
+        </Or>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
+
+    <!-- Object.clone() answers null for anything but an array on a device,
+         so these two copy themselves field by field instead of calling
+         super.clone(). -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.desktopcompat.javax.swing.tree.DefaultMutableTreeNode"/>
+            <Class name="com.codename1.desktopcompat.javax.swing.tree.DefaultTreeSelectionModel"/>
+        </Or>
+        <Method name="clone"/>
+        <Bug pattern="CN_IDIOM_NO_SUPER_CALL"/>
+    </Match>
+
+    <!-- noFocusBorder is "protected static Border", not final, in the JDK,
+         and subclasses of the renderer assign it. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.javax.swing.table.DefaultTableCellRenderer"/>
+        <Field name="noFocusBorder"/>
+        <Bug pattern="MS_SHOULD_BE_FINAL"/>
+    </Match>
+
+    <!-- END table-tree slice -->
+
+    <!-- BEGIN windows-menus slice -->
+
+    <!-- The JDK documents null, not an empty array, as the answer of these
+         when there is no key, nothing selected, or no option set, and
+         callers test for it. -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.ActionMap"/>
+                <Method name="keys"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.InputMap"/>
+                <Method name="keys"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.JCheckBoxMenuItem"/>
+                <Method name="getSelectedObjects"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.JOptionPane"/>
+                <Or>
+                    <Method name="getOptions"/>
+                    <Method name="getSelectionValues"/>
+                </Or>
+            </And>
+        </Or>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
+
+    <!-- Created on first use by the event dispatch thread, the only thread
+         that touches them; the layer takes no locks. Creating them when the
+         class loads would have a superclass initializer create its own
+         subclass, and JOptionPane a frame no application asked for. -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.desktopcompat.java.awt.GraphicsEnvironment"/>
+                <Method name="getLocalGraphicsEnvironment"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.java.awt.KeyboardFocusManager"/>
+                <Method name="getCurrentKeyboardFocusManager"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.JOptionPane"/>
+                <Method name="getRootFrame"/>
+            </And>
+        </Or>
+        <Bug pattern="LI_LAZY_INIT_STATIC"/>
+    </Match>
+
+    <!-- Each of these is one object for the whole application by the
+         JDK's contract: the caller gets THE focus manager, THE menu
+         selection manager, THE root frame, and sets the root frame it is
+         given. -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.desktopcompat.java.awt.KeyboardFocusManager"/>
+                <Method name="getCurrentKeyboardFocusManager"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.MenuSelectionManager"/>
+                <Method name="defaultManager"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.JOptionPane"/>
+                <Or>
+                    <Method name="getRootFrame"/>
+                    <Method name="setRootFrame"/>
+                </Or>
+            </And>
+        </Or>
+        <Or>
+            <Bug pattern="MS_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_STATIC_REP2"/>
+        </Or>
+    </Match>
+
+    <!-- The container a window's peer pans in exists to hold the window
+         whose minimum size it lays that peer out at. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.rt.RootPan"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- The JDK's renderer takes its three icons from getDefaultOpenIcon,
+         getDefaultClosedIcon and getDefaultLeafIcon while it is being
+         built, and an application overrides those to give a tree its own
+         icons; calling them from the constructor is the contract. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.javax.swing.tree.DefaultTreeCellRenderer"/>
+        <Method name="&lt;init&gt;"/>
+        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR"/>
+    </Match>
+
+    <!-- The form a dialog floats in exists to hold the window it shows. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.rt.DialogForm"/>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+
+    <!-- AWT's Window constructor sets its layout through the overridable
+         setLayout, and JWindow builds its root pane through the overridable
+         windowInit, as JFrame and JDialog do; applications override them
+         counting on that. -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.desktopcompat.java.awt.Window"/>
+            <Class name="com.codename1.desktopcompat.javax.swing.JWindow"/>
+        </Or>
+        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR"/>
+    </Match>
+
+    <!-- END windows-menus slice -->
+
+    <!-- BEGIN swingx slice -->
+
+    <!-- SwingX hands out and takes the objects a component is built from,
+         as Swing does: a table's column control and column factory, a
+         list's sorter, a titled panel's content, a renderer's provider and
+         the component a cell context describes are the application's to
+         configure. A copy would not be the object the component uses. -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.JXBusyLabel"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.JXCollapsiblePane"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.JXDatePicker"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.JXFrame"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.JXList"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.error.ErrorEvent"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.JXMonthView"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.JXSearchField"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.JXTable"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.JXTitledPanel"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.decorator.ComponentAdapter"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.painter.ImagePainter"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.renderer.AbstractRenderer"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.renderer.CellContext"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.renderer.ComponentProvider"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.renderer.ListCellContext"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.renderer.TableCellContext"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.renderer.TreeCellContext"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.sort.ListSortController"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.sort.TableSortController"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.table.ColumnControlButton"/>
+        </Or>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+
+    <!-- The shared column factory is a replaceable singleton in SwingX:
+         getInstance/setInstance are its API, and it is made on first use.
+         It is only reached from the event dispatch thread. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.table.ColumnFactory"/>
+        <Or>
+            <Bug pattern="EI_EXPOSE_STATIC_REP2"/>
+            <Bug pattern="MS_EXPOSE_REP"/>
+            <Bug pattern="LI_LAZY_INIT_STATIC"/>
+        </Or>
+    </Match>
+
+    <!-- createTableColumn is overridable and SwingX documents that an
+         override may answer null to leave a model column out, so the null
+         checks are live although this class's own version never does. -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.table.ColumnFactory"/>
+                <Method name="createAndConfigureTableColumn"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.JXTable"/>
+                <Method name="createDefaultColumnsFromModel"/>
+            </And>
+        </Or>
+        <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE"/>
+    </Match>
+
+    <!-- SwingX builds a provider's component and a renderer's provider in
+         the constructor through overridable factory methods
+         (createRendererComponent, createDefaultComponentProvider), and the
+         collapsible pane sets its content pane the same way; subclasses
+         override them counting on that. -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.JXCollapsiblePane"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.renderer.AbstractRenderer"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.renderer.ComponentProvider"/>
+        </Or>
+        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR"/>
+    </Match>
+
+    <!-- noFocusBorder is "protected static Border", not final, in SwingX,
+         and dropOn and the three icons are protected fields a subclass
+         assigns; nothing in the layer writes them. -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.renderer.CellContext"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.renderer.TreeCellContext"/>
+        </Or>
+        <Or>
+            <Bug pattern="MS_SHOULD_BE_FINAL"/>
+            <Bug pattern="UWF_UNWRITTEN_PUBLIC_OR_PROTECTED_FIELD"/>
+        </Or>
+    </Match>
+
+    <!-- The default tree icons are read from one renderer made on first
+         use; cell contexts are only used on the event dispatch thread. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.renderer.TreeCellContext"/>
+        <Bug pattern="LI_LAZY_INIT_STATIC"/>
+    </Match>
+
+    <!-- Serializable only because java.util.EventObject is; nothing in
+         Codename One serializes an event. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.event.DateSelectionEvent"/>
+        <Bug pattern="SE_NO_SERIALVERSIONID"/>
+    </Match>
+
+    <!-- Picker's constructor calls updateValue() before this class has
+         its host. The override expects that: it tests the field for null
+         and falls back to the superclass's text. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.rt.DatePickerPeer"/>
+        <Method name="updateValue"/>
+        <Bug pattern="UR_UNINIT_READ_CALLED_FROM_SUPER_CONSTRUCTOR"/>
+    </Match>
+
+    <!-- TreeModelSupport is final in SwingX and still has a protected
+         listener list, and it keeps the model whose events it fires. A
+         tree table node hands out and takes its parent and user object, as
+         Swing's tree nodes do, and its constructor makes the child list
+         through the protected createChildrenList, which SwingX documents
+         as the hook for another list type. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.tree.TreeModelSupport"/>
+        <Or>
+            <Bug pattern="CI_CONFUSED_INHERITANCE"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+    <Match>
+        <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.treetable.AbstractMutableTreeTableNode"/>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+            <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR"/>
+        </Or>
+    </Match>
+
+    <!-- END swingx slice -->
+
+    <!-- BEGIN hardening slice -->
+
+    <!-- UIManager.getDefaults() and getLookAndFeelDefaults() answer THE
+         table: an application writes its defaults into what they return,
+         so a copy would lose every put. The table is static because the
+         JDK's methods are. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.javax.swing.UIManager"/>
+        <Or>
+            <Method name="getDefaults"/>
+            <Method name="getLookAndFeelDefaults"/>
+            <Method name="getLookAndFeel"/>
+        </Or>
+        <Bug pattern="MS_EXPOSE_REP"/>
+    </Match>
+
+    <!-- The JDK's BasicComboBoxEditor makes its text field through the
+         protected createEditorComponent() from its constructor, and a
+         subclass overrides exactly that to supply its own field. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.javax.swing.plaf.basic.BasicComboBoxEditor"/>
+        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR"/>
+    </Match>
+
+    <!-- The combo box peer calls its owner back when the popup opens and
+         closes; holding the watcher is the point of setting it. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.rt.ComboPeer"/>
+        <Method name="setPopupWatcher"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- Toolkit.getSystemClipboard() answers the one system clipboard;
+         a copy would be a clipboard nothing else reads. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.rt.DesktopToolkit"/>
+        <Method name="getSystemClipboard"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+
+    <!-- Swing has one tool tip manager and one current Metal theme for the
+         whole application, handed out and replaced through static methods
+         by contract; both are touched on the event dispatch thread only. -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.desktopcompat.javax.swing.ToolTipManager"/>
+            <Class name="com.codename1.desktopcompat.javax.swing.plaf.metal.MetalLookAndFeel"/>
+        </Or>
+        <Or>
+            <Bug pattern="EI_EXPOSE_STATIC_REP2"/>
+            <Bug pattern="MS_EXPOSE_REP"/>
+        </Or>
+    </Match>
+
+    <!-- FileView.isTraversable answers a Boolean so that null can mean
+         "ask the file system view"; that is the JDK's signature and its
+         documented contract, and the chooser tests for null. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.javax.swing.filechooser.FileView"/>
+        <Method name="isTraversable"/>
+        <Bug pattern="NP_BOOLEAN_RETURN_NULL"/>
+    </Match>
+
+    <!-- END hardening slice -->
+
+    <!-- BEGIN drag and drop, styled text and created fonts -->
+
+    <!-- The desktop, the toolkit, the default style context and the three
+         clipboard actions of TransferHandler are each one object for the
+         whole application, handed out by a static method: that is the
+         JDK's contract, and every one is touched on the event dispatch
+         thread only. The style context is made on first use there. -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.desktopcompat.java.awt.Desktop"/>
+                <Method name="getDesktop"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.java.awt.Toolkit"/>
+                <Method name="getDefaultToolkit"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.text.StyleContext"/>
+                <Method name="getDefaultStyleContext"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.TransferHandler"/>
+                <Or>
+                    <Method name="getCutAction"/>
+                    <Method name="getCopyAction"/>
+                    <Method name="getPasteAction"/>
+                </Or>
+            </And>
+        </Or>
+        <Or>
+            <Bug pattern="MS_EXPOSE_REP"/>
+            <Bug pattern="LI_LAZY_INIT_STATIC"/>
+        </Or>
+    </Match>
+
+    <!-- The drop target events and the desktop's application events are
+         Serializable only because java.util.EventObject is. A device has
+         no object streams, so there is no serialized form to version and
+         no field that could fail to be written. -->
+    <Match>
+        <Class name="~com\.codename1\.desktopcompat\.java\.awt\.(dnd|desktop)\..*Event"/>
+        <Or>
+            <Bug pattern="SE_NO_SERIALVERSIONID"/>
+            <Bug pattern="SE_BAD_FIELD"/>
+        </Or>
+    </Match>
+
+    <!-- A text pane's document has to be a styled one, so JTextPane
+         overrides setDocument, which the constructor of JEditorPane
+         calls (as the JDK does) before this class has its fields. The
+         override reads its listener field to tell that call apart, and
+         a null there is the answer it is looking for. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.javax.swing.JTextPane"/>
+        <Method name="setDocument"/>
+        <Bug pattern="UR_UNINIT_READ_CALLED_FROM_SUPER_CONSTRUCTOR"/>
+    </Match>
+
+    <!-- A face hands out the platform's font of its file, which is an
+         immutable handle: deriving a size from it makes another. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.rt.FontFiles$Face"/>
+        <Method name="base"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+
+    <!-- Making a drop target for a component attaches it: the JDK's
+         constructor calls the component's setDropTarget, a public method
+         of Component, and so does this one. The target's own fields are
+         all set before the call. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.java.awt.dnd.DropTarget"/>
+        <Method name="&lt;init&gt;"/>
+        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR"/>
+    </Match>
+
+    <!-- END drag and drop, styled text and created fonts -->
+
+    <!-- BEGIN look-and-feel slice: UIManager's palettes, FlatLaf and
+         RSyntaxTextArea under their own names -->
+
+    <!-- Whether a look and feel is dark has three answers: dark, light,
+         and a name the layer does not know, which keeps the palette. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.javax.swing.UIManager"/>
+        <Method name="dark"/>
+        <Bug pattern="NP_BOOLEAN_RETURN_NULL"/>
+    </Match>
+
+    <!-- FlatLaf's API: the extra defaults are a map the application
+         hands over and reads back, per look and feel and for all of them,
+         and it is that map by FlatLaf's contract. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.com.formdev.flatlaf.FlatLaf"/>
+        <Or>
+            <Method name="getExtraDefaults"/>
+            <Method name="setExtraDefaults"/>
+            <Method name="getGlobalExtraDefaults"/>
+            <Method name="setGlobalExtraDefaults"/>
+        </Or>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+            <Bug pattern="MS_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_STATIC_REP2"/>
+        </Or>
+    </Match>
+
+    <!-- "public static int duration" and "resolution" are FlatLaf's own
+         fields, not final, which applications assign. Nothing reads them
+         here because a switch of palette is not animated. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.com.formdev.flatlaf.extras.FlatAnimatedLafChange"/>
+        <Or>
+            <Field name="duration"/>
+            <Field name="resolution"/>
+        </Or>
+        <Or>
+            <Bug pattern="MS_SHOULD_BE_FINAL"/>
+            <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD"/>
+        </Or>
+    </Match>
+
+    <!-- A Theme's fields are public in RSyntaxTextArea and applications
+         assign them; the line number font is kept for them to read back,
+         the gutter draws in the editor's font. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.org.fife.ui.rsyntaxtextarea.Theme"/>
+        <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD"/>
+    </Match>
+
+    <!-- A gutter belongs to the editor it numbers, a scroll pane hands
+         out its gutter, an editor its marked ranges and a search result
+         the range it was given: each is that object by the library's
+         contract, as with the components of the JDK packages above. -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.desktopcompat.org.fife.ui.rtextarea.Gutter"/>
+            <Class name="com.codename1.desktopcompat.org.fife.ui.rtextarea.RTextScrollPane"/>
+            <Class name="com.codename1.desktopcompat.org.fife.ui.rtextarea.RTextArea"/>
+            <Class name="com.codename1.desktopcompat.org.fife.ui.rtextarea.SearchResult"/>
+        </Or>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+
+    <!-- SearchContext.clone() is public API of the library, where the
+         class is Cloneable. Here it copies field by field: Object.clone()
+         answers null on a device, so the class must not rely on it and
+         does not declare the interface the device has no use for. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.org.fife.ui.rtextarea.SearchContext"/>
+        <Method name="clone"/>
+        <Bug pattern="CN_IMPLEMENTS_CLONE_BUT_NOT_CLONEABLE"/>
+    </Match>
+
+    <!-- END look-and-feel slice -->
+</FindBugsFilter>

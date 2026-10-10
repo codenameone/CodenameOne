@@ -1,0 +1,293 @@
+name: Desktop compatibility benchmarks
+
+# The two in-tree desktop samples (scripts/desktop-compat-samples) built as what
+# their developer ships today -- jar, jlink runtime image, jpackage application
+# image -- and as native Codename One executables, then measured side by side:
+# distributable size, memory, start-up and idle CPU.
+#
+# This is a measurement, not a gate: a job fails when the harness breaks, never
+# because a number moved. Each leg uploads benchmarks-<os>.json and the same
+# figures as a markdown table. scripts/desktop-compat-benchmarks/README.md says
+# what every column means and how it was taken.
+#
+#   linux     the reference leg: the same install script, driver and input
+#             scripts as the container the committed numbers came from
+#   macos     sizes, and the runtime figures run-macos-bench.sh takes (start-up
+#             to first window, idle memory and CPU; no scripted input)
+#   windows   sizes, and the same reduced runtime figures through
+#             win-measure.ps1. NOTHING on this leg has run outside CI: nobody
+#             had a Windows machine when it was written.
+#
+# Shared runners are noisy and have few cores. Compare the columns of one run
+# with each other, not one run with another.
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'scripts/desktop-compat-benchmarks/**'
+      - '.github/workflows/desktop-compat-benchmarks.yml'
+  push:
+    branches: [ master ]
+    paths:
+      - 'scripts/desktop-compat-benchmarks/**'
+      - '.github/workflows/desktop-compat-benchmarks.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  # The modules a native build of an imported desktop project resolves, plus
+  # everything they depend on (-am). The port module is added per leg.
+  BENCH_MODULES: parparvm,compat-jdk,swing-compat,javafx-compat,fxml-compiler,codenameone-maven-plugin,cn1app-archetype
+
+jobs:
+  linux:
+    name: Linux (x64, Xvfb)
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          java-version: '8'
+          distribution: 'temurin'
+          cache: 'maven'
+      - run: echo "JDK_8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+      # The same script the benchmark container is built from: the GTK stack,
+      # Xvfb and a window manager, JDK 17 and 21, zig, the OpenJFX jmods.
+      - name: Install the toolchain and the measuring tools
+        run: sudo bash scripts/desktop-compat-benchmarks/install-linux-deps.sh /opt/bench/tools
+      - name: Build Codename One (JDK 8)
+        env:
+          RETRY_ONLY_MATCHING: transient
+          RETRY_ATTEMPTS: '5'
+          RETRY_DELAY_SECONDS: '60'
+        run: |
+          cd maven
+          JAVA_HOME="$JDK_8_HOME" bash ../scripts/ci/retry.sh xvfb-run -a mvn -B \
+            -pl "linux,$BENCH_MODULES" -am -Plocal-dev-javase -DskipTests \
+            -Darchetype.test.skip=true -Dmaven.javadoc.skip=true install
+      - name: Build and measure the samples
+        env:
+          BENCH_JAVAFX_JMODS: /opt/bench/tools/javafx-jmods
+          CN1_CC: /opt/bench/tools/cn1-zig-cc
+          BENCH_XVFB: '1'
+          BENCH_IMAGE_NAME: GitHub-hosted ubuntu-latest runner
+          BENCH_COMMIT: ${{ github.sha }}
+        run: |
+          ARCH="$(dpkg --print-architecture)"
+          export JAVA17_HOME="/usr/lib/jvm/java-17-openjdk-$ARCH"
+          export BENCH_JDK21_HOME="/usr/lib/jvm/java-21-openjdk-$ARCH"
+          export PATH="/opt/bench/tools/zig:$PATH"
+          bash scripts/desktop-compat-benchmarks/bench-samples.sh \
+            --work "$RUNNER_TEMP/bench" --out "$GITHUB_WORKSPACE/benchmark-results"
+          cat benchmark-results/benchmarks-linux.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload the results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: benchmarks-linux
+          path: benchmark-results/
+          if-no-files-found: warn
+      - name: Upload the logs and screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: benchmarks-linux-logs
+          path: ${{ runner.temp }}/bench/*/logs/
+          if-no-files-found: ignore
+
+  macos:
+    name: macOS (arm64)
+    runs-on: macos-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - run: echo "BENCH_JDK21_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - run: echo "JAVA17_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+      # Zulu: Temurin publishes no JDK 8 for Apple silicon.
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          java-version: '8'
+          distribution: 'zulu'
+          cache: 'maven'
+      - run: echo "JDK_8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+      - name: Build Codename One (JDK 8)
+        env:
+          RETRY_ONLY_MATCHING: transient
+          RETRY_ATTEMPTS: '5'
+          RETRY_DELAY_SECONDS: '60'
+        run: |
+          cd maven
+          JAVA_HOME="$JDK_8_HOME" bash ../scripts/ci/retry.sh mvn -B \
+            -pl "mac,ios,$BENCH_MODULES" -am -Plocal-dev-javase -DskipTests \
+            -Darchetype.test.skip=true -Dmaven.javadoc.skip=true -Djava.awt.headless=true install
+      - name: OpenJFX jmods
+        run: |
+          bash scripts/desktop-compat-benchmarks/javafx-jmods.sh "$BENCH_JDK21_HOME" "$RUNNER_TEMP/javafx-jmods"
+          echo "BENCH_JAVAFX_JMODS=$RUNNER_TEMP/javafx-jmods" >> "$GITHUB_ENV"
+      - name: Build the samples (sizes)
+        env:
+          BENCH_COMMIT: ${{ github.sha }}
+        run: |
+          bash scripts/desktop-compat-benchmarks/bench-samples.sh --stage build \
+            --work "$RUNNER_TEMP/bench" --out "$GITHUB_WORKSPACE/benchmark-results"
+      # The runner has a logged-in desktop session, which is what this needs:
+      # it opens each application's window in turn.
+      - name: Measure the samples (start-up, idle memory and CPU)
+        run: |
+          for NAME in swing-gallery javafx-gallery; do
+            bash scripts/desktop-compat-benchmarks/run-macos-bench.sh --work "$RUNNER_TEMP/bench" --name "$NAME" \
+              || echo "::warning::run-macos-bench.sh failed for $NAME"
+          done
+          python3 scripts/desktop-compat-benchmarks/benchutil.py collect benchmark-results/benchmarks-macos.json \
+            "$RUNNER_TEMP"/bench/*/result.json
+          python3 scripts/desktop-compat-benchmarks/report.py --out benchmark-results/benchmarks-macos.md \
+            "$RUNNER_TEMP"/bench/*/result.json
+          cat benchmark-results/benchmarks-macos.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload the results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: benchmarks-macos
+          path: benchmark-results/
+          if-no-files-found: warn
+      - name: Upload the logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: benchmarks-macos-logs
+          path: ${{ runner.temp }}/bench/*/logs/
+          if-no-files-found: ignore
+
+  windows:
+    name: Windows (x64)
+    runs-on: windows-latest
+    timeout-minutes: 240
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+      # clang-cl uses the MSVC headers, CRT and linker, so the MSVC developer
+      # environment has to be on PATH for the cmake the builder spawns.
+      - name: Set up the MSVC developer environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64
+      - name: Install Ninja
+        run: |
+          python -m pip install --upgrade ninja
+          ninja --version
+          clang-cl --version
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - run: echo "BENCH_JDK21_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - run: echo "JAVA17_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          java-version: '8'
+          distribution: 'temurin'
+          cache: 'maven'
+      - run: echo "JDK_8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+      # The scripts call python3; the runner's interpreter is "python".
+      - name: Provide python3
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          printf '#!/bin/sh\nexec python "$@"\n' > "$RUNNER_TEMP/bin/python3"
+          chmod +x "$RUNNER_TEMP/bin/python3"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Build Codename One (JDK 8)
+        env:
+          RETRY_ONLY_MATCHING: transient
+          RETRY_ATTEMPTS: '5'
+          RETRY_DELAY_SECONDS: '60'
+        run: |
+          cd maven
+          JAVA_HOME="$JDK_8_HOME" bash ../scripts/ci/retry.sh mvn -B \
+            -pl "windows,$BENCH_MODULES" -am -Plocal-dev-javase -DskipTests \
+            -Darchetype.test.skip=true -Dmaven.javadoc.skip=true install
+      - name: OpenJFX jmods
+        run: |
+          bash scripts/desktop-compat-benchmarks/javafx-jmods.sh "$BENCH_JDK21_HOME" "$RUNNER_TEMP/javafx-jmods"
+          echo "BENCH_JAVAFX_JMODS=$RUNNER_TEMP/javafx-jmods" >> "$GITHUB_ENV"
+      - name: Build the samples (sizes)
+        env:
+          BENCH_COMMIT: ${{ github.sha }}
+        run: |
+          bash scripts/desktop-compat-benchmarks/bench-samples.sh --stage build \
+            --work "$RUNNER_TEMP/bench" --out "$GITHUB_WORKSPACE/benchmark-results"
+      - name: Measure the samples (start-up, idle memory and CPU)
+        shell: pwsh
+        run: |
+          $bench = Join-Path $env:RUNNER_TEMP 'bench'
+          foreach ($name in 'swing-gallery', 'javafx-gallery') {
+            $dir = Join-Path $bench $name
+            $parts = Join-Path $dir 'parts'
+            $java = Join-Path $dir 'baseline\runtime\bin\java.exe'
+            $baseline = Join-Path $parts 'baseline.json'
+            if ((Test-Path $java) -and (Test-Path $baseline)) {
+              $main = (Get-Content $baseline -Raw | ConvertFrom-Json).main_class
+              $cp = (Join-Path $dir 'baseline\app') + '\*'
+              & scripts/desktop-compat-benchmarks/win-measure.ps1 -Label jvm_default `
+                -Out (Join-Path $parts 'run.jvm_default.json') -Exe $java -Arguments '-cp', $cp, $main
+              & scripts/desktop-compat-benchmarks/win-measure.ps1 -Label jvm_tuned `
+                -Out (Join-Path $parts 'run.jvm_tuned.json') -Exe $java `
+                -Arguments '-XX:+UseSerialGC', '-Xss256k', '-XX:TieredStopAtLevel=1', '-Xmx64m', '-cp', $cp, $main
+            } else {
+              Write-Host "::warning::no baseline runtime image for $name"
+            }
+            $marker = Join-Path $dir 'cn1\executable.txt'
+            if (Test-Path $marker) {
+              $exe = Join-Path $dir ('cn1\dist\' + (Get-Content $marker -Raw).Trim())
+              & scripts/desktop-compat-benchmarks/win-measure.ps1 -Label cn1_native `
+                -Out (Join-Path $parts 'run.cn1_native.json') -Exe $exe
+            } else {
+              Write-Host "::warning::no native Codename One build for $name"
+            }
+            python scripts/desktop-compat-benchmarks/benchutil.py assemble $parts (Join-Path $dir 'result.json')
+          }
+          $results = @(Get-ChildItem -Path $bench -Filter result.json -Recurse -Depth 1 | ForEach-Object { $_.FullName })
+          python scripts/desktop-compat-benchmarks/benchutil.py collect benchmark-results/benchmarks-windows.json @results
+          python scripts/desktop-compat-benchmarks/report.py --out benchmark-results/benchmarks-windows.md @results
+          Get-Content benchmark-results/benchmarks-windows.md | Add-Content $env:GITHUB_STEP_SUMMARY
+      - name: Upload the results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: benchmarks-windows
+          path: benchmark-results/
+          if-no-files-found: warn
+      - name: Upload the logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: benchmarks-windows-logs
+          path: ${{ runner.temp }}/bench/*/logs/
+          if-no-files-found: ignore

@@ -143,7 +143,7 @@ public class AndroidRemapperTest {
         List<String> app = refs(Files.readAllBytes(new File(classes, "com/x/Main.class").toPath()));
         assertTrue(app.toString(), app.contains("com/codename1/androidcompat/android/app/Activity"));
         assertTrue(app.toString(), app.contains("(Lcom/codename1/androidcompat/android/view/View;)V"));
-        assertTrue(app.toString(), app.contains("com/codename1/androidcompat/jdk/BufferedReader"));
+        assertTrue(app.toString(), app.contains("com/codename1/compat/jdk/BufferedReader"));
         for (String r : app) {
             assertFalse(r, r != null && (r.startsWith("android/") || r.contains("Landroid/")));
         }
@@ -488,8 +488,8 @@ public class AndroidRemapperTest {
         assertEquals(1, itf.get(0).length);
         assertEquals("java/lang/AutoCloseable", itf.get(0)[0]);
         List<String> r = refs(out);
-        assertTrue(r.toString(), r.contains("(Lcom/codename1/androidcompat/jdk/File;)Ljava/io/InputStream;"));
-        assertTrue(r.toString(), r.contains("com/codename1/androidcompat/jdk/FileInputStream"));
+        assertTrue(r.toString(), r.contains("(Lcom/codename1/compat/jdk/File;)Ljava/io/InputStream;"));
+        assertTrue(r.toString(), r.contains("com/codename1/compat/jdk/FileInputStream"));
     }
 
     /// A public class `name` extending `superName` with public constructors

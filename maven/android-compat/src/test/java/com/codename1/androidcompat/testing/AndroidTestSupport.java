@@ -30,6 +30,7 @@ import android.view.View;
 
 import com.codename1.androidcompat.runtime.AndroidApp;
 import com.codename1.androidcompat.runtime.AndroidRuntime;
+import com.codename1.compat.testing.HeadlessImplementation;
 
 /// The Android runtime started on [HeadlessImplementation] with an
 /// application that has no resources of its own, so tests can construct,

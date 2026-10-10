@@ -130,6 +130,13 @@
       ]
     },
     {
+      "id": "desktop-compatibility",
+      "category": "Application runtime",
+      "name": "Swing and JavaFX applications (java.awt, javax.swing, SwingX and javafx.*)",
+      "description": "Runs unmodified Swing, SwingX and JavaFX code -- layout managers, the standard controls, tables, trees and lists with custom renderers, Graphics2D and Canvas painting, FXML with controllers and style sheets, and modal dialogs that block their caller -- through the desktop compatibility runtimes, embedded in a Codename One form.",
+      "tests": ["DesktopCompatSwingControlsScreenshotTest","DesktopCompatSwingTablesScreenshotTest","DesktopCompatSwingTreesScreenshotTest","DesktopCompatSwingPaintingScreenshotTest","DesktopCompatSwingContainersScreenshotTest","DesktopCompatSwingOptionPaneScreenshotTest","DesktopCompatSwingXScreenshotTest","DesktopCompatFxControlsScreenshotTest","DesktopCompatFxDataScreenshotTest","DesktopCompatFxShapesScreenshotTest","DesktopCompatFxFxmlScreenshotTest","DesktopCompatFxPanesScreenshotTest","DesktopCompatFxAlertScreenshotTest"]
+    },
+    {
       "id": "ads",
       "category": "Application runtime",
       "name": "Advertising components",
@@ -1584,6 +1591,58 @@
     {
       "pattern": "AndroidCompatKotlin",
       "test": "AndroidCompatKotlinScreenshotTest"
+    },
+    {
+      "pattern": "DesktopCompatSwingControls",
+      "test": "DesktopCompatSwingControlsScreenshotTest"
+    },
+    {
+      "pattern": "DesktopCompatSwingTables",
+      "test": "DesktopCompatSwingTablesScreenshotTest"
+    },
+    {
+      "pattern": "DesktopCompatSwingTrees",
+      "test": "DesktopCompatSwingTreesScreenshotTest"
+    },
+    {
+      "pattern": "DesktopCompatSwingPainting",
+      "test": "DesktopCompatSwingPaintingScreenshotTest"
+    },
+    {
+      "pattern": "DesktopCompatSwingContainers",
+      "test": "DesktopCompatSwingContainersScreenshotTest"
+    },
+    {
+      "pattern": "DesktopCompatSwingOptionPane",
+      "test": "DesktopCompatSwingOptionPaneScreenshotTest"
+    },
+    {
+      "pattern": "DesktopCompatSwingX",
+      "test": "DesktopCompatSwingXScreenshotTest"
+    },
+    {
+      "pattern": "DesktopCompatFxControls",
+      "test": "DesktopCompatFxControlsScreenshotTest"
+    },
+    {
+      "pattern": "DesktopCompatFxData",
+      "test": "DesktopCompatFxDataScreenshotTest"
+    },
+    {
+      "pattern": "DesktopCompatFxShapes",
+      "test": "DesktopCompatFxShapesScreenshotTest"
+    },
+    {
+      "pattern": "DesktopCompatFxFxml",
+      "test": "DesktopCompatFxFxmlScreenshotTest"
+    },
+    {
+      "pattern": "DesktopCompatFxPanes",
+      "test": "DesktopCompatFxPanesScreenshotTest"
+    },
+    {
+      "pattern": "DesktopCompatFxAlert",
+      "test": "DesktopCompatFxAlertScreenshotTest"
     }
   ]
 }

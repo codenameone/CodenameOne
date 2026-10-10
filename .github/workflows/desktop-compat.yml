@@ -1,0 +1,147 @@
+name: Desktop compatibility
+
+# Swing and JavaFX applications built as Codename One applications: the
+# relocated toolkits (maven/swing-compat, maven/javafx-compat), the JDK classes
+# they share with the Android layer (maven/compat-jdk), the headless harness
+# their tests run on (maven/compat-testing) and the build steps that relocate
+# and package them (build-engine, the Maven and Gradle plugins).
+#
+#   unit tests                    the runtimes against the JDK's own behaviour,
+#                                 the remapper, the importer, and the sample
+#                                 loaded remapped and painted headless
+#   desktop-compat-test.sh        every sample under scripts/desktop-compat-samples
+#                                 imported unmodified, built by Maven and Gradle,
+#                                 checked for unrelocated toolkit references,
+#                                 staged for iOS, Android, JavaScript and the
+#                                 desktop with identical uploads from both
+#                                 tools, and built once in a project that also
+#                                 holds an Android application
+#   desktop-compat-realport       the two galleries that script staged, run on
+#                                 the real JavaSE port under xvfb and driven
+#                                 with the display server's pointer and keys;
+#                                 fails on anything thrown and on a click, a
+#                                 drag or a key that changes no pixel
+on:
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'maven/swing-compat/**'
+      - 'maven/javafx-compat/**'
+      - 'maven/fxml-compiler/**'
+      - 'maven/compat-jdk/**'
+      - 'maven/compat-testing/**'
+      - 'maven/build-engine/**'
+      - 'maven/codenameone-maven-plugin/**'
+      - 'maven/codenameone-gradle-plugin/**'
+      - 'maven/project-model/**'
+      - 'maven/cn1app-archetype/**'
+      - 'maven/pom.xml'
+      - 'maven/integration-tests/desktop-compat-test.sh'
+      - 'maven/integration-tests/desktop-compat-realport/**'
+      - 'maven/integration-tests/inc/**'
+      - 'scripts/desktop-compat-samples/**'
+      # The script builds one project holding both layers from this sample.
+      - 'scripts/android-compat-samples/gallery/**'
+      - '.github/workflows/desktop-compat.yml'
+  push:
+    branches: [ master ]
+    paths:
+      - 'maven/swing-compat/**'
+      - 'maven/javafx-compat/**'
+      - 'maven/fxml-compiler/**'
+      - 'maven/compat-jdk/**'
+      - 'maven/compat-testing/**'
+      - 'maven/build-engine/**'
+      - 'maven/codenameone-maven-plugin/**'
+      - 'maven/codenameone-gradle-plugin/**'
+      - 'maven/project-model/**'
+      - 'maven/cn1app-archetype/**'
+      - 'maven/pom.xml'
+      - 'maven/integration-tests/desktop-compat-test.sh'
+      - 'maven/integration-tests/desktop-compat-realport/**'
+      - 'maven/integration-tests/inc/**'
+      - 'scripts/desktop-compat-samples/**'
+      - 'scripts/android-compat-samples/gallery/**'
+      - '.github/workflows/desktop-compat.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  desktop-compat:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CN1_GRADLE_REQUIRED: '1'
+    steps:
+      - uses: actions/checkout@v6
+      # Installed FIRST so the JDK 8 below is the one JAVA_HOME names.
+      - name: Set up JDK 17 for Gradle
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - run: echo "GRADLE_JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          java-version: '8'
+          distribution: 'temurin'
+          cache: 'maven'
+      # xvfb for the CSS compiler, which opens an AWT frame. Nothing in the
+      # compatibility layers opens a window: their tests run on the headless
+      # implementation in maven/compat-testing.
+      - name: Install xvfb
+        run: bash scripts/ci/apt-get-install.sh xvfb
+      - name: Build Codename One Maven artifacts (includes archetypes and both plugins)
+        env:
+          RETRY_ONLY_MATCHING: transient
+          RETRY_ATTEMPTS: '5'
+          RETRY_DELAY_SECONDS: '60'
+        run: |
+          cd maven
+          bash ../scripts/ci/retry.sh xvfb-run -a mvn install -Plocal-dev-javase -DskipTests -Darchetype.test.skip=true -Dmaven.javadoc.skip=true
+      # A module added to the layer (an FXML compiler, say) joins this list.
+      - name: Unit tests
+        working-directory: maven
+        run: xvfb-run -a mvn -B -Plocal-dev-javase -pl compat-jdk,compat-testing,swing-compat,javafx-compat,fxml-compiler,build-engine test
+      # The JavaFX sample has to stay what it claims to be: a JavaFX project
+      # that builds on its own, against OpenJFX, with nothing of the layer on
+      # its class path. Everything else here compiles it against the layer,
+      # which would also accept a sample written to the layer's shape. JDK 17
+      # because OpenJFX 17 is; the Swing sample needs no such step, the JDK
+      # that compiles it in the unit tests is the toolkit.
+      - name: The JavaFX sample compiles against OpenJFX
+        env:
+          RETRY_ONLY_MATCHING: transient
+          RETRY_ATTEMPTS: '5'
+          RETRY_DELAY_SECONDS: '60'
+        run: JAVA_HOME="$GRADLE_JAVA_HOME" bash scripts/ci/retry.sh mvn -B -f scripts/desktop-compat-samples/javafx-gallery/pom.xml compile
+      - name: Refresh archetype catalog
+        run: |
+          cd maven
+          xvfb-run -a mvn archetype:update-local-catalog -Plocal-dev-javase
+          xvfb-run -a mvn archetype:crawl -Plocal-dev-javase
+      - name: Desktop samples, imported and built by Maven and Gradle
+        working-directory: maven/integration-tests
+        run: xvfb-run -a bash desktop-compat-test.sh
+      # The galleries the step above staged, on the real port, under the
+      # display server's own pointer and keys. The unit tests fire events at
+      # the node they are meant for; this is the only place a dead button or a
+      # key the port never delivers can fail. It runs on GRADLE_JAVA_HOME,
+      # the JDK 17: the port needs 11 or newer at run time. The screen is
+      # named because xvfb-run's default is smaller than the application.
+      - name: The galleries on the real JavaSE port, under real input
+        working-directory: maven/integration-tests
+        run: xvfb-run -a -s "-screen 0 1400x1000x24" bash desktop-compat-realport/run.sh
+      - name: Upload the test projects' logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-compat-logs
+          path: |
+            maven/integration-tests/build/desktop-compat/**/*.log
+            maven/integration-tests/build/desktop-compat-realport/**/realport.log
+            maven/integration-tests/build/desktop-compat-realport/**/frames/*.png
+          if-no-files-found: ignore

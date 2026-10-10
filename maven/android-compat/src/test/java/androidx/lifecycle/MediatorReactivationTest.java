@@ -21,7 +21,7 @@
  * need additional information or have any questions.
  */
 package androidx.lifecycle;
-import com.codename1.androidcompat.testing.MainThreadRule;
+import com.codename1.compat.testing.MainThreadRule;
 import androidx.arch.core.util.Function;
 import org.junit.Rule;
 import org.junit.Test;

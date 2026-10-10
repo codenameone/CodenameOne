@@ -158,4 +158,38 @@ class KotlinRelocationWiringTest {
         assertTrue(recorded.get("classes").dependsOn.contains(relocate),
                 "every Codename One task depends on classes, so it waits for relocation");
     }
+
+    /// The Swing runtime is written under the names it ships with, so
+    /// Kotlin's classes can only be checked once they are relocated. The
+    /// relocation task then does both, in that order, and a module that
+    /// checks Kotlin where it is compiled passes no check here at all.
+    @Test
+    void complianceFollowsRelocationInTheSameTask() {
+        final List<String> ran = new ArrayList<String>();
+        Action<Task> remap = t -> ran.add("remap");
+        Action<Task> compliance = t -> ran.add("compliance");
+
+        AppSupport.kotlinRelocation(remap, compliance).execute(task("cn1RemapAndroidKotlin"));
+        assertEquals(Arrays.asList("remap", "compliance"), ran);
+
+        ran.clear();
+        AppSupport.kotlinRelocation(remap, null).execute(task("cn1RemapAndroidKotlin"));
+        assertEquals(Arrays.asList("remap"), ran);
+    }
+
+    /// A failed relocation leaves classes the check would misreport.
+    @Test
+    void aFailedRelocationSkipsTheCheck() {
+        final List<String> ran = new ArrayList<String>();
+        Action<Task> remap = t -> {
+            throw new IllegalStateException("remap");
+        };
+        Action<Task> compliance = t -> ran.add("compliance");
+        try {
+            AppSupport.kotlinRelocation(remap, compliance).execute(task("cn1RemapAndroidKotlin"));
+            throw new AssertionError("the failure must reach Gradle");
+        } catch (IllegalStateException expected) {
+            assertTrue(ran.isEmpty());
+        }
+    }
 }

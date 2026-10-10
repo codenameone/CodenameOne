@@ -29,13 +29,10 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -128,18 +125,21 @@ public final class AndroidProjectImporter {
         Result r = new Result();
         File target = new File(commonDir, "src/main/android");
         try {
-            Map<String, String> previous = readImportRecord(target);
-            Map<String, String> imported = new TreeMap<String, String>();
+            // The manifest's hash is recorded below, once the build script has
+            // been merged into it; it is always imported (a module without one
+            // is refused), so it is never stale either.
+            ImportedFiles files = new ImportedFiles(target, IMPORT_RECORD, "the Android project", log)
+                    .deferring(MANIFEST);
             for (String name : new String[] {"AndroidManifest.xml", "res", "assets", "java", "kotlin"}) {
                 File src = new File(main, name);
                 if (src.exists()) {
-                    r.copiedFiles += copy(src, new File(target, name), name, previous, imported);
+                    r.copiedFiles += files.copy(src, new File(target, name), name);
                 }
             }
             // A manifest the developer edited since the earlier import was kept
             // by copy() with its earlier record; it already carries the merge.
-            boolean manifestKept = imported.containsKey(MANIFEST);
-            removeStaleImports(target, previous, imported);
+            boolean manifestKept = files.has(MANIFEST);
+            files.removeStale();
             File moduleDir = main.getParentFile().getParentFile();
             File gradle = new File(moduleDir, "build.gradle.kts");
             if (!gradle.isFile()) {
@@ -173,9 +173,9 @@ public final class AndroidProjectImporter {
                     log.info("Added the Gradle namespace and version to the copied manifest");
                 }
                 // Recorded as written, so a later import can tell a local edit.
-                imported.put(MANIFEST, sha256(manifest));
+                files.record(MANIFEST);
             }
-            writeImportRecord(target, imported);
+            files.write();
             if (mainPackage != null && mainClass != null) {
                 writeEntryPoint(new File(commonDir, "src/main/java"), mainPackage, mainClass);
             }
@@ -201,16 +201,7 @@ public final class AndroidProjectImporter {
     }
 
     static boolean hasKotlin(File dir) {
-        File[] files = dir.listFiles();
-        if (files == null) {
-            return false;
-        }
-        for (File f : files) {
-            if (f.isDirectory() ? hasKotlin(f) : f.getName().endsWith(".kt")) {
-                return true;
-            }
-        }
-        return false;
+        return ImportedFiles.hasKotlin(dir);
     }
 
     /// Adds `name="value"` to the `<manifest>` element when it has no such
@@ -356,119 +347,7 @@ public final class AndroidProjectImporter {
     /// The manifest's path in the import record.
     static final String MANIFEST = "AndroidManifest.xml";
 
-    /// Copies `src` to `dest`, recording each copied file's path (relative to
-    /// `src/main/android`, `/` separated) and content hash in `imported`. The
-    /// manifest's hash is left for the caller to record once it has merged the
-    /// build script into it.
-    ///
-    /// A file an earlier import wrote and the developer changed since (its
-    /// bytes no longer match `previous`) is kept, as [#removeStaleImports]
-    /// keeps one, and as an import keeps a customized entry point: it is
-    /// recorded with its earlier hash, so the next import still recognizes
-    /// the edit, and deleting it lets an import copy it afresh.
-    private int copy(File src, File dest, String path, Map<String, String> previous, Map<String, String> imported)
-            throws IOException {
-        if (src.isDirectory()) {
-            int n = 0;
-            File[] files = src.listFiles();
-            if (files != null) {
-                for (File f : files) {
-                    n += copy(f, new File(dest, f.getName()), path + "/" + f.getName(), previous, imported);
-                }
-            }
-            return n;
-        }
-        String recorded = previous.get(path);
-        if (recorded != null && dest.isFile() && !recorded.equals(sha256(dest))
-                && !java.util.Arrays.equals(Files.readAllBytes(src.toPath()), Files.readAllBytes(dest.toPath()))) {
-            log.warn("Kept " + dest + ": it was changed after the earlier import, so the Android project's copy "
-                    + "was not imported; delete it and import again to take that copy");
-            imported.put(path, recorded);
-            return 0;
-        }
-        dest.getParentFile().mkdirs();
-        Files.copy(src.toPath(), dest.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-        if (!MANIFEST.equals(path)) {
-            imported.put(path, sha256(dest));
-        }
-        return 1;
-    }
-
-    /// Removes what an earlier import copied and this one did not, so a file
-    /// deleted or renamed upstream does not stay behind to be compiled or
-    /// packaged. Only a file listed in the earlier import's record is a
-    /// candidate, and only while it still holds exactly the bytes that import
-    /// wrote: a file the developer added, or edited after importing it, is
-    /// kept. Directories the removal empties go too.
-    private void removeStaleImports(File target, Map<String, String> previous, Map<String, String> imported)
-            throws IOException {
-        for (Map.Entry<String, String> e : previous.entrySet()) {
-            String path = e.getKey();
-            // The manifest is always imported (a module without one is refused);
-            // its record is written only after the merge, so it is not here yet.
-            if (imported.containsKey(path) || MANIFEST.equals(path) || path.contains("..")) {
-                continue;
-            }
-            File f = new File(target, path.replace('/', File.separatorChar));
-            if (!f.isFile()) {
-                continue;
-            }
-            if (!e.getValue().equals(sha256(f))) {
-                log.warn("Kept " + f + ": it is no longer in the Android project, but it was changed after "
-                        + "the earlier import");
-                continue;
-            }
-            Files.delete(f.toPath());
-            log.info("Removed " + f + ": it is no longer in the Android project");
-            File dir = f.getParentFile();
-            while (dir != null && !dir.equals(target)) {
-                String[] left = dir.list();
-                if (left == null || left.length > 0 || !dir.delete()) {
-                    break;
-                }
-                dir = dir.getParentFile();
-            }
-        }
-    }
-
     /// The record an import leaves in `src/main/android`: one
     /// `<sha-256> <path>` line per file it copied.
     static final String IMPORT_RECORD = ".android-import-files";
-
-    private static Map<String, String> readImportRecord(File target) throws IOException {
-        Map<String, String> out = new TreeMap<String, String>();
-        File f = new File(target, IMPORT_RECORD);
-        if (!f.isFile()) {
-            return out;
-        }
-        for (String line : Files.readAllLines(f.toPath(), Charset.forName("UTF-8"))) {
-            int sp = line.indexOf(' ');
-            if (sp > 0 && sp < line.length() - 1) {
-                out.put(line.substring(sp + 1), line.substring(0, sp));
-            }
-        }
-        return out;
-    }
-
-    private static void writeImportRecord(File target, Map<String, String> imported) throws IOException {
-        StringBuilder b = new StringBuilder();
-        for (Map.Entry<String, String> e : imported.entrySet()) {
-            b.append(e.getValue()).append(' ').append(e.getKey()).append('\n');
-        }
-        target.mkdirs();
-        Files.write(new File(target, IMPORT_RECORD).toPath(), b.toString().getBytes(Charset.forName("UTF-8")));
-    }
-
-    private static String sha256(File f) throws IOException {
-        try {
-            byte[] d = MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(f.toPath()));
-            StringBuilder b = new StringBuilder(d.length * 2);
-            for (byte x : d) {
-                b.append(Character.forDigit((x >> 4) & 0xf, 16)).append(Character.forDigit(x & 0xf, 16));
-            }
-            return b.toString();
-        } catch (NoSuchAlgorithmException e) {
-            throw new IOException("SHA-256 is unavailable", e);
-        }
-    }
 }

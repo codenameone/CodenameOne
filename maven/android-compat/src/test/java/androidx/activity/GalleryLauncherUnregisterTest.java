@@ -31,8 +31,8 @@ import androidx.activity.result.ActivityResultCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 
-import com.codename1.androidcompat.testing.HeadlessImplementation;
-import com.codename1.androidcompat.testing.MainThreadRule;
+import com.codename1.compat.testing.HeadlessImplementation;
+import com.codename1.compat.testing.MainThreadRule;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 

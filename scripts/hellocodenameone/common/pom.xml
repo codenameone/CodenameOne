@@ -43,6 +43,38 @@
     <!-- The following are profiles to cover special cases -->
     <profiles>
 
+        <!-- The desktop compatibility layers: active while src/main/desktop
+             exists, as in a generated project. The desktop sources there name no
+             entry point (there is no cn1-desktop.properties), so they are built
+             in library mode and this app keeps its own main class. SwingX is
+             only compiled against: the Swing layer has its own. -->
+        <profile>
+            <id>desktop-compat</id>
+            <activation>
+                <file>
+                    <exists>${basedir}/src/main/desktop</exists>
+                </file>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-swing-compat</artifactId>
+                    <scope>provided</scope>
+                </dependency>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-javafx-compat</artifactId>
+                    <scope>provided</scope>
+                </dependency>
+                <dependency>
+                    <groupId>org.swinglabs.swingx</groupId>
+                    <artifactId>swingx-all</artifactId>
+                    <version>1.6.5-1</version>
+                    <scope>provided</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+
         <!-- A profile to install Codename One support libraries to your home directory
             if they aren't installed yet. -->
         <profile>
@@ -411,6 +443,16 @@
                             <androidSourceDir>${android.gallery.dir}</androidSourceDir>
                         </configuration>
                     </execution>
+                    <!-- The desktop compatibility screens (src/main/desktop): adds
+                         its java/ and resources/ to the build and compiles the
+                         FXML document and the style sheet. -->
+                    <execution>
+                        <id>prepare-desktop-sources</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>prepare-desktop-sources</goal>
+                        </goals>
+                    </execution>
                     <execution>
                         <id>generate-gui-sources</id>
                         <phase>process-sources</phase>
@@ -422,7 +464,9 @@
                         <id>cn1-process-classes</id>
                         <phase>process-classes</phase>
                         <goals>
-                            <goal>remap-android</goal>
+                            <!-- Relocates the Android gallery AND the desktop
+                                 screens onto their compatibility runtimes. -->
+                            <goal>remap-compat</goal>
                             <goal>bytecode-compliance</goal>
                             <goal>css</goal>
                             <goal>process-annotations</goal>

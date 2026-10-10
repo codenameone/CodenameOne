@@ -34,8 +34,15 @@
  */
 
 #include "cn1_linux_gfx.h"
+#include <pthread.h>
+#include <stdatomic.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#ifdef __GLIBC__
+#include <malloc.h>
+#endif
 
 extern const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str);
 extern JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim);
@@ -44,11 +51,61 @@ int cn1LinuxSurfaceToPng(cairo_surface_t* surface, unsigned char** outData, int*
 
 #define CN1I(p) ((CN1Image*) (intptr_t) (p))
 
+/*
+ * How many images are alive and how many bytes their surfaces hold. An image is
+ * made on whatever thread asks for one and destroyed on the drawing thread, hence
+ * atomics. The numbers answer the question a resident-set figure cannot: whether
+ * memory is in pictures the port still holds, or somewhere else.
+ *
+ * CN1_LOG_IMAGES in the environment prints them to stderr, at most every 50 ms,
+ * as "[IMAGES] live=<count> bytes=<bytes> made=<count> freed=<count>" -- the same
+ * kind of switch as the collector's CN1_GC_LOG_CYCLES, and like it one cached
+ * getenv when it is off.
+ */
+static _Atomic long cn1ImagesLive = 0;
+static _Atomic long cn1ImageBytesLive = 0;
+static _Atomic long cn1ImagesMade = 0;
+static _Atomic long cn1ImagesFreed = 0;
+
+static void cn1LogImages(void) {
+    static _Atomic int logImages = -1;
+    static _Atomic long long lastLogged = 0;
+    struct timespec now;
+    long long millis;
+    int on = atomic_load_explicit(&logImages, memory_order_relaxed);
+    if (on < 0) {
+        on = getenv("CN1_LOG_IMAGES") ? 1 : 0;
+        atomic_store_explicit(&logImages, on, memory_order_relaxed);
+    }
+    if (!on) {
+        return;
+    }
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    millis = (long long) now.tv_sec * 1000 + now.tv_nsec / 1000000;
+    if (millis - atomic_load_explicit(&lastLogged, memory_order_relaxed) < 50) {
+        return;
+    }
+    atomic_store_explicit(&lastLogged, millis, memory_order_relaxed);
+    fprintf(stderr, "[IMAGES] live=%ld bytes=%ld made=%ld freed=%ld\n",
+            atomic_load_explicit(&cn1ImagesLive, memory_order_relaxed),
+            atomic_load_explicit(&cn1ImageBytesLive, memory_order_relaxed),
+            atomic_load_explicit(&cn1ImagesMade, memory_order_relaxed),
+            atomic_load_explicit(&cn1ImagesFreed, memory_order_relaxed));
+}
+
+static long cn1SurfaceBytes(cairo_surface_t* surface) {
+    return (long) cairo_image_surface_get_stride(surface) * cairo_image_surface_get_height(surface);
+}
+
 static CN1Image* cn1WrapSurface(cairo_surface_t* surface) {
     CN1Image* img = (CN1Image*) calloc(1, sizeof(CN1Image));
     img->surface = surface;
     img->width = cairo_image_surface_get_width(surface);
     img->height = cairo_image_surface_get_height(surface);
+    atomic_fetch_add_explicit(&cn1ImagesLive, 1, memory_order_relaxed);
+    atomic_fetch_add_explicit(&cn1ImageBytesLive, cn1SurfaceBytes(surface), memory_order_relaxed);
+    atomic_fetch_add_explicit(&cn1ImagesMade, 1, memory_order_relaxed);
+    cn1LogImages();
     return img;
 }
 
@@ -232,6 +289,98 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_getImageGraphics___long_R_long(CO
     g->clipH = img->height;
     cairo_matrix_init_identity(&g->transform);
     img->mutableGraphics = g;
+    return (JAVA_LONG) (intptr_t) g;
+}
+
+/*
+ * Disposal.
+ *
+ * An image handle's finalizer runs on the collector's thread while the event
+ * dispatch thread may be inside cairo with the very surface, so the finalizer only
+ * queues the pointer (releaseImage) and the drawing thread frees what is queued
+ * between frames (nextReleasedImage / disposeImage). Until these existed nothing
+ * in the port destroyed an image surface at all.
+ */
+/*
+ * Freeing is not giving back. glibc keeps what free() hands it for the next
+ * malloc, and a surface is 1.9 MB at 800x600 -- below the size it maps on its
+ * own once the threshold has adapted, so the pages stay in the process. An
+ * application that draws a picture per frame freed every one of them and was
+ * still measured at 340 MB resident with 58 MB in use; malloc_trim(0) took it to
+ * 188 MB. The pages are returned once this many bytes of surfaces were freed
+ * since the last time, which is about once per collection. Other C libraries
+ * have no such call and keep their own counsel.
+ */
+#define CN1_TRIM_AFTER_BYTES (32L * 1024 * 1024)
+static long cn1FreedSinceTrim = 0;
+
+static pthread_mutex_t cn1ReleasedLock = PTHREAD_MUTEX_INITIALIZER;
+static CN1Image** cn1Released = 0;
+static int cn1ReleasedCount = 0;
+static int cn1ReleasedCapacity = 0;
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_releaseImage___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG image) {
+    CN1Image* img = CN1I(image);
+    if (!img) {
+        return;
+    }
+    pthread_mutex_lock(&cn1ReleasedLock);
+    if (cn1ReleasedCount == cn1ReleasedCapacity) {
+        int capacity = cn1ReleasedCapacity == 0 ? 64 : cn1ReleasedCapacity * 2;
+        CN1Image** grown = (CN1Image**) realloc(cn1Released, sizeof(CN1Image*) * (size_t) capacity);
+        if (grown == 0) {
+            /* Out of memory for the queue itself: the image stays allocated, which
+             * is what happened to every image before this queue existed. */
+            pthread_mutex_unlock(&cn1ReleasedLock);
+            return;
+        }
+        cn1Released = grown;
+        cn1ReleasedCapacity = capacity;
+    }
+    cn1Released[cn1ReleasedCount++] = img;
+    pthread_mutex_unlock(&cn1ReleasedLock);
+}
+
+JAVA_LONG com_codename1_impl_linux_LinuxNative_nextReleasedImage___R_long(CODENAME_ONE_THREAD_STATE) {
+    CN1Image* img = 0;
+    pthread_mutex_lock(&cn1ReleasedLock);
+    if (cn1ReleasedCount > 0) {
+        img = cn1Released[--cn1ReleasedCount];
+    }
+    pthread_mutex_unlock(&cn1ReleasedLock);
+    return (JAVA_LONG) (intptr_t) img;
+}
+
+JAVA_LONG com_codename1_impl_linux_LinuxNative_disposeImage___long_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG image) {
+    CN1Image* img = CN1I(image);
+    CN1Graphics* g;
+    if (!img) {
+        return 0;
+    }
+    g = img->mutableGraphics;
+    if (g != 0) {
+        if (g->cr != 0) {
+            cairo_destroy(g->cr);
+        }
+        cn1LinuxFreeClipShape(g);
+        free(g);
+    }
+    if (img->surface != 0) {
+        long bytes = cn1SurfaceBytes(img->surface);
+        cn1FreedSinceTrim += bytes;
+        atomic_fetch_sub_explicit(&cn1ImageBytesLive, bytes, memory_order_relaxed);
+        cairo_surface_destroy(img->surface);
+    }
+    free(img);
+    atomic_fetch_sub_explicit(&cn1ImagesLive, 1, memory_order_relaxed);
+    atomic_fetch_add_explicit(&cn1ImagesFreed, 1, memory_order_relaxed);
+    cn1LogImages();
+#ifdef __GLIBC__
+    if (cn1FreedSinceTrim >= CN1_TRIM_AFTER_BYTES) {
+        cn1FreedSinceTrim = 0;
+        malloc_trim(0);
+    }
+#endif
     return (JAVA_LONG) (intptr_t) g;
 }
 

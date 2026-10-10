@@ -1,0 +1,32 @@
+# The JavaFX gallery under a real pointer and real keys.
+# Every step but the quiet ones has to change the picture, outside whatever
+# was moving by itself; see RealPortDriver.java.
+#
+# Positions are fractions of the application's area, which is the one the
+# gallery gives itself: its scene is 920 by 660 logical pixels, and under
+# xvfb that is a window of 949 by 681 with 949 by 660 left under the port's
+# own menu bar ("REALPORT area: 949x660"). A step that stops changing the
+# picture after a change to the layer is first checked against the frames:
+# what it aimed at may have moved.
+sleep 4000
+shot start
+# A button, a toggle, a check box and a radio button, each reported in the line below the controls.
+click 0.056 0.185
+click 0.433 0.185
+click 0.028 0.309
+click 0.028 0.359
+# A text field: focus, typing, and Tab on to the next one.
+click 0.300 0.433
+type ada
+key TAB
+# The slider follows a drag.
+drag 0.403 0.789 0.250 0.789 400
+# Tabs: Data, Layouts, Animation and back.
+click 0.092 0.059
+shot data
+click 0.148 0.059
+shot layouts
+click 0.406 0.059
+shot animation
+click 0.034 0.059
+shot controls

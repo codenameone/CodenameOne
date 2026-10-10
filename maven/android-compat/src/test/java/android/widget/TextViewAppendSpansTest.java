@@ -24,7 +24,7 @@ package android.widget;
 import android.text.SpannableString;
 import android.text.Spanned;
 import com.codename1.androidcompat.testing.AndroidTestSupport;
-import com.codename1.androidcompat.testing.MainThreadRule;
+import com.codename1.compat.testing.MainThreadRule;
 import org.junit.Rule;
 import org.junit.Test;
 import static org.junit.Assert.*;

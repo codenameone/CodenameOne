@@ -1,0 +1,153 @@
+# The nearest supported alternative to an API a device does not have.
+#
+# One row per line:   API prefix | what to use, by name | what to say
+#
+# - The prefix is the API as Java spells it: a package ending in a dot
+#   (java.sql.), a class (java.lang.ProcessBuilder) or a member
+#   (java.lang.Runtime.exec). The longest prefix that matches wins.
+# - The second column lists the classes and members the advice names, comma
+#   separated, a member as Class#member. ComplianceAlternativesTest fails
+#   when one of them is not in codenameone-core, java-runtime or a
+#   compatibility layer, so a row cannot point at something that is gone.
+#   It is empty for a row that says there is no equivalent.
+# - Adding a row is adding a line.
+
+# Processes
+java.lang.ProcessBuilder | com.codename1.ui.CN#execute, com.codename1.ui.CN#canExecute | A device cannot start a process. To open a URL, a file or another application use CN.execute(url), after CN.canExecute(url); anything else belongs behind an interface with a desktop-only implementation.
+java.lang.Process | com.codename1.ui.CN#execute | A device cannot start a process. Use CN.execute(url) to hand a URL or a file to the system, or put the feature behind an interface with a desktop-only implementation.
+java.lang.Runtime.exec | com.codename1.ui.CN#execute, com.codename1.ui.CN#canExecute | A device cannot start a process. To open a URL, a file or another application use CN.execute(url), after CN.canExecute(url).
+java.lang.Runtime.addShutdownHook | com.codename1.system.Lifecycle#stop, com.codename1.system.Lifecycle#destroy | An application is stopped by the system, not by a JVM exit. Save state in the Lifecycle's stop() and destroy().
+java.lang.ProcessHandle | | No equivalent: a device application sees no other process.
+
+# Networking
+java.net.http. | com.codename1.io.rest.Rest, com.codename1.io.ConnectionRequest | Use Rest (Rest.get(url).getAsJsonMap()) for a request and its response, or ConnectionRequest for full control; both run on the network thread and call back on the EDT.
+java.net.HttpURLConnection | com.codename1.io.rest.Rest, com.codename1.io.ConnectionRequest | Use Rest for a request and its response, or ConnectionRequest for full control.
+java.net.URLConnection | com.codename1.io.ConnectionRequest | Use ConnectionRequest, which reads the response in readResponse(InputStream).
+javax.net.ssl. | com.codename1.io.ConnectionRequest | HTTPS is handled by the platform: use ConnectionRequest or Rest with an https URL. To pin a certificate override ConnectionRequest.checkSSLCertificates.
+java.net.Socket | com.codename1.io.Socket#connect, com.codename1.io.WebSocket | Use com.codename1.io.Socket.connect(host, port, SocketConnection), or WebSocket for a message stream to a server.
+java.net.ServerSocket | com.codename1.io.Socket#listen | Use com.codename1.io.Socket.listen(port, SocketConnection class) where Socket.isServerSocketSupported(); a phone is rarely reachable from outside.
+java.net.DatagramSocket | | No equivalent: there are no datagram sockets on a device. Use a WebSocket or an HTTP request.
+java.net.InetAddress | com.codename1.io.Socket#getHostOrIP | Host names are resolved by the connection that uses them. Socket.getHostOrIP() answers the device's own.
+java.net.URLEncoder | com.codename1.io.Util#encodeUrl | Use Util.encodeUrl(String).
+java.net.URLDecoder | com.codename1.io.Util#decode | Use Util.decode(String, String, boolean).
+java.net.NetworkInterface | com.codename1.io.NetworkManager#isAPSupported | Use NetworkManager for what the platform tells an application about its connection.
+java.nio.channels. | com.codename1.io.Socket, com.codename1.io.FileSystemStorage | There are no channels on a device. Use streams: FileSystemStorage for files, com.codename1.io.Socket for a connection.
+
+# Files
+java.nio.file.WatchService | com.codename1.ui.util.UITimer | No equivalent: a device does not report file changes. Poll what you need with a UITimer, or refresh when the application resumes.
+java.nio.file.WatchKey | com.codename1.ui.util.UITimer | No equivalent: a device does not report file changes. Poll what you need with a UITimer.
+java.nio.file.WatchEvent | com.codename1.ui.util.UITimer | No equivalent: a device does not report file changes. Poll what you need with a UITimer.
+java.nio.file.FileVisitor | com.codename1.io.FileSystemStorage#listFiles | Walk the tree yourself with FileSystemStorage.listFiles(dir) and isDirectory(path).
+java.nio.file.SimpleFileVisitor | com.codename1.io.FileSystemStorage#listFiles | Walk the tree yourself with FileSystemStorage.listFiles(dir) and isDirectory(path).
+java.nio.file.attribute. | com.codename1.io.FileSystemStorage#getLastModified, com.codename1.io.FileSystemStorage#getLength | A device file has a length and a modification time and no permissions, owners or links: FileSystemStorage.getLength(path), getLastModified(path).
+java.nio.file. | com.codename1.io.FileSystemStorage, com.codename1.io.Storage | Use java.io.File and its streams, which the build maps onto the application's own directory, or FileSystemStorage directly; Storage for small named entries.
+java.io.File.toPath | com.codename1.io.FileSystemStorage | java.nio.file.Path is not on a device. Stay with java.io.File and its streams, which the build maps onto the application's own directory.
+java.math. | com.codename1.util.BigInteger, com.codename1.util.BigDecimal | Use com.codename1.util.BigInteger and com.codename1.util.BigDecimal.
+java.nio.MappedByteBuffer | com.codename1.io.FileSystemStorage#openInputStream | No memory-mapped files on a device. Read through FileSystemStorage.openInputStream(path).
+java.io.RandomAccessFile | com.codename1.io.FileSystemStorage#openInputStream, com.codename1.io.FileSystemStorage#openOutputStream | No random access to a file on a device. Read and write whole streams with FileSystemStorage.
+java.io.Console | | No equivalent: a device application has no console.
+java.awt.Desktop | com.codename1.ui.CN#execute | Use CN.execute(url) to open a URL or a file with whatever the device has for it.
+
+# Reflection, class loading, serialization
+java.lang.reflect.Proxy | | No equivalent: a device cannot create a class at run time. Write the implementing class.
+java.lang.reflect. | com.codename1.properties.PropertyBusinessObject | No reflection on a device: every class is compiled ahead of time and unused members are removed. Call the member directly, or describe the object's fields with PropertyBusinessObject.
+java.lang.invoke.MethodHandle | | No method handles on a device beyond what a lambda compiles to. Call the method directly or pass a lambda.
+java.lang.Class.forName | | A device cannot find a class by a name computed at run time. Name the class in code (a switch over the names you expect, each with its own "new").
+java.lang.Class.getDeclared | com.codename1.properties.PropertyBusinessObject | No reflection on a device. Call the member directly, or describe the object's fields with PropertyBusinessObject.
+java.lang.Class.getMethod | com.codename1.properties.PropertyBusinessObject | No reflection on a device. Call the method directly.
+java.lang.Class.getField | com.codename1.properties.PropertyBusinessObject | No reflection on a device. Read the field directly.
+java.lang.Class.getConstructor | | No reflection on a device. Write "new" for the class you mean.
+java.lang.Class.newInstance | | No reflection on a device. Write "new" for the class you mean.
+java.lang.Class.getResource | com.codename1.ui.CN#getResourceAsStream | A device has streams, not resource URLs. Use Class.getResourceAsStream(name) or CN.getResourceAsStream("/name"); resources live in the root of the application, without directories.
+java.lang.ClassLoader | com.codename1.ui.CN#getResourceAsStream | There is one class loader and it loads nothing at run time. For a resource use CN.getResourceAsStream("/name").
+java.util.ServiceLoader | | ServiceLoader finds the providers that the META-INF/services files of the application and its bundled libraries list, fixed when the application is built. This member of it has no equivalent: create the implementation you ship by name.
+java.lang.Module | | No modules on a device: every class is in the one unnamed module, which has no name, layer or descriptor. Module.isNamed(), getName() and getLayer() answer that; nothing else of the module system exists.
+java.lang.ModuleLayer | | No modules on a device: there is no module layer, and Module.getLayer() answers null.
+org.osgi. | | No OSGi framework on a device. FrameworkUtil.getBundle(Class) answers null, as it does outside a framework; take the code path your library uses on a plain class path.
+java.io.ObjectOutputStream | com.codename1.io.Externalizable, com.codename1.io.Storage#writeObject, com.codename1.io.Util#register | No Java serialization on a device. Implement com.codename1.io.Externalizable, register the class with Util.register, and store it with Storage.writeObject; or write JSON.
+java.io.ObjectInputStream | com.codename1.io.Externalizable, com.codename1.io.Storage#readObject, com.codename1.io.Util#register | No Java serialization on a device. Implement com.codename1.io.Externalizable, register the class with Util.register, and read it with Storage.readObject; or parse JSON with JSONParser.
+java.beans.XMLEncoder | com.codename1.io.Externalizable, com.codename1.io.JSONParser | No long-term persistence on a device. Store the state yourself: Externalizable, or JSON.
+java.beans.XMLDecoder | com.codename1.io.Externalizable, com.codename1.io.JSONParser | No long-term persistence on a device. Store the state yourself: Externalizable, or JSON.
+java.beans.Introspector | com.codename1.properties.PropertyBusinessObject | No introspection on a device. Describe the object's fields with PropertyBusinessObject.
+
+# Crypto
+javax.crypto. | com.codename1.security.Cipher, com.codename1.security.Hmac, com.codename1.security.KeyGenerator | Use com.codename1.security: Cipher for AES, Hmac, KeyGenerator, SecureRandom.
+java.security.MessageDigest | com.codename1.security.Hash#sha256 | Use com.codename1.security.Hash (Hash.sha256(bytes), sha1, md5).
+java.security.SecureRandom | com.codename1.security.SecureRandom | Use com.codename1.security.SecureRandom.
+java.security.KeyStore | com.codename1.security.SecureStorage | Keep a secret in com.codename1.security.SecureStorage, which is the platform's key store.
+java.security.Signature | com.codename1.security.Signature | Use com.codename1.security.Signature.
+java.security. | com.codename1.security.Hash, com.codename1.security.Cipher | Use com.codename1.security, which has the digests, ciphers, keys and signatures a device provides.
+java.util.Base64 | com.codename1.util.Base64#encodeNoNewline, com.codename1.util.Base64#decode | Use com.codename1.util.Base64.
+
+# Data
+java.sql. | com.codename1.db.Database, com.codename1.ui.Display#openOrCreate | No JDBC on a device. Use the device's SQLite through Display.getInstance().openOrCreate(name), which answers a com.codename1.db.Database; a server database belongs behind a web service.
+javax.sql. | com.codename1.db.Database | No JDBC on a device. Use com.codename1.db.Database for local data.
+java.util.prefs. | com.codename1.io.Preferences#set, com.codename1.io.Preferences#get | Use com.codename1.io.Preferences (Preferences.set(key, value), Preferences.get(key, default)).
+java.util.logging. | com.codename1.io.Log#p | Use com.codename1.io.Log (Log.p(message), Log.e(throwable)).
+java.lang.System.Logger | com.codename1.io.Log#p | Use com.codename1.io.Log.
+javax.xml. | com.codename1.xml.XMLParser, com.codename1.xml.Element | Use com.codename1.xml.XMLParser, which answers a tree of Element.
+org.w3c.dom. | com.codename1.xml.XMLParser, com.codename1.xml.Element | Use com.codename1.xml.XMLParser, which answers a tree of Element.
+org.xml.sax. | com.codename1.xml.XMLParser | Use com.codename1.xml.XMLParser.
+java.util.zip.ZipFile | com.codename1.io.gzip.GZIPInputStream | No zip archives on a device out of the box. GZIP streams are in com.codename1.io.gzip; a zip needs a library written for Codename One.
+java.util.zip.ZipInputStream | com.codename1.io.gzip.GZIPInputStream | No zip archives on a device out of the box. GZIP streams are in com.codename1.io.gzip.
+java.util.zip. | com.codename1.io.gzip.GZIPInputStream, com.codename1.io.gzip.GZIPOutputStream | Use com.codename1.io.gzip for GZIP and deflate streams.
+java.util.jar. | | No equivalent: an application is not a jar on a device.
+java.text.SimpleDateFormat | com.codename1.l10n.SimpleDateFormat | Use com.codename1.l10n.SimpleDateFormat.
+java.text.MessageFormat | com.codename1.util.StringUtil#replaceAll | No MessageFormat on a device. Build the text with StringBuilder or StringUtil.replaceAll.
+java.util.regex. | com.codename1.util.regex.RE | The device's regular expressions cover the common syntax. For what they refuse use com.codename1.util.regex.RE, or simplify the expression.
+java.lang.management. | | No equivalent: a device has no JMX.
+javax.management. | | No equivalent: a device has no JMX.
+javax.naming. | | No equivalent: a device has no naming service.
+java.rmi. | com.codename1.io.rest.Rest | No RMI on a device. Call the server through a web service (Rest).
+javax.script. | com.codename1.ui.BrowserComponent#execute | No script engines on a device. JavaScript runs inside a BrowserComponent (execute, executeAndReturnString).
+javax.tools. | | No equivalent: a device cannot compile Java.
+java.lang.instrument. | | No equivalent: a device has no agents.
+
+# Threads and timing
+java.lang.Thread.sleep | com.codename1.ui.CN#invokeAndBlock, com.codename1.ui.util.UITimer#timer | Never on the event dispatch thread, which is the whole UI. Use UITimer.timer(ms, repeat, form, runnable) to do something later, or CN.invokeAndBlock for a wait that keeps the UI alive.
+java.util.concurrent.ForkJoinPool | com.codename1.util.EasyThread, com.codename1.ui.CN#scheduleBackgroundTask | Use CN.scheduleBackgroundTask(runnable) or an EasyThread, and return to the UI with CN.callSerially.
+java.util.concurrent.CompletableFuture | com.codename1.util.AsyncResource, com.codename1.ui.CN#callSerially | Use com.codename1.util.AsyncResource for a result that arrives later, and CN.callSerially to return to the UI.
+java.util.concurrent.Executor | com.codename1.util.EasyThread, com.codename1.ui.CN#scheduleBackgroundTask | Use CN.scheduleBackgroundTask(runnable) or an EasyThread, and return to the UI with CN.callSerially.
+java.util.concurrent.ScheduledExecutorService | com.codename1.ui.util.UITimer#timer, com.codename1.ui.CN#setTimeout | Use UITimer.timer or CN.setTimeout(ms, runnable).
+
+# Desktop-only AWT and Swing
+java.awt.Robot | com.codename1.testing.TestUtils | No equivalent in an application: a device does not let one synthesize input or read the screen. In a test use com.codename1.testing.TestUtils.
+java.awt.SystemTray | com.codename1.notifications.LocalNotification, com.codename1.ui.Display#scheduleLocalNotification | A device has no tray. What a tray icon announces is a LocalNotification (Display.scheduleLocalNotification).
+java.awt.TrayIcon | com.codename1.notifications.LocalNotification, com.codename1.ui.Display#scheduleLocalNotification | A device has no tray. What a tray icon announces is a LocalNotification (Display.scheduleLocalNotification).
+java.awt.Taskbar | com.codename1.ui.Display#setBadgeNumber | A device has no task bar. A count on the application's icon is Display.setBadgeNumber(n).
+java.awt.print. | com.codename1.ui.Display#print, com.codename1.ui.Display#isPrintingSupported | The Swing layer does not print. Write the document to a file (a PDF or an image) and hand it to Display.print(path, mimeType, listener) where Display.isPrintingSupported().
+javax.print. | com.codename1.ui.Display#print, com.codename1.ui.Display#isPrintingSupported | Write the document to a file and hand it to Display.print(path, mimeType, listener) where Display.isPrintingSupported().
+java.awt.PrintJob | com.codename1.ui.Display#print | Write the document to a file and hand it to Display.print(path, mimeType, listener).
+java.awt.dnd. | com.codename1.ui.Component#setDraggable, com.codename1.ui.Component#setDropTarget, com.codename1.ui.Component#addDropListener | The Swing layer does not drag data, and nothing is dragged between applications on a device. Inside the application use Codename One's own Component.setDraggable, setDropTarget and addDropListener, or offer the action in a menu.
+javax.swing.TransferHandler | com.codename1.ui.Display#copyToClipboard, com.codename1.ui.Component#setDraggable | The Swing layer does not drag data. Use the clipboard (Display.copyToClipboard) or Codename One's own Component.setDraggable and setDropTarget.
+javax.swing.JEditorPane | com.codename1.ui.BrowserComponent#setPage | A JEditorPane shows plain text or simple HTML that the user cannot edit. For a full HTML page use a BrowserComponent (setPage(html, baseUrl)).
+javax.swing.text.html. | com.codename1.ui.BrowserComponent#setPage | The Swing layer has no editor kits: a JEditorPane shows plain text or simple HTML. For a full HTML page use a BrowserComponent (setPage(html, baseUrl)).
+javax.swing.text.StyledDocument | | No styled documents in the Swing layer: a text component holds plain text, or simple HTML it shows and does not edit.
+javax.swing.text.StyledEditorKit | | No editor kits in the Swing layer: a text component holds plain text, or simple HTML it shows and does not edit.
+javax.swing.undo. | | No javax.swing.undo in the Swing layer. Keep the history yourself: a list of the edits and their inverses.
+java.awt.image.Raster | com.codename1.ui.Image#getRGB | No rasters or color models in the Swing layer. Read and write pixels as ARGB ints: BufferedImage.getRGB and setRGB.
+java.awt.image.WritableRaster | com.codename1.ui.Image#getRGB | No rasters or color models in the Swing layer. Read and write pixels as ARGB ints: BufferedImage.getRGB and setRGB.
+java.awt.im. | | No equivalent: the device's own keyboard does the input method's work.
+java.awt.datatransfer. | com.codename1.ui.Display#copyToClipboard, com.codename1.ui.Display#getPasteDataFromClipboard | Use Display.copyToClipboard(Object) and Display.getPasteDataFromClipboard().
+java.awt.GraphicsEnvironment | com.codename1.ui.CN#getDisplayWidth, com.codename1.ui.CN#getDisplayHeight | A device has one screen: CN.getDisplayWidth(), CN.getDisplayHeight().
+java.awt.GraphicsDevice | com.codename1.ui.CN#getDisplayWidth, com.codename1.ui.CN#getDisplayHeight | A device has one screen, and the application fills it: CN.getDisplayWidth(), CN.getDisplayHeight().
+javax.swing.text.rtf. | | No equivalent: there is no RTF on a device.
+javax.swing.plaf. | | Look-and-feel delegates are not part of the Swing layer: a component is drawn by the layer's own theme. Style through the UIManager keys and client properties the layer honors.
+javax.sound. | com.codename1.media.MediaManager#createMedia | Use com.codename1.media.MediaManager.createMedia(uri, isVideo).
+java.applet. | | No equivalent: there are no applets.
+javax.accessibility. | com.codename1.ui.Component#setAccessibilityText | Describe a component to the platform's screen reader with Component.setAccessibilityText.
+com.sun.jna. | com.codename1.system.NativeInterface | Native code a desktop loads cannot run on a device. A device's native code is written per platform behind a com.codename1.system.NativeInterface.
+java.lang.System.loadLibrary | com.codename1.system.NativeInterface | Native code a desktop loads cannot run on a device. A device's native code is written per platform behind a com.codename1.system.NativeInterface.
+java.lang.System.load | com.codename1.system.NativeInterface | Native code a desktop loads cannot run on a device. A device's native code is written per platform behind a com.codename1.system.NativeInterface.
+
+# Well-known libraries with a Codename One counterpart
+com.fasterxml.jackson. | com.codename1.io.JSONParser, com.codename1.io.rest.Rest | Jackson binds through reflection, which a device lacks. Parse with com.codename1.io.JSONParser (a Map), or let Rest answer the Map directly.
+com.google.gson. | com.codename1.io.JSONParser | Gson binds through reflection, which a device lacks. Parse with com.codename1.io.JSONParser.
+org.json. | com.codename1.io.JSONParser | Parse with com.codename1.io.JSONParser.
+org.slf4j. | com.codename1.io.Log#p | Use com.codename1.io.Log.
+org.apache.logging. | com.codename1.io.Log#p | Use com.codename1.io.Log.
+ch.qos.logback. | com.codename1.io.Log#p | Use com.codename1.io.Log.
+org.apache.commons.logging. | com.codename1.io.Log#p | Use com.codename1.io.Log.
+org.apache.http. | com.codename1.io.rest.Rest, com.codename1.io.ConnectionRequest | Use Rest or ConnectionRequest.
+okhttp3. | com.codename1.io.rest.Rest, com.codename1.io.ConnectionRequest | Use Rest or ConnectionRequest.
+org.sqlite. | com.codename1.db.Database | Use the device's own SQLite through com.codename1.db.Database.

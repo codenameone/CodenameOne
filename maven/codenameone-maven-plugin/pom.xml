@@ -290,6 +290,22 @@
             <scope>provided</scope>
             <optional>true</optional>
         </dependency>
+        <!-- The same for the desktop layers: remap-compat ships these
+             runtimes inside an application with src/main/desktop. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-swing-compat</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-javafx-compat</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+            <optional>true</optional>
+        </dependency>
 
         <dependency>
             <groupId>com.codenameone</groupId>

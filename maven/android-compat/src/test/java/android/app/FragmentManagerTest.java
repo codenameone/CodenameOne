@@ -29,7 +29,7 @@ import android.view.MenuItem;
 
 import com.codename1.androidcompat.runtime.MenuImpl;
 
-import com.codename1.androidcompat.testing.MainThreadRule;
+import com.codename1.compat.testing.MainThreadRule;
 import org.junit.Rule;
 import org.junit.Test;
 

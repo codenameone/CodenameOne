@@ -1,0 +1,7 @@
+# The providers of the differential test, with everything a services file may hold.
+com.codename1.compat.jdk.ServiceLoaderDifferentialTest$English   # a comment after a name
+
+   com.codename1.compat.jdk.ServiceLoaderDifferentialTest$French
+#com.codename1.compat.jdk.ServiceLoaderDifferentialTest$Commented
+com.codename1.compat.jdk.ServiceLoaderDifferentialTest$English
+	com.codename1.compat.jdk.ServiceLoaderDifferentialTest$German	

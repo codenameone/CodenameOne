@@ -1,0 +1,57 @@
+# The public classes of FlatLaf and FlatLaf Extras that this layer deliberately
+# does not have. FlatLafApiShapeTest reads this file: a class of the real jars
+# must be in the layer, or named here, or in a package named here with ".*".
+# A line that names a class the layer does have fails the test, so the list
+# cannot go stale.
+#
+# Whole packages. The UI delegates, icons and JSON reader are how FlatLaf
+# paints Swing; here the widgets are Codename One components and the palette
+# is a theme, so there is nothing for them to do. The extras components wrap
+# Swing components to add FlatLaf-only properties.
+com.formdev.flatlaf.ui.*
+com.formdev.flatlaf.icons.*
+com.formdev.flatlaf.json.*
+com.formdev.flatlaf.resources.*
+com.formdev.flatlaf.extras.components.*
+com.formdev.flatlaf.extras.resources.*
+#
+# Single classes: property-file loading, addons, IntelliJ theme files, the
+# inspector and the native-window and font machinery, none of which has a
+# counterpart on a device; and the SVG icon, which needs a renderer the
+# layer does not carry.
+com.formdev.flatlaf.FlatDefaultsAddon
+com.formdev.flatlaf.FlatIconColors
+com.formdev.flatlaf.FlatInputMaps
+com.formdev.flatlaf.FlatPropertiesLaf
+com.formdev.flatlaf.IntelliJTheme
+com.formdev.flatlaf.LinuxFontPolicy
+com.formdev.flatlaf.LinuxPopupMenuCanceler
+com.formdev.flatlaf.MnemonicHandler
+com.formdev.flatlaf.SubMenuUsabilityHelper
+com.formdev.flatlaf.UIDefaultsLoader
+com.formdev.flatlaf.extras.FlatDesktop
+com.formdev.flatlaf.extras.FlatInspector
+com.formdev.flatlaf.extras.FlatSVGIcon
+com.formdev.flatlaf.extras.FlatSVGUtils
+com.formdev.flatlaf.extras.FlatUIDefaultsInspector
+com.formdev.flatlaf.util.AnimatedIcon
+com.formdev.flatlaf.util.Animator
+com.formdev.flatlaf.util.ColorFunctions
+com.formdev.flatlaf.util.CubicBezierEasing
+com.formdev.flatlaf.util.DerivedColor
+com.formdev.flatlaf.util.FontUtils
+com.formdev.flatlaf.util.Graphics2DProxy
+com.formdev.flatlaf.util.GrayFilter
+com.formdev.flatlaf.util.HSLColor
+com.formdev.flatlaf.util.HiDPIUtils
+com.formdev.flatlaf.util.JavaCompatibility
+com.formdev.flatlaf.util.LoggingFacade
+com.formdev.flatlaf.util.LoggingFacadeImpl
+com.formdev.flatlaf.util.MultiResolutionImageSupport
+com.formdev.flatlaf.util.NativeLibrary
+com.formdev.flatlaf.util.ScaledEmptyBorder
+com.formdev.flatlaf.util.ScaledImageIcon
+com.formdev.flatlaf.util.SoftCache
+com.formdev.flatlaf.util.StringUtils
+com.formdev.flatlaf.util.SwingUtils
+com.formdev.flatlaf.util.SystemFileChooser

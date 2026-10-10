@@ -1,0 +1,27 @@
+{
+ "pr": 5980,
+ "rebaseline": {
+  "linux-x64@amd-epyc-7763-64-core-processor": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 1.018,
+      "time": 0.847,
+      "tolerance": {
+       "memory": 0.2,
+       "time": 0.5
+      }
+     },
+     "memory": 0.783,
+     "reason": "The native Linux port hands the memory of freed images back to the system, so the hello application settles at a lower resident size.",
+     "runs": 1,
+     "time": 0.847,
+     "tolerance": {
+      "memory": 0.2,
+      "time": 0.5
+     }
+    }
+   }
+  }
+ }
+}
