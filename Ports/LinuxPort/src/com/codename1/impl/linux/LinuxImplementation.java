@@ -82,6 +82,9 @@ public class LinuxImplementation extends CodenameOneImplementation {
     /// editor and browser hosts. Matches CN1_MAIN_WINDOW_SLOT in cn1_linux_gfx.h.
     static final int MAIN_WINDOW_SLOT = -1;
 
+    /// The key code of Tab, the one `Form` moves the focus on.
+    private static final int KEY_CODE_TAB = 9;
+
 
     @Override
     public boolean isHighContrastEnabled() {
@@ -2417,6 +2420,14 @@ public class LinuxImplementation extends CodenameOneImplementation {
         // The editor goes into the overlay of the window the field lives in; without
         // the slot it appeared over the main window while the window being typed into
         // showed nothing.
+        // The key that started the edit is part of what was typed. The editor
+        // opens after it was pressed and never sees it, so it is added here;
+        // without it the first character typed into a field was lost.
+        if (initiatingKeycode >= ' ' && initiatingKeycode != 127 && initiatingKeycode <= 0xffff
+                && getGameAction(initiatingKeycode) == 0
+                && (maxSize <= 0 || text == null || text.length() < maxSize)) {
+            text = (text == null ? "" : text) + (char) initiatingKeycode;
+        }
         long peer = LinuxNative.editStringAt(x, y, w, h, text == null ? "" : text,
                 singleLine, maxSize, fontPeer, s.getFgColor(), s.getBgColor(), 0,
                 LinuxWindowManager.slotForComponent(cmp));
@@ -2440,7 +2451,16 @@ public class LinuxImplementation extends CodenameOneImplementation {
                         return;
                     }
                     if (LinuxNative.editIsDone(editPeer)) {
+                        // Tab ended it: the editor kept the key from the form, so
+                        // the form is given it now and moves its focus on. In the
+                        // main window only; a second window keeps what it did.
+                        boolean tab = LinuxNative.editTabbed(editPeer) != 0
+                                && LinuxWindowManager.slotForComponent(cmp) == MAIN_WINDOW_SLOT;
                         hideTextEditor();
+                        if (tab) {
+                            keyPressed(KEY_CODE_TAB);
+                            keyReleased(KEY_CODE_TAB);
+                        }
                         return;
                     }
                     // Mirror the native control's text into the field as the user

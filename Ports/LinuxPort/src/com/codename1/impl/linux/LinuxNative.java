@@ -536,6 +536,9 @@ public final class LinuxNative {
     /** True once the user has committed the native edit (Enter / focus loss). */
     public static native boolean editIsDone(long peer);
 
+    /** How Tab ended the native edit: 1 forwards, 2 backwards, 0 when it did not. */
+    public static native int editTabbed(long peer);
+
     /** The native EDIT control's current text. */
     public static native String editGetText(long peer);
 
