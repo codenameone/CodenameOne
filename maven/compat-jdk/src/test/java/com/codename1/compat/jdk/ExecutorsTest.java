@@ -341,4 +341,41 @@ public class ExecutorsTest {
         assertFalse(once.isDone());
         assertFalse(once.isCancelled());
     }
+
+    private static boolean collected(java.lang.ref.WeakReference<?> ref) throws Exception {
+        for (int i = 0; i < 100 && ref.get() != null; i++) {
+            System.gc();
+            Thread.sleep(20);
+        }
+        return ref.get() == null;
+    }
+
+    /// A timeout set for a future that completed in time is cancelled, and
+    /// holds on to nothing: the timer keeps a cancelled task until its time.
+    @Test
+    public void aTimeoutNoLongerNeededLetsGoOfItsFuture() throws Exception {
+        CompletableFuture<String> failing = new CompletableFuture<String>();
+        assertSame(failing, failing.orTimeout(1, TimeUnit.HOURS));
+        assertTrue(failing.complete("in time"));
+        java.lang.ref.WeakReference<Object> first = new java.lang.ref.WeakReference<Object>(failing);
+        failing = null;
+        assertTrue("orTimeout still holds a future that completed", collected(first));
+
+        CompletableFuture<String> defaulting = new CompletableFuture<String>();
+        defaulting.completeOnTimeout("late", 1, TimeUnit.HOURS);
+        assertTrue(defaulting.cancel(false));
+        java.lang.ref.WeakReference<Object> second = new java.lang.ref.WeakReference<Object>(defaulting);
+        defaulting = null;
+        assertTrue("completeOnTimeout still holds a future that completed", collected(second));
+
+        // And one that is needed still fires.
+        assertEquals("late", new CompletableFuture<String>().completeOnTimeout("late", 30, TimeUnit.MILLISECONDS)
+                .get(10, TimeUnit.SECONDS));
+        try {
+            new CompletableFuture<String>().orTimeout(30, TimeUnit.MILLISECONDS).get(10, TimeUnit.SECONDS);
+            fail("The time passed");
+        } catch (ExecutionException expected) {
+            assertTrue(String.valueOf(expected.getCause()), expected.getCause() instanceof TimeoutException);
+        }
+    }
 }
