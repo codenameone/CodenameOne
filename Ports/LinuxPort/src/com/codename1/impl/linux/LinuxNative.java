@@ -239,6 +239,15 @@ public final class LinuxNative {
 
     public static native boolean mainWindowGetBounds(int[] out);
 
+    /// Resizes the application's MAIN window to an outer size, frame included.
+    /// A no-op when headless, where the surface is the size of the screenshot.
+    public static native void mainWindowSetSize(int width, int height);
+
+    /// Fills `out` with the main window's outer rectangle, the one
+    /// `#mainWindowSetSize(int, int)` sets; `#mainWindowGetBounds(int[])` answers
+    /// the client area. False when there is no window.
+    public static native boolean mainWindowGetFrame(int[] out);
+
     public static native int desktopWindowGetWidth(int slot);
 
     public static native int desktopWindowGetHeight(int slot);

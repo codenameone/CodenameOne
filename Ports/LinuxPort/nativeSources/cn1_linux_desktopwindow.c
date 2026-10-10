@@ -1181,6 +1181,136 @@ JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_mainWindowGetBounds___int_1ARR
     return JAVA_TRUE;
 }
 
+/*
+ * Resizing the application's own window.
+ *
+ * The main window opens at the size initDisplay is given and, until this existed,
+ * could only be resized by the user: Display.setWindowSize reached the default
+ * implementation, which does nothing, so an application that asked for a 350x550
+ * window drew into the 800x600 one it was born with.
+ *
+ * The size is the OUTER one, frame included, which is what the JavaSE port's
+ * setWindowSize (JFrame.setSize) and this port's secondary windows both mean. GTK
+ * resizes the client area, so the chrome has to be subtracted, and the chrome is
+ * not measurable until the window manager has reparented the window. The request
+ * is therefore kept pending and applied from configure-event, exactly as
+ * cn1DesktopApplyPendingOuterSize does for a secondary window.
+ */
+static int cn1MainOuterPending;
+static int cn1MainRequestedOuterW;
+static int cn1MainRequestedOuterH;
+static int cn1MainConfigureHooked;
+
+static void cn1MainApplyPendingOuterSize(GtkWidget* main) {
+    int chromeW;
+    int chromeH;
+    int clientW;
+    int clientH;
+    if (main == 0 || !cn1MainOuterPending) {
+        return;
+    }
+    if (!cn1DesktopChromeInsets(main, &chromeW, &chromeH)) {
+        return;
+    }
+    clientW = cn1MainRequestedOuterW - chromeW;
+    clientH = cn1MainRequestedOuterH - chromeH;
+    if (clientW < 1) {
+        clientW = 1;
+    }
+    if (clientH < 1) {
+        clientH = 1;
+    }
+    /* Cleared before the resize: the resize comes back through configure-event. */
+    cn1MainOuterPending = 0;
+    gtk_window_resize(GTK_WINDOW(main), clientW, clientH);
+}
+
+static gboolean cn1MainOnWindowConfigure(GtkWidget* widget, GdkEventConfigure* e, gpointer data) {
+    (void) e;
+    (void) data;
+    cn1MainApplyPendingOuterSize(widget);
+    return FALSE;
+}
+
+static void cn1MainWindowSetSizeOnMain(void* arg) {
+    CN1DesktopOp* op = (CN1DesktopOp*) arg;
+    GtkWidget* main = cn1LinuxWindowWidget();
+    if (main == 0) {
+        /* Headless: the surface size is the screenshot's, and is not ours to change. */
+        return;
+    }
+    if (!cn1MainConfigureHooked) {
+        cn1MainConfigureHooked = 1;
+        g_signal_connect(main, "configure-event", G_CALLBACK(cn1MainOnWindowConfigure), 0);
+    }
+    cn1MainRequestedOuterW = op->a > 0 ? op->a : 1;
+    cn1MainRequestedOuterH = op->b > 0 ? op->b : 1;
+    cn1MainOuterPending = 1;
+    cn1MainApplyPendingOuterSize(main);
+    if (cn1MainOuterPending) {
+        /* No frame to measure yet -- or never, with no window manager, where the
+         * client area is the outer size. Resize to the figure asked for and let
+         * configure-event correct it once there is chrome. */
+        gtk_window_resize(GTK_WINDOW(main), cn1MainRequestedOuterW, cn1MainRequestedOuterH);
+    }
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_mainWindowSetSize___int_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_INT width, JAVA_INT height) {
+    CN1DesktopOp op;
+    memset(&op, 0, sizeof(op));
+    op.a = width;
+    op.b = height;
+    cn1LinuxRunOnMainAndWait(cn1MainWindowSetSizeOnMain, &op);
+}
+
+/* The main window's outer rectangle: what mainWindowSetSize accepts, so that a
+ * size read back is the size that was set. mainWindowGetBounds answers the client
+ * area, which is what centring over a Form wants and is smaller by the chrome. */
+static void cn1MainWindowGetFrameOnMain(void* arg) {
+    CN1DesktopOp* op = (CN1DesktopOp*) arg;
+    GtkWidget* main = cn1LinuxWindowWidget();
+    int chromeW;
+    int chromeH;
+    op->a = 0;
+    if (main == 0) {
+        return;
+    }
+    gtk_window_get_position(GTK_WINDOW(main), &op->out[0], &op->out[1]);
+    gtk_window_get_size(GTK_WINDOW(main), &op->out[2], &op->out[3]);
+    if (cn1DesktopChromeInsets(main, &chromeW, &chromeH)) {
+        op->out[2] += chromeW;
+        op->out[3] += chromeH;
+    } else if (cn1MainOuterPending) {
+        op->out[2] = cn1MainRequestedOuterW;
+        op->out[3] = cn1MainRequestedOuterH;
+    }
+    op->a = 1;
+}
+
+JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_mainWindowGetFrame___int_1ARRAY_R_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT out) {
+    CN1DesktopOp op;
+    JAVA_INT* arr;
+    if (out == JAVA_NULL) {
+        return JAVA_FALSE;
+    }
+    if ((int) (*(JAVA_ARRAY) out).length < 4) {
+        return JAVA_FALSE;
+    }
+    memset(&op, 0, sizeof(op));
+    cn1LinuxRunOnMainAndWait(cn1MainWindowGetFrameOnMain, &op);
+    if (!op.a) {
+        return JAVA_FALSE;
+    }
+    arr = (JAVA_INT*) CN1_ARRAY_DATA(out);
+    arr[0] = op.out[0];
+    arr[1] = op.out[1];
+    arr[2] = op.out[2];
+    arr[3] = op.out[3];
+    return JAVA_TRUE;
+}
+
 JAVA_INT com_codename1_impl_linux_LinuxNative_desktopWindowGetWidth___int_R_int(
         CODENAME_ONE_THREAD_STATE, JAVA_INT slot) {
     CN1LinuxWindow* w = slotAt(slot);

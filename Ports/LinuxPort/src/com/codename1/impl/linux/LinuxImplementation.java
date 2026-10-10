@@ -736,6 +736,61 @@ public class LinuxImplementation extends CodenameOneImplementation {
     }
 
     /*
+    /// Resizes the application window. The size is the outer one, frame included,
+    /// as on the JavaSE port; the display follows through the size-changed event
+    /// the window's new allocation produces, so nothing is laid out here.
+    ///
+    /// The window still OPENS at 800x600: it exists before any application code
+    /// runs, and that default is what every screenshot baseline was taken at.
+    @Override
+    public void setWindowSize(int width, int height) {
+        if (width > 0 && height > 0) {
+            LinuxNative.mainWindowSetSize(width, height);
+        }
+    }
+
+    @Override
+    public com.codename1.ui.geom.Rectangle getWindowBounds() {
+        int[] frame = new int[4];
+        if (!LinuxNative.mainWindowGetFrame(frame)) {
+            return super.getWindowBounds();
+        }
+        return new com.codename1.ui.geom.Rectangle(frame[0], frame[1], frame[2], frame[3]);
+    }
+
+    /// The monitor the application window is on, which is the desktop a
+    /// percentage of it is taken from.
+    @Override
+    public com.codename1.ui.geom.Dimension getDesktopSize() {
+        int[] bounds = new int[4];
+        if (!LinuxNative.mainWindowGetFrame(bounds)) {
+            return super.getDesktopSize();
+        }
+        LinuxNative.monitorBounds(LinuxNative.monitorForMainWindow(), false, bounds);
+        if (bounds[2] <= 0 || bounds[3] <= 0) {
+            return super.getDesktopSize();
+        }
+        return new com.codename1.ui.geom.Dimension(bounds[2], bounds[3]);
+    }
+
+    /// The hint is a size for the window the first form opens in. Here that window
+    /// already exists, so the hint is applied as it arrives and consumed, the way
+    /// the JavaSE port consumes it when it builds its frame.
+    @Override
+    public void setInitialWindowSizeHintPercent(com.codename1.ui.geom.Dimension hint) {
+        super.setInitialWindowSizeHintPercent(hint);
+        com.codename1.ui.geom.Dimension desktop = hint == null ? null : getDesktopSize();
+        if (desktop == null) {
+            return;
+        }
+        int width = Math.min(desktop.getWidth(),
+                Math.max(1, Math.round(desktop.getWidth() * (hint.getWidth() / 100f))));
+        int height = Math.min(desktop.getHeight(),
+                Math.max(1, Math.round(desktop.getHeight() * (hint.getHeight() / 100f))));
+        super.setInitialWindowSizeHintPercent(null);
+        setWindowSize(width, height);
+    }
+
      * Capture the already-rendered window instead of the base behaviour, which
      * re-paints the current form into a fresh mutable image
      * (current.paintComponent(img.getGraphics(), true)). Re-painting a *heavy*
