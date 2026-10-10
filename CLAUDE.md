@@ -1014,7 +1014,21 @@ Traps:
   anywhere else. The digest covers every class of the runtime, the references
   and the translator, so output is good only with the archive's own jars. When
   they differ the failure adds "does not match these sources or jars" -- that,
-  not a missing SDK, is the thing to fix.
+  not a missing SDK, is the thing to fix. `state.txt` records a digest per
+  part under the whole one, and the message names the part that differs and,
+  within it, the first entry: read that before guessing.
+- **The translator's class path is its runtime scope and nothing more**
+  (`CompileUnityMojo.resolve`). Maven's legacy resolver also hands back a
+  pom's test-scoped dependencies unless it is filtered; that once put the
+  consumer's own `codenameone-core` jar into the digest, which a Linux job
+  rebuilds byte for byte and a Windows one does not, so every Windows consumer
+  refused an archive that was good.
+- **A hand-assembled translation takes the application's libraries from
+  `common/target/translation-libs`**, which the application's own pom stages
+  from its runtime class path in `process-classes`. The native Linux and
+  Windows translations (`vm/tests`, `helloSuiteLibraryClasses`) and the
+  JavaScript build script read it; a list of class directories per workflow
+  is how the Unity runtime was missing from three of them.
 - **The artifact name is fixed, so the workflow is called once per run.** A
   workflow that is itself called (`scripts-ios-native.yml`, `ios-packaging.yml`,
   `scripts-mac-catalyst.yml`) takes `unity_prepared` and skips its own call

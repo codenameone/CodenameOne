@@ -153,20 +153,28 @@ if [ -d "$COMMON_DEPS_DIR" ]; then
   done < <(find "$COMMON_DEPS_DIR" -maxdepth 1 -type f -name '*.jar' -print0 | sort -z)
 fi
 
-# Stage the deterministic mock-ads provider (compile-scope dependency used by
-# AdsScreenshotTest). The COMMON_DEPS_DIR allowlist above only extracts
-# kotlin/annotations, and the ads *framework* (com.codename1.ads.*) lives in
-# codenameone-core, but the provider implementation (com.codename1.ads.mock.*)
-# ships in cn1-ads-mock and would otherwise never reach the translator
-# ("Unknown class com_codename1_ads_mock_MockAdProvider" at runtime).
-ADS_MOCK_JAR="$(find "$HOME/.m2/repository/com/codenameone/cn1-ads-mock" -type f -name 'cn1-ads-mock-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' 2>/dev/null | sort | tail -1)"
-if [ -n "$ADS_MOCK_JAR" ]; then
-  bj_log "Including ad-mock classes from $(basename "$ADS_MOCK_JAR")"
-  (
-    cd "$STAGE_CLASSES"
-    "$JAR_BIN" xf "$ADS_MOCK_JAR"
-  )
+# Stage the libraries the application ships besides its own classes: the
+# deterministic mock-ads provider (AdsScreenshotTest) and the Unity compatibility
+# runtime (the UnityCompat* tests). The COMMON_DEPS_DIR allowlist above only
+# extracts kotlin/annotations, so neither would reach the translator
+# ("Unknown class com_codename1_ads_mock_MockAdProvider" at runtime). The common
+# module unpacks them itself (stage-translation-libs in its pom), from its own
+# dependency list: the native Linux and Windows suites read the same directory,
+# and a library added to the application reaches all three without being named
+# here. This used to look for one jar by name in ~/.m2.
+COMMON_LIBS_DIR="$COMMON_ROOT/target/translation-libs"
+if [ ! -d "$COMMON_LIBS_DIR" ]; then
+  bj_log "Missing $COMMON_LIBS_DIR: build the common module to process-classes or later" >&2
+  exit 1
 fi
+for required in com/codename1/ads/mock/MockAdProvider.class com/codename1/unitycompat/unityengine/UnityRuntime.class; do
+  if [ ! -f "$COMMON_LIBS_DIR/$required" ]; then
+    bj_log "$COMMON_LIBS_DIR has no $required" >&2
+    exit 1
+  fi
+done
+bj_log "Including the application's library classes from $COMMON_LIBS_DIR"
+cp -R "$COMMON_LIBS_DIR"/. "$STAGE_CLASSES"/
 
 # TeaVM is optional for ParparVM builds. The JavaScriptPort now includes JSO interfaces
 # in org.teavm.jso package, so it can compile without external TeaVM dependency.

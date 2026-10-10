@@ -25,6 +25,7 @@ package com.codename1.maven;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.resolver.ArtifactResolutionRequest;
 import org.apache.maven.artifact.resolver.ArtifactResolutionResult;
+import org.apache.maven.artifact.resolver.filter.ScopeArtifactFilter;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
@@ -115,6 +116,9 @@ public class CompileUnityMojo extends AbstractCN1Mojo {
         registerSourceRoot(unityOutputDir);
     }
 
+    /// Compile and runtime scope: what `java -cp` needs to run a jar.
+    private static final ScopeArtifactFilter RUNTIME_SCOPE = new ScopeArtifactFilter(Artifact.SCOPE_RUNTIME);
+
     static Artifact runtimeArtifact(Iterable<?> artifacts) {
         for (Object o : artifacts) {
             Artifact a = (Artifact) o;
@@ -145,6 +149,18 @@ public class CompileUnityMojo extends AbstractCN1Mojo {
                 .setRemoteRepositories(new ArrayList<org.apache.maven.artifact.repository.ArtifactRepository>(
                         remoteRepositories))
                 .setResolveTransitively(transitive)
+                // What the tool runs with, and nothing else. Unfiltered, this
+                // resolver also returns the test and provided dependencies its
+                // pom declares -- for the translator that is codenameone-core,
+                // JUnit and everything JUnit needs. They were on the tool's
+                // class path for no reason, and since the content of that class
+                // path is part of what compiled output is matched by, the output
+                // of one machine was good only beside a core jar with the same
+                // bytes: a core built on Windows, whose text resources are
+                // checked out with other line endings, refused every archive
+                // made on Linux.
+                .setCollectionFilter(RUNTIME_SCOPE)
+                .setResolutionFilter(RUNTIME_SCOPE)
                 // The legacy resolver does not read the session's offline flag
                 // by itself; see AbstractCN1Mojo.offline.
                 .setOffline(offline)

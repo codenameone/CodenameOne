@@ -469,12 +469,21 @@ jobs:
           $out = "scripts/hellocodenameone/common/target/classes"
           if (!(Test-Path "$out/com/codenameone/examples/hellocodenameone/tests/Cn1ssDeviceRunner.class")) { throw "common classes missing" }
           if (!(Test-Path "$out/com/codename1/generated/svg/SVGRegistry.class")) { throw "transcode-svg did not produce SVGRegistry" }
+          # The libraries the application ships (stage-translation-libs in its pom):
+          # the capture test hands them to the translator as a source root.
+          $libs = "scripts/hellocodenameone/common/target/translation-libs"
+          if (!(Test-Path "$libs/com/codename1/ads/mock/MockAdProvider.class")) { throw "translation-libs has no mock ad provider" }
+          if (!(Test-Path "$libs/com/codename1/unitycompat/unityengine/UnityRuntime.class")) { throw "translation-libs has no Unity runtime" }
 
+      # Two paths, so the artifact is rooted at their common parent,
+      # common/target -- which is where the arm64 leg restores it.
       - name: Upload hellocodenameone-common classes
         uses: ./.github/actions/upload-artifact-with-retry
         with:
           name: windows-port-common-classes
-          path: scripts/hellocodenameone/common/target/classes
+          path: |
+            scripts/hellocodenameone/common/target/classes
+            scripts/hellocodenameone/common/target/translation-libs
           if-no-files-found: error
           retention-days: 1
 
@@ -515,7 +524,6 @@ jobs:
           path: |
             maven/core/target/classes
             maven/windows/target/classes
-            maven/cn1-ads-mock/target/classes
           if-no-files-found: error
           retention-days: 1
 
@@ -725,7 +733,7 @@ jobs:
         uses: ./.github/actions/download-artifact-with-retry
         with:
           name: windows-port-common-classes
-          path: scripts/hellocodenameone/common/target/classes
+          path: scripts/hellocodenameone/common/target
 
       # Fail loudly if the artifacts did not land where the test reads them --
       # otherwise the capture test would silently skip (assumeTrue) and post nothing.
@@ -738,6 +746,10 @@ jobs:
           if (!(Test-Path $core)) { Write-Error "core classes missing after download: $core"; exit 1 }
           if (!(Test-Path $port)) { Write-Error "port classes missing after download: $port"; exit 1 }
           if (!(Test-Path $common)) { Write-Error "common classes missing after download: $common"; exit 1 }
+          $libs = "scripts/hellocodenameone/common/target/translation-libs"
+          foreach ($lib in "com/codename1/ads/mock/MockAdProvider.class", "com/codename1/unitycompat/unityengine/UnityRuntime.class") {
+            if (!(Test-Path "$libs/$lib")) { Write-Error "application libraries missing after download: $libs/$lib"; exit 1 }
+          }
           Write-Host "Restored core + Windows port + common classes OK"
 
       # Fetch the WebView2 SDK so buildHelloCodenameOneExe's CMake compiles the

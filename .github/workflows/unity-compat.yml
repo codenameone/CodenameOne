@@ -356,8 +356,10 @@ jobs:
           export JAVA_HOME="$JDK_17_HOME"
           export PATH="$JAVA_HOME/bin:$PATH"
           echo stale > scripts/hellocodenameone/common/target/unity/state.txt
-          xvfb-run -a mvn -B -f scripts/hellocodenameone/pom.xml -pl common generate-sources -DskipTests "$NO_DOTNET" > "$RUNNER_TEMP/stale.log" 2>&1
-          status=$?
+          # The step runs under "bash -e": the build is meant to fail, so its
+          # status is taken with "||" or the step would stop before judging it.
+          status=0
+          xvfb-run -a mvn -B -f scripts/hellocodenameone/pom.xml -pl common generate-sources -DskipTests "$NO_DOTNET" > "$RUNNER_TEMP/stale.log" 2>&1 || status=$?
           tail -n 30 "$RUNNER_TEMP/stale.log"
           if [ "$status" -eq 0 ]; then
             echo "::error::A build with a stale state.txt and no .NET SDK succeeded."

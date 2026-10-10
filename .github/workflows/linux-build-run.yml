@@ -15,7 +15,8 @@
 #
 # Jobs:
 #   prepare-suite (x64)            -> builds the plugin + hellocodenameone-common,
-#                                     uploads the suite + ads-mock classes
+#                                     uploads the suite classes and those of
+#                                     the libraries it ships (translation-libs)
 #   build-run (matrix x64 + arm64) -> core + Linux port, translate + build + run,
 #                                     uploads PNGs/arch
 #   compare-comment (ubuntu)       -> diffs each arch vs its in-repo baseline,
@@ -115,8 +116,9 @@ jobs:
     uses: ./.github/workflows/unity-gallery-prebuilt.yml
 
   # Build the codenameone maven plugin (it needs CEF, which is x64-only on Linux)
-  # and the hellocodenameone screenshot suite, then publish the suite + ads-mock
-  # *.class. These are architecture-independent (they are translated to C later),
+  # and the hellocodenameone screenshot suite, then publish the suite *.class
+  # and the *.class of the libraries it ships (common/target/translation-libs:
+  # the mock ad provider, the Unity runtime). These are architecture-independent (they are translated to C later),
   # so both arch legs translate from these same classes.
   prepare-suite:
     needs: unity-gallery
@@ -192,7 +194,7 @@ jobs:
           set -e
           tar czf suite-classes.tgz \
             scripts/hellocodenameone/common/target/classes \
-            maven/cn1-ads-mock/target/classes \
+            scripts/hellocodenameone/common/target/translation-libs \
             artifacts/cn1ss-server
       - name: Upload suite classes
         uses: actions/upload-artifact@v4

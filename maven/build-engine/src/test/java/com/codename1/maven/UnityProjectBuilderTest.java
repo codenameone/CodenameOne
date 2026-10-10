@@ -562,6 +562,180 @@ public class UnityProjectBuilderTest {
         }
     }
 
+    /// A builder with a tool class path, whose INFO lines are kept.
+    private UnityProjectBuilder told(File tool, final List<String> said) {
+        UnityProjectBuilder b = new UnityProjectBuilder(unity, generated, classes, target, runtimeJar, referencesJar,
+                Collections.singletonList(tool), null, "com.acme.game", "MyGame", Collections.singletonList(sources),
+                new SystemStreamLog() {
+                    @Override
+                    public void info(CharSequence content) {
+                        said.add(content.toString());
+                    }
+                });
+        b.setToolchain(tools);
+        return b;
+    }
+
+    private static String mismatch(List<String> said) {
+        for (String line : said) {
+            if (line.contains("does not match these sources or jars")) {
+                return line;
+            }
+        }
+        return null;
+    }
+
+    /// Output compiled on another machine that is refused here has to say
+    /// which of its four inputs is not the one it was compiled from. The
+    /// first time it happened the log said only that one of them was, from a
+    /// runner nobody could look at afterwards.
+    @Test
+    public void aMismatchNamesThePartAndTheFirstEntryThatDiffer() throws Exception {
+        File tool = zip(new File(tmp.getRoot(), "tool.jar"), "com/acme/Translator.class", "org/asm/Reader.class");
+        List<String> said = new ArrayList<String>();
+        assertTrue(told(tool, said).run());
+        assertEquals(said.toString(), null, mismatch(said));
+        // Nothing changed: nothing is said, and nothing is compiled.
+        assertTrue(told(tool, said).run());
+        assertEquals(said.toString(), null, mismatch(said));
+        assertEquals(1, tools.compiled);
+
+        // The project: one file edited, one added.
+        write(new File(unity, "Assets/Scripts/Player.cs"), "class Player { int lives; }");
+        write(new File(unity, "Assets/Later.cs"), "class Later {}");
+        assertTrue(told(tool, said).run());
+        String m = mismatch(said);
+        assertTrue(m, m.contains("What differs: the project files ("));
+        assertTrue(m, m.contains("; 2 of 4 entries differ, the first: Assets/Later.cs is there now and is not"
+                + " recorded)."));
+        assertFalse(m, m.contains("; the codenameone-"));
+        assertFalse(m, m.contains("; the 'references' jar"));
+
+        // A file that is gone, and one whose content is another.
+        said.clear();
+        assertTrue(new File(unity, "Assets/Later.cs").delete());
+        assertTrue(told(tool, said).run());
+        m = mismatch(said);
+        assertTrue(m, m.contains("1 of 4 entries differ, the first: Assets/Later.cs is recorded and is not there"
+                + " now)."));
+        said.clear();
+        write(new File(unity, "Assets/Scripts/Player.cs"), "class Player { int score; }");
+        assertTrue(told(tool, said).run());
+        m = mismatch(said);
+        assertTrue(m, m.contains("1 of 3 entries differ, the first: Assets/Scripts/Player.cs has other content)."));
+
+        // The runtime jar.
+        said.clear();
+        zip(runtimeJar, "UnityEngine/Vector2.class", "UnityEngine/Vector3.class",
+                "com/codename1/unitycompat/unityengine/UnityRuntime.class", "META-INF/MANIFEST.MF");
+        assertTrue(told(tool, said).run());
+        m = mismatch(said);
+        assertTrue(m, m.contains("What differs: the codenameone-unity-compat jar ("));
+        assertTrue(m, m.contains("1 of 3 entries differ, the first: UnityEngine/Vector3.class is there now and is"
+                + " not recorded)."));
+        assertFalse(m, m.contains("the project files"));
+
+        // The references.
+        said.clear();
+        zip(referencesJar, "netstandard.dll", "UnityEngine.dll", "Codename1.UnityValues.dll", "Other.dll");
+        assertTrue(told(tool, said).run());
+        m = mismatch(said);
+        assertTrue(m, m.contains("What differs: the 'references' jar ("));
+        assertTrue(m, m.contains("the first: Other.dll is there now and is not recorded)."));
+
+        // The tool, whose jars are one class path: the same classes from
+        // another jar of another name are the same content.
+        said.clear();
+        File renamed = zip(new File(tmp.getRoot(), "tool-2.jar"), "com/acme/Translator.class",
+                "org/asm/Reader.class");
+        assertTrue(told(renamed, said).run());
+        assertEquals(said.toString(), null, mismatch(said));
+        File other = zip(new File(tmp.getRoot(), "tool-3.jar"), "com/acme/Translator.class");
+        assertTrue(told(other, said).run());
+        m = mismatch(said);
+        assertTrue(m, m.contains("What differs: the codenameone-cil-translator class path ("));
+        assertTrue(m, m.contains("1 of 2 entries differ, the first: org/asm/Reader.class is recorded and is not"
+                + " there now)."));
+
+        // Two parts at once are both named, in the order they are listed.
+        said.clear();
+        write(new File(unity, "Assets/Scripts/Player.cs"), "class Player {}");
+        assertTrue(told(tool, said).run());
+        m = mismatch(said);
+        assertTrue(m, m.indexOf("What differs: the project files (") > 0);
+        assertTrue(m, m.indexOf("; the codenameone-cil-translator class path (")
+                > m.indexOf("What differs: the project files ("));
+    }
+
+    /// The first line of the state file is the digest and the only line a
+    /// build is skipped on; what follows is read back as it was written.
+    @Test
+    public void theStateFileRecordsThePartsUnderTheDigest() throws Exception {
+        assertTrue(builder().run());
+        File state = new File(target, "unity/state.txt");
+        String text = new String(Files.readAllBytes(state.toPath()), StandardCharsets.UTF_8);
+        UnityProjectBuilder.State recorded = UnityProjectBuilder.State.parse(text);
+        assertEquals(text, text.substring(0, text.indexOf('\n')), recorded.digest);
+        assertEquals(64, recorded.digest.length());
+        assertEquals(UnityProjectBuilder.STATE_VERSION, recorded.version);
+        assertEquals(Arrays.asList("project", "runtime", "references", "tool"),
+                new ArrayList<String>(recorded.parts.keySet()));
+        // Three files of the project, two classes of the runtime (META-INF
+        // is not content), three assemblies, and no tool in this fixture.
+        assertEquals(text, 8, recorded.entries.size());
+        assertEquals(text, recorded.text());
+        assertEquals(recorded.digest, UnityProjectBuilder.State.of(recorded.entries).digest);
+        // Line endings a checkout or an archive rewrote do not make it
+        // another record.
+        UnityProjectBuilder.State crlf = UnityProjectBuilder.State.parse(text.replace("\n", "\r\n"));
+        assertEquals(recorded.digest, crlf.digest);
+        assertEquals(recorded.entries, crlf.entries);
+        assertEquals(recorded.parts, crlf.parts);
+        assertEquals(null, UnityProjectBuilder.State.parse(null));
+    }
+
+    /// A state file with nothing under its digest -- an older build's, or one
+    /// that was overwritten -- is refused as any other, and says that it has
+    /// nothing to compare.
+    @Test
+    public void aStateFileOfADigestAloneSaysItCannotNameThePart() throws Exception {
+        assertTrue(builder().run());
+        File state = new File(target, "unity/state.txt");
+        write(state, "stale\n");
+        List<String> said = new ArrayList<String>();
+        assertTrue(told(runtimeJar, said).run());
+        String m = mismatch(said);
+        assertTrue(m, m.contains("Which of them differs cannot be said: the file records a digest (stale, now "));
+        assertEquals(2, tools.compiled);
+        // An empty file is not the digest of anything, either.
+        write(state, "");
+        said.clear();
+        assertTrue(told(runtimeJar, said).run());
+        assertTrue(said.toString(), mismatch(said).contains("records a digest (none, now "));
+        assertEquals(3, tools.compiled);
+    }
+
+    /// The same content under another version of the record: the digest
+    /// covers the version, and no part is blamed for it.
+    @Test
+    public void aRecordOfAnotherVersionWithTheSameContentBlamesNoPart() throws Exception {
+        UnityProjectBuilder.State now = UnityProjectBuilder.State.of(Arrays.asList(
+                "Assets/A.cs=00", "runtime!a/B.class:1:ff"));
+        UnityProjectBuilder.State old = UnityProjectBuilder.State.parse(
+                now.text().replace("version=" + UnityProjectBuilder.STATE_VERSION, "version=0")
+                        .replace(now.digest, "0123"));
+        String said = UnityProjectBuilder.differences(old, now);
+        assertEquals("All four are the same content: the file was written as version 0 of this record and the"
+                + " build writes version " + UnityProjectBuilder.STATE_VERSION + ".", said);
+        // And a part the file gives a digest for, without its entries.
+        UnityProjectBuilder.State bare = UnityProjectBuilder.State.parse("0123\nversion=3\npart.project=aa\n"
+                + "part.runtime=" + now.parts.get("runtime") + "\npart.references=" + now.parts.get("references")
+                + "\npart.tool=" + now.parts.get("tool") + "\nruntime!a/B.class:1:ff\n");
+        said = UnityProjectBuilder.differences(bare, now);
+        assertTrue(said, said.startsWith("What differs: the project files (aa recorded, "));
+        assertTrue(said, said.endsWith("; the file lists none of its 1 entries)."));
+    }
+
     @Test
     public void readsTheSdkVersion() {
         assertEquals(10, UnityProjectBuilder.sdkMajor(Arrays.asList("10.0.401")));

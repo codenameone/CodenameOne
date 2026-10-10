@@ -463,6 +463,38 @@
                 </executions>
 
             </plugin>
+            <!-- The libraries this application ships besides its own classes,
+                 unpacked for the builds that hand ParparVM its class directories
+                 themselves: the native Linux and Windows suites
+                 (vm/tests, CleanTarget*IntegrationTest) and the JavaScript port
+                 (scripts/build-javascript-port-hellocodenameone.sh). The build
+                 plugin merges every compile-scope dependency into the jar it
+                 submits, so a build that goes through it needs none of this; a
+                 build that does not used to name the libraries one by one, and
+                 the one nobody had named was left out of the translation - the
+                 application then failed in C, on the header of a class no
+                 source directory supplied. Kotlin's runtime is the exception:
+                 those builds stage it themselves. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.6.1</version>
+                <executions>
+                    <execution>
+                        <id>stage-translation-libs</id>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <goal>unpack-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <includeScope>runtime</includeScope>
+                            <excludeGroupIds>org.jetbrains.kotlin,org.jetbrains</excludeGroupIds>
+                            <excludes>META-INF/**</excludes>
+                            <outputDirectory>${project.build.directory}/translation-libs</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>

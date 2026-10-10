@@ -334,7 +334,7 @@ time that passed since its last frame, so the picture depends on how fast the
 frames came. `gameView.holdClock()` takes the clock away from the game: a
 frame then simulates nothing and draws the scene as it stands.
 `gameView.advance(90, 1f / 60)` asks for 90 steps of a sixtieth of a second
-each, and the next frame the view draws runs all of them, however long that
+each, and the next frame the view draws runs every one, however long that
 frame took. `framesAdvanced()` grows by the number of steps once they've been
 run and the scene shows the last of them, which is the moment to capture.
 `releaseClock()` hands the clock back.

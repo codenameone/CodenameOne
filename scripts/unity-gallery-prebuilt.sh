@@ -158,7 +158,8 @@ pack() {
   cp -R "$COMMON/target/generated-sources/unity" "$stage/target/generated-sources/unity"
   {
     echo "cn1.version=$version"
-    echo "state=$(cat "$COMMON/target/unity/state.txt")"
+    # The digest is the first line; under it the file lists what it is of.
+    echo "state=$(head -n 1 "$COMMON/target/unity/state.txt")"
   } >"$stage/pack-info.txt"
 
   mkdir -p "$(dirname "$out")"

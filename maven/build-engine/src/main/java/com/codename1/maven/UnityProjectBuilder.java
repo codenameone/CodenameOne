@@ -36,6 +36,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -107,8 +108,16 @@ public class UnityProjectBuilder {
     private static final String TRANSLATOR_MAIN = "com.codename1.cil.translate.Translator";
     private static final String SCENE_COMPILER_MAIN = "com.codename1.unity.scenecompiler.SceneCompiler";
     /// Bumped when what the steps write changes, so an upgraded plugin does
-    /// not trust the staging directory an older one left.
-    private static final String STATE_VERSION = "2";
+    /// not trust the staging directory an older one left. Also when the
+    /// state file changes: 3 is the first to record the parts and the
+    /// entries behind the digest (see [State]).
+    static final String STATE_VERSION = "3";
+    /// The four things the digest is of, as the state file names them and
+    /// in the order a mismatch is reported.
+    private static final String[] PARTS = {"project", "runtime", "references", "tool"};
+    private static final String RUNTIME_LABEL = "runtime!";
+    private static final String REFERENCES_LABEL = "references!";
+    private static final String TOOL_LABEL = "tool!";
     private final File unityDir;
     private final File javaOut;
     private final File classesOut;
@@ -127,6 +136,8 @@ public class UnityProjectBuilder {
     /// build that was given compiled output and still asks for the SDK was
     /// given output of something else, and that is the fact to act on.
     private String staleOutput;
+    /// Why the content the digest is of could not be read, when it could not.
+    private String unreadable;
 
     /// The three external steps. An interface so the tests can count and fake
     /// them: the logic around them (what is skipped, what is installed, what
@@ -227,12 +238,15 @@ public class UnityProjectBuilder {
         File runtimeClasses = new File(workDir, "runtime");
         File appImpl = new File(javaOut, GENERATED_PACKAGE.replace('.', File.separatorChar) + File.separator
                 + APP_IMPL_CLASS + ".java");
-        String digest = digest();
-        String stored = read(state);
-        if (digest.equals(stored) && staged.isDirectory() && appImpl.isFile()) {
+        State now = currentState();
+        State recorded = State.parse(read(state));
+        // No digest, no skipping: content that could not be read matches
+        // nothing, not even a state file that is empty for the same reason.
+        if (now != null && recorded != null && now.digest.equals(recorded.digest) && staged.isDirectory()
+                && appImpl.isFile()) {
             log.debug("Unity project unchanged; not compiled again");
         } else {
-            staleOutput = staleOutput(state, stored, staged, appImpl);
+            staleOutput = staleOutput(state, recorded, now, staged, appImpl);
             if (staleOutput != null) {
                 log.info(staleOutput);
             }
@@ -244,7 +258,9 @@ public class UnityProjectBuilder {
                 throw new BuildException("The scene compiler wrote no " + appImpl + " (log: "
                         + new File(workDir, "scene-compiler.log") + ")");
             }
-            write(state, digest);
+            if (now != null) {
+                write(state, now.text());
+            }
         }
         install(staged, resources, runtimeClasses);
         writeMainClass();
@@ -254,8 +270,8 @@ public class UnityProjectBuilder {
     /// What to say about compiled output that is present and cannot be used,
     /// or null when the work directory holds none: a first build has nothing
     /// to explain.
-    private String staleOutput(File state, String stored, File staged, File appImpl) {
-        if (stored == null) {
+    private String staleOutput(File state, State recorded, State now, File staged, File appImpl) {
+        if (recorded == null) {
             return null;
         }
         if (!staged.isDirectory() || !appImpl.isFile()) {
@@ -264,9 +280,265 @@ public class UnityProjectBuilder {
         }
         return "The compiled output under " + workDir + " does not match these sources or jars: " + state
                 + " records other content than " + unityDir + ", the " + RUNTIME_ARTIFACT + " jar, its '"
-                + REFERENCES_CLASSIFIER + "' jar and the " + TOOL_ARTIFACT + " class path have now. Output"
-                + " compiled elsewhere is good only with the exact project files and jars it was compiled"
-                + " from, so the project has to be compiled again.";
+                + REFERENCES_CLASSIFIER + "' jar and the " + TOOL_ARTIFACT + " class path have now. "
+                + (now == null ? "What is there now could not be read: " + unreadable + "."
+                        : differences(recorded, now))
+                + " Output compiled elsewhere is good only with the exact project files and jars it was"
+                + " compiled from, so the project has to be compiled again.";
+    }
+
+    /// The state file: the digest the build is skipped on, and under it what
+    /// the digest is of -- a digest of each of the four parts, then every
+    /// entry of every part. Only the first line decides anything. The rest is
+    /// there for the build that finds another digest, which can then say
+    /// which part differs and name a file in it; a digest alone says only
+    /// that something does, and the machine that made the output is not the
+    /// one being asked.
+    ///
+    /// ```
+    /// <digest>
+    /// version=3
+    /// part.project=<digest of the project's entries>
+    /// part.runtime=...
+    /// part.references=...
+    /// part.tool=...
+    /// Assets/Scripts/Player.cs=<SHA-256>
+    /// runtime!com/acme/A.class:<length>:<CRC-32>
+    /// ```
+    static final class State {
+        final String digest;
+        /// Null in a file with no `version=` line: one an older plugin
+        /// wrote, or one that was not written by a build at all.
+        final String version;
+        /// A digest for each of [#PARTS] that is recorded.
+        final Map<String, String> parts;
+        /// Sorted as `String` compares them.
+        final List<String> entries;
+
+        State(String digest, String version, Map<String, String> parts, List<String> entries) {
+            this.digest = digest;
+            this.version = version;
+            this.parts = parts;
+            this.entries = entries;
+        }
+
+        /// The state of sorted `entries`.
+        static State of(List<String> entries) throws NoSuchAlgorithmException {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            Map<String, String> parts = new LinkedHashMap<String, String>();
+            for (String part : PARTS) {
+                md.reset();
+                for (String e : entries) {
+                    if (part.equals(partOf(e))) {
+                        md.update((byte) '\n');
+                        md.update(e.getBytes(StandardCharsets.UTF_8));
+                    }
+                }
+                StringBuilder sb = new StringBuilder();
+                hex(sb, md.digest());
+                parts.put(part, sb.toString());
+            }
+            md.reset();
+            md.update(STATE_VERSION.getBytes(StandardCharsets.UTF_8));
+            for (String e : entries) {
+                md.update((byte) '\n');
+                md.update(e.getBytes(StandardCharsets.UTF_8));
+            }
+            StringBuilder sb = new StringBuilder();
+            hex(sb, md.digest());
+            return new State(sb.toString(), STATE_VERSION, parts, entries);
+        }
+
+        /// What a state file holds, or null for no file. Anything is read:
+        /// a file of one line is a digest with nothing recorded under it.
+        static State parse(String text) {
+            if (text == null) {
+                return null;
+            }
+            String digest = null;
+            String version = null;
+            Map<String, String> parts = new LinkedHashMap<String, String>();
+            List<String> entries = new ArrayList<String>();
+            int start = 0;
+            int length = text.length();
+            while (start <= length) {
+                int end = text.indexOf('\n', start);
+                if (end < 0) {
+                    end = length;
+                }
+                String line = text.substring(start, end);
+                if (line.endsWith("\r")) {
+                    line = line.substring(0, line.length() - 1);
+                }
+                start = end + 1;
+                if (digest == null) {
+                    digest = line.trim();
+                } else if (line.startsWith("version=")) {
+                    version = line.substring("version=".length());
+                } else if (line.startsWith("part.") && line.indexOf('=') > 0) {
+                    int eq = line.indexOf('=');
+                    parts.put(line.substring("part.".length(), eq), line.substring(eq + 1));
+                } else if (line.length() > 0) {
+                    entries.add(line);
+                }
+            }
+            return new State(digest == null ? "" : digest, version, parts, entries);
+        }
+
+        String text() {
+            StringBuilder sb = new StringBuilder(digest).append('\n');
+            sb.append("version=").append(version).append('\n');
+            for (Map.Entry<String, String> part : parts.entrySet()) {
+                sb.append("part.").append(part.getKey()).append('=').append(part.getValue()).append('\n');
+            }
+            for (String e : entries) {
+                sb.append(e).append('\n');
+            }
+            return sb.toString();
+        }
+    }
+
+    /// Which of [#PARTS] an entry belongs to. A file of the project is its
+    /// path, which starts with `Assets/` or `ProjectSettings/`; the entries
+    /// of the three jars start with the label of their role.
+    private static String partOf(String entry) {
+        if (entry.startsWith(RUNTIME_LABEL)) {
+            return PARTS[1];
+        }
+        if (entry.startsWith(REFERENCES_LABEL)) {
+            return PARTS[2];
+        }
+        if (entry.startsWith(TOOL_LABEL)) {
+            return PARTS[3];
+        }
+        return PARTS[0];
+    }
+
+    /// The name in an entry, without the digest or the length and checksum
+    /// after it: `Assets/a.cs=<hex>` and `tool!a/B.class:<length>:<crc>`.
+    private static String nameOf(String entry) {
+        String part = partOf(entry);
+        if (PARTS[0].equals(part)) {
+            int eq = entry.lastIndexOf('=');
+            return eq < 0 ? entry : entry.substring(0, eq);
+        }
+        String name = entry.substring(entry.indexOf('!') + 1);
+        int crc = name.lastIndexOf(':');
+        int size = crc < 0 ? -1 : name.lastIndexOf(':', crc - 1);
+        if (size >= 0) {
+            return name.substring(0, size);
+        }
+        // A file on the class path that is no jar has no name here, only
+        // the digest of its bytes.
+        return "a file that is not a jar";
+    }
+
+    private static String describe(String part) {
+        if (PARTS[0].equals(part)) {
+            return "the project files";
+        }
+        if (PARTS[1].equals(part)) {
+            return "the " + RUNTIME_ARTIFACT + " jar";
+        }
+        if (PARTS[2].equals(part)) {
+            return "the '" + REFERENCES_CLASSIFIER + "' jar";
+        }
+        return "the " + TOOL_ARTIFACT + " class path";
+    }
+
+    /// One sentence on what differs between the state a file records and
+    /// the state found now: each part whose digest is another, with how many
+    /// of its entries differ and the first of them. Without it a mismatch
+    /// says that one of four things is not what it was, on a machine that
+    /// cannot be looked at afterwards.
+    static String differences(State recorded, State now) {
+        if (recorded.version == null || recorded.parts.isEmpty()) {
+            return "Which of them differs cannot be said: the file records a digest ("
+                    + abbreviate(recorded.digest) + ", now " + abbreviate(now.digest) + ") and nothing under"
+                    + " it, as one written by an older build or by hand does.";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String part : PARTS) {
+            String was = recorded.parts.get(part);
+            String is = now.parts.get(part);
+            if (was != null && was.equals(is)) {
+                continue;
+            }
+            sb.append(sb.length() == 0 ? "What differs: " : "; ").append(describe(part));
+            sb.append(" (").append(abbreviate(was)).append(" recorded, ").append(abbreviate(is)).append(" now");
+            describeEntries(sb, part, recorded.entries, now.entries);
+            sb.append(')');
+        }
+        if (sb.length() == 0) {
+            // Every part is what it was, so the content is: the digest also
+            // covers the version of this record.
+            return "All four are the same content: the file was written as version " + recorded.version
+                    + " of this record and the build writes version " + now.version + ".";
+        }
+        return sb.append('.').toString();
+    }
+
+    /// Appends how many entries of `part` differ and what the first one is.
+    /// Both lists are sorted, so one pass over the two finds them in order.
+    private static void describeEntries(StringBuilder sb, String part, List<String> recorded, List<String> now) {
+        List<String> was = entriesOf(part, recorded);
+        List<String> is = entriesOf(part, now);
+        if (was.isEmpty()) {
+            sb.append("; the file lists none of its ").append(is.size()).append(" entries");
+            return;
+        }
+        int i = 0;
+        int j = 0;
+        int count = 0;
+        String first = null;
+        while (i < was.size() || j < is.size()) {
+            String a = i < was.size() ? was.get(i) : null;
+            String b = j < is.size() ? is.get(j) : null;
+            if (a != null && a.equals(b)) {
+                i++;
+                j++;
+                continue;
+            }
+            String nameA = a == null ? null : nameOf(a);
+            String nameB = b == null ? null : nameOf(b);
+            int order = nameA == null ? 1 : nameB == null ? -1 : nameA.compareTo(nameB);
+            String what;
+            if (order == 0) {
+                what = nameA + " has other content";
+                i++;
+                j++;
+            } else if (order < 0) {
+                what = nameA + " is recorded and is not there now";
+                i++;
+            } else {
+                what = nameB + " is there now and is not recorded";
+                j++;
+            }
+            if (first == null) {
+                first = what;
+            }
+            count++;
+        }
+        sb.append("; ").append(count).append(" of ").append(Math.max(was.size(), is.size()))
+                .append(" entries differ, the first: ").append(first);
+    }
+
+    private static List<String> entriesOf(String part, List<String> entries) {
+        List<String> out = new ArrayList<String>();
+        for (String e : entries) {
+            if (part.equals(partOf(e))) {
+                out.add(e);
+            }
+        }
+        return out;
+    }
+
+    /// Enough of a digest to tell two apart in a log line.
+    private static String abbreviate(String digest) {
+        if (digest == null || digest.length() == 0) {
+            return "none";
+        }
+        return digest.length() <= 12 ? digest : digest.substring(0, 12);
     }
 
     private void compile(File staged, File resources, File runtimeClasses) throws BuildException {
@@ -582,37 +854,33 @@ public class UnityProjectBuilder {
     /// The runtime, the references and the tool are in it by what their
     /// jars hold -- see [#stamp] -- and by the role they have here, never
     /// by a file name, which has a version and a directory in it.
-    private String digest() {
+    ///
+    /// Returns null when the content could not be read, and leaves why in
+    /// [#unreadable]: no digest, no skipping.
+    private State currentState() {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
             byte[] buffer = new byte[1 << 16];
             List<String> entries = new ArrayList<String>();
             collectStamped(new File(unityDir, "Assets"), "Assets/", entries, md, buffer);
             collectStamped(new File(unityDir, "ProjectSettings"), "ProjectSettings/", entries, md, buffer);
-            stamp(runtimeJar, "runtime!", entries, md, buffer);
-            stamp(referencesJar, "references!", entries, md, buffer);
+            stamp(runtimeJar, RUNTIME_LABEL, entries, md, buffer);
+            stamp(referencesJar, REFERENCES_LABEL, entries, md, buffer);
             for (File f : toolClasspath) {
                 // One label for all of them: the order of a class path and
                 // how many jars the classes came in are not content.
-                stamp(f, "tool!", entries, md, buffer);
+                stamp(f, TOOL_LABEL, entries, md, buffer);
             }
             Collections.sort(entries);
-            md.reset();
-            md.update(STATE_VERSION.getBytes(StandardCharsets.UTF_8));
-            for (String e : entries) {
-                md.update((byte) '\n');
-                md.update(e.getBytes(StandardCharsets.UTF_8));
-            }
-            StringBuilder sb = new StringBuilder();
-            hex(sb, md.digest());
-            return sb.toString();
+            return State.of(entries);
         } catch (NoSuchAlgorithmException e) {
-            // No digest, no skipping: an empty string never equals a stored one.
-            return "";
+            unreadable = e.toString();
+            return null;
         } catch (IOException e) {
-            // Nor for a file that cannot be read: the build that follows
-            // says which and why.
-            return "";
+            // A file that cannot be read: said with the mismatch, since the
+            // build that follows may fail on something else first.
+            unreadable = e.toString();
+            return null;
         }
     }
 
