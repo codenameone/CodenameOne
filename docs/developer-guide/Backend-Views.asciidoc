@@ -74,6 +74,9 @@ and query arguments, such as `@{/search(q=${query})}`.
 
 Dynamic text and attributes are HTML-escaped. URL arguments use URL encoding
 before attribute escaping. Dynamic URL attributes reject executable URL schemes.
+Dynamic htmx attributes that evaluate expressions (`hx-on*`, `hx-vars`, `hx-vals`,
+`hx-headers`, `hx-request`, and `hx-trigger`) are rejected, including `data-hx-*`
+aliases. Define those attributes as static template content.
 Raw HTML, dynamic script/style content, arbitrary method calls, expression
 preprocessing, message expressions, inline expressions, custom dialects, and
 Spring EL are outside this subset. Unsupported `th:` attributes fail the build.

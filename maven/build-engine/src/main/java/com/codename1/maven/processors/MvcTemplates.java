@@ -492,6 +492,9 @@ final class MvcTemplates {
                             || attr.equals("srcdoc")
                             || attr.startsWith("th:")
                             || attr.startsWith("hx-on")
+                            || attr.equals("hx-vars")
+                            || attr.equals("hx-request")
+                            || attr.equals("hx-trigger")
                             || attr.equals("hx-vals")
                             || attr.equals("hx-headers"))
                         throw new IllegalArgumentException("Unsupported dynamic attribute " + attr);

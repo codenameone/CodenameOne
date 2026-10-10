@@ -48,9 +48,8 @@ final class MvcForms {
             throw new IllegalArgumentException(
                     "Form requires a public no-argument constructor: " + type);
         Map<String, String[]> fields = new TreeMap<String, String[]>();
-        for (AnnotatedClass c = cls;
-                c != null && !"java/lang/Object".equals(c.getInternalName());
-                c = RestControllerAnnotationProcessor.resolveClass(ctx, c.getSuperInternalName())) {
+        for (MvcTypes resolved : MvcTypes.hierarchy(ctx, type)) {
+            AnnotatedClass c = resolved.cls;
             for (String annotation : c.getAllAnnotationDescriptors())
                 if (annotation.endsWith("/Entity;") || annotation.endsWith("/Table;"))
                     throw new IllegalArgumentException(
@@ -63,13 +62,15 @@ final class MvcForms {
                     fields.put(
                             f.getName(),
                             new String[] {
-                                Type.getType(f.getDescriptor()).getClassName(),
+                                resolved.member(
+                                        Type.getType(f.getDescriptor()), f.getSignature(), false),
                                 "." + f.getName() + " = ",
                                 ";"
                             });
             for (MethodInfo m : c.getMethods())
                 if (m.isPublic()
                         && !m.isStatic()
+                        && !m.isSynthetic()
                         && m.getName().startsWith("set")
                         && m.getName().length() > 3
                         && Type.getArgumentTypes(m.getDescriptor()).length == 1
@@ -79,7 +80,10 @@ final class MvcForms {
                         fields.put(
                                 field,
                                 new String[] {
-                                    Type.getArgumentTypes(m.getDescriptor())[0].getClassName(),
+                                    resolved.parameter(
+                                            Type.getArgumentTypes(m.getDescriptor())[0],
+                                            m.getSignature(),
+                                            0),
                                     "." + m.getName() + "(",
                                     ");"
                                 });

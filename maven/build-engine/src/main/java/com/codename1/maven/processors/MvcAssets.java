@@ -61,7 +61,7 @@ final class MvcAssets {
         if (files == null) return;
         for (File file : files) {
             String name = file.getName();
-            if (!name.matches("(Assets|Asset[0-9]+)\\.class")) continue;
+            if (!name.matches("(Views|Assets|Asset[0-9]+)\\.class")) continue;
             String type = "com.codename1.generated.mvc." + name.substring(0, name.length() - 6);
             if (!currentSources.contains(type)
                     && ClassScanner.readClass(file)

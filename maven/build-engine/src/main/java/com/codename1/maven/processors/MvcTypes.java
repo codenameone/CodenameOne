@@ -55,6 +55,29 @@ final class MvcTypes {
         return null;
     }
 
+    static List<MvcTypes> hierarchy(ProcessorContext ctx, String type) {
+        List<MvcTypes> result = new ArrayList<MvcTypes>();
+        Deque<String> pending = new ArrayDeque<String>();
+        Set<String> seen = new HashSet<String>();
+        pending.add(type);
+        while (!pending.isEmpty()) {
+            String owner = pending.removeFirst();
+            String name = MvcExpression.raw(owner).replace('.', '/');
+            if (!seen.add(name) || "java/lang/Object".equals(name)) continue;
+            AnnotatedClass cls = MvcTypes.resolveClass(ctx, MvcExpression.raw(owner));
+            if (cls == null) continue;
+            MvcTypes resolved = new MvcTypes(cls, owner);
+            result.add(resolved);
+            // Class declarations take precedence over inherited interface defaults.
+            for (int i = 0; i < resolved.parents.size(); i++) {
+                String parent = resolved.parents.get(i).toString();
+                if (i == 0) pending.addFirst(parent);
+                else pending.addLast(parent);
+            }
+        }
+        return result;
+    }
+
     static String sourceType(ProcessorContext ctx, String type) {
         java.util.regex.Matcher words =
                 java.util.regex.Pattern.compile("[A-Za-z_$][A-Za-z0-9_$.]*").matcher(type);
@@ -125,6 +148,14 @@ final class MvcTypes {
     }
 
     String member(Type erased, String signature, boolean method) {
+        return member(erased, signature, method, -1);
+    }
+
+    String parameter(Type erased, String signature, int index) {
+        return member(erased, signature, true, index);
+    }
+
+    private String member(Type erased, String signature, boolean method, final int parameterIndex) {
         if (signature == null) return RestClientAnnotationProcessor.javaTypeFor(erased, null);
         final StringBuilder out = new StringBuilder();
         final Map<String, String> scope = new LinkedHashMap<String, String>(bindings);
@@ -133,6 +164,8 @@ final class MvcTypes {
         else
             reader.accept(
                     new SignatureVisitor(Opcodes.ASM9) {
+                        private int parameter;
+
                         // A method type parameter shadows one with the same name on the class.
                         @Override
                         public void visitFormalTypeParameter(String name) {
@@ -151,7 +184,9 @@ final class MvcTypes {
 
                         @Override
                         public SignatureVisitor visitParameterType() {
-                            return ignored();
+                            return parameter++ == parameterIndex
+                                    ? new JavaType(out, scope)
+                                    : ignored();
                         }
 
                         @Override
@@ -161,7 +196,7 @@ final class MvcTypes {
 
                         @Override
                         public SignatureVisitor visitReturnType() {
-                            return new JavaType(out, scope);
+                            return parameterIndex < 0 ? new JavaType(out, scope) : ignored();
                         }
                     });
         return out.toString();

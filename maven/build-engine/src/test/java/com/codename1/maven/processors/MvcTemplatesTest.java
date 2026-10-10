@@ -1618,6 +1618,165 @@ public class MvcTemplatesTest {
         assertTrue(html.getElementById("radio").hasAttr("checked"));
     }
 
+    @Test
+    public void incrementalBuildRemovesViewsWhenLastViewRouteIsRemoved() throws Exception {
+        setup();
+        template("private", "<p>deleted private template</p>");
+        controller(
+                "package sample; import com.codename1.backend.annotations.*; @Controller public"
+                    + " class Pages { @GetMapping(\"/\") public String page(){return \"private\";}"
+                    + " }");
+        File views = new File(classes, "com/codename1/generated/mvc/Views.class");
+        assertTrue(views.isFile());
+        assertTrue(new File(project, "src/main/resources/templates/private.html").delete());
+        controller(
+                "package sample; import com.codename1.backend.annotations.*; import"
+                        + " com.codename1.backend.HttpServer; @Controller public class Pages {"
+                        + " @GetMapping(\"/\") public HttpServer.Response page(){return"
+                        + " HttpServer.Response.text(200,\"plain\");} }");
+        assertFalse("Deleted template bytecode survives rebuild", views.exists());
+        fixtureSources(
+                Collections.singletonMap(
+                        "com.codename1.generated.mvc.Views",
+                        "package com.codename1.generated.mvc; public class Views {}"));
+        MvcAssets.removeObsoleteClasses(classes, Collections.<String>emptySet());
+        assertTrue("User-written Views must survive", views.isFile());
+    }
+
+    @Test
+    public void inheritedGenericScalarFormPropertiesBindResolvedTypes() throws Exception {
+        setup();
+        Map<String, String> fixtures = new LinkedHashMap<String, String>();
+        fixtures.put(
+                "sample.Base",
+                "package sample; public class Base<T> { private T value; public T field; public"
+                        + " void setValue(T value){this.value=value;} public T getValue(){return"
+                        + " value;} }");
+        fixtures.put("sample.Middle", "package sample; public class Middle<U> extends Base<U> {}");
+        fixtures.put(
+                "sample.IntForm",
+                "package sample; public class IntForm extends Middle<Integer> { public"
+                        + " IntForm(){field=7;setValue(8);} }");
+        fixtureSources(fixtures);
+        HttpServer.Handler handler =
+                controller(
+                        "package sample; import com.codename1.backend.annotations.*; import"
+                                + " com.codename1.backend.mvc.*; @Controller public class Pages {"
+                                + " @PostMapping(\"/bind\") @ResponseBody public String"
+                                + " bind(@ModelAttribute(\"form\") IntForm f, BindingResult"
+                                + " errors){return"
+                                + " f.getValue()+\"|\"+f.field+\"|\"+errors.hasErrors();} }");
+        assertEquals(
+                "12|34|false",
+                body(handler.handle(request("POST", "/bind", "value=12&field=34", false))));
+        assertEquals("8|7|false", body(handler.handle(request("POST", "/bind", "", false))));
+        assertEquals(
+                "null|null|false",
+                body(handler.handle(request("POST", "/bind", "value=&field=", false))));
+        assertEquals(
+                "8|7|true",
+                body(handler.handle(request("POST", "/bind", "value=bad&field=bad", false))));
+    }
+
+    @Test
+    public void dynamicHtmxExpressionAttributesAreRejectedIncludingAliases() throws Exception {
+        setup();
+        for (String name : Arrays.asList("hx-vars", "hx-request", "hx-trigger")) {
+            for (String prefix : Arrays.asList("", "DATA-")) {
+                template(
+                        "executable",
+                        "<!-- cn1:model payload java.lang.String --><button th:attr=\""
+                                + prefix
+                                + name
+                                + "=${payload}\">Go</button>");
+                try {
+                    new MvcTemplates(context).sources();
+                    fail("Accepted executable attribute " + prefix + name);
+                } catch (IllegalArgumentException expected) {
+                    assertTrue(
+                            expected.getMessage(),
+                            expected.getMessage().contains("Unsupported dynamic attribute"));
+                }
+            }
+        }
+        template(
+                "executable",
+                "<button hx-trigger=\"click[ctrlKey]\" hx-request=\"{&quot;timeout&quot;:1000}\""
+                        + " hx-vars=\"count:1\">Go</button>");
+        compile();
+        assertTrue(render("executable", new Model()).contains("click[ctrlKey]"));
+    }
+
+    @Test
+    public void numericConditionalsRemainNumericInComparisonsAndArithmetic() throws Exception {
+        setup();
+        template(
+                "conditional",
+                "<!-- cn1:model flag java.lang.Boolean --><!-- cn1:model whole java.lang.Long"
+                    + " --><!-- cn1:model count java.lang.Integer --><b th:text=\"${(flag ? 1 :"
+                    + " 2.5) > 0}\"></b><i th:text=\"${(flag ? 1 : 2.5) + 1}\"></i><em"
+                    + " th:text=\"${(flag ? whole : count) == whole}\"></em><u th:text=\"${(flag ?"
+                    + " whole : count) > 0}\"></u><small th:text=\"${flag ? (1 + 1) :"
+                    + " 3}\"></small>");
+        compile();
+        Model model =
+                new Model()
+                        .addAttribute("whole", 9007199254740993L)
+                        .addAttribute("count", 2)
+                        .addAttribute("flag", true);
+        String html = render("conditional", model);
+        assertTrue(
+                html,
+                html.contains("<b>true</b><i>2.0</i><em>true</em><u>true</u><small>2</small>"));
+        model.addAttribute("flag", false);
+        html = render("conditional", model);
+        assertTrue(
+                html,
+                html.contains("<b>true</b><i>3.5</i><em>false</em><u>true</u><small>3</small>"));
+    }
+
+    @Test
+    public void primitiveIsGettersTakePrecedenceRegardlessOfDeclarationOrder() throws Exception {
+        setup();
+        Map<String, String> fixtures = new LinkedHashMap<String, String>();
+        fixtures.put(
+                "sample.GetFirst",
+                "package sample; public class GetFirst { public Boolean getActive(){return false;}"
+                        + " public boolean isActive(){return true;} }");
+        fixtures.put(
+                "sample.IsFirst",
+                "package sample; public class IsFirst { public boolean isActive(){return true;}"
+                        + " public Boolean getActive(){return false;} }");
+        fixtures.put(
+                "sample.Inherited",
+                "package sample; public class Inherited extends IsFirst { public Boolean"
+                        + " getActive(){return false;} }");
+        fixtures.put(
+                "sample.BoxedIs",
+                "package sample; public class BoxedIs { public Boolean isActive(){return false;}"
+                        + " public boolean getActive(){return true;} }");
+        fixtureSources(fixtures);
+        template(
+                "beans",
+                "<!-- cn1:model a sample.GetFirst --><!-- cn1:model b sample.IsFirst --><!--"
+                        + " cn1:model c sample.Inherited --><!-- cn1:model d sample.BoxedIs --><b"
+                        + " th:text=\"${a.active}\"></b><i th:text=\"${b.active}\"></i><em"
+                        + " th:text=\"${c.active}\"></em><u th:text=\"${d.active}\"></u>");
+        compile();
+        String html =
+                render(
+                        "beans",
+                        new Model()
+                                .addAttribute(
+                                        "a", loader.loadClass("sample.GetFirst").newInstance())
+                                .addAttribute("b", loader.loadClass("sample.IsFirst").newInstance())
+                                .addAttribute(
+                                        "c", loader.loadClass("sample.Inherited").newInstance())
+                                .addAttribute(
+                                        "d", loader.loadClass("sample.BoxedIs").newInstance()));
+        assertTrue(html, html.contains("<b>true</b><i>true</i><em>true</em><u>true</u>"));
+    }
+
     private static volatile int benchmarkSink;
 
     @Test

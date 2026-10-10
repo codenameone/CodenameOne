@@ -100,9 +100,14 @@ final class MvcExpression {
             Value yes = conditional();
             need(":");
             Value no = conditional();
-            return new Value(
-                    "(" + truth(test) + " ? " + yes.code + " : " + no.code + ")",
-                    yes.type.equals(no.type) ? yes.type : "java.lang.Object");
+            String type = yes.type.equals(no.type) ? yes.type : "java.lang.Object";
+            if (!yes.type.equals(no.type) && numeric(yes.type) && numeric(no.type)) {
+                type = promoteNumeric(yes.type, no.type);
+                // Match the recorded type explicitly, including Java's boxed-number branches.
+                yes = new Value("((" + type + ")(" + unboxNumber(yes) + "))", type);
+                no = new Value("((" + type + ")(" + unboxNumber(no) + "))", type);
+            }
+            return new Value("(" + truth(test) + " ? " + yes.code + " : " + no.code + ")", type);
         }
         return test;
     }
@@ -157,7 +162,7 @@ final class MvcExpression {
                                         : (left.type.equals("java.lang.String")
                                                         || right.type.equals("java.lang.String")
                                                 ? "java.lang.String"
-                                                : "double"));
+                                                : promoteNumeric(left.type, right.type)));
             }
         }
         return left;
@@ -277,24 +282,31 @@ final class MvcExpression {
             access = ".length";
         } else {
             String cap = Character.toUpperCase(name.charAt(0)) + name.substring(1);
-            for (MvcTypes resolved : hierarchy(owner.type)) {
-                AnnotatedClass cls = resolved.cls;
-                for (MethodInfo m : cls.getMethods())
-                    if (m.isPublic()
-                            && !m.isStatic()
-                            && Type.getArgumentTypes(m.getDescriptor()).length == 0
-                            && (m.getName().equals("get" + cap)
-                                    || (m.getName().equals("is" + cap)
-                                            && Type.getReturnType(m.getDescriptor())
-                                                    .equals(Type.BOOLEAN_TYPE)))) {
+            List<MvcTypes> hierarchy = MvcTypes.hierarchy(ctx, owner.type);
+            // JavaBeans prefers a primitive isX getter even when getX appears first.
+            for (String prefix : Arrays.asList("is", "get")) {
+                for (MvcTypes resolved : hierarchy) {
+                    for (MethodInfo m : resolved.cls.getMethods()) {
                         Type result = Type.getReturnType(m.getDescriptor());
-                        if (result.equals(Type.VOID_TYPE)) continue;
-                        type = resolved.member(result, m.getSignature(), true);
-                        access = "." + m.getName() + "()";
-                        break;
+                        if (m.isPublic()
+                                && !m.isStatic()
+                                && !m.isSynthetic()
+                                && Type.getArgumentTypes(m.getDescriptor()).length == 0
+                                && m.getName().equals(prefix + cap)
+                                && !result.equals(Type.VOID_TYPE)
+                                && (!prefix.equals("is") || result.equals(Type.BOOLEAN_TYPE))) {
+                            type = resolved.member(result, m.getSignature(), true);
+                            access = "." + m.getName() + "()";
+                            break;
+                        }
                     }
-                if (access == null)
-                    for (FieldInfo f : cls.getFields())
+                    if (access != null) break;
+                }
+                if (access != null) break;
+            }
+            if (access == null) {
+                for (MvcTypes resolved : hierarchy) {
+                    for (FieldInfo f : resolved.cls.getFields())
                         if (f.isPublic() && !f.isStatic() && f.getName().equals(name)) {
                             type =
                                     resolved.member(
@@ -304,7 +316,8 @@ final class MvcExpression {
                             access = "." + name;
                             break;
                         }
-                if (access != null) break;
+                    if (access != null) break;
+                }
             }
         }
         if (access == null) throw error("No readable property '" + name + "' on " + owner.type);
@@ -319,29 +332,6 @@ final class MvcExpression {
                         + access
                         + "))",
                 boxed);
-    }
-
-    private List<MvcTypes> hierarchy(String type) {
-        List<MvcTypes> result = new ArrayList<MvcTypes>();
-        Deque<String> pending = new ArrayDeque<String>();
-        Set<String> seen = new HashSet<String>();
-        pending.add(type);
-        while (!pending.isEmpty()) {
-            String owner = pending.removeFirst();
-            String name = raw(owner).replace('.', '/');
-            if (!seen.add(name) || "java/lang/Object".equals(name)) continue;
-            AnnotatedClass cls = MvcTypes.resolveClass(ctx, raw(owner));
-            if (cls == null) continue;
-            MvcTypes resolved = new MvcTypes(cls, owner);
-            result.add(resolved);
-            // Class declarations take precedence over inherited interface defaults.
-            for (int i = 0; i < resolved.parents.size(); i++) {
-                String parent = resolved.parents.get(i).toString();
-                if (i == 0) pending.addFirst(parent);
-                else pending.addLast(parent);
-            }
-        }
-        return result;
     }
 
     private static String numericEquality(Value left, Value right) {
@@ -404,6 +394,15 @@ final class MvcExpression {
         };
         for (int i = 0; i < a.length; i++) if (a[i].equals(t)) return "java.lang." + b[i];
         return t;
+    }
+
+    private static String promoteNumeric(String left, String right) {
+        for (String type : Arrays.asList("double", "float", "long"))
+            if (left.equals(type)
+                    || left.equals(box(type))
+                    || right.equals(type)
+                    || right.equals(box(type))) return type;
+        return "int";
     }
 
     private static boolean numeric(String t) {
