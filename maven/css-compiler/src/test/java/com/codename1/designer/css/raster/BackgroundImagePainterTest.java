@@ -285,4 +285,14 @@ class BackgroundImagePainterTest {
         assertPixel(YELLOW, img, 199, 199);
         assertPixel(GREEN, img, 151, 76);
     }
+
+    @Test
+    void tilesTooSmallToCountAreStillPaintedPromptly() {
+        // Both tile counts are past what a long holds, and their product
+        // wraps around to something small.
+        final BufferedImage dot = new BufferedImage(2, 2, BufferedImage.TYPE_INT_ARGB);
+        org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(java.time.Duration.ofSeconds(20),
+                () -> paint(BoxStyle.builder().size(30, 30)
+                        .backgroundImage(new BackgroundImage(dot).withSize(1e-300, 1e-300))));
+    }
 }

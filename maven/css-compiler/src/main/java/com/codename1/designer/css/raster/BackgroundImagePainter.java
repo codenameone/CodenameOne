@@ -138,7 +138,9 @@ public final class BackgroundImagePainter {
             g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
             g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
             g.clip(clip);
-            if (nx * ny > MAX_DRAWN_TILES) {
+            // Divided, not multiplied: two counts large enough wrap around
+            // to a small product, and the loops below would then never end.
+            if (nx > MAX_DRAWN_TILES / ny) {
                 g.setPaint(new TexturePaint(src, new Rectangle2D.Double(x0, y0, tw, th)));
                 g.fill(new Rectangle2D.Double(x0, y0, nx * tw, ny * th));
             } else {
