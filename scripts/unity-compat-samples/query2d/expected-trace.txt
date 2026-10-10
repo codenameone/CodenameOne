@@ -74,12 +74,30 @@ capsule Disc
 filter 1 Pill
 own point True False
 bounds pill 350,-200..450,0 ramp -300,-300..300,-200 log -493,-175..-307,-25 floor -600,-450..-200,-350
+find Menu/Panel/Button Menu/Panel/Button 12 Menu Menu/Panel none none none none TrueTrue
+children 3 Panel Button
+inactive 1 Panel 1 Button 1 none none Panel/Button
+inactive root none 0 Button
+outer starts frame=1
+inner a starts frame=1
 touch supported=True multi=True simulate=True count=0
+inner a waited frame=3
+deep a step=3 frame=4
 falling touching=False layers=False y=-294
+inner a ends frame=7
+outer after a frame=7
+empty frame=7
+outer after empty frame=7
+inner b starts frame=7
+inner b waited frame=8
+deep b step=7 frame=9
 input frame=10 touch=100,200
+stopping ticks=9
 frame 10 touches=1 [0 began 100,100 d=0,0 taps=1] array=1 mouse=down at 100,100 axis=0,0
 input frame=11 touch=110,200
 frame 11 touches=1 [0 moved 110,100 d=10,0 taps=1] array=1 mouse=held at 110,100 axis=500,0
+inner b ends frame=11
+outer ends frame=11
 input frame=12 touch=110,200;300,100
 frame 12 touches=2 [0 stationary 110,100 d=0,0 taps=1] [1 began 300,200 d=0,0 taps=1] array=2 mouse=held at 110,100 axis=0,0
 input frame=13 touch=120,210;300,100
@@ -92,6 +110,9 @@ frame 16 touches=2 [0 ended 120,90 d=0,0 taps=1] [1 stationary 310,210 d=0,0 tap
 frame 17 touches=1 [1 stationary 310,210 d=0,0 taps=1] array=1 mouse=held at 310,210 axis=0,0
 input frame=18 touch=none
 frame 18 touches=1 [1 ended 310,210 d=0,0 taps=1] array=1 mouse=up at 310,210 axis=0,0
+A coroutine of Probe ran 1000000 nested enumerators in one frame and none of them yielded; it goes on in the next frame.
+spin given up spins=1000000
+spin stopped spins=1000000
 input frame=30 touch=50,50
 input frame=30 touch=none
 frame 30 touches=1 [0 began 50,250 d=0,0 taps=1] array=1 mouse=down at 50,250 axis=0,0
@@ -120,6 +141,9 @@ collider cast short 0
 body point True False
 moved stale Disc d=351 p=351,90 n=-98,-20 f=35
 moved synced Disc d=370 p=370,90 n=-60,80 f=37
+stopped ticks=9 fixed clock dt=200 unscaled=200 fixedUnscaled=200 ahead=TrueTrue
+fixed clock half dt=200 unscaled=400 fixedUnscaled=400
+update clock dt=83 unscaled=167 fixed=200 fixedUnscaled=400
 mouse emulation off
 input frame=105 touch=100,100
 frame 105 touches=1 [0 began 100,200 d=0,0 taps=1] array=1 mouse=none at 120,210 axis=0,0

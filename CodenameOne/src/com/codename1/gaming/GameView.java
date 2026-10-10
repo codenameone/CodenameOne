@@ -25,6 +25,7 @@ package com.codename1.gaming;
 import com.codename1.gpu.GraphicsDevice;
 import com.codename1.gpu.Light;
 import com.codename1.gpu.RenderView;
+import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Rectangle;
@@ -139,6 +140,26 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
     /// Removes a previously added 3D `Model`.
     public void removeModel(Model model) {
         ((SpriteRenderer) getRenderer()).removeModel(model);
+    }
+
+    /// Releases the texture the view keeps for an image that is no longer
+    /// drawn. The view uploads each image a sprite shows once and keeps the
+    /// texture for as long as it lives, so an image that is made at run time
+    /// and then replaced -- a text painted into an image, for one -- has to be
+    /// released, or its texture stays. Safe to call from `update`; an image
+    /// that is drawn again later is uploaded again, and one the view has no
+    /// texture for is ignored. See `SpriteRenderer#releaseTexture(Image)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `image`: the image whose texture is no longer needed
+    public void releaseTexture(Image image) {
+        ((SpriteRenderer) getRenderer()).releaseTexture(image);
+    }
+
+    /// The number of images the view holds a texture for at the moment.
+    public int getTextureCount() {
+        return ((SpriteRenderer) getRenderer()).getTextureCount();
     }
 
     /// Override to allocate GPU resources (meshes, textures, `Model`s) once the GPU

@@ -20,12 +20,16 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 // Asks the physics world questions and logs every answer in hundredths of a
 // unit: a ray, a line, a circle, a box and a capsule cast against each kind
 // of collider, the overlap tests, layer masks, triggers and contact filters.
+// Then the hierarchy: objects found by a path, and components looked for
+// below an object that is inactive. A coroutine that yields other routines
+// without starting them, and the clock as a fixed step reads it.
 public class Probe : MonoBehaviour
 {
     public LayerMask walls;
@@ -36,6 +40,10 @@ public class Probe : MonoBehaviour
     private readonly RaycastHit2D[] buffer = new RaycastHit2D[2];
     private readonly Collider2D[] found = new Collider2D[8];
     private int frame;
+    private int ticks;
+    private Coroutine stopped;
+    private int spins;
+    private bool logUpdate;
 
     private static int Cm(float v)
     {
@@ -83,6 +91,161 @@ public class Probe : MonoBehaviour
         Masks();
         Casts();
         Overlaps();
+        Hierarchy();
+        StartCoroutine(Outer());
+        stopped = StartCoroutine(Stopped());
+    }
+
+    private static string Path(GameObject go)
+    {
+        if (go == null)
+        {
+            return "none";
+        }
+        string s = go.name;
+        for (Transform t = go.transform.parent; t != null; t = t.parent)
+        {
+            s = t.name + "/" + s;
+        }
+        return s;
+    }
+
+    private static string Name(Component c)
+    {
+        return c == null ? "none" : c.name;
+    }
+
+    // Menu/Panel/Button, and beside it a second Panel/Button with no Menu
+    // above it. No colliders: the questions above are asked again later.
+    private void Hierarchy()
+    {
+        GameObject menu = new GameObject("Menu");
+        GameObject panel = new GameObject("Panel");
+        panel.transform.SetParent(menu.transform);
+        GameObject button = new GameObject("Button");
+        button.transform.SetParent(panel.transform);
+        GameObject loose = new GameObject("Panel");
+        GameObject stray = new GameObject("Button");
+        stray.transform.SetParent(loose.transform);
+        stray.AddComponent<SpriteRenderer>();
+
+        // A name with a slash is a path; a leading slash starts at a root.
+        Debug.Log("find " + Path(GameObject.Find("Menu/Panel/Button")) + " " + Path(GameObject.Find("Panel/Button"))
+            + " " + Path(GameObject.Find("/Panel/Button")).Length + " " + Path(GameObject.Find("/Menu")) + " "
+            + Path(GameObject.Find("/Menu/Panel")) + " " + Path(GameObject.Find("/Button")) + " "
+            + Path(GameObject.Find("Menu/Button")) + " " + Path(GameObject.Find("Panel/Menu")) + " "
+            + Path(GameObject.Find("Menu/")) + " " + (GameObject.Find("/Panel/Button") == stray)
+            + (GameObject.Find("Button") != null));
+
+        menu.AddComponent<SpriteRenderer>();
+        panel.AddComponent<SpriteRenderer>();
+        button.AddComponent<SpriteRenderer>();
+        Debug.Log("children " + menu.GetComponentsInChildren<SpriteRenderer>().Length + " "
+            + Name(panel.GetComponentInChildren<SpriteRenderer>()) + " "
+            + Name(loose.GetComponentInChildren<SpriteRenderer>()));
+        // The object asked is searched though it is inactive; nothing below
+        // an inactive object is, and an inactive object is not found.
+        panel.SetActive(false);
+        Debug.Log("inactive " + menu.GetComponentsInChildren<SpriteRenderer>().Length + " "
+            + Name(panel.GetComponentInChildren<SpriteRenderer>()) + " "
+            + panel.GetComponentsInChildren<SpriteRenderer>().Length + " "
+            + Name(button.transform.GetComponentInChildren<SpriteRenderer>()) + " "
+            + button.GetComponentsInChildren<SpriteRenderer>().Length + " "
+            + Path(GameObject.Find("Menu/Panel/Button")) + " " + Path(GameObject.Find("Menu/Panel")) + " "
+            + Path(GameObject.Find("Panel/Button")));
+        loose.SetActive(false);
+        Debug.Log("inactive root " + Name(loose.GetComponentInChildren<SpriteRenderer>()) + " "
+            + loose.GetComponentsInChildren<SpriteRenderer>().Length + " "
+            + Name(stray.GetComponentInChildren<SpriteRenderer>()));
+        Destroy(menu);
+        Destroy(loose);
+    }
+
+    // A routine yielded without StartCoroutine is run to its end before the
+    // one that yielded it goes on, whatever it waits for on the way.
+    private IEnumerator Outer()
+    {
+        Debug.Log("outer starts frame=" + Time.frameCount);
+        yield return Inner("a", 2);
+        Debug.Log("outer after a frame=" + Time.frameCount);
+        yield return Empty();
+        Debug.Log("outer after empty frame=" + Time.frameCount);
+        yield return Inner("b", 1);
+        Debug.Log("outer ends frame=" + Time.frameCount);
+    }
+
+    private IEnumerator Inner(string name, int frames)
+    {
+        Debug.Log("inner " + name + " starts frame=" + Time.frameCount);
+        for (int i = 0; i < frames; i++)
+        {
+            yield return null;
+        }
+        Debug.Log("inner " + name + " waited frame=" + Time.frameCount);
+        yield return Deep(name);
+        yield return new WaitForSeconds(0.05f);
+        Debug.Log("inner " + name + " ends frame=" + Time.frameCount);
+    }
+
+    private IEnumerator Deep(string name)
+    {
+        yield return new WaitForFixedUpdate();
+        Debug.Log("deep " + name + " step=" + frame + " frame=" + Time.frameCount);
+    }
+
+    private IEnumerator Empty()
+    {
+        Debug.Log("empty frame=" + Time.frameCount);
+        yield break;
+    }
+
+    // Stopping the coroutine stops the routine it was waiting in.
+    private IEnumerator Stopped()
+    {
+        yield return Forever();
+        Debug.Log("stopped went on");
+    }
+
+    private IEnumerator Forever()
+    {
+        while (true)
+        {
+            ticks++;
+            yield return null;
+        }
+    }
+
+    // A child that ends without yielding is not a frame: this never reaches
+    // the end of the one it starts in. Unity's player stops for good in it;
+    // this runtime gives it up after a million children, says so in the log
+    // and goes on in the next frame, which is what the count below holds.
+    private IEnumerator Spin()
+    {
+        while (true)
+        {
+            spins++;
+            yield return Nothing();
+        }
+    }
+
+    private IEnumerator Nothing()
+    {
+        yield break;
+    }
+
+    private static int Tenths(float seconds)
+    {
+        return Mathf.RoundToInt(seconds * 10000f);
+    }
+
+    private void Update()
+    {
+        if (logUpdate)
+        {
+            logUpdate = false;
+            Debug.Log("update clock dt=" + Tenths(Time.deltaTime) + " unscaled=" + Tenths(Time.unscaledDeltaTime)
+                + " fixed=" + Tenths(Time.fixedDeltaTime) + " fixedUnscaled=" + Tenths(Time.fixedUnscaledDeltaTime));
+        }
     }
 
     private void Rays()
@@ -244,6 +407,40 @@ public class Probe : MonoBehaviour
             // The crate is still falling: it touches nothing.
             Debug.Log("falling touching=" + crate.IsTouching(floor) + " layers=" + crate.IsTouchingLayers(walls)
                 + " y=" + Cm(crate.transform.position.y));
+        }
+        if (frame == 20)
+        {
+            Coroutine spinning = StartCoroutine(Spin());
+            Debug.Log("spin given up spins=" + spins);
+            StopCoroutine(spinning);
+        }
+        if (frame == 21)
+        {
+            Debug.Log("spin stopped spins=" + spins);
+        }
+        if (frame == 8)
+        {
+            StopCoroutine(stopped);
+            Debug.Log("stopping ticks=" + ticks);
+        }
+        if (frame == 61)
+        {
+            // Half speed: a step is still 0.02 seconds of the game, and now
+            // 0.04 of the clock on the wall.
+            Debug.Log("stopped ticks=" + ticks + " fixed clock dt=" + Tenths(Time.deltaTime) + " unscaled="
+                + Tenths(Time.unscaledDeltaTime) + " fixedUnscaled=" + Tenths(Time.fixedUnscaledDeltaTime)
+                + " ahead=" + (Time.unscaledTime == Time.fixedUnscaledTime) + (Time.time == Time.fixedTime));
+            Time.timeScale = 0.5f;
+        }
+        if (frame == 62)
+        {
+            Debug.Log("fixed clock half dt=" + Tenths(Time.deltaTime) + " unscaled=" + Tenths(Time.unscaledDeltaTime)
+                + " fixedUnscaled=" + Tenths(Time.fixedUnscaledDeltaTime));
+            logUpdate = true;
+        }
+        if (frame == 63)
+        {
+            Time.timeScale = 1f;
         }
         if (frame != 60)
         {

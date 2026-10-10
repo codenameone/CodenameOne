@@ -187,6 +187,8 @@ namespace UnityEngine
         public static float deltaTime { get { throw null; } }
         public static float fixedDeltaTime { get { throw null; } set { throw null; } }
         public static float unscaledDeltaTime { get { throw null; } }
+        public static float fixedUnscaledDeltaTime { get { throw null; } }
+        public static float fixedUnscaledTime { get { throw null; } }
         public static float time { get { throw null; } }
         public static float fixedTime { get { throw null; } }
         public static float unscaledTime { get { throw null; } }

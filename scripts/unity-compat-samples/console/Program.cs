@@ -1607,6 +1607,68 @@ namespace Spike
                 + "xyaxy".TrimEnd('x', 'y') + " " + " \u0001 ".Trim().Length + "\u200b ".Trim().Length
                 + "\ufeff".Trim().Length + "\t\r\n a b \u000b\u000c\u0085".Trim().Length + "   ".Trim().Length + "[" + "".Trim()
                 + "]");
+
+            // char.IsDigit asks Unicode for a decimal digit of any script;
+            // int.Parse reads the ASCII ten alone. Every char is asked, and
+            // the answers summed, so a run of ten that is off by one shows.
+            char[] probes = { '0', '9', '/', ':', 'a', '\u0663', '\u06f9', '\u0966', '\u0e59', '\uff15', '\uff1a',
+                '\u00b2', '\u2460', '\u3007', '\u0669', '\u066a', '\ua9f0', '\uabf9', '\uabfa', '\ud835' };
+            string digits = "";
+            for (int i = 0; i < probes.Length; i++)
+            {
+                digits += char.IsDigit(probes[i]) ? "1" : "0";
+            }
+            int digitCount = 0;
+            long digitSum = 0;
+            for (int c = 0; c < 65536; c++)
+            {
+                if (char.IsDigit((char)c))
+                {
+                    digitCount++;
+                    digitSum += c;
+                }
+            }
+            int arabic;
+            bool parsed = int.TryParse("\u0663", out arabic);
+            Log("digits " + digits + " " + digitCount + " " + digitSum + " " + parsed + arabic + " "
+                + Outcome(() => int.Parse("\uff15")) + " " + Outcome(() => Enum.Parse(typeof(Layers), "\u0663")));
+
+            // A collection made from another: an array, a list, an iterator,
+            // whose finally block runs, and a dictionary. Each is a copy.
+            int[] numbers = { 3, 1, 2 };
+            List<int> fromArray = new List<int>(numbers);
+            numbers[0] = 9;
+            List<int> fromList = new List<int>(fromArray);
+            fromArray.Add(4);
+            List<int> fromIterator = new List<int>(Guarded(3));
+            Vec2[] spots = { new Vec2(1, 2), new Vec2(3, 4) };
+            List<Vec2> fromStructs = new List<Vec2>(spots);
+            List<Vec2> ranged = new List<Vec2>();
+            ranged.AddRange(spots);
+            spots[0].x = 7;
+            Log("copies " + fromArray.Count + fromArray[0] + " " + fromList.Count + fromList[2] + " " + fromIterator.Count
+                + "/" + released + " " + fromStructs[0] + ranged[0] + spots[0] + " " + new List<string>(new string[0]).Count
+                + " " + Outcome(() => new List<int>((IEnumerable<int>)null)));
+            Dictionary<string, int> source = new Dictionary<string, int>();
+            source.Add("a", 1);
+            source.Add("b", 2);
+            source.Add("c", 3);
+            source.Remove("b");
+            source.Add("d", 4);
+            Dictionary<string, int> copy = new Dictionary<string, int>(source);
+            source["a"] = 100;
+            IDictionary<string, int> through = copy;
+            through["e"] = 5;
+            through.Add("f", 6);
+            through.Remove("c");
+            int got;
+            string walked = "";
+            foreach (KeyValuePair<string, int> pair in copy)
+            {
+                walked += pair.Key + pair.Value;
+            }
+            Log("dictionary copy " + walked + " " + through.Count + through.ContainsKey("d") + through.TryGetValue("a", out got)
+                + got + through["f"] + " " + Outcome(() => new Dictionary<string, int>((IDictionary<string, int>)null)));
         }
 
         private static void StaticInit()

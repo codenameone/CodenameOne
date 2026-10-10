@@ -258,6 +258,87 @@ public class UnityProjectBuilderTest {
         assertEquals(3, tools.scenes);
     }
 
+    /// An edit that keeps a file's length and its modification time -- a
+    /// checkout that restores times, two saves inside one tick of the file
+    /// system's clock -- is still an edit: text is compared by content.
+    @Test
+    public void anEditOfTheSameLengthAndTimeCompilesAgain() throws Exception {
+        File script = new File(unity, "Assets/Scripts/Player.cs");
+        File scene = new File(unity, "Assets/Scenes/Main.unity");
+        write(script, "class Player { int speed = 1; }");
+        assertTrue(builder().run());
+        long length = script.length();
+        long time = script.lastModified();
+        write(script, "class Player { int speed = 2; }");
+        assertTrue(script.setLastModified(time));
+        assertEquals(length, script.length());
+        assertEquals(time, script.lastModified());
+        assertTrue(builder().run());
+        assertEquals(2, tools.compiled);
+        // A scene, which only the scene compiler reads, likewise.
+        time = scene.lastModified();
+        write(scene, "%YAML 1.2");
+        assertTrue(scene.setLastModified(time));
+        assertTrue(builder().run());
+        assertEquals(3, tools.scenes);
+        // And nothing changed is still nothing to do.
+        assertTrue(builder().run());
+        assertEquals(3, tools.scenes);
+    }
+
+    /// The staging directory is made where the .NET SDK is and may be used
+    /// somewhere else: another checkout, at another path, with the times a
+    /// checkout gives its files and jars that were packed again. Nothing of
+    /// that is the project, so the build there has nothing to compile.
+    @Test
+    public void aCopyElsewhereWithNewTimesIsNotCompiledAgain() throws Exception {
+        write(new File(unity, "Assets/Sprites/ship.png"), "pixels");
+        assertTrue(builder().run());
+        File elsewhere = new File(tmp.newFolder("another"), "deeper/checkout");
+        long later = System.currentTimeMillis() + 86400000L;
+        copy(unity, new File(elsewhere, "src/main/unity"), later);
+        copy(target, new File(elsewhere, "target"), later);
+        // The same entries, packed again under other names: a jar's own
+        // bytes differ by the times in it.
+        File runtime = zip(new File(elsewhere, "runtime-of-another-version.jar"), "META-INF/MANIFEST.MF",
+                "com/codename1/unitycompat/unityengine/UnityRuntime.class", "UnityEngine/Vector2.class");
+        File references = zip(new File(elsewhere, "references.jar"), "netstandard.dll", "UnityEngine.dll",
+                "Codename1.UnityValues.dll");
+        assertTrue(runtime.setLastModified(later));
+        File classesThere = new File(elsewhere, "target/classes");
+        assertTrue(new File(classesThere, "global/Player.class").delete());
+        UnityProjectBuilder there = new UnityProjectBuilder(new File(elsewhere, "src/main/unity"),
+                new File(elsewhere, "target/generated-sources/unity"), classesThere, new File(elsewhere, "target"),
+                runtime, references, Collections.<File>emptyList(), null, "com.acme.game", "MyGame",
+                Collections.singletonList(new File(elsewhere, "src/main/java")), new SystemStreamLog());
+        there.setToolchain(tools);
+        assertTrue(there.run());
+        assertEquals(1, tools.compiled);
+        assertEquals(1, tools.translated);
+        assertEquals(1, tools.scenes);
+        assertTrue(new File(classesThere, "global/Player.class").isFile());
+        // And content is still what decides: a picture of the same length
+        // and time, with other pixels in it.
+        File picture = new File(elsewhere, "src/main/unity/Assets/Sprites/ship.png");
+        write(picture, "PIXELS");
+        assertTrue(picture.setLastModified(later));
+        assertTrue(there.run());
+        assertEquals(2, tools.scenes);
+    }
+
+    private static void copy(File from, File to, long time) throws IOException {
+        File[] children = from.listFiles();
+        if (children == null) {
+            to.getParentFile().mkdirs();
+            Files.copy(from.toPath(), to.toPath());
+            assertTrue(to.setLastModified(time));
+            return;
+        }
+        for (File c : children) {
+            copy(c, new File(to, c.getName()), time);
+        }
+    }
+
     /// A new runtime translates differently and checks against different
     /// classes: the staging directory of the old one cannot be trusted.
     @Test

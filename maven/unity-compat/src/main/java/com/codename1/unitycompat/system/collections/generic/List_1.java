@@ -22,6 +22,7 @@
  */
 package com.codename1.unitycompat.system.collections.generic;
 
+import com.codename1.unitycompat.system.ArgumentNullException;
 import com.codename1.unitycompat.system.ArgumentOutOfRangeException;
 import com.codename1.unitycompat.system.Interop;
 import com.codename1.unitycompat.system.InvalidOperationException;
@@ -31,7 +32,7 @@ import com.codename1.unitycompat.system.Struct;
 /// `System.Collections.Generic.List<T>`. Elements are `Object`: the
 /// translator boxes a primitive and copies a struct on the way in.
 @SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
-public class List_1 implements IEnumerable_1 {
+public class List_1 implements ICollection_1 {
     private Object[] items;
     private int size;
     private int version;
@@ -44,12 +45,24 @@ public class List_1 implements IEnumerable_1 {
         items = new Object[capacity < 4 ? 4 : capacity];
     }
 
+    /// `new List<T>(IEnumerable<T>)`: the elements of a collection, in its
+    /// order. An array arrives as an [com.codename1.unitycompat.system.ArrayView].
+    public List_1(IEnumerable_1 values) {
+        if (values == null) {
+            throw new ArgumentNullException();
+        }
+        int n = values instanceof List_1 ? ((List_1) values).size : 0;
+        items = new Object[n < 4 ? 4 : n];
+        AddRange(values);
+    }
+
     private void check(int index) {
         if (index < 0 || index >= size) {
             throw new ArgumentOutOfRangeException();
         }
     }
 
+    @Override
     public int get_Count() {
         return size;
     }
@@ -123,6 +136,9 @@ public class List_1 implements IEnumerable_1 {
     }
 
     public void AddRange(IEnumerable_1 values) {
+        if (values == null) {
+            throw new ArgumentNullException();
+        }
         if (values instanceof List_1) {
             // Indexed: a list may be added to itself.
             List_1 other = (List_1) values;
@@ -137,7 +153,11 @@ public class List_1 implements IEnumerable_1 {
         IEnumerator_1 e = values.GetEnumerator();
         try {
             while (e.MoveNext()) {
-                Add(e.get_Current());
+                // A struct is copied on its way in: what walks an array
+                // hands out the array's own element, which `a[0].x = 1`
+                // changes in place, and .NET's list has a value of its own.
+                Object v = e.get_Current();
+                Add(v instanceof Struct ? ((Struct) v).$copyValue() : v);
             }
         } finally {
             e.Dispose();
@@ -153,6 +173,7 @@ public class List_1 implements IEnumerable_1 {
         version++;
     }
 
+    @Override
     public void Clear() {
         for (int i = 0; i < size; i++) {
             items[i] = null;

@@ -31,6 +31,10 @@ public final class Time {
     static float time;
     static float unscaledTime;
     static float fixedTime;
+    /// The real time one fixed step stands for, and the real time all of
+    /// them so far have: game time divided by the scale it passed at.
+    static float fixedUnscaledDeltaTime = 0.02f;
+    static float fixedUnscaledTime;
     static float timeScale = 1f;
     static int frameCount;
     /// What `time` and `fixedTime` read when the current scene was loaded.
@@ -49,6 +53,8 @@ public final class Time {
         time = 0f;
         unscaledTime = 0f;
         fixedTime = 0f;
+        fixedUnscaledDeltaTime = fixedDeltaTime;
+        fixedUnscaledTime = 0f;
         timeScale = 1f;
         frameCount = 0;
         inFixedUpdate = false;
@@ -66,8 +72,19 @@ public final class Time {
         return inFixedUpdate ? fixedDeltaTime : deltaTime;
     }
 
+    /// Inside `FixedUpdate` the fixed step's own, as Unity documents it:
+    /// there the frame's is the length of a frame that may hold several
+    /// steps, or none.
     public static float get_unscaledDeltaTime() {
-        return unscaledDeltaTime;
+        return inFixedUpdate ? fixedUnscaledDeltaTime : unscaledDeltaTime;
+    }
+
+    public static float get_fixedUnscaledDeltaTime() {
+        return fixedUnscaledDeltaTime;
+    }
+
+    public static float get_fixedUnscaledTime() {
+        return fixedUnscaledTime;
     }
 
     public static float get_fixedDeltaTime() {
@@ -90,7 +107,7 @@ public final class Time {
     }
 
     public static float get_unscaledTime() {
-        return unscaledTime;
+        return inFixedUpdate ? fixedUnscaledTime : unscaledTime;
     }
 
     /// One scene's worth: the clock restarts when a scene is loaded, the

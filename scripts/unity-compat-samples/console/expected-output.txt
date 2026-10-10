@@ -145,6 +145,9 @@ types FalseFalseFalseFalseFalseTrueTrueTrue System.UInt32 System.UInt64 System.I
 zeros True pos 1 2 neg True True 1 same 1 True True True0TrueTrueTrue
 format Format a}b1{ 1} Format Format Format
 trim 61 33 a axy xya 11130[]
+digits 11000111110000101100 370 4915445 False0 Format Argument
+copies 43 32 3/17 (100,200)(100,200)(700,200) 0 ArgumentNull
+dictionary copy a1d4e5f6 4TrueTrue16 ArgumentNull
 == static init
 before
 Order.cctor

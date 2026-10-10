@@ -214,6 +214,14 @@ public final class PortablePdb {
         if (documentNames[row] != null) {
             return documentNames[row];
         }
+        String last = documentText(row, false);
+        documentNames[row] = last;
+        return last;
+    }
+
+    /// The name of a document, whole -- its parts joined by `/` whatever
+    /// the compiler's machine separated them with -- or its last part.
+    private String documentText(int row, boolean whole) {
         int saved = at;
         at = blobOffset + index(documentsAt + (row - 1) * documentRow, wideBlobs);
         int length = compressed();
@@ -221,6 +229,7 @@ public final class PortablePdb {
         int separator = length > 0 ? u1(at) : 0;
         at++;
         String last = "";
+        StringBuilder path = new StringBuilder();
         while (at < end) {
             int part = compressed();
             if (part == 0) {
@@ -233,16 +242,53 @@ public final class PortablePdb {
             at = resume;
             if (text.length() > 0) {
                 last = text;
+                path.append(path.length() == 0 ? "" : "/").append(text);
             }
+        }
+        at = saved;
+        if (whole) {
+            return path.toString().replace('\\', '/');
         }
         if (separator == 0) {
             // No separator: the name is one part, a whole path.
             int slash = Math.max(last.lastIndexOf('/'), last.lastIndexOf('\\'));
             last = slash >= 0 ? last.substring(slash + 1) : last;
         }
-        at = saved;
-        documentNames[row] = last;
         return last;
+    }
+
+    /// The source file a method was compiled from, as the compiler named
+    /// it: a path of the machine that compiled it, with `/` between its
+    /// parts. Null for a method with no source of its own, as a
+    /// constructor the compiler wrote is, and when the PDB does not say.
+    public String document(int methodDefRow) {
+        try {
+            if (methodDefRow < 1 || methodDefRow > methods) {
+                return null;
+            }
+            int row = methodsAt + (methodDefRow - 1) * methodRow;
+            int document = documents < 65536 ? u2(row) : i4(row);
+            if (document == 0) {
+                int blob = index(row + (documents < 65536 ? 2 : 4), wideBlobs);
+                if (blob == 0) {
+                    return null;
+                }
+                // A method in several files: the header of its points,
+                // after the signature of the locals, names the first.
+                int saved = at;
+                at = blobOffset + blob;
+                compressed();
+                compressed();
+                document = compressed();
+                at = saved;
+            }
+            if (document < 1 || document > documents) {
+                return null;
+            }
+            return documentText(document, true);
+        } catch (IndexOutOfBoundsException e) {
+            return null;
+        }
     }
 
     /// Where in the source the instruction at an offset of a method came

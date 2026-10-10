@@ -255,7 +255,9 @@ public final class Enum_ {
             return null;
         }
         char c = text.charAt(0);
-        if (Char_.IsDigit(c) || c == '-' || c == '+') {
+        // The ASCII digits only: a digit of another script is `char.IsDigit`
+        // and still no number to parse, so such a text is looked up as a name.
+        if (Char_.isAsciiDigit(c) || c == '-' || c == '+') {
             // Not `Long.parseLong`: digits read by hand need no exception
             // to say that the text was a name after all, and know which of
             // a `ulong`'s twenty digits is one too many.

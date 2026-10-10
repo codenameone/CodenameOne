@@ -30,10 +30,12 @@ import com.codename1.impl.javase.OffscreenSurface;
 import com.codename1.testing.OffscreenImplementation;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.Image;
 import com.codename1.unitycompat.unityengine.DrawCommand;
 import com.codename1.unitycompat.unityengine.DrawList;
 import com.codename1.unitycompat.unityengine.Input;
 import com.codename1.unitycompat.unityengine.UnityRuntime;
+import com.codename1.unitycompat.unityengine.ui.Text;
 import com.codename1.unitycompat.unityengine.ui.UnityGameView;
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -364,6 +366,7 @@ public final class OffscreenCheck {
         pointer(view);
         resized(view, surface, png);
         clock(view, surface);
+        texts(view, surface);
         System.out.println(FAILURES.isEmpty() ? "OFFSCREEN OK" : "OFFSCREEN FAILED: " + FAILURES.size());
         return FAILURES.isEmpty() ? 0 : 1;
     }
@@ -755,5 +758,104 @@ public final class OffscreenCheck {
                 + " ms and Time.time, at a scale of " + scale + ", by " + (int) (moved * 1000) + " ms; a frame of "
                 + view.getWidth() + "x" + view.getHeight() + " took the software rasteriser " + spent / 5000000
                 + " ms");
+    }
+
+    /// The image the view shows for the text command that reads `text`, or
+    /// null if no command of this frame does.
+    private static Image shown(UnityGameView view, String text) {
+        DrawList list = UnityRuntime.render();
+        Scene scene = view.getScene();
+        int visible = 0;
+        for (int i = 0; i < scene.size() && visible < list.size(); i++) {
+            Sprite s = scene.get(i);
+            if (!s.isVisible()) {
+                continue;
+            }
+            DrawCommand d = list.get(visible++);
+            if (text.equals(d.text)) {
+                return s.getImage();
+            }
+        }
+        return null;
+    }
+
+    /// A text that never repeats must not cost an image and a texture for
+    /// each string it ever read. The view paints a text into an image and
+    /// the sprite renderer keeps a texture for every image it draws, so
+    /// both are counted here over three thousand frames of a label that
+    /// changes in every one of them: each frame is the renderer's own, which
+    /// steps the scripts, shows the frame and draws it. Then the same label
+    /// goes round four strings, which must be the same four images every
+    /// time round; and then it is left alone, and what it made must be gone.
+    ///
+    /// It takes the first UI text of the scene, and says so where there is
+    /// none or where the text is not drawn -- behind a canvas that is off,
+    /// or written by a script in every frame.
+    private static void texts(UnityGameView view, OffscreenSurface surface) throws Exception {
+        java.lang.Object found = com.codename1.unitycompat.unityengine.Object.FindObjectOfType(Text.class);
+        if (!(found instanceof Text)) {
+            System.out.println("texts: the scene has no UI text; the cache of painted texts was not checked");
+            return;
+        }
+        Text label = (Text) found;
+        String was = label.get_text();
+        int width = view.getWidth();
+        int height = view.getHeight();
+        label.set_text("offscreen probe");
+        surface.frame(view.getRenderer(), width, height);
+        if (shown(view, "offscreen probe") == null) {
+            label.set_text(was);
+            System.out.println("texts: the first UI text of the scene is not drawn as it is set; the cache of "
+                    + "painted texts was not checked");
+            return;
+        }
+        int cachedBefore = view.paintedTextCount();
+        int texturesBefore = view.getTextureCount();
+        int cachedMost = 0;
+        int texturesMost = 0;
+        int frames = 3000;
+        for (int i = 0; i < frames; i++) {
+            label.set_text("offscreen " + i);
+            surface.frame(view.getRenderer(), width, height);
+            cachedMost = Math.max(cachedMost, view.paintedTextCount());
+            texturesMost = Math.max(texturesMost, view.getTextureCount());
+        }
+        // What may wait off the screen is the view's own number, 32; the
+        // rest is room for what the scripts of the project did meanwhile.
+        int room = 32 + 16;
+        check(cachedMost <= cachedBefore + room, "a text that changed in each of " + frames + " frames left "
+                + cachedMost + " painted texts in the view's cache, which had " + cachedBefore);
+        check(texturesMost <= texturesBefore + room, "a text that changed in each of " + frames + " frames left "
+                + "the renderer with " + texturesMost + " textures, which had " + texturesBefore);
+
+        String[] round = {"offscreen north", "offscreen east", "offscreen south", "offscreen west"};
+        Image[] first = new Image[round.length];
+        boolean same = true;
+        for (int i = 0; i < 400; i++) {
+            int at = i % round.length;
+            label.set_text(round[at]);
+            surface.frame(view.getRenderer(), width, height);
+            Image image = shown(view, round[at]);
+            if (i < round.length) {
+                first[at] = image;
+            } else {
+                same &= image != null && image == first[at];
+            }
+        }
+        check(same, "a text going round four strings was painted again when a string came back");
+
+        // Left alone for longer than the view keeps a text it does not draw.
+        label.set_text(was);
+        for (int i = 0; i < 200; i++) {
+            surface.frame(view.getRenderer(), width, height);
+        }
+        int cachedAfter = view.paintedTextCount();
+        int texturesAfter = view.getTextureCount();
+        check(cachedAfter <= cachedBefore + 16 && texturesAfter <= texturesBefore + 16, "200 frames after the text "
+                + "stopped changing the view keeps " + cachedAfter + " painted texts and the renderer "
+                + texturesAfter + " textures; they were " + cachedBefore + " and " + texturesBefore);
+        System.out.println("texts: " + frames + " frames of a text that never repeats: at most " + cachedMost
+                + " painted texts (from " + cachedBefore + ") and " + texturesMost + " textures (from "
+                + texturesBefore + "); " + cachedAfter + " and " + texturesAfter + " once it was left alone");
     }
 }

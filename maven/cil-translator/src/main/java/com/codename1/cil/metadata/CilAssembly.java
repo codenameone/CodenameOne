@@ -389,6 +389,32 @@ public final class CilAssembly {
         return debug == null ? null : debug.location(method.row, ilOffset);
     }
 
+    /// The C# file a type was written in, as the path the compiler was
+    /// given with `/` between its parts, or null when the assembly came
+    /// without a PDB or no method of the type has source of its own. Read
+    /// from the first method that says, then from the types nested in it,
+    /// which is where a lambda or an iterator of the type lives.
+    public String sourceFile(TypeDef type) {
+        if (debug == null) {
+            return null;
+        }
+        for (MethodDef m : type.methods) {
+            String document = debug.document(m.row);
+            if (document != null) {
+                return document;
+            }
+        }
+        for (TypeDef t : types) {
+            if (t.enclosing == type) { // NOPMD CompareObjectsWithEquals
+                String document = sourceFile(t);
+                if (document != null) {
+                    return document;
+                }
+            }
+        }
+        return null;
+    }
+
     public String source() {
         return md.source();
     }

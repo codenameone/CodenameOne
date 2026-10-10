@@ -224,11 +224,45 @@ public class UnityGameView extends GameView {
     private boolean pointerFinger;
     private float[] touchX = new float[4];
     private float[] touchY = new float[4];
-    /// Painted texts by everything that decides how they look. The sprite
-    /// renderer keeps a texture for every image it is ever shown, so a
-    /// text that comes back -- one that blinks, a score that returns to a
-    /// value -- must come back as the image it was.
+    /// Painted texts (`CachedText`) by everything that decides how they
+    /// look, so that a text that comes back -- one that blinks, a score that
+    /// returns to a value, a label that alternates among a few strings --
+    /// comes back as the image it was, and as the texture the renderer
+    /// already has for it.
+    ///
+    /// A label that never repeats -- a clock, a rising score -- makes an
+    /// image for each string, and the sprite renderer a texture for each
+    /// image, so the cache is bounded, and what leaves it gives its texture
+    /// back (`releaseTexture`). After every frame (`trimTexts`) a text that
+    /// was not drawn for `TEXT_KEEP_FRAMES` frames is dropped, and so are
+    /// the longest undrawn while more than `TEXT_SPARE` of them are waiting:
+    /// a text that changes every frame leaves one behind a frame, and that
+    /// many is what it may leave. A text that is on the screen is never
+    /// dropped, however many there are.
+    ///
+    /// TextMesh Pro text is drawn through the same commands and this cache.
     private final HashMap paintedTexts = new HashMap();
+    /// The entries of `paintedTexts` again, to walk them without an
+    /// iterator: this is done once a frame.
+    private final ArrayList cachedTexts = new ArrayList();
+    /// Counts the frames shown; an entry records the one it was last drawn in.
+    private int textFrame;
+    /// How long a painted text that is no longer drawn is kept: two seconds
+    /// of a game at sixty frames a second.
+    private static final int TEXT_KEEP_FRAMES = 120;
+    /// How many painted texts that are not on the screen are kept at most.
+    private static final int TEXT_SPARE = 32;
+
+    /// A painted text of the cache.
+    private static final class CachedText {
+        String key;
+        Image image;
+        int drawn;
+        /// Cleared when the entry leaves the cache: a text command that
+        /// still has it must not show its image, which the renderer would
+        /// make a texture for that nothing would ever release.
+        boolean kept = true;
+    }
 
     /// A text command as it was last painted, and the image of it.
     private static final class PaintedText {
@@ -243,10 +277,10 @@ public class UnityGameView extends GameView {
         float max;
         boolean fit;
         boolean wrap;
-        Image image;
+        CachedText cached;
 
         boolean shows(DrawCommand d, int w, int h) {
-            return image != null && width == w && height == h && color == d.color && alignment == d.alignment
+            return cached != null && cached.kept && width == w && height == h && color == d.color && alignment == d.alignment
                     && style == d.fontStyle && size == d.fontSize && min == d.minFontSize && max == d.maxFontSize
                     && fit == d.bestFit && wrap == d.wrap && text.equals(d.text);
         }
@@ -728,6 +762,7 @@ public class UnityGameView extends GameView {
     }
 
     private void show(DrawList list) {
+        textFrame++;
         if (list.hasCamera) {
             setClearColor(list.backgroundColor);
         }
@@ -774,6 +809,64 @@ public class UnityGameView extends GameView {
         for (int i = n; i < pool.size(); i++) {
             ((Sprite) pool.get(i)).setVisible(false);
         }
+        trimTexts();
+    }
+
+    /// Drops the painted texts that have not been drawn for a while, and
+    /// the longest undrawn of them while there are too many. Run after the
+    /// frame's texts were all looked up, so that one drawn in this frame is
+    /// known by its mark and is never dropped; it allocates nothing.
+    private void trimTexts() {
+        int idle = 0;
+        // Backwards, since dropping one moves the last into its place.
+        for (int i = cachedTexts.size() - 1; i >= 0; i--) { // NOPMD ForLoopCanBeForeach
+            CachedText c = (CachedText) cachedTexts.get(i);
+            if (c.drawn == textFrame) {
+                continue;
+            }
+            // A difference, not a comparison: the counter may wrap.
+            if (textFrame - c.drawn > TEXT_KEEP_FRAMES) {
+                dropText(i);
+            } else {
+                idle++;
+            }
+        }
+        while (idle > TEXT_SPARE) {
+            int oldest = -1;
+            int age = 0;
+            for (int i = cachedTexts.size() - 1; i >= 0; i--) { // NOPMD ForLoopCanBeForeach
+                CachedText c = (CachedText) cachedTexts.get(i);
+                if (textFrame - c.drawn > age) {
+                    age = textFrame - c.drawn;
+                    oldest = i;
+                }
+            }
+            if (oldest < 0) {
+                return;
+            }
+            dropText(oldest);
+            idle--;
+        }
+    }
+
+    /// Takes an entry out of the cache and gives its texture back. The
+    /// renderer disposes it at the start of its next frame, in which this
+    /// image is not drawn.
+    private void dropText(int index) {
+        CachedText c = (CachedText) cachedTexts.get(index);
+        int last = cachedTexts.size() - 1;
+        cachedTexts.set(index, cachedTexts.get(last));
+        cachedTexts.remove(last);
+        paintedTexts.remove(c.key);
+        c.kept = false;
+        releaseTexture(c.image);
+        c.image = null;
+    }
+
+    /// The number of painted texts kept at the moment, for a check to hold
+    /// against: the texts on the screen and at most `TEXT_SPARE` more.
+    public int paintedTextCount() {
+        return cachedTexts.size();
     }
 
     private Image image(String resource) {
@@ -924,15 +1017,20 @@ public class UnityGameView extends GameView {
             return null;
         }
         if (p.shows(d, width, height)) {
-            return p.image;
+            p.cached.drawn = textFrame;
+            return p.cached.image;
         }
         String key = width + "x" + height + "/" + d.color + "/" + d.alignment + "/" + d.fontStyle + "/" + d.fontSize
                 + "/" + d.minFontSize + "/" + d.maxFontSize + "/" + d.bestFit + "/" + d.wrap + "/" + d.text;
-        Image image = (Image) paintedTexts.get(key);
-        if (image == null) {
-            image = paint(d, width, height);
-            paintedTexts.put(key, image);
+        CachedText cached = (CachedText) paintedTexts.get(key);
+        if (cached == null) {
+            cached = new CachedText();
+            cached.key = key;
+            cached.image = paint(d, width, height);
+            paintedTexts.put(key, cached);
+            cachedTexts.add(cached);
         }
+        cached.drawn = textFrame;
         p.text = d.text;
         p.width = width;
         p.height = height;
@@ -944,8 +1042,8 @@ public class UnityGameView extends GameView {
         p.max = d.maxFontSize;
         p.fit = d.bestFit;
         p.wrap = d.wrap;
-        p.image = image;
-        return image;
+        p.cached = cached;
+        return cached.image;
     }
 
     /// Lays a text out in its rectangle and paints it into a new image.

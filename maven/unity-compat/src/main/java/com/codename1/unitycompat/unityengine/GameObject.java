@@ -199,32 +199,51 @@ public final class GameObject extends Object {
         return found.toArray();
     }
 
-    /// Depth first, this object included, inactive objects skipped as
-    /// Unity's one-argument form does.
+    /// Depth first, this object first. Unity's one-argument form leaves
+    /// out inactive *children*; the object asked is searched whether it is
+    /// active or not, as the documentation of the `includeInactive`
+    /// argument has it. Below an object that is itself inactive, or whose
+    /// parent is, every child is inactive in the hierarchy and none is
+    /// searched.
     public java.lang.Object GetComponentInChildren(Class type) {
-        if (!active) {
-            return null;
-        }
         java.lang.Object c = GetComponent(type);
-        ArrayList children = transform.children;
-        if (c == null && children != null) {
-            for (int i = 0; i < children.size() && c == null; i++) {
-                c = ((Transform) children.get(i)).gameObject.GetComponentInChildren(type);
-            }
+        if (c == null && activeInHierarchy()) {
+            c = firstBelow(type);
         }
         return c;
     }
 
+    /// The first component of a type on the active objects below this one.
+    private java.lang.Object firstBelow(Class type) {
+        ArrayList children = transform.children;
+        if (children == null) {
+            return null;
+        }
+        for (int i = 0; i < children.size(); i++) { // NOPMD ForLoopCanBeForeach
+            GameObject child = ((Transform) children.get(i)).gameObject;
+            if (!child.active) {
+                continue;
+            }
+            java.lang.Object c = child.GetComponent(type);
+            if (c == null) {
+                c = child.firstBelow(type);
+            }
+            if (c != null) {
+                return c;
+            }
+        }
+        return null;
+    }
+
     public java.lang.Object[] GetComponentsInChildren(Class type) { // NOPMD UnnecessaryFullyQualifiedName
         ArrayList found = new ArrayList();
-        collect(type, found);
+        // This object's own whatever its state, then the active ones below
+        // it: see [#GetComponentInChildren(Class)].
+        collect(type, found, activeInHierarchy());
         return found.toArray();
     }
 
-    private void collect(Class type, ArrayList found) {
-        if (!active) {
-            return;
-        }
+    private void collect(Class type, ArrayList found, boolean below) {
         int n = components.size();
         for (int i = 0; i < n; i++) {
             java.lang.Object c = components.get(i);
@@ -233,9 +252,12 @@ public final class GameObject extends Object {
             }
         }
         ArrayList children = transform.children;
-        if (children != null) {
+        if (below && children != null) {
             for (int i = 0; i < children.size(); i++) { // NOPMD ForLoopCanBeForeach
-                ((Transform) children.get(i)).gameObject.collect(type, found);
+                GameObject child = ((Transform) children.get(i)).gameObject;
+                if (child.active) {
+                    child.collect(type, found, true);
+                }
             }
         }
     }

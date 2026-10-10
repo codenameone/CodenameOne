@@ -47,7 +47,7 @@ import java.util.HashMap;
 /// recently freed. A `HashMap` alone would hand them out by hash code,
 /// which for an object is whatever the virtual machine made up.
 @SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
-public class Dictionary_2 implements IEnumerable_1 {
+public class Dictionary_2 implements IDictionary_2 {
     /// In `next`, a slot that holds an entry.
     private static final int LIVE = -2;
 
@@ -73,6 +73,42 @@ public class Dictionary_2 implements IEnumerable_1 {
         keys = new Object[n];
         values = new Object[n];
         next = new int[n];
+    }
+
+    /// `new Dictionary<TKey, TValue>(IDictionary<TKey, TValue>)`: a copy,
+    /// with the entries in the order the source walks them.
+    public Dictionary_2(IDictionary_2 source) {
+        this((IEnumerable_1) source);
+    }
+
+    /// `new Dictionary<TKey, TValue>(IEnumerable<KeyValuePair<TKey, TValue>>)`.
+    /// A key that comes twice is refused, as `Add` refuses it.
+    public Dictionary_2(IEnumerable_1 source) {
+        this(source instanceof Dictionary_2 ? ((Dictionary_2) source).slots.size() : 4);
+        if (source == null) {
+            throw new ArgumentNullException();
+        }
+        if (source instanceof Dictionary_2) {
+            Dictionary_2 other = (Dictionary_2) source;
+            for (int i = 0; i < other.high; i++) {
+                if (other.next[i] == LIVE) {
+                    insert(other.keys[i], other.values[i]);
+                }
+            }
+            return;
+        }
+        IEnumerator_1 e = source.GetEnumerator();
+        try {
+            while (e.MoveNext()) {
+                Object pair = e.get_Current();
+                if (pair instanceof KeyValuePair_2) {
+                    Object v = ((KeyValuePair_2) pair).value;
+                    Add(((KeyValuePair_2) pair).key, v instanceof Struct ? ((Struct) v).$copyValue() : v);
+                }
+            }
+        } finally {
+            e.Dispose();
+        }
     }
 
     private static Object key(Object key) {
@@ -114,10 +150,12 @@ public class Dictionary_2 implements IEnumerable_1 {
         version++;
     }
 
+    @Override
     public int get_Count() {
         return slots.size();
     }
 
+    @Override
     public void Add(Object key, Object value) {
         if (slot(key) >= 0) {
             throw new ArgumentException("An item with the same key has already been added.");
@@ -125,6 +163,7 @@ public class Dictionary_2 implements IEnumerable_1 {
         insert(key, value);
     }
 
+    @Override
     public boolean ContainsKey(Object key) {
         return slot(key) >= 0;
     }
@@ -138,6 +177,7 @@ public class Dictionary_2 implements IEnumerable_1 {
         return false;
     }
 
+    @Override
     public Object get_Item(Object key) {
         int at = slot(key);
         if (at < 0) {
@@ -148,6 +188,7 @@ public class Dictionary_2 implements IEnumerable_1 {
 
     /// Replacing the value of a key that is there leaves a running
     /// `foreach` valid, as it does in .NET.
+    @Override
     public void set_Item(Object key, Object value) {
         int at = slot(key);
         if (at < 0) {
@@ -159,6 +200,7 @@ public class Dictionary_2 implements IEnumerable_1 {
 
     /// `out TValue` is an array and an index, like every reference to
     /// something that is not a struct.
+    @Override
     public boolean TryGetValue(Object key, Object[] value, int at) {
         int found = slot(key);
         if (found < 0) {
@@ -169,6 +211,7 @@ public class Dictionary_2 implements IEnumerable_1 {
         return true;
     }
 
+    @Override
     public boolean Remove(Object key) {
         int at = slot(key);
         if (at < 0) {
@@ -182,6 +225,7 @@ public class Dictionary_2 implements IEnumerable_1 {
         return true;
     }
 
+    @Override
     public void Clear() {
         slots.clear();
         for (int i = 0; i < high; i++) {

@@ -42,6 +42,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 
 /// Builds the Unity project of an application module (`src/main/unity`, laid
@@ -107,8 +108,7 @@ public class UnityProjectBuilder {
     private static final String SCENE_COMPILER_MAIN = "com.codename1.unity.scenecompiler.SceneCompiler";
     /// Bumped when what the steps write changes, so an upgraded plugin does
     /// not trust the staging directory an older one left.
-    private static final String STATE_VERSION = "1";
-
+    private static final String STATE_VERSION = "2";
     private final File unityDir;
     private final File javaOut;
     private final File classesOut;
@@ -530,50 +530,134 @@ public class UnityProjectBuilder {
                 + "}\n";
     }
 
+    /// What the build is skipped on the strength of: the content of
+    /// everything the steps read, and nothing of where or when.
+    ///
+    /// The staging directory may be made on one machine and used on
+    /// another -- compiled once where the .NET SDK is, then handed with its
+    /// state file to the jobs that package each target -- and a fresh
+    /// checkout there has its own path and its own modification times. So
+    /// neither is in here. Every file of `Assets` and `ProjectSettings` is
+    /// its path below the project, with `/` between the names, and a
+    /// SHA-256 of its bytes; the lines are sorted as `String` compares
+    /// them, which no locale changes. A length and a time would also miss
+    /// an edit of the same length whose time was kept, as a checkout that
+    /// restores times makes of `speed = 1` to `speed = 2`.
+    ///
+    /// That reads the whole project on every build, also the ones that
+    /// change nothing. Measured: SHA-256 through 256 MB took 1.1 to 1.6
+    /// seconds on JDK 8 and on JDK 17 here, about 200 MB a second, so a
+    /// gigabyte of pictures and sound is some five seconds; the sample
+    /// projects under `scripts/unity-compat-samples`, 0.2 MB between
+    /// them, take under ten milliseconds.
+    ///
+    /// The runtime, the references and the tool are in it by what their
+    /// jars hold -- see [#stamp] -- and by the role they have here, never
+    /// by a file name, which has a version and a directory in it.
     private String digest() {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] buffer = new byte[1 << 16];
             List<String> entries = new ArrayList<String>();
-            collectStamped(new File(unityDir, "Assets"), "Assets/", entries);
-            collectStamped(new File(unityDir, "ProjectSettings"), "ProjectSettings/", entries);
-            Collections.sort(entries);
-            for (String e : entries) {
-                md.update(e.getBytes(StandardCharsets.UTF_8));
-                md.update((byte) '\n');
-            }
-            StringBuilder tools = new StringBuilder(STATE_VERSION);
-            stamp(tools, runtimeJar);
-            stamp(tools, referencesJar);
+            collectStamped(new File(unityDir, "Assets"), "Assets/", entries, md, buffer);
+            collectStamped(new File(unityDir, "ProjectSettings"), "ProjectSettings/", entries, md, buffer);
+            stamp(runtimeJar, "runtime!", entries, md, buffer);
+            stamp(referencesJar, "references!", entries, md, buffer);
             for (File f : toolClasspath) {
-                stamp(tools, f);
+                // One label for all of them: the order of a class path and
+                // how many jars the classes came in are not content.
+                stamp(f, "tool!", entries, md, buffer);
             }
-            md.update(tools.toString().getBytes(StandardCharsets.UTF_8));
+            Collections.sort(entries);
+            md.reset();
+            md.update(STATE_VERSION.getBytes(StandardCharsets.UTF_8));
+            for (String e : entries) {
+                md.update((byte) '\n');
+                md.update(e.getBytes(StandardCharsets.UTF_8));
+            }
             StringBuilder sb = new StringBuilder();
-            for (byte b : md.digest()) {
-                sb.append(Integer.toHexString((b & 0xff) | 0x100).substring(1));
-            }
+            hex(sb, md.digest());
             return sb.toString();
         } catch (NoSuchAlgorithmException e) {
             // No digest, no skipping: an empty string never equals a stored one.
             return "";
+        } catch (IOException e) {
+            // Nor for a file that cannot be read: the build that follows
+            // says which and why.
+            return "";
         }
     }
 
-    private static void stamp(StringBuilder sb, File f) {
-        sb.append('|').append(f.getName()).append(':').append(f.length()).append(':').append(f.lastModified());
+    /// The lines of one jar, or of a directory of classes standing in for
+    /// one. A jar is read by its directory: each entry's name, length and
+    /// CRC-32, which is of the entry's bytes as they are unpacked. The file
+    /// itself is not hashed, since the same classes packed twice are two
+    /// different files -- every entry carries the time it was packed at.
+    /// `META-INF` is left out for the same reason: the manifest names the
+    /// JDK and the machine that packed it, and no step reads anything
+    /// there.
+    private static void stamp(File f, String label, List<String> out, MessageDigest md, byte[] buffer)
+            throws IOException {
+        if (f.isDirectory()) {
+            collectStamped(f, label, out, md, buffer);
+            return;
+        }
+        try (ZipFile zip = new ZipFile(f)) {
+            Enumeration<? extends ZipEntry> entries = zip.entries();
+            while (entries.hasMoreElements()) {
+                ZipEntry e = entries.nextElement();
+                if (!e.isDirectory() && !e.getName().startsWith("META-INF/")) {
+                    out.add(label + e.getName() + ":" + e.getSize() + ":" + Long.toHexString(e.getCrc()));
+                }
+            }
+        } catch (ZipException e) {
+            // Not a jar: a file of some other kind on the class path, by
+            // its bytes and without its name.
+            md.reset();
+            try (InputStream in = Files.newInputStream(f.toPath())) {
+                int n = in.read(buffer);
+                while (n >= 0) {
+                    md.update(buffer, 0, n);
+                    n = in.read(buffer);
+                }
+            }
+            StringBuilder line = new StringBuilder(label).append('=');
+            hex(line, md.digest());
+            out.add(line.toString());
+        }
     }
 
-    private static void collectStamped(File dir, String prefix, List<String> out) {
+    /// One line for each file below a directory: its path from `prefix`
+    /// on, and a SHA-256 of its bytes.
+    private static void collectStamped(File dir, String prefix, List<String> out, MessageDigest md, byte[] buffer)
+            throws IOException {
         File[] files = dir.listFiles();
         if (files == null) {
             return;
         }
         for (File f : files) {
+            String name = f.getName();
             if (f.isDirectory()) {
-                collectStamped(f, prefix + f.getName() + "/", out);
-            } else {
-                out.add(prefix + f.getName() + ":" + f.length() + ":" + f.lastModified());
+                collectStamped(f, prefix + name + "/", out, md, buffer);
+                continue;
             }
+            md.reset();
+            try (InputStream in = Files.newInputStream(f.toPath())) {
+                int n = in.read(buffer);
+                while (n >= 0) {
+                    md.update(buffer, 0, n);
+                    n = in.read(buffer);
+                }
+            }
+            StringBuilder line = new StringBuilder(prefix).append(name).append('=');
+            hex(line, md.digest());
+            out.add(line.toString());
+        }
+    }
+
+    private static void hex(StringBuilder sb, byte[] bytes) {
+        for (byte b : bytes) {
+            sb.append(Integer.toHexString((b & 0xff) | 0x100).substring(1));
         }
     }
 

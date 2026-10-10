@@ -27,7 +27,18 @@ import com.codename1.unitycompat.system.collections.IEnumerator;
 /// `UnityEngine.Coroutine`: a running iterator and what it is waiting for.
 public final class Coroutine extends YieldInstruction {
     MonoBehaviour owner;
+    /// The enumerator being stepped: the one given to `StartCoroutine`, or
+    /// the innermost of those it yielded.
     IEnumerator routine;
+    /// The enumerators waiting for [#routine] to end, outermost first, when
+    /// a routine has yielded another: `yield return Child()`. The shared
+    /// empty array until the first time one does.
+    IEnumerator[] outer = NONE;
+    private static final IEnumerator[] NONE = new IEnumerator[0];
+    int depth;
+    /// Whether the log was told that this coroutine was made to wait a
+    /// frame, having run nested routines without end in one.
+    boolean spun;
     float resumeAt;
     /// The first frame, by `Time.frameCount`, whose pass after `Update` may
     /// resume it: the one after the frame it last yielded in.

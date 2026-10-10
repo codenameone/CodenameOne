@@ -842,22 +842,75 @@ public final class SceneCompiler {
         return null;
     }
 
+    /// Maps a script's GUID to the class its file declares.
+    ///
+    /// Unity knows a script by its file and names the class after the file,
+    /// so the class is found by that name. A name can be had by several
+    /// classes, though: `Player.cs` under two folders with a namespace
+    /// each, or a second `Player` declared in some other file. Then the
+    /// compiler's debug information says which file each was written in,
+    /// and the one written in this file is taken. Without it -- no PDB, or
+    /// a class with no method of its own to carry a source position --
+    /// the first is taken, as it always was, and the build says so.
     private void indexScript(File meta) throws IOException {
         String guid = text(UnityYaml.parseMeta(read(meta)).get("guid"));
         if (guid.length() == 0) {
             return;
         }
         String simple = meta.getName().substring(0, meta.getName().length() - ".cs.meta".length());
+        List<TypeDef> named = new ArrayList<TypeDef>();
         for (CilAssembly assembly : scripts) {
             for (TypeDef t : assembly.types()) {
                 String full = t.fullName();
                 if (full.equals(simple) || full.endsWith("." + simple)) {
-                    scriptsByGuid.put(guid, t);
-                    return;
+                    named.add(t);
                 }
             }
         }
-        notes.add(meta.getName() + ": no compiled class is named " + simple);
+        if (named.isEmpty()) {
+            notes.add(meta.getName() + ": no compiled class is named " + simple);
+            return;
+        }
+        TypeDef script = named.get(0);
+        if (named.size() > 1) {
+            File source = new File(meta.getParentFile(), simple + ".cs");
+            TypeDef written = writtenIn(named, source);
+            if (written != null) {
+                script = written;
+            } else {
+                StringBuilder all = new StringBuilder();
+                for (TypeDef t : named) {
+                    all.append(all.length() == 0 ? "" : ", ").append(t.fullName());
+                }
+                warnings.add(relative(project, source).replace(File.separatorChar, '/') + ": " + named.size() + " classes are named " + simple + " (" + all
+                        + ") and the debug information of the scripts does not say which of them this file"
+                        + " declares; its components were given " + script.fullName());
+            }
+        }
+        scriptsByGuid.put(guid, script);
+    }
+
+    /// Of several classes, the one whose source file is `source`: the one
+    /// the debug information places in a file whose path ends in this
+    /// one's path below the project, `Assets/Game/Player.cs`. Not the whole
+    /// path, since the compiler may have been given the project under
+    /// another root or told to rewrite it; and not the file's name alone,
+    /// which is what the classes have in common. Null when none is there,
+    /// or more than one.
+    private TypeDef writtenIn(List<TypeDef> named, File source) {
+        String wanted = relative(project, source).replace(File.separatorChar, '/');
+        TypeDef found = null;
+        for (TypeDef t : named) {
+            String document = t.assembly.sourceFile(t);
+            if (document == null || !(document.equals(wanted) || document.endsWith("/" + wanted))) {
+                continue;
+            }
+            if (found != null) {
+                return null;
+            }
+            found = t;
+        }
+        return found;
     }
 
     /// SpriteAlignment: 0 centre, 1 top left, 2 top, 3 top right, 4 left,

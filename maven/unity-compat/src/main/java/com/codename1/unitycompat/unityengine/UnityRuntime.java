@@ -727,14 +727,22 @@ public final class UnityRuntime {
 
     /// The first active object with this name or this tag; with `out`,
     /// all of them.
+    ///
+    /// A name with a `/` in it is a path, as `GameObject.Find` documents:
+    /// `Canvas/Panel/Button` is a `Button` whose parent is a `Panel` whose
+    /// parent is a `Canvas`, wherever that is, and a leading `/` asks for
+    /// the first of them to have no parent. Only the object found has to be
+    /// active, which says the same of everything above it.
     static GameObject find(String name, String tag, ArrayList out) {
         int n = objects.size();
+        boolean path = name != null && name.indexOf('/') >= 0;
         for (int i = 0; i < n; i++) {
             GameObject go = (GameObject) objects.get(i);
             if (go.destroyed || !go.activeInHierarchy()) {
                 continue;
             }
-            if ((name != null && !go.name.equals(name)) || (tag != null && !go.tag.equals(tag))) {
+            if ((name != null && !go.name.equals(name) && !(path && atPath(go.transform, name)))
+                    || (tag != null && !go.tag.equals(tag))) {
                 continue;
             }
             if (out == null) {
@@ -743,6 +751,29 @@ public final class UnityRuntime {
             out.add(go);
         }
         return null;
+    }
+
+    /// Whether an object is where a path says: read from its last name
+    /// back to its first, up the parents, so that two objects of one name
+    /// with different children are told apart and nothing is allocated.
+    private static boolean atPath(Transform t, String path) {
+        int end = path.length();
+        Transform at = t;
+        while (at != null) {
+            int slash = path.lastIndexOf('/', end - 1);
+            int length = end - slash - 1;
+            String name = at.gameObject.name;
+            if (name.length() != length || !path.regionMatches(slash + 1, name, 0, length)) {
+                return false;
+            }
+            if (slash <= 0) {
+                // The whole path is matched; a leading `/` wants a root.
+                return slash < 0 || at.parent == null;
+            }
+            end = slash;
+            at = at.parent;
+        }
+        return false;
     }
 
     /// The first component of a type on an active object; with `out`, all
@@ -1268,6 +1299,12 @@ public final class UnityRuntime {
         while (accumulator >= fixed) {
             accumulator -= fixed;
             Time.fixedTime += fixed;
+            // A step is `fixed` seconds of game time, which the scale
+            // stretched out of this much real time. No step runs at a scale
+            // of zero, since nothing reaches the accumulator then; the
+            // check is for a step left over from before the scale dropped.
+            Time.fixedUnscaledDeltaTime = Time.timeScale > 0f ? fixed / Time.timeScale : fixed;
+            Time.fixedUnscaledTime += Time.fixedUnscaledDeltaTime;
             Time.inFixedUpdate = true;
             // Indexed, not iterated: a script may add a behaviour while
             // these run.
@@ -1535,6 +1572,11 @@ public final class UnityRuntime {
 
     // ------------------------------------------------------------ coroutines
 
+    /// How many nested enumerators one pass of a coroutine may run to their
+    /// end without any of them yielding, before it is made to wait a frame.
+    /// See `advance`.
+    private static final int EMPTY_CHILDREN = 1000000;
+
     static Coroutine startCoroutine(MonoBehaviour owner, IEnumerator routine) {
         Coroutine c = new Coroutine();
         c.owner = owner;
@@ -1557,12 +1599,81 @@ public final class UnityRuntime {
         }
     }
 
+    /// Steps a coroutine to the next thing it waits for.
+    ///
+    /// A routine that yields an enumerator -- `yield return Child()`, with
+    /// no `StartCoroutine` -- waits for all of it, as Unity has it: the
+    /// child is stepped in the parent's place, whatever the child waits for
+    /// is what the coroutine waits for, and the parent goes on from the
+    /// point the child ends at, in that same pass. They are one coroutine,
+    /// so stopping it, or deactivating its object, stops the child too.
+    ///
+    /// A child that ends without having yielded once costs nothing: Unity
+    /// runs a nested enumerator at once, so the parent goes on in the same
+    /// frame, and a routine that calls ten such children in a row has run
+    /// them all before `StartCoroutine` returns.
+    ///
+    /// That makes `while (true) { yield return Empty(); }` a loop that never
+    /// reaches the end of its frame, which is what it is in Unity too, where
+    /// it stops the player for good. Here it would be a device that stopped
+    /// answering with nothing to say why. So a pass that has entered
+    /// `EMPTY_CHILDREN` nested enumerators without one thing to wait for
+    /// makes the coroutine wait for the next frame, and the log says so,
+    /// once for a coroutine. Any yield of something else ends the pass, so only such a loop
+    /// gets there; and the count is of children and not of time, so it is
+    /// the same on every target.
     private static void advance(Coroutine c) {
-        if (!c.routine.MoveNext()) {
-            c.done = true;
-            return;
+        int children = 0;
+        for (;;) {
+            boolean more = c.routine.MoveNext();
+            if (c.done) {
+                // It stopped itself from inside the step.
+                return;
+            }
+            if (more) {
+                java.lang.Object yielded = c.routine.get_Current();
+                if (!(yielded instanceof IEnumerator)) {
+                    waitFor(c, yielded);
+                    return;
+                }
+                children++;
+                if (children == EMPTY_CHILDREN) {
+                    // Not stepped: it is the next thing the coroutine runs.
+                    if (!c.spun) {
+                        c.spun = true;
+                        String of = c.owner == null ? "no script" : c.owner.get_name();
+                        Debug.LogError("A coroutine of " + of + " ran " + EMPTY_CHILDREN + " nested enumerators in"
+                                + " one frame and none of them yielded; it goes on in the next frame.");
+                    }
+                    push(c, (IEnumerator) yielded);
+                    waitFor(c, null);
+                    return;
+                }
+                push(c, (IEnumerator) yielded);
+                continue;
+            }
+            if (c.depth == 0) {
+                c.done = true;
+                return;
+            }
+            c.routine = c.outer[--c.depth];
+            c.outer[c.depth] = null;
         }
-        java.lang.Object yielded = c.routine.get_Current();
+    }
+
+    /// Makes `child` the enumerator a coroutine steps, and keeps the one it
+    /// was stepping to go back to.
+    private static void push(Coroutine c, IEnumerator child) {
+        if (c.depth == c.outer.length) {
+            IEnumerator[] grown = new IEnumerator[Math.max(4, c.depth * 2)];
+            System.arraycopy(c.outer, 0, grown, 0, c.depth);
+            c.outer = grown;
+        }
+        c.outer[c.depth++] = c.routine;
+        c.routine = child;
+    }
+
+    private static void waitFor(Coroutine c, java.lang.Object yielded) { // NOPMD UnnecessaryFullyQualifiedName
         c.waitingFor = null;
         c.resumeAt = 0f;
         c.phase = 0;
