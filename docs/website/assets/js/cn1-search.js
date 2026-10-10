@@ -21,29 +21,44 @@
     if (sectionOf(doc) !== "blog" || !doc.date || Number.isNaN(Date.parse(doc.date))) return 1;
     return Math.max(0.5, 2 * Math.exp(-Math.max(0, Date.now() - Date.parse(doc.date)) / (3 * 365.25 * 86400000)));
   };
-  const pageMatches = query => {
-    if (!pagesReady || pagesFailed || scope === "javadoc") return [];
-    if (!indexes.has(scope)) {
+  const pageIndex = (literal = false) => {
+    const key = literal ? scope + ':literal' : scope;
+    if (!indexes.has(key)) {
       const selected = docs.filter(doc => scope === "all" || sectionOf(doc) === scope);
-      indexes.set(scope, lunr(function () {
+      indexes.set(key, lunr(function () {
         this.ref("id");
         this.field("title", { boost: 10 });
         this.field("content");
+        if (literal) {
+          // Typos need the original words: "notification" stems to "notif",
+          // while "notificaton" does not. Build this only if normal searches fail.
+          this.pipeline.remove(lunr.stemmer);
+          this.searchPipeline.remove(lunr.stemmer);
+        }
         selected.forEach(doc => this.add(doc));
       }));
     }
+    return indexes.get(key);
+  };
+  const pageMatches = query => {
+    if (!pagesReady || pagesFailed || scope === "javadoc") return [];
     // The query builder treats punctuation as text, not Lunr query syntax.
     // Require every word so broad chapters do not outrank a specific match
     // merely because they contain one of several unrelated query terms.
     const tokens = lunr.tokenizer(query).map(token => token.toString());
     if (!tokens.length) return [];
-    let matches = indexes.get(scope).query(q => {
+    let matches = pageIndex().query(q => {
       tokens.forEach(term => q.term(term, { presence: lunr.Query.presence.REQUIRED }));
     });
     if (!matches.length) {
-      matches = indexes.get(scope).query(q => {
+      matches = pageIndex().query(q => {
         tokens.forEach(term => q.term(term, { presence: lunr.Query.presence.REQUIRED,
           wildcard: lunr.Query.wildcard.TRAILING, usePipeline: false }));
+      });
+    }
+    if (!matches.length) {
+      matches = pageIndex(true).query(q => {
+        tokens.forEach(term => q.term(term, { presence: lunr.Query.presence.REQUIRED, editDistance: 1 }));
       });
     }
     return matches.map(hit => ({ doc: docsById.get(hit.ref), score: hit.score }))

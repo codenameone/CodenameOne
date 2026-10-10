@@ -101,6 +101,34 @@ try {
   }
   await page.goto(base + '/developer-guide/advanced-topics-under-the-hood/#_sending_arguments_to_the_build_server');
   await page.waitForURL('**/developer-guide/build-hints/#_sending_arguments_to_the_build_server');
+  // A controlled corpus makes typo recovery and required-word matching observable:
+  // two near matches each omit one word, and another match belongs to the blog.
+  await page.route('**/lunr-index.json', route => route.fulfill({ json: { docs: [
+    { id: 'push', title: 'Push notifications', content: 'Deliver a notification with push.', url: '/developer-guide/push/', section: 'guide' },
+    { id: 'local', title: 'Local notifications', content: 'Display a notification locally.', url: '/developer-guide/local/', section: 'guide' },
+    { id: 'messages', title: 'Push messages', content: 'Send a push message.', url: '/developer-guide/messages/', section: 'guide' },
+    { id: 'blog', title: 'Push notifications', content: 'Deliver a notification with push.', url: '/blog/push/', section: 'blog' },
+  ] } }));
+  await page.goto(base + '/search/?scope=guide&q=push%20notificaton');
+  await ready();
+  const guideMatches = () => page.locator('#cn1-search-guide-results h3 a').evaluateAll(nodes => nodes.map(node => node.getAttribute('href')));
+  assert.deepEqual(await guideMatches(), ['/developer-guide/push/'], 'Missing-character typo must retain every query word');
+  for (const typo of ['notificationx', 'notifikation']) {
+    await query('push ' + typo);
+    assert.deepEqual(await guideMatches(), ['/developer-guide/push/'], 'One-character insertions and substitutions must match');
+  }
+  await query('notificaton');
+  assert.deepEqual((await guideMatches()).sort(), ['/developer-guide/local/', '/developer-guide/push/']);
+  await query('push notificaton unrelatedzzzz');
+  assert.equal(await page.locator('#cn1-search-status').textContent(), 'No results found.');
+  await query('notificatonxx');
+  assert.equal(await page.locator('#cn1-search-status').textContent(), 'No results found.');
+  await query('push notificaton');
+  await page.locator('[data-search-scope=blog]').click();
+  await ready();
+  assert.equal(await page.locator('#cn1-search-guide').isVisible(), false);
+  assert.equal(await page.locator('#cn1-search-results h3 a').first().getAttribute('href'), '/blog/push/');
+  await page.unroute('**/lunr-index.json');
   assert.deepEqual(errors, []);
   console.log(`Search scopes, ordering, deep links, API names, failure isolation, themes, mobile layout, ${names.length} catalog rows, and legacy bookmark passed.`);
 } finally {
