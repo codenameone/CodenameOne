@@ -797,6 +797,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         String[] genericParams = RestClientAnnotationProcessor.parseGenericParameterSignatures(
                 m.getSignature(), paramTypes.length);
         List<Map<String, AnnotationValues>> paramAnnotations = m.getParameterAnnotations();
+        Set<String> formNames = new LinkedHashSet<String>();
         for (int i = 0; i < paramTypes.length; i++) {
             Param p = new Param();
             p.javaType = RestClientAnnotationProcessor.javaTypeFor(paramTypes[i], null);
@@ -839,6 +840,12 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 p.name = form.getStringOrDefault("value", "");
                 p.local = "cn1Form" + i;
                 if (!p.name.matches("[A-Za-z][A-Za-z0-9_]*")) { ctx.error(cls, "@ModelAttribute requires a simple nonempty name"); return null; }
+                if (!formNames.add(p.name)) {
+                    ctx.error(cls, "Duplicate @ModelAttribute name '" + p.name + "' on "
+                            + cls.getBinaryName() + "." + m.getName()
+                            + "; each form parameter on a route needs a distinct name");
+                    return null;
+                }
                 try { p.formBinding = MvcForms.binding(ctx, p.javaType, p.name, p.local); }
                 catch (IllegalArgumentException error) { ctx.error(cls, error.getMessage()); return null; }
             } else if ((MVC + "Model").equals(p.javaType)) {

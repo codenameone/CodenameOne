@@ -34,10 +34,18 @@ final class MvcExpression {
 
     static final class Value {
         final String code, type;
+        final boolean nullLiteral;
+        // The environment retains these symbol objects across nested lexical scopes.
+        boolean read;
 
         Value(String code, String type) {
+            this(code, type, false);
+        }
+
+        private Value(String code, String type, boolean nullLiteral) {
             this.code = code;
             this.type = type;
+            this.nullLiteral = nullLiteral;
         }
     }
 
@@ -128,7 +136,9 @@ final class MvcExpression {
             need(":");
             Value no = conditional();
             String type = yes.type.equals(no.type) ? yes.type : "java.lang.Object";
-            if (!yes.type.equals(no.type) && numeric(yes.type) && numeric(no.type)) {
+            if (yes.nullLiteral) type = box(no.type);
+            else if (no.nullLiteral) type = box(yes.type);
+            else if (!yes.type.equals(no.type) && numeric(yes.type) && numeric(no.type)) {
                 type = promoteNumeric(yes.type, no.type);
                 // Match the recorded type explicitly, including Java's boxed-number branches.
                 yes = new Value("((" + type + ")(" + unboxNumber(yes) + "))", type);
@@ -226,10 +236,11 @@ final class MvcExpression {
             } else if (t.matches("[0-9]+(\\.[0-9]+)?"))
                 v = new Value(t, t.contains(".") ? "double" : "int");
             else if (t.equals("true") || t.equals("false")) v = new Value(t, "boolean");
-            else if (t.equals("null")) v = new Value("null", "java.lang.Object");
+            else if (t.equals("null")) v = new Value("null", "java.lang.Object", true);
             else {
                 v = names.get(t);
                 if (v == null) throw error("Undeclared model or local: " + t);
+                v.read = true;
             }
         }
         while (at < tokens.size()) {

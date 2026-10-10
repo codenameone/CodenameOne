@@ -308,7 +308,7 @@ final class MvcTemplates {
         // A fragment only requires the model names it actually reads.
         for (Map.Entry<String, String> entry : t.models.entrySet()) {
             String variable = env.get(entry.getKey()).code;
-            if (!Pattern.compile("\\b" + variable + "\\b").matcher(body).find()) continue;
+            if (!env.get(entry.getKey()).read) continue;
             String type = entry.getValue(), raw = MvcExpression.raw(type);
             prelude.append("Object raw_")
                     .append(variable)
@@ -510,6 +510,26 @@ final class MvcTemplates {
             throw new IllegalArgumentException("Dynamic script sources are not supported");
         if (tag.equals("base") && dynamic.containsKey("href"))
             throw new IllegalArgumentException("Dynamic base URLs are not supported");
+        // Every submission destination must stay on this origin, including submit controls
+        // rendered in separate fragments. A base URL must not redirect local paths off-origin.
+        for (String attribute : Arrays.asList("action", "formaction", "href")) {
+            if (attribute.equals("href") && !tag.equals("base")) continue;
+            MvcExpression.Value value = dynamic.get(attribute);
+            if (value == null && !e.hasAttr(attribute)) continue;
+            String code = value == null ? q(e.attr(attribute)) : value.code;
+            String checked =
+                    helpers.call(
+                            "java.lang.String",
+                            "java.lang.Object value",
+                            "if (value == null) return null; String url = Html.string(value); if"
+                                + " (!url.isEmpty()) { try { Html.localLocation(url); } catch"
+                                + " (IllegalArgumentException error) { throw new"
+                                + " IllegalArgumentException(\"Form action and base URLs must be a"
+                                + " local absolute path\"); } } return url;",
+                            code);
+            if (value == null) out.append(checked).append(";\n");
+            else dynamic.put(attribute, new MvcExpression.Value(checked, "java.lang.String"));
+        }
         if (e.hasAttr("th:classappend")) {
             MvcExpression.Value v = expression(e.attr("th:classappend"), env, form);
             MvcExpression.Value base = dynamic.get("class");

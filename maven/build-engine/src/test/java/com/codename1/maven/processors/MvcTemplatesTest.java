@@ -1928,6 +1928,212 @@ public class MvcTemplatesTest {
         assertEquals(1, node.getField("calls").getInt(equalLeaf));
     }
 
+    @Test
+    public void formDestinationsCannotDiscloseCsrfTokens() throws Exception {
+        setup();
+        fixtureSources(
+                Collections.singletonMap(
+                        "sample.Destination",
+                        "package sample; public class Destination { public int conversions; public"
+                            + " String toString() {return ++conversions == 1 ? \"/save\" :"
+                            + " \"https://external.test/save\";} }"));
+        String declaration = "<!-- cn1:model destination java.lang.String -->";
+        template(
+                "action",
+                declaration + "<form method=\"post\" th:action=\"${destination}\"></form>");
+        template(
+                "attrAction",
+                declaration + "<form method=\"post\" th:attr=\"ACTION=${destination}\"></form>");
+        template(
+                "fragment",
+                declaration
+                        + "<button th:fragment=\"save\" form=\"owner\" formmethod=\"post\""
+                        + " th:attr=\"formaction=${destination}\">Save</button>");
+        template(
+                "override",
+                declaration
+                        + "<form id=\"owner\" method=\"post\" action=\"/save\"></form><button"
+                        + " form=\"owner\" th:attr=\"formaction=${destination}\">Save</button>");
+        template(
+                "input",
+                declaration
+                        + "<form method=\"post\"><input type=\"submit\""
+                        + " th:attr=\"formaction=${destination}\"></form>");
+        template("static", "<form method=\"post\" action=\"https://external.test/save\"></form>");
+        template(
+                "staticOverride",
+                "<form method=\"post\"><button"
+                        + " formaction=\"//external.test/save\">Save</button></form>");
+        template(
+                "base",
+                "<base href=\"https://external.test/\"><form method=\"post\""
+                        + " action=\"/save\"></form>");
+        template(
+                "changing",
+                "<!-- cn1:model destination sample.Destination --><form method=\"post\""
+                        + " th:action=\"${destination}\"></form>");
+        compile();
+        Model model =
+                new Model()
+                        .addAttribute(
+                                "_csrf",
+                                new com.codename1.backend.security.DefaultCsrfToken(
+                                        "X-CSRF-TOKEN", "_csrf", "secret"));
+        for (String view :
+                Arrays.asList("action", "attrAction", "override", "input", "fragment :: save")) {
+            for (String url :
+                    Arrays.asList(
+                            "https://external.test/save",
+                            "http://external.test/save",
+                            "//external.test/save",
+                            "/\\external.test/save",
+                            " https://external.test/save",
+                            "javascript:alert(1)")) {
+                try {
+                    render(view, model.addAttribute("destination", url));
+                    fail("Accepted " + view + " destination " + url);
+                } catch (IllegalArgumentException expected) {
+                    assertTrue(
+                            expected.getMessage(),
+                            expected.getMessage().contains("local absolute path"));
+                }
+            }
+            for (String url : Arrays.asList("/save", "/save?next=a&b=c", "", null)) {
+                String html = render(view, model.addAttribute("destination", url));
+                assertTrue(html, html.contains("name=\"_csrf\" value=\"secret\""));
+                if (url != null && url.contains("&")) assertTrue(html, html.contains("a&amp;b=c"));
+            }
+        }
+        Object changingUrl = loader.loadClass("sample.Destination").newInstance();
+        String checked = render("changing", model.addAttribute("destination", changingUrl));
+        assertTrue(checked, checked.contains("action=\"/save\""));
+        assertEquals(1, changingUrl.getClass().getField("conversions").getInt(changingUrl));
+        for (String view : Arrays.asList("static", "staticOverride", "base")) {
+            try {
+                render(view, model);
+                fail("Accepted external destination in " + view);
+            } catch (IllegalArgumentException expected) {
+                assertTrue(
+                        expected.getMessage(),
+                        expected.getMessage().contains("local absolute path"));
+            }
+        }
+    }
+
+    @Test
+    public void conditionalNullBranchesRetainReferenceAndCollectionTypes() throws Exception {
+        setup();
+        template(
+                "conditionalNull",
+                DECL
+                        + "<!-- cn1:model flag java.lang.Boolean --><b th:text=\"${(flag ? product"
+                        + " : null).name}\"></b><i th:text=\"${(flag ? null :"
+                        + " product).name}\"></i><em th:text=\"${flag ? (flag ? products :"
+                        + " null)[0].name : ''}\"></em><u th:text=\"${flag ? '' : (flag ? null :"
+                        + " products)[0].name}\"></u><span th:each=\"p : ${flag ? products :"
+                        + " null}\" th:text=\"${p.name}\"></span>");
+        compile();
+        Object product = product("Typed", 1);
+        Model model =
+                new Model()
+                        .addAttribute("flag", true)
+                        .addAttribute("product", product)
+                        .addAttribute("products", Arrays.asList(product));
+        String html = render("conditionalNull", model);
+        assertTrue(
+                html, html.contains("<b>Typed</b><i></i><em>Typed</em><u></u><span>Typed</span>"));
+        html = render("conditionalNull", model.addAttribute("flag", false));
+        assertTrue(html, html.contains("<b></b><i>Typed</i><em></em><u>Typed</u>"));
+        assertFalse(html, html.contains("<span>"));
+    }
+
+    @Test
+    public void modelRequirementsFollowSymbolReadsInsteadOfGeneratedText() throws Exception {
+        setup();
+        StringBuilder literals = new StringBuilder();
+        for (int i = 0; i < 40; i++) literals.append("model").append(i).append(' ');
+        template(
+                "usage",
+                DECL
+                        + "<section th:fragment=\"literal\"><b th:text=\"'"
+                        + literals
+                        + "'\"></b><!-- "
+                        + literals
+                        + " --><i title=\""
+                        + literals
+                        + "\">static</i></section>"
+                        + "<section th:fragment=\"read\" th:text=\"${product.name}\"></section>"
+                        + "<section th:fragment=\"shadow\"><b th:each=\"product : ${products}\""
+                        + " th:text=\"${product.name}\"></b></section>");
+        template("include", DECL + "<div th:replace=\"~{usage :: literal}\"></div>");
+        compile();
+        assertTrue(render("usage :: literal", new Model()).contains(literals));
+        assertTrue(render("include", new Model()).contains(literals));
+        assertTrue(
+                render(
+                                "usage :: shadow",
+                                new Model()
+                                        .addAttribute(
+                                                "products", Arrays.asList(product("Local", 1))))
+                        .contains("<b>Local</b>"));
+        try {
+            render("usage :: read", new Model());
+            fail("Missing referenced model was accepted");
+        } catch (IllegalStateException expected) {
+            assertTrue(
+                    expected.getMessage(),
+                    expected.getMessage().contains("Missing model 'product'"));
+        }
+    }
+
+    @Test
+    public void duplicateModelAttributeNamesFailDuringRouteProcessing() throws Exception {
+        setup();
+        fixtureSources(
+                Collections.singletonMap(
+                        "sample.Pages",
+                        "package sample; import com.codename1.backend.annotations.*; import"
+                                + " com.codename1.backend.mvc.*; @Controller public class Pages {"
+                                + " @PostMapping(\"/save\") public String"
+                                + " save(@ModelAttribute(\"product\") Product first, BindingResult"
+                                + " firstErrors,@ModelAttribute(\"product\") Product second,"
+                                + " BindingResult secondErrors) {return \"edit\";} }"));
+        RestControllerAnnotationProcessor processor = new RestControllerAnnotationProcessor();
+        processor.start(context);
+        for (AnnotatedClass cls : context.getClassIndex().values())
+            processor.processClass(cls, context);
+        processor.finish(context);
+        assertTrue(context.getErrors().toString(), context.hasErrors());
+        assertTrue(
+                context.getErrors().toString(),
+                context.getErrors()
+                        .toString()
+                        .contains("Duplicate @ModelAttribute name 'product'"));
+    }
+
+    @Test
+    public void distinctModelAttributeNamesKeepBothObjectsAndResults() throws Exception {
+        setup();
+        HttpServer.Handler handler =
+                controller(
+                        "package sample; import com.codename1.backend.annotations.*; import"
+                            + " com.codename1.backend.mvc.*; @Controller public class Pages {"
+                            + " @PostMapping(\"/save\") @ResponseBody public String"
+                            + " save(@ModelAttribute(\"first\") Product first, BindingResult"
+                            + " firstErrors,@ModelAttribute(\"second\") Product second,"
+                            + " BindingResult secondErrors, Model model) {return"
+                            + " Boolean.toString(first != second && firstErrors != secondErrors &&"
+                            + " model.getAttribute(\"first\") == first &&"
+                            + " model.getAttribute(\"second\") == second &&"
+                            + " model.getAttribute(\"BindingResult.first\") == firstErrors &&"
+                            + " model.getAttribute(\"BindingResult.second\") == secondErrors); }"
+                            + " @PostMapping(\"/other\") @ResponseBody public String"
+                            + " other(@ModelAttribute(\"first\") Product first) {return"
+                            + " first.name;} }");
+        assertEquals("true", body(handler.handle(request("POST", "/save", "name=One", false))));
+        assertEquals("Two", body(handler.handle(request("POST", "/other", "name=Two", false))));
+    }
+
     private static volatile int benchmarkSink;
 
     @Test

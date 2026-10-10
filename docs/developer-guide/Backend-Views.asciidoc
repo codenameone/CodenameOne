@@ -118,6 +118,9 @@ use strict value conversion.
 `th:errors="*{*}"` renders all errors for the selected form. Use distinct explicit
 ids for radio buttons in a group. Multiple-selection collection binding is deferred.
 
+Each `@ModelAttribute` parameter on a route must have a distinct name; duplicate
+names fail the build instead of overwriting form objects and validation results.
+
 === htmx, CSRF and assets
 
 Ordinary `hx-*` attributes pass through. Put `hx-post` on a form and target a
@@ -130,6 +133,10 @@ provide response-header helpers.
 The existing security chain remains responsible for CSRF enforcement. The model
 contains `_csrf`, whose type is declared automatically. Unsafe forms include a
 hidden CSRF token when one is available; htmx serializes it with the other fields.
+Form `action`, submit-control `formaction`, and static base URLs must be local
+absolute paths such as `/products/save`, or empty to use the current document.
+This applies to static and dynamic form destinations, including controls in fragments,
+to prevent ordinary form submissions from disclosing the generated token to another origin.
 For requests outside forms, supply the existing token header explicitly. Defining
 HTML controllers doesn't enable a security chain automatically.
 
