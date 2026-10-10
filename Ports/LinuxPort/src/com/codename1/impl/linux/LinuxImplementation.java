@@ -1031,10 +1031,10 @@ public class LinuxImplementation extends CodenameOneImplementation {
                     dispatchPointerHover(windowId, x, y, key);
                     break;
                 case EVENT_KEY_PRESSED:
-                    windowKeyPressed(windowId, key);
+                    windowKeyPressed(windowId, keyCodeOf(key));
                     break;
                 case EVENT_KEY_RELEASED:
-                    windowKeyReleased(windowId, key);
+                    windowKeyReleased(windowId, keyCodeOf(key));
                     break;
                 case EVENT_SIZE_CHANGED:
                     if (windowId == 0) {
@@ -2712,12 +2712,71 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     @Override
     public int getGameAction(int keyCode) {
-        return 0;
+        switch (keyCode) {
+            case GAME_KEY_CODE_UP:
+                return Display.GAME_UP;
+            case GAME_KEY_CODE_DOWN:
+                return Display.GAME_DOWN;
+            case GAME_KEY_CODE_LEFT:
+                return Display.GAME_LEFT;
+            case GAME_KEY_CODE_RIGHT:
+                return Display.GAME_RIGHT;
+            default:
+                return 0;
+        }
     }
 
     @Override
     public int getKeyCode(int gameAction) {
-        return 0;
+        switch (gameAction) {
+            case Display.GAME_UP:
+                return GAME_KEY_CODE_UP;
+            case Display.GAME_DOWN:
+                return GAME_KEY_CODE_DOWN;
+            case Display.GAME_LEFT:
+                return GAME_KEY_CODE_LEFT;
+            case Display.GAME_RIGHT:
+                return GAME_KEY_CODE_RIGHT;
+            default:
+                return 0;
+        }
+    }
+
+    // The codes the arrow keys are handed to Codename One as. They are
+    // negative, as on the JavaSE port: a positive code is a character, and
+    // a form, a list and everything else that moves on an arrow asks
+    // getGameAction what a negative one means.
+    private static final int GAME_KEY_CODE_UP = -91;
+    private static final int GAME_KEY_CODE_DOWN = -92;
+    private static final int GAME_KEY_CODE_LEFT = -93;
+    private static final int GAME_KEY_CODE_RIGHT = -94;
+
+    /// The Codename One code of a key the window reported.
+    ///
+    /// The window hands over the character a key types, and for a key
+    /// that types none its GDK key value. The arrows are such keys, and
+    /// their values (0xff51 to 0xff54, and the keypad's 0xff96 to 0xff99)
+    /// were passed on as they came: getGameAction answered 0 for
+    /// everything, so no arrow key did anything in any application -- a
+    /// form did not move its focus, and a game played with the arrows did
+    /// not play -- while a text component read the value as a character.
+    static int keyCodeOf(int key) {
+        switch (key) {
+            case 0xff51:
+            case 0xff96:
+                return GAME_KEY_CODE_LEFT;
+            case 0xff52:
+            case 0xff97:
+                return GAME_KEY_CODE_UP;
+            case 0xff53:
+            case 0xff98:
+                return GAME_KEY_CODE_RIGHT;
+            case 0xff54:
+            case 0xff99:
+                return GAME_KEY_CODE_DOWN;
+            default:
+                return key;
+        }
     }
 
     /* ------------------------------------------------------------ network */
