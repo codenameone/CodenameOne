@@ -4358,6 +4358,50 @@ static inline JAVA_INT cn1InlTableNext(JAVA_LONG metadata, JAVA_INT from, JAVA_I
     return -1;
 }
 
+/* StringBuilder owns reallocatable native memory. Even though its Java API is
+ * unsynchronized, overlapping native accesses must not free a buffer another
+ * thread is reading or resizing (issue #5963). Use the VM monitor so blocking
+ * participates in GC handshakes and Java exception unwinding releases the lock.
+ * Stack builders are escape-proven and cannot be shared. Two-builder copies
+ * acquire in address order to avoid opposite-direction append deadlocks. This
+ * protects native borrows, not compound Java operations on a shared builder. */
+struct CN1BuilderAccess {
+    struct ThreadLocalData* thread;
+    JAVA_OBJECT first;
+    JAVA_OBJECT second;
+    int offset;
+};
+static inline struct CN1BuilderAccess cn1BuilderAccessBegin(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT first, JAVA_OBJECT second) {
+    struct CN1BuilderAccess access = { threadStateData, JAVA_NULL, JAVA_NULL,
+                                      threadStateData->tryBlockOffset };
+    if(first == JAVA_NULL) { THROW_NULL_POINTER_EXCEPTION(); return access; }
+    if(first == second) second = JAVA_NULL;
+    if(second != JAVA_NULL && (uintptr_t)first > (uintptr_t)second) {
+        JAVA_OBJECT swap = first; first = second; second = swap;
+    }
+    if(CN1_OBJ_HEAPPOS(first) != CN1_GC_STACK_BUILDER) {
+        monitorEnterBlock(threadStateData, first);
+        access.first = first;
+    }
+    if(second != JAVA_NULL && CN1_OBJ_HEAPPOS(second) != CN1_GC_STACK_BUILDER) {
+        monitorEnterBlock(threadStateData, second);
+        access.second = second;
+    }
+    return access;
+}
+static inline void cn1BuilderAccessEnd(struct CN1BuilderAccess* access) {
+    // A caught exception longjmps past cleanup; throwException releases monitors.
+    // Older app targets can return from an uncaught throw after unwinding them.
+    if(access->thread->tryBlockOffset <= access->offset) return;
+    if(access->second != JAVA_NULL) monitorExitBlock(access->thread, access->second);
+    if(access->first != JAVA_NULL) monitorExitBlock(access->thread, access->first);
+}
+#define CN1_BUILDER_ACCESS_PAIR(name, first, second) \
+    struct CN1BuilderAccess name __attribute__((cleanup(cn1BuilderAccessEnd))) = \
+        cn1BuilderAccessBegin(threadStateData, (first), (second))
+#define CN1_BUILDER_ACCESS(name, builder) CN1_BUILDER_ACCESS_PAIR(name, builder, JAVA_NULL)
+
 // Untraced, exclusively owned primitive storage; growth preserves existing bytes.
 extern JAVA_LONG cn1PrimitiveBlockResize(JAVA_LONG block, JAVA_INT bytes);
 extern JAVA_LONG cn1IntBlockAlloc(JAVA_INT capacity);

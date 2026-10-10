@@ -5177,6 +5177,18 @@ JAVA_OBJECT java_lang_String_toString___R_java_lang_String(CODENAME_ONE_THREAD_S
     return __cn1ThisObject;
 }
 
+static inline void cn1BuilderCheckStorageRange(CODENAME_ONE_THREAD_STATE,
+        JAVA_OBJECT builder, JAVA_INT start, JAVA_INT length) {
+    JAVA_INT capacity = ((struct obj__java_lang_StringBuilder*)builder)->java_lang_StringBuilder_capacity;
+    if(start < 0 || length < 0 || start > capacity || length > capacity - start)
+        THROW_ARRAY_INDEX_EXCEPTION(start);
+}
+static inline JAVA_INT cn1BuilderCount(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT builder) {
+    JAVA_INT count = ((struct obj__java_lang_StringBuilder*)builder)->java_lang_StringBuilder_count;
+    cn1BuilderCheckStorageRange(threadStateData, builder, 0, count);
+    return count;
+}
+
 static inline void* cn1BuilderData(JAVA_OBJECT builder) {
     return (void*)(uintptr_t)((struct obj__java_lang_StringBuilder*)builder)->java_lang_StringBuilder_cn1Storage;
 }
@@ -5213,11 +5225,15 @@ static JAVA_VOID cn1SbEnsure(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT builder, JAV
 
 JAVA_BOOLEAN java_lang_StringBuilder_resizeBufferImpl___int_boolean_R_boolean(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT builder, JAVA_INT capacity, JAVA_BOOLEAN wide) {
+    CN1_BUILDER_ACCESS(bufferAccess, builder);
     CN1_KEEP_NATIVE_OWNER(bufferOwner, builder);
     struct obj__java_lang_StringBuilder* target = (struct obj__java_lang_StringBuilder*)builder;
-    if(capacity < 0 || capacity > INT_MAX / (wide ? 2 : 1)) return JAVA_FALSE;
     int wasWide = target->java_lang_StringBuilder_wide;
-    int count = target->java_lang_StringBuilder_count;
+    // A Java ensureCapacity call may have read the coder before another native
+    // append widened the buffer. Widening is permanent; never shrink its stride.
+    if(wasWide) wide = JAVA_TRUE;
+    if(capacity < 0 || capacity > INT_MAX / (wide ? 2 : 1)) return JAVA_FALSE;
+    int count = cn1BuilderCount(threadStateData, builder);
     JAVA_LONG previous = target->java_lang_StringBuilder_cn1Storage;
     JAVA_LONG inlineStorage = (JAVA_LONG)(uintptr_t)target->__cn1InlineStorage;
     int inlineBytes = sizeof(target->__cn1InlineStorage);
@@ -5228,6 +5244,8 @@ JAVA_BOOLEAN java_lang_StringBuilder_resizeBufferImpl___int_boolean_R_boolean(
         inlineBytes = scope->initialBytes;
     }
     int bytes = capacity * (wide ? 2 : 1);
+    // trimToSize may have read count before a competing append grew it.
+    if(capacity < count) { CN1_THROW_CME(); return JAVA_FALSE; }
     JAVA_LONG block;
     if(bytes <= inlineBytes) {
         block = inlineStorage;
@@ -5285,31 +5303,42 @@ static JAVA_VOID cn1SbEnsure(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT builder, JAV
 
 JAVA_CHAR java_lang_StringBuilder_unit___int_R_char(CODENAME_ONE_THREAD_STATE,
         JAVA_OBJECT builder, JAVA_INT index) {
+    CN1_BUILDER_ACCESS(bufferAccess, builder);
+    cn1BuilderCheckStorageRange(threadStateData, builder, index, 1);
     return cn1BuilderUnit(builder, index);
 }
 JAVA_VOID java_lang_StringBuilder_put___int_char(CODENAME_ONE_THREAD_STATE,
         JAVA_OBJECT builder, JAVA_INT index, JAVA_CHAR value) {
+    CN1_BUILDER_ACCESS(bufferAccess, builder);
     CN1_KEEP_NATIVE_OWNER(bufferOwner, builder);
     if(value > 255 && cn1BuilderIsLatin1(builder))
         java_lang_StringBuilder_widen__(threadStateData, builder);
+    cn1BuilderCheckStorageRange(threadStateData, builder, index, 1);
     cn1BuilderStore(builder, index, value);
 }
 JAVA_VOID java_lang_StringBuilder_move___int_int_int(CODENAME_ONE_THREAD_STATE,
         JAVA_OBJECT builder, JAVA_INT from, JAVA_INT to, JAVA_INT length) {
+    CN1_BUILDER_ACCESS(bufferAccess, builder);
     if(length <= 0) return;
     size_t width = cn1BuilderIsLatin1(builder) ? 1 : sizeof(JAVA_ARRAY_CHAR);
     char* data = (char*)cn1BuilderData(builder);
+    cn1BuilderCheckStorageRange(threadStateData, builder, from, length);
+    cn1BuilderCheckStorageRange(threadStateData, builder, to, length);
     memmove(data + (size_t)to * width, data + (size_t)from * width, (size_t)length * width);
 }
 JAVA_VOID java_lang_StringBuilder_zero___int_int(CODENAME_ONE_THREAD_STATE,
         JAVA_OBJECT builder, JAVA_INT from, JAVA_INT length) {
+    CN1_BUILDER_ACCESS(bufferAccess, builder);
     if(length <= 0) return;
     size_t width = cn1BuilderIsLatin1(builder) ? 1 : sizeof(JAVA_ARRAY_CHAR);
+    cn1BuilderCheckStorageRange(threadStateData, builder, from, length);
     memset((char*)cn1BuilderData(builder) + (size_t)from * width, 0, (size_t)length * width);
 }
 
 JAVA_CHAR java_lang_StringBuilder_charAt___int_R_char(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT builder, JAVA_INT index) {
+    CN1_BUILDER_ACCESS(bufferAccess, builder);
     java_lang_StringBuilder_checkIndex___int(threadStateData, builder, index);
+    cn1BuilderCheckStorageRange(threadStateData, builder, index, 1);
     return cn1BuilderUnit(builder, index);
 }
 
@@ -5333,6 +5362,7 @@ static inline void cn1CharCopy(JAVA_ARRAY_CHAR* dst, const JAVA_ARRAY_CHAR* src,
 }
 
 JAVA_OBJECT java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT builder, JAVA_OBJECT str) {
+    CN1_BUILDER_ACCESS(bufferAccess, builder);
     enteringNativeAllocations();
     if(str == JAVA_NULL) {
         java_lang_StringBuilder_appendNull__(threadStateData, builder);
@@ -5343,7 +5373,7 @@ JAVA_OBJECT java_lang_StringBuilder_append___java_lang_String_R_java_lang_String
     CN1_KEEP_NATIVE_OWNER(stringOwner, str);
     struct obj__java_lang_String* source = (struct obj__java_lang_String*)str;
     struct obj__java_lang_StringBuilder* target = (struct obj__java_lang_StringBuilder*)builder;
-    JAVA_INT length = source->java_lang_String_count, count = target->java_lang_StringBuilder_count;
+    JAVA_INT length = source->java_lang_String_count, count = cn1BuilderCount(threadStateData, builder);
     if(length == 0) { finishedNativeAllocations(); return builder; }
     JAVA_INT needed = count + length;
     if(needed < 0 || needed > target->java_lang_StringBuilder_capacity)
@@ -5382,12 +5412,14 @@ JAVA_BOOLEAN java_lang_StringBuilder_tryAppendRange___java_lang_CharSequence_int
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT builder, JAVA_OBJECT text, JAVA_INT start, JAVA_INT end) {
     int sourceBuilder = CN1_OBJ_CLASS(text) == &class__java_lang_StringBuilder;
     if(!sourceBuilder && !cn1IsStringClass(CN1_OBJ_CLASS(text))) return JAVA_FALSE;
+    CN1_BUILDER_ACCESS_PAIR(bufferAccess, builder, sourceBuilder ? text : JAVA_NULL);
     JAVA_INT length = end - start;
+    if(sourceBuilder) cn1BuilderCheckStorageRange(threadStateData, text, start, length);
     if(length == 0) return JAVA_TRUE;
     CN1_KEEP_NATIVE_OWNER(bufferOwner, builder);
     CN1_KEEP_NATIVE_OWNER(sourceOwner, text);
     struct obj__java_lang_StringBuilder* target = (struct obj__java_lang_StringBuilder*)builder;
-    JAVA_INT count = target->java_lang_StringBuilder_count;
+    JAVA_INT count = cn1BuilderCount(threadStateData, builder);
     JAVA_INT needed = count + length;
     if(needed < 0 || needed > target->java_lang_StringBuilder_capacity)
         cn1SbEnsure(threadStateData, builder, needed);
@@ -5436,6 +5468,7 @@ JAVA_BOOLEAN java_lang_StringBuilder_tryAppendRange___java_lang_CharSequence_int
 
 JAVA_OBJECT java_lang_StringBuilder_append___char_1ARRAY_int_int_R_java_lang_StringBuilder(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT builder, JAVA_OBJECT source, JAVA_INT offset, JAVA_INT length) {
+    CN1_BUILDER_ACCESS(bufferAccess, builder);
     if(source == JAVA_NULL) THROW_NULL_POINTER_EXCEPTION();
     JAVA_ARRAY array = (JAVA_ARRAY)source;
     if(offset < 0 || length < 0 || offset > array->length - length) THROW_ARRAY_INDEX_EXCEPTION(offset);
@@ -5443,7 +5476,7 @@ JAVA_OBJECT java_lang_StringBuilder_append___char_1ARRAY_int_int_R_java_lang_Str
     CN1_KEEP_NATIVE_OWNER(bufferOwner, builder);
     CN1_KEEP_NATIVE_OWNER(arrayOwner, source);
     struct obj__java_lang_StringBuilder* target = (struct obj__java_lang_StringBuilder*)builder;
-    int count = target->java_lang_StringBuilder_count;
+    int count = cn1BuilderCount(threadStateData, builder);
     int needed = count + length;
     if(needed < 0 || needed > target->java_lang_StringBuilder_capacity)
         cn1SbEnsure(threadStateData, builder, needed);
@@ -5468,7 +5501,7 @@ JAVA_OBJECT java_lang_StringBuilder_append___char_1ARRAY_int_int_R_java_lang_Str
 // stays native and is copied directly, without an intermediate Java array.
 static JAVA_OBJECT cn1BuilderStringCopy(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT builder, int latin1) {
     CN1_KEEP_NATIVE_OWNER(bufferOwner, builder);
-    int count = ((struct obj__java_lang_StringBuilder*)builder)->java_lang_StringBuilder_count;
+    int count = cn1BuilderCount(threadStateData, builder);
     JAVA_OBJECT result = __NEW_INSTANCE_java_lang_String(threadStateData);
     CN1_KEEP_NATIVE_OWNER(resultOwner, result);
     JAVA_OBJECT value = latin1 ? __NEW_ARRAY_JAVA_BYTE(threadStateData, count)
@@ -5582,10 +5615,11 @@ JAVA_OBJECT java_lang_String_cn1SubstringFused___int_int_R_java_lang_String(CODE
 }
 
 JAVA_OBJECT java_lang_StringBuilder_toString___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+    CN1_BUILDER_ACCESS(bufferAccess, __cn1ThisObject);
     CN1_KEEP_NATIVE_OWNER(bufferOwner, __cn1ThisObject);
     if(__builtin_expect(!class__java_lang_String.initialized, 0)) __STATIC_INITIALIZER_java_lang_String(threadStateData);
     struct obj__java_lang_StringBuilder* t = (struct obj__java_lang_StringBuilder*)__cn1ThisObject;
-    int count = t->java_lang_StringBuilder_count;
+    int count = cn1BuilderCount(threadStateData, __cn1ThisObject);
     enteringNativeAllocations();
 
     int latin1 = cn1BuilderIsLatin1(__cn1ThisObject);
@@ -5662,10 +5696,12 @@ JAVA_OBJECT java_lang_StringBuilder_toString___R_java_lang_String(CODENAME_ONE_T
 }
 
 JAVA_VOID java_lang_StringBuilder_getChars___int_int_char_1ARRAY_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT builder, JAVA_INT start, JAVA_INT end, JAVA_OBJECT destination, JAVA_INT destinationStart) {
+    CN1_BUILDER_ACCESS(bufferAccess, builder);
     java_lang_StringBuilder_checkRange___int_int(threadStateData, builder, start, end);
     if(destination == JAVA_NULL) THROW_NULL_POINTER_EXCEPTION();
     JAVA_ARRAY dst = (JAVA_ARRAY)destination;
     if(destinationStart < 0 || destinationStart > dst->length - (end - start)) THROW_ARRAY_INDEX_EXCEPTION(destinationStart);
+    cn1BuilderCheckStorageRange(threadStateData, builder, start, end - start);
     if(end == start) return;
     void* src = cn1BuilderData(builder);
     JAVA_ARRAY_CHAR* chars = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA(dst) + destinationStart;
@@ -5686,6 +5722,7 @@ JAVA_OBJECT java_lang_StringBuilder_append___java_lang_Object_R_java_lang_String
 // buffer, no temporary String. Digits are generated in negative space so INT/LONG_MIN
 // work without overflow.
 JAVA_OBJECT java_lang_StringBuilder_append___int_R_java_lang_StringBuilder(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT i) {
+    CN1_BUILDER_ACCESS(bufferAccess, __cn1ThisObject);
     CN1_KEEP_NATIVE_OWNER(bufferOwner, __cn1ThisObject);
     enteringNativeAllocations();
     char tmp[12]; int tlen = 0;
@@ -5693,7 +5730,7 @@ JAVA_OBJECT java_lang_StringBuilder_append___int_R_java_lang_StringBuilder(CODEN
     JAVA_INT q = i; if(q > 0) q = -q;
     do { tmp[tlen++] = (char)('0' - (q % 10)); q /= 10; } while(q != 0);
     JAVA_INT needed = tlen + (neg ? 1 : 0);
-    JAVA_INT count = get_field_java_lang_StringBuilder_count(__cn1ThisObject);
+    JAVA_INT count = cn1BuilderCount(threadStateData, __cn1ThisObject);
     if(count + needed < 0 || count + needed > get_field_java_lang_StringBuilder_capacity(__cn1ThisObject)) {
         cn1SbEnsure(threadStateData, __cn1ThisObject, count + needed);
     }
@@ -5706,6 +5743,7 @@ JAVA_OBJECT java_lang_StringBuilder_append___int_R_java_lang_StringBuilder(CODEN
 }
 
 JAVA_OBJECT java_lang_StringBuilder_append___long_R_java_lang_StringBuilder(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_LONG l) {
+    CN1_BUILDER_ACCESS(bufferAccess, __cn1ThisObject);
     CN1_KEEP_NATIVE_OWNER(bufferOwner, __cn1ThisObject);
     enteringNativeAllocations();
     char tmp[21]; int tlen = 0;
@@ -5713,7 +5751,7 @@ JAVA_OBJECT java_lang_StringBuilder_append___long_R_java_lang_StringBuilder(CODE
     JAVA_LONG q = l; if(q > 0) q = -q;
     do { tmp[tlen++] = (char)('0' - (q % 10)); q /= 10; } while(q != 0);
     JAVA_INT needed = tlen + (neg ? 1 : 0);
-    JAVA_INT count = get_field_java_lang_StringBuilder_count(__cn1ThisObject);
+    JAVA_INT count = cn1BuilderCount(threadStateData, __cn1ThisObject);
     if(count + needed < 0 || count + needed > get_field_java_lang_StringBuilder_capacity(__cn1ThisObject)) {
         cn1SbEnsure(threadStateData, __cn1ThisObject, count + needed);
     }
@@ -5726,9 +5764,10 @@ JAVA_OBJECT java_lang_StringBuilder_append___long_R_java_lang_StringBuilder(CODE
 }
 
 JAVA_OBJECT java_lang_StringBuilder_append___char_R_java_lang_StringBuilder(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_CHAR __cn1Arg1) {
+    CN1_BUILDER_ACCESS(bufferAccess, __cn1ThisObject);
     CN1_KEEP_NATIVE_OWNER(bufferOwner, __cn1ThisObject);
     enteringNativeAllocations();
-    JAVA_INT len = get_field_java_lang_StringBuilder_count(__cn1ThisObject);
+    JAVA_INT len = cn1BuilderCount(threadStateData, __cn1ThisObject);
     JAVA_INT valueLen = get_field_java_lang_StringBuilder_capacity(__cn1ThisObject);
     if (len==valueLen) {
         cn1SbEnsure(threadStateData, __cn1ThisObject, len+1);

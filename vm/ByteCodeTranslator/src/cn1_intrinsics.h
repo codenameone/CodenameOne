@@ -143,11 +143,12 @@ static inline JAVA_BOOLEAN cn1InlListAdd(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT 
 #ifdef CN1_HAVE_SB_INTRINSICS
 
 static inline JAVA_OBJECT cn1InlSbAppendChar(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT sb, JAVA_CHAR c) {
+    CN1_BUILDER_ACCESS(bufferAccess, sb);
     CN1_KEEP_NATIVE_OWNER(bufferOwner, sb);
     struct obj__java_lang_StringBuilder* t = (struct obj__java_lang_StringBuilder*)sb;
     JAVA_INT count = t->java_lang_StringBuilder_count;
     void* data = (void*)(uintptr_t)t->java_lang_StringBuilder_cn1Storage;
-    if(__builtin_expect(count < t->java_lang_StringBuilder_capacity && (c <= 255 || t->java_lang_StringBuilder_wide), 1)) {
+    if(__builtin_expect(count >= 0 && count < t->java_lang_StringBuilder_capacity && (c <= 255 || t->java_lang_StringBuilder_wide), 1)) {
         if(!t->java_lang_StringBuilder_wide) ((JAVA_ARRAY_BYTE*)data)[count] = (JAVA_ARRAY_BYTE)c;
         else ((JAVA_ARRAY_CHAR*)data)[count] = c;
         t->java_lang_StringBuilder_count = count + 1;
@@ -157,13 +158,14 @@ static inline JAVA_OBJECT cn1InlSbAppendChar(CODENAME_ONE_THREAD_STATE, JAVA_OBJ
 }
 
 static inline JAVA_OBJECT cn1InlSbAppendInt(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT sb, JAVA_INT v) {
+    CN1_BUILDER_ACCESS(bufferAccess, sb);
     CN1_KEEP_NATIVE_OWNER(bufferOwner, sb);
     struct obj__java_lang_StringBuilder* t = (struct obj__java_lang_StringBuilder*)sb;
     JAVA_INT count = t->java_lang_StringBuilder_count;
     void* data = (void*)(uintptr_t)t->java_lang_StringBuilder_cn1Storage;
     // positive with guaranteed headroom stays inline; negatives and
     // tight-capacity builders take the out-of-line path (INT_MIN etc.)
-    if(__builtin_expect(v >= 0 && count + 11 <= t->java_lang_StringBuilder_capacity, 1)) {
+    if(__builtin_expect(v >= 0 && count >= 0 && count <= t->java_lang_StringBuilder_capacity - 11, 1)) {
         JAVA_ARRAY_CHAR* d = (JAVA_ARRAY_CHAR*)data;
         char tmp[11]; int n = 0;
         JAVA_INT q = v;
@@ -215,6 +217,7 @@ static inline JAVA_OBJECT cn1InlSbAppendInt(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
  */
 static inline JAVA_BOOLEAN cn1InlSbResize(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT builder,
                                           JAVA_INT capacity, JAVA_BOOLEAN wide) {
+    CN1_BUILDER_ACCESS(bufferAccess, builder);
     struct obj__java_lang_StringBuilder* t = (struct obj__java_lang_StringBuilder*)builder;
     /* CAPACITY IS PART OF THE RESULT. This path used to install the storage and
      * return without recording the capacity, so `new StringBuilder().capacity()`
@@ -254,6 +257,7 @@ static inline JAVA_BOOLEAN cn1InlSbResize(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT
 }
 
 static inline JAVA_OBJECT cn1InlSbAppendStr(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT sb, JAVA_OBJECT str) {
+    CN1_BUILDER_ACCESS(bufferAccess, sb);
     CN1_KEEP_NATIVE_OWNER(bufferOwner, sb);
     CN1_KEEP_NATIVE_OWNER(stringOwner, str);
     if(__builtin_expect(str != JAVA_NULL, 1)) {
@@ -268,7 +272,7 @@ static inline JAVA_OBJECT cn1InlSbAppendStr(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
             JAVA_INT len = s->java_lang_String_count;
             JAVA_INT count = t->java_lang_StringBuilder_count;
             if(__builtin_expect((unsigned)len <= 8u
-                    && count + len <= t->java_lang_StringBuilder_capacity, 1)) {
+                    && count >= 0 && count <= t->java_lang_StringBuilder_capacity - len, 1)) {
                 cn1SmallCopy((JAVA_ARRAY_BYTE*)(uintptr_t)t->java_lang_StringBuilder_cn1Storage + count,
                        (char*)str + ((sizeof(struct obj__java_lang_String) + 7) & ~(size_t)7),
                        (size_t)len);
@@ -286,6 +290,7 @@ static inline JAVA_OBJECT cn1InlSbAppendStr(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
 // parentCls==0 guard keeps a signal-stopped scan from tracing the body).
 // Mirrors the out-of-line native, which stays the fallback + source of truth.
 static inline JAVA_OBJECT cn1InlSbToString(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT sb) {
+    CN1_BUILDER_ACCESS(bufferAccess, sb);
     CN1_KEEP_NATIVE_OWNER(bufferOwner, sb);
 #ifndef CN1_DISABLE_BIBOP
     struct obj__java_lang_StringBuilder* t = (struct obj__java_lang_StringBuilder*)sb;
@@ -296,7 +301,7 @@ static inline JAVA_OBJECT cn1InlSbToString(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
         cn1InitStringTwin();
         // No array header: the characters follow the fields, the coder is the twin.
         size_t total = off + (size_t)count;
-        if(total <= CN1_BIBOP_MAX_OBJECT) {
+        if(count >= 0 && count <= t->java_lang_StringBuilder_capacity && total <= CN1_BIBOP_MAX_OBJECT) {
             JAVA_OBJECT result = cn1BibopFastAllocNoZero(threadStateData, (int)total, &class__java_lang_String_i8, CN1_BIBOP_CIDX(total));
             if(result != JAVA_NULL) {
                 cn1SmallCopy((char*)result + off, source, (size_t)count);
