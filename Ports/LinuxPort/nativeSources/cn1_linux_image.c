@@ -35,8 +35,11 @@
 
 #include "cn1_linux_gfx.h"
 #include <pthread.h>
+#include <stdatomic.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #ifdef __GLIBC__
 #include <malloc.h>
 #endif
@@ -48,11 +51,61 @@ int cn1LinuxSurfaceToPng(cairo_surface_t* surface, unsigned char** outData, int*
 
 #define CN1I(p) ((CN1Image*) (intptr_t) (p))
 
+/*
+ * How many images are alive and how many bytes their surfaces hold. An image is
+ * made on whatever thread asks for one and destroyed on the drawing thread, hence
+ * atomics. The numbers answer the question a resident-set figure cannot: whether
+ * memory is in pictures the port still holds, or somewhere else.
+ *
+ * CN1_LOG_IMAGES in the environment prints them to stderr, at most every 50 ms,
+ * as "[IMAGES] live=<count> bytes=<bytes> made=<count> freed=<count>" -- the same
+ * kind of switch as the collector's CN1_GC_LOG_CYCLES, and like it one cached
+ * getenv when it is off.
+ */
+static _Atomic long cn1ImagesLive = 0;
+static _Atomic long cn1ImageBytesLive = 0;
+static _Atomic long cn1ImagesMade = 0;
+static _Atomic long cn1ImagesFreed = 0;
+
+static void cn1LogImages(void) {
+    static _Atomic int logImages = -1;
+    static _Atomic long long lastLogged = 0;
+    struct timespec now;
+    long long millis;
+    int on = atomic_load_explicit(&logImages, memory_order_relaxed);
+    if (on < 0) {
+        on = getenv("CN1_LOG_IMAGES") ? 1 : 0;
+        atomic_store_explicit(&logImages, on, memory_order_relaxed);
+    }
+    if (!on) {
+        return;
+    }
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    millis = (long long) now.tv_sec * 1000 + now.tv_nsec / 1000000;
+    if (millis - atomic_load_explicit(&lastLogged, memory_order_relaxed) < 50) {
+        return;
+    }
+    atomic_store_explicit(&lastLogged, millis, memory_order_relaxed);
+    fprintf(stderr, "[IMAGES] live=%ld bytes=%ld made=%ld freed=%ld\n",
+            atomic_load_explicit(&cn1ImagesLive, memory_order_relaxed),
+            atomic_load_explicit(&cn1ImageBytesLive, memory_order_relaxed),
+            atomic_load_explicit(&cn1ImagesMade, memory_order_relaxed),
+            atomic_load_explicit(&cn1ImagesFreed, memory_order_relaxed));
+}
+
+static long cn1SurfaceBytes(cairo_surface_t* surface) {
+    return (long) cairo_image_surface_get_stride(surface) * cairo_image_surface_get_height(surface);
+}
+
 static CN1Image* cn1WrapSurface(cairo_surface_t* surface) {
     CN1Image* img = (CN1Image*) calloc(1, sizeof(CN1Image));
     img->surface = surface;
     img->width = cairo_image_surface_get_width(surface);
     img->height = cairo_image_surface_get_height(surface);
+    atomic_fetch_add_explicit(&cn1ImagesLive, 1, memory_order_relaxed);
+    atomic_fetch_add_explicit(&cn1ImageBytesLive, cn1SurfaceBytes(surface), memory_order_relaxed);
+    atomic_fetch_add_explicit(&cn1ImagesMade, 1, memory_order_relaxed);
+    cn1LogImages();
     return img;
 }
 
@@ -313,10 +366,15 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_disposeImage___long_R_long(CODENA
         free(g);
     }
     if (img->surface != 0) {
-        cn1FreedSinceTrim += (long) cairo_image_surface_get_stride(img->surface) * img->height;
+        long bytes = cn1SurfaceBytes(img->surface);
+        cn1FreedSinceTrim += bytes;
+        atomic_fetch_sub_explicit(&cn1ImageBytesLive, bytes, memory_order_relaxed);
         cairo_surface_destroy(img->surface);
     }
     free(img);
+    atomic_fetch_sub_explicit(&cn1ImagesLive, 1, memory_order_relaxed);
+    atomic_fetch_add_explicit(&cn1ImagesFreed, 1, memory_order_relaxed);
+    cn1LogImages();
 #ifdef __GLIBC__
     if (cn1FreedSinceTrim >= CN1_TRIM_AFTER_BYTES) {
         cn1FreedSinceTrim = 0;

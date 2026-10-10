@@ -53,6 +53,7 @@ import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Native Linux (GTK3, desktop) implementation of the Codename One platform
@@ -937,13 +938,72 @@ public class LinuxImplementation extends CodenameOneImplementation {
         // measured run, for as long as nothing was repainted.
         if (enter) {
             disposeReleasedImages();
-            if (imageBytesSinceGc > 0 && System.currentTimeMillis() - lastImageMillis > IMAGE_QUIET_MILLIS) {
-                // See lastImageMillis. What the cycle lets go of is freed the
-                // next time round, and nothing is counted until an image is made.
-                imageBytesSinceGc = 0;
-                System.gc();
+            if (imageBytesSinceGc > 0) {
+                long quiet = System.currentTimeMillis() - lastImageMillis;
+                if (quiet > IMAGE_QUIET_MILLIS) {
+                    // See lastImageMillis. Nothing is counted until an image is made.
+                    imageBytesSinceGc = 0;
+                    System.gc();
+                    releaseWakes = 2;
+                    wakeEdtIn(IMAGE_RELEASE_MILLIS);
+                } else {
+                    // Too soon to call it quiet, and this thread may not wake again
+                    // on its own: an application that stops moving stops for good.
+                    wakeEdtIn(IMAGE_QUIET_MILLIS - quiet + 1);
+                }
+            } else if (releaseWakes > 0) {
+                releaseWakes--;
+                if (releaseWakes > 0) {
+                    wakeEdtIn(4 * IMAGE_RELEASE_MILLIS);
+                }
             }
         }
+    }
+
+    /// How long after asking for the quiet collection this thread comes back to free
+    /// what it let go of, and how many times it still will: once soon, once later for
+    /// a cycle that took its time.
+    private static final long IMAGE_RELEASE_MILLIS = 250;
+
+    private int releaseWakes;
+
+    private static final AtomicBoolean WAKE_PENDING = new AtomicBoolean();
+
+    private static final Runnable NOTHING = new Runnable() {
+        @Override
+        public void run() {
+        }
+    };
+
+    /// Has the event dispatch thread pass through `edtIdle` once more, some time
+    /// from now. The quiet collection above is asked for by a thread on its way to
+    /// sleep, and the collector answers on its own thread a moment later: the images
+    /// it released sat in the queue until the next frame, which a still application
+    /// never paints. A Mandelbrot picture that had finished rendering held 115
+    /// surfaces, 220 MB, for as long as nobody touched the window; and when the
+    /// thread went to sleep less than `IMAGE_QUIET_MILLIS` after the last image,
+    /// the collection was never asked for at all.
+    ///
+    /// One wake-up is pending at a time, hence the atomic: the timer thread clears
+    /// it and this thread sets it.
+    private static void wakeEdtIn(final long millis) {
+        if (!WAKE_PENDING.compareAndSet(false, true)) {
+            return;
+        }
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(millis);
+                } catch (InterruptedException ex) {
+                    // Woken early is still woken: the pass it asks for is harmless.
+                }
+                WAKE_PENDING.set(false);
+                Display.getInstance().callSerially(NOTHING);
+            }
+        }, "cn1-linux-image-release");
+        t.setDaemon(true);
+        t.start();
     }
 
     // High bits in the native key flag touch, pen, or eraser input (see cn1_linux.h);
