@@ -152,6 +152,41 @@ public class CanvasTest {
         assertEquals(0, seen[5 * 8 + 5]);
     }
 
+    /// The canvas image is drawn on again after it was shown. A port that
+    /// cannot draw an image at a size shows a copy the image keeps, and the
+    /// copy made for the first frame went on being shown: Mandelbrot on the
+    /// native Linux port ended on a black picture more often than not. The
+    /// canvas is drawn at two device pixels to one here, so that what is
+    /// shown is such a copy.
+    @Test
+    public void theCanvasImageDrawnOnAgainIsWhatIsShown() {
+        Units.setScale(1);
+        HeadlessImplementation.rasterImages = true;
+        HeadlessImplementation.pixelImages = true;
+        javafx.scene.image.WritableImage picture = new javafx.scene.image.WritableImage(8, 6);
+        javafx.scene.image.PixelWriter w = picture.getPixelWriter();
+        Canvas canvas = new Canvas(8, 6);
+        GraphicsContext gc = canvas.getGraphicsContext2D();
+        w.setArgb(1, 1, 0xffff0000);
+        gc.drawImage(picture, 0, 0, 8, 6, 0, 0, 8, 6);
+        gc.drawImage(picture, 0, 0, 8, 6, 0, 0, 8, 6);
+        com.codename1.ui.Image first = com.codename1.ui.Image.createImage(16, 12, 0);
+        Renderer twice = new Renderer(first.getGraphics(), 0, 0);
+        twice.concat(2, 0, 0, 2, 0, 0);
+        canvas.cn1Paint(twice);
+        assertEquals(0xffff0000, first.getRGB()[2 * 16 + 2]);
+        assertEquals(0, first.getRGB()[6 * 16 + 6]);
+        w.setArgb(3, 3, 0xff0000ff);
+        gc.drawImage(picture, 0, 0, 8, 6, 0, 0, 8, 6);
+        gc.drawImage(picture, 0, 0, 8, 6, 0, 0, 8, 6);
+        com.codename1.ui.Image second = com.codename1.ui.Image.createImage(16, 12, 0);
+        twice = new Renderer(second.getGraphics(), 0, 0);
+        twice.concat(2, 0, 0, 2, 0, 0);
+        canvas.cn1Paint(twice);
+        assertEquals(0xffff0000, second.getRGB()[2 * 16 + 2]);
+        assertEquals(0xff0000ff, second.getRGB()[6 * 16 + 6]);
+    }
+
     /// The canvas image is drawn on again and again, and a port may hand
     /// out the one graphics it keeps for an image each time: a clip the
     /// last frame left there must not cut the next one.
