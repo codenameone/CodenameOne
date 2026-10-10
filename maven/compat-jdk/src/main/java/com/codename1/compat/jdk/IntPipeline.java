@@ -285,8 +285,10 @@ final class IntPipeline implements IntStream {
 
     @Override
     public OptionalInt findFirst() {
-        Iterator<Integer> it = boxed.iterator();
-        return it.hasNext() ? OptionalInt.of(it.next()) : OptionalInt.empty();
+        // Through the boxed stream's own, which says that the rest is not
+        // going to be read: a mapped stream left part read is closed.
+        Optional<Integer> first = boxed.findFirst();
+        return first.isPresent() ? OptionalInt.of(first.get()) : OptionalInt.empty();
     }
 
     @Override

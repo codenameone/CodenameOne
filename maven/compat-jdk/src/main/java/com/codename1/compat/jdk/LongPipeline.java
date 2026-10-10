@@ -285,8 +285,10 @@ final class LongPipeline implements LongStream {
 
     @Override
     public OptionalLong findFirst() {
-        Iterator<Long> it = boxed.iterator();
-        return it.hasNext() ? OptionalLong.of(it.next()) : OptionalLong.empty();
+        // Through the boxed stream's own, which says that the rest is not
+        // going to be read: a mapped stream left part read is closed.
+        Optional<Long> first = boxed.findFirst();
+        return first.isPresent() ? OptionalLong.of(first.get()) : OptionalLong.empty();
     }
 
     @Override
