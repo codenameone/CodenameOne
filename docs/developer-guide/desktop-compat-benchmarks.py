@@ -379,7 +379,7 @@ def linux_tables(results):
             table.add(label, cells[0], cells[1], cells[2], show_ratio(first), show_ratio(second))
         if section == "idle":
             table.show(chart(tag, "Linux: memory %g seconds after the first frame" % idle_seconds,
-                             "Bar chart of the resident memory of each application on Linux once it is idle: "
+                             "Bar chart of the resident memory of each idle application on Linux: "
                              "the native build beside the default and the tuned JVM", "MB of RSS",
                              [LABEL[name_of(r)] for r in measured],
                              [(series, [megabytes_of(dig(r, "run", variant, section, "rss_kb"), 1024.0)
