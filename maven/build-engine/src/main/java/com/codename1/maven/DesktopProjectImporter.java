@@ -638,6 +638,16 @@ public final class DesktopProjectImporter {
         return value;
     }
 
+    /// [#resolve] against `pom`, and when the property is not defined there,
+    /// against each of `poms` in turn: a property is inherited too.
+    private static String resolveIn(String value, String pom, List<String> poms) {
+        String v = resolve(value, pom);
+        for (int i = 0; v == null && i < poms.size(); i++) {
+            v = resolve(value, poms.get(i));
+        }
+        return v;
+    }
+
     /// A compiler plugin's own configuration: it wins over the properties.
     private static final Pattern POM_COMPILER = Pattern.compile(
             "<artifactId>\\s*maven-compiler-plugin\\s*</artifactId>(.*?)</plugin>", Pattern.DOTALL);
@@ -745,26 +755,91 @@ public final class DesktopProjectImporter {
         return r.libraries;
     }
 
+    private static final Pattern POM_PARENT = Pattern.compile("<parent>(.*?)</parent>", Pattern.DOTALL);
+    private static final Pattern POM_NO_RELATIVE_PATH = Pattern.compile(
+            "<relativePath\\s*/>|<relativePath>\\s*</relativePath>");
+    /// How many parents up a module's POM is followed: deeper than any real
+    /// build, and an end to two POMs that name each other.
+    private static final int MAX_PARENTS = 12;
+
+    /// The POM of the module in `moduleDir`, then its parent's, then that
+    /// one's, as far as they are files of the source tree: a parent is read
+    /// from where the module says it is (`relativePath`, `../pom.xml` when
+    /// it says nothing), and only when the POM found there is the one the
+    /// module names.
+    ///
+    /// A parent that is not in the tree -- one resolved from a repository,
+    /// as `spring-boot-starter-parent` is -- is not fetched: an import reads
+    /// the files it was given and does not run Maven. It is named in
+    /// [Result#unresolved], since what it declares for its modules is then
+    /// unknown here. Neither are profiles activated or imported BOMs
+    /// expanded; this is the dependencies a POM spells out, not the
+    /// effective model.
+    static List<String> pomChain(File moduleDir, Result r) throws IOException {
+        List<String> chain = new ArrayList<String>();
+        File dir = moduleDir.getAbsoluteFile();
+        String pom = read(new File(dir, "pom.xml"));
+        if (pom.length() == 0) {
+            return chain;
+        }
+        chain.add(pom);
+        for (int depth = 0; depth < MAX_PARENTS; depth++) {
+            Matcher parent = POM_PARENT.matcher(pom);
+            if (!parent.find()) {
+                break;
+            }
+            String named = element(parent.group(1), "groupId") + ":" + element(parent.group(1), "artifactId");
+            String relative = element(parent.group(1), "relativePath");
+            File file = null;
+            // An empty relativePath is how a POM says its parent is not on disk.
+            if (!POM_NO_RELATIVE_PATH.matcher(parent.group(1)).find()) {
+                file = new File(dir, relative == null ? "../pom.xml" : relative);
+                if (file.isDirectory()) {
+                    file = new File(file, "pom.xml");
+                }
+            }
+            String text = file == null ? "" : read(file);
+            // Maven takes the file only when it is the POM asked for.
+            String own = element(POM_PARENT.matcher(text).replaceAll(" "), "artifactId");
+            if (text.length() == 0 || own == null || !own.equals(element(parent.group(1), "artifactId"))) {
+                r.unresolved.add("the parent POM " + named + " is not among the project's files; dependencies it "
+                        + "declares for its modules were not read: add the ones the application needs to its "
+                        + "build by hand");
+                break;
+            }
+            chain.add(text);
+            pom = text;
+            dir = file.getAbsoluteFile().getParentFile();
+        }
+        return chain;
+    }
+
     static void readDependencies(File moduleDir, Result r) throws IOException {
         Set<String> coords = new LinkedHashSet<String>();
         Map<String, String> versions = new java.util.HashMap<String, String>();
         boolean catalog = false;
-        // The module's own build only: what a parent declares for every module
-        // says nothing about what this one uses.
-        String pom = read(new File(moduleDir, "pom.xml"));
-        // Managed versions and plugin dependencies are not the module's.
-        pom = pom.replaceAll("(?s)<dependencyManagement>.*?</dependencyManagement>", " ")
-                .replaceAll("(?s)<build>.*?</build>", " ");
-        Matcher dep = POM_DEPENDENCY.matcher(pom);
-        while (dep.find()) {
-            String group = element(dep.group(1), "groupId");
-            String artifact = element(dep.group(1), "artifactId");
-            if (group != null && artifact != null && !"test".equals(element(dep.group(1), "scope"))) {
-                coords.add(group + ":" + artifact);
-                String version = element(dep.group(1), "version");
-                version = version == null ? null : resolve(version, pom);
-                if (version != null && version.indexOf("${") < 0) {
-                    versions.put(group + ":" + artifact, version);
+        // The module's own POM, then its parents': Maven hands a parent's
+        // <dependencies> down to every module, so they are this module's as
+        // much as the ones it spells out. (Its dependencyManagement is not:
+        // that only says which version a module would get if it asked.)
+        List<String> poms = pomChain(moduleDir, r);
+        for (String text : poms) {
+            // Managed versions and plugin dependencies are not the module's.
+            String pom = text.replaceAll("(?s)<dependencyManagement>.*?</dependencyManagement>", " ")
+                    .replaceAll("(?s)<build>.*?</build>", " ");
+            Matcher dep = POM_DEPENDENCY.matcher(pom);
+            while (dep.find()) {
+                String group = element(dep.group(1), "groupId");
+                String artifact = element(dep.group(1), "artifactId");
+                if (group != null && artifact != null && !"test".equals(element(dep.group(1), "scope"))
+                        && !coords.contains(group + ":" + artifact)) {
+                    // The nearest declaration wins, as it does in Maven.
+                    coords.add(group + ":" + artifact);
+                    String version = element(dep.group(1), "version");
+                    version = version == null ? null : resolveIn(version, pom, poms);
+                    if (version != null && version.indexOf("${") < 0) {
+                        versions.put(group + ":" + artifact, version);
+                    }
                 }
             }
         }
