@@ -3,11 +3,11 @@
 
 from __future__ import annotations
 
-import html
 import json
 import re
 from datetime import datetime, timezone
 from pathlib import Path
+from html.parser import HTMLParser
 from typing import Dict, List
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,6 +19,10 @@ SKIP_PREFIXES = (
     "/categories/",
     "/page/",
     "/developer-guide/single-page/",
+    "/search/",
+    # API types and members have their own identifier index.
+    "/javadoc/",
+    "/backend/javadoc/",
 )
 
 # Cloudflare Pages refuses to deploy a file over 25 MiB, and the index is the text of
@@ -30,39 +34,82 @@ PAGES_FILE_LIMIT = 25 * 1024 * 1024
 PART_BYTES = 8 * 1024 * 1024
 
 WS_RE = re.compile(r"\s+")
-TAG_RE = re.compile(r"<[^>]+>")
 
 
-def clean_html_text(raw: str) -> str:
-    raw = re.sub(r"<script\b[^>]*>.*?</script(?:\s+[^>]*)?>", " ", raw, flags=re.I | re.S)
-    raw = re.sub(r"<style\b[^>]*>.*?</style(?:\s+[^>]*)?>", " ", raw, flags=re.I | re.S)
-    text = TAG_RE.sub(" ", raw)
-    text = html.unescape(text)
-    text = WS_RE.sub(" ", text).strip()
-    return text
+class PageText(HTMLParser):
+    """Read both Hugo's minified attributes and normal HTML without indexing menus."""
+
+    def __init__(self, source):
+        super().__init__()
+        self.stack = []
+        self.date = ""
+        self.redirect = False
+        self.title, self.heading, self.article, self.main, self.fallback = [], [], [], [], []
+        self.feed(source)
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == "meta":
+            if attrs.get("property") in ("article:published_time", "article:modified_time") and not self.date:
+                self.date = attrs.get("content", "")
+            if attrs.get("http-equiv", "").lower() == "refresh":
+                self.redirect = True
+        classes = attrs.get("class", "").split()
+        parent = self.stack[-1][1] if self.stack else set()
+        flags = set(parent)
+        if tag in ("script", "style", "nav", "footer", "aside") or "cn1-guide-toc" in classes:
+            flags.add("skip")
+        if tag == "title":
+            flags.add("title")
+        if tag == "h1" and "post-title" in classes:
+            flags.add("heading")
+        if tag == "article" and "post-single" in classes:
+            flags.add("article")
+        if tag == "main":
+            flags.add("main")
+        if tag not in {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}:
+            self.stack.append((tag, flags))
+
+    def handle_startendtag(self, tag, attrs):
+        self.handle_starttag(tag, attrs)
+        self.handle_endtag(tag)
+
+    def handle_endtag(self, tag):
+        for i in range(len(self.stack) - 1, -1, -1):
+            if self.stack[i][0] == tag:
+                del self.stack[i:]
+                break
+
+    def handle_data(self, data):
+        flags = self.stack[-1][1] if self.stack else set()
+        if "skip" in flags:
+            return
+        self.fallback.append(data)
+        for name in ("title", "heading", "article", "main"):
+            if name in flags:
+                getattr(self, name).append(data)
+
+    @staticmethod
+    def text(parts):
+        return WS_RE.sub(" ", " ".join(parts)).strip()
 
 
 def extract_title(html_doc: str) -> str:
-    m = re.search(r"<h1\b[^>]*class=\"[^\"]*post-title[^\"]*\"[^>]*>(.*?)</h1>", html_doc, flags=re.I | re.S)
-    if m:
-        return clean_html_text(m.group(1))
-
-    m = re.search(r"<title>(.*?)</title>", html_doc, flags=re.I | re.S)
-    if m:
-        title = clean_html_text(m.group(1))
-        title = re.sub(r"\s*\|\s*Codename One\s*$", "", title)
-        return title
-
-    return "Untitled"
+    page = PageText(html_doc)
+    return page.text(page.heading) or re.sub(r"\s*\|\s*Codename One\s*$", "", page.text(page.title)) or "Untitled"
 
 
 def extract_main_content(html_doc: str) -> str:
-    m = re.search(r"<article\b[^>]*class=\"[^\"]*post-single[^\"]*\"[^>]*>(.*?)</article>", html_doc, flags=re.I | re.S)
-    chunk = m.group(1) if m else html_doc
+    page = PageText(html_doc)
+    return page.text(page.article or page.main or page.fallback)
 
-    chunk = re.sub(r"<nav\b[^>]*>.*?</nav>", " ", chunk, flags=re.I | re.S)
-    chunk = re.sub(r"<footer\b[^>]*>.*?</footer>", " ", chunk, flags=re.I | re.S)
-    return clean_html_text(chunk)
+
+def search_section(url: str) -> str:
+    if url.startswith("/developer-guide/"):
+        return "guide"
+    if url.startswith("/blog/"):
+        return "blog"
+    return "site"
 
 
 DATE_META_RE = re.compile(
@@ -106,9 +153,12 @@ def build_index() -> Dict[str, object]:
             continue
 
         doc = html_file.read_text(encoding="utf-8", errors="ignore")
-        title = extract_title(doc)
-        content = extract_main_content(doc)
-        date = extract_date(doc)
+        page = PageText(doc)
+        if page.redirect:
+            continue
+        title = page.text(page.heading) or re.sub(r"\s*\|\s*Codename One\s*$", "", page.text(page.title)) or "Untitled"
+        content = page.text(page.article or page.main or page.fallback)
+        date = page.date or extract_date(doc)
 
         if not content or len(content) < 80:
             continue
@@ -118,6 +168,7 @@ def build_index() -> Dict[str, object]:
                 "title": title,
                 "url": url,
                 "date": date,
+                "section": search_section(url),
                 "content": content,
             }
         )

@@ -20,7 +20,7 @@ covering all of those options from startup splash screen configuration to servle
 a ready to deploy WAR file which should make setting this up on any Java servlet container a nobrainer. 
 
 During our work on the developer guide for 3.0 we updated the  
-[build hints section](/developer-guide/advanced-topics-under-the-hood/#_sending_arguments_to_the_build_server) with many\
+[build hints section](/developer-guide/build-hints/#_sending_arguments_to_the_build_server) with many\
 previously undocumented hints and also updated the  
 [theme constants section](/developer-guide/advanced-theming/#theme-constants-section) in a similar way.\
 Hopefully, this will allow us to keep them up to date more easily as we add them in the future. This week  

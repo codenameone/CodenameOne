@@ -1,7 +1,7 @@
 {{ define "main" }}
 <div class="cn1-guide-layout">
   {{ partial "guide-sidebar.html" . }}
-  <article class="post-single cn1-guide-chapter">
+  <article class="post-single cn1-guide-chapter{{ if eq .Params.guide_id "_build_hints_reference" }} cn1-build-hints{{ end }}">
     {{ partial "guide-pagination.html" (dict "page" . "position" "top") }}
     <header class="post-header">
       <nav class="cn1-guide-crumbs" aria-label="Breadcrumb"><a href="/developer-guide/">Developer Guide</a> / {{ .Params.guide_group }}</nav>

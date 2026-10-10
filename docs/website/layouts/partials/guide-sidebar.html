@@ -5,7 +5,8 @@
       <a class="cn1-guide-home" href="/developer-guide/">Developer Guide</a>
       <div class="cn1-guide-sidebar-tools">
         <a href="/developer-guide/" {{ if eq .Layout "guide-index" }}aria-current="page"{{ end }}>Contents</a>
-        <a href="/search/">Search documentation</a>
+        <a href="/developer-guide/build-hints/">Build hints reference</a>
+        <a href="/search/?scope=guide">Search Developer Guide</a>
       </div>
       {{ $page := . }}
       {{ range index site.Data "developer-guide" }}

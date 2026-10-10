@@ -1,0 +1,36 @@
+{{- define "main" -}}
+<article class="post-single cn1-search-page">
+  <header class="post-header">
+    {{ partial "breadcrumbs.html" . }}
+    <h1 class="post-title entry-hint-parent">{{ .Title }}</h1>
+    <div class="post-description">Search the Developer Guide, Javadocs, blog, and the rest of the site.</div>
+  </header>
+  <section class="cn1-search-shell">
+    <nav class="cn1-search-scopes" aria-label="Search in">
+      <a href="/search/?scope=all" data-search-scope="all" aria-current="page">Entire site</a>
+      <a href="/search/?scope=guide" data-search-scope="guide">Developer Guide</a>
+      <a href="/search/?scope=javadoc" data-search-scope="javadoc">Javadocs</a>
+      <a href="/search/?scope=blog" data-search-scope="blog">Blog</a>
+    </nav>
+    <label class="cn1-search-label" for="cn1-search-input">Search</label>
+    <input id="cn1-search-input" class="cn1-search-input" type="search" placeholder="Try: build hints, BorderLayout, push notifications" autocomplete="off" />
+    <p class="cn1-search-note">Matching Developer Guide chapters and API references appear first. Javadocs include client and backend types and members.</p>
+    <p class="cn1-search-status" id="cn1-search-status" role="status" aria-live="polite">Loading search index…</p>
+    <section id="cn1-search-guide" hidden aria-labelledby="cn1-search-guide-title">
+      <h2 class="cn1-search-group-title" id="cn1-search-guide-title">Developer Guide</h2>
+      <div class="cn1-search-results" id="cn1-search-guide-results"></div>
+    </section>
+    <section class="cn1-search-api" id="cn1-search-api" hidden aria-labelledby="cn1-search-api-title">
+      <h2 class="cn1-search-group-title" id="cn1-search-api-title">Javadocs</h2>
+      <div class="cn1-search-api__results" id="cn1-search-api-results"></div>
+    </section>
+    <section id="cn1-search-pages" hidden aria-labelledby="cn1-search-pages-title">
+      <h2 class="cn1-search-group-title" id="cn1-search-pages-title">Site pages and blog</h2>
+      <div class="cn1-search-results" id="cn1-search-results"></div>
+    </section>
+  </section>
+</article>
+<script defer src="https://cdn.jsdelivr.net/npm/lunr@2.3.9/lunr.min.js"></script>
+{{ $search := resources.Get "js/cn1-search.js" | minify | fingerprint }}
+<script defer src="{{ $search.RelPermalink }}"></script>
+{{- end -}}

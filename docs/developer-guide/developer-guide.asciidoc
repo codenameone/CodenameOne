@@ -233,6 +233,8 @@ include::On-Device-Debugging-Android.asciidoc[]
 
 = Build, sign and ship
 
+include::Build-Hints.asciidoc[]
+
 include::signing.asciidoc[]
 
 include::App-Store-Submission.asciidoc[]
