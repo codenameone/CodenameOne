@@ -54,7 +54,43 @@ class CaseResult:
     error: str | None = None
 
 
+# Cover both the canonical catalog path and the path used by released Settings.
+# Keep final remote downloads out of CI; these cases exercise our routing layer.
+CN1LIB_DOWNLOAD_CASES = [
+    Case(
+        source=source,
+        expected_status=302,
+        expected_target=(
+            "https://github.com/codenameone/CodenameOneLibs/raw/refs/heads/master/"
+            "cn1libs/" + filename
+        ),
+        label="cn1lib-download",
+    )
+    for source, filename in [
+        ("/files/CN1JSON.cn1lib", "CN1JSON.cn1lib"),
+        ("/files/cn1libs/CN1JSON.cn1lib", "CN1JSON.cn1lib"),
+        ("/files/CN1JSON.cn1lib?download=1", "CN1JSON.cn1lib?download=1"),
+        ("/files/BouncyCastleCN1Lib.cn1lib", "BouncyCastleCN1Lib.cn1lib"),
+        ("/files/cn1libs/BouncyCastleCN1Lib.cn1lib", "BouncyCastleCN1Lib.cn1lib"),
+    ]
+]
+
+
+# Existing directory routes must win even for a library-shaped filename.
+DOWNLOAD_FOLDER_CASES = [
+    Case(
+        source=f"/files/{folder}/probe.cn1lib",
+        expected_status=302,
+        expected_target=f"https://download.codenameone.com/files/{folder}/probe.cn1lib",
+        label="download-folder",
+    )
+    for folder in ("updates", "pr", "eclipse", "netbeans", "uber-book", "kitchensink", "Themes")
+]
+
+
 REQUIRED_CASES = [
+    *CN1LIB_DOWNLOAD_CASES,
+    *DOWNLOAD_FOLDER_CASES,
     Case(
         source="/android-compatibility-demo/",
         expected_status=200,
