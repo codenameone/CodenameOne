@@ -2853,6 +2853,7 @@ JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
         threadStateData->blocks[threadStateData->tryBlockOffset].monitor = 0;
         threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass = 0; // catch-all
         threadStateData->blocks[threadStateData->tryBlockOffset].nativeBuffers = threadStateData->nativeBuffers;
+        threadStateData->blocks[threadStateData->tryBlockOffset].builderAccess = threadStateData->builderAccess;
         memcpy(threadStateData->blocks[threadStateData->tryBlockOffset].destination, __gcTryJmp, sizeof(jmp_buf));
         threadStateData->tryBlockOffset++;
 #ifdef CN1_GC_INSTRUMENT

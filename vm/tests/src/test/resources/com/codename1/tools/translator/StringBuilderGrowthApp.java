@@ -24,12 +24,18 @@
  * StringBuilder remains an unsynchronized Java API; this pins native memory safety. */
 public class StringBuilderGrowthApp {
     private static volatile boolean start;
+    private static volatile boolean leftReady, rightReady;
     private static volatile Throwable failure;
     private static StringBuilder builder;
     private static final String TEXT = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ\n";
     private static final int APPENDS = 1000;
 
     public static void main(String[] args) throws Exception {
+        if (args.length != 0 && "monitors".equals(args[0])) {
+            externalMonitorCopies();
+            System.out.println("BUILDER_MONITORS_OK");
+            return;
+        }
         for (int round = 0; round < 16; round++) {
             final int mode = round % 8;
             final String token = token(mode);
@@ -71,6 +77,7 @@ public class StringBuilderGrowthApp {
         }
         mixedGrowth();
         oppositeCopies();
+        externalMonitorCopies();
         exceptionsReleaseAccess();
         System.out.println("BUILDER_GROWTH_OK: 16 growth rounds, snapshots, bidirectional copies, exception cleanup");
     }
@@ -132,6 +139,30 @@ public class StringBuilderGrowthApp {
         check(left.length() == 6012, "self append");
     }
 
+    private static void externalMonitorCopies() throws Exception {
+        final StringBuilder left = new StringBuilder("abcdef");
+        final StringBuilder right = new StringBuilder("abcdef");
+        leftReady = rightReady = false;
+        parallel(new Runnable[] {
+            new Runnable() { public void run() {
+                synchronized (left) {
+                    leftReady = true;
+                    while (!rightReady) Thread.yield();
+                    left.append(right, 0, 6);
+                }
+            }},
+            new Runnable() { public void run() {
+                synchronized (right) {
+                    rightReady = true;
+                    while (!leftReady) Thread.yield();
+                    right.append(left, 0, 6);
+                }
+            }}
+        });
+        check("abcdefabcdef".equals(left.toString()), "left public monitor copy");
+        check("abcdefabcdef".equals(right.toString()), "right public monitor copy");
+    }
+
     private static void exceptionsReleaseAccess() throws Exception {
         builder = new StringBuilder("safe");
         try { builder.charAt(-1); throw new AssertionError("missing index exception"); }
@@ -140,7 +171,7 @@ public class StringBuilderGrowthApp {
         catch (NullPointerException expected) { }
         try { builder.getChars(0, 4, new char[1], 0); throw new AssertionError("missing destination exception"); }
         catch (IndexOutOfBoundsException expected) { }
-        // A leaked reentrant monitor is invisible on this thread; another must enter.
+        // A leaked reentrant lock is invisible on this thread; another must enter.
         parallel(new Runnable[] { new Runnable() { public void run() { builder.append("!"); }} });
         check("safe!".equals(builder.toString()), "lock retained after exception");
     }
