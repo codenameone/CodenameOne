@@ -713,7 +713,13 @@ public final class Renderer {
         }
         int old = g.getAlpha();
         g.setAlpha(alpha(old, 255));
-        if (straight || !g.isTransformSupported()) {
+        if ((straight || !g.isTransformSupported()) && pw == image.getWidth() && ph == image.getHeight()) {
+            // At its own size there is nothing to scale. Asking for the
+            // size all the same makes a port that cannot draw an image at
+            // a size copy it first -- the native Linux port does -- and a
+            // canvas image is as large as the window and drawn every frame.
+            g.drawImage(image, left, top);
+        } else if (straight || !g.isTransformSupported()) {
             g.drawImage(image, left, top, pw, ph);
         } else {
             Transform before = Transform.makeIdentity();
