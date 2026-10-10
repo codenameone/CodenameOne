@@ -43,11 +43,25 @@ public class HeadlessImplementation extends CodenameOneImplementation {
     private static final L10NManager L10N = new L10NManager("en", "US") {
     };
 
-    /// Starts Codename One on this implementation once per test JVM (the
-    /// test ImplementationFactory creates it).
+    /// Starts Codename One on this implementation once per test JVM.
+    ///
+    /// The factory is set here and not left to the class path. A module whose
+    /// tests also carry a port, as the build engine's carry the JavaSE port,
+    /// has two classes named `ImplementationFactory`, and which of them the
+    /// loader finds first is the order of the class path: with the port's
+    /// first, a test asking for no screen opened a window, and failed where
+    /// there is no display to open it on.
     public static synchronized void install() {
         if (!Display.isInitialized()) {
+            com.codename1.impl.ImplementationFactory.setInstance(new HeadlessFactory());
             Display.init(null);
+        }
+    }
+
+    private static final class HeadlessFactory extends com.codename1.impl.ImplementationFactory {
+        @Override
+        public Object createImplementation() {
+            return new HeadlessImplementation();
         }
     }
 
