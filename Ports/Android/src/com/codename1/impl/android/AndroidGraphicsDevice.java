@@ -330,10 +330,17 @@ class AndroidGraphicsDevice extends GraphicsDevice {
             GLES20.glDisable(GLES20.GL_BLEND);
         } else {
             GLES20.glEnable(GLES20.GL_BLEND);
+            // The alpha channel accumulates coverage rather than being
+            // weighted by itself, so an opaque frame stays opaque
+            // (RenderState.BlendMode's contract). The default surface has no
+            // alpha channel and showed nothing of this; one that does -- a
+            // translucent surface, a frame read back -- would have.
             if (blend == RenderState.BlendMode.ADDITIVE) {
-                GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE);
+                GLES20.glBlendFuncSeparate(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE,
+                        GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_ALPHA);
             } else {
-                GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
+                GLES20.glBlendFuncSeparate(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA,
+                        GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_ALPHA);
             }
         }
 

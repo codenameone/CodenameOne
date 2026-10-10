@@ -7,6 +7,13 @@ on:
       - '.github/workflows/parparvm-tests.yml'
       - 'vm/**'
       - 'Ports/JavaScriptPort/**'
+      # GpuBlendContractTest reads each GPU backend's blend factors out of its
+      # source; a change to one of these alone must still run it.
+      - 'Ports/LinuxPort/nativeSources/cn1_linux_gl.c'
+      - 'Ports/iOSPort/nativeSources/CN1GL3D.m'
+      - 'Ports/WindowsPort/nativeSources/cn1_windows_d3d.cpp'
+      - 'Ports/Android/src/com/codename1/impl/android/AndroidGraphicsDevice.java'
+      - 'Ports/JavaSE/src/com/codename1/impl/javase/JavaSEGLDevice.java'
       # The GENERATOR, because the translated backend tests run what it writes:
       # a change to the @Entity processor or BackendPackageMojo alone reaches
       # PostgreSQL and MySQL through the daos it generates, and this is the only
@@ -59,6 +66,13 @@ on:
       - '.github/workflows/parparvm-tests.yml'
       - 'vm/**'
       - 'Ports/JavaScriptPort/**'
+      # GpuBlendContractTest reads each GPU backend's blend factors out of its
+      # source; a change to one of these alone must still run it.
+      - 'Ports/LinuxPort/nativeSources/cn1_linux_gl.c'
+      - 'Ports/iOSPort/nativeSources/CN1GL3D.m'
+      - 'Ports/WindowsPort/nativeSources/cn1_windows_d3d.cpp'
+      - 'Ports/Android/src/com/codename1/impl/android/AndroidGraphicsDevice.java'
+      - 'Ports/JavaSE/src/com/codename1/impl/javase/JavaSEGLDevice.java'
       # The GENERATOR, because the translated backend tests run what it writes:
       # a change to the @Entity processor or BackendPackageMojo alone reaches
       # PostgreSQL and MySQL through the daos it generates, and this is the only

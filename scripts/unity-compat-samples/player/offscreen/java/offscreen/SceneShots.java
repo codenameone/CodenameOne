@@ -58,6 +58,9 @@ import javax.imageio.ImageIO;
 /// - `UnityRuntime.reset()` leaves nothing of a scene for the next one: no
 ///   object is left, and the clock is back at zero.
 ///
+/// And one thing of the renderer, in a scene named `Canvas` (the gallery's):
+/// its panel, black at 40%, leaves six tenths of the background.
+///
 /// ```
 /// SceneShots [--seed n] [--frames n] [--size WxH] [--png dir] [--twice]
 /// ```
@@ -137,6 +140,30 @@ public final class SceneShots {
         return n;
     }
 
+    /// The canvas scene's panel is black at 40% over the whole view: where
+    /// it is, six tenths of the camera's background are left, whatever the
+    /// background is. A check of the arithmetic, apart from any golden: a
+    /// port whose capture of this scene differs there blends differently
+    /// from `RenderState.BlendMode`'s contract (two did -- the frame's
+    /// alpha was weighted by itself and what was behind the view showed
+    /// through the panel).
+    ///
+    /// The panel is inset from the edges of the screen, so the background
+    /// is read at the left edge and the panel a quarter of the way in, a
+    /// third of the way down, which no child of the panel covers.
+    private static void checkCanvasPanel(BufferedImage image) {
+        int background = image.getRGB(3, image.getHeight() / 2);
+        int panel = image.getRGB(image.getWidth() / 4, image.getHeight() / 3);
+        check((background & 0xffffff) != 0, "Canvas: the background at the left edge is black, so the panel's"
+                + " tint cannot be told from it");
+        for (int shift = 16; shift >= 0; shift -= 8) {
+            int b = (background >> shift) & 0xff;
+            int p = (panel >> shift) & 0xff;
+            check(Math.abs(p - 0.6f * b) <= 1f, "Canvas: the panel is black at 40%, so channel " + (2 - shift / 8)
+                    + " should be 0.6 * " + b + " and is " + p);
+        }
+    }
+
     private static int run(String[] args) throws Exception {
         int seed = 1;
         int frames = 90;
@@ -193,6 +220,9 @@ public final class SceneShots {
                         ImageIO.write(image, "png", new File(png, names[i] + ".png"));
                     }
                     System.out.println("scene " + names[i] + " frame=" + frames + " ink=" + ink(image));
+                    if (names[i].equals("Canvas")) {
+                        checkCanvasPanel(image);
+                    }
                 } else {
                     check(same(first[i], image), names[i] + ": run again after the other scenes, it shows another image");
                 }

@@ -527,13 +527,17 @@ class JavaSESoftwareDevice extends GraphicsDevice {
         int dr = (dst >> 16) & 0xff;
         int dg = (dst >> 8) & 0xff;
         int db = dst & 0xff;
-        if (additive) {
-            return (0xff << 24)
-                    | (clamp255(dr + sr) << 16)
-                    | (clamp255(dg + sg) << 8)
-                    | clamp255(db + sb);
-        }
         float sa = srcAlpha;
+        if (additive) {
+            // The light added is weighted by the source alpha, as on every
+            // GPU backend (source factor SRC_ALPHA, destination ONE): a
+            // particle fading out adds less and less. Unweighted, it stayed
+            // at full strength here until the frame it vanished.
+            return (0xff << 24)
+                    | (clamp255((int) (dr + sr * sa + 0.5f)) << 16)
+                    | (clamp255((int) (dg + sg * sa + 0.5f)) << 8)
+                    | clamp255((int) (db + sb * sa + 0.5f));
+        }
         float ia = 1.0f - sa;
         int rr = clamp255((int) (sr * sa + dr * ia + 0.5f));
         int rg = clamp255((int) (sg * sa + dg * ia + 0.5f));

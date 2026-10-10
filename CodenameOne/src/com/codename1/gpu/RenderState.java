@@ -14,12 +14,27 @@ package com.codename1.gpu;
 /// geometry (depth test and write on, no blending, back faces culled).
 public final class RenderState {
     /// The alpha blending mode applied when a fragment is written.
+    ///
+    /// A fragment's color is a material's color multiplied by its texture, in
+    /// straight (not premultiplied) alpha: a material colored `0x66000000` over
+    /// a white texture is black at 40%, and drawn with `ALPHA` over an opaque
+    /// destination `d` it leaves `0.6 * d`.
+    ///
+    /// The framebuffer's own alpha channel is not blended the way its color
+    /// is. In both blending modes it accumulates coverage,
+    /// `alpha = source + destination * (1 - source)`, so a frame cleared to an
+    /// opaque color stays opaque whatever is blended onto it. A backend that
+    /// weights the alpha by the same factor as the color leaves `0.76` under a
+    /// fragment at 40%, and where the frame is composited or read back with
+    /// its alpha, what is behind the view shows through the fragment.
     public enum BlendMode {
         /// No blending; the fragment overwrites the destination.
         NONE,
-        /// Standard source-over alpha blending.
+        /// Standard source-over alpha blending:
+        /// `color = source * sourceAlpha + destination * (1 - sourceAlpha)`.
         ALPHA,
-        /// Additive blending, useful for particles and glows.
+        /// Additive blending, useful for particles and glows:
+        /// `color = source * sourceAlpha + destination`.
         ADDITIVE
     }
 

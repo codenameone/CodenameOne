@@ -311,10 +311,17 @@ class JavaSEGLDevice extends GraphicsDevice {
             gl.glDisable(GL2ES2.GL_BLEND);
         } else {
             gl.glEnable(GL2ES2.GL_BLEND);
+            // The alpha channel accumulates coverage rather than being
+            // weighted by itself, so an opaque frame stays opaque
+            // (RenderState.BlendMode's contract). The frame is read back
+            // with its alpha and painted over the form: with one glBlendFunc
+            // a 40% quad left 0.76 there and the form showed through it.
             if (blend == RenderState.BlendMode.ADDITIVE) {
-                gl.glBlendFunc(GL2ES2.GL_SRC_ALPHA, GL2ES2.GL_ONE);
+                gl.glBlendFuncSeparate(GL2ES2.GL_SRC_ALPHA, GL2ES2.GL_ONE,
+                        GL2ES2.GL_ONE, GL2ES2.GL_ONE_MINUS_SRC_ALPHA);
             } else {
-                gl.glBlendFunc(GL2ES2.GL_SRC_ALPHA, GL2ES2.GL_ONE_MINUS_SRC_ALPHA);
+                gl.glBlendFuncSeparate(GL2ES2.GL_SRC_ALPHA, GL2ES2.GL_ONE_MINUS_SRC_ALPHA,
+                        GL2ES2.GL_ONE, GL2ES2.GL_ONE_MINUS_SRC_ALPHA);
             }
         }
 
