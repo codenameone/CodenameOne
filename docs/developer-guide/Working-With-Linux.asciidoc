@@ -132,7 +132,7 @@ variable.
 |===
 
 The full cross-platform build-hints reference is in the
-link:#_sending_arguments_to_the_build_server[Advanced topics chapter].
+link:#_build_hints_reference[Build hints reference chapter].
 
 === Optimized and stripped by default
 
