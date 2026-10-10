@@ -83,6 +83,7 @@ public abstract class Component implements ImageObserver {
     private boolean valid;
     private boolean displayable;
     private boolean focusable = true;
+    private boolean focusableSet;
     /// Whether the peer took the focus when it was made, which is what
     /// it goes back to when this component is made focusable again.
     private boolean peerTakesFocus;
@@ -255,6 +256,22 @@ public abstract class Component implements ImageObserver {
             return true;
         }
         return peer instanceof Peer && ((Peer) peer).nativeLook() && peer.isFocusable();
+    }
+
+    /// Whether a window that opens may make this component its focus
+    /// owner: it is shown by a widget that takes the focus, or the
+    /// application said it is focusable.
+    ///
+    /// That is narrower than [#cn1FocusTraversable], as it is on the
+    /// desktop. A component the application draws is passed over there
+    /// unless `setFocusable` was called for it, whatever listens to it:
+    /// a panel with a key listener and nothing more leaves the keys with
+    /// the window.
+    public boolean cn1TakesInitialFocus() {
+        if (peer instanceof Peer && ((Peer) peer).nativeLook() && peer.isFocusable()) {
+            return true;
+        }
+        return focusableSet && focusable;
     }
 
     /// Gives the peer the pointer shape this component has, its own or
@@ -788,6 +805,7 @@ public abstract class Component implements ImageObserver {
     public void setFocusable(boolean focusable) {
         boolean old = this.focusable;
         this.focusable = focusable;
+        focusableSet = true;
         // The widget that shows a component takes the focus of the form
         // by itself, when the form is shown or the tab key is pressed, and
         // draws itself as the one chosen: one that is not focusable must

@@ -175,6 +175,7 @@ public class Window extends Container {
             if (f != null && isAncestorOf(f) && f.isDisplayable()) {
                 f.requestFocusInWindow();
             }
+            cn1InitialFocus();
         } else {
             Component f = EventBridge.focusOwner();
             if (f != null && (f == this || isAncestorOf(f))) {
@@ -183,6 +184,41 @@ public class Window extends Container {
             }
             dispatchEvent(new WindowEvent(this, WindowEvent.WINDOW_LOST_FOCUS, opposite));
             dispatchEvent(new WindowEvent(this, WindowEvent.WINDOW_DEACTIVATED, opposite));
+        }
+    }
+
+    /// Gives the keyboard focus to the component the traversal policy
+    /// names first, when nothing in this window has it.
+    ///
+    /// A window that becomes the focused one hands the focus to its
+    /// initial component. The form did that by itself for a component a
+    /// widget shows -- a button, a text field -- because the widget takes
+    /// the focus of the form. A component the application draws has no
+    /// such widget: a panel made focusable with a key listener, which is
+    /// how a game reads its keys, never became the focus owner, the keys
+    /// went to the window, and the game could not be played on any port.
+    /// See [Component#cn1TakesInitialFocus] for which components count.
+    private void cn1InitialFocus() {
+        Component f = EventBridge.focusOwner();
+        if (f != null && (f == this || isAncestorOf(f))) {
+            return;
+        }
+        FocusTraversalPolicy p = getFocusTraversalPolicy();
+        if (p == null) {
+            p = KeyboardFocusManager.getCurrentKeyboardFocusManager().getDefaultFocusTraversalPolicy();
+        }
+        Component first = p == null ? null : p.getInitialComponent(this);
+        Component c = first;
+        // The policy offers every component a key may be meant for, in
+        // order; the first of them a window may open on is the one.
+        for (int i = 0; c != null && c != this && i < 10000; i++) {
+            if (c.cn1TakesInitialFocus() && c.requestFocusInWindow()) {
+                return;
+            }
+            c = p.getComponentAfter(this, c);
+            if (c == first) {
+                return;
+            }
         }
     }
 

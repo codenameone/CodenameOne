@@ -27,12 +27,18 @@ import static org.junit.Assert.assertTrue;
 
 import com.codename1.compat.testing.HeadlessImplementation;
 import com.codename1.compat.testing.MainThreadRule;
+import com.codename1.desktopcompat.java.awt.BorderLayout;
 import com.codename1.desktopcompat.java.awt.FlowLayout;
 import com.codename1.desktopcompat.java.awt.event.ActionEvent;
 import com.codename1.desktopcompat.java.awt.event.ActionListener;
+import com.codename1.desktopcompat.java.awt.event.KeyAdapter;
+import com.codename1.desktopcompat.java.awt.event.KeyEvent;
 import com.codename1.desktopcompat.javax.swing.JButton;
 import com.codename1.desktopcompat.javax.swing.JCheckBox;
 import com.codename1.desktopcompat.javax.swing.JFrame;
+import com.codename1.desktopcompat.javax.swing.JLabel;
+import com.codename1.desktopcompat.javax.swing.JPanel;
+import com.codename1.ui.Display;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.After;
@@ -166,5 +172,34 @@ public class PortKeyboardTest extends WindowsTestBase {
         assertTrue(c.requestFocusInWindow());
         key(f, 10);
         assertEquals("[ok]", seen.toString());
+    }
+
+    /// A game draws its board on a panel, makes the panel focusable and
+    /// reads the keyboard with a key listener on it. Nothing asks for the
+    /// focus: the window gives it to its first component when it opens.
+    @Test
+    public void aFocusablePanelWithAKeyListenerGetsTheKeysOfItsWindow() {
+        JFrame f = new JFrame("game");
+        JPanel board = new JPanel();
+        board.setFocusable(true);
+        board.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
+                seen.add(String.valueOf(e.getKeyCode()));
+            }
+        });
+        f.add(new JLabel(" 0"), BorderLayout.SOUTH);
+        f.add(board);
+        f.setSize(200, 400);
+        show(f);
+        assertTrue("the board is the focus owner of the window it opened in", board.isFocusOwner());
+        Display d = Display.getInstance();
+        key(f, d.getKeyCode(Display.GAME_LEFT));
+        key(f, d.getKeyCode(Display.GAME_RIGHT));
+        key(f, d.getKeyCode(Display.GAME_UP));
+        key(f, d.getKeyCode(Display.GAME_DOWN));
+        key(f, ' ');
+        assertEquals("[" + KeyEvent.VK_LEFT + ", " + KeyEvent.VK_RIGHT + ", " + KeyEvent.VK_UP + ", "
+                + KeyEvent.VK_DOWN + ", " + KeyEvent.VK_SPACE + "]", seen.toString());
     }
 }
