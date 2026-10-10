@@ -82,11 +82,33 @@ final class PathImpl implements Path {
         if (scheme == null || !"file".equalsIgnoreCase(scheme)) {
             throw new IllegalArgumentException("URI scheme is not \"file\"");
         }
+        // Only what names a file on this device is a path, as in the JDK:
+        // a host, a query or a fragment is not dropped, it is refused, so
+        // that file://server/share/x does not quietly become /share/x.
+        if (uri.isOpaque()) {
+            throw new IllegalArgumentException("URI is not hierarchical");
+        }
+        if (present(uri.getRawAuthority())) {
+            throw new IllegalArgumentException("URI has an authority component");
+        }
+        if (present(uri.getRawFragment())) {
+            throw new IllegalArgumentException("URI has a fragment component");
+        }
+        if (present(uri.getRawQuery())) {
+            throw new IllegalArgumentException("URI has a query component");
+        }
         String p = uri.getPath();
         if (p == null || p.length() == 0) {
             throw new IllegalArgumentException("URI has no path component");
         }
         return of(p);
+    }
+
+    /// Whether a URI has the component. An empty one counts as none: the
+    /// device's `URI` answers an empty authority for `file:///x`, where the
+    /// JDK's answers null.
+    private static boolean present(String component) {
+        return component != null && component.length() > 0;
     }
 
     /// How many leading characters are the root: one for `/`, the scheme and
