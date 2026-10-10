@@ -170,6 +170,54 @@ class VectorImageTest {
     }
 
     @Test
+    void anEmbeddedStylesheetColoursTheShapesOfItsClasses() throws Exception {
+        BufferedImage img = paint("<style>.st0{fill:#ff0000;} /* a note; */ .st1 { fill: #0000ff }</style>"
+                + "<rect class=\"st0\" x=\"0\" y=\"0\" width=\"50\" height=\"100\"/>"
+                + "<rect class=\"big st1\" x=\"50\" y=\"0\" width=\"50\" height=\"100\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(25, 50));
+        assertEquals(0xff0000ff, img.getRGB(75, 50));
+    }
+
+    @Test
+    void aStylesheetAfterTheShapesStillApplies() throws Exception {
+        BufferedImage img = paint("<rect id=\"box\" width=\"100\" height=\"100\"/>"
+                + "<defs><style type=\"text/css\"><![CDATA[ #box { fill: #00ff00; } ]]></style></defs>", 100, 100);
+        assertEquals(0xff00ff00, img.getRGB(50, 50));
+    }
+
+    @Test
+    void stylesheetRulesFollowTheCascade() throws Exception {
+        String sheet = "<style>"
+                + "rect { fill: #0000ff; }"
+                + ".a { fill: #ff0000; }"
+                + "g.grp > .b { fill: #00ff00; }"
+                + ".c:hover { fill: #ffffff; }"
+                + "@media print { .a { fill: #ffffff; } }"
+                + ".e { fill: #ffff00 !important; }"
+                + "</style>";
+        BufferedImage img = paint(sheet
+                + "<rect class=\"a\" x=\"0\" width=\"20\" height=\"100\" fill=\"#000000\"/>"
+                + "<g class=\"grp\"><rect class=\"b\" x=\"20\" width=\"20\" height=\"100\"/></g>"
+                + "<rect class=\"b c\" x=\"40\" width=\"20\" height=\"100\"/>"
+                + "<rect class=\"a\" x=\"60\" width=\"20\" height=\"100\" style=\"fill:#00ffff\"/>"
+                + "<rect class=\"e\" x=\"80\" width=\"20\" height=\"100\" style=\"fill:#00ffff\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(10, 50), "a class beats a type and an attribute");
+        assertEquals(0xff00ff00, img.getRGB(30, 50), "a child of the group");
+        assertEquals(0xff0000ff, img.getRGB(50, 50), "not a child of the group, and no pseudo-class");
+        assertEquals(0xff00ffff, img.getRGB(70, 50), "the element's own style beats the stylesheet");
+        assertEquals(0xffffff00, img.getRGB(90, 50), "unless the rule is important");
+    }
+
+    @Test
+    void aGradientStopTakesItsColourFromTheStylesheet() throws Exception {
+        BufferedImage img = paint("<style>.s0{stop-color:#ff0000} .s1{stop-color:#ff0000}</style>"
+                + "<defs><linearGradient id=\"g\"><stop class=\"s0\" offset=\"0\"/>"
+                + "<stop class=\"s1\" offset=\"1\"/></linearGradient></defs>"
+                + "<rect width=\"100\" height=\"100\" fill=\"url(#g)\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(50, 50));
+    }
+
+    @Test
     void aUseThatNamesItselfDrawsNothingAndEnds() throws Exception {
         BufferedImage img = paint("<g id=\"loop\"><use href=\"#loop\"/></g>", 20, 20);
         assertEquals(0, alpha(img, 10, 10));

@@ -128,6 +128,9 @@ public final class BorderPainter {
                 | Pixels.clamp8(b * m * 255f);
     }
 
+    /// The most pixels the borders are worked out for at a time.
+    static final int MAX_BAND_PIXELS = 1 << 20;
+
     /// Paints the borders.
     ///
     /// #### Parameters
@@ -144,6 +147,12 @@ public final class BorderPainter {
     ///
     /// - `widths`: the effective widths, from [#effectiveWidths(BorderSide[], double, double)]
     public static void paint(int[] dst, int w, int h, RoundedBox outer, BorderSide[] sides, double[] widths) {
+        paint(dst, w, h, outer, sides, widths, MAX_BAND_PIXELS);
+    }
+
+    /// Paints the borders, working out at most `bandPixels` pixels at a time.
+    static void paint(int[] dst, int w, int h, RoundedBox outer, BorderSide[] sides, double[] widths,
+            int bandPixels) {
         boolean any = false;
         boolean uniform = true;
         int color = 0;
@@ -162,13 +171,33 @@ public final class BorderPainter {
             return;
         }
         RoundedBox inner = outer.inset(widths[TOP], widths[RIGHT], widths[BOTTOM], widths[LEFT]);
-        float[] ring = Pixels.coverage(RoundedBox.ring(outer, inner), w, h, 0, 0);
+        // A band at a time: mixed borders keep some ten planes of floats
+        // per pixel while they are worked out, which for an image near the
+        // size the rasterizer accepts is several gigabytes. The shapes are
+        // the same for every band, only moved up, so the result is too.
+        int bandRows = Math.max(1, bandPixels / Math.max(1, w));
+        for (int y0 = 0; y0 < h; y0 += bandRows) {
+            paintBand(dst, w, h, y0, Math.min(bandRows, h - y0), outer, inner, sides, widths, uniform, color);
+        }
+    }
+
+    /// Paints rows `y0` to `y0 + rows` of the borders.
+    private static void paintBand(int[] dst, int w, int h, int y0, int rows, RoundedBox outer, RoundedBox inner,
+            BorderSide[] sides, double[] widths, boolean uniform, int color) {
+        int n = w * rows;
+        int first = y0 * w;
+        float[] ring = Pixels.coverage(RoundedBox.ring(outer, inner), w, rows, 0, -y0);
         if (uniform) {
-            Pixels.fill(dst, color, ring);
+            if ((color >>> 24) != 0) {
+                for (int i = 0; i < n; i++) {
+                    if (ring[i] > 0f) {
+                        Pixels.blend(dst, first + i, color, ring[i]);
+                    }
+                }
+            }
             return;
         }
 
-        int n = w * h;
         float[] acc = new float[n * 4];
         float[] gap = null;
         float[] half = null;
@@ -180,7 +209,7 @@ public final class BorderPainter {
         float[][] wedges = new float[4][];
         float[] total = new float[n];
         for (int side = 0; side < 4; side++) {
-            wedges[side] = Pixels.coverage(wedge(outer, inner, widths, side, w, h), w, h, 0, 0);
+            wedges[side] = Pixels.coverage(wedge(outer, inner, widths, side, w, h), w, rows, 0, -y0);
             for (int i = 0; i < n; i++) {
                 total[i] += wedges[side][i];
             }
@@ -204,7 +233,7 @@ public final class BorderPainter {
                             gap = Pixels.coverage(RoundedBox.ring(
                                     outer.inset(widths[TOP] / 3, widths[RIGHT] / 3, widths[BOTTOM] / 3, widths[LEFT] / 3),
                                     outer.inset(widths[TOP] * 2 / 3, widths[RIGHT] * 2 / 3,
-                                            widths[BOTTOM] * 2 / 3, widths[LEFT] * 2 / 3)), w, h, 0, 0);
+                                            widths[BOTTOM] * 2 / 3, widths[LEFT] * 2 / 3)), w, rows, 0, -y0);
                         }
                         for (int i = 0; i < n; i++) {
                             m[i] *= 1f - gap[i];
@@ -220,7 +249,7 @@ public final class BorderPainter {
                     Shape pattern = sides[side].style == BorderStyle.DASHED
                             ? dashes(mid.sidePath(side), bw, reach)
                             : dots(mid.sidePath(side), bw);
-                    float[] p = Pixels.coverage(pattern, w, h, 0, 0);
+                    float[] p = Pixels.coverage(pattern, w, rows, 0, -y0);
                     for (int i = 0; i < n; i++) {
                         m[i] *= p[i];
                     }
@@ -237,7 +266,7 @@ public final class BorderPainter {
                 case RIDGE: {
                     if (half == null) {
                         half = Pixels.coverage(outer.inset(widths[TOP] / 2, widths[RIGHT] / 2,
-                                widths[BOTTOM] / 2, widths[LEFT] / 2).toPath(), w, h, 0, 0);
+                                widths[BOTTOM] / 2, widths[LEFT] / 2).toPath(), w, rows, 0, -y0);
                     }
                     boolean groove = sides[side].style == BorderStyle.GROOVE;
                     // A groove's outer half is an inset border: dark on the
@@ -265,7 +294,7 @@ public final class BorderPainter {
                     | (Pixels.clamp8(acc[i * 4 + 1] / acc[i * 4] * 255f) << 16)
                     | (Pixels.clamp8(acc[i * 4 + 2] / acc[i * 4] * 255f) << 8)
                     | Pixels.clamp8(acc[i * 4 + 3] / acc[i * 4] * 255f);
-            Pixels.blend(dst, i, src, sa);
+            Pixels.blend(dst, first + i, src, sa);
         }
     }
 

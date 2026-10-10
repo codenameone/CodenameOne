@@ -29,6 +29,9 @@ import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
+import javax.xml.stream.util.StreamReaderDelegate;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -50,21 +53,121 @@ import java.util.Map;
  */
 public final class SVGParser {
 
+    /**
+     * What the document's {@code <style>} elements give each element, keyed
+     * by the element's position among the start tags; null without any.
+     */
+    private Map<Integer, String[]> sheetStyles;
+
+    /** The reader of the pass that builds the tree. */
+    private CountingReader reader;
+
     public SVGDocument parse(InputStream in) throws IOException {
+        // Read twice: a <style> element may follow the shapes it colours,
+        // so its rules are collected before the tree is built.
+        ByteArrayOutputStream buf = new ByteArrayOutputStream();
+        byte[] chunk = new byte[8192];
+        int len;
+        while ((len = in.read(chunk)) != -1) {
+            buf.write(chunk, 0, len);
+        }
+        byte[] data = buf.toByteArray();
         XMLInputFactory f = XMLInputFactory.newInstance();
         // harden against XXE
         f.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, Boolean.FALSE);
         f.setProperty(XMLInputFactory.SUPPORT_DTD, Boolean.FALSE);
         try {
-            XMLStreamReader r = f.createXMLStreamReader(in);
+            XMLStreamReader first = f.createXMLStreamReader(new ByteArrayInputStream(data));
             try {
-                return parseDocument(r);
+                sheetStyles = readSheetStyles(first);
             } finally {
-                r.close();
+                first.close();
+            }
+            reader = new CountingReader(f.createXMLStreamReader(new ByteArrayInputStream(data)));
+            try {
+                return parseDocument(reader);
+            } finally {
+                reader.close();
             }
         } catch (XMLStreamException e) {
             throw new IOException(e);
+        } finally {
+            sheetStyles = null;
+            reader = null;
         }
+    }
+
+    /** Counts the start tags passed, which is how an element is told apart between the two passes. */
+    private static final class CountingReader extends StreamReaderDelegate {
+        int started;
+
+        CountingReader(XMLStreamReader r) {
+            super(r);
+        }
+
+        @Override
+        public int next() throws XMLStreamException {
+            int ev = super.next();
+            if (ev == XMLStreamConstants.START_ELEMENT) started++;
+            return ev;
+        }
+
+        @Override
+        public int nextTag() throws XMLStreamException {
+            int ev = super.nextTag();
+            if (ev == XMLStreamConstants.START_ELEMENT) started++;
+            return ev;
+        }
+    }
+
+    /**
+     * Collects the embedded stylesheets and matches their rules against
+     * every element of the document.
+     */
+    private static Map<Integer, String[]> readSheetStyles(XMLStreamReader r) throws XMLStreamException {
+        StyleSheet sheet = new StyleSheet();
+        List<StyleSheet.Element> elements = new ArrayList<StyleSheet.Element>();
+        List<StyleSheet.Element> open = new ArrayList<StyleSheet.Element>();
+        while (r.hasNext()) {
+            int ev = r.next();
+            if (ev == XMLStreamConstants.END_ELEMENT) {
+                if (!open.isEmpty()) open.remove(open.size() - 1);
+                continue;
+            }
+            if (ev != XMLStreamConstants.START_ELEMENT) continue;
+            StyleSheet.Element parent = open.isEmpty() ? null : open.get(open.size() - 1);
+            StyleSheet.Element el = new StyleSheet.Element(r.getLocalName(),
+                    r.getAttributeValue(null, "id"), r.getAttributeValue(null, "class"), parent);
+            elements.add(el);
+            if (!"style".equals(el.name)) {
+                open.add(el);
+                continue;
+            }
+            String type = r.getAttributeValue(null, "type");
+            boolean css = type == null || type.trim().isEmpty() || "text/css".equalsIgnoreCase(type.trim());
+            StringBuilder text = new StringBuilder();
+            int depth = 1;
+            while (r.hasNext() && depth > 0) {
+                int inner = r.next();
+                if (inner == XMLStreamConstants.START_ELEMENT) {
+                    depth++;
+                    // Keeps the positions in step with the second pass.
+                    elements.add(new StyleSheet.Element(r.getLocalName(), null, null, el));
+                } else if (inner == XMLStreamConstants.END_ELEMENT) {
+                    depth--;
+                } else if (inner == XMLStreamConstants.CHARACTERS || inner == XMLStreamConstants.CDATA) {
+                    text.append(r.getText());
+                }
+            }
+            if (css) sheet.add(text.toString());
+        }
+        if (sheet.isEmpty()) return null;
+        Map<Integer, String[]> out = new HashMap<Integer, String[]>();
+        for (int i = 0; i < elements.size(); i++) {
+            String[] d = sheet.declarationsFor(elements.get(i));
+            if (d != null) out.put(Integer.valueOf(i), d);
+        }
+        return out;
     }
 
     private SVGDocument parseDocument(XMLStreamReader r) throws XMLStreamException {
@@ -451,18 +554,20 @@ public final class SVGParser {
         }
     }
 
+    /** A property from the element's style, where the last declaration wins, or else from its attribute. */
     private String mergedValue(Map<String, String> attrs, String key) {
-        if (attrs.containsKey(key)) return attrs.get(key);
         String style = attrs.get("style");
-        if (style == null) return null;
-        for (String decl : style.split(";")) {
-            int colon = decl.indexOf(':');
-            if (colon <= 0) continue;
-            if (decl.substring(0, colon).trim().equals(key)) {
-                return decl.substring(colon + 1).trim();
+        String found = null;
+        if (style != null) {
+            for (String decl : style.split(";")) {
+                int colon = decl.indexOf(':');
+                if (colon <= 0) continue;
+                if (decl.substring(0, colon).trim().equals(key)) {
+                    found = decl.substring(colon + 1).trim();
+                }
             }
         }
-        return null;
+        return found != null ? found : attrs.get(key);
     }
 
     private Map<String, String> presentationFor(Map<String, String> attrs, String... keys) {
@@ -536,6 +641,15 @@ public final class SVGParser {
             m.put(key, r.getAttributeValue(i));
             // also stash bare local name so callers can ignore namespace prefixes
             m.put(name, r.getAttributeValue(i));
+        }
+        // Stylesheet rules are folded into the style attribute, around the
+        // element's own: every reader of a style then sees them, and a later
+        // declaration overrides an earlier one.
+        String[] sheet = sheetStyles == null || reader == null ? null
+                : sheetStyles.get(Integer.valueOf(reader.started - 1));
+        if (sheet != null) {
+            String own = m.get("style");
+            m.put("style", sheet[0] + (own == null ? "" : own + ";") + sheet[1]);
         }
         return m;
     }

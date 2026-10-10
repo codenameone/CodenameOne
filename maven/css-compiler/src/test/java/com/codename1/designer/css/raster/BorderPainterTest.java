@@ -35,6 +35,7 @@ import static com.codename1.designer.css.raster.RasterAssert.assertPixel;
 import static com.codename1.designer.css.raster.RasterAssert.assertTransparent;
 import static com.codename1.designer.css.raster.RasterAssert.paint;
 import static com.codename1.designer.css.raster.RasterAssert.runsInRow;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -68,6 +69,34 @@ class BorderPainterTest {
         assertEquals(BorderStyle.NONE, BorderStyle.parse(null));
         assertEquals(BorderStyle.NONE, BorderStyle.parse("wavy"));
         assertEquals(BorderStyle.NONE, BorderStyle.parse(""));
+    }
+
+    @Test
+    void bordersWorkedOutInBandsAreTheSameAsInOneGo() {
+        BorderStyle[] styles = {BorderStyle.DASHED, BorderStyle.DOTTED, BorderStyle.DOUBLE, BorderStyle.GROOVE};
+        BorderSide[] sides = new BorderSide[4];
+        int[] colours = {RED, GREEN, BLUE, YELLOW};
+        for (int i = 0; i < 4; i++) {
+            sides[i] = new BorderSide(9, styles[i], colours[i]);
+        }
+        int w = 100;
+        int h = 80;
+        RoundedBox outer = new RoundedBox(0, 0, w, h, new double[] {12, 12, 12, 12, 12, 12, 12, 12});
+        double[] widths = BorderPainter.effectiveWidths(sides, w, h);
+        int[] whole = new int[w * h];
+        BorderPainter.paint(whole, w, h, outer, sides, widths);
+        // Seven rows at a time, and a last band of three.
+        int[] banded = new int[w * h];
+        BorderPainter.paint(banded, w, h, outer, sides, widths, 7 * w);
+        assertArrayEquals(whole, banded);
+
+        BorderSide[] plain = {solid(9, RED), solid(9, RED), solid(9, RED), solid(9, RED)};
+        int[] wholePlain = new int[w * h];
+        BorderPainter.paint(wholePlain, w, h, outer, plain, widths);
+        int[] bandedPlain = new int[w * h];
+        BorderPainter.paint(bandedPlain, w, h, outer, plain, widths, 1);
+        assertArrayEquals(wholePlain, bandedPlain);
+        assertEquals(RED, wholePlain[40 * w + 4]);
     }
 
     @Test
