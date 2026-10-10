@@ -22,6 +22,10 @@
  */
 package com.codename1.backend.mvc;
 
+import com.codename1.backend.HttpServer;
+import com.codename1.backend.security.CsrfToken;
+import com.codename1.impl.backend.security.SecuritySupport;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -29,13 +33,39 @@ import java.util.Map;
 public final class Model {
     private final Map<String, Object> values = new LinkedHashMap<String, Object>();
 
+    public Model() {}
+
+    Model(HttpServer.Request request) {
+        values.put("_csrf", new DeferredCsrf(request));
+    }
+
+    // Keep the deferred value in the map so merging models does not resolve it or lose it.
+    private static final class DeferredCsrf {
+        private final HttpServer.Request request;
+        private CsrfToken token;
+        private boolean resolved;
+
+        DeferredCsrf(HttpServer.Request request) {
+            this.request = request;
+        }
+
+        CsrfToken get() {
+            if (!resolved) {
+                token = SecuritySupport.csrfToken(request);
+                resolved = true;
+            }
+            return token;
+        }
+    }
+
     public Model addAttribute(String name, Object value) {
         values.put(name, value);
         return this;
     }
 
     public Object getAttribute(String name) {
-        return values.get(name);
+        Object value = values.get(name);
+        return value instanceof DeferredCsrf ? ((DeferredCsrf) value).get() : value;
     }
 
     public boolean containsAttribute(String name) {

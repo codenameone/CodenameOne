@@ -27,13 +27,17 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.codename1.backend.Base64;
+import com.codename1.backend.ByteSink;
 import com.codename1.backend.HttpServer;
 import com.codename1.backend.WebSocket;
 import com.codename1.backend.WebSocketSession;
+import com.codename1.backend.mvc.Html;
+import com.codename1.backend.mvc.Model;
 import com.codename1.backend.security.SecuredServer.Reply;
 import com.codename1.backend.security.core.userdetails.InMemoryUserDetailsManager;
 import com.codename1.backend.security.core.userdetails.User;
@@ -798,6 +802,49 @@ class SecurityFilterChainTest {
     }
 
     // -------------------------------------------------------------------- CSRF
+
+    @Test
+    void mvcModelsDeferCsrfUntilTheTokenIsUsed() throws Exception {
+        HttpServer.Handler pages = request -> {
+            Model source = Html.model(request);
+            Model model = new Model().addAllAttributes(source);
+            String path = request.pathFrom(0);
+            assertTrue(model.containsAttribute("_csrf"));
+            if (path.endsWith("/read")) {
+                return HttpServer.Response.text(200, "read-only");
+            }
+            if (path.endsWith("/override")) {
+                model.addAttribute("_csrf", null);
+            }
+            ByteSink out = new ByteSink(128);
+            Html.csrf(out, model);
+            CsrfToken token = (CsrfToken) model.getAttribute("_csrf");
+            assertSame(token, model.getAttribute("_csrf"));
+            String text = new String(Html.bytes(out), "UTF-8");
+            if (token != null) {
+                assertSame(token, source.getAttribute("_csrf"));
+                assertTrue(text.contains("name=\"" + token.getParameterName() + "\""));
+                assertTrue(text.contains("value=\"" + token.getToken() + "\""));
+            }
+            return HttpServer.Response.text(200, token == null ? "none" : token.getToken());
+        };
+        try (SecuredServer server = SecuredServer.start(dev(), "test", beans(), pages,
+                http -> http.securityMatcher("/open/**").csrf(csrf -> csrf.disable()).build(),
+                http -> http.build())) {
+            for (String path : new String[] {"/read", "/open/form", "/override"}) {
+                Reply reply = server.get(path);
+                assertEquals(200, reply.status);
+                assertTrue(reply.headers("Set-Cookie").isEmpty(), reply.toString());
+                assertTrue(server.cookies.isEmpty());
+            }
+            Reply form = server.get("/form");
+            assertEquals(200, form.status);
+            assertNotNull(server.cookies.get("CN1SESSION"));
+            assertNotEquals("none", form.body);
+            assertEquals(403, server.post("/save", "").status);
+            assertEquals(200, server.post("/save", "_csrf=" + form.body).status);
+        }
+    }
 
     @Test
     void csrfCookieCannotBeInjectedOrCopiedFromAnotherSession() throws Exception {

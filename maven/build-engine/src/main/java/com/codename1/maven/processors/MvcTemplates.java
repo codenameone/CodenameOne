@@ -249,7 +249,7 @@ final class MvcTemplates {
         if (node instanceof Element) {
             Element e = (Element) node;
             if ((e.normalName().equals("script") || e.normalName().equals("style"))
-                    && e.hasAttr("th:text"))
+                    && (e.hasAttr("th:text") || e.hasAttr("th:insert") || e.hasAttr("th:errors")))
                 throw problem(t, e, "Dynamic script/style content is not supported");
             for (Attribute a : e.attributes())
                 if (a.getKey().startsWith("th:")) {

@@ -954,6 +954,90 @@ public class MvcTemplatesTest {
         assertTrue(options.get(2).hasAttr("selected"));
     }
 
+    @Test
+    public void omittedPrimitiveFieldsKeepDefaultsAndMarkersStillClearCheckboxes()
+            throws Exception {
+        setup();
+        fixtureSources(
+                Collections.singletonMap(
+                        "sample.DefaultForm",
+                        "package sample; public class DefaultForm { public byte b=1; public short"
+                            + " s=2; public int n=3; public long l=4; public float f=5; public"
+                            + " double d=6; public char c='Q'; public boolean active=true; private"
+                            + " int count=7; public int calls; public void setCount(int"
+                            + " v){count=v;calls++;} public String summary(){return"
+                            + " b+\"|\"+s+\"|\"+n+\"|\"+l+\"|\"+f+\"|\"+d+\"|\"+c+\"|\"+active+\"|\"+count+\"|\"+calls;}"
+                            + " }"));
+        HttpServer.Handler handler =
+                controller(
+                        "package sample; import com.codename1.backend.annotations.*; import"
+                            + " com.codename1.backend.mvc.*; @Controller public class Pages {"
+                            + " @PostMapping(\"/bind\") @ResponseBody public String"
+                            + " bind(@ModelAttribute(\"form\") DefaultForm form, BindingResult"
+                            + " errors) { return"
+                            + " form.summary()+\"|\"+errors.hasErrors()+\"|\"+errors.fieldValue(\"n\","
+                            + " form.n); } @PostMapping(\"/strict\") @ResponseBody public String"
+                            + " strict(@ModelAttribute(\"form\") DefaultForm form) {return"
+                            + " form.summary();} }");
+        String defaults = "1|2|3|4|5.0|6.0|Q|true|7|0";
+        assertEquals(
+                defaults + "|false|3", body(handler.handle(request("POST", "/bind", "", false))));
+        Object strict = handler.handle(request("POST", "/strict", "", false));
+        assertEquals(200, field(strict, "status"));
+        assertEquals(defaults, body(strict));
+        assertEquals(
+                "1|2|3|4|5.0|6.0|Q|false|7|0|false|3",
+                body(handler.handle(request("POST", "/bind", "_active=on", false))));
+        assertEquals(
+                "1|2|8|4|5.0|6.0|Z|true|9|1|false|8",
+                body(handler.handle(request("POST", "/bind", "n=8&c=Z&count=9", false))));
+        for (String invalid : Arrays.asList("n=", "n=bad", "c=", "c=long")) {
+            assertEquals(
+                    400,
+                    field(handler.handle(request("POST", "/strict", invalid, false)), "status"));
+            assertEquals(
+                    "true",
+                    body(handler.handle(request("POST", "/bind", invalid, false)))
+                            .split("\\|", -1)[10]);
+        }
+    }
+
+    @Test
+    public void rawTextElementsRejectDynamicFragmentInsertionAndErrors() throws Exception {
+        for (String tag : Arrays.asList("script", "style")) {
+            for (String directive : Arrays.asList("insert", "errors")) {
+                setup();
+                template(
+                        "parts",
+                        "<!-- cn1:model payload java.lang.String --><th:block th:fragment=\"code\""
+                            + " th:text=\"${payload}\"></th:block>");
+                template(
+                        "unsafe",
+                        DECL
+                                + "<form th:object=\"${product}\"><"
+                                + tag
+                                + " th:"
+                                + directive
+                                + "=\""
+                                + (directive.equals("insert") ? "~{parts :: code}" : "*{name}")
+                                + "\"></"
+                                + tag
+                                + "></form>");
+                try {
+                    new MvcTemplates(context).sources();
+                    fail(tag + " th:" + directive);
+                } catch (IllegalArgumentException expected) {
+                    assertTrue(
+                            expected.getMessage(), expected.getMessage().contains("script/style"));
+                }
+            }
+        }
+        setup();
+        template("safe", "<script src=\"/app.js\"></script><style>p {color: red}</style>");
+        compile();
+        assertTrue(render("safe", new Model()).contains("p {color: red}"));
+    }
+
     private static volatile int benchmarkSink;
 
     @Test

@@ -25,7 +25,6 @@ package com.codename1.backend.mvc;
 import com.codename1.backend.ByteSink;
 import com.codename1.backend.HttpServer;
 import com.codename1.backend.security.CsrfToken;
-import com.codename1.impl.backend.security.SecuritySupport;
 
 /// Primitives called by generated views; no template evaluation occurs here.
 public final class Html {
@@ -182,7 +181,7 @@ public final class Html {
     }
 
     public static Model model(HttpServer.Request request) {
-        return new Model().addAttribute("_csrf", SecuritySupport.csrfToken(request));
+        return new Model(request);
     }
 
     public static void csrf(ByteSink out, Model model) {
