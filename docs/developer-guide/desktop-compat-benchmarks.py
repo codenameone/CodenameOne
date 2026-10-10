@@ -561,6 +561,11 @@ def environment(linux, macos):
             line += " The display is a virtual framebuffer, Xvfb, of %s pixels." % str(facts["screen"]).replace("x", " by ")
         if usable(facts.get("gtk")):
             line += " GTK %s." % facts["gtk"]
+        if any((session or {}).get("gtk_session") for r in linux
+               for session in (dig(r, "run", "cn1_native", "sessions") or [])):
+            line += (" Each display has had one GTK program on it before the measured application starts, "
+                     "as a desktop session has: the first GTK program on a display loads a GL driver to "
+                     "choose its visuals, and no later one does.")
         if usable(facts.get("openjfx")):
             line += " OpenJFX %s for the JavaFX baselines." % facts["openjfx"]
         lines.append(line)
