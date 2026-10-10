@@ -147,6 +147,46 @@ class VectorImageTest {
     }
 
     @Test
+    void aUseDrawsTheElementItNamesWhereItSays() throws Exception {
+        BufferedImage img = paint("<defs><rect id=\"sq\" width=\"20\" height=\"20\"/></defs>"
+                + "<use href=\"#sq\" x=\"10\" y=\"10\" fill=\"#ff0000\"/>"
+                + "<use xmlns:xlink=\"http://www.w3.org/1999/xlink\" xlink:href=\"#sq\" x=\"60\" y=\"60\""
+                + " fill=\"#0000ff\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(20, 20), "the first, in the colour its use gives it");
+        assertEquals(0xff0000ff, img.getRGB(70, 70), "the second, named the older way");
+        assertEquals(0, alpha(img, 5, 5), "the definition itself is not drawn");
+        assertEquals(0, alpha(img, 45, 45));
+    }
+
+    @Test
+    void aSymbolIsFittedIntoTheSizeItsUseGivesIt() throws Exception {
+        BufferedImage img = paint("<symbol id=\"dot\" viewBox=\"0 0 10 10\">"
+                + "<rect width=\"10\" height=\"10\" fill=\"#00ff00\"/></symbol>"
+                + "<use href=\"#dot\" x=\"20\" y=\"20\" width=\"60\" height=\"60\"/>", 100, 100);
+        assertEquals(0xff00ff00, img.getRGB(25, 25));
+        assertEquals(0xff00ff00, img.getRGB(75, 75));
+        assertEquals(0, alpha(img, 10, 10), "the symbol is drawn only through its use");
+        assertEquals(0, alpha(img, 90, 90));
+    }
+
+    @Test
+    void aUseThatNamesItselfDrawsNothingAndEnds() throws Exception {
+        BufferedImage img = paint("<g id=\"loop\"><use href=\"#loop\"/></g>", 20, 20);
+        assertEquals(0, alpha(img, 10, 10));
+    }
+
+    @Test
+    void anEvenOddFillLeavesTheInnerSubpathAsAHole() throws Exception {
+        String ring = "M 10 10 H 90 V 90 H 10 Z M 30 30 H 70 V 70 H 30 Z";
+        BufferedImage holed = paint("<path d=\"" + ring + "\" fill=\"#ff0000\" fill-rule=\"evenodd\"/>", 100, 100);
+        assertEquals(0xffff0000, holed.getRGB(20, 50), "the ring");
+        assertEquals(0, alpha(holed, 50, 50), "the hole");
+
+        BufferedImage solid = paint("<path d=\"" + ring + "\" fill=\"#ff0000\"/>", 100, 100);
+        assertEquals(0xffff0000, solid.getRGB(50, 50), "by default both squares wind the same way and fill");
+    }
+
+    @Test
     void aClipPathKeepsOnlyWhatIsInsideIt() throws Exception {
         BufferedImage img = paint("<defs><clipPath id=\"c\"><circle cx=\"50\" cy=\"50\" r=\"30\"/></clipPath></defs>"
                 + "<rect width=\"100\" height=\"100\" fill=\"#ff0000\" clip-path=\"url(#c)\"/>", 100, 100);

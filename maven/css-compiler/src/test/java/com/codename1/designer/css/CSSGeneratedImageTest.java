@@ -412,6 +412,25 @@ class CSSGeneratedImageTest {
     }
 
     @Test
+    void aCurrentColorStopIsTheColourOfTheRule(@TempDir Path dir) throws Exception {
+        Compiled c = compile(dir, "Banner { width: 50%; height: 10%; color: #00ff00;"
+                + " background: linear-gradient(to right, currentColor 50%, #000000 50%);"
+                + " box-shadow: 0 0 4px black; }");
+        BufferedImage img = stored(c.res, "Banner_1.png", Display.DENSITY_HD);
+        assertEquals(0xff00ff00, img.getRGB(2 + 40, 50), "the rule's colour");
+        assertEquals(0xff000000, img.getRGB(2 + 280, 50));
+    }
+
+    @Test
+    void aCommentInAnImportMayHoldASemicolon(@TempDir Path dir) throws Exception {
+        Files.write(dir.resolve("base.css"), "Imported { color: #abcdef; }\n".getBytes(StandardCharsets.UTF_8));
+        Compiled c = compile(dir, "@import \"base.css\" /* note; keep */;\nPlain { color: #000004; }\n");
+        assertTrue("abcdef".equalsIgnoreCase(String.valueOf(c.keys.get("Imported.fgColor"))),
+                String.valueOf(c.keys.keySet()));
+        assertEquals("000004", c.keys.get("Plain.fgColor"));
+    }
+
+    @Test
     void aGradientWrittenAsABackgroundImageIsPainted(@TempDir Path dir) throws Exception {
         Compiled c = compile(dir, "Banner { width: 50%; height: 10%;"
                 + " background-image: linear-gradient(to right, #ffffff 50%, #000000 50%);"

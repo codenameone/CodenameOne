@@ -48,7 +48,35 @@ import java.util.regex.Pattern;
 /// is skipped: the compiler is what reports a broken import.
 public final class CssImportDependencies {
 
-    private static final Pattern COMMENT = Pattern.compile("/\\*.*?\\*/", Pattern.DOTALL);
+    /// `text` without its comments. A `/*` inside a string is part of the
+    /// string, so the text is walked rather than matched: a pattern for
+    /// comments alone would start one at `content: "/*"` and swallow
+    /// everything up to the next `*/`, imports included.
+    static String withoutComments(String text) {
+        StringBuilder out = new StringBuilder(text.length());
+        int len = text.length();
+        int i = 0;
+        while (i < len) {
+            char c = text.charAt(i);
+            if (c == '/' && i + 1 < len && text.charAt(i + 1) == '*') {
+                int end = text.indexOf("*/", i + 2);
+                i = end < 0 ? len : end + 2;
+                out.append(' ');
+            } else if (c == '"' || c == '\'') {
+                int end = i + 1;
+                while (end < len && text.charAt(end) != c) {
+                    end += text.charAt(end) == '\\' ? 2 : 1;
+                }
+                end = Math.min(len, end + 1);
+                out.append(text, i, end);
+                i = end;
+            } else {
+                out.append(c);
+                i++;
+            }
+        }
+        return out.toString();
+    }
 
     private static final Pattern IMPORT = Pattern.compile(
             "@import\\s+(?:url\\(\\s*)?(?:\"([^\"]*)\"|'([^']*)'|([^\"')\\s;]+))", Pattern.CASE_INSENSITIVE);
@@ -85,7 +113,7 @@ public final class CssImportDependencies {
             } catch (IOException ex) {
                 continue;
             }
-            text = COMMENT.matcher(text).replaceAll("");
+            text = withoutComments(text);
             // An image or a font the stylesheet names from outside the
             // directory is compiled into the theme just as an import is.
             Matcher asset = URL.matcher(text);

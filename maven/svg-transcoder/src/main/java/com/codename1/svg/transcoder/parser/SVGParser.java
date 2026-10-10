@@ -74,6 +74,7 @@ public final class SVGParser {
                 SVGDocument doc = new SVGDocument();
                 readSVGRoot(r, doc);
                 readChildren(r, doc, doc);
+                indexById(doc, doc);
                 return doc;
             }
         }
@@ -119,6 +120,29 @@ public final class SVGParser {
                 readChildren(r, g, doc);
             } else if ("defs".equals(name)) {
                 readDefs(r, doc);
+            } else if ("use".equals(name)) {
+                // Read for a renderer that follows references. The class the
+                // transcoder generates does not draw one.
+                parent.addChild(readUse(r));
+                consumeUntilEnd(r);
+            } else if ("symbol".equals(name)) {
+                // Drawn only where a <use> names it, so it is registered and
+                // kept out of the drawing.
+                SVGSymbol symbol = new SVGSymbol();
+                Map<String, String> sa = attrs(r);
+                applyCommon(symbol, sa);
+                String svb = sa.get("viewBox");
+                if (svb != null) {
+                    NumberParser np = new NumberParser(svb);
+                    try {
+                        symbol.setViewBox(np.nextFloat(), np.nextFloat(), np.nextFloat(), np.nextFloat());
+                    } catch (RuntimeException e) {
+                        // no view box
+                    }
+                }
+                readChildren(r, symbol, doc);
+                if (symbol.getId() != null) doc.getDefinitions().put(symbol.getId(), symbol);
+                indexById(symbol, doc);
             } else if ("rect".equals(name)) {
                 SVGRect rect = readRect(r);
                 parent.addChild(rect);
@@ -176,26 +200,44 @@ public final class SVGParser {
         }
     }
 
+    /**
+     * Reads a {@code <defs>} block. Gradients and clip paths are registered
+     * as they are read. Everything else in it -- the shapes, groups and
+     * symbols a {@code <use>} draws -- is read like any other content into a
+     * group that is never part of the drawing, and registered by id.
+     */
     private void readDefs(XMLStreamReader r, SVGDocument doc) throws XMLStreamException {
-        while (r.hasNext()) {
-            int ev = r.next();
-            if (ev == XMLStreamConstants.END_ELEMENT) return;
-            if (ev != XMLStreamConstants.START_ELEMENT) continue;
-            String name = r.getLocalName();
-            if ("linearGradient".equals(name)) {
-                SVGLinearGradient lg = readLinearGradient(r);
-                if (lg.getId() != null) doc.getDefinitions().put(lg.getId(), lg);
-            } else if ("radialGradient".equals(name)) {
-                SVGRadialGradient rg = readRadialGradient(r);
-                if (rg.getId() != null) doc.getDefinitions().put(rg.getId(), rg);
-            } else if ("clipPath".equals(name) || "mask".equals(name)) {
-                // Mask treated as clip -- alpha masking falls back to opaque.
-                SVGClipPath cp = readClipPath(r, doc);
-                if (cp.getId() != null) doc.getDefinitions().put(cp.getId(), cp);
-            } else {
-                skip(r);
+        SVGGroup held = new SVGGroup();
+        readChildren(r, held, doc);
+        indexById(held, doc);
+    }
+
+    /** Registers every element under {@code node} that has an id and is not registered yet. */
+    private static void indexById(SVGNode node, SVGDocument doc) {
+        if (node != doc && node.getId() != null && !doc.getDefinitions().containsKey(node.getId())) {
+            doc.getDefinitions().put(node.getId(), node);
+        }
+        if (node instanceof SVGGroup) {
+            for (SVGNode child : ((SVGGroup) node).getChildren()) {
+                indexById(child, doc);
             }
         }
+    }
+
+    private SVGUse readUse(XMLStreamReader r) {
+        SVGUse use = new SVGUse();
+        Map<String, String> a = attrs(r);
+        applyCommon(use, a);
+        String href = a.get("href");
+        if (href != null) {
+            href = href.trim();
+            use.setHref(href.startsWith("#") ? href.substring(1) : href);
+        }
+        use.setX(NumberParser.parseFloat(a.get("x")));
+        use.setY(NumberParser.parseFloat(a.get("y")));
+        use.setWidth(NumberParser.parseFloat(a.get("width")));
+        use.setHeight(NumberParser.parseFloat(a.get("height")));
+        return use;
     }
 
     private SVGClipPath readClipPath(XMLStreamReader r, SVGDocument doc) throws XMLStreamException {
@@ -477,7 +519,7 @@ public final class SVGParser {
             if ("fill".equals(k) || "stroke".equals(k) || "fill-opacity".equals(k) || "stroke-opacity".equals(k)
                     || "opacity".equals(k) || "stroke-width".equals(k) || "stroke-linecap".equals(k)
                     || "stroke-linejoin".equals(k) || "stroke-miterlimit".equals(k)
-                    || "clip-path".equals(k)) {
+                    || "clip-path".equals(k) || "fill-rule".equals(k)) {
                 pres.put(k, e.getValue());
             }
         }

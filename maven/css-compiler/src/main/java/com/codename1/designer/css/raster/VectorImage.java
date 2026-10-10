@@ -36,7 +36,9 @@ import com.codename1.svg.transcoder.model.SVGPath;
 import com.codename1.svg.transcoder.model.SVGPolyline;
 import com.codename1.svg.transcoder.model.SVGRadialGradient;
 import com.codename1.svg.transcoder.model.SVGRect;
+import com.codename1.svg.transcoder.model.SVGSymbol;
 import com.codename1.svg.transcoder.model.SVGText;
+import com.codename1.svg.transcoder.model.SVGUse;
 import com.codename1.svg.transcoder.parser.PathCommand;
 import com.codename1.svg.transcoder.parser.SVGPaint;
 import com.codename1.svg.transcoder.parser.SVGParser;
@@ -74,6 +76,11 @@ import java.util.List;
 /// that needs a generated image has its background baked into that image, and
 /// this is what bakes it.
 ///
+/// Nothing here is shared with the class the transcoders generate, which
+/// draws through the framework at runtime, so the two can differ: this
+/// follows `<use>` references and `fill-rule`, which that class does not
+/// draw.
+///
 /// An animated file is painted at rest: the values its elements are written
 /// with, before any animation has moved them. A Lottie file is painted the
 /// same way, from the first frame the parser resolves.
@@ -81,6 +88,10 @@ public final class VectorImage {
     private final SVGDocument doc;
     /// Whether the drawing is fitted to the viewport it is painted into.
     private final boolean scales;
+    private static final int MAX_USE_DEPTH = 16;
+    /// How many `<use>` elements deep the painting is. One image is painted
+    /// by one thread at a time, which `paint` sees to.
+    private int useDepth;
 
     private VectorImage(SVGDocument doc, boolean scales) {
         this.doc = doc;
@@ -158,7 +169,7 @@ public final class VectorImage {
     /// - `maxSide`: the most pixels the image may have on a side. A larger
     ///   viewport is painted smaller, in proportion, for the caller to
     ///   stretch back.
-    public BufferedImage paint(double width, double height, int maxSide) {
+    public synchronized BufferedImage paint(double width, double height, int maxSide) {
         double k = Math.min(1.0, maxSide / Math.max(1.0, Math.max(width, height)));
         if (!(k > 0)) {
             k = 1;
@@ -206,7 +217,16 @@ public final class VectorImage {
     }
 
     private void paintNode(Graphics2D g, SVGNode node, SVGStyle parentStyle, int w, int h) {
-        SVGStyle style = node.getStyle() == null ? new SVGStyle() : node.getStyle();
+        // Worked out on a style of its own. Filling in the element's would
+        // fix what it inherits the first time it is drawn, and an element a
+        // `<use>` draws twice inherits from each of them in turn.
+        SVGStyle style = new SVGStyle();
+        SVGStyle own = node.getStyle();
+        if (own != null) {
+            style.inherit(own);
+            style.setOpacity(own.getOpacity());
+            style.setClipPathRef(own.getClipPathRef());
+        }
         style.inherit(parentStyle);
         float opacity = style.getOpacity() == null ? 1f : clamp(style.getOpacity().floatValue());
         if (opacity <= 0f) {
@@ -264,6 +284,10 @@ public final class VectorImage {
                 // A definition. It is used through clip-path, never drawn.
                 return;
             }
+            if (node instanceof SVGUse) {
+                paintUse(g, (SVGUse) node, style, w, h);
+                return;
+            }
             if (node instanceof SVGGroup) {
                 for (SVGNode child : ((SVGGroup) node).getChildren()) {
                     paintNode(g, child, style, w, h);
@@ -279,6 +303,41 @@ public final class VectorImage {
         } finally {
             g.setTransform(savedTransform);
             g.setClip(savedClip);
+        }
+    }
+
+    /// Draws the element a `<use>` names, at the offset it gives. What the
+    /// element does not set for itself it takes from the `<use>`, as if it
+    /// were written there.
+    private void paintUse(Graphics2D g, SVGUse use, SVGStyle style, int w, int h) {
+        SVGNode target = use.getHref() == null ? null : doc.getDefinitions().get(use.getHref());
+        if (target == null || target instanceof SVGClipPath || target instanceof SVGLinearGradient
+                || target instanceof SVGRadialGradient) {
+            return;
+        }
+        // An element that draws itself, directly or through others, would
+        // never finish.
+        if (useDepth >= MAX_USE_DEPTH) {
+            return;
+        }
+        useDepth++;
+        try {
+            g.translate(use.getX(), use.getY());
+            if (target instanceof SVGSymbol) {
+                SVGSymbol symbol = (SVGSymbol) target;
+                if (symbol.getViewBoxWidth() > 0 && symbol.getViewBoxHeight() > 0
+                        && use.getWidth() > 0 && use.getHeight() > 0) {
+                    double s = Math.min(use.getWidth() / symbol.getViewBoxWidth(),
+                            use.getHeight() / symbol.getViewBoxHeight());
+                    g.translate((use.getWidth() - symbol.getViewBoxWidth() * s) / 2,
+                            (use.getHeight() - symbol.getViewBoxHeight() * s) / 2);
+                    g.scale(s, s);
+                    g.translate(-symbol.getViewBoxX(), -symbol.getViewBoxY());
+                }
+            }
+            paintNode(g, target, style, w, h);
+        } finally {
+            useDepth--;
         }
     }
 
@@ -469,7 +528,14 @@ public final class VectorImage {
         SVGPaint fill = style.getFill() == null ? SVGPaint.BLACK : style.getFill();
         if (!fill.isNone()) {
             float a = style.getFillOpacity() == null ? 1f : clamp(style.getFillOpacity().floatValue());
-            paintWith(g, fill, a, shape, shape);
+            Shape filled = shape;
+            if (shape instanceof Path2D && Boolean.TRUE.equals(style.getFillEvenOdd())) {
+                // `fill-rule: evenodd`: a subpath inside another is a hole.
+                Path2D holes = new Path2D.Double(shape);
+                holes.setWindingRule(Path2D.WIND_EVEN_ODD);
+                filled = holes;
+            }
+            paintWith(g, fill, a, filled, shape);
         }
         SVGPaint stroke = style.getStroke();
         if (stroke != null && !stroke.isNone()) {

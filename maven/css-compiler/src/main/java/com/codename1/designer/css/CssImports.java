@@ -211,6 +211,8 @@ public final class CssImports {
         } else {
             throw new IOException("Malformed @import in " + current + ": " + statement);
         }
+        // What follows the name is its media, once any comment is out of it.
+        rest = rest.replaceAll("(?s)/\\*.*?\\*/", " ").trim();
         if (target.length() == 0) {
             throw new IOException("@import with no file name in " + current);
         }
@@ -537,6 +539,10 @@ public final class CssImports {
             char c = text.charAt(i);
             if (c == '"' || c == '\'') {
                 i = skipString(text, i);
+            } else if (c == '/' && i + 1 < len && text.charAt(i + 1) == '*') {
+                // A comment may hold a semicolon of its own.
+                int end = text.indexOf("*/", i + 2);
+                i = end < 0 ? len : end + 2;
             } else if (c == ';') {
                 return i;
             } else {

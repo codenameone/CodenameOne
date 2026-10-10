@@ -76,6 +76,19 @@ class CssImportDependenciesTest {
     }
 
     @Test
+    void aCommentDelimiterInsideAStringHidesNothingAfterIt(@TempDir Path tmp) throws Exception {
+        File dir = tmp.toFile();
+        File css = new File(dir, "css");
+        write(new File(css, "theme.css"), "A::before { content: \"/*\"; }\n"
+                + "@import \"../shared/base.css\";\n/* a real comment */\nB { color: red; }\n");
+        File base = write(new File(dir, "shared/base.css"), "C { color: red; }\n");
+
+        Set<File> found = CssImportDependencies.outside(css);
+
+        assertTrue(found.contains(base.getCanonicalFile()), found.toString());
+    }
+
+    @Test
     void aQuotedUrlKeepsItsParentheses(@TempDir Path tmp) throws Exception {
         File dir = tmp.toFile();
         File css = new File(dir, "css");

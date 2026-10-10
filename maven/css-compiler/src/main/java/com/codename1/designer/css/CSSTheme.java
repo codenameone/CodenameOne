@@ -367,7 +367,21 @@ public class CSSTheme {
         /// Always goes through the multi-stop parsers. The two-colour legacy
         /// parsers answer a narrower question (can the oldest theme format hold
         /// this?) and record less than is needed to paint it.
-        static GradientSpec describeForRaster(ScaledUnit background, int width, int height) {
+        static GradientSpec describeForRaster(ScaledUnit background, int width, int height, int currentColor) {
+            RASTER_CURRENT_COLOR.set(Integer.valueOf(currentColor));
+            try {
+                return describeForRaster(background, width, height);
+            } finally {
+                RASTER_CURRENT_COLOR.remove();
+            }
+        }
+
+        /// The `color` of the rule a gradient is being described for, which
+        /// is what a `currentColor` stop means. Unset while a gradient is
+        /// parsed for a theme entry, which has no such colour to hold.
+        private static final ThreadLocal<Integer> RASTER_CURRENT_COLOR = new ThreadLocal<Integer>();
+
+        private static GradientSpec describeForRaster(ScaledUnit background, int width, int height) {
             CN1Gradient g = new CN1Gradient();
             g.rasterWidth = width;
             g.rasterHeight = height;
@@ -940,12 +954,18 @@ public class CSSTheme {
                 }
                 int rgb;
                 int alpha;
-                try {
-                    rgb = getColorInt(p);
-                    Integer a = getColorAlphaInt(p);
-                    alpha = a == null ? 0xff : a.intValue();
-                } catch (RuntimeException ex) {
-                    return null;
+                Integer current = RASTER_CURRENT_COLOR.get();
+                if (current != null && isIdentLike(p) && "currentColor".equalsIgnoreCase(identValue(p))) {
+                    rgb = current.intValue() & 0xffffff;
+                    alpha = current.intValue() >>> 24;
+                } else {
+                    try {
+                        rgb = getColorInt(p);
+                        Integer a = getColorAlphaInt(p);
+                        alpha = a == null ? 0xff : a.intValue();
+                    } catch (RuntimeException ex) {
+                        return null;
+                    }
                 }
                 int argb = (alpha << 24) | (rgb & 0xffffff);
                 if (hint != null) {
@@ -4947,7 +4967,7 @@ public class CSSTheme {
                 double[] tile = bgImage == null ? explicitBackgroundSize(styles, paintWidth, paintHeight) : null;
                 if (tile == null) {
                     box.gradient(CN1Gradient.describeForRaster((ScaledUnit) gradient,
-                            (int) paintWidth, (int) paintHeight));
+                            (int) paintWidth, (int) paintHeight, currentColor));
                 } else {
                     // A gradient given a `background-size` is an image of
                     // that size, laid out by `background-repeat` like any
@@ -4963,7 +4983,8 @@ public class CSSTheme {
                     // does not come round again on that axis.
                     int tileW = (int) Math.min(MAX_VECTOR_SIDE, fullW);
                     int tileH = (int) Math.min(MAX_VECTOR_SIDE, fullH);
-                    GradientSpec spec = CN1Gradient.describeForRaster((ScaledUnit) gradient, (int) fullW, (int) fullH);
+                    GradientSpec spec = CN1Gradient.describeForRaster((ScaledUnit) gradient, (int) fullW, (int) fullH,
+                            currentColor);
                     BufferedImage image = new BufferedImage(tileW, tileH, BufferedImage.TYPE_INT_ARGB);
                     image.setRGB(0, 0, tileW, tileH,
                             new GradientPainter(spec, 0, 0, fullW, fullH).paint(tileW, tileH), 0, tileW);
