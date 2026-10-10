@@ -107,9 +107,9 @@ final class MvcForms {
             s.append("{ String raw = request.param(").append(q(field)).append(");\n");
             boolean bool = "boolean".equals(t) || "java.lang.Boolean".equals(t);
             if (bool)
-                s.append("if (raw == null && request.param(")
+                s.append("if (request.param(")
                         .append(q("_" + field))
-                        .append(") != null) raw = \"false\";\n");
+                        .append(") != null) raw = raw == null ? \"false\" : \"true\";\n");
             s.append("if (raw != null) {\n");
             s.append(local).append("Errors.submitted(").append(q(field)).append(", raw);\ntry {\n");
             if (!"java.lang.String".equals(t)) {

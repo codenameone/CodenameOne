@@ -23,6 +23,7 @@
 package com.codename1.maven.processors;
 
 import com.codename1.maven.annotations.AnnotatedClass;
+import com.codename1.maven.annotations.ProcessorContext;
 
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
@@ -36,6 +37,39 @@ final class MvcTypes {
     final AnnotatedClass cls;
     final Map<String, String> bindings = new LinkedHashMap<String, String>();
     final List<StringBuilder> parents = new ArrayList<StringBuilder>();
+
+    static AnnotatedClass resolveClass(ProcessorContext ctx, String name) {
+        for (AnnotatedClass cls : ctx.getClassIndex().values())
+            if (name.equals(cls.getSourceName())) return cls;
+        String internal = name.replace('.', '/');
+        AnnotatedClass cls = RestControllerAnnotationProcessor.resolveClass(ctx, internal);
+        if (cls != null) return cls;
+        // Dependencies may not be indexed yet. Try nested separators from the right,
+        // then verify InnerClasses metadata so a top-level '$' is not mistaken for nesting.
+        int slash;
+        while ((slash = internal.lastIndexOf('/')) >= 0) {
+            internal = internal.substring(0, slash) + '$' + internal.substring(slash + 1);
+            cls = RestControllerAnnotationProcessor.resolveClass(ctx, internal);
+            if (cls != null && name.equals(cls.getSourceName())) return cls;
+        }
+        return null;
+    }
+
+    static String sourceType(ProcessorContext ctx, String type) {
+        java.util.regex.Matcher words =
+                java.util.regex.Pattern.compile("[A-Za-z_$][A-Za-z0-9_$.]*").matcher(type);
+        StringBuffer result = new StringBuffer();
+        while (words.find()) {
+            String word = words.group();
+            AnnotatedClass cls = word.indexOf('.') < 0 ? null : resolveClass(ctx, word);
+            words.appendReplacement(
+                    result,
+                    java.util.regex.Matcher.quoteReplacement(
+                            cls == null ? word : cls.getSourceName()));
+        }
+        words.appendTail(result);
+        return result.toString();
+    }
 
     MvcTypes(AnnotatedClass cls, String owner) {
         this.cls = cls;

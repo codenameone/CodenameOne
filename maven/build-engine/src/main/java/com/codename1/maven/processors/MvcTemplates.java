@@ -196,7 +196,7 @@ final class MvcTemplates {
                 t.models.put("_csrf", "com.codename1.backend.security.CsrfToken");
                 while (declarations.find()) {
                     String name = declarations.group(1), type = declarations.group(2).trim();
-                    checkType(type);
+                    type = checkType(type);
                     if (t.models.put(name, type) != null)
                         throw new IllegalArgumentException("Duplicate/reserved model name " + name);
                 }
@@ -210,7 +210,7 @@ final class MvcTemplates {
         }
     }
 
-    private void checkType(String type) {
+    private String checkType(String type) {
         // Only named reference types and generic arguments: declarations are not Java snippets.
         if (!type.matches("[A-Za-z_$][A-Za-z0-9_$.]*(\\s*<.*>)?(\\[\\])*")
                 || type.matches(".*[^A-Za-z0-9_$.,<>\\[\\] ].*"))
@@ -239,15 +239,23 @@ final class MvcTemplates {
                                     "java.util.Collection",
                                     "java.util.Map")
                             .contains(word)
-                    && RestControllerAnnotationProcessor.resolveClass(ctx, word.replace('.', '/'))
-                            == null)
+                    && MvcTypes.resolveClass(ctx, word) == null)
                 throw new IllegalArgumentException("Unknown model type " + word);
         }
+        return MvcTypes.sourceType(ctx, type);
     }
 
     private void validate(Template t, Node node) {
         if (node instanceof Element) {
             Element e = (Element) node;
+            // htmx recognizes both spellings. Normalize before overrides and CSRF analysis.
+            for (Attribute attribute : new ArrayList<Attribute>(e.attributes().asList())) {
+                String canonical = canonicalAttribute(attribute.getKey());
+                if (!canonical.equals(attribute.getKey())) {
+                    if (!e.hasAttr(canonical)) e.attr(canonical, attribute.getValue());
+                    e.removeAttr(attribute.getKey());
+                }
+            }
             if ((e.normalName().equals("script") || e.normalName().equals("style"))
                     && (e.hasAttr("th:text") || e.hasAttr("th:insert") || e.hasAttr("th:errors")))
                 throw problem(t, e, "Dynamic script/style content is not supported");
@@ -477,6 +485,7 @@ final class MvcTemplates {
                                     .substring(0, equal)
                                     .trim()
                                     .toLowerCase(java.util.Locale.ROOT);
+                    attr = canonicalAttribute(attr);
                     if (!attr.matches("[a-z][a-z0-9:_-]*")
                             || attr.startsWith("on")
                             || attr.equals("style")
@@ -551,23 +560,57 @@ final class MvcTemplates {
                                                     + fieldValue
                                                     + ")",
                                             "java.lang.Object"));
+                    String checked = HTML + "checked(" + fieldValue + ", " + candidate.code + ")";
+                    if ("java.lang.Boolean".equals(value.type) || "boolean".equals(value.type))
+                        checked =
+                                "("
+                                        + checkbox
+                                        + " ? "
+                                        + HTML
+                                        + "truth("
+                                        + fieldValue
+                                        + ") : "
+                                        + checked
+                                        + ")";
                     dynamic.put(
                             "checked",
-                            new MvcExpression.Value(
-                                    choice
-                                            + " && "
-                                            + HTML
-                                            + "checked("
-                                            + fieldValue
-                                            + ", "
-                                            + candidate.code
-                                            + ")",
-                                    "boolean"));
+                            new MvcExpression.Value(choice + " && " + checked, "boolean"));
                     if (inputType != null) out.append("if (").append(checkbox).append(") {\n");
-                    if (inputType != null || e.attr("type").equalsIgnoreCase("checkbox"))
-                        literal(
-                                out,
-                                "<input type=\"hidden\" name=\"_" + field + "\" value=\"on\">");
+                    if (inputType != null || e.attr("type").equalsIgnoreCase("checkbox")) {
+                        literal(out, "<input type=\"hidden\" name=\"_" + field + "\" value=\"on\"");
+                        // The marker must have the same successful-control semantics as its
+                        // checkbox.
+                        for (String attribute : Arrays.asList("disabled", "form")) {
+                            MvcExpression.Value effective = dynamic.get(attribute);
+                            if (effective != null) {
+                                out.append(HTML)
+                                        .append(
+                                                attribute.equals("disabled")
+                                                        ? "booleanAttribute"
+                                                        : "attribute")
+                                        .append("(out, ")
+                                        .append(q(attribute))
+                                        .append(", ")
+                                        .append(effective.code)
+                                        .append(");\n");
+                            } else if (e.hasAttr(attribute)) {
+                                out.append(HTML)
+                                        .append(
+                                                attribute.equals("disabled")
+                                                        ? "booleanAttribute"
+                                                        : "attribute")
+                                        .append("(out, ")
+                                        .append(q(attribute))
+                                        .append(", ")
+                                        .append(
+                                                attribute.equals("disabled")
+                                                        ? "true"
+                                                        : q(e.attr(attribute)))
+                                        .append(");\n");
+                            }
+                        }
+                        literal(out, ">");
+                    }
                     if (inputType != null) out.append("}\n");
                 } else
                     dynamic.put("value", new MvcExpression.Value(fieldValue, "java.lang.Object"));
@@ -667,6 +710,10 @@ final class MvcTemplates {
         else for (Node child : e.childNodes()) render(t, child, env, form, select, out);
         if (!block && !e.tag().isEmpty()) literal(out, "</" + tag + ">");
         close(out, braces);
+    }
+
+    private static String canonicalAttribute(String name) {
+        return name.startsWith("data-hx-") ? name.substring(5) : name;
     }
 
     private static String unsafeHtmx(Element e, Map<String, MvcExpression.Value> dynamic) {

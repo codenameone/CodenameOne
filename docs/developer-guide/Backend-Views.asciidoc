@@ -107,7 +107,10 @@ include::../demos/backend/src/main/snippets/edit.html[tag=backend-views-form,ind
 
 `th:field` renders the name, a default id, and the submitted value if binding failed.
 It supports inputs, textareas, scalar selects, checkboxes and radio buttons.
-Checkboxes emit a hidden marker so an unchecked field binds to false.
+Boolean checkboxes use field presence, including with custom values. They emit a
+hidden marker so an unchecked field binds to false. The marker shares the
+checkbox's disabled state and form association. Without a marker, Boolean fields
+use strict value conversion.
 `th:errors="*{*}"` renders all errors for the selected form. Use distinct explicit
 ids for radio buttons in a group. Multiple-selection collection binding is deferred.
 

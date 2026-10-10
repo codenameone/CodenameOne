@@ -308,7 +308,7 @@ final class MvcExpression {
             }
         }
         if (access == null) throw error("No readable property '" + name + "' on " + owner.type);
-        String boxed = box(type);
+        String boxed = box(MvcTypes.sourceType(ctx, type));
         return new Value(
                 "("
                         + owner.code
@@ -330,7 +330,7 @@ final class MvcExpression {
             String owner = pending.removeFirst();
             String name = raw(owner).replace('.', '/');
             if (!seen.add(name) || "java/lang/Object".equals(name)) continue;
-            AnnotatedClass cls = RestControllerAnnotationProcessor.resolveClass(ctx, name);
+            AnnotatedClass cls = MvcTypes.resolveClass(ctx, raw(owner));
             if (cls == null) continue;
             MvcTypes resolved = new MvcTypes(cls, owner);
             result.add(resolved);

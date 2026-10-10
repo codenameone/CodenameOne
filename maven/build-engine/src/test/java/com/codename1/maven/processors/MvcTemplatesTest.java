@@ -1373,6 +1373,251 @@ public class MvcTemplatesTest {
         assertFalse(new File(generated, "Asset0.class").exists());
     }
 
+    @Test
+    public void checkboxMarkersMirrorDisabledAndFormAttributes() throws Exception {
+        setup();
+        template(
+                "markers",
+                DECL
+                        + "<!-- cn1:model disabled java.lang.Boolean --><!-- cn1:model owner"
+                        + " java.lang.String --><!-- cn1:model kind java.lang.String --><form"
+                        + " id=\"other\"></form><div th:object=\"${product}\"><input id=\"static\""
+                        + " type=\"checkbox\" th:field=\"*{active}\" disabled form=\"other\"><input"
+                        + " id=\"dynamic\" th:field=\"*{active}\" disabled form=\"old\""
+                        + " th:disabled=\"${disabled}\" th:attr=\"type=${kind},form=${owner}\">"
+                        + "</div>");
+        compile();
+        Model model =
+                new Model()
+                        .addAttribute("product", product("item", 1))
+                        .addAttribute("disabled", true)
+                        .addAttribute("owner", "other")
+                        .addAttribute("kind", "checkbox");
+        for (Object disabled : Arrays.asList(true, false, null)) {
+            model.addAttribute("disabled", disabled);
+            org.jsoup.nodes.Document html = org.jsoup.Jsoup.parse(render("markers", model));
+            for (String id : Arrays.asList("static", "dynamic")) {
+                org.jsoup.nodes.Element checkbox = html.getElementById(id);
+                org.jsoup.nodes.Element marker = checkbox.previousElementSibling();
+                assertEquals("_active", marker.attr("name"));
+                assertEquals(checkbox.hasAttr("disabled"), marker.hasAttr("disabled"));
+                assertEquals(checkbox.attr("form"), marker.attr("form"));
+            }
+        }
+        model.addAttribute("owner", null);
+        org.jsoup.nodes.Element checkbox =
+                org.jsoup.Jsoup.parse(render("markers", model)).getElementById("dynamic");
+        assertFalse(checkbox.hasAttr("form"));
+        assertFalse(checkbox.previousElementSibling().hasAttr("form"));
+        model.addAttribute("kind", "radio");
+        assertEquals(
+                1,
+                org.jsoup.Jsoup.parse(render("markers", model))
+                        .select("input[name=_active]")
+                        .size());
+    }
+
+    @Test
+    public void dataHtmxAliasesRejectExecutableAttributes() throws Exception {
+        setup();
+        for (String attribute :
+                Arrays.asList(
+                        "data-hx-on:click",
+                        "DATA-HX-ON::before-request",
+                        "data-hx-vals",
+                        "Data-Hx-Headers")) {
+            template(
+                    "alias",
+                    "<!-- cn1:model payload java.lang.String --><button th:attr=\""
+                            + attribute
+                            + "=${payload}\">Go</button>");
+            try {
+                new MvcTemplates(context).sources();
+                fail("Accepted executable alias " + attribute);
+            } catch (IllegalArgumentException expected) {
+                assertTrue(
+                        expected.getMessage(),
+                        expected.getMessage().contains("Unsupported dynamic attribute"));
+            }
+        }
+    }
+
+    @Test
+    public void dataHtmxAliasesUseUrlValidationAndCsrfHandling() throws Exception {
+        setup();
+        template(
+                "alias",
+                "<!-- cn1:model url java.lang.String --><form id=\"static\""
+                    + " data-hx-post=\"/save\"></form><form id=\"dynamic\""
+                    + " data-hx-post=\"/fallback\" th:attr=\"DATA-HX-POST=${url}\"></form><button"
+                    + " id=\"external\" form=\"static\""
+                    + " th:attr=\"data-hx-delete=${url}\">Delete</button><a"
+                    + " th:attr=\"data-hx-get=${url}\">Get</a>");
+        compile();
+        Model model =
+                new Model()
+                        .addAttribute("url", "/save")
+                        .addAttribute(
+                                "_csrf",
+                                new com.codename1.backend.security.CsrfToken() {
+                                    public String getToken() {
+                                        return "token";
+                                    }
+
+                                    public String getHeaderName() {
+                                        return "X-CSRF-TOKEN";
+                                    }
+
+                                    public String getParameterName() {
+                                        return "_csrf";
+                                    }
+                                });
+        org.jsoup.nodes.Document html = org.jsoup.Jsoup.parse(render("alias", model));
+        assertEquals(1, html.select("form#static input[name=_csrf]").size());
+        assertEquals(1, html.select("form#dynamic input[name=_csrf]").size());
+        assertEquals(1, html.select("input[name=_csrf][form=static]").size());
+        model.addAttribute("url", null);
+        html = org.jsoup.Jsoup.parse(render("alias", model));
+        assertTrue(
+                html.select("form#dynamic input[name=_csrf], input[name=_csrf][form=static]")
+                        .isEmpty());
+        assertFalse(html.getElementById("dynamic").hasAttr("data-hx-post"));
+        assertFalse(html.getElementById("dynamic").hasAttr("hx-post"));
+        for (String url : Arrays.asList("javascript:alert(1)", "data:text/html,bad")) {
+            model.addAttribute("url", url);
+            try {
+                render("alias", model);
+                fail("Unsafe alias URL " + url);
+            } catch (IllegalArgumentException expected) {
+                assertTrue(expected.getMessage().contains("URL"));
+            }
+        }
+    }
+
+    @Test
+    public void nestedModelDeclarationsAndPropertiesUseJavaSourceNames() throws Exception {
+        setup();
+        fixtureSources(
+                Collections.singletonMap(
+                        "sample.Forms",
+                        "package sample; public class Forms { public static class Edit { public"
+                            + " String name=\"nested\"; public Edit getSelf(){return this;} public"
+                            + " java.util.List<Edit> getItems(){return"
+                            + " java.util.Collections.singletonList(this);} } }"));
+        template(
+                "nested",
+                "<!-- cn1:model form sample.Forms.Edit --><!-- cn1:model forms"
+                        + " java.util.List<sample.Forms.Edit> --><b th:text=\"${form.name}\"></b><i"
+                        + " th:text=\"${form.self.name}\"></i><em th:each=\"item : ${form.items}\""
+                        + " th:text=\"${item.name}\"></em><u th:text=\"${forms[0].name}\"></u>");
+        compile();
+        Object form = loader.loadClass("sample.Forms$Edit").newInstance();
+        String html =
+                render(
+                        "nested",
+                        new Model()
+                                .addAttribute("form", form)
+                                .addAttribute("forms", Collections.singletonList(form)));
+        assertTrue(html, html.contains("<b>nested</b><i>nested</i><em>nested</em><u>nested</u>"));
+    }
+
+    @Test
+    public void nestedClasspathModelsPreserveActualDollarNames() throws Exception {
+        setup();
+        Map<String, String> fixtures = new LinkedHashMap<String, String>();
+        fixtures.put(
+                "sample.Forms",
+                "package sample; public class Forms { public static class Edit { public String"
+                    + " name=\"nested\"; } }");
+        fixtures.put(
+                "sample.Dollar$Model",
+                "package sample; public class Dollar$Model { public String name=\"dollar\"; }");
+        fixtureSources(fixtures);
+        context =
+                new ProcessorContext(
+                        classes,
+                        tmp.newFolder(),
+                        Collections.<String, AnnotatedClass>emptyMap(),
+                        new SystemStreamLog(),
+                        project,
+                        new Properties(),
+                        null,
+                        Collections.<String>emptyList(),
+                        "UTF-8",
+                        Arrays.asList(classpath().get(0).getPath(), classes.getPath()));
+        template(
+                "classpath",
+                "<!-- cn1:model form sample.Forms.Edit --><!-- cn1:model binary sample.Forms$Edit"
+                    + " --><!-- cn1:model dollar sample.Dollar$Model --><b"
+                    + " th:text=\"${form.name}\"></b><i th:text=\"${binary.name}\"></i><em"
+                    + " th:text=\"${dollar.name}\"></em>");
+        compile();
+        Object form = loader.loadClass("sample.Forms$Edit").newInstance();
+        String html =
+                render(
+                        "classpath",
+                        new Model()
+                                .addAttribute("form", form)
+                                .addAttribute("binary", form)
+                                .addAttribute(
+                                        "dollar",
+                                        loader.loadClass("sample.Dollar$Model").newInstance()));
+        assertTrue(html, html.contains("<b>nested</b><i>nested</i><em>dollar</em>"));
+    }
+
+    @Test
+    public void booleanCheckboxesUsePresenceWithCustomValuesAndRetainRadioSemantics()
+            throws Exception {
+        setup();
+        template(
+                "checks",
+                DECL
+                        + "<!-- cn1:model candidate java.lang.String --><!-- cn1:model kind"
+                        + " java.lang.String --><div th:object=\"${product}\"><input id=\"check\""
+                        + " th:attr=\"type=${kind}\" th:field=\"*{active}\""
+                        + " th:value=\"${candidate}\"><input id=\"radio\" type=\"radio\""
+                        + " th:field=\"*{active}\" value=\"false\"></div>");
+        HttpServer.Handler handler =
+                controller(
+                        "package sample; import com.codename1.backend.annotations.*; import"
+                            + " com.codename1.backend.mvc.*; @Controller public class Pages {"
+                            + " @GetMapping(\"/checks\") public String checks(){return \"checks\";}"
+                            + " @PostMapping(\"/bind\") @ResponseBody public String"
+                            + " bind(@ModelAttribute(\"product\") Product p, BindingResult errors)"
+                            + " { return"
+                            + " p.active+\"|\"+errors.hasErrors()+\"|\"+errors.fieldValue(\"active\","
+                            + " p.active); } }");
+        Object product = product("item", 1);
+        product.getClass().getField("active").setBoolean(product, true);
+        Model model = new Model().addAttribute("product", product).addAttribute("kind", "checkbox");
+        for (String candidate : Arrays.asList("yes", "1", "false", "", "custom")) {
+            model.addAttribute("candidate", candidate);
+            org.jsoup.nodes.Document html = org.jsoup.Jsoup.parse(render("checks", model));
+            assertTrue(candidate, html.getElementById("check").hasAttr("checked"));
+            assertEquals(candidate, html.getElementById("check").val());
+            assertFalse(html.getElementById("radio").hasAttr("checked"));
+            String submitted =
+                    "_active=on&active=" + java.net.URLEncoder.encode(candidate, "UTF-8");
+            assertEquals(
+                    "true|false|true",
+                    body(handler.handle(request("POST", "/bind", submitted, false))));
+        }
+        assertEquals(
+                "false|false|false",
+                body(handler.handle(request("POST", "/bind", "_active=on", false))));
+        assertEquals(
+                "false|false|false",
+                body(handler.handle(request("POST", "/bind", "active=false", false))));
+        assertTrue(
+                body(handler.handle(request("POST", "/bind", "active=invalid", false)))
+                        .contains("|true|"));
+        product.getClass().getField("active").setBoolean(product, false);
+        model.addAttribute("candidate", "false");
+        org.jsoup.nodes.Document html = org.jsoup.Jsoup.parse(render("checks", model));
+        assertFalse(html.getElementById("check").hasAttr("checked"));
+        assertTrue(html.getElementById("radio").hasAttr("checked"));
+    }
+
     private static volatile int benchmarkSink;
 
     @Test

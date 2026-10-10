@@ -100,6 +100,9 @@ public final class Html {
             return;
         }
         name = asciiLower(name);
+        if (name.startsWith("data-hx-")) {
+            name = name.substring(5);
+        }
         if ("href".equals(name)
                 || "xlink:href".equals(name)
                 || "src".equals(name)
