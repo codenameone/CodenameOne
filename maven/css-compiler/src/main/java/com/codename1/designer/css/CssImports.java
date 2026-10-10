@@ -114,8 +114,9 @@ public final class CssImports {
         }
     }
 
-    /// Every existing local file a `url()` of `css`, or of anything it
-    /// imports, names: its images and fonts.
+    /// Every local file a `url()` of `css`, or of anything it imports,
+    /// names: its images and fonts. One that is not there yet is included,
+    /// so that a caller watching these notices it arrive.
     ///
     /// These are compiled into the theme, so a caller deciding whether a
     /// theme is stale has to look at them as well as at the stylesheets.
@@ -133,7 +134,7 @@ public final class CssImports {
                 // from one and none can go stale.
                 if (isRelativeUrl(url)) {
                     File file = new File(dir, url);
-                    if (file.isFile()) {
+                    if (file.isFile() || !file.exists()) {
                         found.add(file);
                     }
                 }
@@ -241,6 +242,11 @@ public final class CssImports {
         } finally {
             stack.remove(stack.size() - 1);
         }
+        // An SVG or Lottie file beside a stylesheet imported from outside
+        // the project is compiled to its placeholder like any other, but the
+        // build's transcoder looks for these files in the project's own
+        // source directories and does not follow imports. Such a file has to
+        // be in one of those directories to be drawn at runtime.
         // Only now, with the file's own imports expanded and already expressed
         // relative to it, is everything moved up one level. Rebasing first
         // would also rewrite the paths of the nested imports themselves.

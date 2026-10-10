@@ -67,17 +67,11 @@ public final class BoxShadowPainter {
         if (shape.isEmpty()) {
             return;
         }
-        double sigma = Math.max(0, shadow.blur) / 2;
-        int m = GaussianBlur.radius(sigma) + 1;
-        int bw = w + 2 * m;
-        int bh = h + 2 * m;
-        float[] cov = Pixels.coverage(shape.toPath(), bw, bh, m, m);
-        GaussianBlur.blur(cov, bw, bh, sigma);
+        BlurredMask mask = BlurredMask.of(shape.toPath(), w, h, Math.max(0, shadow.blur) / 2);
         for (int y = 0; y < h; y++) {
-            int src = (y + m) * bw + m;
             int row = y * w;
             for (int x = 0; x < w; x++) {
-                float a = cov[src + x] * (1f - borderCoverage[row + x]);
+                float a = mask.at(x, y) * (1f - borderCoverage[row + x]);
                 if (a > 0f) {
                     Pixels.blend(dst, row + x, shadow.color, a);
                 }
@@ -85,9 +79,62 @@ public final class BoxShadowPainter {
         }
     }
 
-    /// The most values in the plane an inset shadow is blurred on.
+    /// A shape's coverage of a `w` by `h` image, blurred.
+    ///
+    /// The blur needs a margin as wide as it reaches, which for a large blur
+    /// is far more than the image. Past a budget the mask is blurred at a
+    /// fraction of the size instead: a blur that wide has no detail a
+    /// smaller plane would lose.
+    private static final class BlurredMask {
+        private final float[] cov;
+        private final int stride;
+        private final int margin;
+        private final int scale;
+
+        private BlurredMask(float[] cov, int stride, int margin, int scale) {
+            this.cov = cov;
+            this.stride = stride;
+            this.margin = margin;
+            this.scale = scale;
+        }
+
+        /// `outline` may be null for a shape that covers nothing.
+        static BlurredMask of(java.awt.Shape outline, int w, int h, double sigma) {
+            double reach = 3 * sigma + 2;
+            double fullW = w + 2 * reach;
+            double fullH = h + 2 * reach;
+            int scale = 1;
+            if (fullW * fullH > MAX_BLUR_PLANE) {
+                scale = (int) Math.min(MAX_BLUR_SCALE, Math.ceil(Math.sqrt(fullW * fullH / MAX_BLUR_PLANE)));
+                // Past the largest reduction the blur is wider than anything
+                // left to blur, and a wider one still looks the same.
+                sigma = Math.min(sigma / scale, MAX_REDUCED_SIGMA);
+            }
+            int m = GaussianBlur.radius(sigma) + 1;
+            int bw = (w + scale - 1) / scale + 2 * m;
+            int bh = (h + scale - 1) / scale + 2 * m;
+            float[] cov;
+            if (outline == null) {
+                cov = new float[bw * bh];
+            } else {
+                if (scale > 1) {
+                    outline = java.awt.geom.AffineTransform.getScaleInstance(1.0 / scale, 1.0 / scale)
+                            .createTransformedShape(outline);
+                }
+                cov = Pixels.coverage(outline, bw, bh, m, m);
+                GaussianBlur.blur(cov, bw, bh, sigma);
+            }
+            return new BlurredMask(cov, bw, m, scale);
+        }
+
+        float at(int x, int y) {
+            return cov[(y / scale + margin) * stride + margin + x / scale];
+        }
+    }
+
+    /// The most values in the plane a shadow is blurred on.
     private static final double MAX_BLUR_PLANE = 16.0 * 1024 * 1024;
-    /// The most an inset shadow's plane is reduced by.
+    /// The most a shadow's plane is reduced by.
     private static final int MAX_BLUR_SCALE = 4096;
     /// The widest blur applied to a reduced plane, whose margins stay within
     /// [#MAX_BLUR_PLANE] at this width.
@@ -118,45 +165,14 @@ public final class BoxShadowPainter {
         }
         float[] clip = Pixels.coverage(paddingBox.toPath(), w, h, 0, 0);
         RoundedBox hole = paddingBox.grow(-shadow.spread).translate(shadow.offsetX, shadow.offsetY);
-        double sigma = Math.max(0, shadow.blur) / 2;
-        // The blur needs a margin as wide as it reaches, which for a large
-        // blur is far more than the image. Past a budget the mask is blurred
-        // at a fraction of the size instead: a blur that wide has no detail
-        // a smaller plane would lose.
-        double reach = 3 * sigma + 2;
-        double fullW = w + 2 * reach;
-        double fullH = h + 2 * reach;
-        int scale = 1;
-        if (fullW * fullH > MAX_BLUR_PLANE) {
-            scale = (int) Math.min(MAX_BLUR_SCALE, Math.ceil(Math.sqrt(fullW * fullH / MAX_BLUR_PLANE)));
-            // Past the largest reduction the blur is wider than anything
-            // left to blur, and a wider one still looks the same.
-            sigma = Math.min(sigma / scale, MAX_REDUCED_SIGMA);
-        }
-        int m = GaussianBlur.radius(sigma) + 1;
-        int sw = (w + scale - 1) / scale;
-        int sh = (h + scale - 1) / scale;
-        int bw = sw + 2 * m;
-        int bh = sh + 2 * m;
-        float[] cov;
-        if (hole.isEmpty()) {
-            cov = new float[bw * bh];
-        } else {
-            java.awt.Shape outline = hole.toPath();
-            if (scale > 1) {
-                outline = java.awt.geom.AffineTransform.getScaleInstance(1.0 / scale, 1.0 / scale)
-                        .createTransformedShape(outline);
-            }
-            cov = Pixels.coverage(outline, bw, bh, m, m);
-            GaussianBlur.blur(cov, bw, bh, sigma);
-        }
+        BlurredMask mask = BlurredMask.of(hole.isEmpty() ? null : hole.toPath(), w, h,
+                Math.max(0, shadow.blur) / 2);
         for (int y = 0; y < h; y++) {
-            int src = (y / scale + m) * bw + m;
             int row = y * w;
             for (int x = 0; x < w; x++) {
                 float c = clip[row + x];
                 if (c > 0f) {
-                    float a = (1f - cov[src + x / scale]) * c;
+                    float a = (1f - mask.at(x, y)) * c;
                     if (a > 0f) {
                         Pixels.blend(dst, row + x, shadow.color, a);
                     }

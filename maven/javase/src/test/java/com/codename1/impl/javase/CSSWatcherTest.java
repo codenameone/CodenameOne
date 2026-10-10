@@ -405,6 +405,26 @@ class CSSWatcherTest {
     }
 
     @Test
+    void aLibraryWithoutThePrefixedThemeIsLeftOutOfItsInputs(@TempDir Path tempDir) throws Exception {
+        File root = mavenProject(tempDir.toFile());
+        launchFrom(new File(root, "javase"));
+        File lib = new File(tempDir.toFile(), "lib/theme.css");
+        File app = new File(tempDir.toFile(), "app/theme.css");
+        File appDark = new File(tempDir.toFile(), "app/dark-theme.css");
+        for (File f : new File[] {lib, app, appDark}) {
+            f.getParentFile().mkdirs();
+            java.nio.file.Files.write(f.toPath(), new byte[0]);
+        }
+        System.setProperty("codename1.css.compiler.args.input", lib.getPath() + "," + app.getPath());
+        System.setProperty("codename1.css.compiler.args.output", new File(tempDir.toFile(), "theme.res").getPath());
+        System.setProperty("codename1.css.compiler.args.merge", new File(tempDir.toFile(), "theme.css").getPath());
+
+        assertEquals(lib.getPath() + "," + app.getPath(), new CSSWatcher().resolveCompilerArgs().input);
+        assertEquals(appDark.getPath(), new CSSWatcher("dark-").resolveCompilerArgs().input,
+                "only the application has a dark theme");
+    }
+
+    @Test
     void anUnexpandedPomPlaceholderIsNotAnArgument(@TempDir Path tempDir) throws Exception {
         File root = mavenProject(tempDir.toFile());
         launchFrom(new File(root, "javase"));

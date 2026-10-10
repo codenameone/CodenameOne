@@ -316,6 +316,57 @@ class CSSGeneratedImageTest {
     }
 
     @Test
+    void theBackgroundShorthandKeepsARepeatForEachAxis(@TempDir Path dir) throws Exception {
+        // `no-repeat repeat` tiles down and not across. The box is 320 by
+        // 100 and starts at (2, 2); the tile is 10 by 10.
+        png(new File(dir.toFile(), "img/tile.png"), 10, 10, 0xff0000ff);
+        Compiled c = compile(dir, "Banner { width: 50%; height: 10%; background-color: #ffffff;"
+                + " background: url(img/tile.png) no-repeat repeat; box-shadow: 0 0 4px black; }");
+        BufferedImage img = stored(c.res, "Banner_1.png", Display.DENSITY_HD);
+        assertEquals(0xff0000ff, img.getRGB(2 + 5, 2 + 5), "the first tile");
+        assertEquals(0xff0000ff, img.getRGB(2 + 5, 2 + 55), "repeated down");
+        assertTrue(img.getRGB(2 + 55, 2 + 5) != 0xff0000ff, "and not across");
+    }
+
+    @Test
+    void aDotLottieArchiveIsPaintedFromTheAnimationInside(@TempDir Path dir) throws Exception {
+        String json = "{\"v\":\"5.7.0\",\"fr\":30,\"ip\":0,\"op\":30,\"w\":100,\"h\":100,"
+                + "\"layers\":[{\"ty\":4,\"nm\":\"sq\",\"ip\":0,\"op\":30,"
+                + "\"ks\":{\"a\":{\"a\":0,\"k\":[0,0]},\"p\":{\"a\":0,\"k\":[50,50]},"
+                + "\"s\":{\"a\":0,\"k\":[100,100]},\"r\":{\"a\":0,\"k\":0},\"o\":{\"a\":0,\"k\":100}},"
+                + "\"shapes\":[{\"ty\":\"rc\",\"p\":{\"a\":0,\"k\":[0,0]},\"s\":{\"a\":0,\"k\":[40,40]},"
+                + "\"r\":{\"a\":0,\"k\":0}},"
+                + "{\"ty\":\"fl\",\"c\":{\"a\":0,\"k\":[1,0,0,1]},\"o\":{\"a\":0,\"k\":100}}]}]}";
+        File archive = new File(dir.toFile(), "img/square.lottie");
+        archive.getParentFile().mkdirs();
+        java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(
+                new java.io.FileOutputStream(archive));
+        try {
+            zip.putNextEntry(new java.util.zip.ZipEntry("manifest.json"));
+            zip.write("{\"animations\":[{\"id\":\"square\"}]}".getBytes(StandardCharsets.UTF_8));
+            zip.closeEntry();
+            zip.putNextEntry(new java.util.zip.ZipEntry("animations/square.json"));
+            zip.write(json.getBytes(StandardCharsets.UTF_8));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        Compiled c = compile(dir, "Banner { width: 50%; height: 10%; background-color: #ffffff;"
+                + " background-image: url(img/square.lottie); background-repeat: no-repeat;"
+                + " box-shadow: 0 0 4px black; }");
+        BufferedImage img = stored(c.res, "Banner_1.png", Display.DENSITY_HD);
+        assertEquals(0xffff0000, img.getRGB(2 + 50, 2 + 50), "the square");
+        assertEquals(0xffffffff, img.getRGB(2 + 10, 2 + 10));
+
+        // Without a generated image it is a placeholder, like the JSON form.
+        Path other = Files.createDirectory(dir.resolve("other"));
+        new File(other.toFile(), "img").mkdirs();
+        Files.copy(archive.toPath(), other.resolve("img/square.lottie"));
+        Compiled plain = compile(other, "Icon { background-image: url(img/square.lottie); }");
+        assertNotNull(plain.keys.get("Icon.bgImage"), String.valueOf(plain.keys.keySet()));
+    }
+
+    @Test
     void aGradientWrittenAsABackgroundImageIsPainted(@TempDir Path dir) throws Exception {
         Compiled c = compile(dir, "Banner { width: 50%; height: 10%;"
                 + " background-image: linear-gradient(to right, #ffffff 50%, #000000 50%);"

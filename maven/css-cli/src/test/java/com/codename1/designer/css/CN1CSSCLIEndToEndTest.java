@@ -358,6 +358,33 @@ class CN1CSSCLIEndToEndTest {
     }
 
     @Test
+    void anImageThatIsNotThereYetIsStillSomethingTheStylesheetDependsOn(@TempDir Path tmp) throws Exception {
+        File css = write(new File(tmp.toFile(), "theme.css"),
+                "A { background-image: url(img/later.png); }\n");
+
+        java.util.Set<File> found = CssImports.assets(css);
+
+        assertTrue(found.contains(new File(tmp.toFile().getCanonicalFile(), "img/later.png")), found.toString());
+    }
+
+    @Test
+    void anImageDeletedFromAMergedBuildIsReportedInsteadOfKept(@TempDir Path tmp) throws Exception {
+        File common = mavenProject(tmp.toFile());
+        File css = write(new File(common, "src/main/css/theme.css"),
+                "Badge { background-image: url(img/a.png); cn1-source-dpi: 160; }\n");
+        File image = png(new File(common, "src/main/css/img/a.png"), 8, 6, 0xff336699);
+        File merged = new File(common, "target/css/theme.css");
+        File res = new File(common, "target/classes/theme.res");
+        String[] args = {"-input", css.getPath(), "-output", res.getPath(), "-merge", merged.getPath()};
+        assertEquals(0, CN1CSSCLI.run(args), stderr());
+
+        assertTrue(image.delete());
+
+        assertEquals(CN1CSSCLI.EXIT_COMPILE_FAILED, CN1CSSCLI.run(args),
+                "the image is gone and the stylesheet still names it: " + stdout());
+    }
+
+    @Test
     void aMissingImportIsStillSomethingTheStylesheetDependsOn(@TempDir Path tmp) throws Exception {
         File css = write(new File(tmp.toFile(), "theme.css"),
                 "@import \"first.css\";\n@import \"absent.css\";\n");

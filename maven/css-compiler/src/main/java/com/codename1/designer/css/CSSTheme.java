@@ -3685,7 +3685,8 @@ public class CSSTheme {
             // file name so the theme references it by name; the runtime
             // com.codename1.generated.svg.SVGRegistry (when present) then
             // overrides the entry with the transcoded image during init().
-            if (endsWithIgnoreCase(fileName, ".svg") || endsWithIgnoreCase(fileName, ".json")) {
+            if (endsWithIgnoreCase(fileName, ".svg") || endsWithIgnoreCase(fileName, ".json")
+                    || endsWithIgnoreCase(fileName, ".lottie")) {
                 Image placeholder = registerSVGPlaceholder(fileName);
                 if (placeholder != null) {
                     loadedImages.put(url, placeholder);
@@ -4169,7 +4170,8 @@ public class CSSTheme {
             end = fragment;
         }
         String path = url.substring(0, end);
-        return endsWithIgnoreCase(path, ".svg") || endsWithIgnoreCase(path, ".json");
+        return endsWithIgnoreCase(path, ".svg") || endsWithIgnoreCase(path, ".json")
+                || endsWithIgnoreCase(path, ".lottie");
     }
 
     /// The directory `url` names when it is a multi-image -- one PNG per
@@ -4218,7 +4220,7 @@ public class CSSTheme {
             InputStream in = imgURL.openStream();
             try {
                 String path = imgURL.getPath();
-                return endsWithIgnoreCase(path, ".json") ? VectorImage.readLottie(in) : VectorImage.readSvg(in);
+                return endsWithIgnoreCase(path, ".svg") ? VectorImage.readSvg(in) : VectorImage.readLottie(in);
             } finally {
                 in.close();
             }
@@ -8186,6 +8188,14 @@ public class CSSTheme {
                                 || "repeat-x".equals(keyword) || "repeat-y".equals(keyword)) {
                             style.put("background-repeat", value);
                             value = value.getNextLexicalUnit();
+                            // `no-repeat repeat` is one value, an axis each.
+                            // What is stored is the first keyword, with the
+                            // second still following it.
+                            if (value != null && value.getLexicalUnitType() == LexicalUnit.SAC_IDENT
+                                    && ("repeat".equals(value.getStringValue())
+                                    || "no-repeat".equals(value.getStringValue()))) {
+                                value = value.getNextLexicalUnit();
+                            }
                             continue;
                         }
                         if ("left".equals(keyword) || "right".equals(keyword) || "top".equals(keyword)

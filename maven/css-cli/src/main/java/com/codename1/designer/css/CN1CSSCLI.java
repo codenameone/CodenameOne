@@ -387,7 +387,8 @@ public class CN1CSSCLI {
             return false;
         }
         for (File dependency : dependencies(css, options)) {
-            if (dependency.lastModified() > built) {
+            // One that is missing is for the compile to report.
+            if (!dependency.exists() || dependency.lastModified() > built) {
                 return false;
             }
         }
@@ -610,9 +611,18 @@ public class CN1CSSCLI {
                     Files.copy(child.toPath(), destChild.toPath(), StandardCopyOption.REPLACE_EXISTING);
                 }
             }
+            destChildren.remove(childName);
         }
-        
-        
+        // What is left was copied from a file that has since been deleted.
+        // Kept, it would go on being compiled into the theme, and a url()
+        // that no longer names anything would never be reported. The
+        // directory of assets copied in from outside is not a copy of
+        // anything in the source and is left alone.
+        for (String leftover : destChildren) {
+            if (!OUTSIDE_ASSETS_DIR.equals(leftover)) {
+                delTree(new File(destDir, leftover));
+            }
+        }
     }
     
     private static String getMd5(String input) 

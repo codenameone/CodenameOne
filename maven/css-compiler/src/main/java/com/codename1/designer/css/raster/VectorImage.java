@@ -94,8 +94,42 @@ public final class VectorImage {
     }
 
     /// Reads a Lottie animation.
+    ///
+    /// The stream is either the animation's JSON or a dotLottie archive, a
+    /// zip that holds the JSON under `animations/`.
     public static VectorImage readLottie(InputStream in) throws IOException {
-        return new VectorImage(LottieParser.parse(in), true);
+        java.io.BufferedInputStream buffered = new java.io.BufferedInputStream(in);
+        buffered.mark(4);
+        int first = buffered.read();
+        int second = buffered.read();
+        buffered.reset();
+        if (first != 'P' || second != 'K') {
+            return new VectorImage(LottieParser.parse(buffered), true);
+        }
+        java.util.zip.ZipInputStream zip = new java.util.zip.ZipInputStream(buffered);
+        byte[] fallback = null;
+        for (java.util.zip.ZipEntry entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
+            String name = entry.getName();
+            if (entry.isDirectory() || !name.endsWith(".json") || name.endsWith("manifest.json")) {
+                continue;
+            }
+            java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+            byte[] chunk = new byte[8192];
+            for (int n = zip.read(chunk); n >= 0; n = zip.read(chunk)) {
+                bytes.write(chunk, 0, n);
+            }
+            if (name.startsWith("animations/") || name.startsWith("a/")) {
+                return new VectorImage(LottieParser.parse(
+                        new java.io.ByteArrayInputStream(bytes.toByteArray())), true);
+            }
+            if (fallback == null) {
+                fallback = bytes.toByteArray();
+            }
+        }
+        if (fallback == null) {
+            throw new IOException("the dotLottie archive holds no animation");
+        }
+        return new VectorImage(LottieParser.parse(new java.io.ByteArrayInputStream(fallback)), true);
     }
 
     /// The width the file asks for, in CSS pixels. At least 1.

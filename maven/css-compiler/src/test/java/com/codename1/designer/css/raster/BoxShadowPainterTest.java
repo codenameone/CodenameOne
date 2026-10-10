@@ -353,6 +353,20 @@ class BoxShadowPainterTest {
     }
 
     @Test
+    void anOuterBlurFarWiderThanTheBoxIsPaintedWithinABoundedPlane() {
+        // The image is some 5000 pixels a side; at full size the plane the
+        // shadow is blurred on would be 20000.
+        final BoxStyle.Builder box = BoxStyle.builder().size(1, 1).pad(2500)
+                .backgroundColor(0xffffffff).shadow(new Shadow(0, 0, 5000, 400, 0xff000000, false));
+        BufferedImage img = org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(
+                java.time.Duration.ofSeconds(120), () -> RasterAssert.paint(box));
+        int near = img.getRGB(2500 + 100, 2500) >>> 24;
+        int far = img.getRGB(2500 + 2400, 2500) >>> 24;
+        org.junit.jupiter.api.Assertions.assertTrue(near > far && near > 0,
+                "the shadow fades away from the box: " + near + " then " + far);
+    }
+
+    @Test
     void anInsetBlurFarWiderThanTheBoxIsPaintedWithinABoundedPlane() {
         // At full size this blur would need a plane of some 15000 pixels a
         // side. The box ends up evenly shaded: the blur reaches every part of

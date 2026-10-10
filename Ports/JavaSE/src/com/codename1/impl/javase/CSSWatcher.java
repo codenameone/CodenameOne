@@ -739,14 +739,29 @@ public class CSSWatcher implements Runnable {
 
 
     private static String prefixInputs(String themePrefix, String inputs) {
-        StringBuilder sb = new StringBuilder();
+        StringBuilder all = new StringBuilder();
+        StringBuilder present = new StringBuilder();
         for (String part : inputs.split(",")) {
-            if (sb.length() > 0) {
-                sb.append(",");
+            File prefixed = prefixFile(themePrefix, new File(part));
+            if (all.length() > 0) {
+                all.append(",");
             }
-            sb.append(prefixFile(themePrefix, new File(part)).getPath());
+            all.append(prefixed.getPath());
+            if (prefixed.exists()) {
+                if (present.length() > 0) {
+                    present.append(",");
+                }
+                present.append(prefixed.getPath());
+            }
         }
-        return sb.toString();
+        // The inputs are the ordinary theme of every library and of the
+        // application, renamed. A library need not have a dark theme because
+        // the application has one, and the compiler refuses an input that is
+        // not there, so the ones that are missing are left out. With none
+        // there at all the list is kept whole, for the compiler to say so.
+        // A library with a prefixed theme and no ordinary one is not in the
+        // list to begin with, and is only compiled by the build.
+        return themePrefix.length() > 0 && present.length() > 0 ? present.toString() : all.toString();
     }
 
     private static File prefixFile(String themePrefix, File file) {
