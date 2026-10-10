@@ -254,6 +254,20 @@ public class SwingInteropTest extends WindowsTestBase {
     }
 
     @Test
+    public void aLabelEndsInAnEllipsisWhateverTheThemeSays() {
+        com.codename1.ui.plaf.LookAndFeel laf = com.codename1.ui.plaf.UIManager.getInstance().getLookAndFeel();
+        boolean before = laf.isDefaultEndsWith3Points();
+        laf.setDefaultEndsWith3Points(false);
+        try {
+            com.codename1.ui.Component peer = new JLabel("Text with no room").cn1Peer();
+            assertTrue(peer instanceof com.codename1.ui.Label);
+            assertTrue(((com.codename1.ui.Label) peer).isEndsWith3Points());
+        } finally {
+            laf.setDefaultEndsWith3Points(before);
+        }
+    }
+
+    @Test
     public void aModalDialogFloatsOverTheFormOfTheApplicationAndReturnsToIt() {
         final Form home = home("Home");
         final JPanel panel = new JPanel(new BorderLayout());

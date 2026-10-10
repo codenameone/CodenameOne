@@ -191,6 +191,10 @@ public abstract class Control extends Region {
                     // back and forth while the pointer is over it or it holds the focus:
                     // a phone's answer to a narrow screen. JavaFX text never moves.
                     ((com.codename1.ui.Label) nativeComponent).setTickerEnabled(false);
+                    // Text with no room ends in an ellipsis, which is the default
+                    // overrun of a JavaFX label. A Codename One label takes that from
+                    // the theme, where it is off unless the theme says otherwise.
+                    ((com.codename1.ui.Label) nativeComponent).setEndsWith3Points(true);
                 }
                 Component peer = cn1Peer();
                 if (peer instanceof Container) {

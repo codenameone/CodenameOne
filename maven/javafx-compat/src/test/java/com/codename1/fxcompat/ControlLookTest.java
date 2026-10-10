@@ -458,7 +458,18 @@ public class ControlLookTest {
 
     @Test
     public void aLabelGivesWayInARowThatIsTooNarrow() {
-        Label label = new Label("A long label that cannot be shown in full here");
+        // The theme's own default is no ellipsis, and it is what a label
+        // gets once a theme was loaded: the layer asks for one itself.
+        com.codename1.ui.plaf.LookAndFeel laf = com.codename1.ui.plaf.UIManager.getInstance().getLookAndFeel();
+        boolean before = laf.isDefaultEndsWith3Points();
+        laf.setDefaultEndsWith3Points(false);
+        Label label;
+        try {
+            label = new Label("A long label that cannot be shown in full here");
+            nativeLabel(label);
+        } finally {
+            laf.setDefaultEndsWith3Points(before);
+        }
         Button ok = new Button("OK");
         double pref = label.prefWidth(-1);
         double min = label.minWidth(-1);

@@ -49,6 +49,10 @@ public final class PeerSupport {
             // under the pointer or with the focus: a phone's answer to a narrow screen.
             // Swing text never moves.
             ((com.codename1.ui.Label) peer).setTickerEnabled(false);
+            // Text with no room ends in an ellipsis, as a Swing label or
+            // button draws it. A Codename One label takes that from the
+            // theme, where it is off unless the theme says otherwise.
+            ((com.codename1.ui.Label) peer).setEndsWith3Points(true);
         }
     }
 
