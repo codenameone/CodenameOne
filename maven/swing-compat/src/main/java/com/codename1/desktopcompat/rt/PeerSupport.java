@@ -186,6 +186,31 @@ public final class PeerSupport {
         Font f = owner.isFontSet() ? owner.getFont() : Fonts.applicationFont();
         if (f != null) {
             s.setFont(Fonts.nativeFont(f, f.getSize2D() * Units.scale()));
+        } else {
+            restFontUnderThePointer();
+        }
+    }
+
+    /// Gives the style of the peer under the pointer the font the peer
+    /// has at rest.
+    ///
+    /// A Swing component has one font, and its size was worked out with
+    /// it. A theme styles the pointer state apart, and themes are layered:
+    /// the theme of an application sets the font of its buttons, which is
+    /// the font at rest, selected, pressed and disabled, while the pointer
+    /// state the platform theme under it declares keeps the platform's
+    /// own. A button then drew a larger text for as long as the pointer
+    /// was over it, in the room measured for the smaller one, and lost its
+    /// last letters to an ellipsis. Only that one style is written, so the
+    /// others still follow the theme when it changes.
+    private void restFontUnderThePointer() {
+        Style hover = peer.getHoverStyle();
+        if (hover == null) {
+            return;
+        }
+        com.codename1.ui.Font rest = peer.getUnselectedStyle().getFont();
+        if (rest != null && rest != hover.getFont()) {
+            hover.setFont(rest);
         }
     }
 

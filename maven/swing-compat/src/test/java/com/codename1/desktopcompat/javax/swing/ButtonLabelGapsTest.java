@@ -646,4 +646,38 @@ public class ButtonLabelGapsTest extends KernelTestBase {
         }
         return sb.toString();
     }
+
+    /// The theme of an application sets the font of its buttons and the
+    /// platform theme under it declares what a button looks like under
+    /// the pointer, with the platform's font: a button with no font of
+    /// its own keeps the one it was measured with while the pointer is
+    /// over it, and so does one that was restyled since.
+    @Test
+    public void aButtonUnderThePointerKeepsTheFontItHasAtRest() {
+        // The fonts of the headless display are all equal to one another,
+        // and a style takes no font that equals the one it has: a font of
+        // another kind is the only one a theme can be seen to give.
+        com.codename1.ui.Font platform = com.codename1.ui.Font.createBitmapFont(
+                com.codename1.ui.Image.createImage(8, 8), new int[]{0}, new int[]{8}, "a");
+        java.util.Hashtable<String, Object> theme = new java.util.Hashtable<String, Object>();
+        theme.put("Button.hover#font", platform);
+        com.codename1.ui.plaf.UIManager.getInstance().addThemeProps(theme);
+        try {
+            assertSame(platform, new com.codename1.ui.Button("Stop").getHoverStyle().getFont());
+            JButton b = new JButton("Stop");
+            JFrame f = new JFrame();
+            f.getContentPane().add(b);
+            f.setSize(200, 100);
+            show(f);
+            com.codename1.ui.Component peer = b.cn1Peer();
+            assertNotNull("the theme styles a button under the pointer", peer.getHoverStyle());
+            assertSame(peer.getUnselectedStyle().getFont(), peer.getHoverStyle().getFont());
+            // A margin takes the styles from the theme again.
+            b.setMargin(new Insets(3, 3, 3, 3));
+            b.setMargin(new Insets(4, 4, 4, 4));
+            assertSame(peer.getUnselectedStyle().getFont(), peer.getHoverStyle().getFont());
+        } finally {
+            com.codename1.ui.plaf.UIManager.getInstance().setThemeProps(new java.util.Hashtable<String, Object>());
+        }
+    }
 }
