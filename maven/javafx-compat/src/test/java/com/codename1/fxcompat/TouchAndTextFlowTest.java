@@ -260,6 +260,22 @@ public class TouchAndTextFlowTest {
         assertSame(TouchEvent.TOUCH_RELEASED, type);
     }
 
+    /// At a desk the screen is the desktop, not the window the application
+    /// was opened in: 2048 sizes its stage from it.
+    @Test
+    public void theScreenOfADesktopIsTheDesktopAndNotTheWindow() {
+        HeadlessImplementation.setDesktop(true);
+        HeadlessImplementation.desktopSize = new int[] {2560, 1600};
+        try {
+            Rectangle2D b = Screen.getPrimary().getVisualBounds();
+            assertEquals(1280, b.getWidth(), 1e-9);
+            assertEquals(800, b.getHeight(), 1e-9);
+        } finally {
+            HeadlessImplementation.desktopSize = null;
+            HeadlessImplementation.setDesktop(false);
+        }
+    }
+
     @Test
     public void theScreenIsTheDisplayInLogicalPixels() {
         Screen s = Screen.getPrimary();

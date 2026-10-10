@@ -75,6 +75,147 @@ public class CanvasTest {
         Units.setScale(0);
         Renderer.setTrace(null);
         HeadlessImplementation.pixelImages = false;
+        HeadlessImplementation.rasterImages = false;
+        HeadlessImplementation.resetRaster();
+    }
+
+    /// A picture that is being computed is drawn over the canvas every
+    /// frame, with nothing cleared between. The canvas used to keep every
+    /// one of them on its list of calls: a frame of memory per call, still
+    /// referenced and so beyond any collector, until four thousand were
+    /// recorded. What it keeps now is its own image and the frame on top.
+    @Test
+    public void aPictureDrawnEveryFrameIsNotKept() {
+        Units.setScale(1);
+        // An image has a size here only when it keeps its pixels.
+        HeadlessImplementation.rasterImages = true;
+        HeadlessImplementation.pixelImages = true;
+        javafx.scene.image.WritableImage picture = new javafx.scene.image.WritableImage(40, 30);
+        Canvas canvas = new Canvas(40, 30);
+        GraphicsContext gc = canvas.getGraphicsContext2D();
+        java.util.List<java.lang.ref.WeakReference<Object>> frames =
+                new java.util.ArrayList<java.lang.ref.WeakReference<Object>>();
+        HeadlessImplementation.mutableImagesMade = 0;
+        for (int frame = 0; frame < 200; frame++) {
+            picture.getPixelWriter().setArgb(frame % 40, frame % 30, 0xff000000 | frame);
+            gc.drawImage(picture, 0, 0, 40, 30, 0, 0, 40, 30);
+            frames.add(new java.lang.ref.WeakReference<Object>(picture.cn1Native()));
+        }
+        // One image to draw on, however many frames went into it.
+        assertEquals(1, HeadlessImplementation.mutableImagesMade);
+        int kept = 0;
+        for (int tries = 0; tries < 20; tries++) {
+            System.gc();
+            kept = 0;
+            for (int i = 0; i < frames.size(); i++) {
+                if (frames.get(i).get() != null) {
+                    kept++;
+                }
+            }
+            if (kept <= 2) {
+                break;
+            }
+        }
+        assertTrue("the canvas keeps " + kept + " of 200 frames alive", kept <= 2);
+    }
+
+    /// Folding the frames into one image keeps what a canvas keeps: a
+    /// pixel an earlier frame drew shows through where a later frame is
+    /// transparent.
+    @Test
+    public void framesDrawnOverEachOtherKeepWhatWasUnderThem() {
+        Units.setScale(1);
+        HeadlessImplementation.rasterImages = true;
+        HeadlessImplementation.pixelImages = true;
+        javafx.scene.image.WritableImage picture = new javafx.scene.image.WritableImage(8, 6);
+        javafx.scene.image.PixelWriter w = picture.getPixelWriter();
+        Canvas canvas = new Canvas(8, 6);
+        GraphicsContext gc = canvas.getGraphicsContext2D();
+        w.setArgb(1, 1, 0xffff0000);
+        gc.drawImage(picture, 0, 0, 8, 6, 0, 0, 8, 6);
+        w.setArgb(1, 1, 0);
+        w.setArgb(2, 2, 0xff0000ff);
+        gc.drawImage(picture, 0, 0, 8, 6, 0, 0, 8, 6);
+        w.setArgb(2, 2, 0);
+        w.setArgb(3, 3, 0xff00ff00);
+        gc.drawImage(picture, 0, 0, 8, 6, 0, 0, 8, 6);
+        w.setArgb(4, 4, 0xffffffff);
+        gc.drawImage(picture, 0, 0, 8, 6, 0, 0, 8, 6);
+        gc.drawImage(picture, 0, 0, 8, 6, 0, 0, 8, 6);
+        com.codename1.ui.Image target = com.codename1.ui.Image.createImage(8, 6, 0);
+        canvas.cn1Paint(new Renderer(target.getGraphics(), 0, 0));
+        int[] seen = target.getRGB();
+        assertEquals(0xffff0000, seen[1 * 8 + 1]);
+        assertEquals(0xff0000ff, seen[2 * 8 + 2]);
+        assertEquals(0xff00ff00, seen[3 * 8 + 3]);
+        assertEquals(0xffffffff, seen[4 * 8 + 4]);
+        assertEquals(0, seen[5 * 8 + 5]);
+    }
+
+    /// The canvas image is drawn on again after it was shown. A port that
+    /// cannot draw an image at a size shows a copy the image keeps, and the
+    /// copy made for the first frame went on being shown: Mandelbrot on the
+    /// native Linux port ended on a black picture more often than not. The
+    /// canvas is drawn at two device pixels to one here, so that what is
+    /// shown is such a copy.
+    @Test
+    public void theCanvasImageDrawnOnAgainIsWhatIsShown() {
+        Units.setScale(1);
+        HeadlessImplementation.rasterImages = true;
+        HeadlessImplementation.pixelImages = true;
+        javafx.scene.image.WritableImage picture = new javafx.scene.image.WritableImage(8, 6);
+        javafx.scene.image.PixelWriter w = picture.getPixelWriter();
+        Canvas canvas = new Canvas(8, 6);
+        GraphicsContext gc = canvas.getGraphicsContext2D();
+        w.setArgb(1, 1, 0xffff0000);
+        gc.drawImage(picture, 0, 0, 8, 6, 0, 0, 8, 6);
+        gc.drawImage(picture, 0, 0, 8, 6, 0, 0, 8, 6);
+        com.codename1.ui.Image first = com.codename1.ui.Image.createImage(16, 12, 0);
+        Renderer twice = new Renderer(first.getGraphics(), 0, 0);
+        twice.concat(2, 0, 0, 2, 0, 0);
+        canvas.cn1Paint(twice);
+        assertEquals(0xffff0000, first.getRGB()[2 * 16 + 2]);
+        assertEquals(0, first.getRGB()[6 * 16 + 6]);
+        w.setArgb(3, 3, 0xff0000ff);
+        gc.drawImage(picture, 0, 0, 8, 6, 0, 0, 8, 6);
+        gc.drawImage(picture, 0, 0, 8, 6, 0, 0, 8, 6);
+        com.codename1.ui.Image second = com.codename1.ui.Image.createImage(16, 12, 0);
+        twice = new Renderer(second.getGraphics(), 0, 0);
+        twice.concat(2, 0, 0, 2, 0, 0);
+        canvas.cn1Paint(twice);
+        assertEquals(0xffff0000, second.getRGB()[2 * 16 + 2]);
+        assertEquals(0xff0000ff, second.getRGB()[6 * 16 + 6]);
+    }
+
+    /// The canvas image is drawn on again and again, and a port may hand
+    /// out the one graphics it keeps for an image each time: a clip the
+    /// last frame left there must not cut the next one.
+    @Test
+    public void aClipLeftOnTheCanvasImageDoesNotCutTheNextFrame() {
+        Units.setScale(1);
+        HeadlessImplementation.rasterImages = true;
+        HeadlessImplementation.pixelImages = true;
+        HeadlessImplementation.trackClip = true;
+        try {
+            javafx.scene.image.WritableImage picture = new javafx.scene.image.WritableImage(8, 6);
+            javafx.scene.image.PixelWriter w = picture.getPixelWriter();
+            Canvas canvas = new Canvas(8, 6);
+            GraphicsContext gc = canvas.getGraphicsContext2D();
+            gc.drawImage(picture, 0, 0, 8, 6, 0, 0, 8, 6);
+            gc.drawImage(picture, 0, 0, 8, 6, 0, 0, 8, 6);
+            // What a port that keeps one graphics per image would still
+            // have from the frame before.
+            com.codename1.ui.Image.createImage(1, 1, 0).getGraphics().setClip(0, 0, 2, 2);
+            w.setArgb(6, 4, 0xff00ff00);
+            gc.drawImage(picture, 0, 0, 8, 6, 0, 0, 8, 6);
+            gc.drawImage(picture, 0, 0, 8, 6, 0, 0, 8, 6);
+            HeadlessImplementation.trackClip = false;
+            com.codename1.ui.Image target = com.codename1.ui.Image.createImage(8, 6, 0);
+            canvas.cn1Paint(new Renderer(target.getGraphics(), 0, 0));
+            assertEquals(0xff00ff00, target.getRGB()[4 * 8 + 6]);
+        } finally {
+            HeadlessImplementation.trackClip = false;
+        }
     }
 
     private void paint(Canvas canvas) {

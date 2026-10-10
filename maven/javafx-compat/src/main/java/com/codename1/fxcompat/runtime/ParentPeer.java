@@ -22,8 +22,10 @@
  */
 package com.codename1.fxcompat.runtime;
 
+import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
 import com.codename1.ui.Transform;
 import com.codename1.ui.events.WheelEvent;
 import com.codename1.ui.geom.Dimension;
@@ -175,22 +177,112 @@ public class ParentPeer extends Container implements FxPeer {
         childClipY = g.getClipY() - getY();
         childClipW = g.getClipWidth();
         childClipH = g.getClipHeight();
+        int bx = g.getClipX();
+        int by = g.getClipY();
+        int bw = g.getClipWidth();
+        int bh = g.getClipHeight();
         Transform saved = PeerPaint.push(g, node, m, getX(), getY());
+        // Codename One paints a child only where its bounds meet the clip,
+        // and compares the two as numbers. Under a matrix, on a port whose
+        // clip stays in the coordinates of the screen, those numbers are in
+        // two different spaces: a child drawn well inside the window was
+        // found outside the clip and never painted. The clip handed down
+        // is therefore widened to hold every child, here and in each
+        // parent below while the matrix is in force, and put back after.
+        // Each child is still clipped to its own bounds when it paints.
+        boolean screen = PeerPaint.underScreenClip()
+                || (saved != null && PeerPaint.clipStaysOnScreen(g, saved, bx, by, bw, bh));
+        if (screen) {
+            PeerPaint.includeChildren(g, this);
+            PeerPaint.screenClip(1);
+        }
         painting++;
-        super.paint(g);
-        painting--;
+        try {
+            if (screen && hostsAComponent()) {
+                paintChildrenOffTheMatrix(g);
+            } else {
+                super.paint(g);
+            }
+        } finally {
+            painting--;
+            if (screen) {
+                PeerPaint.screenClip(-1);
+            }
+        }
         if (saved != null) {
             PeerPaint.setDeviceTransform(g, saved);
         }
         if (clipped) {
             g.popClip();
         }
-        if (widened) {
+        if (widened || screen) {
             g.setClip(cx, cy, cw, ch);
         }
         g.setAlpha(old);
         if (Effects.has(node)) {
             Effects.paintOver(g, node, this);
+        }
+    }
+
+    /// Whether one of the children is a Codename One component rather than
+    /// the peer of a node: the label, button or field a control is shown by.
+    private boolean hostsAComponent() {
+        int n = getComponentCount();
+        for (int i = 0; i < n; i++) {
+            Component c = getComponentAt(i);
+            if (!(c instanceof FxPeer) && c.isVisible() && c.getWidth() > 0 && c.getHeight() > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Paints the children of a control under a matrix on a port that keeps
+    /// its clip in the coordinates of the screen (see
+    /// [PeerPaint#clipStaysOnScreen]), in place of Codename One doing it.
+    ///
+    /// The component a control is shown by is Codename One's own, and paints
+    /// as one: a label narrows the clip to its text with a rectangle made
+    /// of where the text goes and of the clip it reads back from the port.
+    /// On such a port the first is in the coordinates drawing is given in
+    /// and the second in the screen's, so the rectangle is in neither and
+    /// the text of every label under a scale was clipped away -- the
+    /// number on each tile of 2048, and its score. Nothing the layer hands
+    /// down as a clip makes those two agree, so the component paints where
+    /// no matrix is installed, into a picture of its own size, and the
+    /// picture is drawn under the matrix. The peers beside it are painted
+    /// as Codename One paints them: clipped to their bounds, background
+    /// first.
+    private void paintChildrenOffTheMatrix(Graphics g) {
+        g.translate(getX(), getY());
+        try {
+            int n = getComponentCount();
+            for (int i = 0; i < n; i++) {
+                Component c = getComponentAt(i);
+                if (!c.isVisible() || c.getWidth() <= 0 || c.getHeight() <= 0) {
+                    continue;
+                }
+                if (!(c instanceof FxPeer)) {
+                    Image picture = c.toImage();
+                    if (picture != null) {
+                        g.drawImage(picture, c.getX(), c.getY());
+                    }
+                    continue;
+                }
+                int cx = g.getClipX();
+                int cy = g.getClipY();
+                int cw = g.getClipWidth();
+                int ch = g.getClipHeight();
+                g.clipRect(c.getX(), c.getY(), c.getWidth(), c.getHeight());
+                if (c instanceof ParentPeer) {
+                    ((ParentPeer) c).capture(g);
+                } else if (c instanceof NodePeer) {
+                    ((NodePeer) c).capture(g);
+                }
+                g.setClip(cx, cy, cw, ch);
+            }
+        } finally {
+            g.translate(-getX(), -getY());
         }
     }
 

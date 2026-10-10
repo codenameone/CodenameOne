@@ -169,6 +169,9 @@ public class HeadlessImplementation extends CodenameOneImplementation {
     /// counts sets it to zero first.
     public static int imagesMade;
 
+    /// How many of those were made to be drawn on.
+    public static int mutableImagesMade;
+
     @Override
     public java.lang.Object createImage(int[] a0, int a1, int a2) {
         imagesMade++;
@@ -205,6 +208,7 @@ public class HeadlessImplementation extends CodenameOneImplementation {
     @Override
     public java.lang.Object createMutableImage(int a0, int a1, int a2) {
         imagesMade++;
+        mutableImagesMade++;
         if (rasterImages && a0 > 0 && a1 > 0) {
             int[][] rows = new int[a1][a0];
             for (int y = 0; y < a1; y++) {
@@ -520,6 +524,31 @@ public class HeadlessImplementation extends CodenameOneImplementation {
         }
     }
 
+    /// The size of the desktop the window is on as `{width, height}`, or
+    /// null for a port that has none to report, which is every port that
+    /// is not at a desk. A test that sets it must reset it.
+    public static int[] desktopSize;
+
+    @Override
+    public com.codename1.ui.geom.Dimension getDesktopSize() {
+        return desktop && desktopSize != null
+                ? new com.codename1.ui.geom.Dimension(desktopSize[0], desktopSize[1]) : null;
+    }
+
+    /// What the frame of the window adds to the display as `{width,
+    /// height}`, or null: the window of a desktop is larger than what is
+    /// drawn in it by its borders and its title bar. A test that sets it
+    /// must reset it.
+    public static int[] windowFrame;
+
+    @Override
+    public com.codename1.ui.geom.Rectangle getWindowBounds() {
+        if (!desktop || windowFrame == null) {
+            return null;
+        }
+        return new com.codename1.ui.geom.Rectangle(0, 0, WIDTH + windowFrame[0], HEIGHT + windowFrame[1]);
+    }
+
     @Override
     public void setWindowSize(int width, int height) {
         if (desktop) {
@@ -630,26 +659,31 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public int getClipX(java.lang.Object a0) {
+        own(a0);
         return trackClip ? clipX : 0;
     }
 
     @Override
     public int getClipY(java.lang.Object a0) {
+        own(a0);
         return trackClip ? clipY : 0;
     }
 
     @Override
     public int getClipWidth(java.lang.Object a0) {
+        own(a0);
         return trackClip ? clipW : WIDTH;
     }
 
     @Override
     public int getClipHeight(java.lang.Object a0) {
+        own(a0);
         return trackClip ? clipH : HEIGHT;
     }
 
     @Override
     public void setClip(java.lang.Object a0, int a1, int a2, int a3, int a4) {
+        own(a0);
         clipX = a1;
         clipY = a2;
         clipW = a3;
@@ -657,8 +691,201 @@ public class HeadlessImplementation extends CodenameOneImplementation {
         shapeClip = null;
     }
 
+    /// When set, the implementation is a port with affine transforms whose
+    /// clip stays in the coordinates of the screen, which is how the native
+    /// Linux port behaves: `setClip` and the clip getters carry the same
+    /// numbers whatever matrix is installed, and `clipRect` under a matrix
+    /// REPLACES the clip with the bounds of the transformed rectangle. Wants
+    /// [#trackClip]. What is drawn is clipped but not moved by the matrix:
+    /// the mode is for testing what gets painted, not where it lands.
+    public static boolean screenSpaceClip;
+    private static double[] matrix = {1, 0, 0, 1, 0, 0};
+
+    private static double[] lastMatrix = matrix;
+
+    /// Where a point handed to the port lands under the matrix installed
+    /// last, on whichever graphics that was, in [#screenSpaceClip] mode.
+    public static double[] onScreen(double x, double y) {
+        double[] m = lastMatrix;
+        return new double[] {m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]};
+    }
+
+    private static double[] affine(Object nativeTransform) {
+        return (double[]) nativeTransform;
+    }
+
+    private static boolean plain(double[] m) {
+        return m[0] == 1 && m[1] == 0 && m[2] == 0 && m[3] == 1 && m[4] == 0 && m[5] == 0;
+    }
+
+    @Override
+    public boolean isTransformSupported() {
+        return screenSpaceClip;
+    }
+
+    @Override
+    public boolean isTransformSupported(Object graphics) {
+        return screenSpaceClip;
+    }
+
+    @Override
+    public Object makeTransformIdentity() {
+        return new double[] {1, 0, 0, 1, 0, 0};
+    }
+
+    @Override
+    public void setTransformIdentity(Object t) {
+        setTransformAffine(t, 1, 0, 0, 1, 0, 0);
+    }
+
+    @Override
+    public Object makeTransformAffine(double m00, double m10, double m01, double m11, double m02, double m12) {
+        return new double[] {m00, m10, m01, m11, m02, m12};
+    }
+
+    @Override
+    public void setTransformAffine(Object t, double m00, double m10, double m01, double m11, double m02,
+                                   double m12) {
+        double[] m = affine(t);
+        m[0] = m00;
+        m[1] = m10;
+        m[2] = m01;
+        m[3] = m11;
+        m[4] = m02;
+        m[5] = m12;
+    }
+
+    @Override
+    public Object makeTransformTranslation(float x, float y, float z) {
+        return new double[] {1, 0, 0, 1, x, y};
+    }
+
+    @Override
+    public void setTransformTranslation(Object t, float x, float y, float z) {
+        setTransformAffine(t, 1, 0, 0, 1, x, y);
+    }
+
+    @Override
+    public Object makeTransformScale(float x, float y, float z) {
+        return new double[] {x, 0, 0, y, 0, 0};
+    }
+
+    @Override
+    public void setTransformScale(Object t, float x, float y, float z) {
+        setTransformAffine(t, x, 0, 0, y, 0, 0);
+    }
+
+    @Override
+    public void transformTranslate(Object t, float x, float y, float z) {
+        concatenateTransform(t, new double[] {1, 0, 0, 1, x, y});
+    }
+
+    @Override
+    public void transformScale(Object t, float x, float y, float z) {
+        concatenateTransform(t, new double[] {x, 0, 0, y, 0, 0});
+    }
+
+    @Override
+    public Object makeTransformInverse(Object t) {
+        double[] m = affine(t);
+        double det = m[0] * m[3] - m[1] * m[2];
+        if (det == 0) {
+            return null;
+        }
+        return new double[] {m[3] / det, -m[1] / det, -m[2] / det, m[0] / det,
+            (m[2] * m[5] - m[3] * m[4]) / det, (m[1] * m[4] - m[0] * m[5]) / det};
+    }
+
+    @Override
+    public void setTransformInverse(Object t) throws com.codename1.ui.Transform.NotInvertibleException {
+        Object inverse = makeTransformInverse(t);
+        if (inverse == null) {
+            throw new com.codename1.ui.Transform.NotInvertibleException();
+        }
+        copyTransform(inverse, t);
+    }
+
+    @Override
+    public void copyTransform(Object src, Object dest) {
+        System.arraycopy(affine(src), 0, affine(dest), 0, 6);
+    }
+
+    @Override
+    public void concatenateTransform(Object t1, Object t2) {
+        double[] a = affine(t1);
+        double[] b = affine(t2);
+        setTransformAffine(t1, a[0] * b[0] + a[2] * b[1], a[1] * b[0] + a[3] * b[1],
+                a[0] * b[2] + a[2] * b[3], a[1] * b[2] + a[3] * b[3],
+                a[0] * b[4] + a[2] * b[5] + a[4], a[1] * b[4] + a[3] * b[5] + a[5]);
+    }
+
+    @Override
+    public boolean transformNativeEqualsImpl(Object t1, Object t2) {
+        return t1 != null && t2 != null && java.util.Arrays.equals(affine(t1), affine(t2));
+    }
+
+    @Override
+    public void transformPoint(Object t, float[] in, float[] out) {
+        double[] m = affine(t);
+        float x = in[0];
+        float y = in[1];
+        out[0] = (float) (m[0] * x + m[2] * y + m[4]);
+        out[1] = (float) (m[1] * x + m[3] * y + m[5]);
+    }
+
+    @Override
+    public void setTransform(Object graphics, com.codename1.ui.Transform transform) {
+        if (graphics instanceof Offscreen) {
+            ((Offscreen) graphics).matrix = transform == null ? new double[] {1, 0, 0, 1, 0, 0}
+                    : affine(transform.getNativeTransform()).clone();
+            lastMatrix = ((Offscreen) graphics).matrix;
+            return;
+        }
+        if (transform == null) {
+            matrix = new double[] {1, 0, 0, 1, 0, 0};
+        } else {
+            matrix = affine(transform.getNativeTransform()).clone();
+        }
+        lastMatrix = matrix;
+    }
+
+    @Override
+    public com.codename1.ui.Transform getTransform(Object graphics) {
+        double[] m = screenSpaceClip ? matrixOf(graphics) : new double[] {1, 0, 0, 1, 0, 0};
+        return com.codename1.ui.Transform.makeAffine(m[0], m[1], m[2], m[3], m[4], m[5]);
+    }
+
+    @Override
+    public void getTransform(Object graphics, com.codename1.ui.Transform t) {
+        t.setTransform(getTransform(graphics));
+    }
+
     @Override
     public void clipRect(java.lang.Object a0, int a1, int a2, int a3, int a4) {
+        own(a0);
+        if (screenSpaceClip && !plain(matrixOf(a0))) {
+            double[] m = matrixOf(a0);
+            double minX = Double.MAX_VALUE;
+            double minY = Double.MAX_VALUE;
+            double maxX = -Double.MAX_VALUE;
+            double maxY = -Double.MAX_VALUE;
+            for (int i = 0; i < 4; i++) {
+                double x = a1 + ((i & 1) == 0 ? 0 : a3);
+                double y = a2 + ((i & 2) == 0 ? 0 : a4);
+                double sx = m[0] * x + m[2] * y + m[4];
+                double sy = m[1] * x + m[3] * y + m[5];
+                minX = Math.min(minX, sx);
+                minY = Math.min(minY, sy);
+                maxX = Math.max(maxX, sx);
+                maxY = Math.max(maxY, sy);
+            }
+            clipX = (int) Math.floor(minX);
+            clipY = (int) Math.floor(minY);
+            clipW = (int) Math.ceil(maxX) - clipX;
+            clipH = (int) Math.ceil(maxY) - clipY;
+            shapeClip = null;
+            return;
+        }
         int x2 = Math.min(clipX + clipW, a1 + a3);
         int y2 = Math.min(clipY + clipH, a2 + a4);
         clipX = Math.max(clipX, a1);
@@ -677,7 +904,13 @@ public class HeadlessImplementation extends CodenameOneImplementation {
     public void setClip(java.lang.Object graphics, com.codename1.ui.geom.Shape shape) {
         if (trackClip) {
             com.codename1.ui.geom.Rectangle b = shape.getBounds();
-            setClip(graphics, b.getX(), b.getY(), b.getWidth(), b.getHeight());
+            if (screenSpaceClip && !plain(matrixOf(graphics))) {
+                // The native Linux port: the shape goes through the matrix
+                // and its bounds on the screen become the clip.
+                clipRect(graphics, b.getX(), b.getY(), b.getWidth(), b.getHeight());
+            } else {
+                setClip(graphics, b.getX(), b.getY(), b.getWidth(), b.getHeight());
+            }
             shapeClip = shape;
         }
     }
@@ -754,12 +987,22 @@ public class HeadlessImplementation extends CodenameOneImplementation {
             span(a0, a2, a3, a1.length() * CHAR_WIDTH, FONT_HEIGHT);
         }
         if (recordText) {
-            drawnText.add(new Object[]{a1, Integer.valueOf(a2), Integer.valueOf(a3)});
+            own(a0);
+            // Whether the place the text starts at is inside the clip, which
+            // is in the coordinates the graphics draws to once its matrix
+            // has been applied.
+            double[] m = screenSpaceClip ? matrixOf(a0) : new double[] {1, 0, 0, 1, 0, 0};
+            double sx = m[0] * (a2 + 1) + m[2] * (a3 + 1) + m[4];
+            double sy = m[1] * (a2 + 1) + m[3] * (a3 + 1) + m[5];
+            boolean seen = sx >= clipX && sx < clipX + clipW && sy >= clipY && sy < clipY + clipH;
+            drawnText.add(new Object[]{a1, Integer.valueOf(a2), Integer.valueOf(a3), Boolean.valueOf(seen)});
         }
     }
 
     /// When set, every `drawString` (a `drawChar` arrives as one) is added
-    /// to [#drawnText] as {text, x, y}. A test that sets it must reset both.
+    /// to [#drawnText] as {text, x, y, inside}, the last being whether the
+    /// text starts inside the clip in force, which only means something
+    /// with [#trackClip]. A test that sets it must reset both.
     public static boolean recordText;
     public static final java.util.List<Object[]> drawnText = new java.util.ArrayList<Object[]>();
 
@@ -801,7 +1044,45 @@ public class HeadlessImplementation extends CodenameOneImplementation {
         if ((pixelImages || rasterImages) && a0 instanceof int[][]) {
             return a0;
         }
-        return new Object();
+        return new Offscreen();
+    }
+
+    /// The graphics of an image without pixels. It keeps the matrix
+    /// installed on it, as a port does: what is on the graphics of one
+    /// image, or on the screen's, is not on that of another.
+    private static final class Offscreen {
+        private double[] matrix = {1, 0, 0, 1, 0, 0};
+        private int[] clip = {0, 0, 1 << 20, 1 << 20};
+    }
+
+    private static Offscreen clipOwner;
+
+    /// In [#screenSpaceClip] mode the clip is that of the graphics it was
+    /// set on, as it is on a port: a picture painted in the middle of a
+    /// frame starts with the whole of itself, not with what the screen was
+    /// clipped to. The one tracked rectangle is handed from graphics to
+    /// graphics as each is used.
+    private static void own(Object graphics) {
+        if (!screenSpaceClip || !(graphics instanceof Offscreen) || graphics == clipOwner) {
+            return;
+        }
+        if (clipOwner != null) {
+            clipOwner.clip = new int[] {clipX, clipY, clipW, clipH};
+        }
+        clipOwner = (Offscreen) graphics;
+        clipX = clipOwner.clip[0];
+        clipY = clipOwner.clip[1];
+        clipW = clipOwner.clip[2];
+        clipH = clipOwner.clip[3];
+        shapeClip = null;
+    }
+
+    /// The matrix in force on a graphics, in [#screenSpaceClip] mode.
+    private static double[] matrixOf(Object graphics) {
+        if (graphics instanceof Offscreen) {
+            return ((Offscreen) graphics).matrix;
+        }
+        return matrix;
     }
 
     /// When set, a run of characters measures 1px narrower per adjacent pair

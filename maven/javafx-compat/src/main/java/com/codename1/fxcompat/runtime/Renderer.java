@@ -143,15 +143,31 @@ public final class Renderer {
         g.pushClip();
         clipDepth++;
         if (exact && !path.isEmpty()) {
-            int[] old = g.getClip();
-            g.setClip(path.toDevice(m));
-            g.clipRect(old[0], old[1], old[2], old[3]);
+            clipToShape(path.toDevice(m));
         } else {
             int x1 = (int) Math.floor(b[0]);
             int y1 = (int) Math.floor(b[1]);
             g.clipRect(x1, y1, (int) Math.ceil(b[2]) - x1, (int) Math.ceil(b[3]) - y1);
         }
         return exact;
+    }
+
+    /// Narrows the clip to a shape. Codename One replaces a clip by a shape,
+    /// so the rectangle that was in force is put back on top of it -- except
+    /// under a matrix on a port that keeps its clip in the coordinates of the
+    /// screen (see `PeerPaint.clipStaysOnScreen`). There the rectangle read
+    /// back is where the clip is on the screen, and handing it to `clipRect`
+    /// runs it through the matrix a second time: the clip moved off what it
+    /// was meant for and replaced the shape, and the text of every label
+    /// inside a scaled parent was cut away. The shape alone is the clip
+    /// there. It is the node's own and lies inside what its parent gave it
+    /// in all but the rarest scene, where it shows a little more.
+    private void clipToShape(com.codename1.ui.geom.Shape shape) {
+        int[] old = g.getClip();
+        g.setClip(shape);
+        if (!PeerPaint.screenClipUnderMatrix(g)) {
+            g.clipRect(old[0], old[1], old[2], old[3]);
+        }
     }
 
     /// Returns whether [#clip(FxPath)] clips to the path itself rather
@@ -400,10 +416,8 @@ public final class Renderer {
         // rings from the outside in, each one covering the centre of the
         // one before.
         fill(path, outer, bx, by, bw, bh);
-        int[] clip = g.getClip();
         g.pushClip();
-        g.setClip(path.toDevice(m));
-        g.clipRect(clip[0], clip[1], clip[2], clip[3]);
+        clipToShape(path.toDevice(m));
         int rings = (int) Math.max(8, Math.min(64, Math.max(rx, ry) * uniformScale() / 2));
         for (int i = rings; i >= 1; i--) {
             double t = (double) i / rings;
@@ -699,7 +713,13 @@ public final class Renderer {
         }
         int old = g.getAlpha();
         g.setAlpha(alpha(old, 255));
-        if (straight || !g.isTransformSupported()) {
+        if ((straight || !g.isTransformSupported()) && pw == image.getWidth() && ph == image.getHeight()) {
+            // At its own size there is nothing to scale. Asking for the
+            // size all the same makes a port that cannot draw an image at
+            // a size copy it first -- the native Linux port does -- and a
+            // canvas image is as large as the window and drawn every frame.
+            g.drawImage(image, left, top);
+        } else if (straight || !g.isTransformSupported()) {
             g.drawImage(image, left, top, pw, ph);
         } else {
             Transform before = Transform.makeIdentity();

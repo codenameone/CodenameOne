@@ -116,6 +116,21 @@ class ImageTest extends UITestBase {
         assertEquals(75, scaled.getHeight());
     }
 
+    /// A scaled copy is kept and handed out again, which is right only
+    /// while the image is what it was. A port that cannot draw an image at
+    /// a size draws the copy, so a mutable image drawn on a second time went
+    /// on showing what it held the first time.
+    @FormTest
+    void testScaledCopyIsForgottenWhenTheImageIsDrawnOnAgain() {
+        Image source = Image.createImage(100, 100);
+        Image first = source.scaled(50, 75);
+        assertSame(first, source.scaled(50, 75));
+
+        source.getGraphics().fillRect(0, 0, 10, 10);
+
+        assertNotSame(first, source.scaled(50, 75));
+    }
+
     @FormTest
     void testScaledSmallerRatio() {
         Image source = Image.createImage(100, 100);

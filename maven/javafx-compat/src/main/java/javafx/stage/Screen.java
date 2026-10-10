@@ -73,12 +73,18 @@ public final class Screen {
     }
 
     /// Returns the whole of the screen in logical pixels.
+    ///
+    /// At a desk that is the desktop the window is on, not the window: an
+    /// application sizes its stage as a share of the screen, and one that
+    /// was told its 800 by 600 window was the screen opened at a fraction
+    /// of the size it has on JavaFX. A port with no desktop to report
+    /// answers the display, which on a phone is the screen.
     public final Rectangle2D getBounds() {
         if (!Display.isInitialized()) {
             return Rectangle2D.EMPTY;
         }
-        Display d = Display.getInstance();
-        return new Rectangle2D(0, 0, Units.toLogical(d.getDisplayWidth()), Units.toLogical(d.getDisplayHeight()));
+        com.codename1.ui.geom.Dimension size = Display.getInstance().getDesktopSize();
+        return new Rectangle2D(0, 0, Units.toLogical(size.getWidth()), Units.toLogical(size.getHeight()));
     }
 
     /// Returns the part of the screen an application can use, which is
