@@ -60,7 +60,7 @@ import java.util.Map;
 /// refresh token ran out, or the account was suspended -- it says so, and the
 /// app goes back to the welcome screen.
 public final class Session {
-    private static final String STORE_KEY = "wayline";
+    private static final String STORE_PREFIX = "wayline";
     private static final String SESSION_COOKIE = "CN1SESSION";
 
     private static String base;
@@ -76,16 +76,21 @@ public final class Session {
     /// Points the app at a server. Called at start-up, and again when the
     /// server address is changed.
     public static void start(String baseUrl) {
-        if (base != null) {
-            NetworkManager.getInstance().setAuthorizer(base + "/api", null);
-        }
-        base = baseUrl;
-        user = null;
         if (store == null) {
             // Falls back to ordinary storage where the platform has no keystore
             // to offer, which is the simulator.
             store = new SecureStorageTokenStore().allowPlainStorageFallback(true);
         }
+        if (base != null) {
+            NetworkManager.getInstance().setAuthorizer(base + "/api", null);
+            if (!base.equals(baseUrl)) {
+                // Changing the server ends the session with the old one, and
+                // its tokens go with it.
+                store.clear(storeKey(base));
+            }
+        }
+        base = baseUrl;
+        user = null;
         client = OidcClient.create(OidcConfiguration.newBuilder()
                         .issuer(base)
                         .authorizationEndpoint(base + "/oauth2/authorize")
@@ -97,7 +102,7 @@ public final class Session {
                 .setRedirectUri(AppConfig.redirectUri())
                 .setScopes("openid", "profile")
                 .setTokenStore(store)
-                .setStoreKey(STORE_KEY);
+                .setStoreKey(storeKey(base));
         authorizer = new OidcRequestAuthorizer(client);
         authorizer.install(base + "/api");
         authorizer.addSignInRequiredListener((source, reason) -> {
@@ -107,6 +112,28 @@ public final class Session {
             }
         });
         Api.connect(base);
+    }
+
+    /// Where the tokens issued by one server are kept: under a name made from
+    /// that server's address.
+    ///
+    /// One name for every server would hand the tokens of the last one to
+    /// whichever address is typed next -- the app would restore them and send
+    /// them, refresh token included, to a server that never issued them.
+    /// Every character that is not a letter or a digit is written as its code,
+    /// so two addresses never share a name and the name is one any platform's
+    /// storage accepts.
+    static String storeKey(String server) {
+        StringBuilder key = new StringBuilder(STORE_PREFIX).append('-');
+        for (int iter = 0; iter < server.length(); iter++) {
+            char c = server.charAt(iter);
+            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+                key.append(c);
+            } else {
+                key.append('_').append(Integer.toHexString(c)).append('_');
+            }
+        }
+        return key.toString();
     }
 
     /// Keeps the tokens somewhere else. The tests keep them in memory, so one
@@ -178,7 +205,7 @@ public final class Session {
             final Net.Failed failed) {
         authenticate(email, password, tokens -> {
             authorizer.setTokens(tokens);
-            store.save(STORE_KEY, tokens);
+            store.save(storeKey(base), tokens);
             refreshUser(done, failed);
         }, failed);
     }

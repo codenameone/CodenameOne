@@ -103,6 +103,7 @@ public final class VectorMapEngine {
     // each failure after it up to the longest.
     private static final int RETRY_FIRST_MILLIS = 2000;
     private static final int RETRY_LONGEST_MILLIS = 60000;
+    private static final int RETRY_SLACK_MILLIS = 50;
 
     // The tiles wanted and not yet asked of the source: tile key to FetchJob.
     // Every pass over the view says again which of them it still wants, and
@@ -867,6 +868,41 @@ public final class VectorMapEngine {
         }
         failure[1] = wait;
         failure[0] = System.currentTimeMillis() + wait;
+        scheduleRetry(wait);
+    }
+
+    // Whether a timer is already waiting to look at the failed tiles again.
+    private boolean retryPending;
+
+    // A tile is only asked for by a paint, and a map nobody is touching does
+    // not paint: without this, the delay above ran out with nothing left to
+    // notice, and the hole stayed until the user happened to move the map.
+    // One timer at a time, set for the tile that may be retried soonest.
+    private void scheduleRetry(long wait) {
+        if (retryPending) {
+            return;
+        }
+        retryPending = true;
+        // A little past the moment, so the paint finds the tile retryable.
+        com.codename1.ui.CN.setTimeout((int) wait + RETRY_SLACK_MILLIS, new Runnable() {
+            @Override
+            public void run() {
+                retryPending = false;
+                long now = System.currentTimeMillis();
+                long soonest = Long.MAX_VALUE;
+                for (Object value : failed.values()) {
+                    long at = ((long[]) value)[0];
+                    if (at > now && at < soonest) {
+                        soonest = at;
+                    }
+                }
+                if (soonest != Long.MAX_VALUE) {
+                    // Tiles that failed later are still waiting their turn.
+                    scheduleRetry(soonest - now);
+                }
+                repaint();
+            }
+        });
     }
 
     private void prepareTile(final String key, final int z, final int x, final int y, final byte[] data,

@@ -88,6 +88,53 @@ public final class AnnotationProcessing {
         this.compileClasspath = compileClasspath == null ? Collections.<String>emptyList() : compileClasspath;
     }
 
+    /// Class directories on the compile classpath that hold this module's OWN
+    /// classes, compiled by another pass of the same build.
+    private List<File> ownClassDirectories = Collections.<File>emptyList();
+
+    /// Names the classpath entries that are the module's own classes and not a
+    /// dependency's, so no dependency class is offered out of them.
+    ///
+    /// A project in two languages is compiled in two passes, and each pass has
+    /// the other's classes on its classpath: Kotlin's pass sees the Java it has
+    /// not compiled yet, javac's sees Kotlin's output. Those are this module's
+    /// classes and the other pass processes them. Read as a dependency's, a
+    /// `@Mapped` Java class was mapped by Kotlin's pass and then again by its
+    /// own, and the build stopped on two copies of one generated class.
+    ///
+    /// The entries stay on the classpath -- types are still resolved from them.
+    public AnnotationProcessing withOwnClassDirectories(List<File> directories) {
+        this.ownClassDirectories = directories == null
+                ? Collections.<File>emptyList() : new ArrayList<File>(directories);
+        return this;
+    }
+
+    /// The compile classpath without [#ownClassDirectories].
+    private List<String> dependencyClasspath() {
+        if (ownClassDirectories.isEmpty()) {
+            return compileClasspath;
+        }
+        Set<File> own = new java.util.HashSet<File>();
+        for (File directory : ownClassDirectories) {
+            own.add(canonical(directory));
+        }
+        List<String> out = new ArrayList<String>();
+        for (String element : compileClasspath) {
+            if (!own.contains(canonical(new File(element)))) {
+                out.add(element);
+            }
+        }
+        return out;
+    }
+
+    private static File canonical(File file) {
+        try {
+            return file.getCanonicalFile();
+        } catch (java.io.IOException e) {
+            return file.getAbsoluteFile();
+        }
+    }
+
     /// Runs every processor.
     public void run() throws BuildExecutionException {
         List<File> classpath = new java.util.ArrayList<File>();
@@ -306,7 +353,7 @@ public final class AnnotationProcessing {
         Map<String, AnnotatedClass> dependencies;
         try {
             dependencies = com.codename1.maven.annotations.DependencyClasses.scan(
-                    compileClasspath, outputDirectory, descriptors);
+                    dependencyClasspath(), outputDirectory, descriptors);
         } catch (ProcessingException e) {
             throw new BuildExecutionException("Failed to scan the classes of "
                     + outputDirectory + "'s dependencies: " + e.getMessage(), e);

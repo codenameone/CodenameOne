@@ -203,7 +203,13 @@ public final class ProcessAnnotationsAction implements Action<Task> {
         }
         try {
             new AnnotationProcessing(new GradleLog(task.getLogger()), classesDir, stubDir, projectDir, raw,
-                    mainClass, new ArrayList<String>(sourceRoots.get()), encoding, classpath).run();
+                    mainClass, new ArrayList<String>(sourceRoots.get()), encoding, classpath)
+                    // The Java this pass compiled only to resolve types against is
+                    // the module's own, and javac's pass processes it.
+                    .withOwnClassDirectories(pending == null
+                            ? java.util.Collections.<File>emptyList()
+                            : java.util.Collections.singletonList(pending))
+                    .run();
         } catch (BuildExecutionException ex) {
             throw new GradleException(ex.getMessage(), ex.getCause() == null ? ex : ex.getCause());
         }

@@ -129,6 +129,24 @@ public class AnnotationProcessingDependencyTest {
         assertFalse(new File(classes, "com/example/shared/NoteCn1Mapper.class").exists());
     }
 
+    /// A project in two languages: the classes the other pass compiles are on
+    /// this pass's classpath and are the module's own. Mapping them here as well
+    /// gave the build two copies of one generated class.
+    @Test
+    public void theModulesOwnClassesFromAnotherPassAreNotOfferedAsADependencys() throws Exception {
+        File otherPass = compileShared();
+        File classes = compileApplication();
+
+        new AnnotationProcessing(new SystemStreamLog(), classes, tmp.newFolder(), tmp.newFolder(),
+                new Properties(), null, Collections.<String>emptyList(), "UTF-8",
+                Arrays.asList(classes.getPath(), otherPass.getPath(), clientRuntime().getPath()))
+                .withOwnClassDirectories(Collections.singletonList(otherPass))
+                .run();
+
+        assertFalse(new File(classes, "com/example/shared/NotesApiImpl.class").exists());
+        assertFalse(new File(classes, "com/example/shared/NoteCn1Mapper.class").exists());
+    }
+
     private void run(File classes, List<String> classpath) throws Exception {
         new AnnotationProcessing(new SystemStreamLog(), classes, tmp.newFolder(), tmp.newFolder(),
                 new Properties(), null, Collections.<String>emptyList(), "UTF-8", classpath).run();

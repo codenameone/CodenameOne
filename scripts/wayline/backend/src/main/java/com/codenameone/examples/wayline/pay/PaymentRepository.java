@@ -135,6 +135,17 @@ public class PaymentRepository {
         session.persist(customer);
     }
 
+    /// Writes an account's row without changing it, which holds the row until
+    /// the transaction ends: whatever else writes it waits its turn.
+    public void touchCustomer(String username) {
+        PaymentCustomer row = customer(username);
+        if (row != null) {
+            session.createQuery("update PaymentCustomer c set c.reference = :reference "
+                    + "where c.username = :username").setParameter("reference", row.reference)
+                    .setParameter("username", username).executeUpdate();
+        }
+    }
+
     public void removeCustomer(String username) {
         session.createQuery("delete from PaymentCustomer c where c.username = :username")
                 .setParameter("username", username).executeUpdate();

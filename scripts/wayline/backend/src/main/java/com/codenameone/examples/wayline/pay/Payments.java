@@ -217,6 +217,15 @@ public class Payments {
         if (!repository.claimSetup(setupId)) {
             throw new ResponseStatusException(404, "No such card setup");
         }
+        // Counted again here, where the card is saved: starting a setup checks
+        // the limit too, but several can be started while there is room for
+        // one. The account's row at the processor is written first, so two
+        // setups finishing together take turns and the second counts the
+        // first one's card. Refusing rolls the claim back with everything else.
+        repository.touchCustomer(username);
+        if (repository.countCards(username) >= MAX_CARDS) {
+            throw new ResponseStatusException(409, "Remove a card before adding another");
+        }
         boolean first = repository.defaultCard(username) == null;
         // Cards are listed in the order they were added, and two added in the
         // same millisecond would have no order: the later is stamped after
@@ -303,7 +312,16 @@ public class Payments {
     /// A ride is settled once: its payment is keyed by the ride, and a ride
     /// completes once. Called with no transaction open, since the card is
     /// charged here; what came of the charge is then written in one.
+    ///
+    /// Safe to ask for again, which is how a ride whose settlement was cut
+    /// short is finished later: the charge carries the ride as its key, so
+    /// the processor answers a second request with the first one's charge, and
+    /// a payment already written is the answer without asking anyone.
     public String settle(Ride ride) throws IOException {
+        Payment kept = payment(ride.id);
+        if (kept != null) {
+            return kept.status;
+        }
         long amount = ride.fareCents + ride.feeCents;
         String status = PAID;
         String reference = CASH;
@@ -326,6 +344,10 @@ public class Payments {
     @Transactional
     private void keepPayment(String rideId, long amount, String currency, String status,
             String reference) {
+        if (repository.payment(rideId) != null) {
+            // Written while this request was at the processor.
+            return;
+        }
         Payment row = new Payment();
         row.rideId = rideId;
         row.amountCents = amount;
@@ -415,8 +437,21 @@ public class Payments {
     /// Marks the ride refunded and returns it as it was just before. Committed
     /// before the processor is asked for the money: of two requests, one
     /// changes the row and only that one refunds.
+    ///
+    /// The update comes first and the ride is read after it. A tip is claimed
+    /// by an update of the same row, so the two take turns, and the ride read
+    /// here says whether a tip got in before this did. One that did and has no
+    /// charge recorded yet is still at the processor: refunding now would
+    /// return the fare, miss the tip, and leave a tip charged to a refunded
+    /// ride. The refund is refused until the tip has settled either way, and
+    /// a tip asked for after this commits finds the ride no longer paid.
+    ///
+    /// A tip whose charge never reports back keeps its ride from being
+    /// refunded here. That is deliberate: nobody knows whether that card was
+    /// charged, and it takes a person and the processor's records to say.
     @Transactional
     private Ride claimRefund(String rideId) {
+        boolean claimed = repository.claimRefund(rideId);
         Ride ride = repository.ride(rideId);
         if (ride == null) {
             throw new ResponseStatusException(404, "No such ride");
@@ -424,8 +459,15 @@ public class Payments {
         if (CASH.equals(ride.methodId)) {
             throw new ResponseStatusException(409, "A ride paid in cash has nothing to refund");
         }
-        if (!repository.claimRefund(rideId)) {
+        if (!claimed) {
             throw new ResponseStatusException(409, "That ride has no payment to refund");
+        }
+        if (ride.tipCents > 0L) {
+            Payment payment = repository.payment(rideId);
+            if (payment == null || payment.tipRef == null || payment.tipRef.length() == 0) {
+                throw new ResponseStatusException(409,
+                        "A tip on that ride is still being charged. Try again in a moment");
+            }
         }
         return ride;
     }

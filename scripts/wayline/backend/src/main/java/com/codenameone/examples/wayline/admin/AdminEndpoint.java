@@ -104,8 +104,15 @@ public class AdminEndpoint implements AdminApiServer {
 
     @Override
     public UserDto setRoles(String username, RoleChangeDto roles) throws Exception {
-        return accounts.setRoles(Caller.name(), username, roles != null && roles.driver,
+        UserDto user = accounts.setRoles(Caller.name(), username, roles != null && roles.driver,
                 roles != null && roles.admin);
+        // A live channel keeps the roles it was opened with: one opened by an
+        // admin goes on receiving where every driver is after the role is
+        // taken away, since it asks for nothing again. Closed here, the app
+        // opens another with a fresh ticket and gets the frames of the roles
+        // the account has now.
+        live.drop(username);
+        return user;
     }
 
     @Override

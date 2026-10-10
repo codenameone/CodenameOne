@@ -22,12 +22,14 @@
  */
 package com.codenameone.examples.wayline;
 
+import com.codename1.backend.DataSource;
 import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.test.BackendTest;
 import com.codename1.backend.test.MockMvc;
 import com.codename1.backend.test.MockRequestBuilder;
 import com.codenameone.examples.wayline.account.Accounts;
 import com.codenameone.examples.wayline.account.DemoAccounts;
+import com.codenameone.examples.wayline.ride.Rides;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -51,6 +53,10 @@ class PaymentsTest {
     private MockMvc mvc;
     @Autowired
     private Accounts accounts;
+    @Autowired
+    private Rides rides;
+    @Autowired
+    private DataSource db;
 
     private MockRequestBuilder admin(MockRequestBuilder request) {
         return People.asAdmin(request, DemoAccounts.ADMIN);
@@ -282,6 +288,94 @@ class PaymentsTest {
         mvc.perform(People.asRider(get("/api/rides/" + id), rider))
                 .andExpect(jsonPath("$.paymentStatus").value("REFUNDED"));
         Trips.offline(mvc, driver);
+    }
+
+    @Test
+    void aRideIsNotRefundedWhileItsTipIsBeingCharged() throws Exception {
+        // Oslo.
+        String rider = People.rider(accounts, "osl-rider");
+        String driver = People.driver(accounts, "osl-driver");
+        Trips.addCard(mvc, rider, Trips.VISA);
+        Trips.online(mvc, driver, 59.9139, 10.7522);
+        String id = (String) Trips.complete(mvc, rider, driver, People.ride(59.9139, 10.7522,
+                59.9239, 10.7622)).get("id");
+
+        // A tip as it stands between being claimed and its charge coming back:
+        // on the ride, and with no charge recorded for it.
+        db.execute("UPDATE wl_ride SET tip_cents = 300 WHERE id = ?", new Object[] {id});
+        mvc.perform(admin(Trips.body(post("/api/admin/rides/" + id + "/refund"),
+                        "{\"reason\":\"Too soon\"}")))
+                .andExpect(status().isConflict());
+        // Refused whole: the ride is still paid, so the refund can be asked
+        // for again and the tip's charge has a paid ride to land on.
+        mvc.perform(People.asRider(get("/api/rides/" + id), rider))
+                .andExpect(jsonPath("$.paymentStatus").value("PAID"));
+
+        // The charge came back.
+        db.execute("UPDATE wl_payment SET tip_ref = 'sim_ch_tip' WHERE ride_id = ?",
+                new Object[] {id});
+        mvc.perform(admin(Trips.body(post("/api/admin/rides/" + id + "/refund"),
+                        "{\"reason\":\"Now\"}")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("refunded"));
+        Trips.offline(mvc, driver);
+    }
+
+    @Test
+    void aRideLeftCompletedAndUnpaidIsSettledLater() throws Exception {
+        // Lisbon.
+        String rider = People.rider(accounts, "lis-rider");
+        String driver = People.driver(accounts, "lis-driver");
+        Trips.addCard(mvc, rider, Trips.VISA);
+        Trips.online(mvc, driver, 38.7223, -9.1393);
+        Map done = Trips.complete(mvc, rider, driver, People.ride(38.7223, -9.1393, 38.7323,
+                -9.1293));
+        String id = (String) done.get("id");
+        long total = Trips.number(done, "fareCents") + Trips.number(done, "serviceFee");
+
+        // The server stopped after the ride completed and before its payment
+        // was written.
+        db.execute("DELETE FROM wl_payment WHERE ride_id = ?", new Object[] {id});
+        db.execute("UPDATE wl_ride SET payment_status = 'PENDING' WHERE id = ?",
+                new Object[] {id});
+
+        // Completed a moment ago, it may still be at the processor: left alone.
+        rides.settleLeftBehind();
+        mvc.perform(People.asRider(get("/api/rides/" + id), rider))
+                .andExpect(jsonPath("$.paymentStatus").value("PENDING"));
+
+        db.execute("UPDATE wl_ride SET updated_at = 1 WHERE id = ?", new Object[] {id});
+        rides.settleLeftBehind();
+        mvc.perform(People.asRider(get("/api/rides/" + id), rider))
+                .andExpect(jsonPath("$.paymentStatus").value("PAID"));
+        Map receipt = Trips.receipt(mvc, rider, id);
+        assertEquals("paid", receipt.get("status"));
+        assertEquals(total, Trips.number(receipt, "total"));
+
+        // And once: a second pass finds nothing left to settle.
+        rides.settleLeftBehind();
+        assertEquals(total, Trips.number(Trips.receipt(mvc, rider, id), "total"));
+        Trips.offline(mvc, driver);
+    }
+
+    @Test
+    void theCardLimitHoldsForSetupsStartedWhileThereWasRoom() throws Exception {
+        String rider = People.rider(accounts, "card-collector");
+        for (int iter = 0; iter < 7; iter++) {
+            Trips.addCard(mvc, rider, Trips.VISA);
+        }
+        // Two setups started with room for one card.
+        Map first = Trips.json(mvc, People.asRider(post("/api/payments/methods/setup"), rider));
+        Map second = Trips.json(mvc, People.asRider(post("/api/payments/methods/setup"), rider));
+        mvc.perform(People.asRider(Trips.body(post("/api/payments/methods/setup/"
+                        + first.get("id") + "/complete"), Trips.card(Trips.MASTERCARD)), rider))
+                .andExpect(status().isOk());
+        mvc.perform(People.asRider(Trips.body(post("/api/payments/methods/setup/"
+                        + second.get("id") + "/complete"), Trips.card(Trips.MASTERCARD)), rider))
+                .andExpect(status().isConflict());
+        // Cash and eight cards.
+        mvc.perform(People.asRider(get("/api/payments/methods"), rider))
+                .andExpect(jsonPath("$.length()").value(9));
     }
 
     @Test

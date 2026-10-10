@@ -68,6 +68,8 @@ concurrency:
 
 permissions:
   contents: read
+  # Required to pull the pr-ci-container image from ghcr.io.
+  packages: read
 
 jobs:
   template-sync:

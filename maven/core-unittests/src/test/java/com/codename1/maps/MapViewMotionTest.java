@@ -27,8 +27,10 @@ import com.codename1.junit.UITestBase;
 import com.codename1.maps.vector.MapStyle;
 import com.codename1.maps.vector.TileCallback;
 import com.codename1.maps.vector.TileSource;
+import com.codename1.ui.Form;
 import com.codename1.ui.events.WheelEvent;
 import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.BorderLayout;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -179,6 +181,35 @@ class MapViewMotionTest extends UITestBase {
         map.pinch(1f);
         assertEquals(zoom + 1, map.getZoom(), 1e-6,
                 "the next pinch starts from where the last one ended");
+    }
+
+    @FormTest
+    void aMapRemovedWhileMovingIsTakenOffItsForm() throws Exception {
+        MapView map = sizedMap();
+        Form form = new Form(new BorderLayout());
+        form.add(BorderLayout.CENTER, map);
+        form.show();
+        map.pointerPressed(50, 150);
+        for (int i = 1; i <= 8; i++) {
+            Thread.sleep(8);
+            map.pointerDragged(50 + i * 12, 150);
+        }
+        map.pointerReleased(146, 150);
+        assertTrue(animatedBy(form).contains(map),
+                "a map let go while moving is animated by its form");
+
+        map.remove();
+        assertFalse(animatedBy(form).contains(map),
+                "and not once it has been removed from it");
+    }
+
+    // The form keeps what it animates to itself; nothing public says whether a
+    // component is still among them.
+    private static java.util.List<?> animatedBy(Form form) throws Exception {
+        java.lang.reflect.Field field = Form.class.getDeclaredField("animatableComponents");
+        field.setAccessible(true);
+        Object value = field.get(form);
+        return value == null ? java.util.Collections.emptyList() : (java.util.List<?>) value;
     }
 
     private static void assertSamePlace(LatLng expected, LatLng actual) {

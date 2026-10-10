@@ -357,7 +357,9 @@ its stars only where it has none, so a ride rated twice is rated once.
 wrong codes with `session.increment`, so two guesses sent together each use
 one up. `PaymentRepository.claimTip` and `claimRefund` claim a tip and a refund
 the same way before the payment provider is asked for anything, so of two
-requests only one charges or refunds. A payout has no single row to claim, so
+requests only one charges or refunds. Both claims update the ride's row, so a
+refund that arrives while a tip is still being charged sees the tip and answers
+409 until the charge has been recorded or given up. A payout has no single row to claim, so
 `Earnings.cashOut` commits the payout, reads the balance again, and takes its
 own row back when the balance has gone below zero.
 
@@ -810,6 +812,13 @@ last four digits.
 charges the fare and the service fee when a ride completes, charges a tip once,
 refunds, and builds receipts. Every charge carries a key made from the ride's
 id, so a request repeated after a timeout can't charge twice.
+
+A ride completes in one transaction and its payment is written in another,
+with the charge between them. A server that stops in between leaves a completed
+ride whose payment is still pending. `Rides.settleLeftBehind` runs every minute,
+finds such rides once they are two minutes old, and settles them. Because the
+charge is keyed by the ride, a card that was already charged isn't charged
+again.
 
 Two implementations come with the sample:
 

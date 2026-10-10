@@ -363,6 +363,46 @@ public class Rides {
         return ride;
     }
 
+    /// How long a completed ride may wait for its payment before it is taken
+    /// to have been left behind. Longer than any charge takes.
+    private static final long UNSETTLED_MILLIS = 2L * 60L * 1000L;
+
+    /// Finishes the payment of rides that completed and were never settled.
+    ///
+    /// Completing a ride commits before the card is charged, and what came of
+    /// the charge is written after it. A server stopped between the two leaves
+    /// a ride that is over and says its payment is pending, and nothing would
+    /// come back for it: the driver's request cannot be made again, the ride
+    /// having completed. This does. Settling is safe to repeat -- see
+    /// [Payments#settle] -- so a ride whose card was charged just before the
+    /// server stopped is recorded as paid and not charged again.
+    @Scheduled(fixedDelay = 60000, initialDelay = 30000, lock = "wayline-settlement")
+    public void settleLeftBehind() throws IOException {
+        List<Ride> unsettled = unsettled(System.currentTimeMillis() - UNSETTLED_MILLIS);
+        Exception failed = null;
+        for (int iter = 0; iter < unsettled.size(); iter++) {
+            Ride ride = unsettled.get(iter);
+            try {
+                tell(settled(ride.driver, ride.id, payments.settle(ride)));
+            } catch (IOException err) {
+                failed = failed == null ? err : failed;
+            } catch (RuntimeException err) {
+                failed = failed == null ? err : failed;
+            }
+        }
+        if (failed instanceof IOException) {
+            throw (IOException) failed;
+        }
+        if (failed instanceof RuntimeException) {
+            throw (RuntimeException) failed;
+        }
+    }
+
+    @Transactional(readOnly = true)
+    private List<Ride> unsettled(long before) {
+        return rides.unsettled(before, 50);
+    }
+
     @Transactional
     private Change settled(String driver, String id, String status) throws IOException {
         rides.paymentStatus(id, status);

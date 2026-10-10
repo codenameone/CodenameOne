@@ -111,6 +111,7 @@ public class MapView extends Container implements MapSurface {
     private int zoomFocusY;
     private long lastStep;
     private boolean moving;
+    private Form movingOn;
     private boolean wheelZoom;
     // Where the pointer was last seen over the map, for a gesture that says
     // how much to zoom and not where.
@@ -747,12 +748,25 @@ public class MapView extends Container implements MapSurface {
         zooming = false;
     }
 
+    // Takes the map off the form it registered with -- the one remembered, not
+    // the one it is on now, which is none once it has been removed.
+    private void stopAnimating() {
+        if (moving) {
+            moving = false;
+            if (movingOn != null) {
+                movingOn.deregisterAnimated(this);
+                movingOn = null;
+            }
+        }
+    }
+
     private void move() {
         lastStep = System.currentTimeMillis();
         if (!moving) {
             Form form = getComponentForm();
             if (form != null) {
                 form.registerAnimated(this);
+                movingOn = form;
                 moving = true;
             }
         }
@@ -775,13 +789,7 @@ public class MapView extends Container implements MapSurface {
     public boolean animate() {
         boolean other = super.animate();
         if (!gliding && !zooming) {
-            if (moving) {
-                moving = false;
-                Form form = getComponentForm();
-                if (form != null) {
-                    form.deregisterAnimated(this);
-                }
-            }
+            stopAnimating();
             return other;
         }
         long now = System.currentTimeMillis();
@@ -834,7 +842,9 @@ public class MapView extends Container implements MapSurface {
     @Override
     protected void deinitialize() {
         settle();
-        moving = false;
+        // Not left to animate(): the form stops asking once this is gone from
+        // it, or would go on asking a map it no longer shows.
+        stopAnimating();
         super.deinitialize();
     }
 

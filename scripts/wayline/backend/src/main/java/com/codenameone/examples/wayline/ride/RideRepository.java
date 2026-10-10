@@ -193,6 +193,15 @@ public class RideRepository {
                 .executeUpdate();
     }
 
+    /// Completed rides whose payment has been pending since before `before`,
+    /// oldest first.
+    public List<Ride> unsettled(long before, int limit) {
+        return session.createQuery("select r from Ride r where r.state = 'COMPLETED' "
+                + "and r.paymentStatus = 'PENDING' and r.updatedAt < :before "
+                + "order by r.updatedAt", Ride.class).setParameter("before", Long.valueOf(before))
+                .limit(limit).list();
+    }
+
     /// Records how the charge for a ride came out. A statement of its own and
     /// not a change to a ride read earlier, so that it writes this one column
     /// whatever else was written to the ride meanwhile.

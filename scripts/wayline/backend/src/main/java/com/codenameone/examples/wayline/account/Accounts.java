@@ -85,8 +85,37 @@ public class Accounts {
 
     /// Opens an account. Answers 400 for a request that cannot be an account
     /// and 409 when the e-mail already has one.
-    @Transactional(rollbackFor = IOException.class)
+    ///
+    /// Not a transaction itself, so that it can look again after one failed.
+    /// Two requests for the same e-mail can both find it free; the name's
+    /// unique key then refuses the second, and what the database says about
+    /// that differs with the database. So nothing here reads the error: if the
+    /// account exists once the transaction is over, that is why it failed, and
+    /// the answer is the same 409 the check gives.
     public UserDto register(RegisterDto request) throws IOException {
+        try {
+            return open(request);
+        } catch (ResponseStatusException answered) {
+            throw answered;
+        } catch (IOException failed) {
+            throw taken(request, failed);
+        } catch (RuntimeException failed) {
+            throw taken(request, failed);
+        }
+    }
+
+    /// The 409 for a registration that failed because the account was opened
+    /// meanwhile, or the failure itself when it was something else.
+    private <T extends Exception> T taken(RegisterDto request, T failed) {
+        if (request != null && request.email != null
+                && users.userExists(email(request.email))) {
+            throw new ResponseStatusException(409, "That e-mail already has an account");
+        }
+        return failed;
+    }
+
+    @Transactional(rollbackFor = IOException.class)
+    private UserDto open(RegisterDto request) throws IOException {
         if (request == null) {
             throw new ResponseStatusException(400, "Nothing to register");
         }

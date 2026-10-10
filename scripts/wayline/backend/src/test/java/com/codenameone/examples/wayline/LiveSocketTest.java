@@ -27,6 +27,8 @@ import com.codename1.backend.Tcp;
 import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.test.BackendTest;
 import com.codename1.backend.test.LocalServerPort;
+import com.codename1.backend.test.MockMvc;
+import com.codenameone.examples.wayline.account.Accounts;
 import com.codenameone.examples.wayline.account.DemoAccounts;
 import com.codenameone.examples.wayline.live.LiveHub;
 import com.codenameone.examples.wayline.live.LiveTickets;
@@ -34,6 +36,8 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 
+import static com.codename1.backend.test.MockMvcRequestBuilders.post;
+import static com.codename1.backend.test.MockMvcResultMatchers.status;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -50,6 +54,10 @@ class LiveSocketTest {
     private LiveTickets tickets;
     @Autowired
     private LiveHub hub;
+    @Autowired
+    private MockMvc mvc;
+    @Autowired
+    private Accounts accounts;
 
     /// The last frame read: its opcode, and its payload as text.
     private int opcode;
@@ -98,6 +106,26 @@ class LiveSocketTest {
             assertEquals(4403, closeCode());
         } finally {
             rider.close();
+        }
+    }
+
+    @Test
+    void changingAnAccountsRolesClosesTheChannelItHasOpen() throws Exception {
+        // The channel keeps the roles it was opened with, so one opened as an
+        // admin would go on hearing the fleet after the role was taken away.
+        String username = People.rider(accounts, "live-roles");
+        Tcp channel = open("/ws/live?ticket=" + tickets.issue(username).ticket);
+        try {
+            readFrame(channel);
+            assertEquals("{\"type\":\"ready\"}", text());
+
+            mvc.perform(People.asAdmin(Trips.body(post("/api/admin/users/" + username + "/roles"),
+                            "{\"driver\":true,\"admin\":false}"), DemoAccounts.ADMIN))
+                    .andExpect(status().isOk());
+            readFrame(channel);
+            assertEquals(CLOSE, opcode);
+        } finally {
+            channel.close();
         }
     }
 
