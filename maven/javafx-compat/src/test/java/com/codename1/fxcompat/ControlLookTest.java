@@ -46,6 +46,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.RadioButton;
+import javafx.scene.control.Slider;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
@@ -485,5 +486,92 @@ public class ControlLookTest {
         assertTrue("the button after it is still in view",
                 ok.getBoundsInParent().getMaxX() <= width + 0.01);
         assertEquals(ok.prefWidth(-1), ok.getWidth(), 0.01);
+    }
+
+    // ---------------------------------------------- what the native lacks
+
+    /// The native slider draws no ticks, so the layer does: one label for
+    /// every major unit, in a band the slider grows by.
+    @Test
+    public void aSliderDrawsTheTickMarksAndLabelsItWasAskedFor() {
+        Slider plain = new Slider(0, 100, 40);
+        new Scene(new StackPane(plain), 300, 100);
+        double bare = plain.prefHeight(-1);
+        assertTrue("nothing is drawn unasked", paint(plain).isEmpty());
+
+        Slider slider = new Slider(0, 100, 40);
+        slider.setMajorTickUnit(25);
+        slider.setMinorTickCount(4);
+        slider.setShowTickMarks(true);
+        slider.setShowTickLabels(true);
+        new Scene(new StackPane(slider), 300, 100);
+        double tall = slider.prefHeight(-1);
+        assertTrue("the ticks have room of their own: " + bare + " -> " + tall, tall > bare + 10);
+        slider.resize(300, tall);
+        slider.layout();
+
+        List<Op> ops = paint(slider);
+        assertEquals(java.util.Arrays.asList("0", "25", "50", "75", "100"), texts(ops));
+        int marks = 0;
+        double left = Double.MAX_VALUE;
+        double right = -Double.MAX_VALUE;
+        for (Op op : ops) {
+            if ("fill".equals(op.kind)) {
+                marks++;
+                left = Math.min(left, op.bounds[0]);
+                right = Math.max(right, op.bounds[2]);
+            }
+        }
+        // Five major marks and four minor ones in each of the four gaps.
+        assertEquals(21, marks);
+        assertTrue("the marks span the track: " + left + ".." + right, right - left > 200);
+
+        // The native slider keeps clear of the band.
+        Component c = slider.cn1Native();
+        assertTrue("native " + c.getHeight() + " of " + tall,
+                Units.toLogical(c.getHeight()) <= tall - 10);
+
+        slider.setShowTickLabels(false);
+        assertTrue(texts(paint(slider)).isEmpty());
+        assertTrue(slider.prefHeight(-1) < tall);
+    }
+
+    /// The native check box has two looks; the third state gets a dash of
+    /// its own, and loses it when the box is determined again.
+    @Test
+    public void anIndeterminateCheckBoxShowsADash() {
+        HeadlessImplementation.rasterImages = true;
+        HeadlessImplementation.pixelImages = true;
+        try {
+            CheckBox box = new CheckBox("Maybe");
+            new Scene(new StackPane(box), 300, 100);
+            box.resize(box.prefWidth(-1), box.prefHeight(-1));
+            box.layout();
+            int[] empty = raster(box);
+            box.setIndeterminate(true);
+            int[] dashed = raster(box);
+            int changed = 0;
+            for (int i = 0; i < empty.length; i++) {
+                if (empty[i] != dashed[i]) {
+                    changed++;
+                }
+            }
+            assertTrue("a dash was drawn: " + changed + " pixels", changed >= 8);
+            box.setIndeterminate(false);
+            assertTrue(java.util.Arrays.equals(empty, raster(box)));
+        } finally {
+            HeadlessImplementation.rasterImages = false;
+            HeadlessImplementation.pixelImages = false;
+        }
+    }
+
+    private static int[] raster(Control control) {
+        Component c = control.cn1Native();
+        com.codename1.ui.Image image = com.codename1.ui.Image.createImage(
+                Math.max(1, c.getWidth()), Math.max(1, c.getHeight()), 0xffffffff);
+        com.codename1.ui.Graphics g = image.getGraphics();
+        g.translate(-c.getX(), -c.getY());
+        c.paintComponent(g, false);
+        return image.getRGB();
     }
 }

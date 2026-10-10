@@ -25,6 +25,11 @@ package javafx.scene.control;
 import com.codename1.fxcompat.runtime.Dirty;
 import com.codename1.fxcompat.runtime.FxBoolean;
 import com.codename1.ui.Component;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.plaf.DefaultLookAndFeel;
+import com.codename1.ui.plaf.LookAndFeel;
+import com.codename1.ui.plaf.Style;
 
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -35,10 +40,10 @@ import javafx.event.ActionEvent;
 ///
 /// With `allowIndeterminate` a press cycles unchecked, indeterminate,
 /// checked; without it a press flips checked and clears indeterminate.
-/// The native check box has no third look: an indeterminate box is shown
-/// unchecked, and only the `indeterminate` pseudo-class tells the two
-/// apart. The pseudo-classes `selected`, `indeterminate` and
-/// `determinate` follow the state.
+/// The native check box has no third look, so this one adds it: an
+/// indeterminate box is the empty box of the theme with a dash in it.
+/// The pseudo-classes `selected`, `indeterminate` and `determinate`
+/// follow the state.
 public class CheckBox extends ButtonBase {
 
     private static final int STATE = Dirty.USER;
@@ -67,9 +72,54 @@ public class CheckBox extends ButtonBase {
         pseudoClassStateChanged(DETERMINATE_STATE, true);
     }
 
+    /// The native check box with the third look it lacks: the empty box
+    /// the theme draws, and a dash in it while the state is undetermined.
+    private static final class Box extends com.codename1.ui.CheckBox {
+
+        private boolean dash;
+
+        void dash(boolean on) {
+            if (dash != on) {
+                dash = on;
+                repaint();
+            }
+        }
+
+        @Override
+        public void paint(Graphics g) {
+            super.paint(g);
+            if (!dash || isToggle() || isOppositeSide()) {
+                return;
+            }
+            // The box is where the look and feel puts it: against the
+            // leading padding, as high as the image the theme draws for
+            // it -- as the text when the theme has none -- and centred on
+            // the height the padding leaves.
+            Style s = getStyle();
+            int side = s.getFont().getHeight();
+            LookAndFeel laf = getUIManager().getLookAndFeel();
+            if (laf instanceof DefaultLookAndFeel) {
+                Image[] images = ((DefaultLookAndFeel) laf).getCheckBoxImages();
+                if (images != null && images.length > 0 && images[0] != null) {
+                    side = images[0].getWidth();
+                }
+            }
+            int lead = s.getPaddingLeft(isRTL());
+            int x = isRTL() ? getX() + getWidth() - lead - side : getX() + lead;
+            int top = s.getPaddingTop();
+            int cy = getY() + top + (getHeight() - top - s.getPaddingBottom()) / 2;
+            int w = Math.max(4, side / 2);
+            int h = Math.max(2, side / 8);
+            int color = g.getColor();
+            g.setColor(s.getFgColor());
+            g.fillRect(x + (side - w) / 2, cy - h / 2, w, h);
+            g.setColor(color);
+        }
+    }
+
     @Override
     protected Component cn1CreateNative() {
-        com.codename1.ui.CheckBox b = new com.codename1.ui.CheckBox();
+        com.codename1.ui.CheckBox b = new Box();
         b.addActionListener(cn1ActionBridge());
         return b;
     }
@@ -78,8 +128,9 @@ public class CheckBox extends ButtonBase {
     protected void cn1SyncNative() {
         super.cn1SyncNative();
         Component c = cn1NativeIfCreated();
-        if (c instanceof com.codename1.ui.CheckBox) {
-            ((com.codename1.ui.CheckBox) c).setSelected(isSelected() && !isIndeterminate());
+        if (c instanceof Box) {
+            ((Box) c).setSelected(isSelected() && !isIndeterminate());
+            ((Box) c).dash(isIndeterminate());
         }
     }
 

@@ -549,6 +549,13 @@ public final class LinuxNative {
     /** Why the most recent open failed, for the exception the port raises. */
     public static native String lastIoError();
 
+    /**
+     * A moment as the user's locale writes a date ({@code what == 0}) or a time
+     * of day ({@code what == 1}), in the local time zone; empty when it cannot
+     * be written.
+     */
+    public static native String formatLocalTime(long millis, int what);
+
     /* ---------------------------------------------------------- crypto */
 
     /** Fills {@code out} with fresh entropy; false when the platform RNG failed. */

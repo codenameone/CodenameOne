@@ -59,6 +59,7 @@ javafx.scene.canvas.GraphicsContext#CN1_MAX_RECORDED_CALLS
 javafx.scene.control.ButtonBase#cn1ActionBridge
 javafx.scene.control.Control#cn1CreateNative
 javafx.scene.control.Control#cn1Native
+javafx.scene.control.Control#cn1NativeBand
 javafx.scene.control.Control#cn1NativeIfCreated
 javafx.scene.control.Control#cn1NativePreferredSize
 javafx.scene.control.Control#cn1NativeSizeChanged

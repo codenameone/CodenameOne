@@ -242,16 +242,25 @@ public abstract class Control extends Region {
         requestLayout();
     }
 
+    /// The room, in logical pixels, the control keeps for itself below the
+    /// native component (index 0) and to its right (index 1), inside its
+    /// insets: what the control draws next to a widget that cannot draw
+    /// it, as a slider draws its tick marks. `null` for none.
+    protected double[] cn1NativeBand() {
+        return null;
+    }
+
     private void placeNative() {
         if (nativeComponent == null || !cn1HasPeer()) {
             return;
         }
         Component peer = cn1Peer();
         Insets in = getInsets();
+        double[] band = cn1NativeBand();
         int left = Units.toPixels(in.getLeft());
         int top = Units.toPixels(in.getTop());
-        int w = Math.max(0, peer.getWidth() - left - Units.toPixels(in.getRight()));
-        int h = Math.max(0, peer.getHeight() - top - Units.toPixels(in.getBottom()));
+        int w = Math.max(0, peer.getWidth() - left - Units.toPixels(in.getRight() + (band == null ? 0 : band[1])));
+        int h = Math.max(0, peer.getHeight() - top - Units.toPixels(in.getBottom() + (band == null ? 0 : band[0])));
         if (nativeComponent.getX() != left || nativeComponent.getY() != top || nativeComponent.getWidth() != w
                 || nativeComponent.getHeight() != h) {
             nativeComponent.setX(left);

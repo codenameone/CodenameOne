@@ -4035,6 +4035,27 @@ public class LinuxImplementation extends CodenameOneImplementation {
                     }
                     return LONG_MONTHS[m];
                 }
+
+                /*
+                 * The short date and the time of day are the locale's own. The
+                 * base class answers Date.toString() for both, which is neither
+                 * short nor a date alone: a date Picker -- and so a JavaFX
+                 * DatePicker or anything else that shows a day -- read
+                 * "February 29, 2024 12:00:00 PM" where every other port shows
+                 * 2/29/2024. An empty answer means the C library could not
+                 * write the moment, and the old text is better than none.
+                 */
+                @Override
+                public String formatDateShortStyle(Date d) {
+                    String s = LinuxNative.formatLocalTime(d.getTime(), 0);
+                    return s == null || s.length() == 0 ? super.formatDateShortStyle(d) : s;
+                }
+
+                @Override
+                public String formatTime(Date d) {
+                    String s = LinuxNative.formatLocalTime(d.getTime(), 1);
+                    return s == null || s.length() == 0 ? super.formatTime(d) : s;
+                }
             };
         }
         return l10n;

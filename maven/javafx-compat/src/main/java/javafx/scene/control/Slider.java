@@ -23,10 +23,16 @@
 package javafx.scene.control;
 
 import com.codename1.fxcompat.runtime.Dirty;
+import com.codename1.fxcompat.runtime.Fonts;
+import com.codename1.fxcompat.runtime.FxBoolean;
 import com.codename1.fxcompat.runtime.FxDouble;
 import com.codename1.fxcompat.runtime.FxObject;
+import com.codename1.fxcompat.runtime.Renderer;
+import com.codename1.fxcompat.runtime.Units;
 import com.codename1.ui.Component;
 import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
 
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.DoubleProperty;
@@ -35,10 +41,11 @@ import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleIntegerProperty;
-import javafx.beans.property.SimpleObjectProperty;
 import javafx.css.PseudoClass;
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
+import javafx.scene.paint.Color;
+import javafx.scene.text.Font;
 import javafx.util.StringConverter;
 
 /// A value picked from a range by moving a thumb, shown as an editable
@@ -49,8 +56,10 @@ import javafx.util.StringConverter;
 /// The native slider counts in whole steps, so the range is mapped onto
 /// 10000 of them; a value the user drags to is one of those.
 ///
-/// Tick marks, tick labels and the label formatter are recorded and not
-/// shown by the native slider. `valueChanging` is true while the user
+/// The native slider draws no ticks. Tick marks and tick labels are drawn
+/// by this control in a band of its own, below a horizontal slider and to
+/// the right of a vertical one, with the label formatter's text when
+/// there is one. `valueChanging` is true while the user
 /// drags the slider and false again when the pointer is let go of.
 /// `snapToTicks`,
 /// `majorTickUnit` and `minorTickCount` do take part in
@@ -72,14 +81,20 @@ public class Slider extends Control {
     private final ObjectProperty<Orientation> orientation = new FxObject<Orientation>(this, "orientation",
             Orientation.HORIZONTAL, ORIENTATION | Dirty.NATIVE | Dirty.LAYOUT);
     private final BooleanProperty valueChanging = new SimpleBooleanProperty(this, "valueChanging", false);
-    private final BooleanProperty showTickLabels = new SimpleBooleanProperty(this, "showTickLabels", false);
-    private final BooleanProperty showTickMarks = new SimpleBooleanProperty(this, "showTickMarks", false);
-    private final DoubleProperty majorTickUnit = new SimpleDoubleProperty(this, "majorTickUnit", 25);
+    private static final int TICKS = Dirty.PAINT | Dirty.LAYOUT;
+    private static final double MAJOR_TICK = 6;
+    private static final double MINOR_TICK = 3;
+    private static final double TICK_GAP = 2;
+    private static final int MAX_TICKS = 1000;
+
+    private final BooleanProperty showTickLabels = new FxBoolean(this, "showTickLabels", false, TICKS);
+    private final BooleanProperty showTickMarks = new FxBoolean(this, "showTickMarks", false, TICKS);
+    private final DoubleProperty majorTickUnit = new FxDouble(this, "majorTickUnit", 25, TICKS);
     private final IntegerProperty minorTickCount = new SimpleIntegerProperty(this, "minorTickCount", 3);
     private final BooleanProperty snapToTicks = new SimpleBooleanProperty(this, "snapToTicks", false);
     private final DoubleProperty blockIncrement = new SimpleDoubleProperty(this, "blockIncrement", 10);
     private final ObjectProperty<StringConverter<Double>> labelFormatter =
-            new SimpleObjectProperty<StringConverter<Double>>(this, "labelFormatter");
+            new FxObject<StringConverter<Double>>(this, "labelFormatter", null, TICKS);
     private boolean clamping;
     private boolean syncing;
 
@@ -118,6 +133,12 @@ public class Slider extends Control {
                         }
                     }
                 });
+        minorTickCount.addListener(new javafx.beans.InvalidationListener() {
+            @Override
+            public void invalidated(javafx.beans.Observable observable) {
+                cn1Repaint();
+            }
+        });
         pseudoClassStateChanged(HORIZONTAL, true);
     }
 
@@ -200,13 +221,160 @@ public class Slider extends Control {
         super.cn1Invalidated(what);
     }
 
+    // ------------------------------------------------------------ ticks
+
+    /// The font of the tick labels: the default one, a little smaller.
+    private static Font tickFont() {
+        return Font.font(Font.getDefault().getSize() * 0.85);
+    }
+
+    /// What a tick label reads: the formatter's text, or the number with
+    /// no fraction when it has none.
+    private String tickText(double v) {
+        StringConverter<Double> f = getLabelFormatter();
+        if (f != null) {
+            String s = f.toString(Double.valueOf(v));
+            return s == null ? "" : s;
+        }
+        if (v == Math.floor(v) && Math.abs(v) < 1e15) {
+            return String.valueOf((long) v);
+        }
+        return String.valueOf(Math.round(v * 100) / 100.0);
+    }
+
+    /// How many major ticks the range holds, the one at `min` included;
+    /// zero when the unit cannot be drawn.
+    private int majorTicks() {
+        double unit = getMajorTickUnit();
+        double span = getMax() - getMin();
+        if (!(unit > 0) || !(span > 0)) {
+            return 0;
+        }
+        double n = Math.floor(span / unit + 1e-9) + 1;
+        return n > MAX_TICKS ? 0 : (int) n;
+    }
+
+    /// The room the tick marks and the tick labels take: below the track
+    /// of a horizontal slider, to the right of a vertical one.
+    private double tickBand() {
+        double band = isShowTickMarks() ? MAJOR_TICK + TICK_GAP : 0;
+        if (!isShowTickLabels()) {
+            return band;
+        }
+        Font font = tickFont();
+        if (getOrientation() != Orientation.VERTICAL) {
+            return band + Fonts.lineHeight(font) + TICK_GAP;
+        }
+        double widest = 0;
+        int n = majorTicks();
+        for (int i = 0; i < n; i++) {
+            widest = Math.max(widest, Fonts.width(font, tickText(getMin() + i * getMajorTickUnit())));
+        }
+        return band + widest + TICK_GAP;
+    }
+
+    @Override
+    protected double[] cn1NativeBand() {
+        double band = isShowTickMarks() || isShowTickLabels() ? tickBand() : 0;
+        if (!(band > 0)) {
+            return null;
+        }
+        return getOrientation() == Orientation.VERTICAL ? new double[] {0, band} : new double[] {band, 0};
+    }
+
+    /// Draws the tick marks and the tick labels the application asked
+    /// for, in the band kept beside the native slider, which draws
+    /// neither. A tick is where the thumb stands at that value: the
+    /// native slider moves it over its width less its padding.
+    @Override
+    public void cn1Paint(Renderer renderer) {
+        super.cn1Paint(renderer);
+        boolean marks = isShowTickMarks();
+        boolean labels = isShowTickLabels();
+        int n = marks || labels ? majorTicks() : 0;
+        if (n == 0) {
+            return;
+        }
+        boolean vertical = getOrientation() == Orientation.VERTICAL;
+        Insets in = getInsets();
+        double band = tickBand();
+        double lead = 0;
+        double trail = 0;
+        Component c = cn1NativeIfCreated();
+        if (c != null) {
+            Style s = c.getStyle();
+            lead = Units.toLogical(vertical ? s.getPaddingTop() : s.getPaddingLeftNoRTL());
+            trail = Units.toLogical(vertical ? s.getPaddingBottom() : s.getPaddingRightNoRTL());
+        }
+        // The line the ticks start from, and the run of the track along it.
+        double from = vertical ? in.getTop() + lead : in.getLeft() + lead;
+        double length = (vertical ? getHeight() - in.getBottom() : getWidth() - in.getRight()) - trail - from;
+        double edge = vertical ? getWidth() - in.getRight() - band : getHeight() - in.getBottom() - band;
+        if (!(length > 0)) {
+            return;
+        }
+        int fg = UIManager.getInstance().getComponentStyle("Label").getFgColor();
+        Color ink = Color.rgb((fg >> 16) & 0xff, (fg >> 8) & 0xff, fg & 0xff);
+        Color line = Color.rgb((fg >> 16) & 0xff, (fg >> 8) & 0xff, fg & 0xff, 0.55);
+        double unit = getMajorTickUnit();
+        double span = getMax() - getMin();
+        double t = Units.toLogical(1);
+        Font font = tickFont();
+        double lineHeight = Fonts.lineHeight(font);
+        int minor = Math.max(0, getMinorTickCount());
+        double step = unit / (minor + 1) / span * length;
+        double lastEnd = -Double.MAX_VALUE;
+        for (int i = 0; i < n; i++) {
+            double v = getMin() + i * unit;
+            double f = (v - getMin()) / span;
+            double at = from + (vertical ? (1 - f) * length : f * length);
+            if (marks) {
+                tick(renderer, vertical, at, edge, MAJOR_TICK, t, line);
+                // The marks between this one and the next, where they
+                // can be told apart.
+                for (int j = 1; j <= minor && step >= 2 && v + j * unit / (minor + 1) <= getMax() + 1e-9; j++) {
+                    tick(renderer, vertical, at + (vertical ? -j * step : j * step), edge, MINOR_TICK, t, line);
+                }
+            }
+            if (labels) {
+                String text = tickText(v);
+                double w = Fonts.width(font, text);
+                double start = edge + (marks ? MAJOR_TICK + TICK_GAP : TICK_GAP);
+                if (vertical) {
+                    double y = Math.max(0, Math.min(getHeight() - lineHeight, at - lineHeight / 2));
+                    // Upwards: a label is drawn when it ends above the one before.
+                    if (i == 0 || y + lineHeight <= lastEnd) {
+                        renderer.drawText(text, start, y, font, ink);
+                        lastEnd = y;
+                    }
+                } else {
+                    double x = Math.max(0, Math.min(getWidth() - w, at - w / 2));
+                    if (x >= lastEnd) {
+                        renderer.drawText(text, x, start, font, ink);
+                        lastEnd = x + w + TICK_GAP;
+                    }
+                }
+            }
+        }
+    }
+
+    private static void tick(Renderer renderer, boolean vertical, double at, double edge, double length, double t,
+            Color line) {
+        double p = Units.snap(at - t / 2);
+        if (vertical) {
+            renderer.fillRect(edge, p, length, t, line);
+        } else {
+            renderer.fillRect(p, edge, t, length, line);
+        }
+    }
+
     /// The length a slider asks for is JavaFX's, 140, and not the platform
     /// slider's, which asks for most of a screen: a slider among other
     /// controls in a row would push them out of it.
     @Override
     protected double computePrefWidth(double height) {
         if (getOrientation() == Orientation.VERTICAL) {
-            return super.computePrefWidth(height);
+            return super.computePrefWidth(height) + tickBand();
         }
         Insets in = getInsets();
         return in.getLeft() + 140 + in.getRight();
@@ -215,7 +383,7 @@ public class Slider extends Control {
     @Override
     protected double computePrefHeight(double width) {
         if (getOrientation() != Orientation.VERTICAL) {
-            return super.computePrefHeight(width);
+            return super.computePrefHeight(width) + tickBand();
         }
         Insets in = getInsets();
         return in.getTop() + 140 + in.getBottom();
@@ -363,12 +531,12 @@ public class Slider extends Control {
         return orientation;
     }
 
-    /// Returns whether tick labels are asked for; recorded only.
+    /// Returns whether tick labels are asked for.
     public final boolean isShowTickLabels() {
         return showTickLabels.get();
     }
 
-    /// Asks for tick labels; recorded only.
+    /// Asks for tick labels.
     public final void setShowTickLabels(boolean value) {
         showTickLabels.set(value);
     }
@@ -378,12 +546,12 @@ public class Slider extends Control {
         return showTickLabels;
     }
 
-    /// Returns whether tick marks are asked for; recorded only.
+    /// Returns whether tick marks are asked for.
     public final boolean isShowTickMarks() {
         return showTickMarks.get();
     }
 
-    /// Asks for tick marks; recorded only.
+    /// Asks for tick marks.
     public final void setShowTickMarks(boolean value) {
         showTickMarks.set(value);
     }
@@ -453,12 +621,12 @@ public class Slider extends Control {
         return blockIncrement;
     }
 
-    /// Returns the converter for tick labels; recorded only.
+    /// Returns the converter for tick labels.
     public final StringConverter<Double> getLabelFormatter() {
         return labelFormatter.get();
     }
 
-    /// Sets the converter for tick labels; recorded only.
+    /// Sets the converter for tick labels.
     public final void setLabelFormatter(StringConverter<Double> value) {
         labelFormatter.set(value);
     }
