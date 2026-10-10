@@ -189,6 +189,7 @@ class Screen(object):
         self.wm = None
         self.name = None
         self.dpy = None
+        self.gtk_session = False
 
     def start(self):
         read_fd, write_fd = os.pipe()
@@ -222,7 +223,34 @@ class Screen(object):
                 if self.dpy.screen().root.get_full_property(atom, X.AnyPropertyType):
                     break
                 time.sleep(0.05)
+        self.gtk_session = self.start_gtk_session()
         return self.name
+
+    def start_gtk_session(self):
+        """Makes the new X server one a GTK program has already run on.
+
+        The first GTK 3 program on an X server initialises GL to choose its
+        visuals and then records the choice on the root window (GDK_VISUALS),
+        "to avoid having to initialize GL each time, as it may not be used
+        later" in GDK's words. Every later program reads the property and never
+        loads a GL driver. A desktop session has had its first GTK program long
+        before an application starts; a private Xvfb has not, so each launch
+        measured here WAS the first one, and carried Mesa's llvmpipe with it:
+        53 MB of the resident set of a native Notepad (108 MB, against 56 MB
+        launched second on the same server), none of it the application's.
+        One bare gtk_init, as a process of its own that exits, puts the server
+        in the state a session leaves it in. Returns whether it did.
+        """
+        code = ("import ctypes, sys; "
+                "sys.exit(0 if ctypes.CDLL('libgtk-3.so.0').gtk_init_check(None, None) else 1)")
+        env = dict(os.environ, DISPLAY=self.name, NO_AT_BRIDGE="1")
+        env.setdefault("LIBGL_ALWAYS_SOFTWARE", "1")
+        try:
+            with open(os.path.join(self.log_dir, "gtk-session.log"), "ab") as out:
+                return subprocess.call([sys.executable, "-c", code], env=env,
+                                       stdout=out, stderr=out, timeout=30) == 0
+        except (OSError, subprocess.SubprocessError):
+            return False
 
     def stop(self):
         for process in (self.wm, self.xvfb):
@@ -451,6 +479,7 @@ def launch(command, cwd, env, size, log_dir, tag, idle_seconds, script, settle_s
     process = None
     try:
         name = screen.start()
+        result["gtk_session"] = screen.gtk_session
         child_env = dict(os.environ)
         child_env.update(env)
         child_env["DISPLAY"] = name

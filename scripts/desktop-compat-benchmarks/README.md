@@ -175,6 +175,16 @@ samples on Linux, macOS and Windows and uploads `benchmarks-<os>.json` and
   a screenshot of the idle and the after-script state of the first session
   (`logs/run-*/session-0-*.png`). Look at them before quoting a number: a
   native build that shows an error dialog starts very quickly.
+- **The X server has had a GTK program on it.** The first GTK 3 program on an
+  X server initialises GL to choose its visuals and records the choice on the
+  root window; every later one reads it and loads no GL driver. A private Xvfb
+  made each launch that first program, and Mesa's llvmpipe was 53 MB of a
+  native Notepad's 108 MB resident set -- 56 MB when launched second. A desktop
+  session is past that point before any application starts, so the driver runs
+  one bare `gtk_init` on each new server first (`gtk_session` in every sample
+  says whether it could). A Swing baseline never loads GTK and is unaffected;
+  a JavaFX one loads GTK itself, and starts from the same server as the
+  native build it is compared with.
 - **RSS counts shared pages in full.** PSS is the fairer single-process figure;
   USS is what quitting the application gives back.
 - **OpenJFX version.** The jmods default to OpenJFX 23.0.2, the oldest release
