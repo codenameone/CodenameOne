@@ -22,19 +22,26 @@
  */
 package com.codename1.build;
 
+import com.sun.net.httpserver.HttpServer;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.InetSocketAddress;
 import java.net.ConnectException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FirstBuildTelemetryTest {
     private static final String URL = "https://cloud.example/api/v2/funnel/initializr-event";
@@ -129,6 +136,102 @@ class FirstBuildTelemetryTest {
         f.put("target", null);
         f.put("client", "intellij");
         assertEquals("pkg=" + ID + "&step=launch&client=intellij", FirstBuildTelemetry.form(f));
+    }
+
+    private HttpServer server;
+    private final CopyOnWriteArrayList<String> bodies = new CopyOnWriteArrayList<String>();
+
+    private String recorder(final long delayMs) throws IOException {
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/", exchange -> {
+            InputStream in = exchange.getRequestBody();
+            ByteArrayOutputStream b = new ByteArrayOutputStream();
+            byte[] buf = new byte[1024];
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                b.write(buf, 0, n);
+            }
+            bodies.add(b.toString("UTF-8"));
+            try {
+                Thread.sleep(delayMs);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            }
+            exchange.sendResponseHeaders(204, -1);
+            exchange.close();
+        });
+        server.start();
+        return "http://127.0.0.1:" + server.getAddress().getPort() + "/e";
+    }
+
+    @AfterEach
+    void stop() {
+        if (server != null) {
+            server.stop(0);
+        }
+        System.clearProperty(FirstBuildTelemetry.OUTCOME_PROPERTY);
+    }
+
+    private String exitReport(String url, String clientOutput, boolean clientSucceeded, Throwable failure) {
+        FirstBuildTelemetry t = FirstBuildTelemetry.start(url, ID, "javascript", env(), props());
+        FirstBuildTelemetry.clearNotedOutcome();
+        if (clientOutput != null) {
+            FirstBuildTelemetry.noteBuildClientOutput(clientOutput, clientSucceeded);
+        }
+        bodies.clear();
+        t.finished(failure);
+        return bodies.get(bodies.size() - 1);
+    }
+
+    @Test
+    void aCleanExitIsNotASubmittedBuildUnlessTheClientSaysSo() throws Exception {
+        String url = recorder(0);
+        // The build client returns normally from the free plan's size limit and from an
+        // upload it never confirmed; only its output tells them apart from a submission.
+        assertTrue(exitReport(url, "Jar size limit reached\n", true, null).contains("exit=0&reason=size_limit"));
+        assertTrue(exitReport(url, "Sending build request to the server\n", true, null)
+                .contains("exit=0&reason=not_submitted"));
+        assertTrue(exitReport(url, "Sending build request to the server\nYour build was submitted\n", true, null)
+                .contains("exit=0&reason=ok"));
+        // No cloud build ran (compile, the simulator): nothing was noted.
+        assertTrue(exitReport(url, null, true, null).contains("exit=0&reason=ok"));
+    }
+
+    @Test
+    void theClientsOwnWordsNameAGenericFailure() throws Exception {
+        String url = recorder(0);
+        assertTrue(exitReport(url, "Browser login timed out\n", false, new RuntimeException("Ant task failed"))
+                .contains("exit=1&reason=login_timeout"));
+        // A specific failure from the exception is kept.
+        assertTrue(exitReport(url, "Browser login timed out\n", false, new RuntimeException("Compilation failure"))
+                .contains("exit=1&reason=compile"));
+    }
+
+    @Test
+    void anOutcomeIsReportedForTheBuildThatNotedItOnly() throws Exception {
+        String url = recorder(0);
+        FirstBuildTelemetry.noteBuildClientOutput("Jar size limit reached", true);
+        FirstBuildTelemetry t = FirstBuildTelemetry.start(url, ID, "javascript", env(), props());
+        t.launched(); // a new build forgets what the previous one noted
+        t.finished(null);
+        String exit = null;
+        for (String b : bodies) {
+            if (b.contains("step=exit")) {
+                exit = b;
+            }
+        }
+        assertNotNull(exit);
+        assertTrue(exit.contains("reason=ok"), exit);
+    }
+
+    @Test
+    void aStalledServerHoldsTheBuildUpForThreeSecondsAtMost() throws Exception {
+        String url = recorder(6_000);
+        FirstBuildTelemetry t = FirstBuildTelemetry.start(url, ID, "run", env(), props());
+        long began = System.currentTimeMillis();
+        t.finished(null);
+        long took = System.currentTimeMillis() - began;
+        assertTrue(took < 3_500, "took " + took + "ms");
     }
 
     private static String reason(String message) {

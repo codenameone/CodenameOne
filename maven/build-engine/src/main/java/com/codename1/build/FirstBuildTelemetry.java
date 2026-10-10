@@ -139,9 +139,69 @@ public final class FirstBuildTelemetry {
         return startedAt;
     }
 
+    /// Where [#noteBuildClientOutput] leaves the outcome the build client printed,
+    /// for whichever reporter ends the build. A system property because the build
+    /// engine and the reporting plugin can sit in different class loaders of the one
+    /// JVM.
+    static final String OUTCOME_PROPERTY = "cn1.telemetry.cloudOutcome";
+
+    /// Records how a cloud build's submission went, read from the build client's
+    /// output -- the only place it is said. Called by the build engine after the
+    /// client ran; harmless when nothing reports the build.
+    ///
+    /// @param output everything the build client printed
+    /// @param succeeded whether the client returned normally
+    public static void noteBuildClientOutput(String output, boolean succeeded) {
+        if (output == null) {
+            return;
+        }
+        String outcome = null;
+        if (succeeded) {
+            if (has(output, "Jar size limit reached", "Quota size limit reached")) {
+                outcome = "size_limit";
+            } else if (output.contains("Sending build request to the server")
+                    && !output.contains("Your build was submitted")) {
+                outcome = "not_submitted";
+            } else if (output.contains("Your build was submitted")) {
+                outcome = "ok";
+            }
+        } else {
+            String r = reason(output, "");
+            if (!"build_failed".equals(r)) {
+                outcome = r;
+            }
+        }
+        try {
+            if (outcome == null) {
+                System.clearProperty(OUTCOME_PROPERTY);
+            } else {
+                System.setProperty(OUTCOME_PROPERTY, outcome);
+            }
+        } catch (SecurityException ignored) {
+            // Without it the build is reported from its exit status alone.
+        }
+    }
+
+    /// Forgets any outcome a previous build in this JVM noted (an IDE's embedded
+    /// Maven, a Gradle daemon), so it is not reported for this one.
+    static void clearNotedOutcome() {
+        takeNotedOutcome();
+    }
+
+    private static String takeNotedOutcome() {
+        try {
+            String v = System.getProperty(OUTCOME_PROPERTY);
+            System.clearProperty(OUTCOME_PROPERTY);
+            return v;
+        } catch (SecurityException ex) {
+            return null;
+        }
+    }
+
     /// Reports that the build started, without waiting for the request: a slow or
     /// unreachable server must not hold up the build that is just beginning.
     public void launched() {
+        clearNotedOutcome();
         final Map<String, String> fields = common("launch");
         Thread t = new Thread(new Runnable() {
             @Override
@@ -172,9 +232,22 @@ public final class FirstBuildTelemetry {
     /// that cannot tell when this run of the build started (see FirstBuildTelemetryAction
     /// in the Gradle plugin).
     public void finishedWith(String failureReason, boolean withDuration) {
+        String noted = takeNotedOutcome();
+        String reason;
+        if (failureReason == null) {
+            // A build that ended normally submitted nothing when the build client
+            // stopped at the free plan's size limit or never confirmed the upload --
+            // it returns normally from both. Its own output says which.
+            reason = noted != null ? noted : "ok";
+        } else {
+            // The client prints the specific cause (a sign-in that timed out, an
+            // Apple certificate it could not read) and fails with a generic one.
+            reason = "build_failed".equals(failureReason) && noted != null && !"ok".equals(noted)
+                    ? noted : failureReason;
+        }
         Map<String, String> fields = common("exit");
         fields.put("exit", failureReason == null ? "0" : "1");
-        fields.put("reason", failureReason == null ? "ok" : failureReason);
+        fields.put("reason", reason);
         if (withDuration) {
             fields.put("secs", Long.toString(Math.max(0, (System.currentTimeMillis() - startedAt) / 1000)));
         }
@@ -241,8 +314,12 @@ public final class FirstBuildTelemetry {
                 break;
             }
         }
-        String m = text.toString();
-        String c = types.toString();
+        return reason(text.toString(), types.toString());
+    }
+
+    /// The same classification over plain text: the failure's messages `m` and the
+    /// class names in its chain `c` (pass "" when there are none).
+    static String reason(String m, String c) {
         if (has(m, "No compiler is provided in this environment",
                 "JAVA_HOME environment variable is not defined correctly")) {
             return "no_jdk";
@@ -360,9 +437,13 @@ public final class FirstBuildTelemetry {
         HttpURLConnection conn = null;
         try {
             byte[] body = form(fields).getBytes("UTF-8");
+            // One budget for the whole request, split between connecting and the
+            // response, so a slow connect followed by a stalled response still holds
+            // the build up for TIMEOUT_MS at most. (A read timeout changed after the
+            // connection opened is not applied, so the split is fixed up front.)
             conn = (HttpURLConnection) new URL(endpoint).openConnection();
-            conn.setConnectTimeout(TIMEOUT_MS);
-            conn.setReadTimeout(TIMEOUT_MS);
+            conn.setConnectTimeout(TIMEOUT_MS / 2);
+            conn.setReadTimeout(TIMEOUT_MS - TIMEOUT_MS / 2);
             conn.setRequestMethod("POST");
             conn.setDoOutput(true);
             conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");

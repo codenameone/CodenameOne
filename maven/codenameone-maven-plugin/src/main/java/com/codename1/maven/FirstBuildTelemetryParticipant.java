@@ -67,6 +67,12 @@ public class FirstBuildTelemetryParticipant extends AbstractMavenLifecyclePartic
             String project = property(session, model, FirstBuildTelemetry.PROJECT_PROPERTY);
             String buildTarget = property(session, model, "codename1.buildTarget");
             List<String> goals = session.getGoals();
+            if (goals == null || goals.isEmpty()) {
+                // No goal is no build: an IDE importing or reloading the project
+                // reads it through the same session, and reporting that as a
+                // successful build would mark first builds done before any ran.
+                return;
+            }
             FirstBuildTelemetry t = FirstBuildTelemetry.start(endpoint, project,
                     FirstBuildTelemetry.target(buildTarget, goals), System.getenv(), System.getProperties());
             if (t == null) {
