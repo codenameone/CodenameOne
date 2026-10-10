@@ -508,4 +508,55 @@ public class CompatRemapperTest {
         assertTrue(app.toString(), app.contains("L" + FX + "javafx/stage/Stage;"));
         assertEquals(Collections.singleton("com/x/Main.class"), snapshot(classes).keySet());
     }
+
+    /// A class a newer runtime no longer has does not outlive it in a
+    /// directory an earlier build extracted the older one into.
+    @Test
+    public void aRuntimeEntryThatIsGoneIsRemovedByTheNextBuild() throws Exception {
+        File classes = tmp.newFolder("classes");
+        byte[] kept = DependencyClassifierTest.cls("org/rt/Kept", DependencyClassifierTest.uses());
+        byte[] gone = DependencyClassifierTest.cls("org/rt/old/Gone", DependencyClassifierTest.uses("org/rt/Kept"));
+        byte[] carried = DependencyClassifierTest.cls("org/rt/Carried", DependencyClassifierTest.uses());
+        File first = jar(new File(tmp.newFolder(), "some-runtime-1.0.jar"), "org/rt/Kept.class", kept,
+                "org/rt/old/Gone.class", gone, "org/rt/Carried.class", carried,
+                "tables/old.bin", new byte[] {1, 2, 3}, "tables/kept.bin", new byte[] {4});
+        File other = jar(new File(tmp.newFolder(), "other-runtime-1.0.jar"), "org/other/Thing.class",
+                DependencyClassifierTest.cls("org/other/Thing", DependencyClassifierTest.uses()));
+        ClassRelocator relocator = new ClassRelocator(CompatLayers.SWING);
+        assertEquals(3, relocator.extractRuntime(first, classes));
+        assertEquals(1, relocator.extractRuntime(other, classes));
+        assertTrue(new File(classes, "org/rt/old/Gone.class").isFile());
+        assertTrue(new File(classes, "tables/old.bin").isFile());
+        // Kept beside the directory: nothing an application ships.
+        assertTrue(ClassRelocator.runtimeRecord(classes).isFile());
+        assertFalse(ClassRelocator.runtimeRecord(classes).getCanonicalPath()
+                .startsWith(classes.getCanonicalPath() + File.separator));
+
+        // The same runtime again changes nothing.
+        long stamp = ClassRelocator.runtimeRecord(classes).lastModified();
+        byte[] record = Files.readAllBytes(ClassRelocator.runtimeRecord(classes).toPath());
+        assertEquals(3, relocator.extractRuntime(first, classes));
+        assertArrayEquals(record, Files.readAllBytes(ClassRelocator.runtimeRecord(classes).toPath()));
+        assertEquals(stamp, ClassRelocator.runtimeRecord(classes).lastModified());
+
+        // The application has since taken one of the classes for its own.
+        byte[] own = DependencyClassifierTest.cls("org/rt/Carried", DependencyClassifierTest.uses("org/rt/Kept"));
+        Files.write(new File(classes, "org/rt/Carried.class").toPath(), own);
+
+        File second = jar(new File(tmp.newFolder(), "some-runtime-1.1.jar"), "org/rt/Kept.class", kept,
+                "org/rt/New.class", DependencyClassifierTest.cls("org/rt/New", DependencyClassifierTest.uses()),
+                "tables/kept.bin", new byte[] {4});
+        assertEquals("some-runtime", ClassRelocator.runtimeKey(second));
+        assertEquals(2, new ClassRelocator(CompatLayers.SWING).extractRuntime(second, classes));
+        assertTrue(new File(classes, "org/rt/Kept.class").isFile());
+        assertTrue(new File(classes, "org/rt/New.class").isFile());
+        assertTrue(new File(classes, "tables/kept.bin").isFile());
+        assertFalse("A class the runtime dropped is still there", new File(classes, "org/rt/old/Gone.class").exists());
+        assertFalse("and so is its directory", new File(classes, "org/rt/old").exists());
+        assertFalse(new File(classes, "tables/old.bin").exists());
+        assertArrayEquals("A file that is no longer what was extracted is not this step's to delete", own,
+                Files.readAllBytes(new File(classes, "org/rt/Carried.class").toPath()));
+        // Another runtime's classes are its own.
+        assertTrue(new File(classes, "org/other/Thing.class").isFile());
+    }
 }

@@ -39,14 +39,19 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -405,8 +410,13 @@ public final class ClassRelocator {
 
     /// Copies a runtime jar's classes into `classesDir`, relocated, and its
     /// other entries as they are. Answers the number of classes.
+    ///
+    /// What an earlier build copied from this runtime and this one did not
+    /// -- a class a newer version of the runtime no longer has -- is
+    /// removed: see [#runtimeRecord].
     public int extractRuntime(File jar, File classesDir) throws IOException {
         int count = 0;
+        Map<String, String> copied = new TreeMap<String, String>();
         ZipFile zip = new ZipFile(jar);
         try {
             Enumeration<? extends ZipEntry> en = zip.entries();
@@ -417,23 +427,157 @@ public final class ClassRelocator {
                     continue;
                 }
                 byte[] data = read(zip.getInputStream(e));
+                String path = name;
                 if (name.endsWith(".class")) {
                     String cls = name.substring(0, name.length() - ".class".length());
-                    File dest = inside(classesDir, jar, new File(classesDir, map(cls) + ".class"), name);
-                    writeIfDifferent(dest, remap(data));
+                    path = map(cls) + ".class";
+                    data = remap(data);
                     count++;
-                } else {
-                    // Resource tables and assets are compared byte for byte
-                    // too: a rebuilt table routinely keeps its length while
-                    // its contents change, and a length check alone kept the
-                    // previous runtime's copy.
-                    writeIfDifferent(inside(classesDir, jar, new File(classesDir, name), name), data);
                 }
+                // Resource tables and assets are compared byte for byte
+                // too: a rebuilt table routinely keeps its length while
+                // its contents change, and a length check alone kept the
+                // previous runtime's copy.
+                writeIfDifferent(inside(classesDir, jar, new File(classesDir, path), name), data);
+                copied.put(path, checksum(data));
             }
         } finally {
             zip.close();
         }
+        forgetStale(jar, classesDir, copied);
         return count;
+    }
+
+    /// Where the list of what [#extractRuntime] copied into `classesDir` is
+    /// kept: beside the directory, not inside it, since it describes a
+    /// build directory and is nothing an application ships.
+    ///
+    /// #### Why there is a list
+    ///
+    /// An incremental build copies a runtime over the copy the build before
+    /// it left, and a class the runtime has since dropped or renamed was
+    /// never among the entries to copy, so it stayed: dead weight at best,
+    /// and at worst a class that names a member the new runtime no longer
+    /// has, which fails the compliance check in a file nobody wrote. With
+    /// the list, what the last build copied from a runtime and this one did
+    /// not is deleted.
+    ///
+    /// A file is deleted only while it is still the bytes that were copied.
+    /// One that has changed is someone else's by now -- an application that
+    /// carries the class itself, a resource of its own under the same name
+    /// -- and is left.
+    ///
+    /// #### What it does not do
+    ///
+    /// It is kept per runtime, so a layer that is no longer active is not
+    /// cleaned out: its section is simply not visited. That is deliberate.
+    /// The classes the build generated for that layer (an entry point, the
+    /// compiled FXML documents, the dispatch tables) name its runtime, and
+    /// they are not in any list; deleting the runtime from under them
+    /// would turn a stale directory that still builds into one that fails.
+    /// Dropping a layer takes a clean build, as dropping any dependency
+    /// from a directory of compiled classes does.
+    static File runtimeRecord(File classesDir) {
+        File dir = classesDir.getAbsoluteFile();
+        return new File(dir.getParentFile(), dir.getName() + ".cn1-compat-runtime.txt");
+    }
+
+    private static final String RUNTIME = "runtime\t";
+
+    /// What names a runtime from one build to the next: its jar's file name
+    /// without the version, which is what changes when the runtime does.
+    static String runtimeKey(File jar) {
+        String name = jar.getName();
+        if (name.endsWith(".jar")) {
+            name = name.substring(0, name.length() - ".jar".length());
+        }
+        for (int i = 0; i + 1 < name.length(); i++) {
+            if (name.charAt(i) == '-' && name.charAt(i + 1) >= '0' && name.charAt(i + 1) <= '9') {
+                return name.substring(0, i);
+            }
+        }
+        return name;
+    }
+
+    private static String checksum(byte[] data) {
+        CRC32 crc = new CRC32();
+        crc.update(data, 0, data.length);
+        return data.length + ":" + Long.toHexString(crc.getValue());
+    }
+
+    /// Deletes what the record says the last build copied from `jar`'s
+    /// runtime and `copied` -- path to checksum, this build's -- does not
+    /// hold, and records `copied` in its place.
+    private static void forgetStale(File jar, File classesDir, Map<String, String> copied) throws IOException {
+        File record = runtimeRecord(classesDir);
+        String key = runtimeKey(jar);
+        // Every runtime's files, by the runtime's key, in the record's order.
+        Map<String, Map<String, String>> all = new LinkedHashMap<String, Map<String, String>>();
+        if (record.isFile()) {
+            Map<String, String> current = null;
+            for (String line : new String(Files.readAllBytes(record.toPath()), StandardCharsets.UTF_8).split("\n")) {
+                int tab = line.indexOf('\t');
+                if (line.startsWith(RUNTIME)) {
+                    current = new TreeMap<String, String>();
+                    all.put(line.substring(RUNTIME.length()), current);
+                } else if (current != null && tab > 0) {
+                    current.put(line.substring(0, tab), line.substring(tab + 1));
+                }
+            }
+        }
+        Map<String, String> before = all.get(key);
+        if (copied.equals(before)) {
+            return;
+        }
+        all.put(key, copied);
+        if (before != null) {
+            for (Map.Entry<String, String> old : before.entrySet()) {
+                if (!owned(all, old.getKey())) {
+                    deleteIfUnchanged(classesDir, old.getKey(), old.getValue());
+                }
+            }
+        }
+        StringBuilder text = new StringBuilder();
+        for (Map.Entry<String, Map<String, String>> runtime : all.entrySet()) {
+            text.append(RUNTIME).append(runtime.getKey()).append('\n');
+            for (Map.Entry<String, String> file : runtime.getValue().entrySet()) {
+                text.append(file.getKey()).append('\t').append(file.getValue()).append('\n');
+            }
+        }
+        writeIfDifferent(record, text.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    /// Whether some runtime's current list holds `path`: two runtimes can
+    /// ship one file, and a class can move from one to the other.
+    private static boolean owned(Map<String, Map<String, String>> all, String path) {
+        for (Map<String, String> files : all.values()) {
+            if (files.containsKey(path)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void deleteIfUnchanged(File classesDir, String path, String checksum) throws IOException {
+        File stale = new File(classesDir, path);
+        String root = classesDir.getCanonicalPath() + File.separator;
+        if (!stale.isFile() || !stale.getCanonicalPath().startsWith(root)
+                || !checksum.equals(checksum(Files.readAllBytes(stale.toPath())))) {
+            return;
+        }
+        if (!stale.delete()) {
+            throw new IOException("Could not delete " + stale);
+        }
+        // And the directories it leaves empty, up to the classes directory.
+        File dir = stale.getParentFile();
+        File top = classesDir.getCanonicalFile();
+        while (dir != null && !dir.getCanonicalFile().equals(top)) {
+            String[] left = dir.list();
+            if (left == null || left.length > 0 || !dir.delete()) {
+                break;
+            }
+            dir = dir.getParentFile();
+        }
     }
 
     /// Writes `data` to `dest` unless the file already holds exactly those
