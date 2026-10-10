@@ -9,9 +9,22 @@ TIP: You can change the CSS values while the simulator is running and the change
 
 Codename One applications always use the resource file. The CSS support compiles a file in CSS syntax to a Codename One resource file and adds it to the application. In runtime the CSS no longer exists and the file acts like a regular theme file.
 
+The CSS compiler is part of the build. It runs without a window or a display, so the same build works on a desktop machine, over SSH, in a container, and on a continuous integration server.
+
 New Maven projects enable CSS by default with `codename1.cssTheme=true` in `common/codenameone_settings.properties`. Add that property manually if you are migrating an older project where CSS support is disabled.
 
 Once enabled your `theme.res` file will regenerate from a CSS file that resides under the `css` directory. Changes you make to the CSS file will instantly update the simulator as you save. But, there are some limits to this live update so sometimes a simulator restart would be necessary.
+
+[[CssImport]]
+=== Splitting a stylesheet with `@import`
+
+A stylesheet can pull in other local stylesheets with `@import`. Both spellings work: `@import "buttons.css";` and `@import url(buttons.css);`. The path is relative to the file that contains the rule.
+
+The compiler places the imported rules at the point where the `@import` appears, as if you had pasted the file there. An imported file can import other files in turn.
+
+A relative `url()` inside an imported file stays relative to that file, not to the file that imported it. An image that sits beside `widgets/buttons.css` is referenced the same way whether `theme.css` imports that file directly or through another stylesheet.
+
+The build fails when an imported file doesn't exist, and when files import each other in a circle. Only local files can be imported: the compiler refuses an `@import` that names a remote URL.
 
 [[OverlayThemes]]
 === Layering one theme over another
@@ -49,10 +62,7 @@ already loaded, so a later overlay beats an earlier one and every overlay beats
 the theme that named them.
 
 Reach for it when you want to override a theme you don't own -- one shipped
-inside a cn1lib, for instance -- without editing the original. It's also what the
-Designer's CSS installer writes when it adds a stylesheet on top of an existing
-Designer theme, which is a migration path for older projects rather than the way
-a CSS project is built today.
+inside a cn1lib, for instance -- without editing the original.
 
 WARNING: An overlay is loaded by name from the resource root. A name the build
 doesn't produce is skipped with a message on the error stream and the app carries
@@ -245,7 +255,7 @@ For other CSS font settings see <<Fonts,the Fonts section>>
 [[border]]
 ==== Border
 
-This library supports the https://developer.mozilla.org/en-You/docs/Web/CSS/border[border property] and most of its variants (for example, https://developer.mozilla.org/en-You/docs/Web/CSS/border-width[border-width], https://developer.mozilla.org/en-You/docs/Web/CSS/border-style[border-style], and https://developer.mozilla.org/en-You/docs/Web/CSS/border-color[border-color]. It will try to use native Codename One styles for generating borders if possible. If the border definition is too complex, it will fall-back to generating a 9-piece image border at compile-time. This has the effect of making the resulting resource file larger, but will produce good runtime performance, and a look that's faithful to the provided CSS.
+This library supports the https://developer.mozilla.org/en-You/docs/Web/CSS/border[border property] and most of its variants (for example, https://developer.mozilla.org/en-You/docs/Web/CSS/border-width[border-width], https://developer.mozilla.org/en-You/docs/Web/CSS/border-style[border-style], and https://developer.mozilla.org/en-You/docs/Web/CSS/border-color[border-color]. It will try to use native Codename One styles for generating borders if possible. If the border definition has no native equivalent, the CSS compiler paints the styled box itself at build time and stores the result in the theme as a 9-piece image border, or as a stretched background image. This has the effect of making the resulting resource file larger, but will produce good runtime performance, and a look that's faithful to the provided CSS.
 
 The algorithm used to determine whether to use a native border or to generate a 9-piece image, is complex, but the following guidelines may help you if you wish to design borders that can be rendered natively in CN1:
 
@@ -256,9 +266,9 @@ The algorithm used to determine whether to use a native border or to generate a 
 * Using a different `border-width`, `border-style`, or `border-color` for different sides of the border
 * Using a `filter`
 
-TIP: You can open the resulting theme file in the designer and inspect it to see if an image was generated
+TIP: To see whether an image was generated for a style, open the compiled `theme.res` in the resource editor (`mvn cn1:designer`) and inspect that style's border. The editor is only a way to look at the result. Compiling the CSS doesn't use it.
 
-Generating the image triggers slower CSS compilation and a larger binary, so tune the CSS so it avoids this fallback.
+A generated image has a fixed resolution and is stretched to fit the component. The native forms -- `cn1-round-border`, `cn1-pill-border`, a plain `border-radius`, and the `cn1-box-shadow-*` properties -- are drawn by the platform at the device's own density. Generating the image also makes CSS compilation slower and the binary larger, so tune the CSS so it avoids this fallback where the design allows.
 
 ===== Round borders
 
@@ -564,6 +574,8 @@ If you want more specific "slice" points, you can add the `border-image-slice` p
 ----
 include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-025,indent=0]
 ----
+
+The compiler also produces 9-piece borders on its own, for styles that have no native equivalent. See <<border,Border>> for which styles those are. It paints these images itself during the build, so they need no image file from you and no extra tool. A background image is painted into the generated image, whether it's a PNG, a JPEG, an SVG or a Lottie file. An animated SVG or Lottie file is painted as it looks before its animation starts.
 
 ==== Image backgrounds
 

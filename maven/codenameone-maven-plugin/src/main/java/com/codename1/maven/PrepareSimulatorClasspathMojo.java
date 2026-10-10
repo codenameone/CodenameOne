@@ -109,13 +109,10 @@ public class PrepareSimulatorClasspathMojo extends AbstractCN1Mojo {
             project.getProperties().setProperty("ffmpeg.dir", System.getProperty("ffmpeg.dir"));
         }
         
-        // Live CSS reload (CSSWatcher) forks the headless CSS compiler CLI, whose
-        // classpath is published through simulator.properties below. This used to
-        // resolve the designer's 43MB shaded jar and hand it over as
-        // codename1.designer.jar; it no longer does, because the deprecated editor is
-        // resolved on demand only by cn1:designer. Generated poms still forward
-        // -Dcodename1.designer.jar, but with the property undefined that argument
-        // arrives blank and CSSWatcher ignores it in favour of the CLI classpath.
+        // Live CSS reload (CSSWatcher) forks the CSS compiler CLI, whose classpath
+        // is published through simulator.properties below. That classpath is the
+        // only way the simulator gets a compiler: without it there is no live
+        // reload, so it must be written whenever the project uses CSS.
 
         File cssFile = new File(getCN1ProjectDir(), "src" + File.separator + "main" + File.separator + "css" + File.separator + "theme.css");
         File resFile = new File(getCN1ProjectDir(), "target" + File.separator + "classes" + File.separator + "theme.res");

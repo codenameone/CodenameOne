@@ -40,8 +40,8 @@ import java.util.Hashtable;
  * {@code Resources} cases 0xff13 and 0xff15 -- and {@code createRoundRectBorder} has
  * always translated every one of them. That code was unreachable:
  * {@code canBeAchievedWithRoundRectBorder} rejected any {@code box-shadow} outright, so
- * an elevated surface fell through to a CEF-rasterized 9-piece image border and, in a
- * native theme compiled with {@code strictNoCef}, to a hard build failure. Every desktop
+ * an elevated surface fell through to a generated 9-piece image border and, in a
+ * native theme compiled with rasterization disallowed, to a hard build failure. Every desktop
  * design language is built on elevation, so the themes were approximating shadows with
  * flat strokes.</p>
  *
@@ -222,29 +222,32 @@ public class CSSBoxShadowNativeBorderTest {
     }
 
     /**
-     * Asserts the sheet is rejected by the no-cef gate, which is the failure a native-theme
-     * build sees. strictNoCef is a static flag, so it is restored in a finally block or it
-     * leaks into every later test in the JVM.
+     * Asserts the sheet is rejected when rasterization is disallowed, which is the failure
+     * a native-theme build sees, and that the refusal names a rule rather than merely
+     * happening.
      */
     private static void assertRefusedByStrictNoCef(String css, String what) throws Exception {
         Path cssFile = Files.createTempFile("cn1-box-shadow-reject", ".css");
         Path resFile = Files.createTempFile("cn1-box-shadow-reject", ".res");
-        boolean previous = CSSTheme.strictNoCef;
         try {
             Files.write(cssFile, css.getBytes(StandardCharsets.UTF_8));
             CSSTheme theme = CSSTheme.load(cssFile.toUri().toURL());
             theme.resourceFile = resFile.toFile();
             theme.res = new com.codename1.ui.util.EditableResourcesForCSS(resFile.toFile());
             theme.res.setTheme("Theme", new Hashtable());
-            CSSTheme.strictNoCef = true;
+            theme.setRasterizationAllowed(false);
             try {
-                theme.createImageBorders(null);
+                theme.createImageBorders();
             } catch (IllegalStateException expected) {
+                if (!expected.getMessage().contains("need a generated image")
+                        || !expected.getMessage().contains("(image border)")) {
+                    throw new AssertionError("Refused " + what + " for the wrong reason: "
+                            + expected.getMessage(), expected);
+                }
                 return;
             }
-            throw new AssertionError("Expected " + what + " to be refused in no-cef mode");
+            throw new AssertionError("Expected " + what + " to be refused when rasterization is disallowed");
         } finally {
-            CSSTheme.strictNoCef = previous;
             deleteIfExists(cssFile);
             deleteIfExists(resFile);
         }

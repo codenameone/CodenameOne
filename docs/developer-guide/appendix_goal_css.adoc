@@ -2,4 +2,6 @@
 
 Compiles the project's CSS files, generating a `theme.res` file which is placed in the build/classes directory.
 
+The compiler runs without a window or a display, so the goal works unchanged over SSH, in a container, and on a continuous integration server. When a style has no native equivalent in Codename One, the compiler paints the image for it during this goal and stores it in `theme.res`. Local stylesheets named by `@import` are inlined into the result. See <<border,Border>> and <<CssImport,Splitting a stylesheet with `@import`>> in the CSS chapter.
+
 This goal is bound to the `process-classes` phase of <<cn1app-archetype>> projects, so you shouldn't need to run this goal directly.

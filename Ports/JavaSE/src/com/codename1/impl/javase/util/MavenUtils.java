@@ -22,7 +22,10 @@
  */
 package com.codename1.impl.javase.util;
 
+import com.codename1.impl.javase.SimulatorProject;
 import com.codename1.io.Log;
+import com.codename1.project.BuildSystem;
+import com.codename1.project.ProjectLayout;
 import com.codename1.ui.Display;
 import java.io.File;
 import java.io.FileInputStream;
@@ -39,15 +42,49 @@ public class MavenUtils {
     private static boolean isRunningInMaven;
     private static boolean isRunningInJDKChecked;
     private static boolean isRunningInMavenChecked;
+    /**
+     * Whether the simulator was launched for a Maven project.
+     *
+     * <p>A generated project forks the simulator with {@code exec:exec}, so neither
+     * {@code maven.home} nor {@code cn1.library.path} reaches it. For a long time the
+     * only thing that made this true there was the {@code -Dcodename1.designer.jar}
+     * argument the project's javase pom forwarded (blank, more often than not).
+     * New projects no longer forward it, so the project layout is asked as well:
+     * a Maven build system found around the working directory is the same answer
+     * without depending on what a pom happens to pass. The property is still read
+     * because projects generated earlier keep passing it.</p>
+     *
+     * <p>The layout answers Maven only for a Maven project: a Gradle or an Ant
+     * project reports its own build system, so neither becomes "Maven" here. Gradle
+     * callers ask {@link SimulatorProject#isGradle()} beside this method.</p>
+     */
     public static boolean isRunningInMaven() {
         if (!isRunningInMavenChecked) {
             isRunningInMavenChecked = true;
-        
+
             isRunningInMaven = System.getProperty("cn1.library.path", null) != null
                 || System.getProperty("maven.home", null) != null
                 || System.getProperty("codename1.designer.jar", null) != null;
         }
-        return isRunningInMaven;
+        // Not cached with the properties: the Executor moves user.dir into the
+        // project, and SimulatorProject already caches the layout per directory.
+        return isRunningInMaven || isMavenProjectLayout();
+    }
+
+    private static boolean isMavenProjectLayout() {
+        try {
+            ProjectLayout layout = SimulatorProject.current();
+            return layout != null && layout.buildSystem() == BuildSystem.MAVEN;
+        } catch (RuntimeException ex) {
+            // An unreadable directory tree is not a Maven project.
+            return false;
+        }
+    }
+
+    /** Test seam: forgets the cached system property answer. */
+    static void reset() {
+        isRunningInMavenChecked = false;
+        isRunningInMaven = false;
     }
 
     public static File findJavac() {
@@ -150,8 +187,8 @@ public class MavenUtils {
             // designer_1.jar and re-zips it, so this file is a zip wrapper containing
             // a single designer_1.jar entry with no top-level Main-Class manifest.
             // AbstractCN1Mojo.getDesignerJar (in the maven plugin) unzips it on demand
-            // and returns the inner jar; we mirror that here so the CSSWatcher
-            // fallback path receives a path that `java -jar` can actually launch.
+            // and returns the inner jar; we mirror that here so the Component
+            // Inspector receives a path that `java -jar` can actually launch.
             File wrapperZip = new File(designerVersionDir, "codenameone-designer-" + version + "-jar-with-dependencies.jar");
             if (!wrapperZip.isFile()) {
                 return null;

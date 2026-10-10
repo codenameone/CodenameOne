@@ -31,6 +31,8 @@ on:
       - 'maven/codenameone-gradle-plugin/**'
       - 'maven/codenameone-gradle-plugin-marker/**'
       - 'maven/codenameone-maven-plugin/**'
+      - 'maven/css-compiler/**'
+      - 'maven/css-cli/**'
       - 'maven/build-engine/**'
       - 'maven/project-model/**'
       - 'maven/cn1app-archetype/**'
@@ -53,6 +55,8 @@ on:
       - 'maven/codenameone-gradle-plugin/**'
       - 'maven/codenameone-gradle-plugin-marker/**'
       - 'maven/codenameone-maven-plugin/**'
+      - 'maven/css-compiler/**'
+      - 'maven/css-cli/**'
       - 'maven/build-engine/**'
       - 'maven/project-model/**'
       - 'maven/cn1app-archetype/**'
@@ -108,9 +112,12 @@ jobs:
           java-version: '8'
           distribution: 'temurin'
           cache: 'maven'
-      # xvfb for the CSS compiler, which opens an AWT frame. clang and the
-      # libraries the generated backend links (see archetype-smoke.yml) for
-      # backendPackage, which the backend-only test otherwise skips.
+      # xvfb for the steps that run cn1Test in the simulator's runner or open
+      # a desktop tool. Building a project, compiling its CSS included, needs
+      # no display, so no build-only step below is wrapped in xvfb-run and
+      # none should be. clang and the libraries the generated backend links
+      # (see archetype-smoke.yml) for backendPackage, which the backend-only
+      # test otherwise skips.
       - name: Install xvfb and the native backend toolchain
         run: |
           bash scripts/ci/apt-get-install.sh xvfb clang \
@@ -122,21 +129,26 @@ jobs:
           RETRY_DELAY_SECONDS: '60'
         run: |
           cd maven
-          bash ../scripts/ci/retry.sh xvfb-run -a mvn install -Plocal-dev-javase -DskipTests -Darchetype.test.skip=true -Dmaven.javadoc.skip=true
+          bash ../scripts/ci/retry.sh mvn install -Plocal-dev-javase -DskipTests -Darchetype.test.skip=true -Dmaven.javadoc.skip=true
       - name: Refresh archetype catalog
         run: |
           cd maven
-          xvfb-run -a mvn archetype:update-local-catalog -Plocal-dev-javase
-          xvfb-run -a mvn archetype:crawl -Plocal-dev-javase
+          mvn archetype:update-local-catalog -Plocal-dev-javase
+          mvn archetype:crawl -Plocal-dev-javase
       - name: Gradle application
         working-directory: maven/integration-tests
         run: xvfb-run -a bash gradle-app-test.sh
       - name: Maven and Gradle upload parity
         working-directory: maven/integration-tests
-        run: xvfb-run -a bash gradle-maven-parity-test.sh
+        run: bash gradle-maven-parity-test.sh
       - name: Gradle cn1lib, consumed by Gradle and Maven
         working-directory: maven/integration-tests
-        run: xvfb-run -a bash gradle-cn1lib-test.sh
+        # DISPLAY and WAYLAND_DISPLAY are cleared on purpose, and this must
+        # never be wrapped in xvfb-run: the script runs cn1Css and stages
+        # Android and iOS builds for several Gradle apps without starting the
+        # simulator, so passing here proves the Gradle CSS compile needs no
+        # display. archetype-smoke.yml holds the same guard for Maven.
+        run: env -u DISPLAY -u WAYLAND_DISPLAY bash gradle-cn1lib-test.sh
       - name: Migration to Gradle
         working-directory: maven/integration-tests
         run: xvfb-run -a bash gradle-migrate-test.sh
@@ -145,13 +157,13 @@ jobs:
         env:
           # A skip reads like a pass; this runner has clang.
           CN1_BACKEND_PACKAGE_REQUIRED: '1'
-        run: xvfb-run -a bash gradle-initializr-test.sh
+        run: bash gradle-initializr-test.sh
       # The desktop tools are separate Maven projects under scripts/; Settings
       # stands in for all four, which start through the same launcher.
       - name: Build Codename One Settings
         working-directory: scripts/settings
-        # Its own CSS compile opens an AWT frame, so it needs a display too.
-        run: JAVA_HOME="$GRADLE_JAVA_HOME" xvfb-run -a mvn -B -ntp install -DskipTests -Pexecutable-jar -Dcodename1.platform=javase
+        # Build only, tests skipped: nothing here opens a window.
+        run: JAVA_HOME="$GRADLE_JAVA_HOME" mvn -B -ntp install -DskipTests -Pexecutable-jar -Dcodename1.platform=javase
       - name: Desktop tools launch from Maven and Gradle
         working-directory: maven/integration-tests
         env:

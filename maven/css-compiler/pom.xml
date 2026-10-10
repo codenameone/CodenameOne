@@ -1,16 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <!--
-    Thin CSS compiler module. Holds the pure serialization / CSS parse / style
-    generation logic (EditableResources, CSSTheme, ResourcesMutator, Color,
-    helpers, NoCefCSSCLI) extracted from CodenameOneDesigner. Depends only on
-    codenameone-core + flute + sac, so it can be used for the native-themes
-    build without pulling in JavaFX / CEF / the Designer GUI.
+    The CSS compiler engine: CSS parsing and style mapping (CSSTheme), the
+    in-process rasterizer for rules with no native equivalent
+    (com.codename1.designer.css.raster), and the .res writer
+    (EditableResources, ResourcesMutator). Depends only on codenameone-core +
+    flute + sac and needs no display.
 
-    The full Designer module depends on this one and layers on the
-    GUI-specific EditableResourcesEditor subclass plus the WebView-backed
-    CLIs (CN1CSSCLI etc.) that can rasterize fallback images when CEF is
-    available.
+    codenameone-css-cli is the command line around it. The Designer module
+    also depends on this one, for the document model its editor subclasses.
     -->
     <parent>
         <groupId>com.codenameone</groupId>
@@ -35,6 +33,17 @@
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-core</artifactId>
         </dependency>
+        <!-- The parsers the build transcodes SVG and Lottie files with. The
+             compiler reads such a file through them when it has to paint one
+             into a generated image. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-svg-transcoder</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-lottie-transcoder</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.vaadin.external.flute</groupId>
             <artifactId>flute</artifactId>
@@ -56,49 +65,13 @@
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-assembly-plugin</artifactId>
-                <version>3.3.0</version>
-                <executions>
-                    <execution>
-                        <id>build-jar-with-dependencies</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>single</goal>
-                        </goals>
-                        <configuration>
-                            <archive>
-                                <manifest>
-                                    <mainClass>com.codename1.designer.css.NoCefCSSCLI</mainClass>
-                                </manifest>
-                            </archive>
-                            <descriptorRefs>
-                                <descriptorRef>jar-with-dependencies</descriptorRef>
-                            </descriptorRefs>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>build-helper-maven-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>attach-jar-with-dependencies</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>attach-artifact</goal>
-                        </goals>
-                        <configuration>
-                            <artifacts>
-                                <artifact>
-                                    <file>${project.build.directory}/${project.build.finalName}-jar-with-dependencies.jar</file>
-                                    <type>jar</type>
-                                    <classifier>jar-with-dependencies</classifier>
-                                </artifact>
-                            </artifacts>
-                        </configuration>
-                    </execution>
-                </executions>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <!-- The compiler must never need a display. Running the
+                         tests headless makes any use of a window or a dialog
+                         throw on every machine, a developer's Mac included. -->
+                    <argLine>-Djava.awt.headless=true</argLine>
+                </configuration>
             </plugin>
         </plugins>
     </build>

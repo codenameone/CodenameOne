@@ -25,32 +25,14 @@ package com.codename1.designer.css;
 
 
 
-import com.codename1.io.JSONParser;
-import com.codename1.io.Log;
-import com.codename1.io.Util;
-import com.codename1.processing.Result;
-import com.codename1.ui.BrowserComponent;
-import com.codename1.ui.CN;
 import com.codename1.ui.Display;
-import com.codename1.ui.events.ActionEvent;
-import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EditableResources;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.IOException;
-import java.io.StringReader;
-import java.lang.reflect.Field;
-import java.net.URL;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Hashtable;
-import java.util.Map;
 import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.imageio.ImageIO;
 
@@ -62,7 +44,6 @@ public class ResourcesMutator {
     public static final int DEFAULT_TARGET_DENSITY = com.codename1.ui.Display.DENSITY_VERY_HIGH;
     
     int targetDensity = DEFAULT_TARGET_DENSITY;
-    private Map<String,ImageProcessor> imageProcessors = new HashMap<>();
     private String themeName = "Theme";
     
     public ResourcesMutator(EditableResources res, int targetDensity, double minDpi, double maxDpi) {
@@ -93,11 +74,6 @@ public class ResourcesMutator {
             includedDensities.add(Display.DENSITY_VERY_LOW);
         }
     }
-    
-    public void addImageProcessor(String id, ImageProcessor proc) {
-        imageProcessors.put(id, proc);
-    }
-    
     
     public com.codename1.ui.EncodedImage storeImage(com.codename1.ui.EncodedImage img, String prefix) {
         return storeImage(img, prefix, true);
@@ -356,49 +332,8 @@ public class ResourcesMutator {
         //return null;
     }
     
-    private static BufferedImage getScaledInstance(BufferedImage img,
-                                           int targetWidth,
-                                           int targetHeight)
-    {
-        BufferedImage ret = (BufferedImage)img;
-        int w, h;
-        // Use multi-step technique: start with original size, then
-        // scale down in multiple passes with drawImage()
-        // until the target size is reached
-        w = img.getWidth();
-        h = img.getHeight();
-        
-        do {
-            if (w > targetWidth) {
-                w /= 2;
-                if (w < targetWidth) {
-                    w = targetWidth;
-                }
-            } else {
-                w = targetWidth;
-            }
-
-            if (h > targetHeight) {
-                h /= 2;
-                if (h < targetHeight) {
-                    h = targetHeight;
-                }
-            } else {
-                h = targetHeight;
-            }
-
-
-            BufferedImage tmp = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-            Graphics2D g2 = tmp.createGraphics();
-            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-            g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-            g2.drawImage(ret, 0, 0, w, h, null);
-            g2.dispose();
-
-            ret = tmp;
-        } while (w != targetWidth || h != targetHeight);
-
-        return ret;
+    private static BufferedImage getScaledInstance(BufferedImage img, int targetWidth, int targetHeight) {
+        return HeadlessImages.scale(img, targetWidth, targetHeight);
     }
     
     public com.codename1.ui.plaf.Border createRoundBorder(int arcWidth, int arcHeight, int color, boolean outline) {
@@ -414,6 +349,17 @@ public class ResourcesMutator {
         
         //bg2d.dispose();
         //img = buff;
+        // The slices come from a rule (cn1-9patch) as often as from arithmetic, so
+        // check them here: getSubimage would otherwise report a bad one as a
+        // RasterFormatException about a rectangle, with nothing to say which
+        // rule it came from.
+        if (top < 1 || right < 1 || bottom < 1 || left < 1
+                || left + right >= img.getWidth() || top + bottom >= img.getHeight()) {
+            throw new IllegalArgumentException("The 9-piece slices of " + prefix + " (top " + top + ", right " + right
+                    + ", bottom " + bottom + ", left " + left + ") do not fit its " + img.getWidth() + "x"
+                    + img.getHeight() + " image. Each slice must be at least 1 pixel, and opposite slices must "
+                    + "leave at least 1 pixel between them.");
+        }
         BufferedImage topLeft = img.getSubimage(0, 0, left, top);
         BufferedImage topRight = img.getSubimage(img.getWidth() - right, 0, right, top);
         BufferedImage bottomLeft = img.getSubimage(0, img.getHeight() - bottom, left, bottom);
@@ -462,247 +408,6 @@ public class ResourcesMutator {
         //((DefaultListModel)applies.getAppliesTo().getModel()).removeAllElements();
         //res.setTheme(theme, newTheme);
         return b;
-    }
-    
-    private BrowserComponent web;
-    private boolean screenshotsComplete;
-    private final Object screenshotsLock = new Object();
-   
-    
-    /**
-     * A callback function triggered inside capture.js Javascript file to take a screenshot
-     * of a particular rectangular region in the web view.  This would generally be the bounds
-     * of an element that we are generating a screenshot for.
-     * @param id THe ID of the element;
-     * @param x The x coordinate in browser space
-     * @param y The y coordinate in browser space
-     * @param w The width
-     * @param h The height
-     */
-    public void createScreenshotCallback(String id, int x, int y, int w, int h) {
-        //System.out.println("In createScreenshotsCallback("+id+","+x+","+y+","+w+","+h);
-        // There are 3 possibilities:
-        // 1. There is no registered image processor with ID=id -> call captureScreenshots()
-        // 2. There is a registered image processor with ID=id, but image generate fails -> call captureScreenshots()
-        // 3. There is a registered image proessor with ID=id.  -> call captureScreenshots()
-        //
-        // Notice in all cases we just call captureScreenshots() again.  The capture.js page will automatically
-        // increment to the next element in the list.  When done, it will fire finishedCaptureScreenshotsCallback().
-        CN.callSerially(()->{
-            if (imageProcessors.containsKey(id)) {
-                double ratio = 1.0;
-                try {
-                    // Create a Snapshotter to snap a screenshot of the given bounds
-                    // in the webview.
-                    WebviewSnapshotter snapper = new WebviewSnapshotter(web);
-                    snapper.setBounds(x, y, w, h);
-                    snapper.snapshot(()-> {
-                        BufferedImage img = snapper.getImage();
-
-                        imageProcessors.get(id).process(img);
-                        CN.callSerially(()-> {
-                            web.execute("window.captureScreenshots()");
-                        });
-
-                    });
-                } catch (Throwable t) {
-                    Log.p("Failed to create snapshot for UIID "+id+": "+t.getMessage());
-                    Log.e(t);
-                    CN.callSerially(()-> {
-                        web.execute("window.captureScreenshots()");
-                    });
-                }
-            } else {
-                CN.callSerially(()-> {
-                    web.execute("window.captureScreenshots()");
-                });
-            }
-            
-        });
-    }
-    
-    public void finishedCaptureScreenshotsCallback() {
-        //System.out.println("In finished screen cap");
-        screenshotsComplete = true;
-        synchronized(screenshotsLock) {
-            screenshotsLock.notifyAll();
-        }
-    }
-    
-    private SimpleWebServer webServer;
-    
-    private void startWebServer(File docRoot) throws IOException {
-        if (webServer != null) {
-            throw new IllegalStateException("Cannot start webserver.  It is already running");
-        }
-        
-        webServer = new SimpleWebServer(0, docRoot);
-        webServer.start();
-    }
-    
-    ActionListener loadListener;
-    
-    /**
-     * Creates screenshots for the given HTML which was generated by {@link CSSTheme#generateCaptureHtml() }.
-     * @param web The web View used to render the HTML
-     * @param html The HTML to render in the webview.  Generated by {@link CSSTheme#generateCaptureHtml() }
-     * @param baseURL The BaseURL - general points to the CSS file location.  Used for loading resources from relative paths.
-     */
-    public void createScreenshots(BrowserComponent web, String html, String baseURL) {
-        //System.out.println("in createScreenshots");
-        try {
-            File baseURLFile = new File(new URL(baseURL).toURI());
-            if (!baseURLFile.isDirectory()) {
-                baseURLFile = baseURLFile.getParentFile();
-            }
-            startWebServer(baseURLFile);
-            boolean waitForServerResult[] = new boolean[1];
-            CN.invokeAndBlock(new Runnable() {
-                public void run() {
-                    waitForServerResult[0] = webServer.waitForServer(2000);
-               
-                }
-            });
-            if (!waitForServerResult[0]) {
-                throw new RuntimeException("Failed to start webserver after 2 seconds");
-            }
-            
-        } catch (Exception ex) {
-            throw new RuntimeException("Failed to start local webserver for creating screenshots", ex);
-        }
-        long timeout = 50000;
-        //String captureSrc = this.getClass().getResource("capture.js").toExternalForm();
-        String captureJS = null;
-        try {
-            captureJS = Util.readToString(this.getClass().getResourceAsStream("capture.js"));
-        } catch (IOException ex) {
-            throw new RuntimeException("Failed to read capture.js file.", ex);
-        }
-        //final String modifiedHtml = html.replace("</body>", /*"<script src=\"https://code.jquery.com/jquery-2.1.4.min.js\">"
-        //        + */"</script><script src=\""+captureSrc+"\"></script></body>");
-        final String modifiedHtml = html.replace("</head>", /*"<script src=\"https://code.jquery.com/jquery-2.1.4.min.js\">"
-                + */"<script>\n"+captureJS+"\n</script></head>");
-        this.web = web;
-        screenshotsComplete = false;
-        CN.callSerially(() -> {
-            
-            loadListener = (ActionEvent evt) -> {
-                if (webServer != null) {
-                    webServer.stop();
-                    webServer = null;
-                }
-                web.removeWebEventListener(BrowserComponent.onLoad, loadListener);
-                try {
-                    //System.out.println("In onLoad event");
-                    // Use reflection to retrieve the WebEngine's private 'page' field.
-                    web.addJSCallback("window.app = window.app || {}; window.app.createScreenshotCallback = function(id, x, y, w, h) {"
-                            + "callback.onSuccess(JSON.stringify({id:id, x:x, y:y, w:w, h:h}));"
-                            + "};", res -> {
-                        try {
-                            Result data = Result.fromContent(new StringReader(res.toString()), Result.JSON);
-
-                            createScreenshotCallback(
-                                    data.getAsString("id"),
-                                    data.getAsInteger("x"),
-                                    data.getAsInteger("y"),
-                                    data.getAsInteger("w"),
-                                    data.getAsInteger("h"));
-                        } catch (Exception ex) {
-                            Log.p("Failed to parse input to createScreenshotsCallback");
-                            Log.e(ex);
-                        }
-
-                    });
-                    web.addJSCallback("window.app.finishedCaptureScreenshotsCallback = function() {"
-                    + "callback.onSuccess(null);"
-                    + "};", res -> {
-                        finishedCaptureScreenshotsCallback();
-                    });
-                    web.execute("$(document).ready(function(){ captureScreenshots();});");
-                    //web.getEngine().executeScript("window.onload = function(){window.app.ready()};");
-                } catch (IllegalArgumentException ex) {
-                    Logger.getLogger(ResourcesMutator.class.getName()).log(Level.SEVERE, null, ex);
-                }  catch (SecurityException ex) {
-                    Logger.getLogger(ResourcesMutator.class.getName()).log(Level.SEVERE, null, ex);
-                }
-
-            };
-                
-
-            
-            web.addWebEventListener(BrowserComponent.onLoad, loadListener);
-            //CN.setProperty("cef.setPage.useDataURI", "true");
-            webServer.route("/index.html", ()->{
-                try {
-                    return modifiedHtml.getBytes("UTF-8");
-                } catch (Exception ex) {
-                    Log.e(ex);
-                    try {
-                        return ("Error: "+ex.getMessage()).getBytes("UTF-8");
-                    } catch (Exception ex2) {
-                        Log.e(ex2);
-                        return new byte[0];
-                    }
-                            
-                }
-            });
-            web.setURL("http://localhost:"+webServer.getPort()+"/index.html");
-            
-        });
-        long startTime = System.currentTimeMillis();
-        while (!screenshotsComplete && System.currentTimeMillis() - startTime < timeout) {
-            CN.invokeAndBlock(new Runnable() {
-                public void run() {
-                    Util.wait(screenshotsLock, 50);
-                }
-            });
-            
-        }
-        
-        
-        if (!screenshotsComplete) {
-            throw new RuntimeException("Failed to create screenshots for HTML "+html+".  Timeout reached.  Likely there was a problem initializing the browser component.");
-        }
-        this.web = null;
-        this.loadListener = null;
-        
-    }
-    
-    BufferedImage createHtmlScreenshot(BrowserComponent web, String html) {
-        final boolean[] complete = new boolean[1];
-        final Object lock = new Object();
-        final BufferedImage[] img = new BufferedImage[1];
-        
-        
-        Runnable webpageLoadedCallback = () -> {
-            img[0] = (BufferedImage)web.captureScreenshot().get().getImage();
-            complete[0] = true;
-            synchronized(lock) {
-                lock.notify();
-            }
-            
-        };
-        CN.callSerially(()->{
-            web.setPage(html, "");
-        });
-        
-        
-        while (!complete[0]) {
-            synchronized(lock) {
-                try {
-                    lock.wait();
-                } catch (InterruptedException ex) {
-                    Logger.getLogger(ResourcesMutator.class.getName()).log(Level.SEVERE, null, ex);
-                }
-            }
-        }
-        
-        return img[0];
-       
-    }
-    
-    public static interface ImageProcessor {
-        public void process(BufferedImage img);
     }
     
     public void put(String property, Object value) {

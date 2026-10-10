@@ -49,7 +49,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  *
  * <p>They are three separate hand-written CSS files by deliberate choice: a shared
  * base would make "what you read is what compiles" false, which is what makes the
- * strictNoCef failure messages actionable. The cost of that choice is drift. A UIID
+ * -no-raster failure messages actionable. The cost of that choice is drift. A UIID
  * added to Fluent and forgotten in Aqua does not fail anything -- the missing UIID
  * falls back to the blank default style, which is white-on-black and looks like a
  * theme bug reported months later by a user on the one platform nobody tested.

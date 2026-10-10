@@ -205,13 +205,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
-      # The Initializr/Playground/Skin Designer JavaScript bundles are built by
-      # scripts/website/build.sh through xvfb-run: the Codename One Maven
-      # plugin's CSS/theme compile instantiates JavaSEPort, which needs a
-      # display on the headless runner. (xvfb formerly also served the Skin
-      # Designer screenshot generation step, which has been removed -- the
-      # screenshots are now committed under docs/developer-guide/img/skin-designer.)
-      - name: Set up xvfb for headless JavaScript bundle builds
+      # For the Playground rendering check further down, which drives Firefox:
+      # it needs an X display to initialize Mesa WebGL even in headless mode.
+      # The Initializr/Playground/Skin Designer bundle builds in
+      # scripts/website/build.sh do not use it here -- this workflow builds
+      # them with the workspace plugin, whose CSS compile is headless.
+      - name: Set up xvfb for the Playground rendering check
         run: |
           set -euo pipefail
           bash scripts/ci/apt-get-update.sh

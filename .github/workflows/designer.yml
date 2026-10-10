@@ -47,7 +47,7 @@ jobs:
           cache: 'maven'
 
       - name: Install build dependencies
-        run: bash scripts/ci/apt-get-install.sh xvfb unzip
+        run: bash scripts/ci/apt-get-install.sh unzip
 
       - name: Cache cn1-binaries
         uses: actions/cache@v5
@@ -69,7 +69,7 @@ jobs:
           rm -rf maven/target/cn1-binaries
           cp -R ../cn1-binaries maven/target/cn1-binaries
 
-      - name: Build Designer (pulls in codenameone-css-compiler as dep)
+      - name: Build Designer (pulls in codenameone-css-compiler and codenameone-css-cli as deps)
         env:
           CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
         run: |
@@ -97,7 +97,8 @@ jobs:
           # CN1CSSCLI lives in the thin codenameone-css-cli module and is launched
           # on a resolved classpath (see AbstractCN1Mojo.getCssCliClasspath and the
           # simulator's CSSWatcher), not as a shaded `java -jar`. Exercise it the
-          # same way here.
+          # same way here, with java.awt.headless set and DISPLAY cleared: the
+          # compiler opens no window and must keep working where there is none.
           cd maven
           bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B -q -pl css-cli -Plocal-dev-javase \
               -Dmdep.outputFile="$PWD/css-cli-cp.txt" dependency:build-classpath
@@ -116,14 +117,14 @@ jobs:
           cat <<'EOF' > "$l10n_dir/Strings.properties"
           greeting=Hello from CLI
           EOF
-          xvfb-run -a java -Dcli=true -cp "$cp" com.codename1.designer.css.CN1CSSCLI \
-            -css -stateless -input "$css_file" -output "$output_file" -localization "$l10n_dir"
+          env -u DISPLAY -u WAYLAND_DISPLAY java -Djava.awt.headless=true -cp "$cp" com.codename1.designer.css.CN1CSSCLI \
+            -input "$css_file" -output "$output_file" -localization "$l10n_dir"
           test -s "$output_file"
 
-      - name: Verify native-themes CEF-free build
+      - name: Verify native-themes build
         run: |
           cd maven
-          bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B -pl css-compiler -am install -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase
+          bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B -pl css-cli -am install -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase
           cd ..
           ./scripts/build-native-themes.sh
           test -f Themes/iOSModernTheme.res || { echo "missing Themes/iOSModernTheme.res"; exit 1; }

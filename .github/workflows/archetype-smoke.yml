@@ -1,7 +1,7 @@
 name: Archetype simulator smoke
 
 # Smoke-tests that an archetype-generated project can run `cn1:css` (the
-# CN1CSSCLI subprocess that boots JavaSEPort) with `cn1.autoDefaultResourceBundle`
+# CN1CSSCLI subprocess, which runs headless) with `cn1.autoDefaultResourceBundle`
 # forced on. This reproduces the user-side preference state that masked
 # issue #4850 in CI for six months: the bug was deterministic on the user
 # code path but invisible to CI runners with the default-false preference.
@@ -17,6 +17,8 @@ on:
       - 'CodenameOneDesigner/**'
       - 'CodenameOne/src/com/codename1/ui/plaf/UIManager.java'
       - 'maven/codenameone-maven-plugin/**'
+      - 'maven/css-compiler/**'
+      - 'maven/css-cli/**'
       - 'maven/build-engine/**'
       - 'maven/project-model/**'
       - 'maven/cn1app-archetype/**'
@@ -42,6 +44,8 @@ on:
       - 'CodenameOneDesigner/**'
       - 'CodenameOne/src/com/codename1/ui/plaf/UIManager.java'
       - 'maven/codenameone-maven-plugin/**'
+      - 'maven/css-compiler/**'
+      - 'maven/css-cli/**'
       - 'maven/build-engine/**'
       - 'maven/project-model/**'
       - 'maven/cn1app-archetype/**'
@@ -96,6 +100,11 @@ jobs:
       # them need those headers to compile at all: without them this failed on
       # "'curl/curl.h' file not found" after translating perfectly well. The same
       # four packages, for the same reason, are in parparvm-tests.yml.
+      #
+      # xvfb is for the minimal-layout step, which runs cn1:test in the
+      # simulator's runner, and is left around the archetype smoke as it was.
+      # Compiling a project's CSS needs no display: the framework build and
+      # the staged-jar step run without one, and the latter is the guard.
       - name: Install xvfb and the native backend toolchain
         run: |
           bash scripts/ci/apt-get-install.sh xvfb clang \
@@ -116,12 +125,12 @@ jobs:
           # -Darchetype.test.skip=true keeps the smoke fast — the per-tag
           # ITs already run in the release workflow.
           cd maven
-          bash ../scripts/ci/retry.sh xvfb-run -a mvn install -Plocal-dev-javase -DskipTests -Darchetype.test.skip=true -Dmaven.javadoc.skip=true
+          bash ../scripts/ci/retry.sh mvn install -Plocal-dev-javase -DskipTests -Darchetype.test.skip=true -Dmaven.javadoc.skip=true
       - name: Refresh archetype catalog
         run: |
           cd maven
-          xvfb-run -a mvn archetype:update-local-catalog -Plocal-dev-javase
-          xvfb-run -a mvn archetype:crawl -Plocal-dev-javase
+          mvn archetype:update-local-catalog -Plocal-dev-javase
+          mvn archetype:crawl -Plocal-dev-javase
       - name: Run archetype simulator smoke (auto-bundle pref forced on)
         env:
           # The packaging check must not be skipped on a runner that has clang.
@@ -135,8 +144,13 @@ jobs:
       - name: Check the staged upload jar of every build target
         run: |
           cd maven/integration-tests
-          # The project's CSS compile opens an AWT frame, so it needs a display.
-          xvfb-run -a bash cn1app-staged-jar-test.sh
+          # DISPLAY and WAYLAND_DISPLAY are cleared on purpose, and this must
+          # never be wrapped in xvfb-run: the script generates a project and
+          # builds every target, which compiles the project's theme.css each
+          # time, so passing here proves the CSS compile needs no display. A
+          # compiler change that reaches for a window fails this step instead
+          # of the first developer who builds over ssh or in a container.
+          env -u DISPLAY -u WAYLAND_DISPLAY bash cn1app-staged-jar-test.sh
       # The archetype's default layouts: an app with no platform modules, whose
       # common module builds, tests and stages every platform, and a backend-only
       # project. Nothing is submitted and the simulator is never launched.

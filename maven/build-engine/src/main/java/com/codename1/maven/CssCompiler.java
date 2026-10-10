@@ -157,22 +157,24 @@ public final class CssCompiler {
             return false;
         }
 
-        // The CLI runs on a resolved classpath rather than `java -jar` against the
-        // Designer's shaded artifact: it needs codenameone-javase for CEF
-        // rasterization, but nothing needs a 43MB shaded copy of it.
+        // The CLI is forked on its own resolved classpath: the engine, the SAC
+        // parser and the project model, none of which the build's own class
+        // loader should have to carry.
         Java java = javaFactory.create();
         java.setDir(workingDir);
         java.setClasspath(new org.apache.tools.ant.types.Path(antProject, cliClasspath));
         java.setClassname(CSS_CLI_MAIN_CLASS);
         java.setFork(true);
         java.setFailonerror(true);
-        java.createJvmarg().setValue("-Dcli=true");
+        // The compiler needs no display, and says so itself in main(). Passing
+        // it here as well covers the window before main runs, when a JVM agent
+        // or a logging framework can already have initialised AWT.
+        java.createJvmarg().setValue("-Djava.awt.headless=true");
         if (buildDirectory != null) {
             // Where the compiler keeps its checksums and other work files: the
             // build's own directory, which it cannot find for itself once moved.
             java.createJvmarg().setValue("-Dcn1.buildDir=" + buildDirectory.getAbsolutePath());
         }
-        java.createArg().setValue("-css");
         java.createArg().setValue("-input");
         java.createArg().setValue(inputs.toString());
         java.createArg().setValue("-output");

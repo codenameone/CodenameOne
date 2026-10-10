@@ -207,16 +207,17 @@ public class CSSImageImporter {
                 .append("  cn1-source-dpi: ").append(sourceDpi).append(";\n")
                 .append("}\n");
         appendCSS(css.toString());
-        try {
-            CN1CSSCLI.main(new String[]{
-                getCSSFile().getAbsolutePath(),
-                getResourceFile().getAbsolutePath()
-            });
-        } catch (Exception ex) {
-            if (ex instanceof IOException) {
-                throw (IOException)ex;
-            }
-            throw new RuntimeException("Failed to compile CSS file.", ex);
+        // run(), not main(): main ends the JVM, and this is the editor's own.
+        // Only the project's own stylesheet is compiled. The stylesheets of
+        // installed cn1libs are merged in by the Maven and Gradle builds, which
+        // know where a project keeps them and rebuild this file with them; the
+        // editor does not look for the lib/impl/css directory of an Ant project.
+        int status = CN1CSSCLI.run(new String[]{
+            "-input", getCSSFile().getAbsolutePath(),
+            "-output", getResourceFile().getAbsolutePath()
+        });
+        if (status != 0) {
+            throw new IOException("Failed to compile CSS file " + getCSSFile() + ". See the console for the reason.");
         }
         
         

@@ -8,8 +8,8 @@
 # a claim anyone can check. This turns it into one command.
 #
 # It is sound because the compiler is byte-reproducible on these inputs:
-# CSSTheme names the resource "Theme" rather than the input path, NoCefCSSCLI
-# never reads the existing .res, theme entries are sorted before writing
+# CSSTheme names the resource "Theme" rather than the input path, the compiler
+# never reads an existing .res outside a project, theme entries are sorted before writing
 # (EditableResources), there are no timestamps, and none of the native themes
 # reference an image or a font, so no encoder runs. Measured: recompiling the
 # committed theme.css reproduced Themes/iOSModernTheme.res byte for byte.
@@ -70,24 +70,24 @@ JAR="$(
     ' 2>/dev/null | tail -n1
 )"
 if [ -z "$JAR" ] || [ ! -f "$JAR" ]; then
-    JAR="$(ls "$REPO_ROOT"/maven/css-compiler/target/codenameone-css-compiler-*-jar-with-dependencies.jar 2>/dev/null | head -n1 || true)"
+    JAR="$(ls "$REPO_ROOT"/maven/css-cli/target/codenameone-css-cli-*-jar-with-dependencies.jar 2>/dev/null | head -n1 || true)"
 fi
 if [ -z "$JAR" ] || [ ! -f "$JAR" ]; then
     log "No CSS compiler jar. Build it first:"
-    log "  mvn -f maven/css-compiler/pom.xml -DskipTests package"
+    log "  (cd maven && mvn -pl css-cli -am -DskipTests package)"
     exit 3
 fi
 log "Using CSS compiler jar: $JAR"
 
 git show "$BASE_REF:$BASE_CSS" > "$WORK/baseline.css"
 log "Baseline: $BASE_REF:$BASE_CSS"
-java -jar "$JAR" -input "$WORK/baseline.css" -output "$WORK/baseline.res" >/dev/null
+java -Djava.awt.headless=true -jar "$JAR" -no-raster -native-theme-units -input "$WORK/baseline.css" -output "$WORK/baseline.res" >/dev/null
 
 # The split side is whatever the build script would feed the compiler today.
 cat native-themes/ios-modern/common.css > "$WORK/split.css"
 printf '\n' >> "$WORK/split.css"
 cat native-themes/ios-modern/gen26.css >> "$WORK/split.css"
-java -jar "$JAR" -input "$WORK/split.css" -output "$WORK/split.res" >/dev/null
+java -Djava.awt.headless=true -jar "$JAR" -no-raster -native-theme-units -input "$WORK/split.css" -output "$WORK/split.res" >/dev/null
 
 if cmp -s "$WORK/baseline.res" "$WORK/split.res"; then
     log "OK: common.css + gen26.css compiles byte-for-byte to the pre-split theme."

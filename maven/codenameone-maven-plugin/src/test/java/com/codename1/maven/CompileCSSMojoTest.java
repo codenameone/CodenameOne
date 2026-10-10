@@ -57,6 +57,11 @@ class CompileCSSMojoTest {
 
         List<String> args = mojo.getRecordingJava().getCommandLineArguments();
         assertTrue(args.contains("-l"), "Expected -l argument when localization directory exists");
+        // The compiler is forked without a display and must be told so: this
+        // flag is what turns a stray window or dialog into an immediate error.
+        assertTrue(args.contains("-Djava.awt.headless=true"), "the CSS compiler is forked headless: " + args);
+        assertTrue(args.contains("com.codename1.designer.css.CN1CSSCLI"), "the compiler CLI is the main class: " + args);
+        assertFalse(args.contains("-css"), "no leftover designer entry-point argument: " + args);
         int index = args.indexOf("-l");
         assertTrue(index >= 0 && index + 1 < args.size(), "Expected localization directory argument after -l");
         assertEquals(projectDir.resolve("src/main/l10n").toFile().getAbsolutePath(), args.get(index + 1));
