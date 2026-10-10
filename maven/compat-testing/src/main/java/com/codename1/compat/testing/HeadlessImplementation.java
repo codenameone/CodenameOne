@@ -998,7 +998,7 @@ public class HeadlessImplementation extends CodenameOneImplementation {
     @Override
     public void drawString(java.lang.Object a0, java.lang.String a1, int a2, int a3) {
         if (raster(a0) && a1 != null) {
-            span(a0, a2, a3, a1.length() * CHAR_WIDTH, FONT_HEIGHT);
+            span(a0, a2, a3, a1.length() * CHAR_WIDTH + textOverhang, FONT_HEIGHT);
         }
         if (recordText) {
             own(a0);
@@ -1012,6 +1012,12 @@ public class HeadlessImplementation extends CodenameOneImplementation {
             drawnText.add(new Object[]{a1, Integer.valueOf(a2), Integer.valueOf(a3), Boolean.valueOf(seen)});
         }
     }
+
+    /// How many pixels the box a string is rasterized as reaches past the
+    /// width the string measures, as the last letter of an italic does on
+    /// a real port, where a text clipped to its measured width loses that
+    /// much of it. 0 by default; a test that sets it puts it back.
+    public static int textOverhang;
 
     /// When set, every `drawString` (a `drawChar` arrives as one) is added
     /// to [#drawnText] as {text, x, y, inside}, the last being whether the

@@ -120,6 +120,60 @@ public class ControlSizeTest {
         assertEquals(line, label.prefHeight(-1), 2.5);
     }
 
+    /// The last letter of an italic leans past the width its text
+    /// measures, and a native label clips its text to that width: a label
+    /// given its preferred width is wider by the lean, and all of the
+    /// letter is drawn. The display here draws a text as a box that many
+    /// pixels wider than it measures, which is what a port does.
+    @Test
+    public void anItalicLabelHasRoomForTheLeanOfItsLastLetter() {
+        boolean before = HeadlessImplementation.rasterImages;
+        HeadlessImplementation.rasterImages = true;
+        HeadlessImplementation.trackClip = true;
+        HeadlessImplementation.textOverhang = 5;
+        com.codename1.fxcompat.runtime.Fonts.flush();
+        javafx.stage.Stage stage = new javafx.stage.Stage();
+        try {
+            javafx.scene.control.Label upright = new javafx.scene.control.Label("Small");
+            javafx.scene.control.Label italic = new javafx.scene.control.Label("Small");
+            italic.setFont(javafx.scene.text.Font.font("System", javafx.scene.text.FontPosture.ITALIC, 12));
+            italic.setTextFill(javafx.scene.paint.Color.RED);
+            javafx.scene.control.Label spaced = new javafx.scene.control.Label("Small ");
+            spaced.setFont(italic.getFont());
+            stage.setScene(new javafx.scene.Scene(new javafx.scene.layout.VBox(upright, italic, spaced), 600, 400));
+            stage.show();
+            int text = 5 * HeadlessImplementation.CHAR_WIDTH;
+            assertEquals(text, upright.getWidth(), 0.01);
+            assertEquals(text + 5, italic.getWidth(), 0.01);
+            assertEquals("nothing leans out of a space", text + HeadlessImplementation.CHAR_WIDTH, spaced.getWidth(),
+                    0.01);
+            com.codename1.ui.Form f = (com.codename1.ui.Form) stage.cn1Host();
+            f.revalidate();
+            com.codename1.ui.Image picture = com.codename1.ui.Image.createImage(HeadlessImplementation.WIDTH,
+                    HeadlessImplementation.HEIGHT, 0xffffffff);
+            com.codename1.ui.Graphics g = picture.getGraphics();
+            g.setClip(0, 0, HeadlessImplementation.WIDTH, HeadlessImplementation.HEIGHT);
+            f.paintComponent(g);
+            int[] rgb = picture.getRGB();
+            int red = 0;
+            int row = -1;
+            for (int i = 0; i < rgb.length && (row < 0 || i / HeadlessImplementation.WIDTH == row); i++) {
+                if (rgb[i] == 0xffff0000) {
+                    row = i / HeadlessImplementation.WIDTH;
+                    red++;
+                }
+            }
+            assertEquals("the pixels of one row of the italic text", text + 5, red);
+        } finally {
+            stage.hide();
+            HeadlessImplementation.textOverhang = 0;
+            HeadlessImplementation.trackClip = false;
+            HeadlessImplementation.rasterImages = before;
+            HeadlessImplementation.resetRaster();
+            com.codename1.fxcompat.runtime.Fonts.flush();
+        }
+    }
+
     /// The standard theme draws a column's header bold, and a style sheet
     /// that only changes its size keeps that.
     @Test

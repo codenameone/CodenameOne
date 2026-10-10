@@ -25,6 +25,8 @@ package com.codename1.fxcompat.runtime;
 import java.util.HashMap;
 
 import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
 
 /// Turns a JavaFX font description into the Codename One font that draws
 /// it, and measures text with it in logical pixels.
@@ -50,6 +52,7 @@ public final class Fonts {
         double scale = Units.scale();
         if (Double.compare(scale, cacheScale) != 0) {
             CACHE.clear();
+            OVERHANG.clear();
             cacheScale = scale;
         }
         String key = family + '|' + weight + '|' + italic + '|' + size;
@@ -115,6 +118,77 @@ public final class Fonts {
     /// file loaded after a text was first drawn in its family takes over.
     public static void flush() {
         CACHE.clear();
+        OVERHANG.clear();
+    }
+
+    private static final HashMap<Font, HashMap<Character, Integer>> OVERHANG =
+            new HashMap<Font, HashMap<Character, Integer>>();
+
+    /// Returns how far the ink of the last character of a text reaches
+    /// past the width the text measures, in device pixels; 0 for a font
+    /// that is not italic.
+    ///
+    /// The width of a text is the sum of the advances of its characters,
+    /// and an italic leans past its own: the top of an `l` or a `d` is
+    /// drawn to the right of where the next character would start. A
+    /// native label clips its text to the room it measured, so a label
+    /// exactly as wide as its text lost the top of such a last letter. A
+    /// font does not say how far its glyphs lean, so the character is
+    /// drawn once and looked at; the answer is kept per font and
+    /// character.
+    public static int overhang(javafx.scene.text.Font font, String text) {
+        if (font == null || text == null || font.cn1Posture() != javafx.scene.text.FontPosture.ITALIC) {
+            return 0;
+        }
+        int end = text.length();
+        if (end == 0 || text.charAt(end - 1) <= ' ') {
+            return 0;
+        }
+        Font f = of(font);
+        Character last = Character.valueOf(text.charAt(end - 1));
+        HashMap<Character, Integer> known = OVERHANG.get(f);
+        if (known == null) {
+            known = new HashMap<Character, Integer>();
+            OVERHANG.put(f, known);
+        }
+        Integer kept = known.get(last);
+        if (kept == null) {
+            kept = Integer.valueOf(inkPastAdvance(f, last.charValue()));
+            known.put(last, kept);
+        }
+        return kept.intValue();
+    }
+
+    /// Draws a character in white on black and answers how many columns
+    /// right of its advance hold any of it. A glyph leans by less than it
+    /// is tall, which is the room it is given.
+    private static int inkPastAdvance(Font f, char c) {
+        int advance = f.charWidth(c);
+        int height = f.getHeight();
+        if (advance <= 0 || height <= 0) {
+            return 0;
+        }
+        int width = advance + height;
+        Image picture = Image.createImage(width, height, 0xff000000);
+        Graphics g = picture.getGraphics();
+        g.setClip(0, 0, width, height);
+        g.setFont(f);
+        g.setColor(0xffffff);
+        g.drawString(String.valueOf(c), 0, 0);
+        int[] rgb = picture.getRGB();
+        if (rgb == null || rgb.length < width * height) {
+            return 0;
+        }
+        for (int x = width - 1; x >= advance; x--) {
+            for (int y = 0; y < height; y++) {
+                // The faintest edge of an antialiased stroke is not worth
+                // a column of its own.
+                if ((rgb[y * width + x] & 0xff) > 0x30) {
+                    return x + 1 - advance;
+                }
+            }
+        }
+        return 0;
     }
 
     /// Returns whether a native font came from the cache of the current

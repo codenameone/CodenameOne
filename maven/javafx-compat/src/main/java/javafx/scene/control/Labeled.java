@@ -283,6 +283,15 @@ public abstract class Labeled extends Control {
             return new Dimension(Math.max(d.getWidth(), s.getHorizontalPadding()),
                     Math.max(d.getHeight(), s.getVerticalPadding()));
         }
+        // The native label clips its text to the width the text measures,
+        // which the last letter of an italic leans out of: the label is
+        // that much wider, so all of the letter is inside.
+        if (c instanceof com.codename1.ui.Label) {
+            int lean = Fonts.overhang(font.get(), ((com.codename1.ui.Label) c).getText());
+            if (lean > 0) {
+                return new Dimension(d.getWidth() + lean, d.getHeight());
+            }
+        }
         return d;
     }
 
