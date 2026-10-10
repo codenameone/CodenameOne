@@ -524,6 +524,17 @@ public class HeadlessImplementation extends CodenameOneImplementation {
         }
     }
 
+    /// The size of the desktop the window is on as `{width, height}`, or
+    /// null for a port that has none to report, which is every port that
+    /// is not at a desk. A test that sets it must reset it.
+    public static int[] desktopSize;
+
+    @Override
+    public com.codename1.ui.geom.Dimension getDesktopSize() {
+        return desktop && desktopSize != null
+                ? new com.codename1.ui.geom.Dimension(desktopSize[0], desktopSize[1]) : null;
+    }
+
     @Override
     public void setWindowSize(int width, int height) {
         if (desktop) {
