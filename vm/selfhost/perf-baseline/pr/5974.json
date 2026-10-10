@@ -1,0 +1,47 @@
+{
+ "pr": 5974,
+ "rebaseline": {
+  "linux-x64@amd-epyc-9v45-96-core-processor": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.414,
+      "time": 0.641,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.454,
+     "reason": "Recalibrate only translator RAM on EPYC 9V45 from unchanged native benchmark code: runs 38024416107 (bb9bdf3516), 38018068620 (0a74400bcf), and 37889557701 (b930a70c88), five rounds each. All native translator, JavaAPI, benchmark, and measurement sources match; only baseline records and a JavaScript-only bridge differ. Run-median RAM ratios are 0.480, 0.449, and 0.454. Preserve timing and existing tolerances.",
+     "runs": 3,
+     "time": 0.641,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   }
+  },
+  "windows-x64@amd64-family-26-model-2-authenticamd": {
+   "stringBuilding": {
+    "all": {
+     "from": {
+      "memory": 0.223,
+      "time": 1.386,
+      "tolerance": {
+       "memory": 0.35,
+       "time": 0.2
+      }
+     },
+     "memory": 0.297,
+     "reason": "Recalibrate only stringBuilding RAM on AMD64 Family 26 Model 2 using runs 38024416103 (bb9bdf3516) and 37867674691 (ac6a6ea42c), five rounds each, with identical native translator, JavaAPI, benchmark, and measurement sources. ParparVM peak RAM remains about 80-85 MiB; JDK 25 varies between about 247, 300, and 480 MiB. Run-median ratios are 0.325 and 0.269. Preserve timing and existing tolerances.",
+     "runs": 2,
+     "time": 1.386,
+     "tolerance": {
+      "memory": 0.35,
+      "time": 0.2
+     }
+    }
+   }
+  }
+ }
+}
