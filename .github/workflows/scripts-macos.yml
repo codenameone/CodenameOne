@@ -22,6 +22,16 @@ on:
     - cron: '25 1 * * *'
   pull_request:
     paths:
+      # The application these jobs build compiles a Unity project, from an
+      # archive that unity-gallery-prebuilt.yml makes out of these.
+      - 'scripts/unity-compat-samples/gallery/**'
+      - 'maven/cil-translator/**'
+      - 'maven/unity-compat/**'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
+      - 'scripts/unity-gallery-prebuilt.sh'
+      - '.github/workflows/unity-gallery-prebuilt.yml'
+      - '.github/actions/unity-gallery-prebuilt/**'
       - '.github/workflows/scripts-macos.yml'
       - '.github/workflows/_build-mac-port.yml'
       - 'scripts/setup-workspace.sh'
@@ -76,6 +86,16 @@ on:
   push:
     branches: [ master ]
     paths:
+      # The application these jobs build compiles a Unity project, from an
+      # archive that unity-gallery-prebuilt.yml makes out of these.
+      - 'scripts/unity-compat-samples/gallery/**'
+      - 'maven/cil-translator/**'
+      - 'maven/unity-compat/**'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
+      - 'scripts/unity-gallery-prebuilt.sh'
+      - '.github/workflows/unity-gallery-prebuilt.yml'
+      - '.github/actions/unity-gallery-prebuilt/**'
       - '.github/workflows/scripts-macos.yml'
       - '.github/workflows/_build-mac-port.yml'
       - 'scripts/setup-workspace.sh'
@@ -121,13 +141,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The application has a Unity project in it. One Linux job compiles it and
+  # hands the result to the jobs below as an artifact; none of them installs
+  # the .NET SDK or builds the Unity modules.
+  unity-gallery:
+    uses: ./.github/workflows/unity-gallery-prebuilt.yml
+
   build-port:
     # AppKit has its own source hash and producer; it does not invalidate
     # the iOS coordinator's bundle.
     uses: ./.github/workflows/_build-mac-port.yml
 
   build-macos:
-    needs: build-port
+    needs: [build-port, unity-gallery]
     permissions:
       contents: read
       pull-requests: write
@@ -233,6 +259,11 @@ jobs:
           cn1_select_xcode || exit 1
           "$XCODEBUILD" -downloadComponent MetalToolchain
         timeout-minutes: 10
+
+      # After everything that fills the local Maven repository and before the
+      # application is built; this job has no .NET SDK (see the action).
+      - name: Unpack the Unity gallery prebuilt
+        uses: ./.github/actions/unity-gallery-prebuilt
 
       - name: Build sample macOS app and compile workspace
         id: build-macos-app

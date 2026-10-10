@@ -12,6 +12,16 @@ on:
   - cron: 15 1 * * *
   pull_request:
     paths:
+    # The application these jobs build compiles a Unity project, from an
+    # archive that unity-gallery-prebuilt.yml makes out of these.
+    - scripts/unity-compat-samples/gallery/**
+    - maven/cil-translator/**
+    - maven/unity-compat/**
+    - maven/build-engine/src/main/java/com/codename1/maven/Unity*
+    - maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*
+    - scripts/unity-gallery-prebuilt.sh
+    - .github/workflows/unity-gallery-prebuilt.yml
+    - .github/actions/unity-gallery-prebuilt/**
     - .github/workflows/scripts-ios.yml
     - .github/workflows/_build-ios-port.yml
     - scripts/setup-workspace.sh
@@ -68,6 +78,16 @@ on:
     branches:
     - master
     paths:
+    # The application these jobs build compiles a Unity project, from an
+    # archive that unity-gallery-prebuilt.yml makes out of these.
+    - scripts/unity-compat-samples/gallery/**
+    - maven/cil-translator/**
+    - maven/unity-compat/**
+    - maven/build-engine/src/main/java/com/codename1/maven/Unity*
+    - maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*
+    - scripts/unity-gallery-prebuilt.sh
+    - .github/workflows/unity-gallery-prebuilt.yml
+    - .github/actions/unity-gallery-prebuilt/**
     - .github/workflows/scripts-ios.yml
     - .github/workflows/_build-ios-port.yml
     - scripts/setup-workspace.sh
@@ -128,6 +148,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The application has a Unity project in it. One Linux job compiles it and
+  # hands the result to the jobs below as an artifact; none of them installs
+  # the .NET SDK or builds the Unity modules.
+  unity-gallery:
+    needs: select
+    if: needs.select.outputs.any == 'true'
+    uses: ./.github/workflows/unity-gallery-prebuilt.yml
+
   select:
     runs-on: ubuntu-24.04
     outputs:
@@ -153,7 +181,7 @@ jobs:
     # The iOS renderer job. Metal is the only iOS rendering backend -- the
     # OpenGL ES 2 pipeline and the job that exercised it are gone -- so this
     # runs on every pull request rather than only on the nightly schedule.
-    needs: [select, build-port]
+    needs: [select, build-port, unity-gallery]
     permissions:
       contents: read
       pull-requests: write
@@ -280,6 +308,11 @@ jobs:
           cn1_select_xcode || exit 1
           "$XCODEBUILD" -downloadComponent MetalToolchain
         timeout-minutes: 10
+
+      # After everything that fills the local Maven repository and before the
+      # application is built; this job has no .NET SDK (see the action).
+      - name: Unpack the Unity gallery prebuilt
+        uses: ./.github/actions/unity-gallery-prebuilt
 
       - name: Build sample iOS app and compile workspace (Metal)
         id: build-ios-app
@@ -540,7 +573,7 @@ jobs:
     # `xcode-27` is a PUBLIC PREVIEW image (actions/runner-images#14404) whose
     # capacity is still being balanced, so read a queue here as the image rather
     # than as a fault in the change under test.
-    needs: [select, build-port]
+    needs: [select, build-port, unity-gallery]
     permissions:
       contents: read
       pull-requests: write
@@ -678,6 +711,11 @@ jobs:
           cn1_select_xcode || exit 1
           "$XCODEBUILD" -downloadComponent MetalToolchain
         timeout-minutes: 10
+
+      # After everything that fills the local Maven repository and before the
+      # application is built; this job has no .NET SDK (see the action).
+      - name: Unpack the Unity gallery prebuilt
+        uses: ./.github/actions/unity-gallery-prebuilt
 
       - name: Build sample iOS app and compile workspace (Metal)
         id: build-ios-app
@@ -946,7 +984,7 @@ jobs:
     # WS sink the iOS jobs use, and compares against scripts/ios/screenshots-watch.
     # Isolated in its own job (like build-ios-metal) so the watch result is a
     # distinct check and a regression there doesn't mask the iOS path.
-    needs: [select, build-port]
+    needs: [select, build-port, unity-gallery]
     permissions:
       contents: read
       pull-requests: write
@@ -1032,6 +1070,11 @@ jobs:
           # build-port handed off (not LRU-evicted, survives --failed re-runs).
           tar -C / -xf "$RUNNER_TEMP/cn1-built-bundle.tar"
 
+      # After everything that fills the local Maven repository and before the
+      # application is built; this job has no .NET SDK (see the action).
+      - name: Unpack the Unity gallery prebuilt
+        uses: ./.github/actions/unity-gallery-prebuilt
+
       - name: Build sample iOS app (generates the watch target)
         id: build-ios-app
         run: ./scripts/build-ios-app.sh -q -DskipTests
@@ -1106,7 +1149,7 @@ jobs:
     # BLOCKING (a hard golden gate, like build-ios-watch): the tvOS slice
     # compiles end-to-end and the golden set is seeded from a CI capture (see
     # Ports/iOSPort/nativeSources/TVOS_PORT.md). A mismatch fails the job.
-    needs: [select, build-port]
+    needs: [select, build-port, unity-gallery]
     permissions:
       contents: read
       pull-requests: write
@@ -1187,6 +1230,11 @@ jobs:
           # Replaces the evictable cn1-built cache restore with the artifact
           # build-port handed off (not LRU-evicted, survives --failed re-runs).
           tar -C / -xf "$RUNNER_TEMP/cn1-built-bundle.tar"
+
+      # After everything that fills the local Maven repository and before the
+      # application is built; this job has no .NET SDK (see the action).
+      - name: Unpack the Unity gallery prebuilt
+        uses: ./.github/actions/unity-gallery-prebuilt
 
       - name: Build sample iOS app (generates the tvOS target)
         id: build-ios-app
@@ -1270,19 +1318,21 @@ jobs:
           retention-days: 14
 
   native:
-    needs: [select, build-port]
+    needs: [select, build-port, unity-gallery]
     if: ${{ !inputs.watch_only && needs.select.outputs.native == 'true' }}
     uses: ./.github/workflows/scripts-ios-native.yml
     with:
       port_prepared: true
+      unity_prepared: true
     secrets: inherit
 
   packaging:
-    needs: [select, build-port]
+    needs: [select, build-port, unity-gallery]
     if: ${{ !inputs.watch_only && needs.select.outputs.packaging == 'true' }}
     uses: ./.github/workflows/ios-packaging.yml
     with:
       port_prepared: true
+      unity_prepared: true
     secrets: inherit
 
   catalyst:
@@ -1290,9 +1340,10 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
-    needs: [select, build-port]
+    needs: [select, build-port, unity-gallery]
     if: ${{ !inputs.watch_only && needs.select.outputs.catalyst == 'true' }}
     uses: ./.github/workflows/scripts-mac-catalyst.yml
     with:
       port_prepared: true
+      unity_prepared: true
     secrets: inherit

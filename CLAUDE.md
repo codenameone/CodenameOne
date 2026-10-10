@@ -985,6 +985,53 @@ Traps that have already cost a fix:
   application build never restores anything: its generated project turns the
   implicit framework reference off and names the three assemblies by path.
 
+#### The screenshot suite's Unity gallery is prebuilt, once, on Linux
+
+`scripts/hellocodenameone` compiles `scripts/unity-compat-samples/gallery`
+(`compile-unity` in `common/pom.xml`) for the `UnityCompat*` screenshot tests,
+so every job that builds the application would need the .NET SDK and both
+Unity modules. None has them. One Linux job per workflow run does:
+
+- **`.github/workflows/unity-gallery-prebuilt.yml`** (reusable) builds the
+  plugin and the two modules, runs the application's common module to
+  `generate-sources`, and uploads what `scripts/unity-gallery-prebuilt.sh pack`
+  writes as the artifact `unity-gallery-prebuilt`: the `codenameone-unity-compat`
+  and `codenameone-cil-translator` artifacts plus `common/target/unity` and
+  `common/target/generated-sources/unity`. The archive is cached on a hash of
+  everything that can change a byte of it, so most runs only upload it again.
+- **`.github/actions/unity-gallery-prebuilt`** downloads and unpacks it.
+  `compile-unity` then finds a matching content digest and never starts
+  `dotnet`.
+
+Traps:
+
+- **A new job that builds the application must use both**: a job that
+  `uses:` the workflow, `needs:` on it, and the action after everything that
+  fills the local Maven repository and before the first build of the
+  application. Without them the job fails in `compile-unity` with ".NET SDK,
+  which was not found", naming the gallery directory.
+- **A consumer must not build the Unity jars itself**, or install them from
+  anywhere else. The digest covers every class of the runtime, the references
+  and the translator, so output is good only with the archive's own jars. When
+  they differ the failure adds "does not match these sources or jars" -- that,
+  not a missing SDK, is the thing to fix.
+- **The artifact name is fixed, so the workflow is called once per run.** A
+  workflow that is itself called (`scripts-ios-native.yml`, `ios-packaging.yml`,
+  `scripts-mac-catalyst.yml`) takes `unity_prepared` and skips its own call
+  when `scripts-ios.yml` already made one.
+- **Anything new that determines the archive goes into the cache key** in the
+  reusable workflow. A stale cached archive is not refused downstream -- it is
+  self-consistent -- it is simply used.
+- **Every workflow that builds the application lists the gallery, both
+  modules, the script, the workflow and the action in its `paths`**, and
+  `.github/ci/apple-checks.json` lists them for the four Apple suites.
+- **`unpack` after `mvn clean` on the application, never before**: the output
+  lives under `common/target`.
+- `unity-compat.yml`'s `unity-gallery-consumer` job is the end-to-end test:
+  it unpacks into a job that built neither module, builds the common module
+  with an SDK setting that names nothing, and then checks that a stale
+  `state.txt` is refused by name.
+
 ### Integration Tests
 
 Located in `maven/integration-tests/`:

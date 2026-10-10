@@ -44,7 +44,15 @@
       "!maven/cn1-unity-levelplay/**",
       "!maven/core-unittests/**",
       "scripts/hellocodenameone/backend/**",
-      "scripts/lib/cn1ss.sh"
+      "scripts/lib/cn1ss.sh",
+      "scripts/unity-compat-samples/gallery/**",
+      "maven/cil-translator/**",
+      "maven/unity-compat/**",
+      "maven/build-engine/src/main/java/com/codename1/maven/Unity*",
+      "maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*",
+      "scripts/unity-gallery-prebuilt.sh",
+      ".github/workflows/unity-gallery-prebuilt.yml",
+      ".github/actions/unity-gallery-prebuilt/**"
     ],
     "push": [
       ".github/workflows/scripts-ios.yml",
@@ -90,7 +98,15 @@
       "!maven/cn1-unity-levelplay/**",
       "!maven/core-unittests/**",
       "scripts/hellocodenameone/backend/**",
-      "scripts/lib/cn1ss.sh"
+      "scripts/lib/cn1ss.sh",
+      "scripts/unity-compat-samples/gallery/**",
+      "maven/cil-translator/**",
+      "maven/unity-compat/**",
+      "maven/build-engine/src/main/java/com/codename1/maven/Unity*",
+      "maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*",
+      "scripts/unity-gallery-prebuilt.sh",
+      ".github/workflows/unity-gallery-prebuilt.yml",
+      ".github/actions/unity-gallery-prebuilt/**"
     ]
   },
   "native": {
@@ -125,7 +141,15 @@
       "!maven/cn1-admob/**",
       "!maven/cn1-applovin/**",
       "!maven/cn1-unity-levelplay/**",
-      "!maven/core-unittests/**"
+      "!maven/core-unittests/**",
+      "scripts/unity-compat-samples/gallery/**",
+      "maven/cil-translator/**",
+      "maven/unity-compat/**",
+      "maven/build-engine/src/main/java/com/codename1/maven/Unity*",
+      "maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*",
+      "scripts/unity-gallery-prebuilt.sh",
+      ".github/workflows/unity-gallery-prebuilt.yml",
+      ".github/actions/unity-gallery-prebuilt/**"
     ],
     "push": [
       ".github/workflows/scripts-ios-native.yml",
@@ -158,7 +182,15 @@
       "!maven/cn1-admob/**",
       "!maven/cn1-applovin/**",
       "!maven/cn1-unity-levelplay/**",
-      "!maven/core-unittests/**"
+      "!maven/core-unittests/**",
+      "scripts/unity-compat-samples/gallery/**",
+      "maven/cil-translator/**",
+      "maven/unity-compat/**",
+      "maven/build-engine/src/main/java/com/codename1/maven/Unity*",
+      "maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*",
+      "scripts/unity-gallery-prebuilt.sh",
+      ".github/workflows/unity-gallery-prebuilt.yml",
+      ".github/actions/unity-gallery-prebuilt/**"
     ]
   },
   "packaging": {
@@ -179,7 +211,15 @@
       "scripts/run-ios-native-tests.sh",
       "scripts/ios/**",
       "scripts/hellocodenameone/**",
-      "!docs/**"
+      "!docs/**",
+      "scripts/unity-compat-samples/gallery/**",
+      "maven/cil-translator/**",
+      "maven/unity-compat/**",
+      "maven/build-engine/src/main/java/com/codename1/maven/Unity*",
+      "maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*",
+      "scripts/unity-gallery-prebuilt.sh",
+      ".github/workflows/unity-gallery-prebuilt.yml",
+      ".github/actions/unity-gallery-prebuilt/**"
     ],
     "push": [
       ".github/workflows/ios-packaging.yml",
@@ -198,7 +238,15 @@
       "scripts/run-ios-native-tests.sh",
       "scripts/ios/**",
       "scripts/hellocodenameone/**",
-      "!docs/**"
+      "!docs/**",
+      "scripts/unity-compat-samples/gallery/**",
+      "maven/cil-translator/**",
+      "maven/unity-compat/**",
+      "maven/build-engine/src/main/java/com/codename1/maven/Unity*",
+      "maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*",
+      "scripts/unity-gallery-prebuilt.sh",
+      ".github/workflows/unity-gallery-prebuilt.yml",
+      ".github/actions/unity-gallery-prebuilt/**"
     ]
   },
   "catalyst": {
@@ -234,7 +282,15 @@
       "!maven/cn1-unity-levelplay/**",
       "!maven/core-unittests/**",
       "!docs/**",
-      "scripts/hellocodenameone/backend/**"
+      "scripts/hellocodenameone/backend/**",
+      "scripts/unity-compat-samples/gallery/**",
+      "maven/cil-translator/**",
+      "maven/unity-compat/**",
+      "maven/build-engine/src/main/java/com/codename1/maven/Unity*",
+      "maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*",
+      "scripts/unity-gallery-prebuilt.sh",
+      ".github/workflows/unity-gallery-prebuilt.yml",
+      ".github/actions/unity-gallery-prebuilt/**"
     ],
     "push": [
       ".github/workflows/scripts-mac-catalyst.yml",
@@ -262,7 +318,15 @@
       "!maven/cn1-applovin/**",
       "!maven/cn1-unity-levelplay/**",
       "!maven/core-unittests/**",
-      "scripts/hellocodenameone/backend/**"
+      "scripts/hellocodenameone/backend/**",
+      "scripts/unity-compat-samples/gallery/**",
+      "maven/cil-translator/**",
+      "maven/unity-compat/**",
+      "maven/build-engine/src/main/java/com/codename1/maven/Unity*",
+      "maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*",
+      "scripts/unity-gallery-prebuilt.sh",
+      ".github/workflows/unity-gallery-prebuilt.yml",
+      ".github/actions/unity-gallery-prebuilt/**"
     ]
   }
 }

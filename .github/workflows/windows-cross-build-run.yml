@@ -26,6 +26,16 @@ on:
     - cron: '55 1 * * *'
   pull_request:
     paths:
+      # The application these jobs build compiles a Unity project, from an
+      # archive that unity-gallery-prebuilt.yml makes out of these.
+      - 'scripts/unity-compat-samples/gallery/**'
+      - 'maven/cil-translator/**'
+      - 'maven/unity-compat/**'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
+      - 'scripts/unity-gallery-prebuilt.sh'
+      - '.github/workflows/unity-gallery-prebuilt.yml'
+      - '.github/actions/unity-gallery-prebuilt/**'
       - '.github/workflows/windows-cross-build-run.yml'
       - 'vm/**'
       - 'Ports/WindowsPort/**'
@@ -44,6 +54,16 @@ on:
   push:
     branches: [ master, main ]
     paths:
+      # The application these jobs build compiles a Unity project, from an
+      # archive that unity-gallery-prebuilt.yml makes out of these.
+      - 'scripts/unity-compat-samples/gallery/**'
+      - 'maven/cil-translator/**'
+      - 'maven/unity-compat/**'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
+      - 'scripts/unity-gallery-prebuilt.sh'
+      - '.github/workflows/unity-gallery-prebuilt.yml'
+      - '.github/actions/unity-gallery-prebuilt/**'
       - '.github/workflows/windows-cross-build-run.yml'
       - 'vm/**'
       - 'Ports/WindowsPort/**'
@@ -59,7 +79,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The application has a Unity project in it. One Linux job compiles it and
+  # hands the result to the jobs below as an artifact; none of them installs
+  # the .NET SDK or builds the Unity modules.
+  unity-gallery:
+    uses: ./.github/workflows/unity-gallery-prebuilt.yml
+
   cross-build:
+    needs: unity-gallery
     name: cross-build suite exe (Linux, x64 + WebView2)
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -186,6 +213,11 @@ jobs:
             -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
           test -f core/target/classes/com/codename1/ui/Form.class
           test -f windows/target/classes/com/codename1/impl/windows/WindowsImplementation.class
+
+      # After everything that fills the local Maven repository and before the
+      # application is built; this job has no .NET SDK (see the action).
+      - name: Unpack the Unity gallery prebuilt
+        uses: ./.github/actions/unity-gallery-prebuilt
 
       # Build the hellocodenameone screenshot app into common/target/classes (the
       # suite the cross-build translates). Plain Maven build of the sample on JDK

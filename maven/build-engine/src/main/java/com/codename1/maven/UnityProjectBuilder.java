@@ -122,6 +122,11 @@ public class UnityProjectBuilder {
     private final List<File> sourceRoots;
     private final Log log;
     private Toolchain toolchain;
+    /// Why an output that was already under the work directory is not being
+    /// used, or null when there was none. Said along with a missing SDK: a
+    /// build that was given compiled output and still asks for the SDK was
+    /// given output of something else, and that is the fact to act on.
+    private String staleOutput;
 
     /// The three external steps. An interface so the tests can count and fake
     /// them: the logic around them (what is skipped, what is installed, what
@@ -223,9 +228,14 @@ public class UnityProjectBuilder {
         File appImpl = new File(javaOut, GENERATED_PACKAGE.replace('.', File.separatorChar) + File.separator
                 + APP_IMPL_CLASS + ".java");
         String digest = digest();
-        if (digest.equals(read(state)) && staged.isDirectory() && appImpl.isFile()) {
+        String stored = read(state);
+        if (digest.equals(stored) && staged.isDirectory() && appImpl.isFile()) {
             log.debug("Unity project unchanged; not compiled again");
         } else {
+            staleOutput = staleOutput(state, stored, staged, appImpl);
+            if (staleOutput != null) {
+                log.info(staleOutput);
+            }
             // Deleted first: a step that fails must not leave the next build
             // believing the staging directory matches the sources.
             deleteQuietly(state);
@@ -239,6 +249,24 @@ public class UnityProjectBuilder {
         install(staged, resources, runtimeClasses);
         writeMainClass();
         return true;
+    }
+
+    /// What to say about compiled output that is present and cannot be used,
+    /// or null when the work directory holds none: a first build has nothing
+    /// to explain.
+    private String staleOutput(File state, String stored, File staged, File appImpl) {
+        if (stored == null) {
+            return null;
+        }
+        if (!staged.isDirectory() || !appImpl.isFile()) {
+            return state + " is there, but " + (staged.isDirectory() ? appImpl : staged) + " is not: the"
+                    + " compiled output of " + unityDir + " is incomplete and has to be made again.";
+        }
+        return "The compiled output under " + workDir + " does not match these sources or jars: " + state
+                + " records other content than " + unityDir + ", the " + RUNTIME_ARTIFACT + " jar, its '"
+                + REFERENCES_CLASSIFIER + "' jar and the " + TOOL_ARTIFACT + " class path have now. Output"
+                + " compiled elsewhere is good only with the exact project files and jars it was compiled"
+                + " from, so the project has to be compiled again.";
     }
 
     private void compile(File staged, File resources, File runtimeClasses) throws BuildException {
@@ -765,6 +793,16 @@ public class UnityProjectBuilder {
     /// @param setting the value of [#DOTNET_PROPERTY], or null
     /// @param env     the environment to read `DOTNET_ROOT` and `PATH` from
     static File locateDotnet(String setting, Map<String, String> env) throws BuildException {
+        return locateDotnet(setting, env, null);
+    }
+
+    /// As [#locateDotnet(String, Map)], naming the project that needs the
+    /// SDK in the failure: a build may be configured to read its Unity
+    /// project from anywhere, and `src/main/unity` is then a directory that
+    /// does not exist.
+    ///
+    /// @param project the Unity project, or null when it is not known
+    static File locateDotnet(String setting, Map<String, String> env, File project) throws BuildException {
         String exe = isWindows() ? "dotnet.exe" : "dotnet";
         String path = env.get("PATH");
         if (path == null) {
@@ -795,7 +833,8 @@ public class UnityProjectBuilder {
         if (found != null) {
             return found;
         }
-        throw new BuildException("src/main/unity holds a Unity project, and compiling its C# scripts needs the"
+        throw new BuildException((project == null ? "src/main/unity" : project.getPath())
+                + " holds a Unity project, and compiling its C# scripts needs the"
                 + " .NET SDK, which was not found. Looked at the " + DOTNET_PROPERTY + " property (not set), the"
                 + " DOTNET_ROOT environment variable (" + (root == null || root.length() == 0 ? "not set" : root)
                 + ") and the PATH. " + installHint());
@@ -852,7 +891,15 @@ public class UnityProjectBuilder {
     /// The forked implementation: the .NET CLI and this JVM's own `java`.
     private final class ForkedToolchain implements Toolchain {
         private File dotnet() throws BuildException {
-            File dotnet = locateDotnet(dotnetSetting, System.getenv());
+            File dotnet;
+            try {
+                dotnet = locateDotnet(dotnetSetting, System.getenv(), unityDir);
+            } catch (BuildException e) {
+                if (staleOutput == null) {
+                    throw e;
+                }
+                throw new BuildException(e.getMessage() + "\n" + staleOutput, e);
+            }
             File logFile = new File(workDir, "dotnet-version.log");
             List<String> cmd = new ArrayList<String>();
             cmd.add(dotnet.getAbsolutePath());

@@ -25,6 +25,16 @@ on:
     - cron: '5 2 * * *'
   pull_request:
     paths:
+      # The application these jobs build compiles a Unity project, from an
+      # archive that unity-gallery-prebuilt.yml makes out of these.
+      - 'scripts/unity-compat-samples/gallery/**'
+      - 'maven/cil-translator/**'
+      - 'maven/unity-compat/**'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
+      - 'scripts/unity-gallery-prebuilt.sh'
+      - '.github/workflows/unity-gallery-prebuilt.yml'
+      - '.github/actions/unity-gallery-prebuilt/**'
       - '.github/workflows/parparvm-tests-windows.yml'
       - 'vm/**'
       - 'Ports/WindowsPort/**'
@@ -48,6 +58,16 @@ on:
   push:
     branches: [ master, main ]
     paths:
+      # The application these jobs build compiles a Unity project, from an
+      # archive that unity-gallery-prebuilt.yml makes out of these.
+      - 'scripts/unity-compat-samples/gallery/**'
+      - 'maven/cil-translator/**'
+      - 'maven/unity-compat/**'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
+      - 'scripts/unity-gallery-prebuilt.sh'
+      - '.github/workflows/unity-gallery-prebuilt.yml'
+      - '.github/actions/unity-gallery-prebuilt/**'
       - '.github/workflows/parparvm-tests-windows.yml'
       - 'vm/**'
       - 'Ports/WindowsPort/**'
@@ -83,6 +103,12 @@ env:
   CN1_NATIVE_VERIFY: strict
 
 jobs:
+  # The application has a Unity project in it. One Linux job compiles it and
+  # hands the result to the jobs below as an artifact; none of them installs
+  # the .NET SDK or builds the Unity modules.
+  unity-gallery:
+    uses: ./.github/workflows/unity-gallery-prebuilt.yml
+
   vm-tests-windows:
     name: clean-target (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
@@ -308,6 +334,7 @@ jobs:
   # Separate from the clean-target gate so rendering failures are reported as
   # their own blocking check with dedicated diagnostics.
   windows-port-screenshot:
+    needs: unity-gallery
     name: screenshot-capture (x64)
     if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
@@ -398,6 +425,11 @@ jobs:
             if ($LASTEXITCODE -eq 0) { $ok = $true; break }
           }
           if (-not $ok) { throw "mvn install failed after all retries" }
+
+      # After everything that fills the local Maven repository and before the
+      # application is built; this job has no .NET SDK (see the action).
+      - name: Unpack the Unity gallery prebuilt
+        uses: ./.github/actions/unity-gallery-prebuilt
 
       # Build the hellocodenameone screenshot app into common/target/classes, which
       # the capture test translates into the native exe. This is a plain Maven build

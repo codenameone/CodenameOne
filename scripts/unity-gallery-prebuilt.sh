@@ -162,7 +162,10 @@ pack() {
   } >"$stage/pack-info.txt"
 
   mkdir -p "$(dirname "$out")"
-  tar -czf "$out" -C "$stage" pack-info.txt repo target
+  # Through a redirection, here and in `unpack`: GNU tar reads a colon in
+  # the name of its archive as "host:path", and the temporary directory of a
+  # Windows runner is D:\a\_temp.
+  tar -czf - -C "$stage" pack-info.txt repo target >"$out"
   log "packed $(cd "$stage" && find repo -type f | wc -l | tr -d ' ') repository files and $(cd "$stage" && find target -type f | wc -l | tr -d ' ') output files into $out"
   (cd "$stage" && find repo -type f | sort) | while IFS= read -r entry; do log "  $entry"; done
 }
@@ -174,7 +177,7 @@ unpack() {
   work="$(mktemp -d "${TMPDIR:-/tmp}/unity-gallery-unpack.XXXXXX")"
   # shellcheck disable=SC2064
   trap "rm -rf '$work'" EXIT
-  tar -xzf "$in" -C "$work"
+  tar -xzf - -C "$work" <"$in"
   [ -f "$work/target/unity/state.txt" ] || die "$in is not an archive this script packed"
 
   (cd "$work/repo" && find . -type f | sed 's:^\./::' | sort) | while IFS= read -r rel; do

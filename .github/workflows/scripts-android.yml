@@ -10,6 +10,16 @@ name: Test Android build scripts
     - cron: '5 1 * * *'
   pull_request:
     paths:
+      # The application these jobs build compiles a Unity project, from an
+      # archive that unity-gallery-prebuilt.yml makes out of these.
+      - 'scripts/unity-compat-samples/gallery/**'
+      - 'maven/cil-translator/**'
+      - 'maven/unity-compat/**'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
+      - 'scripts/unity-gallery-prebuilt.sh'
+      - '.github/workflows/unity-gallery-prebuilt.yml'
+      - '.github/actions/unity-gallery-prebuilt/**'
       - '.github/workflows/scripts-android.yml'
       - 'scripts/setup-workspace.sh'
       - 'scripts/ci/retry.sh'
@@ -57,6 +67,16 @@ name: Test Android build scripts
     branches:
       - master
     paths:
+      # The application these jobs build compiles a Unity project, from an
+      # archive that unity-gallery-prebuilt.yml makes out of these.
+      - 'scripts/unity-compat-samples/gallery/**'
+      - 'maven/cil-translator/**'
+      - 'maven/unity-compat/**'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
+      - 'scripts/unity-gallery-prebuilt.sh'
+      - '.github/workflows/unity-gallery-prebuilt.yml'
+      - '.github/actions/unity-gallery-prebuilt/**'
       - '.github/workflows/scripts-android.yml'
       - 'scripts/setup-workspace.sh'
       - 'scripts/ci/retry.sh'
@@ -123,8 +143,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The application has a Unity project in it. One Linux job compiles it and
+  # hands the result to the jobs below as an artifact; none of them installs
+  # the .NET SDK or builds the Unity modules.
+  unity-gallery:
+    uses: ./.github/workflows/unity-gallery-prebuilt.yml
+
   build-android:
     name: Build Android ${{ matrix.name }}
+    needs: unity-gallery
     strategy:
       fail-fast: false
       matrix:
@@ -272,6 +299,11 @@ jobs:
           # tried and is wrong here, because -Pcompile-android reads its jars
           # from maven/target/cn1-binaries, which this job never stages.
           python3 scripts/check-android-api-removals.py --require-all
+      # After everything that fills the local Maven repository and before the
+      # application is built; this job has no .NET SDK (see the action).
+      - name: Unpack the Unity gallery prebuilt
+        uses: ./.github/actions/unity-gallery-prebuilt
+
       - name: Build Hello Codename One Android app
         id: build-android-app
         run: |

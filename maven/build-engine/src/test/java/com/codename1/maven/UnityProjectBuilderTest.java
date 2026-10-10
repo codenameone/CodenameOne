@@ -511,6 +511,57 @@ public class UnityProjectBuilderTest {
         }
     }
 
+    /// A build that reads its project from a configured directory names that
+    /// directory, not the default one it does not have.
+    @Test
+    public void aMissingSdkNamesTheProjectThatNeedsIt() {
+        Map<String, String> env = new HashMap<String, String>();
+        env.put("PATH", tmp.getRoot().getPath());
+        File elsewhere = new File(tmp.getRoot(), "samples/gallery");
+        try {
+            UnityProjectBuilder.locateDotnet(null, env, elsewhere);
+            fail();
+        } catch (BuildException e) {
+            String m = e.getMessage();
+            assertTrue(m, m.startsWith(elsewhere.getPath() + " holds a Unity project"));
+            assertFalse(m, m.contains("src/main/unity"));
+        }
+    }
+
+    /// Output compiled on another machine is used only with the exact jars
+    /// and project files it was compiled from. A build that has such output
+    /// and still needs the SDK says that the output does not match, since
+    /// installing an SDK is not what its owner meant to do.
+    @Test
+    public void outputOfOtherInputsIsNamedWhenTheSdkIsMissing() throws Exception {
+        builder().run();
+        File state = new File(target, "unity/state.txt");
+        assertTrue(state.isFile());
+        write(new File(unity, "Assets/Later.cs"), "class Later {}");
+        File noSdk = new File(tmp.getRoot(), "no/such/dotnet");
+        UnityProjectBuilder real = new UnityProjectBuilder(unity, generated, classes, target, runtimeJar,
+                referencesJar, Collections.singletonList(runtimeJar), noSdk.getPath(), "com.acme.game", "MyGame",
+                Collections.singletonList(sources), new SystemStreamLog());
+        try {
+            real.run();
+            fail();
+        } catch (BuildException e) {
+            String m = e.getMessage();
+            assertTrue(m, m.startsWith("cn1.unity.dotnet names "));
+            assertTrue(m, m.contains("does not match these sources or jars"));
+            assertTrue(m, m.contains(state.getPath()));
+            assertTrue(m, m.contains(unity.getPath()));
+        }
+        // The first build of a project has no output to explain.
+        assertFalse(state.exists());
+        try {
+            real.run();
+            fail();
+        } catch (BuildException e) {
+            assertFalse(e.getMessage(), e.getMessage().contains("does not match"));
+        }
+    }
+
     @Test
     public void readsTheSdkVersion() {
         assertEquals(10, UnityProjectBuilder.sdkMajor(Arrays.asList("10.0.401")));
