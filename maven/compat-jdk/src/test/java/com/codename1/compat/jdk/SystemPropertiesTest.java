@@ -57,4 +57,40 @@ public class SystemPropertiesTest {
     public void theHomeDirectoryHasNoTrailingSeparator() {
         assertEquals("file:///home", JdkSystem.getProperty("user.home"));
     }
+
+    /// In the JDK a hook is a thread of its own, and what one throws stops
+    /// nothing else.
+    @Test
+    public void aShutdownHookThatThrowsDoesNotStopTheOthers() {
+        final java.util.List<String> ran = new java.util.ArrayList<String>();
+        JdkSystem.addShutdownHook(null, new Thread() {
+            @Override
+            public void run() {
+                ran.add("first");
+            }
+        });
+        JdkSystem.addShutdownHook(null, new Thread() {
+            @Override
+            public void run() {
+                throw new IllegalStateException("a hook that fails");
+            }
+        });
+        JdkSystem.addShutdownHook(null, new Thread() {
+            @Override
+            public void run() {
+                throw new AssertionError("an error is no different");
+            }
+        });
+        JdkSystem.addShutdownHook(null, new Thread() {
+            @Override
+            public void run() {
+                ran.add("last");
+            }
+        });
+        JdkSystem.runShutdownHooks();
+        assertEquals(java.util.Arrays.asList("first", "last"), ran);
+        // Each runs once.
+        JdkSystem.runShutdownHooks();
+        assertEquals(2, ran.size());
+    }
 }
