@@ -2134,6 +2134,216 @@ public class MvcTemplatesTest {
         assertEquals("Two", body(handler.handle(request("POST", "/other", "name=Two", false))));
     }
 
+    @Test
+    public void dynamicAttributesAreEvaluatedOncePerElement() throws Exception {
+        setup();
+        fixtureSources(
+                Collections.singletonMap(
+                        "sample.Attributes",
+                        "package sample; public class Attributes { public int methods, verbs,"
+                            + " owners, titles; public String getMethod(){return ++methods == 1 ?"
+                            + " \"post\" : \"get\";} public String getVerb(){return ++verbs == 1 ?"
+                            + " null : \"/save\";} public String getOwner(){return ++owners == 1 ?"
+                            + " \"owner\" : \"wrong\";} public String getTitle(){titles++;return"
+                            + " \"title\";} }"));
+        String declaration = "<!-- cn1:model a sample.Attributes -->";
+        template(
+                "methodOnce",
+                declaration + "<form th:method=\"${a.method}\" th:title=\"${a.title}\"></form>");
+        template(
+                "controlOnce",
+                declaration
+                        + "<button"
+                        + " th:attr=\"formmethod=${a.method},form=${a.owner}\">Save</button>");
+        template("verbOnce", declaration + "<form th:attr=\"hx-post=${a.verb}\"></form>");
+        template("nullMethod", declaration + "<form th:method=\"${a.verb}\"></form>");
+        template(
+                "skipped", declaration + "<form th:if=\"false\" th:method=\"${a.method}\"></form>");
+        template(
+                "loopOnce",
+                declaration
+                        + "<!-- cn1:model items java.util.List<java.lang.String> -->"
+                        + "<form th:each=\"item : ${items}\" th:method=\"${a.method}\"></form>");
+        compile();
+        Model model = csrfModel();
+        Object attributes = loader.loadClass("sample.Attributes").newInstance();
+        org.jsoup.nodes.Document html =
+                org.jsoup.Jsoup.parse(render("methodOnce", model.addAttribute("a", attributes)));
+        assertEquals("post", html.select("form").attr("method"));
+        assertEquals("secret", html.select("form input[name=_csrf]").val());
+        assertEquals(1, attributes.getClass().getField("methods").getInt(attributes));
+        assertEquals(1, attributes.getClass().getField("titles").getInt(attributes));
+        attributes = loader.loadClass("sample.Attributes").newInstance();
+        html = org.jsoup.Jsoup.parse(render("controlOnce", model.addAttribute("a", attributes)));
+        assertEquals("post", html.select("button").attr("formmethod"));
+        assertEquals("owner", html.select("button").attr("form"));
+        assertEquals("secret", html.select("input[name=_csrf][form=owner]").val());
+        assertEquals(1, attributes.getClass().getField("methods").getInt(attributes));
+        assertEquals(1, attributes.getClass().getField("owners").getInt(attributes));
+        attributes = loader.loadClass("sample.Attributes").newInstance();
+        html = org.jsoup.Jsoup.parse(render("verbOnce", model.addAttribute("a", attributes)));
+        assertFalse(html.select("form").hasAttr("hx-post"));
+        assertTrue(html.select("input[name=_csrf]").isEmpty());
+        assertEquals(1, attributes.getClass().getField("verbs").getInt(attributes));
+        attributes = loader.loadClass("sample.Attributes").newInstance();
+        html = org.jsoup.Jsoup.parse(render("nullMethod", model.addAttribute("a", attributes)));
+        assertFalse(html.select("form").hasAttr("method"));
+        assertTrue(html.select("input[name=_csrf]").isEmpty());
+        assertEquals(1, attributes.getClass().getField("verbs").getInt(attributes));
+        attributes = loader.loadClass("sample.Attributes").newInstance();
+        render("skipped", model.addAttribute("a", attributes));
+        assertEquals(0, attributes.getClass().getField("methods").getInt(attributes));
+        attributes = loader.loadClass("sample.Attributes").newInstance();
+        html =
+                org.jsoup.Jsoup.parse(
+                        render(
+                                "loopOnce",
+                                model.addAttribute("a", attributes)
+                                        .addAttribute("items", Arrays.asList("one", "two"))));
+        assertEquals("post", html.select("form").get(0).attr("method"));
+        assertEquals("get", html.select("form").get(1).attr("method"));
+        assertEquals(1, html.select("input[name=_csrf]").size());
+        assertEquals(2, attributes.getClass().getField("methods").getInt(attributes));
+    }
+
+    private static Model csrfModel() {
+        return new Model()
+                .addAttribute(
+                        "_csrf",
+                        new com.codename1.backend.security.DefaultCsrfToken(
+                                "X-CSRF-TOKEN", "_csrf", "secret"));
+    }
+
+    @Test
+    public void mutatingHtmxDestinationsMustStayLocal() throws Exception {
+        setup();
+        int i = 0;
+        for (String verb : Arrays.asList("post", "put", "patch", "delete")) {
+            for (String prefix : Arrays.asList("hx-", "data-hx-")) {
+                template(
+                        "dynamic" + i,
+                        "<!-- cn1:model url java.lang.String --><form th:attr=\""
+                                + prefix
+                                + verb
+                                + "=${url}\"></form>");
+                template(
+                        "static" + i,
+                        "<form " + prefix + verb + "=\"https://external.test/save\"></form>");
+                i++;
+            }
+        }
+        compile();
+        for (int n = 0; n < i; n++) {
+            for (String url :
+                    Arrays.asList(
+                            "https://external.test/save",
+                            "//external.test/save",
+                            "/\\external.test/save")) {
+                try {
+                    render("dynamic" + n, csrfModel().addAttribute("url", url));
+                    fail("Accepted " + url);
+                } catch (IllegalArgumentException expected) {
+                    assertTrue(
+                            expected.getMessage(),
+                            expected.getMessage().contains("local absolute path"));
+                }
+            }
+            try {
+                render("static" + n, csrfModel());
+                fail("Accepted static external htmx destination");
+            } catch (IllegalArgumentException expected) {
+                assertTrue(
+                        expected.getMessage(),
+                        expected.getMessage().contains("local absolute path"));
+            }
+            assertTrue(
+                    render("dynamic" + n, csrfModel().addAttribute("url", "/save"))
+                            .contains("name=\"_csrf\""));
+        }
+    }
+
+    @Test
+    public void htmxGetFiltersCsrfAndRetainsNativePostFallback() throws Exception {
+        setup();
+        template(
+                "preview",
+                "<!-- cn1:model params java.lang.String --><!-- cn1:model url java.lang.String"
+                    + " --><form method=\"post\" action=\"/save\""
+                    + " th:attr=\"data-hx-get=${url},hx-params=${params}\"><input name=\"title\""
+                    + " value=\"Preview\"><input name=\"other\" value=\"Other\"></form>");
+        template(
+                "inherited",
+                "<div hx-params=\"title,_csrf\"><form method=\"post\" hx-get=\"/preview\"><button"
+                    + " hx-post=\"/save\">Save</button><div th:insert=\"~{parts ::"
+                    + " save}\"></div></form></div>");
+        template("parts", "<button th:fragment=\"save\" hx-post=\"/save\">Save</button>");
+        compile();
+        for (String params :
+                Arrays.asList(null, "", "*", "none", "not other", "title,_csrf", "_csrf")) {
+            org.jsoup.nodes.Document html =
+                    org.jsoup.Jsoup.parse(
+                            render(
+                                    "preview",
+                                    csrfModel()
+                                            .addAttribute("url", "/preview")
+                                            .addAttribute("params", params)));
+            assertEquals("post", html.select("form").attr("method"));
+            assertEquals("secret", html.select("input[name=_csrf]").val());
+            String expected =
+                    params == null || params.isEmpty() || params.equals("*")
+                            ? "not _csrf"
+                            : params.equals("not other")
+                                    ? "not other,_csrf"
+                                    : params.equals("title,_csrf") ? "title" : "none";
+            assertEquals(expected, html.select("form").attr("hx-params"));
+        }
+        org.jsoup.nodes.Document html = org.jsoup.Jsoup.parse(render("inherited", csrfModel()));
+        assertEquals("title", html.select("form").attr("hx-params"));
+        for (org.jsoup.nodes.Element button : html.select("button"))
+            assertEquals("title,_csrf", button.attr("hx-params"));
+        Model custom =
+                new Model()
+                        .addAttribute(
+                                "_csrf",
+                                new com.codename1.backend.security.DefaultCsrfToken(
+                                        "X-TOKEN", "customToken", "secret"))
+                        .addAttribute("url", "/preview")
+                        .addAttribute("params", "*");
+        html = org.jsoup.Jsoup.parse(render("preview", custom));
+        assertEquals("not customToken", html.select("form").attr("hx-params"));
+        assertEquals("secret", html.select("input[name=customToken]").val());
+    }
+
+    @Test
+    public void linkResourceUrlsMustBeStatic() throws Exception {
+        setup();
+        for (String link :
+                Arrays.asList(
+                        "<link rel=\"stylesheet\" th:href=\"${url}\">",
+                        "<link th:attr=\"rel=${rel},href=${url}\">",
+                        "<link rel=\"preload\" as=\"style\" th:attr=\"HREF=${url}\">")) {
+            template(
+                    "link",
+                    "<!-- cn1:model url java.lang.String --><!-- cn1:model rel java.lang.String -->"
+                            + link);
+            try {
+                new MvcTemplates(context).sources();
+                fail("Accepted dynamic link resource URL");
+            } catch (IllegalArgumentException expected) {
+                assertTrue(
+                        expected.getMessage(),
+                        expected.getMessage().contains("Dynamic link resource URLs"));
+            }
+        }
+        template(
+                "link",
+                "<link rel=\"stylesheet\" href=\"/static/catalog.css\"><a"
+                    + " th:href=\"'https://example.test/'\">Link</a>");
+        compile();
+        assertTrue(render("link", new Model()).contains("href=\"/static/catalog.css\""));
+        assertTrue(render("link", new Model()).contains("href=\"https://example.test/\""));
+    }
+
     private static volatile int benchmarkSink;
 
     @Test

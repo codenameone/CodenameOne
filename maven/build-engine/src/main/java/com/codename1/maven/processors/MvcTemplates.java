@@ -157,7 +157,7 @@ final class MvcTemplates {
                     .append(q(key))
                     .append(".equals(view)) { ")
                     .append(methodName(key))
-                    .append("(out, model); return Html.bytes(out); }\n");
+                    .append("(out, model, null); return Html.bytes(out); }\n");
         source.append(
                 "throw new IllegalArgumentException(\"Unknown compiled view: \" + view); }\n");
         for (String method : methods.values()) source.append(method);
@@ -304,6 +304,7 @@ final class MvcTemplates {
             String variable = "model" + sequence++;
             env.put(entry.getKey(), new MvcExpression.Value(variable, entry.getValue()));
         }
+        env.put("@hxParams", new MvcExpression.Value("inheritedParams", "java.lang.String"));
         render(t, root, env, null, null, body);
         // A fragment only requires the model names it actually reads.
         for (Map.Entry<String, String> entry : t.models.entrySet()) {
@@ -346,7 +347,7 @@ final class MvcTemplates {
                 key,
                 "private static void "
                         + methodName(key)
-                        + "(ByteSink out, Model model) {\n"
+                        + "(ByteSink out, Model model, String inheritedParams) {\n"
                         + prelude
                         + body
                         + "}\n");
@@ -464,7 +465,7 @@ final class MvcTemplates {
                 braces++;
             }
         if (e.hasAttr("th:replace")) {
-            include(t, e.attr("th:replace"), out);
+            include(t, e.attr("th:replace"), env, out);
             close(out, braces);
             return;
         }
@@ -503,6 +504,10 @@ final class MvcTemplates {
                     dynamic.put(attr, expression(assignment.substring(equal + 1), env, form));
                 }
         }
+        Set<MvcExpression.Value> snapshots = new HashSet<MvcExpression.Value>();
+        cacheAttributes(dynamic, snapshots, out);
+        if (tag.equals("link") && dynamic.containsKey("href"))
+            throw new IllegalArgumentException("Dynamic link resource URLs are not supported");
         if (tag.equals("script")
                 && (dynamic.containsKey("src")
                         || dynamic.containsKey("href")
@@ -512,7 +517,15 @@ final class MvcTemplates {
             throw new IllegalArgumentException("Dynamic base URLs are not supported");
         // Every submission destination must stay on this origin, including submit controls
         // rendered in separate fragments. A base URL must not redirect local paths off-origin.
-        for (String attribute : Arrays.asList("action", "formaction", "href")) {
+        for (String attribute :
+                Arrays.asList(
+                        "action",
+                        "formaction",
+                        "href",
+                        "hx-post",
+                        "hx-put",
+                        "hx-patch",
+                        "hx-delete")) {
             if (attribute.equals("href") && !tag.equals("base")) continue;
             MvcExpression.Value value = dynamic.get(attribute);
             if (value == null && !e.hasAttr(attribute)) continue;
@@ -524,8 +537,8 @@ final class MvcTemplates {
                             "if (value == null) return null; String url = Html.string(value); if"
                                 + " (!url.isEmpty()) { try { Html.localLocation(url); } catch"
                                 + " (IllegalArgumentException error) { throw new"
-                                + " IllegalArgumentException(\"Form action and base URLs must be a"
-                                + " local absolute path\"); } } return url;",
+                                + " IllegalArgumentException(\"Form action, htmx mutation and base"
+                                + " URLs must be a local absolute path\"); } } return url;",
                             code);
             if (value == null) out.append(checked).append(";\n");
             else dynamic.put(attribute, new MvcExpression.Value(checked, "java.lang.String"));
@@ -550,6 +563,9 @@ final class MvcTemplates {
             MvcExpression.Value value = expression(e.attr("th:field"), env, form);
             fieldValue =
                     HTML + "field(model, " + q(form) + ", " + q(field) + ", " + value.code + ")";
+            String fieldLocal = "field" + sequence++;
+            out.append("Object ").append(fieldLocal).append(" = ").append(fieldValue).append(";\n");
+            fieldValue = fieldLocal;
             dynamic.put("name", new MvcExpression.Value(q(field), "java.lang.String"));
             if (!e.hasAttr("id") && !dynamic.containsKey("id"))
                 dynamic.put("id", new MvcExpression.Value(q(field), "java.lang.String"));
@@ -669,6 +685,36 @@ final class MvcTemplates {
                     new MvcExpression.Value(
                             HTML + "checked(" + select + ", " + candidate.code + ")", "boolean"));
         }
+        // Keep the author's inherited filter separate from the GET-only security exclusion.
+        // Included fragments receive that original filter too, so POST descendants retain it.
+        String paramsLocal = env.get("@hxParams").code;
+        MvcExpression.Value ownParams = dynamic.get("hx-params");
+        if (ownParams != null || e.hasAttr("hx-params")) {
+            String own = ownParams != null ? ownParams.code : q(e.attr("hx-params"));
+            String inherited = paramsLocal;
+            paramsLocal = "params" + sequence++;
+            out.append("String ")
+                    .append(paramsLocal)
+                    .append(" = ")
+                    .append(own)
+                    .append(" == null ? ")
+                    .append(inherited)
+                    .append(" : ")
+                    .append(own)
+                    .append(";\n");
+            env.put("@hxParams", new MvcExpression.Value(paramsLocal, "java.lang.String"));
+        }
+        MvcExpression.Value get = dynamic.get("hx-get");
+        if (get != null || e.hasAttr("hx-get") || !unsafeHtmx(e, dynamic).equals("false")) {
+            String isGet =
+                    get != null ? get.code + " != null" : Boolean.toString(e.hasAttr("hx-get"));
+            dynamic.put(
+                    "hx-params",
+                    new MvcExpression.Value(
+                            HTML + "htmxParameters(model, " + isGet + ", " + paramsLocal + ")",
+                            "java.lang.String"));
+        }
+        cacheAttributes(dynamic, snapshots, out);
         String unsafeHtmx = unsafeHtmx(e, dynamic);
         if (!block && !tag.equals("form")) {
             MvcExpression.Value method = dynamic.get("formmethod");
@@ -717,13 +763,13 @@ final class MvcTemplates {
                             ? q(e.hasAttr("method") ? e.attr("method") : "get")
                             : method.code;
             // htmx submissions of a form serialize the hidden token as well.
-            out.append("if(!\"get\".equalsIgnoreCase(Html.string(")
+            out.append("if(\"post\".equalsIgnoreCase(Html.string(")
                     .append(methodCode)
                     .append(")) || ")
                     .append(unsafeHtmx)
                     .append(") Html.csrf(out, model);\n");
         }
-        if (e.hasAttr("th:insert")) include(t, e.attr("th:insert"), out);
+        if (e.hasAttr("th:insert")) include(t, e.attr("th:insert"), env, out);
         else if (e.hasAttr("th:text"))
             out.append(HTML)
                     .append("text(out, ")
@@ -744,6 +790,29 @@ final class MvcTemplates {
         close(out, braces);
     }
 
+    private void cacheAttributes(
+            Map<String, MvcExpression.Value> attributes,
+            Set<MvcExpression.Value> snapshots,
+            StringBuilder out) {
+        for (Map.Entry<String, MvcExpression.Value> entry : attributes.entrySet()) {
+            MvcExpression.Value value = entry.getValue();
+            if (snapshots.contains(value)) continue;
+            boolean bool = BOOLEAN.contains(entry.getKey());
+            String type = bool ? "boolean" : "java.lang.String", name = "attr" + sequence++;
+            out.append(type)
+                    .append(' ')
+                    .append(name)
+                    .append(" = ")
+                    .append(HTML)
+                    .append(bool ? "truth(" : "attributeValue(")
+                    .append(value.code)
+                    .append(");\n");
+            MvcExpression.Value snapshot = new MvcExpression.Value(name, type);
+            entry.setValue(snapshot);
+            snapshots.add(snapshot);
+        }
+    }
+
     private static String canonicalAttribute(String name) {
         return name.startsWith("data-hx-") ? name.substring(5) : name;
     }
@@ -758,7 +827,11 @@ final class MvcTemplates {
         return conditions.isEmpty() ? "false" : "(" + String.join(" || ", conditions) + ")";
     }
 
-    private void include(Template current, String reference, StringBuilder out) {
+    private void include(
+            Template current,
+            String reference,
+            Map<String, MvcExpression.Value> env,
+            StringBuilder out) {
         reference = reference.trim();
         if (reference.startsWith("~{") && reference.endsWith("}"))
             reference = reference.substring(2, reference.length() - 1).trim();
@@ -769,7 +842,10 @@ final class MvcTemplates {
             throw new IllegalArgumentException("Expected a static template :: fragment reference");
         String key = (pair[0].isEmpty() ? current.name : pair[0]) + " :: " + pair[1];
         compile(key);
-        out.append(methodName(key)).append("(out, model);\n");
+        out.append(methodName(key))
+                .append("(out, model, ")
+                .append(env.get("@hxParams").code)
+                .append(");\n");
     }
 
     private MvcExpression.Value expression(

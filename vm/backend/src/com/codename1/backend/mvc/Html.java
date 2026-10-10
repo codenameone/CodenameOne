@@ -123,6 +123,56 @@ public final class Html {
         out.put('"');
     }
 
+    /// Snapshot an attribute's textual value before it is checked and rendered.
+    public static String attributeValue(Object value) {
+        return value == null ? null : string(value);
+    }
+
+    /// Preserve parameter filtering while keeping CSRF tokens out of htmx GET URLs.
+    public static String htmxParameters(Model model, boolean get, String parameters) {
+        String filter =
+                parameters == null || parameters.length() == 0 || "unset".equals(parameters)
+                        ? "*"
+                        : parameters;
+        CsrfToken token = (CsrfToken) model.getAttribute("_csrf");
+        if (!get || token == null || "none".equals(filter)) {
+            return filter;
+        }
+        String name = token.getParameterName();
+        // htmx's comma-separated syntax cannot represent these names safely.
+        if (name.indexOf(',') >= 0 || !name.equals(name.trim())) {
+            return "none";
+        }
+        if ("*".equals(filter)) {
+            return "not " + name;
+        }
+        boolean exclude = filter.startsWith("not ");
+        StringBuilder result = new StringBuilder();
+        int start = exclude ? 4 : 0;
+        while (start <= filter.length()) {
+            int end = filter.indexOf(',', start);
+            if (end < 0) {
+                end = filter.length();
+            }
+            String candidate = filter.substring(start, end).trim();
+            start = end + 1;
+            if (candidate.equals(name)) {
+                if (exclude) {
+                    return filter;
+                }
+                continue;
+            }
+            if (result.length() > 0) {
+                result.append(',');
+            }
+            result.append(candidate);
+        }
+        if (exclude) {
+            return "not " + result + (result.length() == 0 ? "" : ",") + name;
+        }
+        return result.length() == 0 ? "none" : result.toString();
+    }
+
     public static void booleanAttribute(ByteSink out, String name, Object value) {
         if (truth(value)) {
             attribute(out, name, name);

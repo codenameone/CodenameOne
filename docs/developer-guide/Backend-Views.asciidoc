@@ -77,7 +77,9 @@ before attribute escaping. Dynamic URL attributes reject executable URL schemes.
 Dynamic htmx attributes that evaluate expressions (`hx-on*`, `hx-vars`, `hx-vals`,
 `hx-headers`, `hx-request`, and `hx-trigger`) are rejected, including `data-hx-*`
 aliases. Define those attributes as static template content.
-Script sources and base URLs must be static template attributes.
+Script sources, link-resource URLs (including stylesheets), and base URLs must be
+static template attributes. Dynamic attributes are evaluated once per rendered
+element, including each iteration of a loop.
 Raw HTML, dynamic script/style content, arbitrary method calls, expression
 preprocessing, message expressions, inline expressions, custom dialects, and
 Spring EL are outside this subset. Unsupported `th:` attributes fail the build.
@@ -133,10 +135,16 @@ provide response-header helpers.
 The existing security chain remains responsible for CSRF enforcement. The model
 contains `_csrf`, whose type is declared automatically. Unsafe forms include a
 hidden CSRF token when one is available; htmx serializes it with the other fields.
-Form `action`, submit-control `formaction`, and static base URLs must be local
+Form `action`, submit-control `formaction`, mutating htmx URLs (`hx-post`,
+`hx-put`, `hx-patch`, `hx-delete`), and static base URLs must be local
 absolute paths such as `/products/save`, or empty to use the current document.
 This applies to static and dynamic form destinations, including controls in fragments,
-to prevent ordinary form submissions from disclosing the generated token to another origin.
+to prevent submissions from disclosing the generated token to another origin.
+For `hx-get`, generated `hx-params` filtering excludes the CSRF parameter while
+preserving the token for a native POST fallback. Explicit parameter allowlists
+and exclusion lists are retained; included fragments receive their parent's
+original parameter filter, so nested POST requests do not inherit the GET-only
+CSRF exclusion. The configured CSRF parameter name is used.
 For requests outside forms, supply the existing token header explicitly. Defining
 HTML controllers doesn't enable a security chain automatically.
 
