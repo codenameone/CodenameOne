@@ -37,6 +37,9 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef __GLIBC__
+#include <malloc.h>
+#endif
 
 extern const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str);
 extern JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim);
@@ -245,6 +248,19 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_getImageGraphics___long_R_long(CO
  * between frames (nextReleasedImage / disposeImage). Until these existed nothing
  * in the port destroyed an image surface at all.
  */
+/*
+ * Freeing is not giving back. glibc keeps what free() hands it for the next
+ * malloc, and a surface is 1.9 MB at 800x600 -- below the size it maps on its
+ * own once the threshold has adapted, so the pages stay in the process. An
+ * application that draws a picture per frame freed every one of them and was
+ * still measured at 340 MB resident with 58 MB in use; malloc_trim(0) took it to
+ * 188 MB. The pages are returned once this many bytes of surfaces were freed
+ * since the last time, which is about once per collection. Other C libraries
+ * have no such call and keep their own counsel.
+ */
+#define CN1_TRIM_AFTER_BYTES (32L * 1024 * 1024)
+static long cn1FreedSinceTrim = 0;
+
 static pthread_mutex_t cn1ReleasedLock = PTHREAD_MUTEX_INITIALIZER;
 static CN1Image** cn1Released = 0;
 static int cn1ReleasedCount = 0;
@@ -297,9 +313,16 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_disposeImage___long_R_long(CODENA
         free(g);
     }
     if (img->surface != 0) {
+        cn1FreedSinceTrim += (long) cairo_image_surface_get_stride(img->surface) * img->height;
         cairo_surface_destroy(img->surface);
     }
     free(img);
+#ifdef __GLIBC__
+    if (cn1FreedSinceTrim >= CN1_TRIM_AFTER_BYTES) {
+        cn1FreedSinceTrim = 0;
+        malloc_trim(0);
+    }
+#endif
     return (JAVA_LONG) (intptr_t) g;
 }
 

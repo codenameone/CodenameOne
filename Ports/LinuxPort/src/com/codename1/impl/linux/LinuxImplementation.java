@@ -241,6 +241,16 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     private static final long IMAGE_BYTES_PER_GC = 32L * 1024 * 1024;
 
+    /// When an image was last made, and how long none must have been made before
+    /// an idle event dispatch thread asks for the collection that the count above
+    /// did not reach. An application that draws a picture per frame and then stops
+    /// leaves the images of its last frames behind, short of the count for good:
+    /// nothing allocates any more, so nothing ever starts a cycle. While images
+    /// are still being made the count is what asks.
+    private static long lastImageMillis;
+
+    private static final long IMAGE_QUIET_MILLIS = 500;
+
     static Object wrapImage(long peer, int width, int height) {
         if (peer != 0) {
             if (width <= 0 || height <= 0) {
@@ -248,6 +258,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
                 height = LinuxNative.imageHeight(peer);
             }
             imageBytesSinceGc += 4L * width * height;
+            lastImageMillis = System.currentTimeMillis();
             if (imageBytesSinceGc > IMAGE_BYTES_PER_GC) {
                 imageBytesSinceGc = 0;
                 System.gc();
@@ -913,11 +924,26 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     @Override
     public void edtIdle(boolean enter) {
-        // Intentionally empty: the Win32 message pump and input dispatch run on the
+        // No pumping here: the message pump and input dispatch run on the
         // main thread (see runMainEventLoop), and the EDT is woken by the Display
         // lock notifications those dispatches trigger. The EDT therefore idles by
         // sleeping on the lock like every other Codename One platform -- it must
         // not pump or drain on its own (it is not the window's owning thread).
+        //
+        // What it does do on its way to sleep is free the images the collector
+        // let go of. A frame frees them too, but an application that computed a
+        // picture and then sat still painted no further frame: the images of
+        // its last collection stayed queued, 70 to 200 MB of them in one
+        // measured run, for as long as nothing was repainted.
+        if (enter) {
+            disposeReleasedImages();
+            if (imageBytesSinceGc > 0 && System.currentTimeMillis() - lastImageMillis > IMAGE_QUIET_MILLIS) {
+                // See lastImageMillis. What the cycle lets go of is freed the
+                // next time round, and nothing is counted until an image is made.
+                imageBytesSinceGc = 0;
+                System.gc();
+            }
+        }
     }
 
     // High bits in the native key flag touch, pen, or eraser input (see cn1_linux.h);
