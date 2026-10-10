@@ -23,52 +23,43 @@
 package com.codename1.initializr.model;
 
 public enum Template {
-    BAREBONES(false, false, "/barebones-src.zip", "/barebones-css.zip", "/barebones-pom.xml", null, "com.example.myapp", "MyAppName", null,
+    BAREBONES(false, "/barebones-src.zip", "/barebones-css.zip", "/barebones-pom.xml", "com.example.myapp", "MyAppName", null,
             null, new String[0]),
     // The same two libraries kotlin-pom.xml's kotlin profile declares (at the Gradle
     // Kotlin version, see GeneratorModel.KOTLIN_VERSION). The Kotlin Gradle plugin
     // itself is added to the plugins {} block by GeneratorModel.
-    KOTLIN(true, false, "/kotlin-src.zip", "/barebones-css.zip", "/kotlin-pom.xml", null, "com.example.myapp", "MyAppName", null,
+    KOTLIN(true, "/kotlin-src.zip", "/barebones-css.zip", "/kotlin-pom.xml", "com.example.myapp", "MyAppName", null,
             null, new String[] {
                     "implementation(\"org.jetbrains.kotlin:kotlin-stdlib:" + GeneratorModel.KOTLIN_VERSION + "\")",
                     "implementation(\"org.jetbrains:annotations:13.0\")"
             }),
-    // Grub is written against CodeRAD 1 (its models extend the CodeRAD 1 Entity
-    // class, which CodeRAD 2 turned into an interface), and that CodeRAD is the
-    // bundled grub-cn1libs.zip build -- a jar with no published coordinates. A
-    // Gradle project consumes cn1libs by Maven coordinates only, so there is
-    // nothing to point cn1lib(...) at.
-    GRUB(false, true, "/grub-src.zip", "/grub-css.zip", "/grub-pom.xml", "/grub-cn1libs.zip", "com.codename1.demos.grub", "Grub", "grub.png",
-            "Grub needs the bundled CodeRAD 1 library, which is not published to a Maven repository; "
-                    + "Gradle projects can only use cn1libs by Maven coordinates.",
-            new String[0]),
-    // Tweet's cn1libs are published, so its pom's dependencies translate directly,
-    // and the Gradle plugin's generateGuiSources turns src/main/rad/views into the
-    // Abstract* view classes. What stops it is the next step: the classes its sources
-    // import (SignupPage, *ModelWrapper, *Controller) are written by
-    // coderad-annotation-processor 2.0.5 inside javac, and that processor locates the
-    // project by walking up from user.dir for a pom.xml
-    // (HelperFunctions.findPom(new File(System.getProperty("user.dir"))) then
-    // .getParentFile()) -- under Gradle there is none, so compileJava fails with a
-    // NullPointerException. Measured against the 8.0-SNAPSHOT plugin. Clear the
-    // reason once CodeRAD's processor can find a Gradle project; the lines below are
-    // already the right dependencies.
-    TWEET(false, true, "/tweet-src.zip", "/tweet-css.zip", "/tweet-pom.xml", null, "com.example.myapp", "MyAppName", "tweet.png",
-            "The Tweet template's CodeRAD annotation processor (2.0.5) finds its project through a pom.xml, "
-                    + "so it cannot run in a Gradle build yet.",
-            new String[] {
-                    "cn1lib(\"com.codenameone:coderad-lib:2.0.5\")",
-                    "cn1lib(\"com.codenameone:tweet-app-ui-kit-lib:1.0-pre1\")",
-                    "annotationProcessor(\"com.codenameone:coderad-annotation-processor:2.0.5\")"
-            });
+    // A whole application rather than a starting point: a ride-hailing app with a
+    // rider, a driver and an admin mode, and the server it talks to. It is the
+    // project in scripts/wayline, which CI builds and tests; the resources named
+    // here are derived from it by scripts/sync-initializr-wayline.py and never
+    // edited by hand.
+    //
+    // Its preview is a resource of its own, read when the template is chosen,
+    // and not an image of the theme: the theme is loaded at start-up, so a
+    // preview kept there is paid for by everyone who opens the page, whichever
+    // template they pick.
+    //
+    // Its `shared` module is what makes it Maven only. The contract the app and
+    // the server both compile against is a module of its own, and a Gradle project
+    // from the Initializr is a single project with nowhere to put one.
+    WAYLINE(false, "/wayline-src.zip", "/wayline-css.zip", "/wayline-pom.xml",
+            "com.codenameone.examples.wayline", "Wayline", "/wayline-preview.jpg",
+            "The ride-hailing template is an app, a server and the contract module they share; "
+                    + "an Initializr Gradle project is a single project.",
+            new String[0], "/wayline-modules.zip", "/wayline-settings.properties");
 
+    /// The resource holding the picture shown for a template that has no live
+    /// preview, or null for one that has.
     public final String IMAGE_NAME;
     public final boolean IS_KOTLIN;
-    public final boolean USES_CODERAD;
     public final String SOURCE_ZIP;
     public final String CSS;
     public final String POM_XML;
-    public final String CN1LIB_ZIP;
     public final String SOURCE_PACKAGE;
     public final String SOURCE_MAIN_CLASS;
     /// Why this template cannot be generated as a Gradle project, or null when it can.
@@ -76,20 +67,39 @@ public enum Template {
     /// Kotlin DSL lines for the `dependencies {}` block of a Gradle project's
     /// build.gradle.kts -- the Gradle form of what the template's pom declares.
     public final String[] GRADLE_DEPENDENCIES;
+    /// The modules of a full-stack template, a zip laid out as the project is --
+    /// `shared/...`, `backend/...` -- or null for a template that is an app alone.
+    /// Its `backend/` replaces the generic server every other project gets.
+    public final String MODULES_ZIP;
+    /// Build hints the template's application needs on top of a plain project's
+    /// `codenameone_settings.properties`, or null.
+    public final String SETTINGS;
 
-    Template(boolean isKotlin, boolean usesCodeRad, String sourceZip, String css, String pomXml, String cn1libZip, String sourcePackage, String sourceMainClass,
+    Template(boolean isKotlin, String sourceZip, String css, String pomXml, String sourcePackage, String sourceMainClass,
              String imageName, String gradleUnsupportedReason, String[] gradleDependencies) {
+        this(isKotlin, sourceZip, css, pomXml, sourcePackage, sourceMainClass, imageName,
+                gradleUnsupportedReason, gradleDependencies, null, null);
+    }
+
+    Template(boolean isKotlin, String sourceZip, String css, String pomXml, String sourcePackage, String sourceMainClass,
+             String imageName, String gradleUnsupportedReason, String[] gradleDependencies, String modulesZip, String settings) {
         IS_KOTLIN = isKotlin;
-        USES_CODERAD = usesCodeRad;
         SOURCE_ZIP = sourceZip;
         CSS = css;
         POM_XML = pomXml;
-        CN1LIB_ZIP = cn1libZip;
         SOURCE_PACKAGE = sourcePackage;
         SOURCE_MAIN_CLASS = sourceMainClass;
         IMAGE_NAME = imageName;
         GRADLE_UNSUPPORTED_REASON = gradleUnsupportedReason;
         GRADLE_DEPENDENCIES = gradleDependencies;
+        MODULES_ZIP = modulesZip;
+        SETTINGS = settings;
+    }
+
+    /// Whether the template is an app together with its server: the project is
+    /// then Maven, has the `backend` and `shared` modules, and targets Java 17.
+    public boolean isFullStack() {
+        return MODULES_ZIP != null;
     }
 
     public boolean supportsGradle() {

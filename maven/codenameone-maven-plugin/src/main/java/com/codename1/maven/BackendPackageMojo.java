@@ -87,6 +87,9 @@ public class BackendPackageMojo extends AbstractMojo {
     @Parameter(defaultValue = "${project}", readonly = true, required = true)
     private MavenProject project;
 
+    @Parameter(defaultValue = "${reactorProjects}", readonly = true)
+    private java.util.List<MavenProject> reactorProjects;
+
     @Parameter(defaultValue = "${localRepository}", readonly = true, required = true)
     private ArtifactRepository localRepository;
 
@@ -171,13 +174,41 @@ public class BackendPackageMojo extends AbstractMojo {
     private boolean devTools;
 
     public void execute() throws MojoExecutionException, MojoFailureException {
+        if (BackendModules.passOver(project, reactorProjects, getLog(), "backend-package")) {
+            return;
+        }
         try {
             packager().execute();
+            webAppBesideTheBinary();
         } catch (BuildFailureException ex) {
             throw new MojoFailureException(ex.getMessage(), ex.getCause() == null ? ex : ex.getCause());
         } catch (BuildExecutionException ex) {
             throw new MojoExecutionException(ex.getMessage(), ex.getCause() == null ? ex : ex.getCause());
         }
+    }
+
+    /**
+     * Puts the web app cn1:backend-webapp staged beside the binary.
+     *
+     * A packaged server looks for its application in `webapp` in its working
+     * directory, the way it looks for application.properties, so a deployment is
+     * the binary with that directory next to it. The default output is
+     * target/&lt;artifactId&gt; and the app is staged in target/webapp, so they are
+     * neighbours already; a binary written anywhere else has the app copied to it.
+     * The files are not linked into the binary: it serves them straight from the
+     * page cache, which needs them to be files.
+     */
+    private void webAppBesideTheBinary() throws BuildExecutionException {
+        File staged = new File(project.getBuild().getDirectory(), "webapp");
+        if (!new File(staged, BackendWebApp.INDEX).isFile()) {
+            return;
+        }
+        File beside = staged;
+        if (output != null && output.getAbsoluteFile().getParentFile() != null) {
+            beside = new File(output.getAbsoluteFile().getParentFile(), "webapp");
+            new BackendWebApp(MavenLog.of(getLog())).copy(staged, beside);
+        }
+        getLog().info("The web app is in " + beside + "; deploy that directory beside the binary");
     }
 
     /** The engine packager, answering from this mojo's project and parameters. */

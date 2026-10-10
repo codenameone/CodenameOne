@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.initializr.ui;
 
 import com.codename1.components.ImageViewer;
@@ -14,6 +36,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
+import com.codename1.ui.Image;
 import com.codename1.ui.InterFormContainer;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -30,6 +53,7 @@ public class TemplatePreviewPanel {
     private final Container root;
     private final Container previewHolder;
     private final ImageViewer staticPreview;
+    private final Hashtable loadedPreviews = new Hashtable();
     private InterFormContainer liveFormPreview;
 
     private Template template;
@@ -219,6 +243,35 @@ public class TemplatePreviewPanel {
         UIManager.getInstance().setThemeProps(resources.getTheme(names[0]));
     }
 
+    /// The picture shown for a template that has no live preview: a resource of
+    /// its own, read here, when the template is first shown.
+    private Image previewImage(Template shown) {
+        String name = shown.IMAGE_NAME;
+        if (name == null) {
+            return null;
+        }
+        Image loaded = (Image) loadedPreviews.get(name);
+        if (loaded == null) {
+            InputStream in = getResourceAsStream(name);
+            if (in == null) {
+                return null;
+            }
+            try {
+                loaded = Image.createImage(in);
+                loadedPreviews.put(name, loaded);
+            } catch (java.io.IOException unreadable) {
+                Log.e(unreadable);
+            } finally {
+                try {
+                    in.close();
+                } catch (java.io.IOException ignored) {
+                    // Nothing to do about a stream that will not close.
+                }
+            }
+        }
+        return loaded;
+    }
+
     private void updateMode() {
         if (template == Template.BAREBONES || template == Template.KOTLIN) {
             Form liveForm = createBarebonesPreviewForm(options);
@@ -228,7 +281,7 @@ public class TemplatePreviewPanel {
             previewHolder.removeAll();
             previewHolder.add(BorderLayout.CENTER, liveFormPreview);
         } else {
-            staticPreview.setImage(Resources.getGlobalResources().getImage(template.IMAGE_NAME));
+            staticPreview.setImage(previewImage(template));
             previewHolder.removeAll();
             previewHolder.add(BorderLayout.CENTER, staticPreview);
         }

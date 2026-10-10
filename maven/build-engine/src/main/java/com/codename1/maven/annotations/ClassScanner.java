@@ -160,6 +160,7 @@ public final class ClassScanner {
             out.setSourceFile(sourceFile);
             out.setSourceName(sourceNameOf(internalName));
             out.setAccessible(accessibleFromAnywhere(internalName));
+            out.setNameableInPackage(nameableInPackage(internalName));
             return out;
         }
 
@@ -196,7 +197,36 @@ public final class ClassScanner {
             if (name != null && outerName != null && innerName != null) {
                 nesting.put(name, new String[] { outerName, innerName });
                 this.innerAccess.put(name, Integer.valueOf(innerAccess));
+            } else if (name != null) {
+                unnamed.add(name);
             }
+        }
+
+        /** The local and anonymous classes of the chain, which no source can name. */
+        private final java.util.Set<String> unnamed = new java.util.HashSet<String>();
+
+        /**
+         * Whether another class of the SAME package can name this class: nothing
+         * in its chain is private, local or anonymous. The declared flags again,
+         * because the class file of a private member class says package-private.
+         */
+        private boolean nameableInPackage(String internal) {
+            String current = internal;
+            while (current != null) {
+                if (unnamed.contains(current)) {
+                    return false;
+                }
+                Integer declared = innerAccess.get(current);
+                String[] entry = nesting.get(current);
+                if (declared == null || entry == null) {
+                    return true;
+                }
+                if ((declared.intValue() & Opcodes.ACC_PRIVATE) != 0) {
+                    return false;
+                }
+                current = entry[0];
+            }
+            return true;
         }
 
         /**

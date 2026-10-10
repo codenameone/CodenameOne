@@ -1492,6 +1492,17 @@ public class Parser extends ClassVisitor {
                 for (ByteCodeClass ownershipClass : classes) {
                     for (BytecodeMethod method : ownershipClass.getMethods()) method.freezeBuilderOwnership();
                 }
+                // A loop of its own, and before the one below: a frame-exit retirement
+                // candidate is decided by reading the bodies of the methods called on
+                // the object, so EVERY body has to be raw while ANY candidate is
+                // decided. See BytecodeMethod.freezeRetireCandidates.
+                if (ByteCodeTranslator.output != ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
+                    for (ByteCodeClass retireCls : classes) {
+                        for (BytecodeMethod retireMtd : retireCls.getMethods()) {
+                            retireMtd.freezeRetireCandidates();
+                        }
+                    }
+                }
                 for (ByteCodeClass fuseCls : classes) {
                     for (BytecodeMethod fuseMtd : fuseCls.getMethods()) {
                         // These rewrites preserve local-stack semantics but introduce
@@ -3140,33 +3151,104 @@ public class Parser extends ClassVisitor {
     /// Do all of these callees keep `this` to themselves? The precise form of the
     /// receiver check: only the methods a site ACTUALLY invokes on the tracked object
     /// matter, not every method the class happens to declare.
-    static boolean calleesKeepThis(List<String> calls, Map<String, Boolean> memo) {
+    ///
+    /// WHAT "CHECKED ON ITS OWN" HAS TO MEAN.
+    ///
+    /// The escape walk lets the tracked object be a receiver because the callee is
+    /// examined separately, and frame-exit retirement stamps the object dead on the
+    /// strength of that examination. A wrong yes is not a missed optimization: a
+    /// retired object that is still reachable only from a thread's roots is not
+    /// re-marked (the root scan refuses a reference whose mark reads as already
+    /// reclaimed), so the next sweep frees it under its user. Four ways the answer
+    /// used to be yes without the body that runs ever having been read, each of
+    /// which emitted a retirement for a live object:
+    ///
+    ///   1. A NATIVE callee has no bytecode, so the walk saw an empty method and
+    ///      found nothing wrong with it. `Thread.start()` is native and hands its
+    ///      receiver to a new thread: `Thread t = new Thread(r); t.start();` with
+    ///      `t` kept in a local retired the Thread object of a running thread, and
+    ///      `Thread.finalize()` then freed that thread's native state while it was
+    ///      executing on it. An ABSTRACT callee is the same empty body.
+    ///   2. The call site names the method by the receiver's STATIC type. What runs
+    ///      is the override in the object's own class, which the static name does
+    ///      not lead to. The allocation site knows the exact class -- it is the
+    ///      operand of the NEW -- so virtual calls are resolved from there.
+    ///   3. The callee's own calls on `this` were recorded by its walk and then
+    ///      dropped: `void publish() { register(); }` read as keeping `this`
+    ///      whatever `register` did. They are followed now, against the same exact
+    ///      class, because `this` in the callee is the same object.
+    ///   4. A callee that could not be found answered no already, and still does.
+    ///
+    /// `exactClass` is the class named by the NEW whose object is being retired.
+    static boolean calleesKeepThis(String exactClass, List<String> calls,
+            Map<String, Boolean> memo) {
         for (int i = 0; i < calls.size(); i++) {
-            String key = calls.get(i);
-            Boolean cached = memo.get(key);
-            if (cached == null) {
-                cached = Boolean.valueOf(calleeIsSafe(key));
-                memo.put(key, cached);
-            }
-            if (!cached.booleanValue()) {
+            if (!calleeKeepsThis(exactClass, calls.get(i), memo)) {
                 return false;
             }
         }
         return true;
     }
 
-    /// owner.name+desc -> does that one method keep `this`? A callee that cannot be
-    /// resolved in this closed world answers NO: an unknown body is an unchecked body.
-    static boolean calleeIsSafe(String key) {
+    /// One callee, and everything it in turn calls on `this`.
+    ///
+    /// A callee already being examined further up this same query answers yes for
+    /// now. That is sound and not a shortcut: "nothing reachable from here leaks
+    /// `this`" is refuted only by an actual leaking instruction, every method on a
+    /// cycle has its own body walked exactly once, and one refusal anywhere fails the
+    /// whole query. The provisional yes must therefore never outlive the query, which
+    /// is why the memo is created per allocation site and is not a field.
+    private static boolean calleeKeepsThis(String exactClass, String call,
+            Map<String, Boolean> memo) {
+        Boolean cached = memo.get(call);
+        if (cached != null) {
+            return cached.booleanValue();
+        }
+        memo.put(call, Boolean.TRUE);
+        boolean safe = false;
+        BytecodeMethod m = resolveReceiverCall(exactClass, call);
+        // An unresolved callee, or one with no body, answers NO: an unknown body is
+        // an unchecked body.
+        if (m != null && !m.isNative() && !m.isAbstract()
+                && IteratorEscape.thisEscapes(m) == IteratorEscape.SAFE) {
+            // Copied before recursing: the list belongs to the last walk and the
+            // next thisEscapes call clears it.
+            List<String> inner = new ArrayList<String>(IteratorEscape.receiverCalls);
+            safe = true;
+            for (int i = 0; i < inner.size(); i++) {
+                if (!calleeKeepsThis(exactClass, inner.get(i), memo)) {
+                    safe = false;
+                    break;
+                }
+            }
+        }
+        memo.put(call, Boolean.valueOf(safe));
+        return safe;
+    }
+
+    /// The method a recorded receiver call actually runs, or null when that cannot
+    /// be established.
+    ///
+    /// `call` is owner.name+desc as IteratorEscape recorded it, prefixed with
+    /// IteratorEscape.EXACT_CALL for an INVOKESPECIAL. That one is not dispatched: it
+    /// runs the method of the class it names (a constructor, a private method, a
+    /// `super.` call), found there or inherited from above it. Everything else is
+    /// dispatched on the object, so the search starts at the object's own class and
+    /// the first declaration going up the superclass chain is the one that runs.
+    ///
+    /// A default method inherited from an interface is found by neither search and
+    /// answers null, which the caller reads as no.
+    private static BytecodeMethod resolveReceiverCall(String exactClass, String call) {
+        boolean exact = call.startsWith(IteratorEscape.EXACT_CALL);
+        String key = exact ? call.substring(IteratorEscape.EXACT_CALL.length()) : call;
         int dot = key.indexOf('.');
         if (dot < 0) {
-            return false;
+            return null;
         }
-        String owner = IteratorEscape.mangle(key.substring(0, dot));
         String rest = key.substring(dot + 1);
         int paren = rest.indexOf('(');
         if (paren < 0) {
-            return false;
+            return null;
         }
         String name = rest.substring(0, paren);
         // BytecodeMethod renames <init> to __INIT__ (see BytecodeMethod:902). Without
@@ -3177,18 +3259,24 @@ public class Parser extends ClassVisitor {
             name = "__INIT__";
         }
         String desc = rest.substring(paren);
-        for (ByteCodeClass c : classes) {
-            if (!IteratorEscape.mangle(c.getClsName()).equals(owner)) {
-                continue;
+        String start = exact ? key.substring(0, dot) : exactClass;
+        // Bounded so that a malformed hierarchy cannot spin here.
+        for (int depth = 0; start != null && depth < 256; depth++) {
+            ByteCodeClass c = getClassByName(start.replace('.', '_'));
+            if (c == null) {
+                return null;    // not in this closed world
             }
             for (BytecodeMethod m : c.getMethods()) {
                 if (m.getMethodName().equals(name) && desc.equals(m.getDesc())) {
-                    return IteratorEscape.thisEscapes(m) == IteratorEscape.SAFE;
+                    return m;
                 }
             }
-            return false;   // class found, method not -- inherited or synthetic
+            if ("__INIT__".equals(name)) {
+                return null;    // a constructor is never inherited
+            }
+            start = c.getBaseClass();
         }
-        return false;       // not in this closed world
+        return null;
     }
 
     static void iteratorStackCensus() {

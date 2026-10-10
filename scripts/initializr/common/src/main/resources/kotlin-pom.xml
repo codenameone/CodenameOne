@@ -352,6 +352,12 @@
                         <goals>
                             <goal>bytecode-compliance</goal>
                             <goal>css</goal>
+                            <!-- Generates what the project's annotations ask for
+                                 from its compiled classes: the dispatcher for
+                                 @Route, the client for a @RestClient interface,
+                                 the mapper for a @Mapped class. A no-op for a
+                                 project that uses none of them. -->
+                            <goal>process-annotations</goal>
                             <!--<goal>compile-javase-sources</goal>-->
                         </goals>
                     </execution>

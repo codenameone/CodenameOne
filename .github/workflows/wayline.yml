@@ -1,0 +1,479 @@
+name: Wayline (full-stack sample)
+
+# scripts/wayline is one Maven project holding an application and its server:
+# a `shared` module of transfer objects and @RestClient contracts, the
+# Codename One client that calls them, and a Codename One Backend that
+# implements them. It is also what the initializr offers as a template.
+#
+# Six things are checked here, because each fails without the others noticing:
+#
+#   backend     the server's own tests, on the JVM and compiled by ParparVM
+#   client-e2e  the application in the simulator, driven through its real
+#               screens against a running server
+#   web         the browser build of the application, hosted by the server
+#               (cn1:backend-webapp) and driven in a headless browser: it
+#               loads, signs in and reaches the home screen
+#   template    the Initializr's template is this project (template-sync), and
+#               a project generated from it under another name builds: its
+#               server's tests pass and its app compiles (a step of client-e2e,
+#               which has the artifacts installed)
+#   android     the Android Gradle project builds
+#   ios         the Xcode project generates and builds for the simulator
+#
+# The two device builds stop at a build: the screens are covered by the
+# simulator run, and neither port holds screenshot baselines for this sample.
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/wayline/**'
+      - 'vm/backend/src/**'
+      - 'vm/backend/impl/**'
+      - 'maven/backend/**'
+      - 'maven/backend-test/**'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/**'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/**'
+      - 'CodenameOne/src/com/codename1/maps/**'
+      - 'CodenameOne/src/com/codename1/io/oidc/**'
+      - 'CodenameOne/src/com/codename1/io/rest/**'
+      # What the hosted web app runs on: the browser side of the JavaScript
+      # port, which no test here reached before the `web` job.
+      - 'Ports/JavaScriptPort/src/main/webapp/**'
+      - 'scripts/build-android-app.sh'
+      - 'scripts/build-ios-app.sh'
+      - 'scripts/sync-initializr-wayline.py'
+      - 'scripts/tests/generate-initializr-fixtures.py'
+      - 'scripts/tests/GenerateInitializr.java'
+      # The generator, the template, and the generator's own tests, which this
+      # workflow is the only one to run.
+      - 'scripts/initializr/common/src/**'
+      - '.github/workflows/wayline.yml'
+  push:
+    branches: [ master ]
+    paths:
+      - 'scripts/wayline/**'
+      - 'vm/backend/src/**'
+      - 'maven/backend/**'
+      - 'maven/backend-test/**'
+      - 'scripts/sync-initializr-wayline.py'
+      - 'scripts/initializr/common/src/**'
+      - '.github/workflows/wayline.yml'
+  workflow_dispatch:
+
+concurrency:
+  # Only the latest revision needs validation. PR numbers keep forks isolated;
+  # event names keep a manual run from cancelling a push or PR run.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  template-sync:
+    name: Initializr template matches the sample
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      # The template's resources are derived from scripts/wayline and committed.
+      # A change to one without the other is a template that is not the project
+      # this workflow tests.
+      - name: Compare the template with scripts/wayline
+        run: python3 scripts/sync-initializr-wayline.py
+
+  backend:
+    name: Server tests (JVM and compiled)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install native build tools
+        run: |
+          bash scripts/ci/apt-get-update.sh
+          # A server binary links libcurl, OpenSSL and nghttp2; clang alone
+          # compiles the tests and then fails at the link.
+          sudo apt-get install -y clang zlib1g-dev libcurl4-openssl-dev libssl-dev libnghttp2-dev
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+          cache: 'maven'
+      - name: Save JDK 8 Path
+        run: echo "JDK_8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Save JDK 17 Path
+        run: echo "JDK_17_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+
+      # The quality gates run in pr.yml; here they would only slow an install
+      # whose purpose is to put this checkout's artifacts in the repository.
+      - name: Install the framework, the backend runtime and the plugin
+        working-directory: maven
+        run: |
+          bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -pl core,backend,backend-test,codenameone-maven-plugin \
+            -am install -DskipTests -Plocal-dev-javase \
+            -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
+            -Dmaven.javadoc.skip=true \
+            -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+        env:
+          JAVA_HOME: ${{ env.JDK_8_HOME }}
+          RETRY_ONLY_MATCHING: transient
+
+      - name: Run the server tests on the JVM and compiled
+        working-directory: scripts/wayline
+        run: |
+          mvn -B -Dcodename1.platform=backend -pl shared,backend test \
+            -Dcn1.backend.compiledTests=true \
+            -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+        env:
+          JAVA_HOME: ${{ env.JDK_17_HOME }}
+          JDK_8_HOME: ${{ env.JDK_8_HOME }}
+
+      # A goal that skipped leaves the job green, so the reports are what prove
+      # that both runners ran.
+      - name: Check that both runners reported
+        working-directory: scripts/wayline/backend/target/surefire-reports
+        run: |
+          jvm=$(find . -maxdepth 1 -name 'TEST-*.xml' ! -name '*-compiled.xml' | wc -l)
+          compiled=$(find . -maxdepth 1 -name 'TEST-*-compiled.xml' | wc -l)
+          echo "JVM reports: $jvm, compiled reports: $compiled"
+          if [ "$jvm" -eq 0 ] || [ "$compiled" -eq 0 ]; then
+            echo "::error::a runner produced no test reports"
+            exit 1
+          fi
+
+      - name: Upload the test reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: wayline-backend-tests
+          path: scripts/wayline/backend/target/surefire-reports/**
+          if-no-files-found: warn
+          retention-days: 14
+
+  client-e2e:
+    name: Application against a running server (simulator)
+    runs-on: ubuntu-24.04
+    container: ghcr.io/codenameone/codenameone/pr-ci-container:latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Codename One artifacts (core / javase / css-compiler / plugin / backend)
+        # Retried only for a failure that is the network's: a compilation
+        # error has to fail on the first attempt.
+        env:
+          RETRY_ONLY_MATCHING: transient
+          RETRY_ATTEMPTS: '5'
+          RETRY_DELAY_SECONDS: '60'
+        run: |
+          export JAVA_HOME="${JAVA_HOME_8}"
+          export PATH="${JAVA_HOME_8}/bin:$PATH"
+          cd maven
+          bash ../scripts/ci/retry.sh mvn -B \
+              -pl core,javase,css-compiler,codenameone-maven-plugin,backend,backend-test -am install \
+              -Plocal-dev-javase -DskipTests -Dmaven.javadoc.skip=true \
+              -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true
+
+      - name: Ensure a virtual display (xvfb) for the simulator
+        run: |
+          if ! command -v xvfb-run >/dev/null 2>&1; then
+            (timeout 300 apt-get update && timeout 300 apt-get install -y xvfb) || true
+          fi
+
+      # Ahead of the simulator run: it is quick, and a template that does not
+      # build should not wait behind the screens to say so.
+      - name: Build a project generated from the Initializr template
+        run: |
+          export JDK_8_HOME="${JAVA_HOME_8}"
+          export JAVA_HOME="${JAVA_HOME_17}"
+          export PATH="${JAVA_HOME_17}/bin:$PATH"
+          scripts/wayline/check-template.sh "$RUNNER_TEMP/wayline-template"
+
+      # The generator's matrix of templates, layouts and IDEs, and the screens
+      # that offer them. No other workflow runs these tests.
+      - name: Run the Initializr's tests
+        working-directory: scripts/initializr
+        run: |
+          export JAVA_HOME="${JAVA_HOME_17}"
+          export PATH="${JAVA_HOME_17}/bin:$PATH"
+          xvfb-run -a mvn -B -Dcn1.localWorkspace=true -Dcodename1.platform=javase -Ptest verify
+
+      - name: Run the application against the server
+        run: |
+          export JDK_8_HOME="${JAVA_HOME_8}"
+          export JAVA_HOME="${JAVA_HOME_17}"
+          export PATH="${JAVA_HOME_17}/bin:$PATH"
+          scripts/wayline/run-e2e.sh
+
+      - name: Upload the captures and the server log
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: wayline-e2e
+          path: |
+            scripts/wayline/target/e2e-shots/**
+            scripts/wayline/target/e2e-server.log
+          if-no-files-found: warn
+          retention-days: 14
+
+  web:
+    name: Web app hosted by the server (headless browser)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+          cache: 'maven'
+      - name: Save JDK 8 Path
+        run: echo "JDK_8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Save JDK 17 Path
+        run: echo "JDK_17_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('scripts/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright Chromium
+        run: |
+          cd scripts
+          npm ci
+          # Playwright shells out to apt for the OS-level packages, so the
+          # runner image's third-party sources are pruned first.
+          bash "$GITHUB_WORKSPACE/scripts/ci/apt-get-update.sh"
+          npx playwright install-deps chromium
+          npx playwright install chromium
+
+      # Compiling the theme opens a window, so the browser build needs a
+      # display; server.sh wraps it in xvfb-run when there is none.
+      - name: Ensure a virtual display (xvfb) for the theme compiler
+        run: |
+          if ! command -v xvfb-run >/dev/null 2>&1; then
+            (timeout 300 sudo apt-get update && timeout 300 sudo apt-get install -y xvfb) || true
+          fi
+
+      # The JavaScript build is the plugin's own: the port and the translator
+      # travel inside it, so installing the plugin with what it is built from
+      # is all the browser build needs.
+      - name: Install the framework, the backend runtime and the plugin
+        working-directory: maven
+        run: |
+          bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B \
+            -pl core,javase,css-compiler,codenameone-maven-plugin,backend,backend-test \
+            -am install -DskipTests -Plocal-dev-javase \
+            -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
+            -Dmaven.javadoc.skip=true
+        env:
+          JAVA_HOME: ${{ env.JDK_8_HOME }}
+          RETRY_ONLY_MATCHING: transient
+
+      # Builds the server and the browser build of the app, starts the server
+      # with the app staged where it serves it from, and signs in through the
+      # real screens.
+      - name: Run the hosted web app in a headless browser
+        run: scripts/wayline/run-web-e2e.sh
+        env:
+          JAVA_HOME: ${{ env.JDK_17_HOME }}
+          JDK_8_HOME: ${{ env.JDK_8_HOME }}
+
+      - name: Upload the screenshots and the logs
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: wayline-web-e2e
+          path: scripts/wayline/target/web-e2e/**
+          if-no-files-found: warn
+          retention-days: 14
+
+  android:
+    name: Android build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CN1_APP_DIR: scripts/wayline
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set TMPDIR
+        run: echo "TMPDIR=${{ runner.temp }}" >> "$GITHUB_ENV"
+      - name: Cache codenameone-tools
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/codenameone-tools
+          key: ${{ runner.os }}-cn1-tools-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-cn1-tools-
+      - name: Cache Maven repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-wayline-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-wayline-
+            ${{ runner.os }}-m2-
+      - name: Cache Gradle
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-wayline-${{ hashFiles('Ports/Android/build.gradle*') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-wayline-
+            ${{ runner.os }}-gradle-
+      - name: Setup workspace
+        run: ./scripts/setup-workspace.sh -q -DskipTests
+      - name: Build Android port
+        run: ./scripts/build-android-port.sh -q -DskipTests
+      - name: Build the Android application
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          ./scripts/build-android-app.sh -q -DskipTests
+
+  build-ios-port:
+    # The reusable workflow scripts-ios.yml depends on; sharing it shares its cache.
+    uses: ./.github/workflows/_build-ios-port.yml
+
+  ios:
+    name: iOS build (simulator)
+    needs: build-ios-port
+    runs-on: macos-15
+    timeout-minutes: 50
+    env:
+      CN1_APP_DIR: scripts/wayline
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache CocoaPods and user gems
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gem
+            ~/Library/Caches/CocoaPods
+            ~/.cocoapods/repos
+          key: ${{ runner.os }}-pods-v1-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-v1-
+
+      - name: Ensure CocoaPods tooling
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          set -euo pipefail
+          GEM_USER_DIR="$(ruby -e 'print Gem.user_dir')"
+          export PATH="$GEM_USER_DIR/bin:$PATH"
+          if ! command -v pod >/dev/null 2>&1; then
+            gem install cocoapods xcodeproj --no-document --user-install
+          fi
+          pod --version
+
+      - name: Compute setup-workspace hash
+        id: setup_hash
+        run: echo "hash=$(shasum -a 256 scripts/setup-workspace.sh | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Set TMPDIR
+        run: echo "TMPDIR=${{ runner.temp }}" >> "$GITHUB_ENV"
+
+      - name: Cache codenameone-tools
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/codenameone-tools
+          key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            ${{ runner.os }}-cn1-tools-
+
+      - name: Cache Maven repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+
+      - name: Restore cn1-binaries cache
+        uses: actions/cache@v5
+        with:
+          path: ../cn1-binaries
+          key: cn1-binaries-${{ runner.os }}-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            cn1-binaries-${{ runner.os }}-
+
+      - name: Download built CN1 + iOS port bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: cn1-built-bundle
+          path: ${{ runner.temp }}
+      - name: Restore built CN1 + iOS port tree
+        run: |
+          set -euo pipefail
+          tar -C / -xf "$RUNNER_TEMP/cn1-built-bundle.tar"
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate the Xcode project
+        id: build-ios-app
+        run: ./scripts/build-ios-app.sh -q -DskipTests
+        timeout-minutes: 25
+
+      - name: Build the application for the simulator
+        run: |
+          set -euo pipefail
+          WORKSPACE='${{ steps.build-ios-app.outputs.workspace }}'
+          SCHEME='${{ steps.build-ios-app.outputs.scheme }}'
+          DERIVED_DATA="${{ runner.temp }}/wayline-dd"
+          rm -rf "$DERIVED_DATA"
+          # One architecture, the host's: the port's SIMD natives are NEON
+          # under __aarch64__, and a universal simulator build compiles an
+          # x86_64 slice that has no use here.
+          HOST_ARCH="$(uname -m)"
+          case "$HOST_ARCH" in
+            arm64|x86_64) BUILD_ARCH="$HOST_ARCH" ;;
+            *) BUILD_ARCH=arm64 ;;
+          esac
+          XCB_CONTAINER_FLAG="-workspace"
+          if [[ "$WORKSPACE" != *.xcworkspace ]]; then
+            XCB_CONTAINER_FLAG="-project"
+          fi
+          xcodebuild "$XCB_CONTAINER_FLAG" "$WORKSPACE" -scheme "$SCHEME" \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$DERIVED_DATA" \
+            ARCHS="$BUILD_ARCH" ONLY_ACTIVE_ARCH=YES \
+            EXCLUDED_ARCHS="armv7 armv7s" \
+            CODE_SIGNING_ALLOWED=NO build
+          APP_BUNDLE="$(find "$DERIVED_DATA/Build/Products" -maxdepth 3 -type d -name "${SCHEME}.app" | head -n 1)"
+          if [ -z "$APP_BUNDLE" ]; then
+            echo "::error::no .app bundle under $DERIVED_DATA"
+            exit 1
+          fi
+        timeout-minutes: 20

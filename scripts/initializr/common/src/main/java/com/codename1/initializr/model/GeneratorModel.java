@@ -71,6 +71,24 @@ public class GeneratorModel {
         return isVersionAtLeast(CN1_PLUGIN_VERSION, MAVEN_LAYOUTS_SINCE);
     }
 
+    /// The first release whose build plugin handles a contract kept in a module of
+    /// its own: it generates the app's clients and the server's dispatchers from a
+    /// dependency's classes, and passes over the module that is neither. A
+    /// full-stack template ([Template#isFullStack()]) is built that way, and is
+    /// neither offered nor generated for a release before this one.
+    static final String FULL_STACK_SINCE = "7.0.276";
+
+    /// The brand colour of the full-stack template as it ships: the `--brand` its
+    /// theme.css declares, which is what the UI paints the icon with when no other
+    /// colour is chosen. GeneratorModelMatrixTest holds the two together.
+    public static final int FULL_STACK_BRAND = 0x1f5eff;
+
+    /// Whether `template` can be generated at [CN1_PLUGIN_VERSION]: the UI offers
+    /// only the templates this answers true for.
+    public static boolean isTemplateOffered(Template template) {
+        return !template.isFullStack() || isVersionAtLeast(CN1_PLUGIN_VERSION, FULL_STACK_SINCE);
+    }
+
     /// The plugin version a download is generated against.
     static String cn1PluginVersion() {
         return CN1_PLUGIN_VERSION;
@@ -266,7 +284,7 @@ public class GeneratorModel {
         cleanupGeneratedZips();
         String fileName = toLowerCaseInvariant(appName) + ".zip";
 
-        // Collect the project's entries (read source/template/cn1lib bytes).
+        // Collect the project's entries (read source/template bytes).
         Map<String, byte[]> entries;
         try {
             entries = collectProjectEntries();
@@ -562,7 +580,7 @@ public class GeneratorModel {
         writeEntriesToZip(outputStream, collectProjectEntries());
     }
 
-    /// Reads every entry (IDE scaffold, common files, template sources, cn1libs,
+    /// Reads every entry (IDE scaffold, common files, template sources,
     /// localization, generated README/.gitignore/skills) into an ordered map of
     /// path -> bytes. This is the I/O phase, kept separate from the zip assembly.
     Map<String, byte[]> collectProjectEntries() throws IOException {
@@ -583,13 +601,15 @@ public class GeneratorModel {
             addAgentSkillEntries(mergedEntries);
         }
         copySingleTextEntryToMap("common/pom.xml", readResourceToString(template.POM_XML), mergedEntries, ZipEntryType.TEMPLATE_POM);
-        if (template.CN1LIB_ZIP != null) {
-            copyZipEntriesToMap(template.CN1LIB_ZIP, mergedEntries, ZipEntryType.TEMPLATE_CN1LIB);
+        if (template.isFullStack()) {
+            copyZipEntriesToMap(template.MODULES_ZIP, mergedEntries, ZipEntryType.TEMPLATE_MODULES);
         }
         copyZipEntriesToMap(template.CSS, mergedEntries, ZipEntryType.TEMPLATE_CSS);
         copyZipEntriesToMap(template.SOURCE_ZIP, mergedEntries, ZipEntryType.TEMPLATE_SOURCE);
         addLocalizationEntries(mergedEntries);
         addLauncherTelemetry(mergedEntries);
+        addCustomIcon(mergedEntries);
+        applyColorScheme(mergedEntries);
         validateGeneratedPomCoordinates(mergedEntries);
         return mergedEntries;
     }
@@ -738,7 +758,7 @@ public class GeneratorModel {
 
     /// The application's build.gradle.kts: the template, plus what the chosen
     /// template's pom adds -- the Kotlin plugin for a Kotlin project, and the
-    /// template's dependencies (cn1libs by coordinates, libraries).
+    /// template's dependencies.
     String gradleAppBuildScript(String script) {
         String[] dependencies = template.GRADLE_DEPENDENCIES;
         if (dependencies.length > 0) {
@@ -829,6 +849,22 @@ public class GeneratorModel {
     /// offers these; the check is here so that no caller (tests, fixtures, a future UI)
     /// can produce a download that fails on its first build.
     void validateOptions() throws IOException {
+        // A Gradle project is refused below, for the reason the template gives; a
+        // backend-only project is no template's, so none of this is about it.
+        if (template.isFullStack() && !options.isGradle()
+                && options.projectType != ProjectOptions.ProjectType.BACKEND_ONLY) {
+            if (!isVersionAtLeast(pluginVersion, FULL_STACK_SINCE)) {
+                throw new IOException("This template shares a contract module between the app and its server, "
+                        + "which needs Codename One " + FULL_STACK_SINCE + " or newer.");
+            }
+            if (options.projectType != ProjectOptions.ProjectType.APP_WITH_BACKEND) {
+                throw new IOException("This template is an app and its server; choose \""
+                        + ProjectOptions.ProjectType.APP_WITH_BACKEND.label + "\".");
+            }
+            if (options.javaVersion != ProjectOptions.JavaVersion.JAVA_17) {
+                throw new IOException("This template's sources are Java 17; choose Java 17.");
+            }
+        }
         if (options.isGradle()) {
             if (options.javaVersion != ProjectOptions.JavaVersion.JAVA_17) {
                 throw new IOException("Gradle projects target Java 17. Choose Java 17, or the Maven build "
@@ -901,6 +937,9 @@ public class GeneratorModel {
         } else {
             requireAbsentModule(entries, rootPom, "backend");
         }
+        if (template.isFullStack()) {
+            validateSharedModule(entries, rootPom, rootArtifactId, version);
+        }
 
         if (mavenLayoutsEnabled()) {
             String commonPom = normalizedPom(entries, "common/pom.xml");
@@ -913,6 +952,28 @@ public class GeneratorModel {
             if (!includesPlatformModules() && rootPom.indexOf("<activeByDefault>") >= 0) {
                 throw new IOException("Refusing to generate project: pom.xml activates a javase module "
                         + "the project does not have");
+            }
+        }
+    }
+
+    /// A full-stack project's contract module: in the reactor ahead of the app,
+    /// which depends on it, and depended on by the server too. Either dependency
+    /// missing is a project that compiles its two halves against nothing in common.
+    private void validateSharedModule(Map<String, byte[]> entries, String rootPom, String rootArtifactId,
+                                      String version) throws IOException {
+        validateModulePomCoordinates(entries, "shared", rootArtifactId + "-shared", false, version);
+        requirePomFragment("pom.xml", rootPom, "<module>shared</module><module>common</module>",
+                "shared module ahead of common");
+        String dependency = "<artifactId>" + rootArtifactId + "-shared</artifactId>";
+        requirePomFragment("common/pom.xml", normalizedPom(entries, "common/pom.xml"), dependency,
+                "dependency on the shared module");
+        requirePomFragment("backend/pom.xml", normalizedPom(entries, "backend/pom.xml"), dependency,
+                "dependency on the shared module");
+        String packagePath = packageName.replace('.', '/');
+        String sourcePath = template.SOURCE_PACKAGE.replace('.', '/');
+        for (String path : entries.keySet()) {
+            if (path.indexOf(sourcePath) >= 0 && !sourcePath.equals(packagePath)) {
+                throw new IOException("Refusing to generate project: " + path + " is still in the template's package");
             }
         }
     }
@@ -1013,6 +1074,14 @@ public class GeneratorModel {
         StringBuilder out = new StringBuilder(value.length());
         for (int i = 0; i < value.length(); i++) {
             out.append(Character.toLowerCase(value.charAt(i)));
+        }
+        return out.toString();
+    }
+
+    static String toUpperCaseInvariant(String value) {
+        StringBuilder out = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            out.append(Character.toUpperCase(value.charAt(i)));
         }
         return out.toString();
     }
@@ -1143,6 +1212,14 @@ public class GeneratorModel {
     /// Where an entry lands in the generated project, or null to leave it out.
     private String mapTargetPath(String sourcePath, ZipEntryType zipType) {
         String targetPath = sourcePath;
+        if (zipType == ZipEntryType.COMMON_ARCHIVE && template.isFullStack() && !options.isGradle()
+                && sourcePath.startsWith("backend/")) {
+            // The template brings its own server. The generic one is dropped whole
+            // rather than overwritten, or its files the template has no counterpart
+            // for -- an endpoint, its test -- would be left in a server they are not
+            // part of.
+            return null;
+        }
         if (zipType == ZipEntryType.COMMON_ARCHIVE && options.isGradle()) {
             // A Gradle project is one project at the root: what common.zip keeps in the
             // Maven common/ module moves up a level, and everything else in it -- the
@@ -1168,8 +1245,6 @@ public class GeneratorModel {
                 targetPath = appDir() + "src/main/kotlin/" + sourcePath.substring("kotlin/".length());
             } else if (sourcePath.startsWith("resources/")) {
                 targetPath = appDir() + "src/main/resources/" + sourcePath.substring("resources/".length());
-            } else if (sourcePath.startsWith("rad/")) {
-                targetPath = appDir() + "src/main/rad/" + sourcePath.substring("rad/".length());
             } else {
                 targetPath = appDir() + "src/main/" + sourcePath;
             }
@@ -1299,11 +1374,19 @@ public class GeneratorModel {
         }
 
         String content = StringUtil.newString(sourceData);
+        if (template.SETTINGS != null && (appDir() + "codenameone_settings.properties").equals(targetPath)) {
+            // Ahead of the replacements below, which the template's hints get too.
+            content = (content.endsWith("\n") ? content : content + "\n") + readResourceToString(template.SETTINGS);
+        }
         content = StringUtil.replaceAll(content, "com.example.myapp", packageName);
         content = StringUtil.replaceAll(content, template.SOURCE_PACKAGE, packageName);
         content = StringUtil.replaceAll(content, "MyAppName", appName);
         content = StringUtil.replaceAll(content, template.SOURCE_MAIN_CLASS, appName);
         content = StringUtil.replaceAll(content, "myappname", toLowerCaseInvariant(appName));
+        // The name in capitals is how an environment variable spells a setting
+        // that starts with it: myappname.payments.key is read from
+        // MYAPPNAME_PAYMENTS_KEY.
+        content = StringUtil.replaceAll(content, "MYAPPNAME", toUpperCaseInvariant(appName));
         if ((appDir() + "codenameone_settings.properties").equals(targetPath)) {
             content = replaceProperty(content, "codename1.kotlin", String.valueOf(template.IS_KOTLIN));
             content = applyJavaVersionSettings(content);
@@ -1333,6 +1416,9 @@ public class GeneratorModel {
         if ("pom.xml".equals(targetPath)) {
             content = replaceTagValue(content, "cn1.plugin.version", pluginVersion);
             content = replaceTagValue(content, "cn1.version", pluginVersion);
+            if (template.isFullStack() && !options.isGradle() && !isMavenBackendOnly()) {
+                content = addSharedModule(content);
+            }
             if (mavenLayoutsEnabled() && !isMavenBackendOnly()) {
                 content = guardModuleProfiles(content, !includesPlatformModules());
             }
@@ -1563,6 +1649,105 @@ public class GeneratorModel {
         return content.substring(0, start) + linePrefix + value + content.substring(end);
     }
 
+    /// The root pom with the `shared` module in it, ahead of `common`: Maven would
+    /// order the two by their dependency anyway, and a reader should not have to
+    /// know that to see which is built first.
+    private static String addSharedModule(String pom) throws IOException {
+        String common = "<module>common</module>";
+        int at = pom.indexOf(common);
+        if (at < 0) {
+            throw new IOException("Refusing to generate project: pom.xml has no common module to put the "
+                    + "shared module ahead of");
+        }
+        int lineStart = pom.lastIndexOf('\n', at) + 1;
+        String indent = pom.substring(lineStart, at).trim().length() == 0 ? pom.substring(lineStart, at) : "";
+        return pom.substring(0, at)
+                + "<!-- What the app and its server have in common: the REST contract and the\n"
+                + indent + "     objects it transfers. Built first, because both depend on it. -->\n"
+                + indent + "<module>shared</module>\n" + indent
+                + pom.substring(at);
+    }
+
+    /// A full-stack template's stylesheet in the colours and shape that were asked
+    /// for. Its rules name no colour of their own: each takes a variable from the
+    /// block the file opens with, so the scheme is changed by rewriting those
+    /// declarations, and every screen follows. Nothing is appended, which is what
+    /// keeps the stylesheet's own dark-mode block working: an override written
+    /// after it would win in both modes.
+    static String applyThemeVariables(String css, ProjectOptions options) throws IOException {
+        ProjectOptions effective = options == null ? ProjectOptions.defaults() : options;
+        if (effective.brandColor >= 0) {
+            int brand = effective.brandColor & 0xffffff;
+            // Dark mode shows the brand on a near-black surface, where the colour as
+            // chosen is usually too deep to read: it is lightened there.
+            int brandDark = lightenColor(brand, 0.35f);
+            css = setCssVariable(css, "--brand", toCssColor(brand));
+            css = setCssVariable(css, "--brand-pressed", toCssColor(darkenColor(brand, 0.22f)));
+            css = setCssVariable(css, "--brand-contrast", toCssColor(contrastColor(brand)));
+            css = setCssVariable(css, "--brand-dark", toCssColor(brandDark));
+            css = setCssVariable(css, "--brand-pressed-dark", toCssColor(lightenColor(brand, 0.15f)));
+            css = setCssVariable(css, "--brand-contrast-dark", toCssColor(contrastColor(brandDark)));
+        }
+        if (!effective.roundedButtons) {
+            css = setCssVariable(css, "--radius", "0.6mm");
+            css = setCssVariable(css, "--radius-small", "0.4mm");
+        }
+        return css;
+    }
+
+    /// `css` with the declaration of the variable `name` given `value`. A variable
+    /// the stylesheet does not declare is an error and not a no-op: it means the
+    /// template was restyled without this method, and the choice made in the UI
+    /// would otherwise be dropped without a word.
+    private static String setCssVariable(String css, String name, String value) throws IOException {
+        int at = css.indexOf(name + ":");
+        int end = at < 0 ? -1 : css.indexOf(';', at);
+        if (end < 0) {
+            throw new IOException("Refusing to generate project: theme.css does not declare " + name);
+        }
+        return css.substring(0, at) + name + ": " + value + css.substring(end);
+    }
+
+    /// Near-black or white, whichever reads on `color`.
+    private static int contrastColor(int color) {
+        int r = (color >> 16) & 0xff;
+        int g = (color >> 8) & 0xff;
+        int b = color & 0xff;
+        // Perceived brightness; the weights are the usual ones for sRGB.
+        return (r * 299 + g * 587 + b * 114) / 1000 > 140 ? 0x0b1020 : 0xffffff;
+    }
+
+    private static int lightenColor(int color, float ratio) {
+        int r = (color >> 16) & 0xff;
+        int g = (color >> 8) & 0xff;
+        int b = color & 0xff;
+        r = Math.min(255, (int)(r + (255 - r) * ratio));
+        g = Math.min(255, (int)(g + (255 - g) * ratio));
+        b = Math.min(255, (int)(b + (255 - b) * ratio));
+        return (r << 16) | (g << 8) | b;
+    }
+
+    /// The template's stylesheet in the scheme that was chosen. Done to the finished
+    /// project and not as the file is copied: common.zip has a theme.css of its own
+    /// at the same path, which the template's replaces and which declares none of
+    /// the variables.
+    private void applyColorScheme(Map<String, byte[]> entries) throws IOException {
+        String path = appDir() + "src/main/css/theme.css";
+        if (!template.isFullStack() || !entries.containsKey(path)) {
+            return;
+        }
+        entries.put(path, applyThemeVariables(StringUtil.newString(entries.get(path)), options).getBytes("UTF-8"));
+    }
+
+    /// The icon chosen in the UI in place of the stock one, wherever the project
+    /// keeps its icon.
+    private void addCustomIcon(Map<String, byte[]> entries) {
+        String path = appDir() + "icon.png";
+        if (options.iconPng != null && options.iconPng.length > 0 && entries.containsKey(path)) {
+            entries.put(path, options.iconPng);
+        }
+    }
+
     private boolean isBareTemplate() {
         return template == Template.BAREBONES || template == Template.KOTLIN;
     }
@@ -1632,14 +1817,42 @@ public class GeneratorModel {
                     .append("`./mvnw -pl backend -Dcodename1.platform=backend cn1:backend` and package it as a native ")
                     .append("binary with `./mvnw -pl backend -Dcodename1.platform=backend cn1:backend-package`.\n\n");
         }
-
-        if (template.USES_CODERAD) {
-            out.append("### Additional Eclipse Steps for CodeRAD Projects\n\n")
-                    .append("CodeRAD uses annotation processing, so Eclipse needs two extra settings:\n\n")
-                    .append("1. Add `org.eclipse.m2e.apt.mode=jdt_apt` to `./common/.settings/org.eclipse.m2e.apt.prefs`\n")
-                    .append("2. Add `target/generated-sources/rad-views` to `.classpath`\n\n")
-                    .append("More details:\n")
-                    .append("https://github.com/codenameone/CodenameOne/issues/3724\n\n");
+        if (template.isFullStack()) {
+            out.append("## The app and its server\n\n")
+                    .append("This project is a working ride-hailing app: a rider, a driver and an admin mode in one ")
+                    .append("app, chosen by the role of whoever signs in, and the server they talk to.\n\n")
+                    .append("- `shared/` is the contract: the REST interfaces and the objects they carry. The app's ")
+                    .append("client and the server's dispatcher are both generated from it, so the two cannot drift.\n")
+                    .append("- `backend/` is the server: accounts and roles, phone verification, driver applications, ")
+                    .append("rides, matching, payments, the live channel and the database migrations.\n")
+                    .append("- `common/` is the app. `src/main/css/theme.css` opens with the colours and corner ")
+                    .append("radius every screen takes its look from.\n\n")
+                    .append("Start the server, then, in a second terminal, the app:\n\n```\n")
+                    .append("CN1_PROFILE=dev backend/server.sh run\n")
+                    .append("./run.sh\n```\n\n")
+                    .append("`server.sh` is a few lines of shell around Maven; on Windows run what it runs, ")
+                    .append("with `mvnw.cmd`, or use a Unix shell such as Git Bash or WSL.\n\n")
+                    .append("On the `dev` profile the server creates demonstration accounts, all with the ")
+                    .append("password `").append(toLowerCaseInvariant(appName)).append("-demo`: `rider@")
+                    .append(toLowerCaseInvariant(appName)).append(".example`, `driver@")
+                    .append(toLowerCaseInvariant(appName)).append(".example`, `admin@")
+                    .append(toLowerCaseInvariant(appName)).append(".example` and `applicant@")
+                    .append(toLowerCaseInvariant(appName)).append(".example`, who has applied to drive ")
+                    .append("and waits for the admin's decision. ")
+                    .append("Verification codes are written to the server's log until an SMS provider is ")
+                    .append("configured. Cards are simulated (`4242 4242 4242 4242` is accepted) until the ")
+                    .append("server is given a Stripe key; `backend/application.properties` says how.\n\n")
+                    .append("`./mvnw -pl backend -am -Dcodename1.platform=backend test` runs the server's tests.\n\n")
+                    .append("The server can also host the app, so it runs in a browser with nothing to install: ")
+                    .append("`backend/server.sh web` builds the browser version, and a server started after that ")
+                    .append("serves it at `http://localhost:8080/`. In a desktop window or a desktop browser the ")
+                    .append("admin mode becomes a console with the operating system's own look.\n\n")
+                    .append("Two chapters of the developer guide, at https://www.codenameone.com/developer-guide/, ")
+                    .append("cover the sample this project started as: \"A ride-hailing app from three sides\" ")
+                    .append("shows it as a rider, a driver and an admin see it, and \"Building on the sample\" ")
+                    .append("explains how it is built and what to change: billing, maps and demo data, native ")
+                    .append("maps and the ")
+                    .append("database.\n\n");
         }
 
         out.append("## Signing\n\n")

@@ -5088,6 +5088,83 @@ public class HTML5Implementation extends CodenameOneImplementation {
      */
     private boolean semanticRefreshPending;
 
+    /**
+     * How long the screen has to have stopped changing before the semantic tree is brought up
+     * to date, in milliseconds.
+     */
+    private static final int SEMANTIC_QUIET_MILLIS = 100;
+
+    /**
+     * The longest the semantic tree is left behind a screen that never stops changing, in
+     * milliseconds.
+     */
+    private static final int SEMANTIC_STALE_LIMIT_MILLIS = 1000;
+
+    /**
+     * True from the first change the tree has not caught up with until the refresh that
+     * was armed for it has run.
+     */
+    private boolean semanticRefreshArmed;
+
+    /**
+     * When the change that armed the refresh arrived, and when the latest one did.
+     */
+    private long semanticFirstChangeMillis;
+    private long semanticLastChangeMillis;
+
+    /**
+     * Never eagerly: a change arms one refresh, and that refresh describes everything that
+     * changed before it ran.
+     *
+     * <p>Answering true rebuilt the whole tree, and diffed it into the overlay, on every turn
+     * of the event thread that changed anything -- once per wheel event while a list scrolls,
+     * and several times over while a screen is filled in, each pass walking every component
+     * of the form. That was more than half of what scrolling cost and a third of a navigation.
+     * The change itself has already been recorded when this is asked: the tree is marked
+     * stale first, so the snapshot the refresh pulls is rebuilt then, once.</p>
+     *
+     * <p>The refresh waits for the screen to be left alone for a moment, as it already waits
+     * for an animation: a tree that follows a scroll step by step is of no use to anybody
+     * reading it. A screen that keeps changing is described once per
+     * {@link #SEMANTIC_STALE_LIMIT_MILLIS} regardless.</p>
+     */
+    @Override
+    public boolean isAccessibilityTreeUpdateRequired() {
+        semanticLastChangeMillis = System.currentTimeMillis();
+        if (!semanticRefreshArmed) {
+            semanticRefreshArmed = true;
+            semanticFirstChangeMillis = semanticLastChangeMillis;
+            armSemanticRefresh(SEMANTIC_QUIET_MILLIS);
+        }
+        return false;
+    }
+
+    private void armSemanticRefresh(int millis) {
+        Window.setTimeout(new TimerHandler() {
+            @Override
+            public void onTimer() {
+                // On the event thread: the tree is only ever built there, and
+                // anywhere else is handed the one built last.
+                callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        long now = System.currentTimeMillis();
+                        long quiet = now - semanticLastChangeMillis;
+                        if (quiet >= 0 && quiet < SEMANTIC_QUIET_MILLIS
+                                && now - semanticFirstChangeMillis < SEMANTIC_STALE_LIMIT_MILLIS) {
+                            armSemanticRefresh((int) (SEMANTIC_QUIET_MILLIS - quiet));
+                            return;
+                        }
+                        // Cleared before the tree is read, so a change that
+                        // arrives while it is being described arms the next one.
+                        semanticRefreshArmed = false;
+                        accessibilityTreeChanged(0);
+                    }
+                });
+            }
+        }, millis);
+    }
+
     @Override
     public boolean isAccessibilityTreeSupported() {
         return true;
@@ -13898,7 +13975,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         sb.append("sans-serif");
                         break;
                     case Font.FACE_PROPORTIONAL:
-                        sb.append("serif");
+                        // Proportional is the opposite of monospaced, not of
+                        // sans-serif. Every other port answers it with its
+                        // sans-serif face; this one answered Times, so anything
+                        // drawn in it -- the labels of the vector map, for one --
+                        // was set in a different typeface in a browser than on
+                        // every device.
+                        sb.append("sans-serif");
                         break;
                     case Font.FACE_MONOSPACE:
                         sb.append("monospace");

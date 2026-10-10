@@ -75,6 +75,10 @@ final class AppSupport {
         {"buildJavascriptLocal", "javascript", "local-javascript", "Builds the JavaScript port locally"},
     };
 
+    /// The local JavaScript build `backendWebApp` stages for a backend: as
+    /// `buildJavascriptLocal`, made for a server that is not a servlet container.
+    static final String WEB_APP_BUILD_TASK = "buildJavascriptWebApp";
+
     private AppSupport() {
     }
 
@@ -345,6 +349,18 @@ final class AppSupport {
         registerBuild(project, "cn1Build", null, null,
                 "Runs the build given by -Pcodename1.platform and -Pcodename1.buildTarget",
                 layout, main, javase, framework, ext, userProperties, queue);
+
+        final File settingsFile = layout.settingsFile();
+        final Provider<Map<String, String>> hosted = userProperties.map(
+                given -> hostedProperties(given, settingsFile));
+        registerBuild(project, WEB_APP_BUILD_TASK, "javascript", "local-javascript",
+                "Builds the JavaScript port locally for the backend to host (see backendWebApp)",
+                layout, main, javase, framework, ext, hosted, queue);
+        // The bundle is found by looking in the build directory, so one an
+        // earlier build left there must not be this build's answer.
+        final Provider<File> bundle = project.getLayout().getBuildDirectory()
+                .file(project.getName() + ".zip").map(f -> f.getAsFile());
+        project.getTasks().named(WEB_APP_BUILD_TASK).configure(t -> t.doFirst(new DeleteStaleBundle(bundle)));
 
         final SourceSet test = sourceSets.getByName(SourceSet.TEST_SOURCE_SET_NAME);
         project.getTasks().register("cn1Test", com.codename1.gradle.tasks.Cn1TestTask.class, t -> {
@@ -864,6 +880,46 @@ final class AppSupport {
                 }
             }
             return Collections.singletonList("-D" + SimulatorSupport.CSS_INPUT_PROPERTY + "=" + inputs);
+        }
+    }
+
+    /// The build properties of a browser build a backend will host.
+    ///
+    /// The JavaScript build sends cross-origin requests through a proxy servlet
+    /// it expects beside the page. A backend is not a servlet container and has
+    /// no such path, and an app talking to the server that hosts it is
+    /// same-origin and never proxied anyway -- so the build is told not to wire
+    /// one in, unless the project has chosen for itself: on the command line, in
+    /// `codenameone { buildHints }` or in its settings file.
+    static Map<String, String> hostedProperties(Map<String, String> given, File settingsFile) {
+        Map<String, String> out = new java.util.LinkedHashMap<String, String>(given);
+        try {
+            if (!out.containsKey("codename1.arg.javascript.inject_proxy")
+                    && !out.containsKey("codename1.arg.javascript.proxy.url")
+                    && !com.codename1.maven.BackendWebApp.choosesProxy(settingsFile)) {
+                out.put("codename1.arg.javascript.inject_proxy", "false");
+            }
+        } catch (com.codename1.build.BuildExecutionException ex) {
+            throw new org.gradle.api.GradleException(ex.getMessage(), ex);
+        }
+        return out;
+    }
+
+    /// Removes the bundle a previous browser build wrote, before the next one
+    /// runs: a build that then writes none leaves none to be mistaken for its own.
+    static final class DeleteStaleBundle implements org.gradle.api.Action<org.gradle.api.Task> {
+        private final Provider<File> bundle;
+
+        DeleteStaleBundle(Provider<File> bundle) {
+            this.bundle = bundle;
+        }
+
+        @Override
+        public void execute(org.gradle.api.Task task) {
+            File stale = bundle.get();
+            if (stale.isFile() && !stale.delete()) {
+                throw new org.gradle.api.GradleException("Could not remove the earlier browser build " + stale);
+            }
         }
     }
 

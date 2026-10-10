@@ -41,6 +41,8 @@ import com.codename1.html5.js.JSObject;
 import com.codename1.html5.js.ajax.ReadyStateChangeHandler;
 import com.codename1.html5.js.ajax.XMLHttpRequest;
 import com.codename1.html5.js.core.JSRegExp;
+import com.codename1.html5.js.dom.Event;
+import com.codename1.html5.js.dom.EventListener;
 import com.codename1.html5.js.typedarrays.ArrayBuffer;
 import com.codename1.html5.js.typedarrays.Uint8Array;
 
@@ -81,11 +83,26 @@ public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
     private static interface XHRBlob extends JSObject {
         void send(Blob blob);
     }
+
+    /// The XMLHttpRequest as a target of events. Listeners are objects with a
+    /// handleEvent, the form that HTML5WebSocketImpl found is delivered for an
+    /// object that lives in the worker.
+    private static interface XHREvents extends JSObject {
+        void addEventListener(String type, EventListener<Event> listener);
+    }
     
     private void open(){
         if (!isOpen){
             isOpen = true;
-            req.open(httpMethod, url, false);
+            // Asynchronous, and waited for in openInputStream(). The whole
+            // application -- the event thread and every other thread -- runs in
+            // the one worker this code runs in, and a synchronous request stops
+            // that worker dead until the server has answered: nothing is laid
+            // out, painted or animated, and no pointer event is delivered. A
+            // map that fetched nineteen tiles while it was dragged stood still
+            // for two of the ten seconds the drag took. Only the thread that
+            // asked has any reason to wait.
+            req.open(httpMethod, url, true);
             // ``responseType = "arraybuffer"`` lets the browser hand back
             // a typed-array view of the bytes directly. The previous
             // ``overrideMimeType("text/plain; charset=x-user-defined")``
@@ -157,16 +174,62 @@ public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
             req.setRequestHeader(h.name, h.value);
         }
         //req.setResponseType("arraybuffer");
-        // Through send(), which applies the request's timeout and turns the
-        // TimeoutError a synchronous XHR throws into this method's IOException --
-        // the error path a timed-out request takes on every other port. The
-        // timeouts were ignored here, so a request past its timeout simply waited
-        // for the answer; and NetworkManager's fallback timeout thread cannot run
-        // while a synchronous request holds the worker.
+        // send() applies the request's timeout, and a request that runs past it
+        // ends in this method's IOException -- the error path a timed-out
+        // request takes on every other port.
+        final String[] outcome = new String[1];
+        EventListener<Event> ended = new EventListener<Event>() {
+            @Override
+            public void handleEvent(Event evt) {
+                String type = evt == null ? null : evt.getType();
+                synchronized (outcome) {
+                    if (outcome[0] == null) {
+                        outcome[0] = type == null ? "load" : type;
+                    }
+                    outcome.notifyAll();
+                }
+            }
+        };
+        // One of these ends every request, whichever way it ends.
+        XHREvents events = (XHREvents) req;
+        events.addEventListener("load", ended);
+        events.addEventListener("error", ended);
+        events.addEventListener("timeout", ended);
+        events.addEventListener("abort", ended);
+        int deadline = requestTimeout();
         String failure = send(req, body == null ? null
-                : BlobUtil.createBlob(body.toByteArray(), "application/octet-stream"), requestTimeout());
+                : BlobUtil.createBlob(body.toByteArray(), "application/octet-stream"), deadline);
         if (failure != null) {
             throw new IOException("Failed to load " + url + ": " + failure);
+        }
+        // The browser enforces the deadline and reports it as "timeout". The
+        // limit here is for an event that never comes at all, so that a
+        // network thread cannot be lost to a request for good.
+        long giveUp = deadline > 0 ? System.currentTimeMillis() + deadline + 5000 : Long.MAX_VALUE;
+        synchronized (outcome) {
+            while (outcome[0] == null) {
+                long left = giveUp - System.currentTimeMillis();
+                if (left <= 0) {
+                    break;
+                }
+                try {
+                    outcome.wait(Math.min(left, 1000));
+                } catch (InterruptedException err) {
+                    req.abort();
+                    throw new IOException("Interrupted while loading " + url);
+                }
+            }
+        }
+        if (outcome[0] == null) {
+            req.abort();
+            throw new IOException("Failed to load " + url + ": TimeoutError: no answer");
+        }
+        if (!"load".equals(outcome[0])) {
+            throw new IOException("Failed to load " + url + ": "
+                    + ("timeout".equals(outcome[0]) ? "TimeoutError" : "NetworkError") + ": " + outcome[0]);
+        }
+        if (req.getStatus() == 0 && req.getResponse() == null) {
+            throw new IOException("Failed to load " + url + ": NetworkError: no response");
         }
 
         
@@ -285,18 +348,15 @@ public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
      * whatever Access-Control-Expose-Headers allowed. A @JSBody runs its
      * script verbatim, so the method is really invoked.
      */
-    /// The XHR timeout for this request, in milliseconds, or 0 for none. A
-    /// synchronous XHR has one deadline for the whole request, so it gets the
-    /// connect and the read timeout together; -1 for either means unset, which is
-    /// what a request that set neither passes.
+    /// The XHR timeout for this request, in milliseconds, or 0 for none. An
+    /// XHR has one deadline for the whole request, so it gets the connect and
+    /// the read timeout together; -1 for either means unset, which is what a
+    /// request that set neither passes.
     ///
-    /// Deliberately a deadline, not the idle limit the other ports enforce: a
-    /// synchronous XHR reports neither when it connected nor when bytes arrive,
-    /// so inactivity cannot be measured here. It is what NetworkManager's own
-    /// watchdog does with a request that shows no activity, except that the
-    /// watchdog cannot run while the request holds the worker. Leaving the
-    /// timeouts out instead let a request to an unreachable host wait forever.
-    /// The developer guide's JavaScript chapter documents the difference.
+    /// Deliberately a deadline, not the idle limit the other ports enforce.
+    /// Leaving the timeouts out instead let a request to an unreachable host
+    /// wait forever. The developer guide's JavaScript chapter documents the
+    /// difference.
     int requestTimeout() {
         if (timeout > 0 && readTimeout > 0) {
             return timeout + readTimeout;
@@ -309,18 +369,14 @@ public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
         this.readTimeout = readTimeout;
     }
 
-    /// Sends `xhr` with `body` (null for none) under a `timeoutMillis` deadline
-    /// (0 for none), answering why it failed or null. Setting the timeout is
-    /// inside the try, because a synchronous XHR on a window rather than a
-    /// worker refuses one outright. A request that ended with no response at all
-    /// -- status 0 and nothing received, which is how a timed-out synchronous XHR
-    /// can come back without throwing -- is a failure too: reading on from there
-    /// reached `responseText`, which an arraybuffer request throws for, and that
-    /// JavaScript error ended the network thread with no callback of any kind.
+    /// Starts `xhr` with `body` (null for none) under a `timeoutMillis` deadline
+    /// (0 for none), answering why it could not be sent or null. How it ended
+    /// is reported by its events, which openInputStream() waits for. Setting
+    /// the timeout is inside a try of its own, because not every kind of
+    /// request accepts one.
     @JSBody(params={"xhr", "body", "timeoutMillis"}, script="try {"
             + " if (timeoutMillis > 0) { try { xhr.timeout = timeoutMillis; } catch (ignored) {} }"
             + " if (body) { xhr.send(body); } else { xhr.send(); }"
-            + " if (xhr.status === 0 && !xhr.response) { return 'NetworkError: no response'; }"
             + " return null;"
             + " } catch (e) { return (e && e.name ? e.name : 'Error') + (e && e.message ? ': ' + e.message : ''); }")
     static native String send(XMLHttpRequest xhr, Blob body, int timeoutMillis);

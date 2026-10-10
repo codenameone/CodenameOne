@@ -1209,13 +1209,26 @@ static inline int cn1GcSweepReclaimsObj(JAVA_OBJECT o, int mark) {
  * the last sweep; the clamp degrades to "no change" otherwise rather than risking
  * the object being mistaken for an already-freed slot.
  *
- * WHY A WRONG PROOF IS NOT FATAL. This does not hide the object. If it is in fact
- * reachable from any root, the mark reaches it and overwrites this value with the
- * current epoch, and the sweep keeps it. The proof failing costs the optimization,
- * not the object. The one residual window is an object reachable ONLY from a
- * location the mark cannot see -- which is what the grace rule exists for, and why
- * this is applied only where escape analysis PROVED the reference never leaves the
- * frame, rather than to fresh objects in general.
+ * A WRONG PROOF IS FATAL, and this comment used to say the opposite: that a
+ * reachable object is simply marked again and the stamp costs only the
+ * optimization. That holds for an object reached through another object's field.
+ * It does not hold for one reached from a ROOT. A root is validated through
+ * cn1ConservativeResolve before it is marked, and that asks cn1GcWasReclaimed of
+ * the mark word; the value written here stops satisfying it the moment the next
+ * sweep raises cn1GcReclaimedBefore. From then on the root scan reads the slot as
+ * already freed and declines to mark it, and the sweep after that frees it.
+ *
+ * Observed, not inferred: a java.lang.Thread stamped by the frame that started it
+ * (mark 6), still the currentThreadObject of its running thread, was passed to
+ * gcMarkObject by the root scan of epoch 8, came back unmarked, and was finalized
+ * by that cycle's sweep -- Thread.finalize() then freed the thread's own state
+ * under it. The translator had "proved" the object frame local because the only
+ * method called on it, the native Thread.start(), had no bytecode to object to.
+ *
+ * So nothing here second-guesses the translator, and the proof has to be right.
+ * What it rests on is spelled out at Parser.calleesKeepThis and
+ * BytecodeMethod.freezeRetireCandidates; a new way for a reference to leave a
+ * frame has to be taught to that analysis before it is allowed to reach here.
  */
 void cn1MarkDeadNow(JAVA_OBJECT o) {
 #ifndef CN1_DISABLE_BIBOP

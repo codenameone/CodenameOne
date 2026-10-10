@@ -120,6 +120,9 @@ final class TileRenderer {
             if ((gt != VectorFeature.GEOM_LINESTRING && gt != VectorFeature.GEOM_POLYGON) || !sl.accepts(f)) {
                 continue;
             }
+            if (gt == VectorFeature.GEOM_POLYGON && sl.isLinesOnly()) {
+                continue;
+            }
             List parts = f.getParts();
             for (Object partObj : parts) {
                 int[] line = (int[]) partObj;

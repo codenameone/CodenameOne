@@ -1,0 +1,1848 @@
+[[wayline-implementors-guide]]
+== Wayline: Building on the sample
+
+<<wayline-users-guide>> shows Wayline from the outside. This chapter is for the
+developer who wants to build on it. It covers how to run the project, how it's
+put together, what to change for two common kinds of service, and the parts a
+sample leaves for you to finish: taking real money, map data at production
+volume, native maps, sign-in through another identity provider, real text
+messages, analytics, and the database it's deployed on.
+
+The project is in `scripts/wayline` in the Codename One repository. The
+Initializr generates the same project under your own name and package, and
+that's the copy to build a product on. Paths in this chapter are relative to the
+project's root.
+
+[[wayline-launch]]
+=== Running it
+
+The server needs JDK 17 and Maven, and nothing else installed. Start it on the
+development profile:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/wayline.sh[tag=wayline-sh-server,indent=0]
+----
+
+On that profile the database is in memory, verification codes are written to
+the log and shown in the app in place of a text message, cards are simulated,
+and the server creates the demo accounts listed in <<wayline-users-guide>>. It
+listens on port 8080.
+
+Then run the app in the simulator, from another terminal in the same directory:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/wayline.sh[tag=wayline-sh-simulator,indent=0]
+----
+
+Sign in as `rider@wayline.example` with the password `wayline-demo`. Start a
+second simulator and sign in as `driver@wayline.example` to follow a ride from
+both ends. A phone on the same network reaches the server through **Server
+address** on the welcome screen.
+
+To use the app in a browser, have the server host it. The first command builds
+the browser version, which takes about a minute and is needed again only when
+the app changes:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/wayline.sh[tag=wayline-sh-web,indent=0]
+----
+
+Then open `http://localhost:8080/`. <<backend-hosting-the-app>> describes what
+the server does with the staged files and how to deploy them.
+
+`backend/server.sh` wraps the Maven goals. On the JVM it starts in a few
+seconds, which suits development. A deployment runs the server compiled to a
+native binary, which needs `clang` and the development headers of OpenSSL,
+libcurl and nghttp2:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/wayline.sh[tag=wayline-sh-native,indent=0]
+----
+
+=== The modules
+
+[cols="1,4"]
+|===
+| Module | What it holds
+
+| `shared`
+| The contract: the data classes both sides exchange and the `@RestClient`
+  interfaces that name every call. It's plain Java 8 with no Codename One build
+  step of its own.
+
+| `common`
+| The app: sign-in, the rider, driver and admin screens, the map, the wallet,
+  the settings and the live channel. The styling is in
+  `src/main/css/theme.css` and the translations in `src/main/l10n`.
+
+| `backend`
+| The server: accounts and roles, phone verification, driving applications,
+  moderation, fares, matching, the ride state machine, payments, statistics and
+  the WebSocket. The entity classes are in the `domain` package, the schema is
+  in `src/main/resources/db/migration`, and the settings are in
+  `application.properties` beside the module's `pom.xml`.
+
+| `javase`, `android`, `ios`
+| The platforms the app is built for. `javase` is the simulator and the
+  desktop build.
+|===
+
+=== The contract both sides share
+
+Every call the app makes is a method of an interface in `shared`. This is part
+of `RiderApi`:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/wayline/RiderApi.java[tag=wayline-contract-api,indent=0]
+----
+
+The data that travels is a class with public fields, marked `@Mapped`. This is
+`RideRequestDto` with some of its fields left out:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/wayline/RideRequestDto.java[tag=wayline-contract-dto,indent=0]
+----
+
+Two builds read these files. The app's build writes a client, `RiderApiImpl`,
+which the app reaches through `Api.rider()` in `common`. The server's build
+writes an interface, `RiderApiServer`, whose methods take the same parameters
+without the callback and return the value, and a controller that routes each
+path to it. The server then implements that interface:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/wayline/RiderEndpoint.java[tag=wayline-contract-endpoint,indent=0]
+----
+
+A method added to the contract and not implemented on the server is a compile
+error, and so is a field the app reads that the server's class no longer has.
+<<backend-web>> covers the mechanism.
+
+The caller is never a parameter. `Caller.name()` reads the signed-in user from
+the request's security context, so an endpoint acts on the rides of whoever
+holds the token and can't be asked to act on someone else's.
+
+The interfaces are `AccountApi`, `RiderApi`, `DrivingApi` for the application
+to drive, `DriverApi`, `PaymentApi`, `GeoApi` and `AdminApi`. Each has one
+endpoint class on the server that does nothing but call a service: `Rides`,
+`Payments`, `Applications`, `Accounts` and the rest. The services hold the rules.
+
+[[wayline-server-structure]]
+=== How the server is put together
+
+Under the endpoints the server has three layers, and a change usually touches
+one class in each.
+
+[cols="1,2,3"]
+|===
+| Layer | Where | What it does
+
+| Entities
+| The `domain` package
+| One class for each table, with public fields: `Ride`, `RideEvent`,
+  `RidePassed`, `Profile`, `Preference`, `PhoneCode`, `DriverState`,
+  `DriverApplication`, `DriverDocument`, `Payment`, `PaymentMethod`, `Payout`,
+  `Pricing` and the rest. They're never sent to the app. The classes in
+  `shared` are what travels.
+
+| Repositories
+| Beside the service that uses them: `RideRepository`, `DriverRepository`,
+  `ProfileRepository`, `PaymentRepository`, `ApplicationRepository` and others
+| The queries, and nothing else. Each is a `@Component` whose constructor takes
+  the ORM's `Session`.
+
+| Services
+| `Rides`, `Matcher`, `Fares`, `Payments`, `Earnings`, `Applications`,
+  `Accounts`, `Preferences`, `PhoneVerification`, `Statistics`
+| The rules. Each is a `@Component` whose methods are `@Transactional`, and it
+  reads and writes through repositories only.
+|===
+
+An entity names its table and its columns, and gets no generated key: every id
+is text the server makes in `Ids`. This is the start of `Ride`:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/wayline/Ride.java[tag=wayline-entity,indent=0]
+----
+
+The annotations are the ones <<backend-data>> describes. The entities don't create
+the tables. The migrations do, as <<wayline-schema>> explains, so a field and
+its column are two edits that go together.
+
+A repository is a `@Component` over the injected `Session`:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/wayline/RideRepository.java[tag=wayline-repository,indent=0]
+----
+
+Most queries are written with the session's builder, which names Java fields
+and not columns. Where the builder can't say it, a repository passes a
+query over the entities to `session.createQuery`, as
+`DriverRepository.freeInBox` does to find the free drivers inside a bounding
+box.
+
+A service method that's marked `@Transactional` runs in one transaction, and
+the injected `Session` is that transaction's session, as
+<<backend-transaction-session>> describes. A change made to an entity the
+session loaded is written when the method returns, with no call to save it:
+`PhoneVerification.store` sets four fields on the `PhoneCode` it read and
+returns. Methods that only read are marked `@Transactional(readOnly = true)`,
+which PostgreSQL and MySQL enforce:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/wayline/Rides.java[tag=wayline-service-readonly,indent=0]
+----
+
+Two rules shape the services, and both are about what a transaction must not
+contain:
+
+* A call that leaves the server isn't made inside a transaction. `Rides.complete`
+  is three steps: `finish` moves the ride to `COMPLETED` and commits,
+  `Payments.settle` charges the card with no transaction open, and `settled`
+  records the result in a second transaction. `PhoneVerification.start` stores
+  the code, commits, and only then sends the text message. A charge can take
+  seconds, and a transaction held across it would hold a database connection
+  for as long.
+* The app is told of a change only once it's committed. The public methods of
+  `Rides` come in pairs for that reason: a private `@Transactional` method
+  makes the change and returns a `Change`, and the public method that called it
+  passes that to `tell`, which publishes it on the live channel. An app that's
+  told a ride changed asks for the ride at once, on another connection, and
+  must find it changed.
+
+A rider cancelling a ride is one such pair:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/wayline/Rides.java[tag=wayline-service-transaction,indent=0]
+----
+
+A private method can carry `@Transactional` here and be called through `this`.
+The build writes the transaction into the method itself, so there's no proxy
+for the call to bypass. <<backend-data>> covers the rules.
+
+=== Who may do what
+
+The server is its own OAuth 2.0 authorization server. `SecurityConfig` registers
+one public client for the app, which signs in with the authorization-code flow
+and PKCE and holds no secret. Accounts, the registered client, tokens and
+signing keys are kept in the database by the tables the security layer creates.
+<<backend-security-authorization-server>> documents the pieces.
+
+`SecurityConfig` declares two filter chains. The first covers the sign-in
+paths: `/login`, `/oauth2/**`, `/.well-known/**`, `/userinfo` and `/logout`. It keeps a session for
+the few requests a sign-in takes, answers the sign-in form with a status and
+JSON, and limits attempts for each client address.
+
+The second chain covers `/api/**`, has no session, and requires a bearer token
+on every request. Its rules are the whole of the access policy:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/wayline/ApiRules.java[tag=wayline-api-rules,indent=0]
+----
+
+Three things about that chain are worth knowing before changing it:
+
+* The roles are `RIDER`, `DRIVER` and `ADMIN`, in `Roles`. A token says who the
+  caller is and not what they may do. The chain reads the account's roles from
+  the database on every request, so a role an admin withdraws and a block an
+  admin places take effect on the next request, not when the token expires.
+* The application to drive is under `/api/driving`, not `/api/driver`, on
+  purpose: someone who isn't a driver yet has to reach it.
+* The app hides the screens a role can't use. That's a courtesy. The chain is
+  what refuses the request.
+
+The same sign-in works from a browser with one difference. An installed app
+receives the authorization code on a loopback address. A page can't, so the
+server registers a second redirect address on its own origin,
+`/signin/code`, which `SignInCodePage` answers with the code as JSON. Because a
+browser sends a session cookie on its own, the sign-in chain refuses a request
+that changes something and names another site in its `Origin` header.
+<<backend-hosting-the-app>> explains the reasoning.
+
+=== A ride from request to receipt
+
+A ride is a `Ride` entity, a row in `wl_ride`, with a state. `RideStateMachine`
+lists the moves that are allowed:
+
+[cols="2,3"]
+|===
+| State | How a ride gets there
+
+| `REQUESTED`
+| A rider asked for it, or the driver it was offered to declined or didn't
+  answer.
+
+| `OFFERED`
+| The server offered it to a driver.
+
+| `ACCEPTED`, `ARRIVED`, `IN_PROGRESS`, `COMPLETED`
+| The driver accepted, reached the pickup, started the trip and finished it.
+
+| `CANCELLED_BY_RIDER`
+| The rider cancelled before the trip started.
+
+| `CANCELLED_BY_DRIVER`
+| The driver cancelled after accepting and before the trip started.
+
+| `CANCELLED_BY_ADMIN`
+| An admin cancelled a ride that hadn't finished.
+
+| `NO_DRIVERS`
+| Nobody took the ride within the time allowed.
+|===
+
+[[wayline-ride-atomic]]
+==== Two answers at the same moment
+
+Two drivers can't both accept a ride, a rider can't cancel a ride in the instant
+a driver accepts it, and an offer can't be accepted while the server is taking
+it back. None of it takes a lock. Every change of state is one
+conditional update, `RideRepository.move`, and the number of rows it changed is
+the whole answer.
+
+`Rides.tryMove` asks `RideStateMachine.sources` which states the new one may be
+reached from and passes them to the repository:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/wayline/Rides.java[tag=wayline-ride-trymove,indent=0]
+----
+
+The repository builds one statement from what it's given:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/wayline/RideRepository.java[tag=wayline-ride-move,indent=0]
+----
+
+For a driver accepting an offer, the statement is this one:
+
+`update Ride r set r.state = :to, r.updatedAt = :now where r.id = :id and r.state in :from and r.driver = :owner and r.offerExpiresAt >= :now`
+
+It names the states the move may start from, the driver the ride was offered
+to, and the time the offer lapses. `executeUpdate` answers 1 for the request
+that made the move and 0 for every other, because by the time the database
+runs the second statement the row is no longer in a state the statement
+names. `tryMove` records a `RideEvent` only for the 1, in the same
+transaction, and `Rides.move` turns a 0 into a 409 that says where the ride is
+now.
+
+The service never reads the state and then writes it. Reading first and
+writing second would let two transactions both read `OFFERED` and both write
+`ACCEPTED`. One statement can't be interleaved that way on any of the three
+engines, and nothing is held in the server's memory, so the rule holds with
+several server processes on one database.
+
+`RideRaceTest` is the test that would notice the difference. It calls
+`Rides.accept` for one offer from eight threads released together, and
+requires that exactly one call returns the ride as `ACCEPTED`, that the other
+seven are answered 409, and that the ride's history holds one `ACCEPTED`
+event. Two more tests run the acceptances against `Rides.tick` while it takes
+back an offer that has lapsed, and require that nobody gets the ride.
+
+Three other places use the same pattern. `RideRepository.rate` gives a ride
+its stars only where it has none, so a ride rated twice is rated once.
+`PhoneCodeRepository.countGuess` has the database add one to the count of
+wrong codes with `session.increment`, so two guesses sent together each use
+one up. `PaymentRepository.claimTip` and `claimRefund` claim a tip and a refund
+the same way before the payment provider is asked for anything, so of two
+requests only one charges or refunds. A payout has no single row to claim, so
+`Earnings.cashOut` commits the payout, reads the balance again, and takes its
+own row back when the balance has gone below zero.
+
+A statement that changes rows in bulk empties the session, so a `Ride` read
+before `move` is read again after it. The services do that wherever they go on
+to describe the ride.
+
+==== Fares, matching and the sweep
+
+`Rides.request` fixes the fare when the ride is created, from the server's own
+prices in `Fares`. The distance the app sends is believed only while it's
+plausible for the two points. The driver's share is fixed at the same moment.
+
+`Matcher` picks the driver. It selects drivers who are online, reported a
+position in the last minute, are approved, aren't blocked, have no ride in hand,
+drive the kind of car asked for and meet the ride's options. It takes the
+nearest one who hasn't already passed on this ride. The search covers 3 km for
+the first twenty seconds and 8 km after that.
+
+`Rides.tick` runs every two seconds as a scheduled job. It takes back offers
+whose time ran out and searches again for every ride still waiting. Each ride
+is dealt with in a transaction of its own, so one ride that fails doesn't cost
+the others their turn. The job carries a lock name, so with several server
+processes only one runs it at a time. <<backend-scheduling>> covers scheduled
+jobs.
+
+When a driver completes a ride, `Payments.settle` charges it.
+
+=== Live updates
+
+`LiveEndpoint` is a WebSocket at `/ws/live`. The server pushes a short JSON
+frame when a ride changes state, when the driver of a ride moves, and, to
+admins, when any car online moves. `LiveChannel` in the app receives them.
+
+A WebSocket request from a browser can't carry a bearer token in a header. The
+app therefore first asks `POST /api/live/ticket`, which is a normal call that
+carries the bearer token, for a ticket: a random value that works once, for thirty seconds. It then
+opens the socket with the ticket in the address. The server stores only a hash
+of each ticket.
+
+The screens don't depend on the socket. Each also asks the server for the
+current state every few seconds, so a dropped connection delays an update and
+doesn't lose it.
+
+NOTE: `LiveHub` keeps the open connections in the memory of one process. With
+several server processes, a change made on one isn't pushed to the sockets held
+by another, and those clients catch up on their next poll. Pushing across
+processes needs a channel between them, such as PostgreSQL's `LISTEN` and
+`NOTIFY` or a message broker. The sample has none.
+
+=== The app
+
+`Wayline` is the app's main class. It applies the look and the language, starts
+the session and hands over to `Nav`.
+
+[cols="1,3"]
+|===
+| Class | What it does
+
+| `Nav`
+| Chooses the first screen from the roles `/api/me` returns: `AdminForm`,
+  `DriverForm`, `ApplyForm` for someone who has applied to drive, or
+  `RiderForm`. It remembers the mode a user with several roles was last in.
+
+| `net.Session`
+| Signs in and out and keeps the tokens in secure storage. `net.Api` holds the
+  generated clients, and `net.Net` adapts their callbacks.
+
+| `AppConfig`
+| The server's address. It's the page's own origin in a browser, the address
+  saved from the welcome screen otherwise, and `http://localhost:8080` when
+  neither is there.
+
+| `map.MapStage`
+| A map filling the screen with the app's controls floating over it: a bar at
+  the top, a chip for one short fact, round buttons and a bottom sheet. The
+  rider's, the driver's and the live-map screens are all built on it.
+
+| `map.Maps`
+| Creates the map and draws what goes on it: the pins, the car and the route.
+
+| `ui.Look`, `ui.Lang`, `ui.Layouts`
+| The theme, the language and the layout for the width of the window.
+
+| `admin.Console`
+| The admin screens side by side, for a wide window.
+|===
+
+The colors and the corner radius are CSS variables in the first block of
+`theme.css`, each with a dark twin, and every style in the file is written in
+terms of them. The style names all start with `Wl`.
+
+The text on every screen is English in the source, and the English text is the
+key of the translation. `src/main/l10n` holds one `Bundle_<code>.properties`
+for each language.
+
+`Layouts.wide()` is true in a window at least 165 mm wide. `AdminForm` shows
+the phone console below that width and `Console` above it, and switches when a
+window is resized across it. Screens that have no wide layout are kept to a
+column 150 mm wide. On the desktop the `nativeTheme=native` build hint gives
+the app the operating system's own look.
+
+=== Tests and continuous integration
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/wayline.sh[tag=wayline-sh-tests,indent=0]
+----
+<1> The server's tests on the JVM. They cover access by role, accounts, driving
+    applications, matching, the ride state machine, a whole ride, payments
+    against the simulated provider and against stand-in answers for Stripe,
+    pricing, statistics, moderation, the live socket and the browser sign-in.
+<2> The same tests again with the server compiled to a native binary, which is
+    how it ships.
+<3> Starts the server on the `test` profile and runs the app's tests against it
+    in the simulator. They register, apply to drive and are approved, request a
+    ride, drive it, pay for it and administer it, and compare screens with the
+    pictures in `screenshots/`. On Linux a second pass runs the simulator as a
+    desktop window for the wide console.
+<4> Generates a project from the Initializr template under another name and
+    package, runs its server tests and builds its app.
+<5> Builds the browser version, starts the server hosting it, and drives it in
+    headless Chromium with Playwright: sign in as the rider, reach the home
+    screen and the live channel, sign out, sign in as the admin and reach the
+    console.
+
+The app's tests draw the map from 24 tiles bundled with the tests and take
+straight lines for routes, so a run asks no outside service for anything. The
+`test` profile also swaps the place search for one that knows ten places.
+
+`.github/workflows/wayline.yml` runs all five and builds the app for Android
+and iOS. <<backend-testing>> covers the server test support.
+
+=== The Initializr template
+
+The Initializr's ride-hailing template is this project. A script in the
+repository, `scripts/sync-initializr-wayline.py`, derives the template from
+`scripts/wayline` and fails the build when the two differ, so the template is
+always the project that the tests above ran against.
+
+A generated project differs from the sample in its names:
+
+* The Java package becomes yours.
+* `wayline` in artifact ids and configuration keys becomes your project's name
+  in lower case. `wayline.fare.baseCents` is `myapp.fare.baseCents` in a project
+  called `MyApp`.
+* `WAYLINE` in environment variable names becomes the name in upper case.
+* The main class takes the project's name.
+
+The server's tests come with the generated project. The app's simulator tests,
+their reference pictures and the browser test stay behind.
+
+This chapter uses the sample's names. In your project read `wayline` as your
+own.
+
+=== Making it yours: A ride-sharing service
+
+Most of a ride-sharing product is already here. What changes is the identity,
+the prices and the rules.
+
+==== Name, icon and colors
+
+The name and the package are chosen in the Initializr. After that they're in
+`common/codenameone_settings.properties`, as `codename1.displayName` and
+`codename1.packageName`, and the icon is `common/icon.png`. Text that names the
+service on screen, such as the title of the welcome screen, is ordinary
+translated text: search the bundles in `src/main/l10n` for it.
+
+The colors are the variables at the top of `theme.css`. Changing the brand
+color and its dark twin recolors every button, link and selection:
+
+[source,css]
+----
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=wayline-css-brand,indent=0]
+----
+
+The map's pins, car and route take their colors from the `WlMarkerPickup`,
+`WlMarkerDropoff`, `WlMarkerCar` and `WlRoute` styles in the same file.
+
+==== Products and prices
+
+The prices start as settings and are in the database from the first time an
+admin saves the pricing screen. To start a deployment with your own, set them
+in `backend/application.properties`. The amounts are in the currency's smallest
+unit:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/wayline.properties[tag=wayline-properties-fares,indent=0]
+----
+
+The currency is a setting only. Rides already taken are recorded in it, and
+changing it doesn't convert them.
+
+A fare is the base fare plus the distance and time charges, multiplied for the
+kind of ride and for surge, and never less than the minimum. The service fee is
+a percentage added on top for the rider. The commission is a percentage of the
+fare kept from the driver. `Fares.price` is the arithmetic, and it's the place
+for a different pricing model, such as fixed prices between zones or a price
+for each stop.
+
+Surge is one multiplier an admin sets by hand. Nothing raises it when demand is
+high.
+
+The three kinds of ride are named in several places, and adding or removing one
+touches each:
+
+* `Fares.PRODUCTS`, and the multiplier for each in `Fares.price`.
+* `Rides.PRODUCT_TEXT`, the name, description and seats the rider is shown.
+* The `comfort` and `xl` fields of the `Pricing` entity and their columns in
+  `wl_pricing`, `PricingDto` and `PricingForm`, if the new kind has a
+  multiplier an admin can set.
+* The picker in `ApplicationForm`, where a driver says which kind their car is,
+  and `Ui.productName`.
+* The icon chosen in `RiderForm`.
+
+==== Matching rules
+
+How long a driver has to answer and how long the search goes on are settings:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/wayline.properties[tag=wayline-properties-matching,indent=0]
+----
+
+The search distances and the minute after which a silent driver counts as gone
+are constants at the top of `Matcher`. The rule itself is in three places: the
+query in `DriverRepository.freeInBox`, which finds the drivers who qualify,
+`Matcher.nearby`, which orders them by distance, and `Matcher.pick`, which
+takes the nearest who hasn't passed on the ride. A different rule, such as the
+driver who has waited longest or the best rated within reach, replaces the
+ordering there. Nothing else in the server knows how a driver was chosen.
+
+`DriverRepository.freeInBox` compares latitudes and longitudes in a bounding
+box. That's right for one city on any of the three databases. A service with
+tens of thousands of drivers online would move that query to a spatial index.
+
+==== What a driver has to provide
+
+The five documents are the `KINDS` array in `Applications` on the server and
+the list of cards in `ApplicationForm` in the app. Add a kind to both, such as a
+vehicle inspection or a background check, and the review screen shows it. The
+fields of the form are fields of the `DriverApplication` entity, columns of
+`wl_driver_application` and fields of `DriverApplicationDto`.
+<<wayline-schema-change>> walks through adding one.
+
+The server checks that an uploaded file is a JPEG or a PNG and under 1.5 MB.
+It doesn't read the documents. Whether a license is real is the admin's
+judgment, or a verification service you call from `Applications.submit`.
+
+==== Text messages
+
+Verification codes go to the log until the server has the credentials of a
+text-message provider. <<wayline-sms>> covers the settings, the limits and
+how to use a provider other than Twilio.
+
+==== Languages
+
+To add a language, add `Bundle_<code>.properties` to `src/main/l10n`, add the
+code to `Lang.CODES` in the app, and add it to the `LANGUAGES` array in
+`Preferences` on the server, which refuses a language it doesn't know. A
+language written right to left sets the `@rtl` key in its bundle, as the Hebrew
+one does.
+
+==== Before it's a product
+
+These are things the sample doesn't have, and a ride-sharing product needs:
+
+* Real payments, payouts to drivers, and tax. See <<wayline-billing>>.
+* Real text messages. See <<wayline-sms>>.
+* Push notifications. The switches in the settings are stored and nothing
+  sends a notification. A rider with the app closed isn't told the driver
+  arrived.
+* Position reports while the driver's app is in the background.
+* A cancellation fee, scheduled rides, shared rides and promotions.
+* A check that the rider asking for a woman driver is one. `Matcher` filters
+  the drivers by the gender in their profile and doesn't look at the rider's.
+* Statistics by local time. The dashboard's day and its busy hours are in UTC.
+* TLS. The Android build allows clear-text traffic so that a phone can reach a
+  development server. Remove `android.xapplication_attr` from
+  `codenameone_settings.properties` once the server has a certificate.
+
+=== Making it yours: A dispatch service for a taxi station
+
+A station with twelve cars and a dispatcher is a smaller service with different
+rules. The drivers are known, bookings arrive by phone as well as from the app,
+a person decides who takes which ride, and most rides are paid in cash or put
+on a company's account. The sample covers the riders' app, the drivers' app, the
+fares, the receipts and the console. The rest is described here, with the class
+each change belongs in.
+
+==== A fixed fleet
+
+Nobody applies to drive. An admin makes an account a driver directly: the
+**Driver** switch on an account in **People** calls `Accounts.setRoles`, which
+gives the role and records an approved application for it. A driver made this
+way is of the standard kind and has no car details. To record each car, fill in
+the application's vehicle fields from an admin screen of your own.
+
+To close the open door:
+
+* Remove **Drive with Wayline** from the rider's menu in `RiderForm`, the
+  **Drive** choice from `RegisterForm`, and `ApplyForm` from `Nav`.
+* Decide whether the public may register. If only staff create accounts, take
+  **Create an account** off `WelcomeForm` and require the admin role for the
+  registration path, as in the rules below.
+
+==== A dispatcher
+
+A dispatcher needs more than a driver and less than an admin, which is a fourth
+role. Add it to `Roles`, to the role switches in `Accounts.setRoles` and
+`UsersForm`, and give its paths a rule of their own in the API chain:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/wayline/ApiRules.java[tag=wayline-station-rules,indent=0]
+----
+
+Then declare the dispatcher's calls in a new `@RestClient` interface in
+`shared`, such as `DispatchApi`, and implement the interface the server's build
+generates from it.
+
+==== Assigning a ride by hand
+
+Automatic matching is two calls to `Rides.search`: one at the end of
+`Rides.request` and one for each waiting ride in `Rides.tick`. Remove both and a
+requested ride waits in `REQUESTED` until somebody assigns it. Keep the part of
+`tick` that takes back unanswered offers.
+
+Assigning is the same move the matcher makes, with the driver chosen by a
+person. Add it to `Rides`:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/wayline/Rides.java[tag=wayline-dispatch-assign,indent=0]
+----
+
+It's a pair, the way the other moves are. The private `@Transactional` method
+calls `tryMove` with `RideStates.OFFERED`, the driver and the time the offer
+lapses, which is the move `Rides.offer` makes for the matcher. The public
+method passes the `Change` it returns to `tell`. `tryMove` also records the
+event in the ride's history, and `tell` has the driver's screen show the offer
+at once. A ride that somebody else assigned first, or that the rider cancelled,
+is answered 409. The driver's app needs no change: an
+offer is an offer whoever made it.
+
+Two settings matter once a person does the matching. `wayline.search.seconds`
+is how long a ride may wait before it becomes `NO_DRIVERS`, and ninety seconds
+is too short for a dispatcher on the phone. `wayline.offer.seconds` is how long
+the driver has to answer.
+
+The dispatcher's screen is a list of waiting rides beside the live map. Both
+exist: `AdminRidesForm` lists rides, `FleetForm` shows the cars, and `Console`
+shows how a list and a detail sit side by side in a wide window.
+
+==== Bookings taken by phone
+
+`Rides.request` takes the rider's account name as its first parameter, and the
+rider's endpoint passes the caller. A dispatcher's endpoint passes the customer
+instead, so a booking entered by staff is the same ride with the same fare
+rules. Two checks in that method are written for riders booking for themselves
+and need a decision:
+
+* The rider's phone number must be verified. A customer the dispatcher is
+  speaking to has shown they hold the number, so staff-created accounts can be
+  marked verified.
+* A rider may have one ride under way. That's right for a customer account and
+  wrong for one shared account that stands for everyone who phones in. Give
+  each caller an account keyed by their phone number, or lift the check for
+  bookings made by staff.
+
+The pickup and the destination come from the same place search the rider's app
+uses, `GeoApi`, so the booking form can reuse `PlaceSearchForm`.
+
+==== Cash and accounts
+
+Cash is already a payment method. It's the default for an account with no saved
+card, the driver's screen says how much to collect, and the ride is recorded as
+paid. A station that takes no cards removes **Add a card** from `WalletForm` and
+never configures a payment provider.
+
+Riding on account, where a company is invoiced at the end of the month, is a
+method the sample doesn't have. Cash shows the pattern: `Payments.CASH` is a
+method id that `Payments.settle` records as paid without asking the provider.
+An account method does the same and records which customer to invoice, which
+needs a table for the customers and a column on the ride. They go in a new
+migration, numbered after the last one the project has, with an entity for the
+table and a field on `Ride` for the column, as <<wayline-schema-change>>
+describes:
+
+[source,sql]
+----
+include::../demos/common/src/main/snippets/developer-guide/wayline.sql[tag=wayline-sql-table,indent=0]
+----
+
+Producing the invoice from those rows is yours to write.
+
+`Earnings` needs a decision too. It credits a driver with the fare less
+commission for every completed ride, cash rides included, as if the service had
+collected the money. For drivers who keep the cash they collect, subtract cash
+fares from the balance, or the ledger says the station owes money it never
+held. For drivers on a wage, remove `EarningsForm` from the driver's menu.
+
+==== What to switch off
+
+[cols="2,3"]
+|===
+| Feature | Where
+
+| The service fee and commission
+| Set both percentages to zero, in the settings or on the pricing screen.
+
+| The larger kinds of ride
+| Leave one entry in `Fares.PRODUCTS` and `Rides.PRODUCT_TEXT`.
+
+| Surge
+| Leave the multiplier at 1, and remove its field from `PricingForm`.
+
+| Tips through the app
+| Remove the tip row from the end-of-ride sheet in `RiderForm` and from
+  `ReceiptForm`.
+
+| Driving applications
+| Remove `ApplyForm`, `ApplicationForm` and the **Applications** section of the
+  console. `DrivingEndpoint` can stay unused or go with them.
+
+| Ratings
+| Remove the stars from the end-of-ride sheet in `RiderForm`.
+|===
+
+[[wayline-billing]]
+=== Billing
+
+==== What the sample does
+
+Every payment goes through one interface on the server, `PaymentProvider`:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/wayline/PaymentProvider.java[tag=wayline-payment-provider,indent=0]
+----
+
+The shape is the one card processors share. A rider is a customer of the
+processor. A card is saved to that customer once and comes back as a token. From
+then on the server charges the token with nobody present, which is what lets a
+ride be paid for as it ends. The server stores the token, the brand and the
+last four digits.
+
+`Payments` is the service that uses the interface. It keeps the saved methods,
+charges the fare and the service fee when a ride completes, charges a tip once,
+refunds, and builds receipts. Every charge carries a key made from the ride's
+id, so a request repeated after a timeout can't charge twice.
+
+Two implementations come with the sample:
+
+* `SimulatedPayments` is used when no key is configured. It accepts any card
+  number that passes the usual checksum, and treats the test numbers listed in
+  <<wayline-users-guide>> specially. The card is typed into the app. No money
+  moves.
+* `StripePayments` is used when a Stripe secret key is configured.
+
+==== Turning on Stripe
+
+Set the key in the server's environment, not in a file in the repository, and
+tell the server the address it's reached at:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/wayline.properties[tag=wayline-properties-stripe,indent=0]
+----
+
+The first line reads the key from the environment variable
+`WAYLINE_PAYMENTS_STRIPE_SECRET`. The server reads that variable for this
+setting without the line as well. The second line is the address Stripe sends
+the browser back to. It's needed only when that address differs from the
+issuer, which the server uses otherwise. With the key set and neither address
+configured the server refuses to start.
+
+`StripePayments` calls Stripe's REST API directly and uses no SDK:
+
+* Adding a card creates a Checkout Session in setup mode. The app opens the
+  session's page in the device's browser, so the card number is typed into
+  Stripe's page and never reaches the app or your server.
+* Stripe sends the browser back to `/pay/return` on your server, a plain page
+  from `PayReturnPage` that tells the user to return to the app. When the app
+  comes back to the foreground, it asks the server to finish the setup, and the
+  server reads the saved card from the session.
+* A ride is charged with a PaymentIntent that's confirmed at once and marked
+  off-session, with the ride's key as the idempotency key.
+* A refund is a Stripe refund of that PaymentIntent.
+
+WARNING: The tests cover this path with stand-in answers in place of Stripe's.
+Nothing in the project has run against a Stripe account. Use a test-mode key
+and Stripe's test cards, and follow one card from adding it to a charge, a tip
+and a refund, before a live key goes near it.
+
+==== What's left to do
+
+The sample stops well short of a billing system. In rough order of need:
+
+Webhooks:: The server learns the result of a charge from the response to its
+own request and listens for nothing. A dispute, a refund made in Stripe's
+dashboard, or a payment that settles later is never seen. Add a controller for
+Stripe's events, verify each event's signature, and update `wl_payment` from
+it.
+
+Cards that need the owner's approval:: A bank may require authentication for an
+off-session charge. `StripePayments` treats that answer as a decline. A product
+brings the rider back into the app to approve the payment, and tries again.
+
+Failed payments:: When the charge at the end of a ride fails, the ride is
+marked as failed to pay and the failure is logged. Nothing retries it, asks for
+another card, or stops that rider from asking for the next ride. Decide the
+policy and put it in `Payments.settle` and `Rides.request`.
+
+Holding the fare first:: The sample charges once, at the end. Placing a hold on
+the card when the ride is requested, and capturing it at the end, catches a
+card with no funds before the driver has driven.
+
+Paying drivers:: Earnings and payouts are a ledger. **Cash out** writes a row
+that says the balance was paid, and no money leaves. Paying drivers needs a
+product built for it, such as Stripe Connect, where each driver is a connected
+account that passes the processor's identity checks and receives transfers. The
+alternative is a payment file for your bank produced from `wl_payout`. The bank
+details the sample stores are a holder's name, a bank's name and four digits,
+which is enough to show on a screen and not enough to pay anyone.
+
+Tax and invoices:: A receipt lists the fare's parts and the total. There's no
+tax line, no invoice number and no document to download. What a receipt must
+show depends on where you operate.
+
+==== Another payment provider
+
+A second processor is a second class that implements `PaymentProvider`. Two of
+its methods show the difference between a provider with a page of its own and
+the simulated one:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/wayline/HostedPayments.java[tag=wayline-payment-second,indent=0]
+----
+
+The app opens the provider's page for any setup that says it's hosted, so it
+needs no change. `Services` is where the server picks an implementation from
+its settings:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/wayline/Services.java[tag=wayline-payment-choice,indent=0]
+----
+
+A provider that takes the card inside the app through its own mobile SDK is a
+bigger change. The setup then happens in native code in the app, and the server
+is sent a token, not a typed card.
+
+[[wayline-sms]]
+=== Text messages
+
+A phone number is verified with a six-digit code sent by text message.
+`PhoneVerification` makes the code and checks it, and hands the sending to an
+`SmsSender`, an interface of two methods: `send(phone, text)` and `delivers()`.
+
+The server has two implementations, and `Services.smsSender` picks one from
+the settings:
+
+[cols="1,3"]
+|===
+| Class | When it's used
+
+| `LoggingSmsSender`
+| When no provider is configured. It writes `[sms] to`, the number and the
+  text to the server's output, and answers `false` from `delivers()`.
+
+| `TwilioSmsSender`
+| When all three Twilio settings are present. It posts the message to Twilio's
+  Messages API.
+|===
+
+==== Turning on Twilio
+
+[cols="2,2,3"]
+|===
+| Property | Environment variable | What it holds
+
+| `wayline.sms.twilio.sid`
+| `WAYLINE_SMS_TWILIO_SID`
+| The account SID.
+
+| `wayline.sms.twilio.token`
+| `WAYLINE_SMS_TWILIO_TOKEN`
+| The auth token. Keep it in the environment and not in a committed file.
+
+| `wayline.sms.twilio.from`
+| `WAYLINE_SMS_TWILIO_FROM`
+| The number the messages are sent from.
+|===
+
+With any of the three missing, the server logs the codes. Nothing in the app
+changes when the provider does.
+
+On a development profile with the logging sender, the server also returns the
+code to the app, which shows it on the verification screen so a demo needs no
+phone. Once the sender delivers, or on any other profile, the code is never
+returned.
+
+==== What limits a code
+
+These are in `PhoneVerification` and `SecurityConfig`:
+
+* A code is good for five minutes, `CODE_SECONDS`.
+* Five wrong entries, `MAX_ATTEMPTS`, spend the code, and the user asks for
+  another. The count is one statement in the database,
+  `PhoneCodeRepository.countGuess`, so guesses sent together are each counted.
+* Another code for the same account within 30 seconds, `RESEND_SECONDS`, is
+  answered 429.
+* `SecurityConfig` allows `/api/account/phone/**` ten requests in ten minutes
+  for each signed-in user.
+* Only a hash of the code is stored, in `wl_phone_code`, and a new code
+  replaces the one before it.
+* The code is stored and committed before the message is sent. When the
+  provider refuses the message, the code is discarded and the request is
+  answered 503.
+
+The ten-in-ten-minutes limit uses an `InMemoryRateLimiter`, so it's counted in
+each server process. The other limits are in the database and hold across
+instances.
+
+==== Another provider
+
+The interface is all a provider has to implement:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/wayline/SmsSender.java[tag=wayline-sms-sender,indent=0]
+----
+
+A second provider is a second class, with `delivers()` answering `true`. This
+one posts a form to a gateway, which is the shape of `TwilioSmsSender` too:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/wayline/GatewaySmsSender.java[tag=wayline-sms-second,indent=0]
+----
+
+`send` throws an `IOException` when the provider refuses the message, and
+`PhoneVerification` turns that into the 503. `Services.smsSender` then returns
+the new class when its settings are present. Add the branch beside the one
+that returns `TwilioSmsSender`:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/wayline/Services.java[tag=wayline-sms-choice,indent=0]
+----
+
+A message costs money and a number can be anyone's, so before going live
+decide which countries you send to and add that check to `Accounts.phone`,
+which accepts any number of seven to fifteen digits.
+
+[[wayline-external-signin]]
+=== Signing in through another identity provider
+
+Out of the box the server is its own authorization server: accounts and
+passwords are in its database, and the tokens the API accepts are the ones it
+signs. A product often wants people to sign in with an account they already
+have, at Google, Microsoft Entra ID, Auth0 or a Keycloak of its own. There
+are two ways to do it, and they differ in who issues the token the API sees.
+
+[cols="1,2,2"]
+|===
+| | Beside the built-in server | Instead of it
+
+| Who signs the user in
+| The provider, or Wayline's own password form
+| The provider only
+
+| Whose token the API accepts
+| Wayline's, as now
+| The provider's
+
+| Where the roles are
+| Wayline's database, as now
+| Wayline's database, or a claim in the token
+
+| What changes
+| The sign-in chain, and how the app starts a sign-in
+| The API chain, the app's sign-in, registration and the password screens
+|===
+
+The first is the smaller change and keeps password accounts working. Choose
+the second when the organization already manages its people, and their roles,
+in the provider.
+
+==== Beside the built-in server
+
+The server keeps issuing its own tokens and leaves it to the provider to
+identify the user. On the server that's `oauth2Login` on the sign-in chain, with the
+provider's client id and secret in the configuration:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-security.properties[tag=backend-security-properties-oauth2,indent=0]
+----
+
+A registration called `google` or `microsoft` needs only the id and the
+secret. Auth0 and Keycloak are described by a provider block with their
+`issuer-uri`, as the `acme` registration is. The secret belongs in the
+environment.
+
+Wayline's accounts are named by e-mail address, which is what
+`LinkingOAuth2UserService` matches on: a person whose provider vouches for
+the address of an existing account signs in as that account, with its roles.
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SocialLoginConfig.java[tag=backend-security-oauth2-linking,indent=0]
+----
+
+In Wayline the `oauth2Login` call goes on the `signIn` chain in
+`SecurityConfig`, beside `formLogin`. <<backend-security-oauth2-login>> covers
+the registration keys and the linking rules. Two things are particular to
+Wayline:
+
+* An account has a row in `wl_profile` as well as a sign-in, and
+  `Accounts.register` writes both. With `setCreateUsers(true)` the linking
+  service creates the sign-in alone. Either leave it `false` and send new
+  people through the app's registration first, or create the profile for a
+  user who arrives without one.
+* The redirect address to register with the provider is the server's:
+  `/login/oauth2/code/` and the registration's name, on the issuer's `https`
+  address. It's one address for every platform, because the provider only
+  ever redirects to the server.
+
+In the app, `Session.authenticate` posts the e-mail address and password to
+`/login` and then asks for the code itself, with no browser. A provider's
+sign-in page has to be shown, so that path changes to the browser flow of
+`OidcClient`. `Session` already builds the client with `OidcClient.create`.
+The sign-in becomes a call to `authorize()`:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/BackendSignInSnippets.java[tag=backend-signin-authorize,indent=0]
+----
+
+The redirect address of that flow is the app's, and it differs by platform:
+
+[cols="1,3"]
+|===
+| Where the app runs | Redirect address
+
+| iOS and Android
+| An address in a scheme of the app's own, such as
+  `com.example.rides:/oauth2redirect`. Declare the scheme with the
+  `ios.urlScheme` and `android.xintent_filter` build hints, as
+  <<signing-in-against-a-codename-one-backend>> shows.
+
+| The hosted browser app
+| `/signin/code` on the server's own origin, `AppConfig.WEB_REDIRECT_PATH`,
+  which the server already registers.
+
+| The simulator and the desktop app
+| An `https` address. The browser window closes when it reaches it.
+|===
+
+Each address the app uses has to be on the registered client. Add the scheme
+address with another `redirectUri` call where `SecurityConfig.clients` builds
+the `RegisteredClient`, and return it from `AppConfig.redirectUri()` on a
+device. The client is saved only when the database has none with that id, so a
+database that already holds the registration keeps the old list until the
+stored client is updated.
+
+==== Instead of the built-in server
+
+With this approach the provider issues the tokens and the server only
+validates them.
+
+*The app.* Build the client from the provider's metadata instead of from
+Wayline's endpoints, with the client id the provider issued:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AuthenticationAndIdentityJava001Snippet.java[tag=authentication-and-identity-java-001,indent=0]
+----
+
+`OidcClient.discover` works with any provider that publishes OpenID Connect
+metadata. Keep the `OidcRequestAuthorizer` that `Session` installs on the
+API's address. It attaches the token and refreshes it whatever the issuer is.
+The redirect addresses are the ones in the table above, registered with the
+provider this time: the scheme address for the installed apps and the `https`
+address of the hosted app. Register the app as a public client, with no
+secret.
+
+*The server.* The API chain stops building a decoder from its own keys and
+validates the provider's tokens:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-security.properties[tag=backend-security-properties-jwt,indent=0]
+----
+
+Set `audiences` to the identifier the provider puts in the access token's
+`aud` for your API. In `SecurityConfig.api`, drop the `DefaultJwtDecoder`
+built from the signing keys and the `decoder` call, and the chain uses the
+one these properties describe. The `signIn` chain, the `clients` bean and
+`SignInCodePage` are no longer used. <<backend-security-resource-server>>
+covers the keys, what's verified and a server that trusts several issuers.
+
+The API needs an access token that's a JWT the server can verify with the
+provider's published keys. Check what your provider issues for an API of your
+own before choosing this approach. A provider whose access tokens are opaque,
+or meant only for its own APIs, fits the first approach.
+
+*What goes with it.* Registration, the password change and the password
+check before deleting an account all work on Wayline's own user store.
+With a provider in charge of the accounts, a person's first request has to
+create their profile, and the password screens go.
+
+==== From claims to roles
+
+The API rules ask for `RIDER`, `DRIVER` and `ADMIN`. Where those come from is
+the `JwtAuthenticationConverter` on the API chain, and there are two choices.
+
+*Keep the roles in Wayline's database.* The converter in `SecurityConfig`
+ignores the token's claims and loads the account named by the token's subject
+on every request. A provider's subject is an opaque id and not an e-mail
+address, so tell the converter which claim names the account with
+`setPrincipalClaimName`, and use a claim the provider has verified. Driver
+approval, an admin's grant and a block all keep working as they do now, and
+they take effect on the next request.
+
+*Read the roles from the token.* Have the provider put the roles in a claim
+and map the claim:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/ResourceServerConfig.java[tag=backend-security-jwt-converter,indent=0]
+----
+
+With the `ROLE_` prefix, a claim holding `RIDER`, `DRIVER` or `ADMIN` matches
+the rules unchanged. `JwtGrantedAuthoritiesConverter` reads a claim holding a
+flat list of names. Each provider has its own way to add such a claim to a
+token and its own name for it, so configure the provider to send one and
+check a token from your own tenant.
+
+The cost of this choice is timing. A role withdrawn at the provider is still
+in every token already issued and holds until the token expires, and the same
+is true of a blocked account. Wayline's flows also grant roles themselves:
+approving a driving application makes a driver, and the admin screens grant
+and withdraw admin. With roles in the provider, those two steps have to change
+the roles there, or the driver role has to stay in the database. A reasonable
+split is `ADMIN` from the provider and `RIDER` and `DRIVER` from the database,
+which a converter of your own can combine.
+
+[[wayline-analytics]]
+=== Analytics
+
+The app reports how it's used through the framework's analytics API, which
+<<analytics>> documents. Everything it does is in one class, `Telemetry`, so
+that's the file to read and the file to change.
+
+==== Consent
+
+Nothing is reported until the user agrees. After the first sign-in,
+`ConsentForm` asks once, with **Share usage statistics** and **Not now**.
+The answer is kept on the device, not with the account, and the **Usage
+statistics** switch under **Privacy and safety** in the settings changes it
+at any time. `Telemetry` passes the answer to `Analytics.setConsent` with
+analytics and crash reporting set to the answer and personalization and
+advertising storage always off. <<analytics-consent>> describes what each of
+those gates.
+
+Deleting the account calls `Telemetry.forget`, which resets the anonymous id
+the reports carry.
+
+==== What's reported
+
+Every screen reports a screen view. Beyond that the app reports these events:
+
+[cols="1,2,2"]
+|===
+| Area | Event | Parameters
+
+| Account
+| `login`, `sign_up`, `logout`, `phone_verified`
+| The method, whether the person meant to ride or drive, and why a session
+  ended: the user, expiry or deletion
+
+| Rides
+| `ride_quoted`, `ride_requested`, `ride_cancelled`, `ride_completed`,
+  `rating_given`
+| The product, the payment kind, a distance bracket, a fare bracket, who
+  cancelled and in which state, the number of stars
+
+| Payments
+| `tip_added`, `card_added`, `card_removed`
+| Where the tip was added and its share of the fare
+
+| Driving
+| `driver_application_started`, `driver_application_submitted`,
+  `driver_online`, `driver_offline`, `offer_accepted`, `offer_declined`,
+  `payout_requested`
+| Whether an application is a resubmission, and an amount bracket
+
+| Administration
+| `admin_application_approved`, `admin_application_rejected`,
+  `admin_user_flagged`, `admin_user_unflagged`, `admin_user_blocked`,
+  `admin_user_unblocked`, `admin_ride_refunded`, `admin_pricing_changed`
+| Which screen a refund was made from
+
+| Settings
+| `language_changed`, `theme_changed`
+| The language and the theme
+|===
+
+Two user properties go with them, the role and the language. An uncaught
+error is reported with `Analytics.crash` and carries the exception's class
+name alone.
+
+No event carries a name, an e-mail address, a phone number, a street address,
+a position, a card number or a ride's id. Money and distance are reported as
+brackets and never as amounts. Keep to that when you add an event: add a
+method to `Telemetry` and call it from the screen, so the list of what leaves
+the device stays in one file.
+
+==== Where the reports go
+
+`Telemetry.start` registers `LoggingAnalyticsProvider` in the simulator and
+`CodenameOneAnalyticsProvider` everywhere else. A run in the simulator
+writes its events to the console and sends nothing. The Codename One provider
+identifies the app from properties the build puts into it, which a local run
+doesn't have. A built app reports to Codename One, and the reports are shown
+in the developer console.
+
+To send the events somewhere else, register another provider in
+`Telemetry.start`. <<analytics>> lists the ones the framework has and how to
+write one.
+
+[[wayline-maps-data]]
+=== Maps, search and routes
+
+==== What the sample uses
+
+[cols="1,2,2"]
+|===
+| What | Where it comes from | Called by
+
+| The map
+| Vector tiles of OpenStreetMap data from OpenFreeMap, drawn by `MapView`. No
+  key and no account.
+| The app, directly.
+
+| Routes
+| The OSRM project's public demo server, through the `Routing` class.
+| The app, directly.
+
+| Place search
+| A public Photon server, which searches OpenStreetMap data.
+| The server, at `/api/geo/search` and `/api/geo/reverse`.
+|===
+
+Place search goes through your server so that the app never sends what a user
+types to a third party directly, and so that you can change the service without
+shipping a new app.
+
+When a route can't be fetched, the app draws a straight line between the two
+points and estimates the time from the distance. The server prices from its own
+estimate whenever the app's figures aren't plausible, so a failed route changes
+what the rider sees and not what they pay.
+
+==== What these services are good for
+
+All three are run by other people at no charge. They're the right choice for
+development, a demo and a pilot, and they need a decision before a launch:
+
+* The OSRM demo server has no service guarantee and limits how often it can be
+  asked. It exists for trying OSRM out.
+* The public Photon server is shared by everyone who uses it and is meant for
+  light use.
+* OpenFreeMap asks for no key. Read its terms of use, and plan for what your
+  app does when a service you don't control is slow or gone.
+
+None of them knows about traffic. The time the app shows and the time part of
+the fare come from distances and typical speeds.
+
+==== Pointing at your own
+
+Tiles and routes are chosen in the app. `Maps.create` builds the map, and
+`Routing.setService` replaces the route service for the whole app:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/WaylineMapSnippets.java[tag=wayline-map-own-services,indent=0]
+----
+
+A keyed tile provider takes its key with `setApiKey`, and a provider that isn't
+OSRM-compatible is an implementation of `RouteService`.
+<<_tile_sources_and_styles_mapview,The Maps chapter>> covers both.
+
+Place search is chosen on the server:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/wayline.properties[tag=wayline-properties-geocoder,indent=0]
+----
+
+That points `PhotonGeocoder` at a Photon server you run. A different search
+service is another implementation of the `Geocoder` interface, chosen in
+`Services`.
+
+==== Where the app starts
+
+A device that reports its position opens the map there. Until it does, and in a
+browser that won't say, the map opens on `AppConfig.DEFAULT_LAT` and
+`DEFAULT_LNG`, which is San Francisco's northern waterfront. Change them to
+your city.
+
+=== Demo data
+
+Everything a development server shows on first start is made by two classes.
+
+`DemoAccounts` creates the accounts when the server starts. On a development
+profile, which is `dev`, `test` or `local`, it creates the riders, the drivers,
+the applicant and the admin, gives the drivers approved applications with cars
+and placeholder documents, and saves a simulated card for some riders. On any
+other profile it creates one account and no more: the first admin, from
+`wayline.admin.email` and `wayline.admin.password`.
+
+`DemoRides` stores two weeks of rides as entities, already finished: three to six a
+day between ten places in San Francisco, about three quarters of them
+completed, with their events, payments and ratings, and a payout of the first
+week's earnings. The
+sequence is fixed, so every start produces the same fortnight ending today.
+That's what the dashboard's charts draw on a fresh server.
+
+The cars a rider sees are real drivers who are online. Nothing on the server
+invents traffic. To see a car move, sign in as a driver in a second simulator
+and go online. In the simulator the app has no position, so it stands at the
+default one, and the driver's screen drives the car along the route itself at
+25 meters a second.
+
+To use your own data:
+
+* For your own city, change the ten places in `DemoRides` and in
+  `StubGeocoder`, and the default position in `AppConfig`.
+* For a demo with your own cast, edit the list in `DemoAccounts`.
+* For a production database, do nothing. Neither class writes demo data
+  outside a development profile.
+* To load real history, such as rides from a system you're replacing, write a
+  one-off job that stores `Ride`, `RideEvent` and `Payment` entities through
+  `RideRepository` the way `DemoRides` does, or a migration that inserts into
+  `wl_ride`, `wl_ride_event` and `wl_payment`. The statistics read those tables
+  and don't care who wrote the rows.
+
+The app's tests use 24 vector tiles of the same waterfront, stored in
+`common/src/test/resources`. They aren't part of the app. `Maps.useTiles` is the
+hook that swaps them in.
+
+=== Native maps
+
+The sample draws its map with `MapView`, the vector map that Codename One
+renders itself. It looks the same on every platform, the app's bottom sheet and
+buttons float over it, and its light and dark styles follow the app.
+
+`NativeMap` shows the platform's own map instead: Apple MapKit on iOS, and
+Google Maps or Huawei Map Kit on Android. It has the same `MapSurface`
+operations as `MapView`, and it falls back to a `MapView` where no provider is
+available, which includes the simulator, the desktop and the browser.
+<<_native_maps_and_providers,Native maps and providers>> documents it.
+
+Three changes move Wayline to it.
+
+First, select a provider for each platform with build hints in
+`common/codenameone_settings.properties`:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/wayline.properties[tag=wayline-properties-native-maps,indent=0]
+----
+
+Apple MapKit needs no key. Google Maps needs an API key for each platform,
+supplied through the build hints the Maps chapter lists.
+
+Second, create the map as a `NativeMap` in `Maps.create`. The tile source and
+style passed to it are what the fallback uses:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/WaylineMapSnippets.java[tag=wayline-map-native,indent=0]
+----
+
+`MapStage.map`, the `CarMarker` constructor and the helper methods of `Maps`
+are declared with the type `MapView`. Change them to `MapSurface`, which has
+the camera, marker and line methods they call. The few calls that treat the map
+as a component, such as `repaint` and `getHeight`, go through `asComponent()`.
+
+Third, change how the car moves. `CarMarker` glides a marker by setting its
+position twenty times a second. A native provider is told about a marker when
+it's added and isn't told when its position changes, so on a native map the
+marker has to be taken off and put back:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/WaylineMapSnippets.java[tag=wayline-map-native-marker,indent=0]
+----
+
+Do that a few times a second, not twenty: every move is a call into the
+platform's map.
+
+The sample hasn't been built with a native provider, so treat this as the
+route to take and test it on devices. What you gain and give up:
+
+[cols="1,2,2"]
+|===
+| | `MapView`, as shipped | `NativeMap` with a provider
+
+| Keys and accounts
+| None.
+| None for Apple MapKit. A key and a billing account for Google Maps, and
+  Huawei's onboarding for Map Kit.
+
+| Look
+| One style on every platform, in the app's light and dark colors, with the
+  pins and car drawn from `theme.css`.
+| The platform's map, which users know. Its colors are the provider's, and a
+  dark app doesn't make the map dark.
+
+| Data
+| OpenStreetMap, as good as its coverage of your city.
+| The provider's data, which often includes more businesses and addresses.
+
+| Layering
+| An ordinary component. The bottom sheet, the chip and the buttons are drawn
+  over it.
+| A native view embedded in the screen. Test every screen that floats controls
+  over the map, on both platforms.
+
+| Offline and tests
+| Tiles can be bundled with the app, which is how the tests run.
+| The provider decides what's cached. In the simulator and in tests you see
+  the fallback, not the native map.
+|===
+
+[[wayline-database]]
+=== The database
+
+==== Engines and where the address comes from
+
+The server runs on SQLite, PostgreSQL, MySQL and MariaDB with the same code. It
+reads one setting, `cn1.datasource.url`:
+
+[cols="1,3"]
+|===
+| Value | What it opens
+
+| `:memory:`
+| A SQLite database that lives as long as the process. It's what
+  `backend/application-dev.properties` and `application-test.properties` set.
+
+| A file path, such as `./target/app.db`
+| A SQLite database in that file.
+
+| `postgres://user:password@host/database`
+| PostgreSQL.
+
+| `mysql://user:password@host/database`
+| MySQL, or MariaDB. Which of the two answered is read from the server and not
+  from the URL.
+|===
+
+The setting is also read from the environment, as `CN1_DATASOURCE_URL` and as
+`DATABASE_URL`, which is the name a hosting platform usually sets for a
+database it attaches. `backend/application.properties` sets the key to
+`${DATABASE_URL}`, so a deployment supplies the address in its environment and
+no address is committed.
+
+To keep data between restarts while developing, give the `dev` profile a file:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/wayline.properties[tag=wayline-properties-dev-database,indent=0]
+----
+
+To run against PostgreSQL or MySQL, give the server a URL. Nothing else
+changes, and there's no driver to add:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/wayline.sh[tag=wayline-sh-database,indent=0]
+----
+
+The server holds a pool of connections. `cn1.datasource.pool.size` sets how
+many: eight for PostgreSQL and MySQL unless set, four for a SQLite file and one
+for an in-memory database. A request that finds no free connection waits
+`cn1.datasource.pool.borrowTimeoutMillis`, ten seconds unless set, and then
+fails. Every server process has a pool of its own, so the processes times the
+pool size has to stay under the number of connections the database allows.
+<<backend-data>> covers the pool, and the table of settings in
+<<_configuration_and_profiles,Configuration and profiles>> lists these keys with the rest.
+
+The sample's own tests run on the `test` profile, which is an in-memory SQLite
+database. Run the server tests against the engine you deploy on before you
+rely on it there.
+
+[[wayline-schema]]
+==== The schema
+
+The tables are created by the migration scripts in
+`backend/src/main/resources/db/migration`, which run in order when the server
+starts. <<backend-schema-migrations>> describes the rules.
+
+[cols="1,3"]
+|===
+| Script | What it creates
+
+| `V1__accounts.sql`
+| The profile, the preferences, the pending phone codes, the live-channel
+  tickets and the moderation history.
+
+| `V2__drivers.sql`
+| A driver's state and position, the driving applications and the hours
+  driven.
+
+| `V3__driver_documents.sql`
+| The photographs behind a driving application.
+
+| `V4__rides.sql`
+| The rides, their events, and the drivers who passed on each.
+
+| `V5__payments.sql`
+| Payments, the provider's customers, saved methods and setups, payout
+  accounts, payouts and the prices.
+|===
+
+The sign-in tables are separate. The security layer creates them because
+`cn1.security.schema.enabled` is set, as <<backend-security-schema>> describes.
+
+Four of the five scripts are written once, in SQL that all three engines
+accept. They use no generated keys and no boolean or timestamp types: an id is
+text the server makes, a yes or no is a `SMALLINT` of 0 or 1, and a time is
+milliseconds in a `BIGINT`. That's also how the ORM stores a `boolean` and a
+`long` field, so the entities and the columns agree on every engine.
+
+`V3__driver_documents.sql` is the exception, and it shows what the per-engine
+directories are for. A document is stored as text, and it outgrows the 64 KB of
+MySQL's `TEXT`. MySQL needs `LONGTEXT`, a type the other two don't have. For that reason
+the script isn't in `db/migration` itself. It exists three times under the same
+name, in `db/migration/sqlite`, `db/migration/postgresql` and
+`db/migration/mysql`, and the server runs the one for the engine it's connected
+to. MariaDB reads the `mysql` directory. A version is either one common script
+or one script for each engine, never both.
+
+[[wayline-schema-change]]
+==== Changing the schema later
+
+A change to the schema is a new script with the next version number. The next
+one is `V6`, and the two underscores before the description are part of the
+name. A child seat a rider can ask for is `V6__child_seat.sql`:
+
+[source,sql]
+----
+include::../demos/common/src/main/snippets/developer-guide/wayline.sql[tag=wayline-sql-column,indent=0]
+----
+
+A column added to a table that already has rows needs a default, as
+`child_seat` has here. `ADD COLUMN` with a `NOT NULL` default is accepted by
+all three engines, so a script that sticks to it stays a common script. When the SQL has to differ, put the script in the
+three engine directories under one name, as `V3` does, and leave it out of
+`db/migration` itself.
+
+Add the field to the entity in the same change. The migrations create the
+columns and the entities read them, and neither is derived from the other.
+Here `Ride` gets one field:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/wayline/Ride.java[tag=wayline-column-entity,indent=0]
+----
+
+A new table gets an entity class of its own in `domain` as well, as the
+customers of <<_cash_and_accounts,Cash and accounts>> do. The server tests start from
+an empty database and run every migration, so `RideFlowTest` and the others
+fail on an entity and a script that disagree.
+
+What happens when the new build starts:
+
+* Before it accepts a request, the server compares the scripts in the build
+  with the history the database keeps and applies the ones the database hasn't
+  had, in order.
+* On SQLite and PostgreSQL each script runs in a transaction with the row that
+  records it, so a script that fails leaves nothing behind and the server
+  doesn't start. MySQL and MariaDB commit each schema change as it runs. A
+  script that fails there is recorded as failed, and the server refuses to
+  migrate until what it left has been removed and `repair` has been called.
+* Several server processes starting together take a lock in the database, so
+  the script runs once.
+* A database that's already at the newest version isn't touched.
+
+Never edit a script that has been applied. The server checks the applied
+scripts against the ones in the build before it migrates, and refuses to start
+on a difference. A mistake in `V6` that has reached a database is corrected in
+`V7`. Before a script has left your own machine, delete the development
+database and start again. An in-memory database starts from nothing every
+time.
+
+A script that removes a column should ship one release after the build that
+stopped reading it. While a deployment replaces its instances one at a time,
+the old build runs against the new schema.
+
+==== A column, end to end
+
+The script and the entity field above are the first two of the places a piece
+of data touches. The option to bring a pet is already in the sample and shows
+every one, so follow it for the child seat, a flight number or a cost center.
+
+*The schema.* `pets` is a `SMALLINT` column of `wl_ride`, in `V4__rides.sql`,
+and of `wl_driver_application`, in `V2__drivers.sql`. For new data it's a new
+script, as `V6__child_seat.sql` is.
+
+*The entities.* `Ride.pets` and `DriverApplication.pets` are `boolean` fields
+with a `@Column`, as `childSeat` is.
+
+*The services.* `Rides.open`, the transaction of `Rides.request`, copies
+`petFriendly` from the request to `Ride.pets`, and `Rides.toDto` copies it into the
+ride the app is sent. Because the pet option also decides who is offered the
+ride, `Rides.offer` passes it to `Matcher.pick`, and
+`DriverRepository.freeInBox` adds a condition on the driver's application.
+
+*The contract.* The field goes on the class in `shared` that carries it,
+`RideRequestDto` here, and on `RideDto` so the driver sees it:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/wayline/RideRequestDto.java[tag=wayline-column-dto,indent=0]
+----
+
+A field needs nothing else. Both builds regenerate the JSON code for the class.
+
+*The endpoint.* A new field on an existing call changes no endpoint. A new call
+is a method on the `@RestClient` interface and its implementation on the
+server, and the server's build fails until the two match.
+
+*The app.* `SettingsForm` has the switch, `Prefs` keeps its value, `RiderForm`
+copies it into the request, and `DriverForm` shows it on the offer. The label is
+a key in each of the five bundles in `src/main/l10n`.
+
+*The tests.* `MatchingTest` on the server checks that a ride with a pet is
+offered only to a driver who takes pets.
+
+More data about a person follows the same path through `Profile`, `wl_profile`
+and `ProfileDto`, about a driver's car through `DriverApplication`,
+`wl_driver_application` and `DriverApplicationDto`, and about the service's
+prices through `Pricing`, `wl_pricing` and `PricingDto`. A new kind of record
+gets a table, an entity, a repository, a class in `shared`, and a service.
+
+[[wayline-hosting]]
+==== Hosting it: A managed database and one binary
+
+A deployment that suits a new service is a managed PostgreSQL and the server's
+native binary in a small container or virtual machine, behind the platform's
+HTTPS proxy. The steps are the same on any platform that runs a container or a
+process and attaches a database to it.
+
+*Build.* `backend/server.sh build --native --web` runs `cn1:backend-package`,
+which writes the binary to `backend/target/wayline-server`, and
+`cn1:backend-webapp`, which stages the browser app in `backend/target/webapp`.
+The binary is built for the machine the build runs on, so build on the
+architecture you deploy to, or use the cross-compiled targets
+<<backend-operations>> describes.
+
+*Lay it out.* The server reads its settings and looks for the browser app in
+its working directory. Put the binary, `application.properties` and the
+`webapp` directory side by side, as <<backend-hosting-the-app>> shows, and
+start the binary from that directory. Leave `webapp` out and the server is the
+API alone.
+
+*Create the database.* Create an empty PostgreSQL database and a user that
+owns it. The server creates every table at its first start, which takes a user
+that may create tables. Don't create anything by hand: a database that has
+tables and no migration history is refused.
+
+*Set the environment.* Nothing secret belongs in `application.properties`,
+which is committed. A setting is read from the environment under its name in
+upper case with an underscore for each dot.
+
+[cols="2,3"]
+|===
+| Variable | What it holds
+
+| `DATABASE_URL`
+| The `postgres://` address of the database. Many platforms set it themselves
+  when a database is attached.
+
+| `PORT`
+| The port to listen on. A platform that sets it wins over `cn1.server.port`.
+
+| `CN1_SECURITY_AUTHORIZATIONSERVER_ISSUER`
+| The public `https` address of the server, without a trailing slash. It goes
+  into every token, and it's the only origin the browser app may sign in from.
+
+| `CN1_SECURITY_AUTHORIZATIONSERVER_JWK_KEYS`
+| The files holding the key that signs the tokens. Mount them as secret files.
+  They're required outside a development profile.
+  <<backend-security-authorization-server>> covers the keys and their rotation.
+
+| `WAYLINE_ADMIN_EMAIL`, `WAYLINE_ADMIN_PASSWORD`
+| The first administrator, created at the first start. That account grants
+  the admin role to the rest.
+
+| `WAYLINE_SMS_TWILIO_SID`, `WAYLINE_SMS_TWILIO_TOKEN`, `WAYLINE_SMS_TWILIO_FROM`
+| The text-message provider. See <<wayline-sms>>.
+
+| `WAYLINE_PAYMENTS_STRIPE_SECRET`
+| The payment provider. See <<wayline-billing>>.
+|===
+
+The same settings as properties, for a platform that mounts a file instead:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/wayline.properties[tag=wayline-properties-deployment,indent=0]
+----
+
+*Leave TLS to the proxy.* The platform's proxy holds the certificate and
+forwards plain HTTP to the port. Two things follow. The issuer is the address
+users reach, which is the proxy's `https` address and not the container's. And
+the server sees every connection coming from the proxy, so the limit on
+sign-in attempts for each client address would count all users as one. Set
+`cn1.server.forwardHeaders` to `true` and list the proxy's addresses in
+`cn1.server.trustedProxies`, as <<backend-security-proxies>> describes. A
+server with no proxy in front terminates TLS itself with
+`cn1.server.tls.certificate` and `cn1.server.tls.key`.
+
+*Give the platform a health check.* `GET /manage/health` answers without a
+token, with 503 while the server is starting or draining. The management
+endpoints are linked into a packaged server only when `cn1.management.enabled`
+is `true` in `backend/application.properties` at build time, and outside a
+development profile they also need `cn1.management.token` set.
+<<backend-observability>> covers both.
+
+*Start it.* The first start applies the five migrations, creates the sign-in
+tables, registers the app as a client and creates the first administrator. No
+demo accounts and no demo rides are written outside a development profile.
+
+*Point the apps at it.* The hosted browser app uses the page's own origin and
+needs nothing. An installed app takes the address from **Server address** on
+the welcome screen. To build an app that needs no such step, change the
+address `AppConfig` falls back to, and remove the Android clear-text
+attribute listed in <<_before_its_a_product,Before it's a product>>.
+
+*Before a second instance.* A change of ride state, the matching job and the
+migrations are each safe with several processes on one database.
+Two things are held in one process's memory: the open sockets in `LiveHub`,
+and the counters of the `InMemoryRateLimiter` that `SecurityConfig` gives each
+rate limit, so every instance allows the full number of attempts.
+
+==== A second database
+
+A server has one configured database. It's the one the `Session` of every
+repository works on, and the one injected wherever a bean asks for a
+`DataSource`. A second one, such as an archive or a database
+another system owns, is a pool you open yourself with `DataSource.open` and
+publish as a bean. Wrap it in a class of your own so that the two can't be
+confused:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/wayline/Services.java[tag=wayline-second-database,indent=0]
+----
+
+A service then asks for both:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/wayline/Trips.java[tag=wayline-second-database-use,indent=0]
+----
+
+The sample has one database, so this is a pattern and not something its tests
+exercise. Its limits come from the runtime:
+
+* Migrations run against the configured database only, and so do the
+  entities. The schema of the second one is yours to manage, and its rows are
+  read with SQL through its `DataSource`.
+* A transaction is on one database: the first pool the method touches.
+  Statements sent to another pool inside the same `@Transactional` method run
+  outside it and commit on their own. Nothing spans the two.
+* The first connection is opened when the pool is, so a wrong address stops the
+  server at start-up and not on the first request.
+* The engines can differ. The portable SQL described in <<backend-data>> is
+  what lets one statement run on both.

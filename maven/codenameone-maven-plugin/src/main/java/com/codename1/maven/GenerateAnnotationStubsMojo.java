@@ -58,8 +58,14 @@ import java.util.ServiceLoader;
 /// If `process-annotations` is not configured the stubs remain as no-ops so the
 /// app still builds — but it sees no registered routes at runtime. This is the
 /// least-surprise default for users experimenting with annotations.
+///
+/// COMPILE resolution, because one kind of stub is generated from the module's
+/// DEPENDENCIES: the server half of a REST contract that lives in a library the
+/// application and its backend share. See
+/// `RestServerAnnotationProcessor.emitStubs`.
 @Mojo(name = "generate-annotation-stubs",
       defaultPhase = LifecyclePhase.GENERATE_SOURCES,
+      requiresDependencyResolution = org.apache.maven.plugins.annotations.ResolutionScope.COMPILE,
       threadSafe = true)
 public class GenerateAnnotationStubsMojo extends AbstractCN1Mojo {
 
@@ -90,9 +96,22 @@ public class GenerateAnnotationStubsMojo extends AbstractCN1Mojo {
         }
 
         File outputDir = new File(project.getBuild().getOutputDirectory());
+        List<String> classpath;
+        try {
+            classpath = project.getCompileClasspathElements();
+        } catch (org.apache.maven.artifact.DependencyResolutionRequiredException unresolved) {
+            // Not fatal for the stubs that need no classpath, and said out loud
+            // for the one that does: without it no served contract is generated,
+            // and the class implementing it then fails to compile for a reason
+            // that is nowhere near this message.
+            getLog().warn("cn1: the compile classpath for " + project.getArtifactId()
+                    + " is unresolved, so no shared REST contract can be read from its "
+                    + "dependencies: " + unresolved.getMessage());
+            classpath = java.util.Collections.emptyList();
+        }
         ProcessorContext ctx = new ProcessorContext(outputDir, stubSourceDirectory,
                 /*classIndex*/ java.util.Collections.<String, com.codename1.maven.annotations.AnnotatedClass>emptyMap(),
-                MavenLog.of(getLog()));
+                MavenLog.of(getLog()), null, null, null, null, null, classpath);
 
         for (Iterator<AnnotationProcessor> it = processors.iterator(); it.hasNext(); ) {
             AnnotationProcessor p = it.next();
@@ -103,6 +122,14 @@ public class GenerateAnnotationStubsMojo extends AbstractCN1Mojo {
                         "Annotation processor " + p.getClass().getName() + " failed to emit stubs: "
                                 + e.getMessage(), e);
             }
+        }
+
+        if (ctx.hasErrors()) {
+            StringBuilder sb = new StringBuilder("Codename One stub generation failed:\n");
+            for (ProcessorContext.ProcessingError error : ctx.getErrors()) {
+                sb.append("  - ").append(error).append('\n');
+            }
+            throw new MojoFailureException(sb.toString());
         }
 
         Map<String, String> stubs = ctx.getEmittedStubSources();

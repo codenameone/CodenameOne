@@ -141,6 +141,10 @@ include::Backend-MCP.asciidoc[]
 
 include::Backend-Operations.asciidoc[]
 
+include::Wayline-Users-Guide.asciidoc[]
+
+include::Wayline-Implementors-Guide.asciidoc[]
+
 = Device and platform services
 
 include::Push-Notifications.asciidoc[]

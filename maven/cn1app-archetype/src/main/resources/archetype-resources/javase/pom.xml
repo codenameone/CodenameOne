@@ -21,6 +21,19 @@
   </properties>
     <build>
     <testSourceDirectory>${project.basedir}/../common/src/test/java</testSourceDirectory>
+    <!--
+      The tests are common's, and so are the files they read. Without this the
+      tests compile from ../common/src/test/java and then cannot find a resource
+      that sits right beside them in ../common/src/test/resources.
+    -->
+    <testResources>
+      <testResource>
+        <directory>${project.basedir}/../common/src/test/resources</directory>
+      </testResource>
+      <testResource>
+        <directory>${project.basedir}/src/test/resources</directory>
+      </testResource>
+    </testResources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

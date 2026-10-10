@@ -53,11 +53,28 @@ public final class StaticFiles implements HttpServer.Handler {
     private final String prefix;
     private final String indexFile;
     private final String cacheControl;
+    private final boolean precompressed;
 
     /// - `root`: the document root; resolved once, and every request must land inside it
     /// - `prefix`: URL prefix to strip, "" or "/" for none
     /// - `cacheControl`: the Cache-Control value, or null to omit it
     public StaticFiles(String root, String prefix, String indexFile, String cacheControl) throws IOException {
+        this(root, prefix, indexFile, cacheControl, false);
+    }
+
+    /// As above, and with `precompressed` a file that has a gzip copy beside it
+    /// -- `app.js.gz` next to `app.js` -- is answered with that copy to a client
+    /// that accepts gzip.
+    ///
+    /// This is how a large text file is compressed without leaving the zero-copy
+    /// path: compressing on the way out would mean reading the whole file into
+    /// this process for every request, and the copy made once at build time goes
+    /// from the page cache to the socket like any other file. It is off unless
+    /// asked for, because nothing but the build that wrote both can know that
+    /// `x.gz` is `x` compressed and not some other file.
+    public StaticFiles(String root, String prefix, String indexFile, String cacheControl,
+                       boolean precompressed) throws IOException {
+        this.precompressed = precompressed;
         String resolved = FileIo.realPath(root);
         if (resolved == null) {
             throw new IOException("Document root does not exist: " + root);
@@ -215,59 +232,23 @@ public final class StaticFiles implements HttpServer.Handler {
                 decoded = stripTrailingSlash(decoded) + "/" + indexFile;
             }
 
-            // Only where the open could not prove it. Checking the request string
-            // instead is defeated by an encoded traversal or by a symlink out of the
-            // tree, so this resolves first -- but it is a second lookup, which is why
-            // the open above is preferred wherever the platform supports it.
-            if (!beneathProven) {
-                String real = FileIo.realPath(root + decoded);
-                if (real == null || !isInsideRoot(real)) {
-                    return HttpServer.Response.text(403, "forbidden");
+            if (!beneathProven && !resolvesInside(decoded, info)) {
+                return HttpServer.Response.text(403, "forbidden");
+            }
+
+            // The file is settled; which BYTES answer for it is the next question.
+            // Only after the checks above, so the copy is looked for beside a
+            // path that is already known to be inside the root.
+            boolean encoded = false;
+            if (precompressed) {
+                long[] packedInfo = new long[4];
+                int packed = openPrecompressed(request, decoded, beneathProven, packedInfo);
+                if (packed >= 0) {
+                    FileIo.close(fd);
+                    fd = packed;
+                    info = packedInfo;
+                    encoded = true;
                 }
-                // AND THE DESCRIPTOR HAS TO BE THAT FILE. The check above is a
-                // second lookup, so on its own it answers a question about the
-                // path rather than about the bytes: an attacker who can write
-                // symlinks into the document root points one outside for the open
-                // and back inside for the resolve, and what gets served is the
-                // outside file that the check never looked at.
-                //
-                // Binding the two by IDENTITY NARROWS it. It does not close it,
-                // and openBeneathImpl says why in its own comment: the second
-                // lookup is racy in the same way as the first. What the comparison
-                // buys is that the final component can no longer be swapped
-                // unseen -- the resolved path has no symlinks left in it, so an
-                // attacker has to swap a DIRECTORY component of it between the
-                // resolve and this open to still win. Closing it outright is what
-                // openat2 is for, which is why the open above is preferred
-                // wherever the kernel has it.
-                //
-                // TWO MORE LIMITS, both worth naming rather than implying. A hard
-                // link inside the root to a file outside it cannot be told apart
-                // -- and that file does have a name inside the document root,
-                // which is what the root is a statement about. And the comparison
-                // is only as good as the identity: the packaged arm reads it from
-                // an fstat of the open descriptor, so it describes the served
-                // bytes, while the Java SE arm has no fstat for a channel and
-                // reads it from the pathname, so there it is one more statement
-                // about the path rather than about what was opened.
-                //
-                // Only where openBeneath could not settle it; a proven open needs
-                // none of this and pays for none of it.
-                if (info[3] != 0) {
-                    int verify = FileIo.openRead(real);
-                    if (verify < 0) {
-                        return HttpServer.Response.text(403, "forbidden");
-                    }
-                    long[] resolved = new long[4];
-                    int rc = FileIo.stat(verify, resolved);
-                    FileIo.close(verify);
-                    if (rc != 0 || resolved[3] != info[3]) {
-                        return HttpServer.Response.text(403, "forbidden");
-                    }
-                }
-                // A platform that reports no identity at all -- a filesystem with
-                // no file key behind it -- keeps the older, weaker answer rather
-                // than refusing every request it cannot bind.
             }
 
             long size = info[0];
@@ -297,7 +278,20 @@ public final class StaticFiles implements HttpServer.Handler {
             Map headers = new LinkedHashMap();
             headers.put("ETag", etag);
             headers.put("Last-Modified", Http1Date.format(modified));
-            headers.put("Accept-Ranges", "bytes");
+            if (precompressed) {
+                // Either answer was chosen by Accept-Encoding, so both say so: a
+                // shared cache that stored one would otherwise hand it to a
+                // client that asked for the other.
+                headers.put("Vary", "Accept-Encoding");
+            }
+            if (encoded) {
+                // No Accept-Ranges: an offset into these bytes is an offset into
+                // the compressed stream, which is why a request carrying a Range
+                // was never given this copy in the first place.
+                headers.put("Content-Encoding", "gzip");
+            } else {
+                headers.put("Accept-Ranges", "bytes");
+            }
             if (cacheControl != null) {
                 headers.put("Cache-Control", cacheControl);
             }
@@ -341,6 +335,95 @@ public final class StaticFiles implements HttpServer.Handler {
                 FileIo.close(fd);
             }
         }
+    }
+
+    /// Opens the gzip copy beside `path` for a request that can take it, filling
+    /// `out` the way [FileIo#stat] does, or answers -1 to send the file itself.
+    ///
+    /// The validators of the response then come from the copy, which is right:
+    /// they name the bytes on the wire, and the two representations must not
+    /// share an ETag or a cache revalidating one would be told 304 about the
+    /// other.
+    private int openPrecompressed(HttpServer.Request request, String path, boolean beneathProven,
+                                  long[] out) {
+        // A range is an offset into the file the client knows about, never into
+        // a compressed stream of it.
+        if (request.getHeader("range") != null || !Compression.acceptsGzip(request)) {
+            return -1;
+        }
+        String packedPath = path + ".gz";
+        int packed = beneathProven ? FileIo.openBeneath(root, packedPath)
+                                   : FileIo.openRead(root + packedPath);
+        if (packed < 0) {
+            return -1;
+        }
+        // A directory named like the copy, an empty file, or -- where the open
+        // could not prove containment -- a link out of the root: none of them is
+        // the copy, and the file itself is still a correct answer.
+        if (FileIo.stat(packed, out) != 0 || out[2] != 0 || out[0] <= 0
+                || (!beneathProven && !resolvesInside(packedPath, out))) {
+            FileIo.close(packed);
+            return -1;
+        }
+        return packed;
+    }
+
+    /// Whether the descriptor described by `info`, opened for `path` without
+    /// the kernel proving where it resolved, is a file inside the root.
+    private boolean resolvesInside(String path, long[] info) {
+        // Only where the open could not prove it. Checking the request string
+        // instead is defeated by an encoded traversal or by a symlink out of the
+        // tree, so this resolves first -- but it is a second lookup, which is why
+        // the open above is preferred wherever the platform supports it.
+        String real = FileIo.realPath(root + path);
+        if (real == null || !isInsideRoot(real)) {
+            return false;
+        }
+        // AND THE DESCRIPTOR HAS TO BE THAT FILE. The check above is a
+        // second lookup, so on its own it answers a question about the
+        // path rather than about the bytes: an attacker who can write
+        // symlinks into the document root points one outside for the open
+        // and back inside for the resolve, and what gets served is the
+        // outside file that the check never looked at.
+        //
+        // Binding the two by IDENTITY NARROWS it. It does not close it,
+        // and openBeneathImpl says why in its own comment: the second
+        // lookup is racy in the same way as the first. What the comparison
+        // buys is that the final component can no longer be swapped
+        // unseen -- the resolved path has no symlinks left in it, so an
+        // attacker has to swap a DIRECTORY component of it between the
+        // resolve and this open to still win. Closing it outright is what
+        // openat2 is for, which is why the open above is preferred
+        // wherever the kernel has it.
+        //
+        // TWO MORE LIMITS, both worth naming rather than implying. A hard
+        // link inside the root to a file outside it cannot be told apart
+        // -- and that file does have a name inside the document root,
+        // which is what the root is a statement about. And the comparison
+        // is only as good as the identity: the packaged arm reads it from
+        // an fstat of the open descriptor, so it describes the served
+        // bytes, while the Java SE arm has no fstat for a channel and
+        // reads it from the pathname, so there it is one more statement
+        // about the path rather than about what was opened.
+        //
+        // Only where openBeneath could not settle it; a proven open needs
+        // none of this and pays for none of it.
+        if (info[3] != 0) {
+            int verify = FileIo.openRead(real);
+            if (verify < 0) {
+                return false;
+            }
+            long[] resolved = new long[4];
+            int rc = FileIo.stat(verify, resolved);
+            FileIo.close(verify);
+            if (rc != 0 || resolved[3] != info[3]) {
+                return false;
+            }
+        }
+        // A platform that reports no identity at all -- a filesystem with
+        // no file key behind it -- keeps the older, weaker answer rather
+        // than refusing every request it cannot bind.
+        return true;
     }
 
     private boolean isInsideRoot(String real) {

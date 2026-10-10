@@ -1793,8 +1793,9 @@ public class BytecodeMethod implements SignatureSet {
         // optimize()'s return fast-paths (plain return, no frame release) so it must
         // be set first.
         frameless = isFramelessEligible();
-        // Phase 1 shares the raw-bytecode requirement with frameless eligibility.
-        collectRetireCandidates();
+        // Phase 1 of frame-exit retirement shares the raw-bytecode requirement, and
+        // more strictly: it reads OTHER methods' bodies too, so it cannot run here at
+        // all. See freezeRetireCandidates, which Parser calls before any rewrite.
 
         boolean hasInstructions = true;
         if(optimizerOn) {
@@ -4683,7 +4684,29 @@ public class BytecodeMethod implements SignatureSet {
     /// and conservatively answers ESCAPES for everything. Measured: running this after
     /// optimize() dropped 209 of 209 non-stack sites, against 14 kept before it. The
     /// same ordering constraint is why `frameless` is decided on raw bytecode too.
-    public void collectRetireCandidates() {
+    ///
+    /// AND RAW MEANS EVERY METHOD, NOT THIS ONE. A candidate is only as good as the
+    /// check of the methods called on it, and that check walks the CALLEE's body. This
+    /// used to run from appendMethodC, i.e. during code generation, where every method
+    /// emitted earlier has already been through optimize(): `KEEP[id] = this` was by
+    /// then one fused instruction with the load of `this` inside it, the walk never
+    /// saw `this` appear, and a body that never touches the reference is SAFE. Whether
+    /// a leaking callee was caught depended on the order two methods were emitted in.
+    /// The "conservatively answers ESCAPES" above holds for a value the walk is
+    /// already following; it does not hold for a source it can no longer see.
+    ///
+    /// So the candidates are frozen in a pass of their own, before the first rewrite
+    /// of any method -- the same reason freezeFramelessEligibility exists.
+    void freezeRetireCandidates() {
+        if (!retireCandidatesFrozen) {
+            retireCandidatesFrozen = true;
+            collectRetireCandidates();
+        }
+    }
+
+    private boolean retireCandidatesFrozen;
+
+    private void collectRetireCandidates() {
         if (DISABLE_FRAME_RETIRE || isNative() || abstractMethod) {
             return;
         }
@@ -4708,7 +4731,22 @@ public class BytecodeMethod implements SignatureSet {
             }
             java.util.List<String> calls =
                     new java.util.ArrayList<String>(IteratorEscape.receiverCalls);
-            if (!Parser.calleesKeepThis(calls, new java.util.HashMap<String, Boolean>())) {
+            // A CLUSTER'S MEMBERS ARE REACHABLE FROM EACH OTHER, and a callee check
+            // only asks whether the callee leaks `this`. Once one tracked object has
+            // been stored into another, a method called on the holder can publish
+            // the member it holds -- `Node next() { return next; }` leaks nothing of
+            // its own receiver -- and no walk of this frame sees it. So a frame that
+            // built a cluster may construct its members and read their fields, which
+            // the walk follows, and nothing else. Constructors are exempt because an
+            // object cannot have had anything stored into it before its constructor
+            // ran, and the one that takes a member as a parameter has been shape
+            // checked by ctorOnlyStoresParamsIntoThis. lastClusterStore is read here,
+            // before the callee check below runs walks of its own and resets it.
+            if (IteratorEscape.lastClusterStore && callsBeyondConstructors(calls)) {
+                continue;
+            }
+            if (!Parser.calleesKeepThis(ti.getTypeName(), calls,
+                    new java.util.HashMap<String, Boolean>())) {
                 continue;
             }
             if (retireCandidates == null) {
@@ -4732,6 +4770,15 @@ public class BytecodeMethod implements SignatureSet {
         }
     }
 
+    private static boolean callsBeyondConstructors(java.util.List<String> calls) {
+        for (int i = 0; i < calls.size(); i++) {
+            if (calls.get(i).indexOf(".<init>(") < 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /// PHASE 2, after optimize(). Only now is it known whether a site still has a heap
     /// object -- scalar replacement and stack allocation are decided inside optimize --
     /// and whether this method has a frame to exit at all.
@@ -4753,6 +4800,12 @@ public class BytecodeMethod implements SignatureSet {
             }
             if (guard >= 8) {
                 break;      // slots[8] in CN1RetireScope
+            }
+            if (!instructions.contains(ti)) {
+                // The candidates were found before the rewrites that run between the
+                // parse and code generation; one of them removed this allocation.
+                // Nothing would ever write the guard, so do not declare one.
+                continue;
             }
             // The SITE writes its own guard, so the scope can only ever retire the
             // object this analysis actually reasoned about.
@@ -4802,7 +4855,8 @@ public class BytecodeMethod implements SignatureSet {
             }
             java.util.List<String> calls =
                     new java.util.ArrayList<String>(IteratorEscape.receiverCalls);
-            if (!Parser.calleesKeepThis(calls, new java.util.HashMap<String, Boolean>())) {
+            if (!Parser.calleesKeepThis(ti.getTypeName(), calls,
+                    new java.util.HashMap<String, Boolean>())) {
                 continue;
             }
             if (frameless) {

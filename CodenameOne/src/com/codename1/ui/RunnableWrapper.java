@@ -34,6 +34,11 @@ class RunnableWrapper implements Runnable {
     private static int maxThreadCount = 5;
     private static int availableThreads = 0;
 
+    /// Counts the calls to `#retireThreadPool()`. A pool thread remembers the count it
+    /// started under and leaves once it is idle and the count has moved on. Read and written
+    /// under `THREADPOOL_LOCK` only.
+    private static int retirements = 0;
+
     private boolean done = false;
     private Runnable internal;
     private int type;
@@ -54,13 +59,32 @@ class RunnableWrapper implements Runnable {
     }
 
     static void pushToThreadPool(Runnable r) {
-        if (availableThreads == 0 && threadCount < maxThreadCount) {
-            threadCount++;
-            Thread poolThread = Display.getInstance().startThread(new RunnableWrapper(null, 4), "invokeAndBlock" + threadCount);
-            poolThread.start();
-        }
+        // Under the lock since a retiring thread gives its place back under it: counted here
+        // without it, the two could lose each other's update and leave the pool one thread
+        // short for good.
         synchronized (THREADPOOL_LOCK) {
+            if (availableThreads == 0 && threadCount < maxThreadCount) {
+                threadCount++;
+                Thread poolThread = Display.getInstance().startThread(new RunnableWrapper(null, 4), "invokeAndBlock" + threadCount);
+                poolThread.start();
+            }
             threadPool.add(r);
+            THREADPOOL_LOCK.notifyAll();
+        }
+    }
+
+    /// Lets the pool's threads end: each one leaves as soon as it has nothing to run, and
+    /// the next `invokeAndBlock` starts the threads it needs.
+    ///
+    /// A pool thread otherwise waits for work for as long as the process lives. That is what
+    /// an application wants, and it is why nothing in the framework calls this. A host that
+    /// runs several generations of Codename One in one process, each in a class loader of
+    /// its own -- the simulator's test runner gives every test one -- needs the opposite: a
+    /// thread still waiting is a live reference to every class and every static of a
+    /// generation that is over, so none of it can be collected.
+    static void retireThreadPool() {
+        synchronized (THREADPOOL_LOCK) {
+            retirements++;
             THREADPOOL_LOCK.notifyAll();
         }
     }
@@ -137,12 +161,22 @@ class RunnableWrapper implements Runnable {
                     Display.getInstance().mainEDTLoop();
                     break;
                 case 4:
+                    int startedUnder;
+                    synchronized (THREADPOOL_LOCK) {
+                        startedUnder = retirements;
+                    }
                     while (!Display.getInstance().codenameOneExited) {
                         Runnable r = null;
                         synchronized (THREADPOOL_LOCK) {
                             if (!threadPool.isEmpty()) {
                                 r = threadPool.get(0);
                                 threadPool.remove(0);
+                            } else if (startedUnder != retirements) {
+                                // Retired, and idle. The place is given back under the lock
+                                // the next request counts under, so that request starts a
+                                // thread of its own and is not left waiting for this one.
+                                threadCount--;
+                                break;
                             } else {
                                 try {
                                     availableThreads++;

@@ -86,6 +86,14 @@ final class BackendWeaver {
                 + BackendBeans.baseName(ownerInternalName);
     }
 
+    /// The name of the method the helper calls INSTEAD of the body when the
+    /// body's signature names a type the helper cannot write: the same call with
+    /// that type's nearest nameable superclass in its place. It contains the
+    /// body's suffix, so everything that skips a body skips this too.
+    static String erasedBodyName(String ownerInternalName, String method) {
+        return bodyName(ownerInternalName, method) + "$erased";
+    }
+
     /// Whether `name` is a moved body's.
     static boolean isBody(String name) {
         return name.indexOf(BODY_SUFFIX) >= 0;
@@ -110,6 +118,10 @@ final class BackendWeaver {
         final Set<String> constructors = new LinkedHashSet<String>();
         /// name + descriptor of methods to give aspects
         final Set<String> aspects = new LinkedHashSet<String>();
+        /// For the members of [#aspects] whose signature names a type the helper
+        /// class cannot write: name + descriptor -> the descriptor the helper is
+        /// written with instead.
+        final Map<String, String> erasedAspects = new LinkedHashMap<String, String>();
 
         Plan(String internalName, String helperInternalName) {
             this.internalName = internalName;
@@ -179,6 +191,7 @@ final class BackendWeaver {
         }
         final ClassWriter writer = new ClassWriter(reader, ClassWriter.COMPUTE_MAXS);
         final String owner = plan.internalName;
+        final java.util.List<Object[]> erasedBodies = new java.util.ArrayList<Object[]>();
         reader.accept(new ClassVisitor(Opcodes.ASM9, writer) {
             @Override
             public MethodVisitor visitMethod(int access, String name, String descriptor,
@@ -202,8 +215,13 @@ final class BackendWeaver {
                         descriptor, signature, exceptions);
                 MethodVisitor stub = writer.visitMethod(access & ~Opcodes.ACC_SYNCHRONIZED,
                         name, descriptor, signature, exceptions);
+                String erased = plan.erasedAspects.get(name + descriptor);
+                if (erased != null) {
+                    erasedBodies.add(new Object[] {name, descriptor, erased,
+                            Boolean.valueOf((access & Opcodes.ACC_STATIC) != 0)});
+                }
                 return new AspectSplitter(body, stub, owner, plan.helperInternalName, access,
-                        name, descriptor);
+                        name, descriptor, erased != null ? erased : descriptor);
             }
 
             @Override
@@ -222,6 +240,10 @@ final class BackendWeaver {
                 }
                 for (String descriptor : plan.constructors) {
                     emitConstructorBridge(writer, owner, descriptor);
+                }
+                for (Object[] erased : erasedBodies) {
+                    emitErasedBody(writer, owner, (String) erased[0], (String) erased[1],
+                            (String) erased[2], ((Boolean) erased[3]).booleanValue());
                 }
                 super.visitEnd();
             }
@@ -267,6 +289,42 @@ final class BackendWeaver {
         m.visitEnd();
     }
 
+    /// The body's entry for a helper that cannot name every type of the body's
+    /// signature: it takes the helper's types and narrows each to the body's.
+    ///
+    /// The narrowing is here because this is the class that can name the type.
+    /// It never fails -- the only caller is the helper, which passes on exactly
+    /// what the stub was given, and the stub's own descriptor says each value is
+    /// of the type narrowed to. That is what makes it right for the translated
+    /// server too, where a cast is not checked at all.
+    private static void emitErasedBody(ClassWriter writer, String owner, String name,
+                                       String descriptor, String erased, boolean isStatic) {
+        // Not synthetic, or javac would not let the helper call it; final and
+        // named for its class, so no subclass can stand in for it.
+        MethodVisitor m = writer.visitMethod(isStatic ? Opcodes.ACC_STATIC : Opcodes.ACC_FINAL,
+                erasedBodyName(owner, name), erased, null, null);
+        m.visitCode();
+        int slot = 0;
+        if (!isStatic) {
+            m.visitVarInsn(Opcodes.ALOAD, 0);
+            slot = 1;
+        }
+        Type[] real = Type.getArgumentTypes(descriptor);
+        Type[] passed = Type.getArgumentTypes(erased);
+        for (int i = 0; i < real.length; i++) {
+            m.visitVarInsn(real[i].getOpcode(Opcodes.ILOAD), slot);
+            slot += real[i].getSize();
+            if (!real[i].equals(passed[i])) {
+                m.visitTypeInsn(Opcodes.CHECKCAST, real[i].getInternalName());
+            }
+        }
+        m.visitMethodInsn(isStatic ? Opcodes.INVOKESTATIC : Opcodes.INVOKEVIRTUAL, owner,
+                bodyName(owner, name), descriptor, false);
+        m.visitInsn(Type.getReturnType(descriptor).getOpcode(Opcodes.IRETURN));
+        m.visitMaxs(0, 0);
+        m.visitEnd();
+    }
+
     private static void emitConstructorBridge(ClassWriter writer, String owner,
                                               String descriptor) {
         Type[] args = Type.getArgumentTypes(descriptor);
@@ -296,9 +354,12 @@ final class BackendWeaver {
         private final int access;
         private final String name;
         private final String descriptor;
+        /// The descriptor the helper's method was written with: [#descriptor],
+        /// unless that names a type the helper cannot.
+        private final String helperSignature;
 
         AspectSplitter(MethodVisitor body, MethodVisitor stub, String owner, String helper,
-                       int access, String name, String descriptor) {
+                       int access, String name, String descriptor, String helperSignature) {
             super(Opcodes.ASM9, body);
             this.stub = stub;
             this.owner = owner;
@@ -306,6 +367,7 @@ final class BackendWeaver {
             this.access = access;
             this.name = name;
             this.descriptor = descriptor;
+            this.helperSignature = helperSignature;
         }
 
         @Override
@@ -353,15 +415,26 @@ final class BackendWeaver {
                 helperDescriptor.append('L').append(owner).append(';');
                 slot = 1;
             }
+            // Loaded by the method's own types and passed as the helper's, which
+            // are those or superclasses of them -- no cast on the way in.
             for (Type arg : Type.getArgumentTypes(descriptor)) {
                 stub.visitVarInsn(arg.getOpcode(Opcodes.ILOAD), slot);
                 slot += arg.getSize();
+            }
+            for (Type arg : Type.getArgumentTypes(helperSignature)) {
                 helperDescriptor.append(arg.getDescriptor());
             }
             Type ret = Type.getReturnType(descriptor);
-            helperDescriptor.append(')').append(ret.getDescriptor());
+            Type helperRet = Type.getReturnType(helperSignature);
+            helperDescriptor.append(')').append(helperRet.getDescriptor());
             stub.visitMethodInsn(Opcodes.INVOKESTATIC, helper, name,
                     helperDescriptor.toString(), false);
+            if (!helperRet.equals(ret)) {
+                // The helper returns what the body returned, under the name of a
+                // superclass; this gives the verifier the type back. It cannot
+                // fail, so nothing is lost where casts are unchecked.
+                stub.visitTypeInsn(Opcodes.CHECKCAST, ret.getInternalName());
+            }
             stub.visitInsn(ret.getOpcode(Opcodes.IRETURN));
             stub.visitMaxs(0, 0);
             stub.visitEnd();

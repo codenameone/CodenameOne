@@ -6034,6 +6034,15 @@ public final class HttpServer {
                     if (response == null) {
                         response = fallback(request, 404, "not found");
                     }
+                } catch (ResponseStatusException chosen) {
+                    // The handler chose this answer. Below 500 it is not a
+                    // failure of the handler: nothing is logged and the span
+                    // is not marked as an error.
+                    if (chosen.getStatus() >= 500) {
+                        System.err.println("handler failed: " + chosen);
+                        handlerError = chosen;
+                    }
+                    response = fallback(request, chosen.getStatus(), chosen.getReason());
                 } catch (Throwable err) {
                     rethrowIfFatal(err);
                     System.err.println("handler failed: " + err);
@@ -6448,6 +6457,15 @@ public final class HttpServer {
                     if (response == null) {
                         response = fallback(request, 404, "not found");
                     }
+                } catch (ResponseStatusException chosen) {
+                    // The handler chose this answer. Below 500 it is not a
+                    // failure of the handler: nothing is logged and the span
+                    // is not marked as an error.
+                    if (chosen.getStatus() >= 500) {
+                        System.err.println("handler failed: " + chosen);
+                        handlerError = chosen;
+                    }
+                    response = fallback(request, chosen.getStatus(), chosen.getReason());
                 } catch (Throwable err) {
                     rethrowIfFatal(err);
                     System.err.println("handler failed: " + err);

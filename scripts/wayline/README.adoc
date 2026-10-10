@@ -1,0 +1,202 @@
+= Wayline
+
+A ride-hailing application and its server, in one Maven project and one language.
+A rider asks for a ride, the nearest suitable driver is offered it, both follow the
+trip on a map, the ride is paid for when it ends, and an administrator runs the
+service. Which of the three a person sees is decided by the roles the server gives
+their account: a rider opens on the map, a driver on the driving screen, an
+administrator on the operations console.
+
+It is a sample of how a Codename One application and a Codename One Backend fit
+together, and the project the Initializr generates when you start from the
+ride-hailing template.
+
+== Start here
+
+Two chapters of the developer guide cover this project:
+
+* https://www.codenameone.com/developer-guide/#wayline-users-guide[The user's guide]
+  (link:../../docs/developer-guide/Wayline-Users-Guide.asciidoc[source]) shows the
+  application as a rider, a driver and an administrator see it, screen by screen,
+  with the demo accounts and test cards.
+* https://www.codenameone.com/developer-guide/#wayline-implementors-guide[The implementor's guide]
+  (link:../../docs/developer-guide/Wayline-Implementors-Guide.asciidoc[source])
+  explains how the project is built and what to change to make it yours: a
+  ride-sharing service or the dispatch service of a small taxi station, real
+  billing, your own map data or native maps, sign-in through another identity
+  provider, real text messages, analytics, and the database: the engines it
+  runs on, changing the schema, and hosting it.
+
+To see it running first, the two commands under <<Running it>> are all it takes.
+
+== The modules
+
+[cols="1,4"]
+|===
+| `shared`
+| The contract: the data classes both sides exchange and the `@RestClient`
+  interfaces that name every call. The app's build generates a client from them
+  and the server's build generates the interfaces it implements, so a change the
+  other side did not follow is a compile error.
+
+| `common`
+| The application: sign-in, the rider, driver and administrator screens, the map,
+  the wallet, the settings and the live channel. Styled in
+  `src/main/css/theme.css`, whose first block of variables holds the colors and
+  the corner radius everything else is drawn with. The text is in
+  `src/main/l10n`, in English, Spanish, French, German and Hebrew.
+  What it reports to Codename One analytics about how it is used, once the user
+  has agreed, is all in `Telemetry`.
+
+| `backend`
+| The server: accounts and roles, phone verification, driver applications and
+  their documents, moderation, fares and pricing, matching, the ride state
+  machine, payments and payouts, statistics, and a WebSocket that pushes changes
+  as they happen.
+  The data is entity classes in `domain`, read and written by the repository
+  beside each service. The schema is the migration scripts in
+  `src/main/resources/db/migration`, and the same server runs on SQLite,
+  PostgreSQL, MySQL and MariaDB.
+
+| `javase`, `android`, `ios`
+| The platforms the application is built for.
+|===
+
+== Running it
+
+Start the server on the development profile. It needs nothing installed: the
+database is in memory, and text messages are written to the log.
+
+[source,bash]
+----
+CN1_PROFILE=dev backend/server.sh run
+----
+
+Then run the application in the simulator, from another terminal:
+
+[source,bash]
+----
+mvn verify -Psimulator -DskipTests -Dcodename1.platform=javase
+----
+
+The development profile creates these accounts, all with the password
+`wayline-demo`, and a fortnight of rides for the charts to draw:
+
+[cols="2,3"]
+|===
+| `rider@wayline.example`, `rider2@wayline.example` | request rides
+| `rider3@wayline.example` | a rider an administrator has flagged
+| `driver@wayline.example`, `driver2@wayline.example` | approved drivers
+| `driver3@wayline.example`, `driver4@wayline.example` | approved drivers of the
+  larger kinds of car
+| `applicant@wayline.example` | has applied to drive and is waiting for a decision
+| `admin@wayline.example` | runs the service
+|===
+
+Sign in as the rider in one simulator and as a driver in another to follow a ride
+from both ends. On a phone, set the server's address on the welcome screen:
+`localhost` on a phone is the phone.
+
+=== In a browser, with nothing installed
+
+The server can host the application itself. Build the browser version once, and
+again when the application changes; it takes about a minute:
+
+[source,bash]
+----
+backend/server.sh web
+CN1_PROFILE=dev backend/server.sh run
+----
+
+Then open `http://localhost:8080/`. `server.sh run --web` does both in one step.
+
+`server.sh web` runs `cn1:backend-webapp`, which builds the application for the
+browser and stages it in `backend/target/webapp`; a server that finds it there
+serves it at `/`, after its own routes. In the browser the application takes the
+page's address as the server's, signs in through the same authorization-code
+flow with the code sent back to `/signin/code` on that server, and opens its live
+channel to the same origin. To deploy it, put `backend/target/webapp` beside the
+server binary as `webapp`.
+
+A browser gives a page less than a phone gives an app, and the application says
+so where it matters: calling and texting a driver are offered only where the
+device can dial, and the map opens on a default position when the browser will
+not say where it is.
+
+== What each role does
+
+A rider picks a destination, a kind of car and a way to pay, and may ask for a
+quiet ride, an accessible vehicle, a car that takes pets or a woman driver. The
+wallet holds their cards and receipts, and a tip can be added after the ride.
+
+Anyone can apply to drive. The application asks for the driver's details, the
+vehicle, and five photographs: an identity document, the licence, a selfie, the
+vehicle registration and the insurance. Nobody drives until an administrator
+approves the application; a rejection carries a reason, and the applicant can
+correct it and send it again. An approved driver goes online, is offered rides,
+and sees what they earned and cashes it out.
+
+An administrator sees the service in charts, reviews applications with their
+documents, flags or blocks an account with a reason that is kept in its history,
+cancels and refunds rides, and sets the prices.
+
+== What is real and what is simulated
+
+Maps, search and routes are real and need no key: the map tiles come from
+OpenFreeMap, routes from the public OSRM server, and place search from Photon,
+which the server calls so the app never talks to a third party directly. Text
+messages are logged unless Twilio credentials are configured on the server.
+
+Payments are simulated until the server is given a Stripe key. Simulated, the
+card `4242 4242 4242 4242` is accepted, `4000 0000 0000 0002` is declined, and no
+money moves. With `WAYLINE_PAYMENTS_STRIPE_SECRET` set in the server's
+environment, a card is added on Stripe's own page, so its number never reaches
+the app or this server, and a ride is charged when it completes. Use a Stripe
+test key first: this path is covered by tests that answer for Stripe, and has
+to be tried against a real account before it is trusted with money. Paying a
+driver out is a ledger entry in both cases; moving that money to a bank is left
+to the deployment.
+
+`backend/application.properties` lists every setting a deployment supplies. The
+database is the one named by `DATABASE_URL`: a `postgres://` or `mysql://`
+address, or the path of a SQLite file. Text messages go to Twilio once
+`WAYLINE_SMS_TWILIO_SID`, `WAYLINE_SMS_TWILIO_TOKEN` and
+`WAYLINE_SMS_TWILIO_FROM` are set.
+
+== Tests
+
+[source,bash]
+----
+mvn -pl shared,backend -Dcodename1.platform=backend test   # <1>
+mvn -pl shared,backend -Dcodename1.platform=backend test -Dcn1.backend.compiledTests=true   # <2>
+./run-e2e.sh   # <3>
+./check-template.sh   # <4>
+./run-web-e2e.sh   # <5>
+----
+<1> The server's tests, on the JVM.
+<2> The same tests again, translated to a native binary, which is how the server
+    ships.
+<3> Starts the server on the `test` profile and runs the application's tests
+    against it in the simulator: they register, apply to drive and are approved,
+    request a ride, drive it, pay for it and administer it, and compare the
+    screens in `screenshots/`. Pass `--native` to run them against the compiled
+    server. On Linux they then run a second time with the simulator as a desktop
+    window, where the admin console is laid out side by side under the
+    platform's own theme.
+<4> Generates a project from the Initializr template, under another name and
+    package, and builds it.
+<5> Builds the browser version of the application, starts the server hosting
+    it, and drives it in a headless browser: the application loads from the
+    server, signs in as the demo rider, reaches the home screen and opens its
+    live channel, then signs out and signs in as the demo admin. Needs Node with Playwright and its Chromium (`npm ci` and
+    `npx playwright install chromium` in `scripts/`). Screenshots and logs go
+    to `target/web-e2e`.
+
+`.github/workflows/wayline.yml` runs all five, and builds the application for
+Android and iOS.
+
+== The Initializr template
+
+`scripts/sync-initializr-wayline.py --write` copies this project into the
+Initializr's resources; without `--write` it fails when they differ, which is what
+CI runs. Change the project here, never the copies.

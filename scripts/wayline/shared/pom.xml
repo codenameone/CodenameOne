@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.codenameone.examples.wayline</groupId>
+    <artifactId>wayline</artifactId>
+    <version>1.0-SNAPSHOT</version>
+  </parent>
+  <groupId>com.codenameone.examples.wayline</groupId>
+  <artifactId>wayline-shared</artifactId>
+  <version>1.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+  <name>wayline-shared</name>
+
+  <!--
+    The REST contract and the objects it transfers, compiled once and used by
+    both halves.
+
+    The app (common) depends on this and its build generates the client: an
+    implementation of each @RestClient interface and a mapper for each @Mapped
+    class. The server (backend) depends on it too and its build generates the
+    other half before compiling: an <Api>Server interface to implement and the
+    controller that routes each operation to it. Change a signature here and
+    whichever side did not follow stops compiling.
+
+    Nothing is generated INTO this module, which is why it carries no Codename
+    One plugin. It only has to compile, and for that it needs the annotations
+    and the client's callback types, so the core is here at provided scope: the
+    app brings its own, and the server must not receive it at all.
+
+    Keep it to what both sides can run. No UI classes, and no JDK API the
+    devices lack.
+  -->
+  <properties>
+    <maven.compiler.source>1.8</maven.compiler.source>
+    <maven.compiler.target>1.8</maven.compiler.target>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.codenameone</groupId>
+      <artifactId>codenameone-core</artifactId>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+</project>

@@ -799,3 +799,6 @@ Toolchain
 # (performance.asciidoc).
 inlining
 inlined
+# -----------------------------------------------------------------------------
+# The sample application the Wayline chapters walk through.
+Wayline

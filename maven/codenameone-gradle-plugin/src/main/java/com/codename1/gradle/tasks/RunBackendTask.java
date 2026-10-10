@@ -22,9 +22,11 @@
  */
 package com.codename1.gradle.tasks;
 
+import com.codename1.build.BuildExecutionException;
 import com.codename1.build.BuildFailureException;
 import com.codename1.gradle.GradleLog;
 import com.codename1.maven.BackendMainClass;
+import com.codename1.maven.BackendWebApp;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.GradleException;
 import org.gradle.api.file.ConfigurableFileCollection;
@@ -85,6 +87,36 @@ public abstract class RunBackendTask extends DefaultTask {
     @Internal
     public abstract DirectoryProperty getWorkingDirectory();
 
+    /// Where `backendWebApp` stages the application's browser build. Unset for
+    /// a task that runs something other than the server.
+    @Internal
+    public abstract DirectoryProperty getWebAppDirectory();
+
+    /// The JVM option that points the server at the application staged in
+    /// `webApp`, or null when it should be given none.
+    ///
+    /// The server looks for its application in `webapp` in its working
+    /// directory, which is the backend's own directory -- and build output does
+    /// not belong in a source directory, so it is under the build directory and
+    /// the server is told. Not when the project says where its application is:
+    /// a system property outranks the backend's own files, and answering for it
+    /// would override a setting somebody wrote down.
+    static String webAppOption(java.io.File webApp, java.io.File workingDirectory,
+                               java.util.Map<String, String> environment, java.util.List<String> jvmArgs)
+            throws BuildExecutionException {
+        if (webApp == null || !new java.io.File(webApp, BackendWebApp.INDEX).isFile()) {
+            return null;
+        }
+        StringBuilder options = new StringBuilder();
+        for (String option : jvmArgs) {
+            options.append(option).append(' ');
+        }
+        if (BackendWebApp.rootIsConfigured(workingDirectory, environment, options.toString())) {
+            return null;
+        }
+        return "-D" + BackendWebApp.ROOT_PROPERTY + "=" + webApp.getAbsolutePath();
+    }
+
     /// The explicit main class, else the generated entry point in whichever
     /// classes directory holds it, else the one class with a main method.
     private String resolveMainClass() throws BuildFailureException {
@@ -132,12 +164,25 @@ public abstract class RunBackendTask extends DefaultTask {
         } catch (BuildFailureException ex) {
             throw new GradleException(ex.getMessage(), ex);
         }
+        final String webApp;
+        try {
+            webApp = webAppOption(getWebAppDirectory().isPresent() ? getWebAppDirectory().get().getAsFile() : null,
+                    getWorkingDirectory().get().getAsFile(), System.getenv(), getJvmArgs().get());
+        } catch (BuildExecutionException ex) {
+            throw new GradleException(ex.getMessage(), ex);
+        }
+        if (webApp != null) {
+            getLogger().lifecycle("Serving the web app staged in " + getWebAppDirectory().get().getAsFile());
+        }
         getLogger().lifecycle("Running " + main + " on " + System.getProperty("java.version"));
         getExecOperations().javaexec(spec -> {
             spec.classpath(getClasspath());
             spec.getMainClass().set(main);
             spec.args(getArgs().get());
             spec.jvmArgs(getJvmArgs().get());
+            if (webApp != null) {
+                spec.jvmArgs(webApp);
+            }
             spec.setWorkingDir(getWorkingDirectory().get().getAsFile());
             spec.setStandardInput(System.in);
         });
