@@ -634,26 +634,31 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public int getClipX(java.lang.Object a0) {
+        own(a0);
         return trackClip ? clipX : 0;
     }
 
     @Override
     public int getClipY(java.lang.Object a0) {
+        own(a0);
         return trackClip ? clipY : 0;
     }
 
     @Override
     public int getClipWidth(java.lang.Object a0) {
+        own(a0);
         return trackClip ? clipW : WIDTH;
     }
 
     @Override
     public int getClipHeight(java.lang.Object a0) {
+        own(a0);
         return trackClip ? clipH : HEIGHT;
     }
 
     @Override
     public void setClip(java.lang.Object a0, int a1, int a2, int a3, int a4) {
+        own(a0);
         clipX = a1;
         clipY = a2;
         clipW = a3;
@@ -671,10 +676,12 @@ public class HeadlessImplementation extends CodenameOneImplementation {
     public static boolean screenSpaceClip;
     private static double[] matrix = {1, 0, 0, 1, 0, 0};
 
-    /// Where a point handed to the port lands on the screen under the
-    /// matrix installed now, in [#screenSpaceClip] mode.
+    private static double[] lastMatrix = matrix;
+
+    /// Where a point handed to the port lands under the matrix installed
+    /// last, on whichever graphics that was, in [#screenSpaceClip] mode.
     public static double[] onScreen(double x, double y) {
-        double[] m = matrix;
+        double[] m = lastMatrix;
         return new double[] {m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]};
     }
 
@@ -803,16 +810,23 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public void setTransform(Object graphics, com.codename1.ui.Transform transform) {
+        if (graphics instanceof Offscreen) {
+            ((Offscreen) graphics).matrix = transform == null ? new double[] {1, 0, 0, 1, 0, 0}
+                    : affine(transform.getNativeTransform()).clone();
+            lastMatrix = ((Offscreen) graphics).matrix;
+            return;
+        }
         if (transform == null) {
             matrix = new double[] {1, 0, 0, 1, 0, 0};
         } else {
             matrix = affine(transform.getNativeTransform()).clone();
         }
+        lastMatrix = matrix;
     }
 
     @Override
     public com.codename1.ui.Transform getTransform(Object graphics) {
-        double[] m = screenSpaceClip ? matrix : new double[] {1, 0, 0, 1, 0, 0};
+        double[] m = screenSpaceClip ? matrixOf(graphics) : new double[] {1, 0, 0, 1, 0, 0};
         return com.codename1.ui.Transform.makeAffine(m[0], m[1], m[2], m[3], m[4], m[5]);
     }
 
@@ -823,8 +837,9 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public void clipRect(java.lang.Object a0, int a1, int a2, int a3, int a4) {
-        if (screenSpaceClip && !plain(matrix)) {
-            double[] m = matrix;
+        own(a0);
+        if (screenSpaceClip && !plain(matrixOf(a0))) {
+            double[] m = matrixOf(a0);
             double minX = Double.MAX_VALUE;
             double minY = Double.MAX_VALUE;
             double maxX = -Double.MAX_VALUE;
@@ -864,7 +879,7 @@ public class HeadlessImplementation extends CodenameOneImplementation {
     public void setClip(java.lang.Object graphics, com.codename1.ui.geom.Shape shape) {
         if (trackClip) {
             com.codename1.ui.geom.Rectangle b = shape.getBounds();
-            if (screenSpaceClip && !plain(matrix)) {
+            if (screenSpaceClip && !plain(matrixOf(graphics))) {
                 // The native Linux port: the shape goes through the matrix
                 // and its bounds on the screen become the clip.
                 clipRect(graphics, b.getX(), b.getY(), b.getWidth(), b.getHeight());
@@ -947,12 +962,22 @@ public class HeadlessImplementation extends CodenameOneImplementation {
             span(a0, a2, a3, a1.length() * CHAR_WIDTH, FONT_HEIGHT);
         }
         if (recordText) {
-            drawnText.add(new Object[]{a1, Integer.valueOf(a2), Integer.valueOf(a3)});
+            own(a0);
+            // Whether the place the text starts at is inside the clip, which
+            // is in the coordinates the graphics draws to once its matrix
+            // has been applied.
+            double[] m = screenSpaceClip ? matrixOf(a0) : new double[] {1, 0, 0, 1, 0, 0};
+            double sx = m[0] * (a2 + 1) + m[2] * (a3 + 1) + m[4];
+            double sy = m[1] * (a2 + 1) + m[3] * (a3 + 1) + m[5];
+            boolean seen = sx >= clipX && sx < clipX + clipW && sy >= clipY && sy < clipY + clipH;
+            drawnText.add(new Object[]{a1, Integer.valueOf(a2), Integer.valueOf(a3), Boolean.valueOf(seen)});
         }
     }
 
     /// When set, every `drawString` (a `drawChar` arrives as one) is added
-    /// to [#drawnText] as {text, x, y}. A test that sets it must reset both.
+    /// to [#drawnText] as {text, x, y, inside}, the last being whether the
+    /// text starts inside the clip in force, which only means something
+    /// with [#trackClip]. A test that sets it must reset both.
     public static boolean recordText;
     public static final java.util.List<Object[]> drawnText = new java.util.ArrayList<Object[]>();
 
@@ -994,7 +1019,45 @@ public class HeadlessImplementation extends CodenameOneImplementation {
         if ((pixelImages || rasterImages) && a0 instanceof int[][]) {
             return a0;
         }
-        return new Object();
+        return new Offscreen();
+    }
+
+    /// The graphics of an image without pixels. It keeps the matrix
+    /// installed on it, as a port does: what is on the graphics of one
+    /// image, or on the screen's, is not on that of another.
+    private static final class Offscreen {
+        private double[] matrix = {1, 0, 0, 1, 0, 0};
+        private int[] clip = {0, 0, 1 << 20, 1 << 20};
+    }
+
+    private static Offscreen clipOwner;
+
+    /// In [#screenSpaceClip] mode the clip is that of the graphics it was
+    /// set on, as it is on a port: a picture painted in the middle of a
+    /// frame starts with the whole of itself, not with what the screen was
+    /// clipped to. The one tracked rectangle is handed from graphics to
+    /// graphics as each is used.
+    private static void own(Object graphics) {
+        if (!screenSpaceClip || !(graphics instanceof Offscreen) || graphics == clipOwner) {
+            return;
+        }
+        if (clipOwner != null) {
+            clipOwner.clip = new int[] {clipX, clipY, clipW, clipH};
+        }
+        clipOwner = (Offscreen) graphics;
+        clipX = clipOwner.clip[0];
+        clipY = clipOwner.clip[1];
+        clipW = clipOwner.clip[2];
+        clipH = clipOwner.clip[3];
+        shapeClip = null;
+    }
+
+    /// The matrix in force on a graphics, in [#screenSpaceClip] mode.
+    private static double[] matrixOf(Object graphics) {
+        if (graphics instanceof Offscreen) {
+            return ((Offscreen) graphics).matrix;
+        }
+        return matrix;
     }
 
     /// When set, a run of characters measures 1px narrower per adjacent pair

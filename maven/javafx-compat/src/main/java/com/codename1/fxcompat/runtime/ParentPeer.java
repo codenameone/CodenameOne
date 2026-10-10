@@ -22,8 +22,10 @@
  */
 package com.codename1.fxcompat.runtime;
 
+import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
 import com.codename1.ui.Transform;
 import com.codename1.ui.events.WheelEvent;
 import com.codename1.ui.geom.Dimension;
@@ -196,7 +198,11 @@ public class ParentPeer extends Container implements FxPeer {
         }
         painting++;
         try {
-            super.paint(g);
+            if (screen && hostsAComponent()) {
+                paintChildrenOffTheMatrix(g);
+            } else {
+                super.paint(g);
+            }
         } finally {
             painting--;
             if (screen) {
@@ -215,6 +221,68 @@ public class ParentPeer extends Container implements FxPeer {
         g.setAlpha(old);
         if (Effects.has(node)) {
             Effects.paintOver(g, node, this);
+        }
+    }
+
+    /// Whether one of the children is a Codename One component rather than
+    /// the peer of a node: the label, button or field a control is shown by.
+    private boolean hostsAComponent() {
+        int n = getComponentCount();
+        for (int i = 0; i < n; i++) {
+            Component c = getComponentAt(i);
+            if (!(c instanceof FxPeer) && c.isVisible() && c.getWidth() > 0 && c.getHeight() > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Paints the children of a control under a matrix on a port that keeps
+    /// its clip in the coordinates of the screen (see
+    /// [PeerPaint#clipStaysOnScreen]), in place of Codename One doing it.
+    ///
+    /// The component a control is shown by is Codename One's own, and paints
+    /// as one: a label narrows the clip to its text with a rectangle made
+    /// of where the text goes and of the clip it reads back from the port.
+    /// On such a port the first is in the coordinates drawing is given in
+    /// and the second in the screen's, so the rectangle is in neither and
+    /// the text of every label under a scale was clipped away -- the
+    /// number on each tile of 2048, and its score. Nothing the layer hands
+    /// down as a clip makes those two agree, so the component paints where
+    /// no matrix is installed, into a picture of its own size, and the
+    /// picture is drawn under the matrix. The peers beside it are painted
+    /// as Codename One paints them: clipped to their bounds, background
+    /// first.
+    private void paintChildrenOffTheMatrix(Graphics g) {
+        g.translate(getX(), getY());
+        try {
+            int n = getComponentCount();
+            for (int i = 0; i < n; i++) {
+                Component c = getComponentAt(i);
+                if (!c.isVisible() || c.getWidth() <= 0 || c.getHeight() <= 0) {
+                    continue;
+                }
+                if (!(c instanceof FxPeer)) {
+                    Image picture = c.toImage();
+                    if (picture != null) {
+                        g.drawImage(picture, c.getX(), c.getY());
+                    }
+                    continue;
+                }
+                int cx = g.getClipX();
+                int cy = g.getClipY();
+                int cw = g.getClipWidth();
+                int ch = g.getClipHeight();
+                g.clipRect(c.getX(), c.getY(), c.getWidth(), c.getHeight());
+                if (c instanceof ParentPeer) {
+                    ((ParentPeer) c).capture(g);
+                } else if (c instanceof NodePeer) {
+                    ((NodePeer) c).capture(g);
+                }
+                g.setClip(cx, cy, cw, ch);
+            }
+        } finally {
+            g.translate(-getX(), -getY());
         }
     }
 

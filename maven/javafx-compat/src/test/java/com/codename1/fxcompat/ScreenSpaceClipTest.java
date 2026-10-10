@@ -72,6 +72,7 @@ public class ScreenSpaceClipTest {
         Units.setScale(1);
         HeadlessImplementation.trackClip = true;
         HeadlessImplementation.screenSpaceClip = true;
+        HeadlessImplementation.drawnText.clear();
     }
 
     @After
@@ -150,6 +151,46 @@ public class ScreenSpaceClipTest {
         assertEquals(0, g.getClipY());
         assertEquals(HeadlessImplementation.WIDTH, g.getClipWidth());
         assertEquals(HeadlessImplementation.HEIGHT, g.getClipHeight());
+    }
+
+    /// The text of a label inside a scaled and moved parent is drawn: the
+    /// number on a tile of 2048, and its score. A JavaFX label is shown by a
+    /// Codename One one, which narrows the clip to its text with numbers it
+    /// reads back from the port; under a matrix those are the screen's, and
+    /// the text was drawn outside the clip it had just made.
+    @Test
+    public void theTextOfALabelUnderAScaledParentIsInsideItsClip() {
+        javafx.scene.control.Label tile = new javafx.scene.control.Label("2048");
+        tile.setLayoutX(900);
+        tile.setLayoutY(300);
+        tile.setPrefSize(200, 100);
+        javafx.scene.layout.VBox box = new javafx.scene.layout.VBox(new javafx.scene.control.Label("score"));
+        box.setLayoutX(1300);
+        box.setLayoutY(40);
+        Group scaled = new Group(new Group(tile, box));
+        scaled.getTransforms().add(new Scale(0.5, 0.5, 0, 0));
+        scaled.setLayoutX(150);
+        scaled.setLayoutY(60);
+        Stage stage = new Stage();
+        stage.setScene(new Scene(new Group(scaled), 1000, 400));
+        stage.show();
+        MainThreadRule.drain();
+
+        HeadlessImplementation.drawnText.clear();
+        HeadlessImplementation.recordText = true;
+        try {
+            paint();
+        } finally {
+            HeadlessImplementation.recordText = false;
+        }
+        List<String> seen = new ArrayList<String>();
+        List<String> cut = new ArrayList<String>();
+        for (Object[] text : HeadlessImplementation.drawnText) {
+            (Boolean.TRUE.equals(text[3]) ? seen : cut).add(String.valueOf(text[0]));
+        }
+        assertTrue("drawn outside the clip: " + cut, cut.isEmpty());
+        assertTrue("the tile: " + seen, seen.contains("2048"));
+        assertTrue("the score: " + seen, seen.contains("score"));
     }
 
     /// A node with a clip of its own, which is what every label is. The clip
