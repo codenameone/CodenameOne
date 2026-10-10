@@ -46,6 +46,13 @@ public final class StageDialog extends Dialog implements StageHost {
         this.core = new HostCore(window, getContentPane(), this);
         setDisposeWhenPointerOutOfBounds(false);
         setAutoDispose(false);
+        // This host is the choice NOT to use a window of the window
+        // manager: StageHosts takes a native window first where the port
+        // has them and the application left them on. A theme may ask for
+        // every Codename One dialog to open in a window of its own (the
+        // Windows native theme does), and the stage then left the form an
+        // application had asked to keep it in.
+        setNativeWindowMode(false);
         setBackCommand(new Command("Back") {
             @Override
             public void actionPerformed(ActionEvent evt) {

@@ -261,6 +261,7 @@ public class SwingInteropTest extends WindowsTestBase {
         home.add(com.codename1.ui.layouts.BorderLayout.CENTER, SwingInterop.asComponent(panel));
         home.revalidate();
         final boolean[] floated = new boolean[1];
+        final boolean[] ownWindow = new boolean[1];
         // A timer, not callSerially: showing a dialog first runs what is
         // waiting on the event dispatch thread, before the dialog is up.
         Display.getInstance().setTimeout(150, new Runnable() {
@@ -272,12 +273,25 @@ public class SwingInteropTest extends WindowsTestBase {
                     Display.getInstance().setTimeout(50, this);
                     return;
                 }
-                floated[0] = Display.getInstance().getCurrent() instanceof DialogForm;
+                Form current = Display.getInstance().getCurrent();
+                floated[0] = current instanceof DialogForm;
+                ownWindow[0] = current instanceof DialogForm && ((DialogForm) current).isNativeWindowMode();
                 pane.setValue(Integer.valueOf(JOptionPane.YES_OPTION));
             }
         });
-        int answer = JOptionPane.showConfirmDialog(panel, "Proceed?", "Confirm", JOptionPane.YES_NO_OPTION);
+        // A theme may ask for every Codename One dialog to open in a
+        // window of its own, as the Windows native theme does. A dialog
+        // the layer keeps in the application's form is not one of them.
+        boolean before = com.codename1.ui.Dialog.isDefaultNativeWindowMode();
+        com.codename1.ui.Dialog.setDefaultNativeWindowMode(true);
+        int answer;
+        try {
+            answer = JOptionPane.showConfirmDialog(panel, "Proceed?", "Confirm", JOptionPane.YES_NO_OPTION);
+        } finally {
+            com.codename1.ui.Dialog.setDefaultNativeWindowMode(before);
+        }
         assertTrue("the dialog floated over the application's form", floated[0]);
+        assertFalse("the dialog asked for a window of its own", ownWindow[0]);
         assertEquals(JOptionPane.YES_OPTION, answer);
         MainThreadRule.drain();
         assertSame(home, Display.getInstance().getCurrent());

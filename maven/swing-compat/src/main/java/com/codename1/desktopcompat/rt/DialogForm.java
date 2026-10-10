@@ -67,6 +67,13 @@ public final class DialogForm extends com.codename1.ui.Dialog implements WindowH
         wantedWidth = ww;
         wantedHeight = wh;
         setScrollable(false);
+        // This host is the choice NOT to use a window of the window
+        // manager: WindowHosts takes a secondary window first where the
+        // port has them and the application left them on. A theme may ask
+        // for every Codename One dialog to open in a window of its own
+        // (the Windows native theme does), and the dialog then left the
+        // form an application had asked to keep it in.
+        setNativeWindowMode(false);
         setAutoDispose(false);
         setDisposeWhenPointerOutOfBounds(false);
         setEnableCursors(true);

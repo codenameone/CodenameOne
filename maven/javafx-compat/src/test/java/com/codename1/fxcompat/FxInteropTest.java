@@ -302,20 +302,32 @@ public class FxInteropTest {
 
             @Override
             public void run() {
-                boolean up = Display.getInstance().getCurrent() instanceof StageDialog;
+                Form current = Display.getInstance().getCurrent();
+                boolean up = current instanceof StageDialog;
                 if (!up && ++tries < 100) {
                     Display.getInstance().setTimeout(50, this);
                     return;
                 }
                 log.add("dialog=" + up);
+                log.add("ownWindow=" + (up && ((StageDialog) current).isNativeWindowMode()));
                 Node ok = alert.getDialogPane().lookupButton(ButtonType.OK);
                 if (ok instanceof Button) {
                     ((Button) ok).fire();
                 }
             }
         });
-        Optional<ButtonType> answer = alert.showAndWait();
-        assertEquals("[dialog=true]", log.toString());
+        // A theme may ask for every Codename One dialog to open in a
+        // window of its own, as the Windows native theme does. A stage
+        // the layer keeps in the application's form is not one of them.
+        boolean before = com.codename1.ui.Dialog.isDefaultNativeWindowMode();
+        com.codename1.ui.Dialog.setDefaultNativeWindowMode(true);
+        Optional<ButtonType> answer;
+        try {
+            answer = alert.showAndWait();
+        } finally {
+            com.codename1.ui.Dialog.setDefaultNativeWindowMode(before);
+        }
+        assertEquals("[dialog=true, ownWindow=false]", log.toString());
         assertTrue(answer.isPresent());
         assertSame(ButtonType.OK, answer.get());
         assertSame(app, Display.getInstance().getCurrent());
