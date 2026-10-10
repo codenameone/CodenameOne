@@ -69,6 +69,10 @@ import java.util.Vector;
 ///
 /// - centeredPopupBool - shows the popup dialog in the center of the screen instead of under the popup
 ///
+/// - comboPopupMaxRowsInt - the most rows the popup shows before it scrolls. A popup with a limit
+/// is anchored to the combo box, below it or above it, and never covers it. Defaults to 10 on a
+/// desktop and to 0, meaning no limit, everywhere else.
+///
 /// - otherPopupRendererBool - Uses a different list cell render for the popup than the one used for the `ComboBox`
 /// itself. When this is false `PopupItem` & `PopupFocus`  become irrelevant. Notice that the
 /// Android native theme defines this to true.
@@ -113,6 +117,8 @@ public class ComboBox<T> extends List<T> implements ActionSource {
     private static boolean defaultIncludeSelectCancel = true;
     /// Popup placement: place the list adjacent to the combo box (default behavior:
     /// above when the combo sits in the lower half of the form, below otherwise).
+    /// A popup with a row limit (the `comboPopupMaxRowsInt` theme constant) goes below
+    /// when it fits there and otherwise to the side with more room.
     public static final int POPUP_PLACEMENT_AUTO = 0;
 
     /// Popup placement: always anchor the list directly above the combo box.
@@ -394,6 +400,13 @@ public class ComboBox<T> extends List<T> implements ActionSource {
             }
         }
 
+        // On a desktop Escape has to cancel the popup whether or not Select and Cancel are
+        // shown, and Form only acts on Escape when there is a back command to run. A centred
+        // or spinner popup without the commands had none. Off the desktop this is left as it
+        // was: a back command there changes what the platform back key does.
+        if (Display.getInstance().isDesktop()) {
+            popupDialog.setBackCommand(popupDialog.getMenuBar().getCancelMenuItem());
+        }
         if (includeSelectCancel) {
             popupDialog.setBackCommand(popupDialog.getMenuBar().getCancelMenuItem());
             if (Display.getInstance().isTouchScreenDevice()) {
@@ -408,6 +421,21 @@ public class ComboBox<T> extends List<T> implements ActionSource {
                     popupDialog.addCommand(popupDialog.getMenuBar().getCancelMenuItem());
                     popupDialog.addCommand(popupDialog.getMenuBar().getSelectMenuItem());
                 }
+            }
+        }
+
+        if (Display.getInstance().isDesktop()) {
+            // With a keyboard in front of it the popup is driven by one: the arrows move
+            // the highlight from the first keystroke and Enter takes it. Both go to the
+            // focused component, so the list is given the focus -- here, after the
+            // commands are placed, because a Cancel button placed in the body asks for
+            // the focus itself -- and it keeps input mode for as long as the popup is up.
+            // Done for desktops only: on a keypad or a remote the sideways arrows are
+            // how the user reaches such a button, and there they keep doing that.
+            l.popupKeepsInput = true;
+            l.setHandlesInputParent(true);
+            if (l.getComponentForm() == popupDialog) { //NOPMD CompareObjectsWithEquals
+                popupDialog.setFocused(l);
             }
         }
 
@@ -447,8 +475,20 @@ public class ComboBox<T> extends List<T> implements ActionSource {
             // combo box in a window did nothing at all.
             TopLevelContainer parentForm = getTopLevelContainer();
 
+            // As wide as the combo, or as wide as the rows when they need more.
+            //
+            // The list's preferred width already contains its scrollbar gutter -- the
+            // look and feel adds getSideGap() to the padding it measures -- so adding the
+            // gutter again here made the popup one scrollbar wider than the combo it
+            // hangs off even when the combo was the wider of the two. On a desktop,
+            // where the gutter is a real scrollbar's width and the popup's edges sit
+            // right under the combo's, that is a visible step. Elsewhere the width is left
+            // exactly as it was, so that no touch popup moves.
             int listW = Math.max(getWidth(), l.getPreferredW());
-            listW = Math.min(listW + l.getSideGap(), parentForm.getContentPane().getWidth());
+            if (!Display.getInstance().isDesktop()) {
+                listW += l.getSideGap();
+            }
+            listW = Math.min(listW, parentForm.getContentPane().getWidth());
 
 
             Component content = popupDialog.getDialogComponent();
@@ -461,6 +501,16 @@ public class ComboBox<T> extends List<T> implements ActionSource {
             listH += title.getPreferredH()
                     + title.getStyle().getVerticalMargins();
 
+            // The cap is taken off the height the popup is GIVEN, never off what the
+            // list asks for. The list sits in the centre of the dialog and is sized by
+            // it, so a popup shorter than the rows leaves the list's scroll size alone
+            // and the rest is reached by scrolling.
+            int maxRows = getPopupMaxRows();
+            boolean anchored = maxRows > 0;
+            if (anchored) {
+                listH -= rowsBeyondCapHeight(l, maxRows);
+            }
+
             bottom = 0;
             top = getAbsoluteY();
             int formHeight = parentForm.asContainer().getHeight();
@@ -468,7 +518,41 @@ public class ComboBox<T> extends List<T> implements ActionSource {
             // have is what this used to spell out inline.
             formHeight -= TopLevelSupport.softButtonAreaHeight(parentForm);
 
-            if (listH < formHeight) {
+            if (anchored) {
+                // A capped popup hangs off its combo and never covers it. The older
+                // rule below gives up when the list is taller than the form and fills
+                // the form from the top, combo included, and it picks a side by which
+                // half of the form the combo is in rather than by where the list fits.
+                // Here the popup goes below when it fits there, otherwise to the side
+                // with more room, and is cut to that room -- the list scrolls.
+                int above = top;
+                int below = formHeight - top - getHeight();
+                switch (popupPlacement) {
+                    case POPUP_PLACEMENT_TOP_OF_FORM:
+                        listH = Math.min(listH, formHeight);
+                        top = 0;
+                        bottom = formHeight - listH;
+                        break;
+                    case POPUP_PLACEMENT_BOTTOM_OF_FORM:
+                        listH = Math.min(listH, formHeight);
+                        bottom = 0;
+                        top = formHeight - listH;
+                        break;
+                    default:
+                        boolean upwards = popupPlacement == POPUP_PLACEMENT_ABOVE
+                                || (popupPlacement != POPUP_PLACEMENT_BELOW && listH > below && above > below);
+                        if (upwards) {
+                            listH = Math.max(0, Math.min(listH, above));
+                            bottom = formHeight - top;
+                            top = top - listH;
+                        } else {
+                            listH = Math.max(0, Math.min(listH, below));
+                            top += getHeight();
+                            bottom = formHeight - top - listH;
+                        }
+                        break;
+                }
+            } else if (listH < formHeight) {
                 switch (popupPlacement) {
                     case POPUP_PLACEMENT_ABOVE:
                         bottom = formHeight - top;
@@ -518,6 +602,28 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         }
     }
 
+    /// The most rows the popup shows before it scrolls, or 0 for no limit.
+    ///
+    /// The `comboPopupMaxRowsInt` theme constant. Without it the limit is ten on a
+    /// desktop, which is what desktop toolkits settle around, and none anywhere else: a
+    /// touch popup has always been as tall as its rows and this leaves it that way.
+    private int getPopupMaxRows() {
+        return getUIManager().getThemeConstant("comboPopupMaxRowsInt",
+                Display.getInstance().isDesktop() ? 10 : 0);
+    }
+
+    /// How much shorter the popup list is when it shows `maxRows` rows instead of all of
+    /// them, or 0 when it has no more rows than that.
+    private static int rowsBeyondCapHeight(List l, int maxRows) {
+        if (l.size() <= maxRows || l.getOrientation() != List.VERTICAL) {
+            return 0;
+        }
+        int capped = l.getElementSize(true, true).getHeight()
+                + (l.getElementSize(false, true).getHeight() + l.getItemGap()) * (maxRows - 1)
+                + l.getStyle().getVerticalPadding();
+        return Math.max(0, l.getPreferredH() - capped);
+    }
+
     /// {@inheritDoc}
     @Override
     protected void fireClicked() {
@@ -565,9 +671,23 @@ public class ComboBox<T> extends List<T> implements ActionSource {
             popBlurOverride();
         }
         parentForm.setTintColor(tint);
+        // The last clause is every other way of leaving without a choice: Escape on a
+        // popup that has no back command, a dispose() from application code, a window
+        // closing under it. The selection is shared with the popup, which moves it as a
+        // highlight -- under the pointer, with the arrow keys, on a press that is then
+        // dragged away -- so a popup that reported no choice and returned no command must
+        // not leave that highlight behind as the value. A subclass that returns a command
+        // of its own from showPopupDialog is saying what happened and is left alone.
         if (result == popupDialog.getMenuBar().getCancelMenuItem() || popupDialog.wasDisposedDueToOutOfBoundsTouch() || //NOPMD CompareObjectsWithEquals
-                popupDialog.wasDisposedDueToRotation()) {
-            setSelectedIndex(originalSel);
+                popupDialog.wasDisposedDueToRotation() || (result == null && !l.popupSelectionFired)) {
+            if (originalSel >= 0) {
+                setSelectedIndex(originalSel);
+            } else {
+                // A combo that opened with nothing selected goes back to nothing selected, or
+                // cancelling would commit the highlighted row. Only the model takes -1:
+                // List.setSelectedIndex rejects a negative index.
+                getModel().setSelectedIndex(originalSel);
+            }
         }
     }
 

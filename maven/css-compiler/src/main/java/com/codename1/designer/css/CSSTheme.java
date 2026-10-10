@@ -8137,9 +8137,63 @@ public class CSSTheme {
                 }
             }
         }
+        if (isUniversalSelector(sel)) {
+            warnUniversalSelectorIgnored();
+            return;
+        }
         Element el = getElementForSelector(media, sel);
         apply(el, property, value);
         
+    }
+
+    /// Set once a `*` rule has been reported, so a stylesheet that uses one says so
+    /// a single time rather than once per declaration.
+    private boolean universalSelectorWarned;
+
+    /// Whether a selector is the universal selector `*`, alone or with a state
+    /// class (`*.pressed`).
+    ///
+    /// The parser does not report `*` as `SAC_ANY_NODE_SELECTOR`. It reports an
+    /// element selector whose local name is null, which is why the any-node arm of
+    /// `getElementForSelector` never ran: the rule reached `getElementByName(null)`
+    /// and was compiled into a UIID literally called "null" -- keys such as
+    /// `null.transparency` that no component ever reads. Both spellings are
+    /// recognized here so the answer does not depend on the parser.
+    ///
+    /// An id condition is deliberately not matched: `#Constants` and `#Device` are
+    /// universal selectors with an id too, and they are handled before this is asked.
+    private static boolean isUniversalSelector(Selector sel) {
+        if (sel.getSelectorType() == Selector.SAC_CONDITIONAL_SELECTOR) {
+            ConditionalSelector csel = (ConditionalSelector)sel;
+            if (csel.getCondition().getConditionType() != Condition.SAC_CLASS_CONDITION) {
+                return false;
+            }
+            return isUniversalSelector(csel.getSimpleSelector());
+        }
+        if (sel.getSelectorType() == Selector.SAC_ANY_NODE_SELECTOR) {
+            return true;
+        }
+        return sel.getSelectorType() == Selector.SAC_ELEMENT_NODE_SELECTOR
+                && ((ElementSelector)sel).getLocalName() == null;
+    }
+
+    /// Reports a `*` rule and drops it.
+    ///
+    /// Dropped rather than honoured, in either of the two ways it could be. Folding
+    /// `*` into every UIID the stylesheet declares would change applications that
+    /// compile today: the rule has never had an effect, so a stylesheet carrying the
+    /// familiar `* { margin: 0; padding: 0; }` reset would lose the padding its UIIDs
+    /// inherit from the native theme on the next build. Treating it as `Default` has
+    /// the same problem one level up. `Default` is the selector that does this job,
+    /// so the message names it.
+    private void warnUniversalSelectorIgnored() {
+        if (universalSelectorWarned) {
+            return;
+        }
+        universalSelectorWarned = true;
+        System.err.println("WARNING: the universal selector `*` is not supported and its"
+                + " declarations were ignored. Use the `Default` selector to style every"
+                + " UIID that does not set a property itself.");
     }
     
     private class Insets {

@@ -287,4 +287,24 @@ public class DesktopNativeThemeParityTest extends UITestBase {
         }
         return null;
     }
+
+    /// Container is the one UIID whose look no theme decides: it is transparent, with no
+    /// padding and no margin, under every desktop theme. Everything else, the default style
+    /// included, is the theme's to define.
+    @Test
+    public void containerIsTransparentAndUnpaddedUnderEveryDesktopTheme() throws Exception {
+        for (String name : DESKTOP_THEMES) {
+            Hashtable theme = loadTheme(name);
+            if (theme == null) {
+                return;
+            }
+            UIManager.getInstance().setThemeProps(theme);
+            Style style = new com.codename1.ui.Container().getUnselectedStyle();
+            assertEquals(0, style.getBgTransparency(), name + ": Container must not paint a background");
+            for (int side = 0; side < 4; side++) {
+                assertEquals(0, style.getPaddingValue(false, side), name + ": Container padding, side " + side);
+                assertEquals(0, style.getMarginValue(false, side), name + ": Container margin, side " + side);
+            }
+        }
+    }
 }
