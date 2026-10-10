@@ -210,19 +210,29 @@ def linux_tables(results):
 
     size = Table("linux-size", "Linux: the distributed application (MB)",
                  ["Application", "Toolkit", "`jlink` image", "`jlink` image, zipped", "`jpackage` image, zipped",
-                  "Native build", "Native build, zipped", "JVM zip / native zip"],
-                 ["<3", "<1", ">1", ">1", ">1", ">1", ">1", ">1"])
+                  "Native build", "Native build, zipped", "JVM image / native build", "JVM zip / native zip"],
+                 ["<3", "<1", ">1", ">1", ">1", ">1", ">1", ">1", ">1"])
     pairs = []
+    installed = []
     for result in results:
         name = name_of(result)
         jlink = dig(result, "size", "baseline_jlink", "zip_bytes")
         native = dig(result, "size", "cn1_linux", "zip_bytes")
         ratio = value_ratio(jlink, native)
         pairs.append((LABEL[name], ratio, megabytes(jlink) + " MB", megabytes(native) + " MB"))
+        jlink_disk = dig(result, "size", "baseline_jlink", "bytes")
+        native_disk = dig(result, "size", "cn1_linux", "bytes")
+        disk_ratio = value_ratio(jlink_disk, native_disk)
+        installed.append((LABEL[name], disk_ratio, megabytes(jlink_disk) + " MB", megabytes(native_disk) + " MB"))
         size.add(LABEL[name], TOOLKIT[name],
-                 megabytes(dig(result, "size", "baseline_jlink", "bytes")), megabytes(jlink),
+                 megabytes(jlink_disk), megabytes(jlink),
                  megabytes(dig(result, "size", "baseline_jpackage", "zip_bytes")),
-                 megabytes(dig(result, "size", "cn1_linux", "bytes")), megabytes(native), show_ratio(ratio))
+                 megabytes(native_disk), megabytes(native), show_ratio(disk_ratio), show_ratio(ratio))
+    size.say("The `jlink` image is the application with the smallest Java runtime that runs it: the "
+             "application's jars and the modules `jlink` found it to need. The native build is one "
+             "executable file with nothing beside it. Both rely on the desktop libraries of the system, "
+             "X11 and, for the native build and for JavaFX, GTK; neither column counts them.")
+    size.say(tally(installed, "smaller", "larger", "the `jlink` image as installed"))
     size.say(tally(pairs, "smaller", "larger", "the zipped `jlink` image"))
     tables.append(size)
 
