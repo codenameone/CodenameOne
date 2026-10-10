@@ -30,6 +30,10 @@ try {
   assert.equal(await page.locator('#cn1-search-pages').isVisible(), false);
   const guideUrls = await page.locator('#cn1-search-guide-results h3 a').evaluateAll(nodes => nodes.map(node => node.getAttribute('href')));
   assert(guideUrls.every(url => url.startsWith('/developer-guide/')));
+  await query('how to use build hints');
+  assert((await page.locator('#cn1-search-guide-results h3 a').evaluateAll(nodes => nodes.map(node => node.getAttribute('href'))))
+    .includes('/developer-guide/build-hints/'), 'Natural-language queries must find the build hints chapter');
+  await query('build hints');
 
   await page.locator('[data-search-scope=blog]').click();
   await ready();
@@ -70,7 +74,7 @@ try {
   }
   await query('nonsensezzzzzzzz');
   assert.equal(await page.locator('#cn1-search-status').textContent(), 'No results found.');
-  await query('title:(');
+  await query('nonsensezzzzzzzz:(');
   assert.equal(await page.locator('#cn1-search-status').textContent(), 'No results found.');
   await query('');
   assert.equal(await page.locator('#cn1-search-status').textContent(), 'Type to search.');
@@ -124,6 +128,7 @@ try {
     { id: 'push', title: 'Push notifications', content: 'Deliver a notification with push.', url: '/developer-guide/push/', section: 'guide' },
     { id: 'local', title: 'Local notifications', content: 'Display a notification locally.', url: '/developer-guide/local/', section: 'guide' },
     { id: 'messages', title: 'Push messages', content: 'Send a push message.', url: '/developer-guide/messages/', section: 'guide' },
+    { id: 'decoy', title: 'Howl tool form theme', content: 'Unrelated words beginning with stop words.', url: '/developer-guide/decoy/', section: 'guide' },
     { id: 'blog-typo', title: 'A misspelled notification', content: 'push notificaton', url: '/blog/typo/', section: 'blog' },
     { id: 'blog', title: 'Push notifications', content: 'Deliver a notification with push.', url: '/blog/push/', section: 'blog' },
   ] } }));
@@ -152,6 +157,14 @@ try {
   await page.locator('[data-search-scope=guide]').click();
   await ready();
   assert.deepEqual(await guideMatches(), ['/developer-guide/push/']);
+  for (const phrase of ['how to push the notification', 'for the push notifica', 'how to push the notificaton', 'HOW, TO: push (notification)']) {
+    await query(phrase);
+    assert.deepEqual(await guideMatches(), ['/developer-guide/push/'], 'Stop words must not block exact, prefix, or fuzzy matches');
+  }
+  for (const phrase of ['how to for the', 'how, to: for (the)', '!!!', 'how to push notification unrelatedzzzz']) {
+    await query(phrase);
+    assert.equal(await page.locator('#cn1-search-status').textContent(), 'No results found.', 'Empty normalized queries and missing meaningful terms must not return unrelated results');
+  }
   assert.equal(await page.evaluate(() => window.searchIndexBuilds), 1, 'Scope changes and typo fallback must reuse one index');
   await page.unroute('**/lunr-index.json');
   assert.deepEqual(errors, []);

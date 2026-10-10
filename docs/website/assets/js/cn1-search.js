@@ -45,9 +45,13 @@
   const pageMatches = query => {
     if (!pagesReady || pagesFailed || scope === "javadoc") return [];
     // The query builder treats punctuation as text, not Lunr query syntax.
-    // Require every word so broad chapters do not outrank a specific match
-    // merely because they contain one of several unrelated query terms.
-    const tokens = lunr.tokenizer(query).map(token => token.toString());
+    // Apply the index's trimming and stop-word filtering before requiring every
+    // meaningful word. Keep literal forms for prefix and typo fallbacks; the
+    // exact query's search pipeline handles stemming.
+    const tokens = lunr.tokenizer(query)
+      .map(token => lunr.stopWordFilter(lunr.trimmer(token)))
+      .filter(token => token && token.toString())
+      .map(token => token.toString());
     if (!tokens.length) return [];
     // Filter EACH attempt before deciding whether a fallback is needed: an exact
     // match in the blog must not suppress typo recovery in the guide.
