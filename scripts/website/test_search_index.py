@@ -23,6 +23,15 @@ class SearchIndexTest(unittest.TestCase):
         self.assertEqual(search.extract_title(source), 'Build hints reference')
         self.assertEqual(search.extract_main_content(source), 'Build hints reference android.xpermissions Extra manifest permissions & settings')
 
+    def test_semantic_asides_are_searchable_but_navigation_is_not(self):
+        source = '''<main><article class=post-single><h1 class=post-title>Services</h1>
+        <aside class=cn1-pricing-commerce>Commerce is optional.</aside>
+        <aside class=cn1-signing-note>Know where the key goes</aside>
+        <aside class=cn1-guide-sidebar>Guide menu</aside>
+        <aside role=navigation>Related chapters</aside></article></main>'''
+        self.assertEqual(search.extract_main_content(source),
+                         'Services Commerce is optional. Know where the key goes')
+
     def test_minified_date_and_redirect(self):
         page = search.PageText('<meta property=article:published_time content=2026-10-10T09:00:00Z><meta http-equiv=refresh content="0; url=/developer-guide/">')
         self.assertEqual(page.date, '2026-10-10T09:00:00Z')
@@ -39,6 +48,11 @@ class SearchIndexTest(unittest.TestCase):
                 path = Path(tmp) / route / 'index.html'
                 path.parent.mkdir(parents=True)
                 path.write_text('<article class=post-single><h1 class=post-title>Build hints</h1><p>' + 'Build arguments for Android and iOS. ' * 5 + '</p></article>')
+            for route in ('blog', 'blog/page/2'):
+                path = Path(tmp) / route / 'index.html'
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text('<article class="post-single cn1-blog-index"><h1 class=post-title>Blog</h1>'
+                                '<article class=cn1-blog-index__card>' + 'Build arguments for Android and iOS. ' * 5 + '</article></article>')
             payload = search.build_index()
             self.assertEqual({doc['url']: doc['section'] for doc in payload['docs']}, {
                 '/developer-guide/build-hints/': 'guide', '/blog/build-hints/': 'blog', '/getting-started/': 'site'})

@@ -8,7 +8,7 @@
   input.value = params.get("q") || "";
   let docs = [], docsById = new Map(), entries = [];
   let pagesReady = false, apiReady = false, pagesFailed = false, apiFailed = false;
-  const indexes = new Map();
+  let index = null;
   const escapeHtml = value => String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;")
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   const sectionOf = doc => doc.section || (doc.url.startsWith("/developer-guide/") ? "guide" : doc.url.startsWith("/blog/") ? "blog" : "site");
@@ -21,24 +21,26 @@
     if (sectionOf(doc) !== "blog" || !doc.date || Number.isNaN(Date.parse(doc.date))) return 1;
     return Math.max(0.5, 2 * Math.exp(-Math.max(0, Date.now() - Date.parse(doc.date)) / (3 * 365.25 * 86400000)));
   };
-  const pageIndex = (literal = false) => {
-    const key = literal ? scope + ':literal' : scope;
-    if (!indexes.has(key)) {
-      const selected = docs.filter(doc => scope === "all" || sectionOf(doc) === scope);
-      indexes.set(key, lunr(function () {
+  // Keep literal words alongside stems in ONE index. This supports both normal
+  // inflections and typo recovery ("notificaton" versus "notification") without
+  // retaining separate indexes for each scope or fallback mode.
+  const literalAndStem = token => {
+    const stem = lunr.stemmer(token.clone());
+    return stem.toString() === token.toString() ? token : [token, stem];
+  };
+  const pageIndex = () => {
+    if (!index) {
+      lunr.Pipeline.registerFunction(literalAndStem, "cn1LiteralAndStem");
+      index = lunr(function () {
         this.ref("id");
         this.field("title", { boost: 10 });
         this.field("content");
-        if (literal) {
-          // Typos need the original words: "notification" stems to "notif",
-          // while "notificaton" does not. Build this only if normal searches fail.
-          this.pipeline.remove(lunr.stemmer);
-          this.searchPipeline.remove(lunr.stemmer);
-        }
-        selected.forEach(doc => this.add(doc));
-      }));
+        this.pipeline.remove(lunr.stemmer);
+        this.pipeline.add(literalAndStem);
+        docs.forEach(doc => this.add(doc));
+      });
     }
-    return indexes.get(key);
+    return index;
   };
   const pageMatches = query => {
     if (!pagesReady || pagesFailed || scope === "javadoc") return [];
@@ -47,19 +49,22 @@
     // merely because they contain one of several unrelated query terms.
     const tokens = lunr.tokenizer(query).map(token => token.toString());
     if (!tokens.length) return [];
-    let matches = pageIndex().query(q => {
+    // Filter EACH attempt before deciding whether a fallback is needed: an exact
+    // match in the blog must not suppress typo recovery in the guide.
+    const inScope = hits => hits.filter(hit => scope === "all" || sectionOf(docsById.get(hit.ref)) === scope);
+    let matches = inScope(pageIndex().query(q => {
       tokens.forEach(term => q.term(term, { presence: lunr.Query.presence.REQUIRED }));
-    });
+    }));
     if (!matches.length) {
-      matches = pageIndex().query(q => {
+      matches = inScope(pageIndex().query(q => {
         tokens.forEach(term => q.term(term, { presence: lunr.Query.presence.REQUIRED,
           wildcard: lunr.Query.wildcard.TRAILING, usePipeline: false }));
-      });
+      }));
     }
     if (!matches.length) {
-      matches = pageIndex(true).query(q => {
-        tokens.forEach(term => q.term(term, { presence: lunr.Query.presence.REQUIRED, editDistance: 1 }));
-      });
+      matches = inScope(pageIndex().query(q => {
+        tokens.forEach(term => q.term(term, { presence: lunr.Query.presence.REQUIRED, editDistance: 1, usePipeline: false }));
+      }));
     }
     return matches.map(hit => ({ doc: docsById.get(hit.ref), score: hit.score }))
       .sort((a, b) => b.score * recencyBoost(b.doc) - a.score * recencyBoost(a.doc));

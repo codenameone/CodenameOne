@@ -44,6 +44,7 @@ class PageText(HTMLParser):
         self.stack = []
         self.date = ""
         self.redirect = False
+        self.listing = False
         self.title, self.heading, self.article, self.main, self.fallback = [], [], [], [], []
         self.feed(source)
 
@@ -57,8 +58,12 @@ class PageText(HTMLParser):
         classes = attrs.get("class", "").split()
         parent = self.stack[-1][1] if self.stack else set()
         flags = set(parent)
-        if tag in ("script", "style", "nav", "footer", "aside") or "cn1-guide-toc" in classes:
+        navigation_classes = {"cn1-guide-sidebar", "cn1-guide-toc", "cn1-course-lesson__sidebar", "cn1-gs-progress"}
+        if (tag in ("script", "style", "nav", "footer") or attrs.get("role") == "navigation"
+                or navigation_classes.intersection(classes)):
             flags.add("skip")
+        if "cn1-blog-index" in classes:
+            self.listing = True
         if tag == "title":
             flags.add("title")
         if tag == "h1" and "post-title" in classes:
@@ -154,7 +159,7 @@ def build_index() -> Dict[str, object]:
 
         doc = html_file.read_text(encoding="utf-8", errors="ignore")
         page = PageText(doc)
-        if page.redirect:
+        if page.redirect or page.listing:
             continue
         title = page.text(page.heading) or re.sub(r"\s*\|\s*Codename One\s*$", "", page.text(page.title)) or "Untitled"
         content = page.text(page.article or page.main or page.fallback)

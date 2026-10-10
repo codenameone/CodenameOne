@@ -101,12 +101,30 @@ try {
   }
   await page.goto(base + '/developer-guide/advanced-topics-under-the-hood/#_sending_arguments_to_the_build_server');
   await page.waitForURL('**/developer-guide/build-hints/#_sending_arguments_to_the_build_server');
+  const shortcut = page.locator('header a.cn1-menu-search-link');
+  assert.equal(await shortcut.getAttribute('accesskey'), '/');
+  assert.match(await shortcut.getAttribute('title'), /Alt \+ \//);
+  await page.addInitScript(() => {
+    window.searchIndexBuilds = 0;
+    let factory;
+    Object.defineProperty(window, 'lunr', {
+      configurable: true,
+      get: () => factory,
+      set: value => { factory = new Proxy(value, {
+        apply(target, receiver, args) {
+          window.searchIndexBuilds++;
+          return Reflect.apply(target, receiver, args);
+        }
+      }); }
+    });
+  });
   // A controlled corpus makes typo recovery and required-word matching observable:
   // two near matches each omit one word, and another match belongs to the blog.
   await page.route('**/lunr-index.json', route => route.fulfill({ json: { docs: [
     { id: 'push', title: 'Push notifications', content: 'Deliver a notification with push.', url: '/developer-guide/push/', section: 'guide' },
     { id: 'local', title: 'Local notifications', content: 'Display a notification locally.', url: '/developer-guide/local/', section: 'guide' },
     { id: 'messages', title: 'Push messages', content: 'Send a push message.', url: '/developer-guide/messages/', section: 'guide' },
+    { id: 'blog-typo', title: 'A misspelled notification', content: 'push notificaton', url: '/blog/typo/', section: 'blog' },
     { id: 'blog', title: 'Push notifications', content: 'Deliver a notification with push.', url: '/blog/push/', section: 'blog' },
   ] } }));
   await page.goto(base + '/search/?scope=guide&q=push%20notificaton');
@@ -123,11 +141,18 @@ try {
   assert.equal(await page.locator('#cn1-search-status').textContent(), 'No results found.');
   await query('notificatonxx');
   assert.equal(await page.locator('#cn1-search-status').textContent(), 'No results found.');
-  await query('push notificaton');
+  await query('push notification');
   await page.locator('[data-search-scope=blog]').click();
   await ready();
   assert.equal(await page.locator('#cn1-search-guide').isVisible(), false);
   assert.equal(await page.locator('#cn1-search-results h3 a').first().getAttribute('href'), '/blog/push/');
+  await page.locator('[data-search-scope=all]').click();
+  await ready();
+  await query('push notifikation');
+  await page.locator('[data-search-scope=guide]').click();
+  await ready();
+  assert.deepEqual(await guideMatches(), ['/developer-guide/push/']);
+  assert.equal(await page.evaluate(() => window.searchIndexBuilds), 1, 'Scope changes and typo fallback must reuse one index');
   await page.unroute('**/lunr-index.json');
   assert.deepEqual(errors, []);
   console.log(`Search scopes, ordering, deep links, API names, failure isolation, themes, mobile layout, ${names.length} catalog rows, and legacy bookmark passed.`);
