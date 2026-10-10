@@ -59,6 +59,15 @@ public class ApplicationWindowTest {
         Units.setScale(2);
         implicit = Platform.isImplicitExit();
         Platform.setImplicitExit(false);
+        // A form an earlier test class left showing is not a stage's, and
+        // the first stage shown over it would be a guest in its window,
+        // which sizes nothing: whichever test ran first here failed. A
+        // stage shown and hidden leaves a stage's form behind instead.
+        Stage first = new Stage();
+        first.cn1MarkPrimary();
+        first.setScene(new Scene(new Pane(), 10, 10));
+        first.show();
+        first.hide();
         HeadlessImplementation.windowTitle = null;
         HeadlessImplementation.windowSize = null;
     }
@@ -74,6 +83,7 @@ public class ApplicationWindowTest {
         HeadlessImplementation.nativeTitle = false;
         HeadlessImplementation.windowTitle = null;
         HeadlessImplementation.windowSize = null;
+        HeadlessImplementation.windowFrame = null;
     }
 
     private static void desktop() {
@@ -107,6 +117,46 @@ public class ApplicationWindowTest {
         desktop();
         primary("Ledger", new Scene(new Pane(), 320, 200));
         assertArrayEquals(new int[] {Units.sizeToPixels(320), Units.sizeToPixels(200)},
+                HeadlessImplementation.windowSize);
+    }
+
+    /// The size of a scene is that of what is drawn in the window, and a
+    /// port is asked for the size of the window: the frame goes on top.
+    @Test
+    public void theFrameOfTheWindowIsAddedToTheSizeOfAScene() {
+        desktop();
+        HeadlessImplementation.windowFrame = new int[] {2, 25};
+        primary("Ledger", new Scene(new Pane(), 320, 200));
+        assertArrayEquals(new int[] {Units.sizeToPixels(320) + 2, Units.sizeToPixels(200) + 25},
+                HeadlessImplementation.windowSize);
+    }
+
+    /// A window that already shows a display of the size of the scene is
+    /// left alone. Mandelbrot, whose scene is the 800 by 600 the native
+    /// Linux window opens at, was resized to that size less the frame, took
+    /// the resize in its first frame for one made by the user, and kept a
+    /// black picture.
+    @Test
+    public void aSceneTheDisplayAlreadyFitsResizesNothing() {
+        desktop();
+        HeadlessImplementation.windowFrame = new int[] {2, 25};
+        primary("Ledger", new Scene(new Pane(), Units.toLogical(HeadlessImplementation.WIDTH),
+                Units.toLogical(HeadlessImplementation.HEIGHT)));
+        assertNull(HeadlessImplementation.windowSize);
+    }
+
+    /// The size of a stage is its window's: nothing is added to it.
+    @Test
+    public void aSizeGivenToTheStageIsTheWindowsFrameIncluded() {
+        desktop();
+        HeadlessImplementation.windowFrame = new int[] {2, 25};
+        stage = new Stage();
+        stage.cn1MarkPrimary();
+        stage.setScene(new Scene(new Pane(), 320, 200));
+        stage.setWidth(500);
+        stage.setHeight(400);
+        stage.show();
+        assertArrayEquals(new int[] {Units.sizeToPixels(500), Units.sizeToPixels(400)},
                 HeadlessImplementation.windowSize);
     }
 

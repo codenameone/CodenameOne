@@ -535,6 +535,20 @@ public class HeadlessImplementation extends CodenameOneImplementation {
                 ? new com.codename1.ui.geom.Dimension(desktopSize[0], desktopSize[1]) : null;
     }
 
+    /// What the frame of the window adds to the display as `{width,
+    /// height}`, or null: the window of a desktop is larger than what is
+    /// drawn in it by its borders and its title bar. A test that sets it
+    /// must reset it.
+    public static int[] windowFrame;
+
+    @Override
+    public com.codename1.ui.geom.Rectangle getWindowBounds() {
+        if (!desktop || windowFrame == null) {
+            return null;
+        }
+        return new com.codename1.ui.geom.Rectangle(0, 0, WIDTH + windowFrame[0], HEIGHT + windowFrame[1]);
+    }
+
     @Override
     public void setWindowSize(int width, int height) {
         if (desktop) {

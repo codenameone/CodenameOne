@@ -237,6 +237,16 @@ public final class StageForm extends Form implements StageHost {
     /// with or prefers, as a stage with a window of its own is sized.
     /// A stage shown over a form that is not a stage's is a guest in
     /// that window and leaves its size alone.
+    ///
+    /// The size of a stage is its window's, frame and title bar included,
+    /// and that is what a port is asked for. The size of a scene is that
+    /// of what is drawn: asking the port for it gave the scene a window
+    /// with its frame taken out of it, so a scene made 800 by 600 was laid
+    /// out at 798 by 575. The frame, which is what the window has over the
+    /// display, is added to a size that came from the scene, and a scene
+    /// the display already fits asks for nothing: a window that opens at
+    /// the size of its scene is not resized under an application in the
+    /// middle of its first frame.
     private void sizeWindow() {
         Display d = Display.getInstance();
         boolean own = previous == null || previous instanceof StageForm;
@@ -255,7 +265,21 @@ public final class StageForm extends Form implements StageHost {
                     : (scene.getRoot() == null ? 0 : scene.getRoot().prefHeight(-1));
         }
         if (width > 0 && height > 0) {
-            d.setWindowSize(Units.sizeToPixels(width), Units.sizeToPixels(height));
+            int w = Units.sizeToPixels(width);
+            int h = Units.sizeToPixels(height);
+            boolean sceneWide = Double.isNaN(askedWidth);
+            boolean sceneHigh = Double.isNaN(askedHeight);
+            if (sceneWide && sceneHigh && w == d.getDisplayWidth() && h == d.getDisplayHeight()) {
+                return;
+            }
+            com.codename1.ui.geom.Rectangle window = d.getWindowBounds();
+            if (sceneWide) {
+                w += Math.max(0, window.getWidth() - d.getDisplayWidth());
+            }
+            if (sceneHigh) {
+                h += Math.max(0, window.getHeight() - d.getDisplayHeight());
+            }
+            d.setWindowSize(w, h);
         }
     }
 
