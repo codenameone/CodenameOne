@@ -199,8 +199,15 @@ bia_log "Running $APP_MAIN_NAME Maven build with JAVA_HOME=$JAVA17_HOME"
   export JAVA_HOME="$JAVA17_HOME"
   export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$BASE_PATH"
   MVN_IOS_LOG="$ARTIFACTS_DIR/cn1-ios-build.log"
+  # The application's own wrapper where it has one. An application without one
+  # is built with the Maven this script has already checked is there, as
+  # build-android-app.sh builds every application.
+  MVN_BIN="$MAVEN_HOME/bin/mvn"
+  if [ -x ./mvnw ]; then
+    MVN_BIN=./mvnw
+  fi
   MVN_CMD=(
-    ./mvnw package
+    "$MVN_BIN" package
     -DskipTests
     -Dcodename1.platform=ios
     -Dcodename1.buildTarget=ios-source
