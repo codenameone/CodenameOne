@@ -2277,8 +2277,10 @@ extern void cn1GcWaitUnblockedSlow(struct ThreadLocalData* ts);
 // sides at least one of the two sees the other's store: either the collector sees this
 // thread active and waits for it, or this thread sees the block, lowers the flag again and
 // goes back to waiting. A collector that sees the transient TRUE only waits a little
-// longer. The fence costs one barrier per resume, at sites that have just come back from a
-// blocking call.
+// longer. This side gets its ordering from a seq_cst store and load (see below) rather
+// than a standalone fence: one barrier per resume either way, but resumes are not
+// confined to blocking calls -- the allocation pacing parks and the allocation-path
+// safepoints resume through here too, so allocation-heavy code pays it often.
 //
 // Returns JAVA_TRUE when the thread is active and may run Java. JAVA_FALSE means the
 // collector raised the block inside the window: threadActive has been lowered again and
@@ -2301,9 +2303,17 @@ static inline JAVA_BOOLEAN cn1GcTryResumeActive(struct ThreadLocalData* ts) {
         }
     }
 #endif
-    __atomic_store_n(&ts->threadActive, JAVA_TRUE, __ATOMIC_RELAXED);
-    __atomic_thread_fence(__ATOMIC_SEQ_CST);
-    if(!__atomic_load_n(&ts->threadBlockedByGC, __ATOMIC_RELAXED)) {
+    // The store-load ordering the handshake needs, from a seq_cst store and a seq_cst
+    // load rather than a relaxed pair around a standalone fence. Both orders are
+    // correct against the collector's seq_cst fence (CN1_GC_BLOCK_FENCE: seq_cst fences
+    // and operations share one total order), but they cost very different amounts on
+    // a path allocation passes often: a standalone fence is MFENCE on x86-64, which on
+    // AMD Zen costs several times a locked instruction, while a seq_cst store is one XCHG
+    // there and STLR + LDAR on arm64 instead of a full DMB. With the fenced form, the
+    // self-hosted translator measured 0.63x of JDK 25 on a Linux x64 perf-gate runner
+    // (AMD EPYC 7763) where master measured 0.47-0.50x, its memory unchanged.
+    __atomic_store_n(&ts->threadActive, JAVA_TRUE, __ATOMIC_SEQ_CST);
+    if(!__atomic_load_n(&ts->threadBlockedByGC, __ATOMIC_SEQ_CST)) {
 #ifdef CN1_GC_VERIFY
         __atomic_fetch_add(&ts->gcVerifyResumes, 1, __ATOMIC_SEQ_CST);
 #endif
