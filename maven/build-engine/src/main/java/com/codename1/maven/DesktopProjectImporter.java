@@ -538,6 +538,60 @@ public final class DesktopProjectImporter {
         }
     }
 
+    private static final Pattern KOTLIN_DECLARATION = Pattern.compile(
+            "(?<!:)\\b(companion\\s+object|object|class|interface)\\b(?:\\s+(\\w+))?");
+
+    /// The binary name, without its package, of the class a `@JvmStatic`
+    /// function at `at` is a static method of: the `object` it is declared
+    /// in, or the class whose `companion object` it is declared in (the
+    /// static method is generated on the class, not on the companion).
+    /// Nested declarations are joined with `$`. Null when the function is
+    /// inside no declaration this can read, and the caller falls back on the
+    /// file's name.
+    ///
+    /// `code` has its comments and string literals blanked, so every brace
+    /// in it is a block's.
+    static String kotlinDeclaration(String code, int at) {
+        // What each open block is: a declaration's name, "" for a companion
+        // object, null for anything else (a function body, a lambda).
+        List<String> open = new ArrayList<String>();
+        int header = 0;
+        for (int i = 0; i < at; i++) {
+            char c = code.charAt(i);
+            if (c == '{') {
+                String name = null;
+                Matcher m = KOTLIN_DECLARATION.matcher(code.substring(header, i));
+                // The last one before the brace: a property or a function
+                // without a body can stand between two blocks. `X::class`
+                // is not a declaration.
+                while (m.find()) {
+                    name = m.group(1).startsWith("companion") ? "" : m.group(2);
+                }
+                open.add(name);
+                header = i + 1;
+            } else if (c == '}') {
+                if (!open.isEmpty()) {
+                    open.remove(open.size() - 1);
+                }
+                header = i + 1;
+            } else if (c == ';') {
+                header = i + 1;
+            }
+        }
+        StringBuilder out = new StringBuilder();
+        for (String name : open) {
+            if (name == null) {
+                // Inside a function: a local declaration, which has no
+                // name a launcher could use.
+                return null;
+            }
+            if (name.length() > 0) {
+                out.append(out.length() == 0 ? "" : "$").append(name);
+            }
+        }
+        return out.length() == 0 ? null : out.toString();
+    }
+
     static void scanKotlin(String fileClass, String source, Map<String, Candidate> out) {
         // The annotation's argument is a string literal, which code() blanks.
         Matcher named = KOTLIN_FILE_NAME.matcher(source);
@@ -552,8 +606,12 @@ public final class DesktopProjectImporter {
             }
             candidate(out, prefix + ext.group(1)).javafx = true;
         }
-        if (KOTLIN_STATIC_MAIN.matcher(code).find()) {
-            candidate(out, prefix + fileClass);
+        Matcher staticMain = KOTLIN_STATIC_MAIN.matcher(code);
+        while (staticMain.find()) {
+            // The class is the declaration the function is written in, which
+            // Kotlin does not tie to the file's name.
+            String declared = kotlinDeclaration(code, staticMain.start());
+            candidate(out, prefix + (declared == null ? fileClass : declared));
         }
         if (KOTLIN_TOP_MAIN.matcher(code).find()) {
             // A top-level function compiles into the file's facade class.
@@ -636,6 +694,16 @@ public final class DesktopProjectImporter {
             return m.find() ? m.group(1) : null;
         }
         return value;
+    }
+
+    /// [#resolve] against `pom`, and when the property is not defined there,
+    /// against each of `poms` in turn: a property is inherited too.
+    private static String resolveIn(String value, String pom, List<String> poms) {
+        String v = resolve(value, pom);
+        for (int i = 0; v == null && i < poms.size(); i++) {
+            v = resolve(value, poms.get(i));
+        }
+        return v;
     }
 
     /// A compiler plugin's own configuration: it wins over the properties.
@@ -745,26 +813,91 @@ public final class DesktopProjectImporter {
         return r.libraries;
     }
 
+    private static final Pattern POM_PARENT = Pattern.compile("<parent>(.*?)</parent>", Pattern.DOTALL);
+    private static final Pattern POM_NO_RELATIVE_PATH = Pattern.compile(
+            "<relativePath\\s*/>|<relativePath>\\s*</relativePath>");
+    /// How many parents up a module's POM is followed: deeper than any real
+    /// build, and an end to two POMs that name each other.
+    private static final int MAX_PARENTS = 12;
+
+    /// The POM of the module in `moduleDir`, then its parent's, then that
+    /// one's, as far as they are files of the source tree: a parent is read
+    /// from where the module says it is (`relativePath`, `../pom.xml` when
+    /// it says nothing), and only when the POM found there is the one the
+    /// module names.
+    ///
+    /// A parent that is not in the tree -- one resolved from a repository,
+    /// as `spring-boot-starter-parent` is -- is not fetched: an import reads
+    /// the files it was given and does not run Maven. It is named in
+    /// [Result#unresolved], since what it declares for its modules is then
+    /// unknown here. Neither are profiles activated or imported BOMs
+    /// expanded; this is the dependencies a POM spells out, not the
+    /// effective model.
+    static List<String> pomChain(File moduleDir, Result r) throws IOException {
+        List<String> chain = new ArrayList<String>();
+        File dir = moduleDir.getAbsoluteFile();
+        String pom = read(new File(dir, "pom.xml"));
+        if (pom.length() == 0) {
+            return chain;
+        }
+        chain.add(pom);
+        for (int depth = 0; depth < MAX_PARENTS; depth++) {
+            Matcher parent = POM_PARENT.matcher(pom);
+            if (!parent.find()) {
+                break;
+            }
+            String named = element(parent.group(1), "groupId") + ":" + element(parent.group(1), "artifactId");
+            String relative = element(parent.group(1), "relativePath");
+            File file = null;
+            // An empty relativePath is how a POM says its parent is not on disk.
+            if (!POM_NO_RELATIVE_PATH.matcher(parent.group(1)).find()) {
+                file = new File(dir, relative == null ? "../pom.xml" : relative);
+                if (file.isDirectory()) {
+                    file = new File(file, "pom.xml");
+                }
+            }
+            String text = file == null ? "" : read(file);
+            // Maven takes the file only when it is the POM asked for.
+            String own = element(POM_PARENT.matcher(text).replaceAll(" "), "artifactId");
+            if (text.length() == 0 || own == null || !own.equals(element(parent.group(1), "artifactId"))) {
+                r.unresolved.add("the parent POM " + named + " is not among the project's files; dependencies it "
+                        + "declares for its modules were not read: add the ones the application needs to its "
+                        + "build by hand");
+                break;
+            }
+            chain.add(text);
+            pom = text;
+            dir = file.getAbsoluteFile().getParentFile();
+        }
+        return chain;
+    }
+
     static void readDependencies(File moduleDir, Result r) throws IOException {
         Set<String> coords = new LinkedHashSet<String>();
         Map<String, String> versions = new java.util.HashMap<String, String>();
         boolean catalog = false;
-        // The module's own build only: what a parent declares for every module
-        // says nothing about what this one uses.
-        String pom = read(new File(moduleDir, "pom.xml"));
-        // Managed versions and plugin dependencies are not the module's.
-        pom = pom.replaceAll("(?s)<dependencyManagement>.*?</dependencyManagement>", " ")
-                .replaceAll("(?s)<build>.*?</build>", " ");
-        Matcher dep = POM_DEPENDENCY.matcher(pom);
-        while (dep.find()) {
-            String group = element(dep.group(1), "groupId");
-            String artifact = element(dep.group(1), "artifactId");
-            if (group != null && artifact != null && !"test".equals(element(dep.group(1), "scope"))) {
-                coords.add(group + ":" + artifact);
-                String version = element(dep.group(1), "version");
-                version = version == null ? null : resolve(version, pom);
-                if (version != null && version.indexOf("${") < 0) {
-                    versions.put(group + ":" + artifact, version);
+        // The module's own POM, then its parents': Maven hands a parent's
+        // <dependencies> down to every module, so they are this module's as
+        // much as the ones it spells out. (Its dependencyManagement is not:
+        // that only says which version a module would get if it asked.)
+        List<String> poms = pomChain(moduleDir, r);
+        for (String text : poms) {
+            // Managed versions and plugin dependencies are not the module's.
+            String pom = text.replaceAll("(?s)<dependencyManagement>.*?</dependencyManagement>", " ")
+                    .replaceAll("(?s)<build>.*?</build>", " ");
+            Matcher dep = POM_DEPENDENCY.matcher(pom);
+            while (dep.find()) {
+                String group = element(dep.group(1), "groupId");
+                String artifact = element(dep.group(1), "artifactId");
+                if (group != null && artifact != null && !"test".equals(element(dep.group(1), "scope"))
+                        && !coords.contains(group + ":" + artifact)) {
+                    // The nearest declaration wins, as it does in Maven.
+                    coords.add(group + ":" + artifact);
+                    String version = element(dep.group(1), "version");
+                    version = version == null ? null : resolveIn(version, pom, poms);
+                    if (version != null && version.indexOf("${") < 0) {
+                        versions.put(group + ":" + artifact, version);
+                    }
                 }
             }
         }

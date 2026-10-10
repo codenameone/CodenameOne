@@ -564,4 +564,115 @@ public class DesktopProjectImporterTest {
         assertEquals("", DesktopSources.toolkitsNamedIn(desktop));
         assertNull(DesktopSources.readEntryRecord(desktop));
     }
+
+    private static String libraries(File module) throws Exception {
+        StringBuilder libraries = new StringBuilder();
+        for (DesktopProjectImporter.Library lib : DesktopProjectImporter.librariesOf(module)) {
+            libraries.append(lib.coordinate()).append(':').append(lib.version)
+                    .append(lib.provided ? " provided\n" : " compile\n");
+        }
+        return libraries.toString();
+    }
+
+    /// Maven hands a parent's `<dependencies>` down to every module: they
+    /// are the module's although its own POM does not spell them out.
+    @Test
+    public void aParentsDependenciesAreItsModules() throws Exception {
+        File source = tmp.newFolder("inherited");
+        write(source, "pom.xml", "<project>\n<groupId>com.acme</groupId><artifactId>root</artifactId>\n"
+                + "<properties><gson.version>2.10</gson.version><mig.version>11.3</mig.version></properties>\n"
+                + "<dependencyManagement><dependencies><dependency><groupId>org.managed</groupId>"
+                + "<artifactId>only-managed</artifactId><version>1</version></dependency></dependencies>"
+                + "</dependencyManagement>\n"
+                + "<dependencies>\n"
+                + "<dependency><groupId>com.google.code.gson</groupId><artifactId>gson</artifactId>"
+                + "<version>${gson.version}</version></dependency>\n"
+                + "<dependency><groupId>junit</groupId><artifactId>junit</artifactId><version>4.13.2</version>"
+                + "<scope>test</scope></dependency>\n"
+                + "</dependencies>\n</project>\n");
+        write(source, "ui/pom.xml", "<project>\n<parent><groupId>com.acme</groupId><artifactId>root</artifactId>"
+                + "<version>1</version></parent>\n<artifactId>ui-parent</artifactId>\n"
+                + "<dependencies>\n"
+                + "<dependency><groupId>com.formdev</groupId><artifactId>flatlaf</artifactId>"
+                + "<version>3.4</version></dependency>\n"
+                + "<dependency><groupId>com.miglayout</groupId><artifactId>miglayout-swing</artifactId>"
+                + "<version>5.0</version></dependency>\n"
+                + "</dependencies>\n</project>\n");
+        write(source, "ui/app/pom.xml", "<project>\n<parent><groupId>com.acme</groupId>"
+                + "<artifactId>ui-parent</artifactId><version>1</version></parent>\n<artifactId>app</artifactId>\n"
+                + "<dependencies>\n"
+                + "<dependency><groupId>com.miglayout</groupId><artifactId>miglayout-swing</artifactId>"
+                + "<version>${mig.version}</version></dependency>\n"
+                + "</dependencies>\n</project>\n");
+        // The module's own first, then each parent's; what the module says
+        // itself wins, and a property is inherited like a dependency.
+        assertEquals("com.miglayout:miglayout-swing:11.3 compile\n"
+                + "com.formdev:flatlaf:3.4 compile\n"
+                + "com.google.code.gson:gson:2.10 compile\n", libraries(new File(source, "ui/app")));
+        DesktopProjectImporter.Result all = new DesktopProjectImporter.Result();
+        DesktopProjectImporter.readDependencies(new File(source, "ui/app"), all);
+        assertTrue(all.unresolved.toString(), all.unresolved.isEmpty());
+
+        // A parent named somewhere else in the tree.
+        write(source, "elsewhere/pom.xml", "<project>\n<parent><groupId>com.acme</groupId>"
+                + "<artifactId>ui-parent</artifactId><version>1</version>"
+                + "<relativePath>../ui</relativePath></parent>\n<artifactId>other</artifactId>\n</project>\n");
+        assertEquals("com.formdev:flatlaf:3.4 compile\n"
+                + "com.miglayout:miglayout-swing:5.0 compile\n"
+                + "com.google.code.gson:gson:2.10 compile\n", libraries(new File(source, "elsewhere")));
+
+        // A parent that is not a file of the project is not fetched, and
+        // the import says that it does not know what it declares: one that
+        // is said to be in a repository, and one that is simply not there.
+        for (String relative : new String[] {"<relativePath/>", ""}) {
+            File lone = tmp.newFolder();
+            write(lone, "module/pom.xml", "<project>\n<parent><groupId>org.springframework.boot</groupId>"
+                    + "<artifactId>spring-boot-starter-parent</artifactId><version>3</version>" + relative
+                    + "</parent>\n<artifactId>module</artifactId>\n"
+                    + "<dependencies>\n<dependency><groupId>com.formdev</groupId><artifactId>flatlaf</artifactId>"
+                    + "<version>3.4</version></dependency>\n</dependencies>\n</project>\n");
+            // The directory above holds a POM, of some other project.
+            write(lone, "pom.xml", "<project><artifactId>unrelated</artifactId><dependencies><dependency>"
+                    + "<groupId>org.stray</groupId><artifactId>stray</artifactId><version>1</version></dependency>"
+                    + "</dependencies></project>\n");
+            DesktopProjectImporter.Result r = new DesktopProjectImporter.Result();
+            DesktopProjectImporter.readDependencies(new File(lone, "module"), r);
+            assertEquals(Collections.singletonList("com.formdev:flatlaf"), r.uncovered);
+            assertEquals(1, r.unresolved.size());
+            assertTrue(r.unresolved.get(0), r.unresolved.get(0).startsWith(
+                    "the parent POM org.springframework.boot:spring-boot-starter-parent is not among"));
+        }
+    }
+
+    /// A Kotlin `@JvmStatic main` is a static method of the class it is
+    /// declared in, whatever the file is called.
+    @Test
+    public void aKotlinEntryClassIsTheDeclarationNotTheFile() {
+        Map<String, DesktopProjectImporter.Candidate> out =
+                new TreeMap<String, DesktopProjectImporter.Candidate>();
+        DesktopProjectImporter.scanKotlin("Launcher", "package k\n\n// object Wrong {\n"
+                + "private val log = java.util.logging.Logger.getLogger(App::class.java.name)\n\n"
+                + "object App {\n    val title = \"object Title {\"\n"
+                + "    fun describe(): String { return title }\n"
+                + "    @JvmStatic fun main(a: Array<String>) {\n    }\n}\n", out);
+        assertEquals(Collections.singleton("k.App"), out.keySet());
+
+        // The static method of a companion object is on the class.
+        out.clear();
+        DesktopProjectImporter.scanKotlin("Start", "package k\n\nclass Tool(val name: String) : Runnable {\n"
+                + "    override fun run() { println(name) }\n"
+                + "    companion object {\n        @JvmStatic\n        fun main(a: Array<String>) {\n        }\n"
+                + "    }\n}\n", out);
+        assertEquals(Collections.singleton("k.Tool"), out.keySet());
+
+        out.clear();
+        DesktopProjectImporter.scanKotlin("Start", "class Outer {\n    object Inner {\n"
+                + "        @JvmStatic fun main(a: Array<String>) {\n        }\n    }\n}\n", out);
+        assertEquals(Collections.singleton("Outer$Inner"), out.keySet());
+
+        // In no declaration this can read: the file's name, as before.
+        out.clear();
+        DesktopProjectImporter.scanKotlin("Odd", "package k\n@JvmStatic fun main(a: Array<String>) {\n}\n", out);
+        assertTrue(out.keySet().toString(), out.containsKey("k.Odd"));
+    }
 }

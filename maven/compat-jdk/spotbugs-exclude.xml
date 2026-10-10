@@ -116,7 +116,7 @@
     -->
     <Match>
         <Class name="com.codename1.compat.jdk.JdkSystem"/>
-        <Method name="exit"/>
+        <Method name="runShutdownHooks"/>
         <Bug pattern="RU_INVOKE_RUN"/>
     </Match>
 

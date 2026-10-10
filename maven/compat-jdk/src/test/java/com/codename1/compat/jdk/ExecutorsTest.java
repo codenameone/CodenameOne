@@ -261,4 +261,139 @@ public class ExecutorsTest {
         }
         pool.shutdown();
     }
+
+    private static Callable<String> answering(final String value, final AtomicBoolean ran) {
+        return new Callable<String>() {
+            @Override
+            public String call() {
+                ran.set(true);
+                return value;
+            }
+        };
+    }
+
+    private static final Runnable NOTHING = new Runnable() {
+        @Override
+        public void run() {
+        }
+    };
+
+    /// What a JDK scheduled executor does by default: delayed work that was
+    /// accepted still runs after `shutdown()`, repeating work is cancelled.
+    @Test
+    public void anOrderlyShutdownStillRunsDelayedWorkAndCancelsWhatRepeats() throws Exception {
+        ScheduledExecutorService pool = Executors.newScheduledThreadPool(1);
+        AtomicBoolean ran = new AtomicBoolean();
+        ScheduledFuture<String> once = pool.schedule(answering("ran", ran), 300, TimeUnit.MILLISECONDS);
+        ScheduledFuture<?> repeating = pool.scheduleAtFixedRate(NOTHING, 50, 50, TimeUnit.MILLISECONDS);
+        ScheduledFuture<?> spaced = pool.scheduleWithFixedDelay(NOTHING, 50, 50, TimeUnit.MILLISECONDS);
+        pool.shutdown();
+        assertTrue(pool.isShutdown());
+        assertFalse("Accepted work is still due", pool.isTerminated());
+        assertTrue(repeating.isCancelled());
+        assertTrue(spaced.isCancelled());
+        assertFalse(once.isDone());
+        try {
+            pool.schedule(answering("late", new AtomicBoolean()), 1, TimeUnit.MILLISECONDS);
+            fail("Nothing new is accepted");
+        } catch (RejectedExecutionException expected) {
+            assertNotNull(expected);
+        }
+        try {
+            pool.execute(NOTHING);
+            fail("Nothing new is accepted");
+        } catch (RejectedExecutionException expected) {
+            assertNotNull(expected);
+        }
+        try {
+            pool.submit(NOTHING);
+            fail("Nothing new is accepted");
+        } catch (RejectedExecutionException expected) {
+            assertNotNull(expected);
+        }
+        assertEquals("ran", once.get(10, TimeUnit.SECONDS));
+        assertTrue(ran.get());
+        assertTrue("the executor did not stop after its last task", pool.awaitTermination(10, TimeUnit.SECONDS));
+        assertTrue(pool.isTerminated());
+
+        // With nothing due, it stops at once.
+        ScheduledExecutorService idle = Executors.newSingleThreadScheduledExecutor();
+        idle.scheduleAtFixedRate(NOTHING, 50, 50, TimeUnit.MILLISECONDS);
+        terminate(idle);
+
+        // Work cancelled before the shutdown is not waited for.
+        ScheduledExecutorService cancelled = Executors.newSingleThreadScheduledExecutor();
+        assertTrue(cancelled.schedule(answering("never", new AtomicBoolean()), 1, TimeUnit.HOURS).cancel(false));
+        terminate(cancelled);
+    }
+
+    @Test
+    public void shutdownNowDropsDelayedWork() throws Exception {
+        ScheduledExecutorService pool = Executors.newScheduledThreadPool(1);
+        AtomicBoolean ran = new AtomicBoolean();
+        ScheduledFuture<String> once = pool.schedule(answering("ran", ran), 150, TimeUnit.MILLISECONDS);
+        pool.shutdownNow();
+        assertTrue(pool.isShutdown());
+        assertTrue(pool.awaitTermination(10, TimeUnit.SECONDS));
+        Thread.sleep(400);
+        assertFalse(ran.get());
+        // As the JDK leaves the future of a dropped task.
+        assertFalse(once.isDone());
+        assertFalse(once.isCancelled());
+    }
+
+    private static boolean collected(java.lang.ref.WeakReference<?> ref) throws Exception {
+        for (int i = 0; i < 100 && ref.get() != null; i++) {
+            System.gc();
+            Thread.sleep(20);
+        }
+        return ref.get() == null;
+    }
+
+    /// A timeout set for a future that completed in time is cancelled, and
+    /// holds on to nothing: the timer keeps a cancelled task until its time.
+    @Test
+    public void aTimeoutNoLongerNeededLetsGoOfItsFuture() throws Exception {
+        CompletableFuture<String> failing = new CompletableFuture<String>();
+        assertSame(failing, failing.orTimeout(1, TimeUnit.HOURS));
+        assertTrue(failing.complete("in time"));
+        java.lang.ref.WeakReference<Object> first = new java.lang.ref.WeakReference<Object>(failing);
+        failing = null;
+        assertTrue("orTimeout still holds a future that completed", collected(first));
+
+        CompletableFuture<String> defaulting = new CompletableFuture<String>();
+        defaulting.completeOnTimeout("late", 1, TimeUnit.HOURS);
+        assertTrue(defaulting.cancel(false));
+        java.lang.ref.WeakReference<Object> second = new java.lang.ref.WeakReference<Object>(defaulting);
+        defaulting = null;
+        assertTrue("completeOnTimeout still holds a future that completed", collected(second));
+
+        // And one that is needed still fires.
+        assertEquals("late", new CompletableFuture<String>().completeOnTimeout("late", 30, TimeUnit.MILLISECONDS)
+                .get(10, TimeUnit.SECONDS));
+        try {
+            new CompletableFuture<String>().orTimeout(30, TimeUnit.MILLISECONDS).get(10, TimeUnit.SECONDS);
+            fail("The time passed");
+        } catch (ExecutionException expected) {
+            assertTrue(String.valueOf(expected.getCause()), expected.getCause() instanceof TimeoutException);
+        }
+    }
+
+    /// The stage answered completes as the future does, and completing it
+    /// leaves the future alone. That it is an ordinary future, not one that
+    /// refuses to be completed, is documented on the method.
+    @Test
+    public void aMinimalCompletionStageIsACopy() throws Exception {
+        CompletableFuture<String> source = new CompletableFuture<String>();
+        CompletionStage<String> stage = source.minimalCompletionStage();
+        assertTrue(stage.toCompletableFuture().complete("the stage's own"));
+        assertFalse(source.isDone());
+        assertTrue(source.complete("the source's"));
+        assertEquals("the source's", source.get());
+
+        CompletableFuture<String> second = new CompletableFuture<String>();
+        CompletionStage<String> follows = second.minimalCompletionStage();
+        second.complete("value");
+        assertEquals("value", follows.toCompletableFuture().get(10, TimeUnit.SECONDS));
+    }
 }

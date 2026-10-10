@@ -254,8 +254,10 @@ final class DoublePipeline implements DoubleStream {
 
     @Override
     public OptionalDouble findFirst() {
-        Iterator<Double> it = boxed.iterator();
-        return it.hasNext() ? OptionalDouble.of(it.next()) : OptionalDouble.empty();
+        // Through the boxed stream's own, which says that the rest is not
+        // going to be read: a mapped stream left part read is closed.
+        Optional<Double> first = boxed.findFirst();
+        return first.isPresent() ? OptionalDouble.of(first.get()) : OptionalDouble.empty();
     }
 
     @Override

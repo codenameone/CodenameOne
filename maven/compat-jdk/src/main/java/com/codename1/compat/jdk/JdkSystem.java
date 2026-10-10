@@ -164,12 +164,26 @@ public final class JdkSystem {
     /// Runs the shutdown hooks, in the order they were added, and asks the
     /// platform to close the application. The status has nowhere to go.
     public static void exit(int status) {
+        runShutdownHooks();
+        Display.getInstance().exitApplication();
+    }
+
+    /// Runs every registered hook once, in the order they were added.
+    ///
+    /// A hook that throws stops neither the hooks after it nor the exit. In
+    /// the JDK each hook is a thread of its own, so what one throws ends
+    /// that thread and nothing else; here it is reported the way an
+    /// uncaught exception of a thread is, and the next hook runs.
+    static void runShutdownHooks() {
         List<Thread> hooks = new ArrayList<Thread>(HOOKS);
         HOOKS.clear();
         for (Thread hook : hooks) {
-            hook.run();
+            try {
+                hook.run();
+            } catch (Throwable t) {
+                com.codename1.io.Log.e(t);
+            }
         }
-        Display.getInstance().exitApplication();
     }
 
     public static void exit(Runtime runtime, int status) {

@@ -36,6 +36,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -460,5 +461,52 @@ public class CompatLibrariesTest {
         byte[] out = new byte[length];
         new java.util.Random(7).nextBytes(out);
         return out;
+    }
+
+    /// An application that uses a library of each of two groups.
+    private static final String TWO_GROUPS_MAIN = "package com.acme.swingapp;\n"
+            + "public class Main {\n"
+            + "    public static void main(String[] args) {\n"
+            + "        new org.fancy.FancyPanel().add(new javax.swing.JLabel(\n"
+            + "                String.valueOf(org.plain.Words.count(\"a b\"))));\n"
+            + "    }\n"
+            + "}\n";
+
+    /// `org.fancy:common:1.0` and `org.plain:common:1.0` are both
+    /// `common-1.0.jar`. Both are the application's, and both ship.
+    @Test
+    public void twoLibrariesOfOneFileNameBothShip() throws Exception {
+        File fancy = library("common-1.0.jar", "org/fancy/FancyPanel.java", PANEL);
+        File plain = library("common-1.0.jar", "org/plain/Words.java", PLAIN);
+        File classes = application(TWO_GROUPS_MAIN, fancy, plain);
+        assertTrue(remapper(classes, Arrays.asList(fancy, plain), fancy, plain).run());
+
+        assertTrue(new File(classes, "org/fancy/FancyPanel.class").isFile());
+        assertTrue("The second jar of the name was left out", new File(classes, "org/plain/Words.class").isFile());
+        // Both are the step's, so neither is merged whole afterwards; one
+        // name stands for the two.
+        assertEquals(Collections.singleton("common-1.0.jar"),
+                CompatLibraries.bundledJarNames(Collections.singletonList(classes)));
+        assertEquals(new java.util.ArrayList<String>(Arrays.asList("common-1.0.jar", "common-1.0.jar/2")),
+                new java.util.ArrayList<String>(CompatLibraries.libraries(classes).keySet()));
+        java.util.Map<String, String> origins = CompatLibraries.classOrigins(classes);
+        assertEquals("common-1.0.jar", origins.get("org/fancy/FancyPanel"));
+        assertEquals("common-1.0.jar/2", origins.get("org/plain/Words"));
+        new BytecodeCompliance(host(classes, fancy, plain)).execute();
+
+        // The next build finds each under its own entry: nothing is
+        // unpacked again, and nothing is taken away.
+        byte[] record = Files.readAllBytes(new File(classes, CompatLibraries.RECORD).toPath());
+        logged.clear();
+        assertTrue(remapper(classes, Arrays.asList(fancy, plain), fancy, plain).run());
+        assertTrue(new File(classes, "org/fancy/FancyPanel.class").isFile());
+        assertTrue(new File(classes, "org/plain/Words.class").isFile());
+        assertArrayEquals(record, Files.readAllBytes(new File(classes, CompatLibraries.RECORD).toPath()));
+        assertFalse(logged.toString(), logged.toString().contains("Bundling"));
+
+        // And one of the two dropped takes only its own classes.
+        assertTrue(remapper(classes, Collections.singletonList(fancy), fancy, plain).run());
+        assertTrue(new File(classes, "org/fancy/FancyPanel.class").isFile());
+        assertFalse(new File(classes, "org/plain/Words.class").exists());
     }
 }

@@ -256,6 +256,67 @@ public class StreamDifferentialTest {
         assertEquals(Collections.singletonList(1), seen);
     }
 
+    /// A mapped stream is closed whether or not all of it was wanted. The
+    /// JDK this suite runs on read each one to its end first and the later
+    /// ones stop part way, and both close it; so does the shim, which stops
+    /// part way.
+    @Test
+    public void aMappedStreamLeftPartReadIsClosed() {
+        List<Integer> source = Arrays.asList(1, 2, 3);
+        List<String> theirClosed = new ArrayList<String>();
+        List<String> myClosed = new ArrayList<String>();
+        assertEquals(theirs(source).flatMap(n -> java.util.stream.Stream.of(n, -n)
+                        .onClose(() -> theirClosed.add("first " + n))).findFirst().get(),
+                mine(source).flatMap(n -> Stream.of(n, -n).onClose(() -> myClosed.add("first " + n)))
+                        .findFirst().get());
+        assertEquals(listed(theirs(source).flatMap(n -> java.util.stream.Stream.of(n, -n)
+                        .onClose(() -> theirClosed.add("limit " + n))).limit(3)),
+                listed(mine(source).flatMap(n -> Stream.of(n, -n).onClose(() -> myClosed.add("limit " + n)))
+                        .limit(3)));
+        assertEquals(theirs(source).flatMap(n -> java.util.stream.Stream.of(n, -n)
+                        .onClose(() -> theirClosed.add("any " + n))).anyMatch(v -> v == 2),
+                mine(source).flatMap(n -> Stream.of(n, -n).onClose(() -> myClosed.add("any " + n)))
+                        .anyMatch(v -> v == 2));
+        assertEquals(theirs(source).flatMap(n -> java.util.stream.Stream.of(n, -n)
+                        .onClose(() -> theirClosed.add("all " + n))).allMatch(v -> v > 0),
+                mine(source).flatMap(n -> Stream.of(n, -n).onClose(() -> myClosed.add("all " + n)))
+                        .allMatch(v -> v > 0));
+        assertEquals(theirs(source).flatMap(n -> java.util.stream.Stream.of(n, -n)
+                        .onClose(() -> theirClosed.add("none " + n))).noneMatch(v -> v == 1),
+                mine(source).flatMap(n -> Stream.of(n, -n).onClose(() -> myClosed.add("none " + n)))
+                        .noneMatch(v -> v == 1));
+        assertEquals(theirs(source).flatMapToInt(n -> java.util.stream.IntStream.of(n, -n)
+                        .onClose(() -> theirClosed.add("int " + n))).findFirst().getAsInt(),
+                mine(source).flatMapToInt(n -> IntStream.of(n, -n).onClose(() -> myClosed.add("int " + n)))
+                        .findFirst().getAsInt());
+        assertEquals(theirClosed, myClosed);
+        assertEquals(Arrays.asList("first 1", "limit 1", "limit 2", "any 1", "any 2", "all 1", "none 1", "int 1"),
+                myClosed);
+
+        // What the JDK of this suite does not have, or reads differently.
+        myClosed.clear();
+        assertEquals(Arrays.asList(1, -1, 2), listed(mine(source)
+                .flatMap(n -> Stream.of(n, -n).onClose(() -> myClosed.add("while " + n))).takeWhile(v -> v != -2)));
+        assertEquals(Arrays.asList("while 1", "while 2"), myClosed);
+
+        // A limit says so about the stages before it only: the mapped
+        // stream after it is still being read when the limit runs out.
+        myClosed.clear();
+        List<String> order = new ArrayList<String>();
+        mine(source).limit(1).flatMap(n -> Stream.of(n, -n).onClose(() -> order.add("closed")))
+                .forEach(v -> order.add(String.valueOf(v)));
+        assertEquals(Arrays.asList("1", "-1", "closed"), order);
+
+        // An iterator nobody reads to the end is the caller's to close.
+        Stream<Integer> open = mine(source).flatMap(n -> Stream.of(n, -n).onClose(() -> myClosed.add("it " + n)));
+        Iterator<Integer> it = open.iterator();
+        assertEquals(Integer.valueOf(1), it.next());
+        assertTrue(myClosed.isEmpty());
+        open.close();
+        open.close();
+        assertEquals(Collections.singletonList("it 1"), myClosed);
+    }
+
     // ---- terminal operations ----
 
     @Test

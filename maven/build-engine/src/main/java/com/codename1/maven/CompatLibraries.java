@@ -163,7 +163,8 @@ public final class CompatLibraries {
                 continue;
             }
             File jar = lib.file();
-            Entry old = before.get(jar.getName());
+            String key = key(after, jar.getName());
+            Entry old = before.get(key);
             Entry entry = new Entry(jar.length() + "\t" + jar.lastModified());
             entry.describe(lib);
             Set<String> shipped = lib.shipped();
@@ -183,7 +184,7 @@ public final class CompatLibraries {
                 bundled.add(jar);
             }
             delete(classesDir, mine, entry.files);
-            after.put(jar.getName(), entry);
+            after.put(key, entry);
             if (entry.equals(old)) {
                 log.debug(jar.getName() + " is handled already and has not changed");
                 continue;
@@ -200,6 +201,27 @@ public final class CompatLibraries {
             write(classesDir, after);
         }
         return bundled;
+    }
+
+    /// What the record calls a jar: its file name, which is what every
+    /// message and report calls it too. Two different jars of one name --
+    /// the same artifact id and version in two groups -- cannot both be
+    /// recorded under it, so the second is `name/2`, the third `name/3`, in
+    /// the order of the class path, which a build keeps from one run to the
+    /// next. A slash is in no file name, so the name is read back from the
+    /// key by [#jarName].
+    private static String key(Map<String, Entry> taken, String name) {
+        String key = name;
+        for (int n = 2; taken.containsKey(key); n++) {
+            key = name + "/" + n;
+        }
+        return key;
+    }
+
+    /// The file name of the jar recorded as `key`.
+    static String jarName(String key) {
+        int slash = key.indexOf('/');
+        return slash < 0 ? key : key.substring(0, slash);
     }
 
     private static Set<String> allFiles(Map<String, Entry> entries) {
@@ -466,7 +488,8 @@ public final class CompatLibraries {
     }
 
     /// Every jar `classesDir`'s record holds, by file name in the order
-    /// recorded; empty when there is no record.
+    /// recorded (a second jar of one file name as `name/2`); empty when
+    /// there is no record.
     public static Map<String, Library> libraries(File classesDir) {
         Map<String, Library> out = new LinkedHashMap<String, Library>();
         try {
@@ -564,12 +587,24 @@ public final class CompatLibraries {
     /// application already as far as they belong there, and which must not
     /// be merged into it again. A root that cannot be read has recorded
     /// nothing.
+    ///
+    /// A name stands for every recorded jar that has it, and each of them
+    /// is recorded: see [#key]. What a name cannot tell apart is a recorded
+    /// jar from one of the same name this step leaves alone -- a Codename
+    /// One library or a jar of resources, sharing an artifact id and a
+    /// version with a desktop library of another group. That one would be
+    /// kept out of the application with its namesake. The record travels
+    /// inside the module's jar to builds on other machines, so it can hold
+    /// no path, and the callers have a file and not always coordinates;
+    /// renaming one of the two artifacts is the way out.
     public static Set<String> bundledJarNames(Iterable<File> roots) {
         Set<String> out = new HashSet<String>();
         if (roots != null) {
             for (File root : roots) {
                 try {
-                    out.addAll(read(root).keySet());
+                    for (String key : read(root).keySet()) {
+                        out.add(jarName(key));
+                    }
                 } catch (IOException e) {
                     // Not a readable jar: then not one this step produced.
                     continue;

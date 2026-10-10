@@ -232,4 +232,28 @@ public class NioPathDifferentialTest {
         assertEquals("/var/data/app/notes.txt",
                 Paths.get(java.net.URI.create("file:///var/data/app/notes.txt")).toString());
     }
+
+    private static String ofUri(boolean jdk, String uri) {
+        try {
+            return jdk ? java.nio.file.Paths.get(java.net.URI.create(uri)).toString()
+                    : Paths.get(java.net.URI.create(uri)).toString();
+        } catch (IllegalArgumentException e) {
+            return "IllegalArgumentException: " + e.getMessage();
+        }
+    }
+
+    /// Only a `file:` URI that is a path and nothing else is one: a host, a
+    /// query or a fragment is refused, not dropped.
+    @Test
+    public void aFileUriWithMoreThanAPathIsRefused() {
+        for (String uri : new String[] {"file:/var/data/a.txt", "file:///var/data/a.txt", "file:/var/my%20data/a.txt",
+            "file:/", "file:/var/data/a.txt?version=2", "file:/var/data/a.txt#top", "file://server/share/a.txt",
+            "file://user@server:8080/a.txt", "file:relative/a.txt"}) {
+            assertEquals(uri, ofUri(true, uri), ofUri(false, uri));
+        }
+        assertEquals("IllegalArgumentException: URI has a query component", ofUri(false, "file:/a?b"));
+        assertEquals("IllegalArgumentException: URI has a fragment component", ofUri(false, "file:/a#b"));
+        assertEquals("IllegalArgumentException: URI has an authority component", ofUri(false, "file://host/a"));
+        assertEquals("IllegalArgumentException: URI is not hierarchical", ofUri(false, "file:a"));
+    }
 }

@@ -204,37 +204,60 @@ final class ObjPipeline<T> implements Stream<T> {
     @Override
     public <R> Stream<R> flatMap(Function<? super T, ? extends Stream<? extends R>> mapper) {
         Objects.requireNonNull(mapper);
-        Iterator<T> up = take();
-        return stage(new PullIterator<R>() {
-            private Stream<? extends R> inner;
-            private Iterator<? extends R> it;
+        FlatMapped<T, R> flat = new FlatMapped<T, R>(take(), mapper);
+        // The mapped stream being read when the pipeline stops asking is
+        // closed too, as the JDK closes it: see StreamState#onAbandon.
+        state.onAbandon(flat);
+        return stage(flat);
+    }
 
-            @Override
-            boolean advance() {
-                while (true) {
-                    if (it != null) {
-                        if (it.hasNext()) {
-                            emit(it.next());
-                            return true;
-                        }
-                        // A mapped stream is closed once its elements have
-                        // been taken.
-                        Stream<? extends R> finished = inner;
-                        inner = null;
-                        it = null;
-                        finished.close();
+    /// The elements of each stream a mapper answers, one mapped stream at a
+    /// time. A mapped stream is read lazily, so the one in hand can be left
+    /// part read: by a `limit` or a `takeWhile` after this stage, or by a
+    /// terminal operation that has its answer. Running this closes it.
+    private static final class FlatMapped<T, R> extends PullIterator<R> implements Runnable {
+        private final Iterator<T> up;
+        private final Function<? super T, ? extends Stream<? extends R>> mapper;
+        private Stream<? extends R> inner;
+        private Iterator<? extends R> it;
+
+        FlatMapped(Iterator<T> up, Function<? super T, ? extends Stream<? extends R>> mapper) {
+            this.up = up;
+            this.mapper = mapper;
+        }
+
+        @Override
+        boolean advance() {
+            while (true) {
+                if (it != null) {
+                    if (it.hasNext()) {
+                        emit(it.next());
+                        return true;
                     }
-                    if (!up.hasNext()) {
-                        return false;
-                    }
-                    Stream<? extends R> mapped = mapper.apply(up.next());
-                    if (mapped != null) {
-                        inner = mapped;
-                        it = mapped.iterator();
-                    }
+                    // A mapped stream is closed once its elements have
+                    // been taken.
+                    run();
+                }
+                if (!up.hasNext()) {
+                    return false;
+                }
+                Stream<? extends R> mapped = mapper.apply(up.next());
+                if (mapped != null) {
+                    inner = mapped;
+                    it = mapped.iterator();
                 }
             }
-        });
+        }
+
+        @Override
+        public void run() {
+            Stream<? extends R> open = inner;
+            inner = null;
+            it = null;
+            if (open != null) {
+                open.close();
+            }
+        }
     }
 
     @Override
@@ -341,6 +364,7 @@ final class ObjPipeline<T> implements Stream<T> {
             throw new IllegalArgumentException(Long.toString(maxSize));
         }
         Iterator<T> up = take();
+        int before = state.abandonable();
         return stage(new PullIterator<T>() {
             private long left = maxSize;
 
@@ -348,7 +372,12 @@ final class ObjPipeline<T> implements Stream<T> {
             boolean advance() {
                 // Checked before asking upstream: the element after the
                 // last one wanted is never produced.
-                if (left <= 0 || !up.hasNext()) {
+                if (left <= 0) {
+                    // Nothing before this stage is asked again.
+                    state.abandon(before);
+                    return false;
+                }
+                if (!up.hasNext()) {
                     return false;
                 }
                 left--;
@@ -389,6 +418,7 @@ final class ObjPipeline<T> implements Stream<T> {
     public Stream<T> takeWhile(Predicate<? super T> predicate) {
         Objects.requireNonNull(predicate);
         Iterator<T> up = take();
+        int before = state.abandonable();
         return stage(new PullIterator<T>() {
             @Override
             boolean advance() {
@@ -397,6 +427,7 @@ final class ObjPipeline<T> implements Stream<T> {
                 }
                 T value = up.next();
                 if (!predicate.test(value)) {
+                    state.abandon(before);
                     return false;
                 }
                 emit(value);
@@ -565,6 +596,7 @@ final class ObjPipeline<T> implements Stream<T> {
         Iterator<T> it = take();
         while (it.hasNext()) {
             if (predicate.test(it.next())) {
+                state.abandon(state.abandonable());
                 return true;
             }
         }
@@ -577,6 +609,7 @@ final class ObjPipeline<T> implements Stream<T> {
         Iterator<T> it = take();
         while (it.hasNext()) {
             if (!predicate.test(it.next())) {
+                state.abandon(state.abandonable());
                 return false;
             }
         }
@@ -589,6 +622,7 @@ final class ObjPipeline<T> implements Stream<T> {
         Iterator<T> it = take();
         while (it.hasNext()) {
             if (predicate.test(it.next())) {
+                state.abandon(state.abandonable());
                 return false;
             }
         }
@@ -598,7 +632,13 @@ final class ObjPipeline<T> implements Stream<T> {
     @Override
     public Optional<T> findFirst() {
         Iterator<T> it = take();
-        return it.hasNext() ? Optional.of(it.next()) : Optional.<T>empty();
+        if (!it.hasNext()) {
+            return Optional.empty();
+        }
+        Optional<T> first = Optional.of(it.next());
+        // The answer is in hand with the rest unread.
+        state.abandon(state.abandonable());
+        return first;
     }
 
     @Override

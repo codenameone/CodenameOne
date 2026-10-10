@@ -485,18 +485,47 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     // Time
     // ------------------------------------------------------------------
 
-    private static void later(long millis, final Runnable action) {
+    /// A timer task that lets go of its action when cancelled. A cancelled
+    /// `TimerTask` stays in its timer's queue until the time it was set
+    /// for, and would hold the future it was to complete for as long.
+    private static final class Timeout extends TimerTask {
+        private final AtomicReference<Runnable> action;
+
+        Timeout(Runnable action) {
+            this.action = new AtomicReference<Runnable>(action);
+        }
+
+        @Override
+        public void run() {
+            Runnable due = action.getAndSet(null);
+            if (due != null) {
+                due.run();
+            }
+        }
+
+        @Override
+        public boolean cancel() {
+            action.set(null);
+            return super.cancel();
+        }
+    }
+
+    /// Runs `action` after `millis`, unless this future completes first:
+    /// then the task is cancelled, and holds nothing.
+    private void later(long millis, Runnable action) {
         Timer timer = TIMER.get();
         if (timer == null) {
             TIMER.compareAndSet(null, new Timer());
             timer = TIMER.get();
         }
-        timer.schedule(new TimerTask() {
+        final Timeout task = new Timeout(action);
+        timer.schedule(task, Math.max(0, millis));
+        whenDone(new Runnable() {
             @Override
             public void run() {
-                action.run();
+                task.cancel();
             }
-        }, Math.max(0, millis));
+        });
     }
 
     /// Fails this future with a [TimeoutException] if it is not complete
@@ -1099,6 +1128,19 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         });
     }
 
+    /// A stage that completes as this one does, and that completing does
+    /// not complete this one: a [#copy].
+    ///
+    /// **Not provided: the JDK's refusal.** There the stage answered is of
+    /// a class whose `complete`, `cancel`, `get` and the rest throw
+    /// `UnsupportedOperationException`, and whose `toCompletableFuture`
+    /// answers yet another copy. Here it is an ordinary future, as what
+    /// [#completedStage] and [#failedStage] answer is, so code that casts
+    /// the stage back to a `CompletableFuture`, or calls
+    /// `toCompletableFuture()` on it, and completes that, completes the
+    /// stage its dependents hang off instead of being refused. What the
+    /// method is called for holds either way: whoever is handed the stage
+    /// cannot complete, fail or cancel the future it was made from.
     public CompletionStage<T> minimalCompletionStage() {
         return copy();
     }
