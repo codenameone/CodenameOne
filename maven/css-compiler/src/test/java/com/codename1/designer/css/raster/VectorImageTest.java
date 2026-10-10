@@ -80,12 +80,17 @@ class VectorImageTest {
     }
 
     @Test
-    void transformsAndGroupOpacityReachTheShapesInside() throws Exception {
+    void aGroupIsFadedAsOneThingAndItsTransformReachesInside() throws Exception {
+        // Two squares that overlap in the middle, in a half transparent
+        // group. Where they overlap is no more opaque than where they do not.
         BufferedImage img = paint("<g transform=\"translate(50 0)\" opacity=\"0.5\">"
-                + "<rect width=\"50\" height=\"100\" fill=\"#ff0000\"/></g>", 100, 100);
+                + "<rect width=\"30\" height=\"100\" fill=\"#ff0000\"/>"
+                + "<rect x=\"20\" width=\"30\" height=\"100\" fill=\"#ff0000\"/></g>", 100, 100);
         assertEquals(0, alpha(img, 25, 50), "moved off the left half");
-        int a = alpha(img, 75, 50);
-        assertTrue(a > 120 && a < 136, "half as opaque, was " + a);
+        int single = alpha(img, 60, 50);
+        int overlap = alpha(img, 75, 50);
+        assertTrue(single > 120 && single < 136, "half as opaque, was " + single);
+        assertEquals(single, overlap, "the overlap is not laid down twice");
     }
 
     @Test

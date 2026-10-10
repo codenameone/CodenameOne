@@ -85,6 +85,14 @@ public final class BoxShadowPainter {
         }
     }
 
+    /// The most values in the plane an inset shadow is blurred on.
+    private static final double MAX_BLUR_PLANE = 16.0 * 1024 * 1024;
+    /// The most an inset shadow's plane is reduced by.
+    private static final int MAX_BLUR_SCALE = 4096;
+    /// The widest blur applied to a reduced plane, whose margins stay within
+    /// [#MAX_BLUR_PLANE] at this width.
+    private static final double MAX_REDUCED_SIGMA = 512;
+
     /// Paints an inset shadow.
     ///
     /// The shadow is everything outside a hole: the padding box shrunk by
@@ -111,23 +119,44 @@ public final class BoxShadowPainter {
         float[] clip = Pixels.coverage(paddingBox.toPath(), w, h, 0, 0);
         RoundedBox hole = paddingBox.grow(-shadow.spread).translate(shadow.offsetX, shadow.offsetY);
         double sigma = Math.max(0, shadow.blur) / 2;
+        // The blur needs a margin as wide as it reaches, which for a large
+        // blur is far more than the image. Past a budget the mask is blurred
+        // at a fraction of the size instead: a blur that wide has no detail
+        // a smaller plane would lose.
+        double reach = 3 * sigma + 2;
+        double fullW = w + 2 * reach;
+        double fullH = h + 2 * reach;
+        int scale = 1;
+        if (fullW * fullH > MAX_BLUR_PLANE) {
+            scale = (int) Math.min(MAX_BLUR_SCALE, Math.ceil(Math.sqrt(fullW * fullH / MAX_BLUR_PLANE)));
+            // Past the largest reduction the blur is wider than anything
+            // left to blur, and a wider one still looks the same.
+            sigma = Math.min(sigma / scale, MAX_REDUCED_SIGMA);
+        }
         int m = GaussianBlur.radius(sigma) + 1;
-        int bw = w + 2 * m;
-        int bh = h + 2 * m;
+        int sw = (w + scale - 1) / scale;
+        int sh = (h + scale - 1) / scale;
+        int bw = sw + 2 * m;
+        int bh = sh + 2 * m;
         float[] cov;
         if (hole.isEmpty()) {
             cov = new float[bw * bh];
         } else {
-            cov = Pixels.coverage(hole.toPath(), bw, bh, m, m);
+            java.awt.Shape outline = hole.toPath();
+            if (scale > 1) {
+                outline = java.awt.geom.AffineTransform.getScaleInstance(1.0 / scale, 1.0 / scale)
+                        .createTransformedShape(outline);
+            }
+            cov = Pixels.coverage(outline, bw, bh, m, m);
             GaussianBlur.blur(cov, bw, bh, sigma);
         }
         for (int y = 0; y < h; y++) {
-            int src = (y + m) * bw + m;
+            int src = (y / scale + m) * bw + m;
             int row = y * w;
             for (int x = 0; x < w; x++) {
                 float c = clip[row + x];
                 if (c > 0f) {
-                    float a = (1f - cov[src + x]) * c;
+                    float a = (1f - cov[src + x / scale]) * c;
                     if (a > 0f) {
                         Pixels.blend(dst, row + x, shadow.color, a);
                     }

@@ -118,7 +118,7 @@ public final class VectorImage {
             g.scale(w / vw, h / vh);
             g.translate(-doc.getViewBoxX(), -doc.getViewBoxY());
             for (SVGNode child : doc.getChildren()) {
-                paintNode(g, child, doc.getStyle(), 1f);
+                paintNode(g, child, doc.getStyle());
             }
         } finally {
             g.dispose();
@@ -126,13 +126,47 @@ public final class VectorImage {
         return out;
     }
 
-    private void paintNode(Graphics2D g, SVGNode node, SVGStyle parentStyle, float parentOpacity) {
+    private void paintNode(Graphics2D g, SVGNode node, SVGStyle parentStyle) {
         SVGStyle style = node.getStyle() == null ? new SVGStyle() : node.getStyle();
         style.inherit(parentStyle);
-        // The opacity of a group is carried down to what it holds. That is
-        // the same as compositing the group, as long as its children do not
-        // overlap.
-        float opacity = parentOpacity * (style.getOpacity() == null ? 1f : clamp(style.getOpacity().floatValue()));
+        float opacity = style.getOpacity() == null ? 1f : clamp(style.getOpacity().floatValue());
+        if (opacity <= 0f) {
+            return;
+        }
+        if (opacity < 1f) {
+            // An element that is not opaque is painted whole on a layer of
+            // its own, and the layer is laid down once at that opacity.
+            // Fading its parts one by one would let them show through each
+            // other where they overlap.
+            java.awt.Rectangle device = g.getDeviceConfiguration().getBounds();
+            BufferedImage layer = new BufferedImage(Math.max(1, device.width), Math.max(1, device.height),
+                    BufferedImage.TYPE_INT_ARGB);
+            Graphics2D lg = layer.createGraphics();
+            try {
+                Pixels.hints(lg);
+                lg.setTransform(g.getTransform());
+                lg.setClip(g.getClip());
+                paintOpaque(lg, node, style);
+            } finally {
+                lg.dispose();
+            }
+            AffineTransform at = g.getTransform();
+            java.awt.Composite composite = g.getComposite();
+            try {
+                g.setTransform(new AffineTransform());
+                g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, opacity));
+                g.drawImage(layer, 0, 0, null);
+            } finally {
+                g.setComposite(composite);
+                g.setTransform(at);
+            }
+            return;
+        }
+        paintOpaque(g, node, style);
+    }
+
+    /// Paints `node` with everything but its own opacity.
+    private void paintOpaque(Graphics2D g, SVGNode node, SVGStyle style) {
         AffineTransform savedTransform = g.getTransform();
         Shape savedClip = g.getClip();
         try {
@@ -152,14 +186,14 @@ public final class VectorImage {
             }
             if (node instanceof SVGGroup) {
                 for (SVGNode child : ((SVGGroup) node).getChildren()) {
-                    paintNode(g, child, style, opacity);
+                    paintNode(g, child, style);
                 }
             } else if (node instanceof SVGText) {
-                paintText(g, (SVGText) node, style, opacity);
+                paintText(g, (SVGText) node, style);
             } else {
                 Shape shape = outline(node);
                 if (shape != null) {
-                    fillAndStroke(g, shape, style, opacity);
+                    fillAndStroke(g, shape, style);
                 }
             }
         } finally {
@@ -351,10 +385,10 @@ public final class VectorImage {
         p.append(AffineTransform.getRotateInstance(phi, cx, cy).createTransformedShape(arc), true);
     }
 
-    private void fillAndStroke(Graphics2D g, Shape shape, SVGStyle style, float opacity) {
+    private void fillAndStroke(Graphics2D g, Shape shape, SVGStyle style) {
         SVGPaint fill = style.getFill() == null ? SVGPaint.BLACK : style.getFill();
         if (!fill.isNone()) {
-            float a = opacity * (style.getFillOpacity() == null ? 1f : clamp(style.getFillOpacity().floatValue()));
+            float a = style.getFillOpacity() == null ? 1f : clamp(style.getFillOpacity().floatValue());
             paintWith(g, fill, a, shape, shape);
         }
         SVGPaint stroke = style.getStroke();
@@ -373,8 +407,7 @@ public final class VectorImage {
                     join == SVGStyle.LINEJOIN_ROUND ? BasicStroke.JOIN_ROUND
                             : join == SVGStyle.LINEJOIN_BEVEL ? BasicStroke.JOIN_BEVEL : BasicStroke.JOIN_MITER,
                     Math.max(1f, miter));
-            float a = opacity * (style.getStrokeOpacity() == null ? 1f
-                    : clamp(style.getStrokeOpacity().floatValue()));
+            float a = style.getStrokeOpacity() == null ? 1f : clamp(style.getStrokeOpacity().floatValue());
             paintWith(g, stroke, a, pen.createStrokedShape(shape), shape);
         }
     }
@@ -494,7 +527,7 @@ public final class VectorImage {
                 : new Point2D.Double(bounds.getX() + x * bounds.getWidth(), bounds.getY() + y * bounds.getHeight());
     }
 
-    private void paintText(Graphics2D g, SVGText text, SVGStyle style, float opacity) {
+    private void paintText(Graphics2D g, SVGText text, SVGStyle style) {
         String content = text.getContent();
         if (content == null || content.length() == 0) {
             return;
@@ -515,7 +548,7 @@ public final class VectorImage {
             x -= advance;
         }
         Shape outline = glyphs.getOutline((float) x, text.getY());
-        float a = opacity * (style.getFillOpacity() == null ? 1f : clamp(style.getFillOpacity().floatValue()));
+        float a = style.getFillOpacity() == null ? 1f : clamp(style.getFillOpacity().floatValue());
         paintWith(g, fill, a, outline, outline);
     }
 

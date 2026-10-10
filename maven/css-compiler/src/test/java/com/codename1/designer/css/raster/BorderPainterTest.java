@@ -407,4 +407,12 @@ class BorderPainterTest {
         assertTrue(b >= 120 && b <= 136, "half covered edge row, alpha was " + b);
         assertEquals(BLUE & 0xffffff, padded.getRGB(15, 30) & 0xffffff);
     }
+
+    @Test
+    void dotsTooSmallToCountAreStillPaintedPromptly() {
+        final BorderSide hair = new BorderSide(1e-7, BorderStyle.DOTTED, 0xffff0000);
+        org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(java.time.Duration.ofSeconds(20),
+                () -> RasterAssert.paint(BoxStyle.builder().size(40, 40)
+                        .top(hair).right(hair).bottom(hair).left(hair)));
+    }
 }

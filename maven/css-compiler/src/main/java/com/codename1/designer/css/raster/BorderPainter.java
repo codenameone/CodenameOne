@@ -416,11 +416,21 @@ public final class BorderPainter {
                 new float[] {(float) dash, (float) best}, 0f).createStrokedShape(path);
     }
 
+    /// The most dots drawn along one side.
+    private static final int MAX_DOTS = 65536;
+
     /// Round dots of diameter `width` centred on a side path, the first on
     /// its start and the last on its end.
     private static Shape dots(Path2D path, double width) {
         double[] pts = flatten(path);
         double length = length(pts);
+        if (!(length / (2 * width) < MAX_DOTS)) {
+            // Dots this small are not separate marks in any image the
+            // rasterizer paints. They are drawn as the line they add up to,
+            // instead of one by one without end.
+            return new BasicStroke((float) width, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL)
+                    .createStrokedShape(path);
+        }
         int spaces = Math.max(1, (int) Math.round(length / (2 * width)));
         double step = length / spaces;
         Path2D.Double out = new Path2D.Double(Path2D.WIND_NON_ZERO);

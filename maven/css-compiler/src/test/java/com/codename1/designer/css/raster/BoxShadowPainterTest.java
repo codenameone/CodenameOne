@@ -351,4 +351,20 @@ class BoxShadowPainterTest {
         assertPixelNear(0xff7f7f7f, img, 11, 25, 1);
         assertPixel(WHITE, img, 35, 25);
     }
+
+    @Test
+    void anInsetBlurFarWiderThanTheBoxIsPaintedWithinABoundedPlane() {
+        // At full size this blur would need a plane of some 15000 pixels a
+        // side. The box ends up evenly shaded: the blur reaches every part of
+        // it from every edge.
+        final BoxStyle.Builder box = BoxStyle.builder().size(64, 40).backgroundColor(0xffffffff)
+                .shadow(new Shadow(0, 0, 5000, 0, 0xff000000, true));
+        BufferedImage img = org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(
+                java.time.Duration.ofSeconds(30), () -> RasterAssert.paint(box));
+        int centre = img.getRGB(32, 20) & 0xff;
+        int nearEdge = img.getRGB(3, 20) & 0xff;
+        org.junit.jupiter.api.Assertions.assertTrue(centre < 0x30, "dark at the centre, was " + centre);
+        org.junit.jupiter.api.Assertions.assertTrue(Math.abs(centre - nearEdge) < 8,
+                "and as dark at the edge: " + centre + " against " + nearEdge);
+    }
 }
