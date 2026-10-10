@@ -23,6 +23,7 @@
 package com.codename1.designer.css;
 
 import com.codename1.designer.css.raster.BackgroundImage;
+import com.codename1.designer.css.raster.BackgroundImagePainter;
 import com.codename1.designer.css.raster.BorderImage;
 import com.codename1.designer.css.raster.BorderSide;
 import com.codename1.designer.css.raster.BorderStyle;
@@ -31,6 +32,7 @@ import com.codename1.designer.css.raster.CssBoxRasterizer;
 import com.codename1.designer.css.raster.GradientPainter;
 import com.codename1.designer.css.raster.GradientSpec;
 import com.codename1.designer.css.raster.Shadow;
+import com.codename1.designer.css.raster.VectorImage;
 import com.codename1.io.JSONParser;
 import com.codename1.io.Util;
 import com.codename1.processing.Result;
@@ -4154,7 +4156,8 @@ public class CSSTheme {
     }
 
     /// Whether `url` names an SVG or Lottie asset, which the build-time
-    /// transcoders turn into classes and the compiler never decodes.
+    /// transcoders turn into classes. The compiler stores a placeholder for
+    /// one, and paints it itself only into a generated image.
     private static boolean isVectorAsset(String url) {
         int end = url.length();
         int query = url.indexOf('?');
@@ -4194,9 +4197,6 @@ public class CSSTheme {
     /// Why the image `url` names cannot be painted into a generated image,
     /// or null when it can.
     private String unpaintableReason(String url) {
-        if (isVectorAsset(url)) {
-            return "a vector image";
-        }
         File multi = multiImageDirectory(url);
         if (multi != null && !new File(multi, "medium.png").isFile()) {
             return "a multi-image with no medium.png";
@@ -4204,7 +4204,33 @@ public class CSSTheme {
         return null;
     }
 
+    /// The SVG or Lottie file `url` names, or null when it names neither.
+    private VectorImage readVectorImage(String url) {
+        if (!isVectorAsset(url)) {
+            return null;
+        }
+        try {
+            URL imgURL = url.startsWith("http://") || url.startsWith("https://") ? new URL(url) : new URL(baseURL, url);
+            InputStream in = imgURL.openStream();
+            try {
+                String path = imgURL.getPath();
+                return endsWithIgnoreCase(path, ".json") ? VectorImage.readLottie(in) : VectorImage.readSvg(in);
+            } finally {
+                in.close();
+            }
+        } catch (IOException ex) {
+            throw new IllegalArgumentException("Could not read " + url + ": " + ex.getMessage(), ex);
+        } catch (RuntimeException ex) {
+            throw new IllegalArgumentException("Could not read " + url + ": " + ex.getMessage(), ex);
+        }
+    }
+
     private BufferedImage readRasterImage(String url) {
+        VectorImage vector = readVectorImage(url);
+        if (vector != null) {
+            // At the size the file asks for, as a browser sizes one.
+            return vector.paint((int) Math.ceil(vector.getWidth()), (int) Math.ceil(vector.getHeight()));
+        }
         // A url is a file or an http address. A `data:` url is not decoded
         // here because it is not decoded anywhere: the theme's own image
         // loader refuses one before a rule gets as far as being painted.
@@ -4221,7 +4247,7 @@ public class CSSTheme {
                 BufferedImage img = javax.imageio.ImageIO.read(in);
                 if (img == null) {
                     throw new IllegalArgumentException(url + " is not an image the compiler can decode (PNG, JPEG, "
-                            + "GIF or BMP). A vector image cannot be painted into a generated border or background.");
+                            + "GIF, BMP, SVG or Lottie).");
                 }
                 return img;
             } finally {
@@ -4925,15 +4951,10 @@ public class CSSTheme {
                 String url = bgImage.getStringValue();
                 String unpaintable = unpaintableReason(url);
                 if (unpaintable != null) {
-                    // An SVG or Lottie file is not decoded by the compiler at
-                    // all: outside a generated image it is a placeholder the
-                    // transcoded class replaces at runtime. There are no
-                    // pixels to paint here, so the layer is left out and the
-                    // rest of the box still gets its image, instead of one
-                    // background failing a build.
+                    // There are no pixels to paint, so the layer is left out
+                    // and the rest of the box still gets its image.
                     System.out.println("CSS Warning: " + url + " is " + unpaintable + " and is left out of the image"
-                            + " generated for this rule. Use a PNG or JPEG, or drop the border, shadow or"
-                            + " size that needs a generated image, to keep it.");
+                            + " generated for this rule.");
                 } else {
                     box.backgroundImage(rasterBackgroundImage(styles, bgImage, paintWidth, paintHeight));
                 }
@@ -5018,7 +5039,22 @@ public class CSSTheme {
             // these images used to be captured from was built from the same
             // stored properties, so it painted at the top left as well.
             BackgroundImage layer = new BackgroundImage(image).withRepeat(repeat).withPosition(0, true, 0, true);
-            return explicit != null ? layer.withSize(explicit[0], explicit[1]) : layer.withSize(size);
+            layer = explicit != null ? layer.withSize(explicit[0], explicit[1]) : layer.withSize(size);
+            VectorImage vector = readVectorImage(bgImage.getStringValue());
+            if (vector != null) {
+                // A vector image has no pixels of its own to stretch. It is
+                // painted again at the size it is drawn at, so a small icon
+                // made to cover a box is as sharp as the box.
+                double[] tile = BackgroundImagePainter.tileSize(layer, boxWidth, boxHeight);
+                int tileW = (int) Math.ceil(tile[0]);
+                int tileH = (int) Math.ceil(tile[1]);
+                if (tileW >= 1 && tileH >= 1 && tileW <= 4096 && tileH <= 4096
+                        && (tileW != image.getWidth() || tileH != image.getHeight())) {
+                    layer = new BackgroundImage(vector.paint(tileW, tileH)).withRepeat(repeat)
+                            .withPosition(0, true, 0, true).withSize(tile[0], tile[1]);
+                }
+            }
+            return layer;
         }
 
         /// The `background-repeat` of a rule, as the painter names it.

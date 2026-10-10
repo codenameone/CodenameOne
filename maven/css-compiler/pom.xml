@@ -33,6 +33,17 @@
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-core</artifactId>
         </dependency>
+        <!-- The parsers the build transcodes SVG and Lottie files with. The
+             compiler reads such a file through them when it has to paint one
+             into a generated image. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-svg-transcoder</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-lottie-transcoder</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.vaadin.external.flute</groupId>
             <artifactId>flute</artifactId>

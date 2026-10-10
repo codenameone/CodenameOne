@@ -87,7 +87,7 @@ rm -rf core/target factory/target css-compiler/target
 # repository and installs it over the jar just built here, which is how the editor kept running
 # without changes that had demonstrably compiled.
 JAVA_HOME="$JDK8" PATH="$JDK8/bin:$PATH" \
-  mvn -q -o -Dmaven.repo.local="$LOCAL_REPO" -pl factory,core,css-compiler \
+  mvn -q -o -Dmaven.repo.local="$LOCAL_REPO" -pl factory,core,svg-transcoder,lottie-transcoder,css-compiler \
     -DskipTests -Dmaven.javadoc.skip=true clean install
 # mvn install has repeatedly reported success while leaving the previous jar in place, so the
 # freshly built artifacts are copied over it explicitly. Trusting install is what made fixes compile

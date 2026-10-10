@@ -248,19 +248,75 @@ class CSSGeneratedImageTest {
     }
 
     @Test
-    void aVectorBackgroundIsLeftOutOfAGeneratedImageInsteadOfFailingTheBuild(@TempDir Path dir) throws Exception {
+    void anSvgBackgroundIsPaintedIntoAGeneratedImage(@TempDir Path dir) throws Exception {
+        // Red on the left half, blue on the right, stretched over the box.
+        // The shadow reserves 2px, so the 320px box starts at (2, 2).
         File svg = new File(dir.toFile(), "img/mark.svg");
         svg.getParentFile().mkdirs();
-        Files.write(svg.toPath(), "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"8\" height=\"8\"/>"
+        Files.write(svg.toPath(), ("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"8\" height=\"8\">"
+                + "<rect width=\"4\" height=\"8\" fill=\"#ff0000\"/>"
+                + "<rect x=\"4\" width=\"4\" height=\"8\" fill=\"#0000ff\"/></svg>")
                 .getBytes(StandardCharsets.UTF_8));
-        Compiled c = compile(dir, "Card { background-color: #ffffff; border-radius: 4px;"
-                + " box-shadow: 0 2px 6px rgba(0,0,0,0.5); background-image: url(img/mark.svg); }");
+        Compiled c = compile(dir, "Banner { width: 50%; height: 10%; background-image: url(img/mark.svg);"
+                + " background-size: 100% 100%; background-repeat: no-repeat; box-shadow: 0 0 4px black; }");
+        BufferedImage img = stored(c.res, "Banner_1.png", Display.DENSITY_HD);
 
-        assertTrue(c.keys.get("Card.border") instanceof com.codename1.ui.plaf.Border, "Card.border");
-        // The same slices as the rule without the image: the box is unchanged.
-        BufferedImage topLeft = stored(c.res, "CardTopL_1.png", Display.DENSITY_HD);
-        assertEquals(11, topLeft.getWidth());
-        assertEquals(11, topLeft.getHeight());
+        assertEquals(0xffff0000, img.getRGB(2 + 80, 50), "the left half of the drawing");
+        assertEquals(0xff0000ff, img.getRGB(2 + 240, 50), "the right half of the drawing");
+        // Painted at the size of the box, not stretched from 8 pixels: the
+        // edge between the halves is one pixel wide.
+        assertEquals(0xffff0000, img.getRGB(2 + 158, 50), "red up to the middle");
+        assertEquals(0xff0000ff, img.getRGB(2 + 161, 50), "blue from the middle");
+    }
+
+    @Test
+    void anSvgBackgroundTilesAtTheSizeItAsksFor(@TempDir Path dir) throws Exception {
+        File svg = new File(dir.toFile(), "img/dot.svg");
+        svg.getParentFile().mkdirs();
+        Files.write(svg.toPath(), ("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\">"
+                + "<rect width=\"10\" height=\"20\" fill=\"#00ff00\"/></svg>").getBytes(StandardCharsets.UTF_8));
+        Compiled c = compile(dir, "Banner { width: 50%; height: 10%; background-color: #ffffff;"
+                + " background-image: url(img/dot.svg); box-shadow: 0 0 4px black; }");
+        BufferedImage img = stored(c.res, "Banner_1.png", Display.DENSITY_HD);
+
+        assertEquals(0xff00ff00, img.getRGB(2 + 5, 50), "the drawn half of the first tile");
+        assertEquals(0xffffffff, img.getRGB(2 + 15, 50), "its empty half shows the colour under it");
+        assertEquals(0xff00ff00, img.getRGB(2 + 25, 50), "the second tile");
+    }
+
+    @Test
+    void aLottieBackgroundIsPaintedIntoAGeneratedImage(@TempDir Path dir) throws Exception {
+        // A 40 by 40 red square in the middle of a 100 by 100 composition.
+        File lottie = new File(dir.toFile(), "img/square.json");
+        lottie.getParentFile().mkdirs();
+        Files.write(lottie.toPath(), ("{\"v\":\"5.7.0\",\"fr\":30,\"ip\":0,\"op\":30,\"w\":100,\"h\":100,"
+                + "\"layers\":[{\"ty\":4,\"nm\":\"sq\",\"ip\":0,\"op\":30,"
+                + "\"ks\":{\"a\":{\"a\":0,\"k\":[0,0]},\"p\":{\"a\":0,\"k\":[50,50]},"
+                + "\"s\":{\"a\":0,\"k\":[100,100]},\"r\":{\"a\":0,\"k\":0},\"o\":{\"a\":0,\"k\":100}},"
+                + "\"shapes\":[{\"ty\":\"rc\",\"p\":{\"a\":0,\"k\":[0,0]},\"s\":{\"a\":0,\"k\":[40,40]},"
+                + "\"r\":{\"a\":0,\"k\":0}},"
+                + "{\"ty\":\"fl\",\"c\":{\"a\":0,\"k\":[1,0,0,1]},\"o\":{\"a\":0,\"k\":100}}]}]}")
+                .getBytes(StandardCharsets.UTF_8));
+        Compiled c = compile(dir, "Banner { width: 50%; height: 10%; background-color: #ffffff;"
+                + " background-image: url(img/square.json); background-repeat: no-repeat;"
+                + " box-shadow: 0 0 4px black; }");
+        BufferedImage img = stored(c.res, "Banner_1.png", Display.DENSITY_HD);
+
+        assertEquals(0xffff0000, img.getRGB(2 + 50, 2 + 50), "the square");
+        assertEquals(0xffffffff, img.getRGB(2 + 10, 2 + 10), "the composition around it is empty");
+        assertEquals(0xffffffff, img.getRGB(2 + 200, 50), "and it is painted once");
+    }
+
+    @Test
+    void anSvgThatCannotBeReadFailsTheRuleByName(@TempDir Path dir) throws Exception {
+        File svg = new File(dir.toFile(), "img/broken.svg");
+        svg.getParentFile().mkdirs();
+        Files.write(svg.toPath(), "<svg".getBytes(StandardCharsets.UTF_8));
+        RuntimeException e = org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class,
+                () -> compile(dir, "Card { border-radius: 4px; box-shadow: 0 2px 6px rgba(0,0,0,0.5);"
+                        + " background-image: url(img/broken.svg); }"));
+        String all = String.valueOf(e.getMessage()) + (e.getCause() == null ? "" : e.getCause().getMessage());
+        assertTrue(all.contains("broken.svg"), all);
     }
 
     @Test
