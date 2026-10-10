@@ -1,11 +1,60 @@
 #!/usr/bin/env python3
 
 import os
+from pathlib import Path
+import subprocess
 import tempfile
+import textwrap
 import unittest
 from unittest import mock
 
 import blog_prose_gate
+
+
+class WorkflowInputDetectionTest(unittest.TestCase):
+    def test_deleted_render_gate_inputs_still_trigger_validation(self):
+        workflow = (Path(__file__).resolve().parents[2]
+                    / ".github/workflows/blog-prose.yml").read_text()
+        # Exercise the actual workflow step against committed Git changes, so
+        # removing D from its diff filter breaks this test as well as the gate.
+        detect = workflow.split("        id: detect\n", 1)[1]
+        script = textwrap.dedent(detect.split("        run: |\n", 1)[1]
+                                 .split("\n      - ", 1)[0])
+        inputs = (
+            "scripts/website/validate_mermaid.mjs",
+            "scripts/website/test_validate_mermaid.mjs",
+            "docs/website/layouts/shortcodes/mermaid.html",
+            "docs/website/hugo.toml",
+            "docs/website/content/blog/deleted-post.md",
+        )
+        for deleted in (*inputs, "unrelated.txt"):
+            with self.subTest(deleted=deleted), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+
+                def git(*args):
+                    return subprocess.run(
+                        ["git", "-c", "user.name=Gate test", "-c", "user.email=gate@example.invalid",
+                         "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null", *args],
+                        cwd=root, check=True, capture_output=True, text=True,
+                    )
+
+                git("init", "-q")
+                for name in (*inputs, "unrelated.txt"):
+                    file = root / name
+                    file.parent.mkdir(parents=True, exist_ok=True)
+                    file.write_text("fixture\n")
+                git("add", ".")
+                git("commit", "-qm", "Base inputs")
+                git("update-ref", "refs/remotes/origin/base", "HEAD")
+                git("rm", deleted)
+                git("commit", "-qm", "Delete input")
+                output = root / "step-output"
+                subprocess.run(
+                    ["bash", "-c", script], cwd=root, check=True, capture_output=True,
+                    env={**os.environ, "GITHUB_BASE_REF": "base", "GITHUB_OUTPUT": str(output)},
+                )
+                expected = "false" if deleted == "unrelated.txt" else "true"
+                self.assertEqual(f"has_posts={expected}\n", output.read_text())
 
 
 class SelfCertifyingLanguageTest(unittest.TestCase):

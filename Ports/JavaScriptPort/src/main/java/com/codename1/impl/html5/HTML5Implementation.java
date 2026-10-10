@@ -5962,12 +5962,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @JSBody(params={}, script="return /Mac/.test(navigator.userAgent)")
     public static native boolean isMac();
     
-    // From https://stackoverflow.com/questions/57599945/how-to-detect-ios-13-on-javascript
-    @JSBody(params={}, script="return \"download\" in document.createElement(\"a\")")
-    private static native boolean doesAnchorSupportDownload();
+    // Answered from the user agent alone, because this runs in the Web Worker, which has no
+    // document. It used to probe document.createElement("a") for a download attribute, and it
+    // is asked on every pointer press on iOS (safariBacksideHookDelay): the probe threw
+    // "document is not defined" there, the press never reached the application, and an iPhone
+    // or iPad could not tap or click anything. A user agent that names no "OS <major>_" is
+    // iPadOS presenting itself as a Mac, which only exists from 13 on.
+    @JSBody(params={}, script="var m = /OS (\\d+)[_.]/.exec(navigator.userAgent); return !m || parseInt(m[1], 10) >= 13;")
+    private static native boolean isIOS13OrNewerUserAgent();
     
     private static boolean isIOS13() {
-        return isIOS() && doesAnchorSupportDownload();
+        return isIOS() && isIOS13OrNewerUserAgent();
     }
     
     @JSBody(params={}, script="return (navigator.userAgent.match(/iPad/i) != null) ||  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)")

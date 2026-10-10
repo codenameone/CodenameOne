@@ -1,0 +1,5 @@
+platform,before_time_ratio,after_time_ratio,before_memory_ratio,after_memory_ratio,calibration_runs
+macOS ARM64,3.696,1.106,0.481,0.937,1
+Linux x64 / EPYC 7763,5.011,1.649,0.37,0.37,1
+Linux ARM64 / Neoverse N2,3.043,3.043,0.239,0.378,1
+Windows x64 / AMD family 25,4.932,1.559,0.4,0.386,3

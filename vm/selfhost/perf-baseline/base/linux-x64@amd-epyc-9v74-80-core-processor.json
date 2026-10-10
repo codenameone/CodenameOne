@@ -32,8 +32,8 @@
  },
  "hello": {
   "all": {
-   "memory": 0.786,
-   "runs": 2,
+   "memory": 0.959,
+   "runs": 1,
    "time": 0.897,
    "tolerance": {
     "memory": 0.2,
@@ -115,8 +115,8 @@
  },
  "translator": {
   "all": {
-   "memory": 0.522,
-   "runs": 2,
+   "memory": 0.43,
+   "runs": 1,
    "time": 0.516,
    "tolerance": {
     "time": 0.2
