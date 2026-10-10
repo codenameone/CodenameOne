@@ -465,4 +465,64 @@ public class MenusTest extends WindowsTestBase {
         f.validate();
         assertTrue(bar.getComponent(2).getY() > b.getY());
     }
+
+    /// A menu is not part of the keyboard focus. The widget that draws
+    /// one in the window took the first focus of the form, and the last
+    /// menu of the bar was drawn as chosen from the moment the window
+    /// opened; the first focus is the content's, as in Swing.
+    @Test
+    public void noMenuOfABarInTheWindowHasTheFocusWhenTheWindowOpens() {
+        com.codename1.compat.testing.HeadlessImplementation.setDesktop(true);
+        try {
+            JFrame f = new JFrame("menus");
+            JMenuBar bar = new JMenuBar();
+            String[] names = {"File", "View", "Help"};
+            JMenu[] menus = new JMenu[3];
+            for (int i = 0; i < 3; i++) {
+                menus[i] = new JMenu(names[i]);
+                menus[i].add(new JMenuItem("Item"));
+                bar.add(menus[i]);
+            }
+            f.setJMenuBar(bar);
+            JButton go = new JButton("Go");
+            f.add(go, BorderLayout.CENTER);
+            f.setSize(300, 200);
+            show(f);
+            paint(f);
+            assertFalse("the bar is drawn in the window", bar.cn1Bridged());
+            for (int i = 0; i < 3; i++) {
+                com.codename1.ui.Component p = menus[i].cn1Peer();
+                assertFalse(names[i], menus[i].isFocusable());
+                assertFalse(names[i], p.isFocusable());
+                assertFalse(names[i], p.hasFocus());
+                assertSame(names[i], p.getUnselectedStyle(), p.getStyle());
+            }
+            assertSame(go.cn1Peer(), f.cn1Form().getFocused());
+            // A menu still opens, and its items are still chosen.
+            click(f, menus[2], 3, 3);
+            assertTrue(menus[2].isPopupMenuVisible());
+            assertFalse(menus[2].cn1Peer().hasFocus());
+            MenuSelectionManager.defaultManager().clearSelectedPath();
+        } finally {
+            com.codename1.compat.testing.HeadlessImplementation.setDesktop(false);
+        }
+    }
+
+    /// What is set on a component after its widget was made reaches the
+    /// widget, and so does what is taken back.
+    @Test
+    public void aComponentMadeNotFocusableIsNotOfferedTheFocus() {
+        JFrame f = new JFrame("focus");
+        JButton b = new JButton("Go");
+        f.add(b, BorderLayout.CENTER);
+        show(f);
+        assertTrue(b.cn1Peer().isFocusable());
+        b.setFocusable(false);
+        assertFalse(b.cn1Peer().isFocusable());
+        b.setFocusable(true);
+        assertTrue(b.cn1Peer().isFocusable());
+        JButton never = new JButton("Never");
+        never.setFocusable(false);
+        assertFalse(never.cn1Peer().isFocusable());
+    }
 }

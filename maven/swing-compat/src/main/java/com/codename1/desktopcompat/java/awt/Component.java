@@ -83,6 +83,9 @@ public abstract class Component implements ImageObserver {
     private boolean valid;
     private boolean displayable;
     private boolean focusable = true;
+    /// Whether the peer took the focus when it was made, which is what
+    /// it goes back to when this component is made focusable again.
+    private boolean peerTakesFocus;
     private boolean ignoreRepaint;
     private Color foreground;
     private Color background;
@@ -120,6 +123,10 @@ public abstract class Component implements ImageObserver {
             cn1SyncPeerBounds();
             peer.setVisible(visible);
             peer.setEnabled(enabled);
+            peerTakesFocus = peer.isFocusable();
+            if (!focusable) {
+                peer.setFocusable(false);
+            }
             cn1PeerCreated();
         }
         return peer;
@@ -781,6 +788,13 @@ public abstract class Component implements ImageObserver {
     public void setFocusable(boolean focusable) {
         boolean old = this.focusable;
         this.focusable = focusable;
+        // The widget that shows a component takes the focus of the form
+        // by itself, when the form is shown or the tab key is pressed, and
+        // draws itself as the one chosen: one that is not focusable must
+        // not be offered.
+        if (peer != null) {
+            peer.setFocusable(focusable && peerTakesFocus);
+        }
         firePropertyChange("focusable", old, focusable);
     }
 

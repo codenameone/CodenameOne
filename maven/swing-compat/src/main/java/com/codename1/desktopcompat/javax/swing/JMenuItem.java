@@ -69,12 +69,24 @@ public class JMenuItem extends AbstractButton implements Accessible, MenuElement
     public JMenuItem(String text, Icon icon) {
         setModel(new DefaultButtonModel());
         init(text, icon);
+        outOfTheFocus();
     }
 
     public JMenuItem(String text, int mnemonic) {
         setModel(new DefaultButtonModel());
         init(text, null);
         setMnemonic(mnemonic);
+        outOfTheFocus();
+    }
+
+    /// A menu and its items are not part of the keyboard focus, as in
+    /// Swing, where a menu item is made not focusable: the focus stays
+    /// with the component that had it while a menu is open. The widget
+    /// that draws an item would take it otherwise, and the window of an
+    /// application opened with the last menu of its bar drawn as chosen,
+    /// since the form gave its first focus to it.
+    private void outOfTheFocus() {
+        setFocusable(false);
     }
 
     @Override
