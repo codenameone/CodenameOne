@@ -13,6 +13,8 @@ Rewrite only what the transpiler refuses.
 widget callbacks (for example `onGenerateRoute`, `onSaved`, `onKeyEvent`,
 `onDismissed`) and parameters (for example `AspectRatio.aspectRatio`,
 `Tooltip`, `Form.autovalidateMode`) are accepted and ignored.
+A `sync*` generator runs to completion before yielding its first element, so
+an infinite generator hangs; rewrite one as a bounded loop or an explicit iterator.
 Tell the user so, and exercise every interaction the app relies on before
 calling a port done.
 

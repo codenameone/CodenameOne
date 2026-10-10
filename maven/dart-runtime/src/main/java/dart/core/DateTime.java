@@ -50,8 +50,8 @@ public final class DateTime {
     /** Local-time constructor mirroring {@code DateTime(year, [month, day, ...])}. */
     public DateTime(long year, long month, long day, long hour, long minute,
                     long second, long millisecond, long microsecond) {
-        this(millisToMicros(build(year, month, day, hour, minute, second, millisecond, false)) + microsecond,
-                false);
+        this(checkedMicros(millisToMicros(build(year, month, day, hour, minute, second, millisecond, false)),
+                microsecond), false);
     }
 
     public static DateTime now() {
@@ -61,8 +61,8 @@ public final class DateTime {
     /** UTC constructor mirroring {@code DateTime.utc(year, [month, day, ...])}. */
     public static DateTime utc(long year, long month, long day, long hour, long minute,
                                long second, long millisecond, long microsecond) {
-        return new DateTime(millisToMicros(build(year, month, day, hour, minute, second, millisecond, true))
-                + microsecond, true);
+        return new DateTime(checkedMicros(millisToMicros(build(year, month, day, hour, minute, second,
+                millisecond, true)), microsecond), true);
     }
 
     public static DateTime fromMillisecondsSinceEpoch(long millisecondsSinceEpoch, boolean isUtc) {
@@ -104,6 +104,24 @@ public final class DateTime {
         if (microseconds > MAX_MICROSECONDS_SINCE_EPOCH || microseconds < -MAX_MICROSECONDS_SINCE_EPOCH) {
             throw new ArgumentError("DateTime is outside valid range: " + microseconds / 1000L);
         }
+    }
+
+    /**
+     * {@code base + delta} microseconds, validated the way Dart's VM validates every
+     * DateTime it builds (add, subtract and the field constructors' microsecond argument
+     * all go through its checking constructor). {@code base} is already in range
+     * (+/-8.64e18), so the sum overflows a long only when {@code delta} is huge; that is
+     * detected from the signs (both operands share a sign the result lacks) rather than
+     * with Math.addExact, which the device class libraries do not all provide. An
+     * overflowed sum is out of Dart's range by definition.
+     */
+    private static long checkedMicros(long base, long delta) {
+        long sum = base + delta;
+        if (((base ^ sum) & (delta ^ sum)) < 0) {
+            throw new ArgumentError("DateTime is outside valid range");
+        }
+        checkMicrosRange(sum);
+        return sum;
     }
 
     /** Milliseconds since the epoch, rounded toward negative infinity as Dart does. */
@@ -275,11 +293,17 @@ public final class DateTime {
     }
 
     public DateTime add(Duration duration) {
-        return new DateTime(epochMicros + duration.inMicroseconds(), utc);
+        return new DateTime(checkedMicros(epochMicros, duration.inMicroseconds()), utc);
     }
 
     public DateTime subtract(Duration duration) {
-        return new DateTime(epochMicros - duration.inMicroseconds(), utc);
+        long micros = duration.inMicroseconds();
+        // Negating Long.MIN_VALUE wraps to itself; no in-range DateTime survives
+        // subtracting it anyway.
+        if (micros == Long.MIN_VALUE) {
+            throw new ArgumentError("DateTime is outside valid range");
+        }
+        return new DateTime(checkedMicros(epochMicros, -micros), utc);
     }
 
     public Duration difference(DateTime other) {

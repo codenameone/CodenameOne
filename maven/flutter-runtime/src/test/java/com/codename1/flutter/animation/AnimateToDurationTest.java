@@ -23,11 +23,14 @@
  */
 package com.codename1.flutter.animation;
 
+import com.codename1.flutter.foundation.FlutterError;
 import dart.core.Duration;
 
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * A controller's duration describes crossing its WHOLE range. An animateTo that covers
@@ -98,5 +101,26 @@ class AnimateToDurationTest {
         c.reverseDuration(Duration.of(0, 0, 0, 0, 200, 0));
         c.value(0.5);
         assertEquals(100, runMillis(c, 0.0, null, AnimationStatus.reverse));
+    }
+
+    /// Flutter's duration is nullable with no default: a controller built without one
+    /// reports null, refuses to run forward/reverse/repeat or a duration-less animateTo,
+    /// and `duration = null` clears it again.
+    @Test
+    void aControllerWithoutADurationRefusesToInventOne() {
+        AnimationController c = new AnimationController();
+        assertNull(c.duration());
+        assertThrows(FlutterError.class, () -> c.forward());
+        assertThrows(FlutterError.class, () -> c.reverse());
+        assertThrows(FlutterError.class, () -> c.repeat(null, null, null, null));
+        assertThrows(FlutterError.class, () -> runMillis(c, 1.0, null, AnimationStatus.forward));
+        assertEquals(200, runMillis(c, 1.0, Duration.of(0, 0, 0, 0, 200, 0), AnimationStatus.forward));
+        c.reverseDuration(Duration.of(0, 0, 0, 0, 100, 0));
+        c.value(1.0);
+        assertEquals(100, runMillis(c, 0.0, null, AnimationStatus.reverse), "reverseDuration alone serves a reverse run");
+        AnimationController d = controller(300);
+        d.duration(null);
+        assertNull(d.duration());
+        assertThrows(FlutterError.class, () -> d.forward());
     }
 }

@@ -55,7 +55,11 @@ public class DartIterable<E> implements Iterable<E> {
      * <p>Still a divergence: an iteration runs the WHOLE body before its first element,
      * where Dart suspends at each {@code yield}. An infinite generator therefore does not
      * terminate here. Suspending needs the body rewritten as a state machine, the same
-     * continuation-passing lowering the blocking async model defers.</p>
+     * continuation-passing lowering the blocking async model defers. Running the body
+     * on a helper thread that hands over one element per {@code moveNext} is not a
+     * shortcut: a generator body may read or build widgets, which belong to the EDT,
+     * and it would cost a thread per live iterator. The limitation is listed in
+     * flutter-runtime/READINESS.md and in the conversion skill.</p>
      */
     public static <E> DartIterable<E> syncStar(final Funcs.VoidFunc1<DartList<E>> body) {
         return wrap(new Iterable<E>() {

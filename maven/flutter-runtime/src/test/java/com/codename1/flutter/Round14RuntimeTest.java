@@ -24,6 +24,7 @@
 package com.codename1.flutter;
 
 import com.codename1.flutter.animation.AnimationController;
+import dart.core.Duration;
 import com.codename1.flutter.foundation.Characters;
 import com.codename1.flutter.material.Dialogs;
 import com.codename1.flutter.material.Slider;
@@ -164,6 +165,7 @@ class Round14RuntimeTest {
     @Test
     void forwardFromNotifiesThroughTheValueSetter() {
         AnimationController c = new AnimationController();
+        c.duration(Duration.of(0, 0, 0, 0, 300, 0));
         final List<Double> seen = new ArrayList<Double>();
         c.addListener(() -> seen.add(c.value()));
         c.forward(Double.valueOf(0.5));

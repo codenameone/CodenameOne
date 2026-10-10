@@ -62,6 +62,13 @@ public class DartSet<E> extends LinkedHashSet<E> {
      * The element this set already holds for {@code e} under Dart's {@code ==}, or
      * {@code e} itself -- {@code <num>{1}.contains(1.0)} is true in Dart, and adding
      * 1.0 leaves the set as {1}. See {@link DartMap#numericTwins}.
+     *
+     * <p>NaN elements are deliberately not modelled: Java's {@code Double.equals} calls
+     * NaN equal to itself, so a set keeps one NaN and {@code contains(double.nan)} is
+     * true, where Dart's {@code ==} says NaN equals nothing. Matching Dart would mean a
+     * set that holds any number of elements equal to nothing, which a
+     * {@link LinkedHashSet} cannot do without wrapping every double it stores -- a cost
+     * on every numeric set paid for sets of NaN, which no Flutter application relies on.</p>
      */
     private Object storedElement(Object e) {
         if (!(e instanceof Number) || super.contains(e)) {

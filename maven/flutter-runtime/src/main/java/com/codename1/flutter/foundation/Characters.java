@@ -31,7 +31,7 @@ package com.codename1.flutter.foundation;
  * <p>The segmentation covers what a text field meets in practice: surrogate pairs,
  * combining marks, variation selectors, emoji skin-tone modifiers, zero-width-joiner
  * sequences (families, professions), regional-indicator flag pairs, tag sequences
- * (subdivision flags) and CR LF. It is not the full Unicode UAX #29 table.</p>
+ * (subdivision flags), Indic conjuncts (consonant + virama + consonant) and CR LF. It is not the full Unicode UAX #29 table.</p>
  */
 public final class Characters {
 
@@ -78,9 +78,21 @@ public final class Characters {
         if (regional && j < len && isRegionalIndicator(codePointAt(s, j))) {
             j += Character.charCount(codePointAt(s, j));   // a flag is two indicators
         }
+        // UAX #29 rule GB9c: a consonant, a virama (linker) and then another consonant
+        // are ONE cluster, so the conjunct ksha (ka + virama + ssa) counts as one
+        // character. Ending the cluster after the virama cut maxLength: 1 input to a
+        // dangling half-letter. Marks between them do not break the chain.
+        boolean conjunctBase = isConjunctConsonant(cp);
+        boolean linked = false;
         while (j < len) {
             int c = codePointAt(s, j);
-            if (isExtender(c)) {
+            if (conjunctBase && linked && isConjunctConsonant(c)) {
+                j += Character.charCount(c);
+                linked = false;
+            } else if (isExtender(c)) {
+                if (isConjunctLinker(c)) {
+                    linked = true;
+                }
                 j += Character.charCount(c);
             } else if (c == 0x200D && j + 1 < len) {
                 // Zero-width joiner: the next character belongs to this cluster too.
@@ -107,6 +119,40 @@ public final class Characters {
         }
         return c;
     }
+
+    /**
+     * Indic_Conjunct_Break=Linker: the viramas of the six scripts UAX #29's GB9c
+     * covers (Devanagari, Bengali, Gujarati, Oriya, Telugu, Malayalam).
+     */
+    private static boolean isConjunctLinker(int c) {
+        return c == 0x94D || c == 0x9CD || c == 0xACD || c == 0xB4D || c == 0xC4D || c == 0xD4D;
+    }
+
+    /** Indic_Conjunct_Break=Consonant, for the same six scripts. */
+    private static boolean isConjunctConsonant(int c) {
+        if (c < 0x915 || c > 0xD3A) {
+            return false;
+        }
+        for (int k = 0; k < CONJUNCT_CONSONANTS.length; k += 2) {
+            if (c >= CONJUNCT_CONSONANTS[k] && c <= CONJUNCT_CONSONANTS[k + 1]) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Inclusive ranges of Indic_Conjunct_Break=Consonant (DerivedCoreProperties). */
+    private static final int[] CONJUNCT_CONSONANTS = {
+        0x915, 0x939, 0x958, 0x95F, 0x978, 0x97F,                         // Devanagari
+        0x995, 0x9A8, 0x9AA, 0x9B0, 0x9B2, 0x9B2, 0x9B6, 0x9B9,
+        0x9DC, 0x9DD, 0x9DF, 0x9DF, 0x9F0, 0x9F1,                         // Bengali
+        0xA95, 0xAA8, 0xAAA, 0xAB0, 0xAB2, 0xAB3, 0xAB5, 0xAB9,
+        0xAF9, 0xAF9,                                                     // Gujarati
+        0xB15, 0xB28, 0xB2A, 0xB30, 0xB32, 0xB33, 0xB35, 0xB39,
+        0xB5C, 0xB5D, 0xB5F, 0xB5F, 0xB71, 0xB71,                         // Oriya
+        0xC15, 0xC28, 0xC2A, 0xC39, 0xC58, 0xC5A,                         // Telugu
+        0xD15, 0xD3A,                                                     // Malayalam
+    };
 
     private static boolean isRegionalIndicator(int c) {
         return c >= 0x1F1E6 && c <= 0x1F1FF;

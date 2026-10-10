@@ -423,6 +423,16 @@ public class DartCoreSemanticsTest {
         assertEquals(maxMicros, DateTime.fromMicrosecondsSinceEpoch(maxMicros, true).microsecondsSinceEpoch());
         assertThrows(ArgumentError.class, () -> DateTime.fromMicrosecondsSinceEpoch(maxMicros + 1, true));
         assertThrows(ArgumentError.class, () -> DateTime.fromMicrosecondsSinceEpoch(-maxMicros - 1, true));
+        // Arithmetic validates its result too, including a sum that overflows a long
+        // into an apparently valid instant.
+        DateTime top = DateTime.fromMicrosecondsSinceEpoch(maxMicros, true);
+        DateTime bottom = DateTime.fromMicrosecondsSinceEpoch(-maxMicros, true);
+        assertThrows(ArgumentError.class, () -> top.add(Duration.ofMicroseconds(1)));
+        assertThrows(ArgumentError.class, () -> bottom.subtract(Duration.ofMicroseconds(1)));
+        assertThrows(ArgumentError.class, () -> top.add(Duration.ofMicroseconds(Long.MAX_VALUE)));
+        assertThrows(ArgumentError.class, () -> bottom.subtract(Duration.ofMicroseconds(Long.MAX_VALUE)));
+        assertThrows(ArgumentError.class, () -> top.subtract(Duration.ofMicroseconds(Long.MIN_VALUE)));
+        assertEquals(maxMicros - 1, top.subtract(Duration.ofMicroseconds(1)).microsecondsSinceEpoch());
     }
 
     @Test

@@ -23,6 +23,7 @@
  */
 package com.codename1.flutter.animation;
 
+import com.codename1.flutter.foundation.FlutterError;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 
@@ -48,8 +49,13 @@ public class AnimationController extends Animation<Double> {
     private double lowerBound = 0.0;
     private double upperBound = 1.0;
     private double currentValue;
-    private long durationMs = 300;
-    private long reverseDurationMs = -1;
+    /// The controller's duration in milliseconds, or {@link #NO_DURATION}. Flutter's
+    /// duration is nullable and has no default: forward, reverse, repeat and an
+    /// animateTo without its own duration fail when it is absent, rather than
+    /// running with a timing nobody chose (a fabricated 300 ms did exactly that).
+    private long durationMs = NO_DURATION;
+    private long reverseDurationMs = NO_DURATION;
+    private static final long NO_DURATION = -1;
     private AnimationStatus status = AnimationStatus.dismissed;
     private AnimationBehavior animationBehavior = AnimationBehavior.normal;
 
@@ -87,16 +93,29 @@ public class AnimationController extends Animation<Double> {
     // Named-parameter setters (constructor arguments)
     // ------------------------------------------------------------------
 
+    /// Both the constructor argument and the nullable setter: {@code duration = null}
+    /// clears it, as in Flutter.
     public void duration(Duration v) {
-        if (v != null) {
-            this.durationMs = v.inMilliseconds();
-        }
+        this.durationMs = v != null ? v.inMilliseconds() : NO_DURATION;
     }
 
     public void reverseDuration(Duration v) {
-        if (v != null) {
-            this.reverseDurationMs = v.inMilliseconds();
+        this.reverseDurationMs = v != null ? v.inMilliseconds() : NO_DURATION;
+    }
+
+    /// The duration a run in {@code dir} takes by default, failing as Flutter does
+    /// when the controller has none: reverseDuration, if set, for a reverse run.
+    private long requireDuration(String method, AnimationStatus dir) {
+        if (dir == AnimationStatus.reverse && reverseDurationMs != NO_DURATION) {
+            return reverseDurationMs;
         }
+        if (durationMs == NO_DURATION) {
+            throw new FlutterError("AnimationController." + method
+                    + "() called with no default duration. The \"duration\" property"
+                    + " should be set, either in the constructor or later, before"
+                    + " calling the " + method + "() function.");
+        }
+        return durationMs;
     }
 
     /**
@@ -183,7 +202,11 @@ public class AnimationController extends Animation<Double> {
     }
 
     public Duration duration() {
-        return Duration.ofMicroseconds(durationMs * 1000);
+        return durationMs == NO_DURATION ? null : Duration.ofMicroseconds(durationMs * 1000);
+    }
+
+    public Duration reverseDuration() {
+        return reverseDurationMs == NO_DURATION ? null : Duration.ofMicroseconds(reverseDurationMs * 1000);
     }
 
     /** Flutter's {@code controller.view}: the controller is its own view. */
@@ -202,9 +225,10 @@ public class AnimationController extends Animation<Double> {
             // field left dependants showing the old value until the next frame.
             value(from.doubleValue());
         }
+        long d = requireDuration("forward", AnimationStatus.forward);
         repeating = false;
         dart.async.Future<Object> done = newRun();
-        beginRun(upperBound, durationMs, AnimationStatus.forward);
+        beginRun(upperBound, d, AnimationStatus.forward);
         return done;
     }
 
@@ -222,8 +246,8 @@ public class AnimationController extends Animation<Double> {
         if (from != null) {
             value(from.doubleValue());   // the setter, as forward(from:) -- see there
         }
+        long d = requireDuration("reverse", AnimationStatus.reverse);
         repeating = false;
-        long d = reverseDurationMs >= 0 ? reverseDurationMs : durationMs;
         dart.async.Future<Object> done = newRun();
         beginRun(lowerBound, d, AnimationStatus.reverse);
         return done;
@@ -235,26 +259,32 @@ public class AnimationController extends Animation<Double> {
      * positive velocity flings toward {@code upperBound}, a negative one toward
      * {@code lowerBound}. The {@code springDescription} (the spring modeling the
      * fling's settle) and {@code animationBehavior} are captured for API shape;
-     * this runtime plays a plain timed run to the target bound.
+     * this runtime plays a plain timed run to the target bound, of the controller's
+     * duration or, since Flutter's spring needs none, {@link #FLING_FALLBACK_MS}.
      */
     public dart.async.Future<Object> fling(double velocity, Object springDescription,
                                           AnimationBehavior animationBehavior) {
         repeating = false;
         dart.async.Future<Object> done = newRun();
+        long d = durationMs != NO_DURATION ? durationMs : FLING_FALLBACK_MS;
         if (velocity < 0.0) {
-            beginRun(lowerBound, durationMs, AnimationStatus.reverse);
+            beginRun(lowerBound, d, AnimationStatus.reverse);
         } else {
-            beginRun(upperBound, durationMs, AnimationStatus.forward);
+            beginRun(upperBound, d, AnimationStatus.forward);
         }
         return done;
     }
 
+    /** How long a fling runs on a controller with no duration; see {@link #fling}. */
+    private static final long FLING_FALLBACK_MS = 300;
+
     public dart.async.Future<Object> animateTo(double target, Duration duration, Curve curve) {
-        repeating = false;
         AnimationStatus dir = target >= currentValue
                 ? AnimationStatus.forward : AnimationStatus.reverse;
+        long d = simulationMillis("animateTo", target, duration, dir);
+        repeating = false;
         dart.async.Future<Object> done = newRun();
-        beginRun(clamp(target), simulationMillis(target, duration, dir), dir, curve);
+        beginRun(clamp(target), d, dir, curve);
         return done;
     }
 
@@ -275,27 +305,24 @@ public class AnimationController extends Animation<Double> {
      */
     /// Seam for AnimateToDurationTest: the arithmetic, without needing a frame clock.
     long simulationMillisForTest(double target, Duration explicit, AnimationStatus dir) {
-        return simulationMillis(target, explicit, dir);
+        return simulationMillis("animateTo", target, explicit, dir);
     }
 
-    private long simulationMillis(double target, Duration explicit, AnimationStatus dir) {
+    private long simulationMillis(String method, double target, Duration explicit, AnimationStatus dir) {
         if (explicit != null) {
             // Flutter does not animate at all when asked to go where it already is.
             return target == currentValue ? 0 : explicit.inMilliseconds();
         }
         double range = upperBound - lowerBound;
         double remaining = range > 0 ? Math.abs(target - currentValue) / range : 1.0;
-        long base = dir == AnimationStatus.reverse && reverseDurationMs >= 0
-                ? reverseDurationMs : durationMs;
-        return Math.round(base * remaining);
+        return Math.round(requireDuration(method, dir) * remaining);
     }
 
     public dart.async.Future<Object> animateBack(double target, Duration duration, Curve curve) {
+        long d = simulationMillis("animateBack", target, duration, AnimationStatus.reverse);
         repeating = false;
         dart.async.Future<Object> done = newRun();
-        beginRun(clamp(target),
-                simulationMillis(target, duration, AnimationStatus.reverse),
-                AnimationStatus.reverse, curve);
+        beginRun(clamp(target), d, AnimationStatus.reverse, curve);
         return done;
     }
 
@@ -317,11 +344,11 @@ public class AnimationController extends Animation<Double> {
     }
 
     public void repeat(Double min, Double max, Boolean reverse, Duration period) {
+        long d = period != null ? period.inMilliseconds() : requireDuration("repeat", AnimationStatus.forward);
         repeating = true;
         repeatReverse = reverse != null && reverse;
         repeatMin = min != null ? min : lowerBound;
         repeatMax = max != null ? max : upperBound;
-        long d = period != null ? period.inMilliseconds() : durationMs;
         currentValue = repeatMin;
         beginRun(repeatMax, d, AnimationStatus.forward);
     }

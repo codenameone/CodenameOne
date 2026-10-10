@@ -24,6 +24,7 @@
 package com.codename1.flutter;
 
 import com.codename1.flutter.animation.AnimationController;
+import dart.core.Duration;
 import com.codename1.flutter.animation.AnimationStatus;
 import com.codename1.flutter.animation.IntTween;
 import com.codename1.flutter.animation.ProxyAnimation;
@@ -73,6 +74,7 @@ class Round13RuntimeTest {
     @Test
     void aReverseAnimationNotifiesItsListenersAndReversesStatus() {
         AnimationController parent = new AnimationController();
+        parent.duration(Duration.of(0, 0, 0, 0, 300, 0));
         ReverseAnimation reverse = new ReverseAnimation(parent.view());
         final List<Double> values = new ArrayList<Double>();
         final List<AnimationStatus> statuses = new ArrayList<AnimationStatus>();

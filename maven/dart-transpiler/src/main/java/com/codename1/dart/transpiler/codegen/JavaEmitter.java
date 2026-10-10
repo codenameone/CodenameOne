@@ -6437,7 +6437,13 @@ public final class JavaEmitter {
             // semantics too, not an approximation of them: measured on the Dart 3.9 VM,
             // 9007199254740993 == 9007199254740992.0 is TRUE and the matching > is false.
             // Only compareTo compares an int and a double exactly.
-            if (numeric || (l.type.is("bool") && r.type.is("bool"))) {
+            //
+            // That shortcut only holds for a non-nullable primitive on both sides. A
+            // nullable operand (int?/double?/num?, emitted as boxed Long/Double) must not
+            // take Java's ==: it auto-unboxes a null operand and throws NPE instead of
+            // answering false, and two equal boxed values would compare by reference
+            // rather than by value. Fall through to the null-safe, value-based helper below.
+            if ((numeric || (l.type.is("bool") && r.type.is("bool"))) && !l.type.nullable && !r.type.nullable) {
                 return new Out(paren(l.code) + " " + b.op + " " + paren(r.code), TypeRef.BOOL);
             }
             ctx.importClass("dart.runtime.DartRuntime");

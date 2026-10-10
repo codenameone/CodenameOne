@@ -50,6 +50,12 @@ class Round15RuntimeTest {
         assertEquals(1, Characters.count("\u05D0\u05B0"), "Hebrew alef with sheva");
         assertEquals(1, Characters.count("\u0628\u064E"), "Arabic beh with fatha");
         assertEquals(1, Characters.count("\u0915\u093F"), "Devanagari ka with the i vowel sign");
+        // GB9c: consonant + virama + consonant is one conjunct, so maxLength: 1 keeps it whole.
+        assertEquals(1, Characters.count("\u0915\u094D\u0937"), "Devanagari ksha conjunct");
+        assertEquals("\u0915\u094D\u0937", Characters.take("\u0915\u094D\u0937\u093E", 1).substring(0, 3));
+        assertEquals(1, Characters.count("\u0938\u094D\u0924\u094D\u0930"), "three-consonant conjunct str");
+        assertEquals(2, Characters.count("\u0915\u094D\u0041"), "a virama does not join a Latin letter");
+        assertEquals(2, Characters.count("\u0915\u0937"), "no virama, no conjunct");
         assertEquals(1, Characters.count("\u1100\u1161\u11A8"), "a Hangul syllable written as jamo");
         assertEquals("\u05D0\u05B0", Characters.take("\u05D0\u05B0\u05D1", 1));
         assertEquals(2, Characters.count("ab"));
