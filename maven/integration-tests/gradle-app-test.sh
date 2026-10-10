@@ -14,6 +14,8 @@
 #     the app and that platform's native sources -- and no other platform's.
 #  5. addBackend adds backend/, whose runBackend serves /healthz and whose
 #     sample tests pass on the JVM and, with clang, compiled.
+#  6. backendWebApp stages a browser build in backend/build/webapp, which
+#     runBackend then serves at /.
 #
 # Needs the reactor installed (mvn install) and a JDK 17+ for Gradle; see
 # inc/gradle.sh for MAVEN_REPO_LOCAL and GRADLE_JAVA_HOME.
@@ -161,6 +163,31 @@ run_gradle "$APP" addBackend > "$WORKDIR/add-backend.log" 2>&1 || { cat "$WORKDI
 [ -f "$APP/backend/application.properties" ] || fail "addBackend wrote no backend/application.properties"
 [ ! -e "$APP/backend/pom.xml" ] || fail "a Gradle backend has no pom"
 check_backend_healthz "$APP" ":backend:runBackend" "$WORKDIR/backend-run.log"
+
+echo "== the backend hosts the app's browser build"
+# With no bundle given the task builds one: it depends on the root project's
+# browser build, the one made without a proxy servlet. Checked on the task graph;
+# the translation itself is the JavaScript port's to test.
+run_gradle "$APP" :backend:backendWebApp --dry-run > "$WORKDIR/webapp-graph.log" 2>&1 \
+  || { cat "$WORKDIR/webapp-graph.log"; fail ":backend:backendWebApp --dry-run"; }
+grep -q "^:buildJavascriptWebApp SKIPPED" "$WORKDIR/webapp-graph.log" \
+  || { cat "$WORKDIR/webapp-graph.log"; fail "backendWebApp does not build the app for the browser"; }
+# A bundle that is already built is staged as it is, and nothing is built for it.
+python3 - "$WORKDIR/bundle.zip" <<'EOF'
+import sys, zipfile
+with zipfile.ZipFile(sys.argv[1], "w") as bundle:
+    bundle.writestr("index.html", "<!doctype html><title>hosted-by-gradle</title>")
+    bundle.writestr("js/app.js", "// app\n" + "function f(){return 1;}\n" * 200)
+EOF
+run_gradle "$APP" :backend:backendWebApp "-Pcn1.backend.webapp.bundle=$WORKDIR/bundle.zip" > "$WORKDIR/webapp.log" 2>&1 \
+  || { cat "$WORKDIR/webapp.log"; fail ":backend:backendWebApp"; }
+if grep -q "buildJavascriptWebApp" "$WORKDIR/webapp.log"; then
+  cat "$WORKDIR/webapp.log"
+  fail "staging a given bundle ran the browser build"
+fi
+[ -f "$APP/backend/build/webapp/index.html" ] || fail "backendWebApp staged no index.html in backend/build/webapp"
+[ -f "$APP/backend/build/webapp/js/app.js.gz" ] || fail "backendWebApp wrote no compressed copy of the app's script"
+check_backend_webapp "$APP" ":backend:runBackend" "$WORKDIR/backend-webapp-run.log" "hosted-by-gradle"
 
 echo "== backend tests"
 # The sample tests addBackend writes, on the JVM and (with clang) compiled. Counted

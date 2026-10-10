@@ -1223,6 +1223,154 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void anAspectOnAMethodNamingAPrivateNestedClassRuns() throws Exception {
+        // The helper is a top-level class, where javac refuses the name of a
+        // private member class -- in the return type, a parameter, an array, and
+        // the local the helper keeps the result in. Generic arguments and thrown
+        // types are here too, to show neither reaches the helper's source.
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Mini", PKG + "public class Mini {\n"
+                + "    static class Shown { String v; }\n"
+                + "    private static class Hidden extends Shown { }\n"
+                + "    private static final class Answer extends Hidden {\n"
+                + "        Answer(String v) { this.v = v; }\n"
+                + "    }\n"
+                + "    private interface Label { String label(); }\n"
+                + "    private static class Boom extends Exception { }\n"
+                + "    @Timed(\"mini.work\") @Counted(\"mini.calls\")\n"
+                + "    private Answer work(Answer in, List<Answer> all, Answer[][] many, int n,\n"
+                + "            long wide, Label label) throws Boom {\n"
+                + "        if (n < 0) { throw new Boom(); }\n"
+                + "        return new Answer(in.v + all.get(0).v + many[0][0].v + n + wide\n"
+                + "                + label.label());\n"
+                + "    }\n"
+                + "    @Timed(\"mini.twice\") private static Answer[] twice(Answer a) {\n"
+                + "        return new Answer[] {a, a};\n"
+                + "    }\n"
+                + "    @Counted(\"mini.label\") Label label(final String text) {\n"
+                + "        return new Label() { public String label() { return text; } };\n"
+                + "    }\n"
+                + "    public String run() throws Exception {\n"
+                + "        List<Answer> all = new ArrayList<Answer>();\n"
+                + "        all.add(new Answer(\"b\"));\n"
+                + "        Answer[][] many = {{new Answer(\"c\")}};\n"
+                + "        Answer a = work(new Answer(\"a\"), all, many, 4, 5L, label(\"!\"));\n"
+                + "        String thrown = \"none\";\n"
+                + "        try { work(a, all, many, -1, 0L, null); } catch (Boom e) { thrown = \"boom\"; }\n"
+                + "        return a.v + twice(a).length + thrown;\n"
+                + "    }\n"
+                + "}\n");
+        File classes = compile(s);
+        ProcessorContext ctx = process(classes);
+        assertNoErrors(ctx);
+        URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
+                getClass().getClassLoader());
+        Class<?> mini = loader.loadClass("com.example.Mini");
+        assertEquals("abc45!2boom", mini.getMethod("run").invoke(mini.newInstance()));
+        // The helper is written against the nearest superclass it can name --
+        // Shown, past the private Hidden -- and Object for the private interface.
+        Class<?> helper = loader.loadClass("com.example.MiniCn1Aspects");
+        Class<?> shown = loader.loadClass("com.example.Mini$Shown");
+        java.lang.reflect.Method work = null;
+        for (java.lang.reflect.Method m : helper.getDeclaredMethods()) {
+            if ("work".equals(m.getName())) {
+                work = m;
+            }
+        }
+        assertNotNull(work);
+        assertEquals(shown, work.getReturnType());
+        assertEquals(Arrays.<Class<?>>asList(mini, shown, List.class,
+                java.lang.reflect.Array.newInstance(shown, 0, 0).getClass(), int.class,
+                long.class, Object.class), Arrays.asList(work.getParameterTypes()));
+        // And the method itself still has the signature its author wrote.
+        Class<?> answer = loader.loadClass("com.example.Mini$Answer");
+        assertEquals(answer, mini.getDeclaredMethod("twice", answer).getReturnType()
+                .getComponentType());
+    }
+
+    @Test
+    public void aTransactionOnAPrivateMethodReturningAPrivateClassCommitsAndRollsBack()
+            throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Rows", PKG + "@Component public class Rows {\n"
+                + "    private static class Answer {\n"
+                + "        final String v;\n"
+                + "        Answer(String v) { this.v = v; }\n"
+                + "    }\n"
+                + "    private final DataSource db;\n"
+                + "    public Rows(DataSource db) { this.db = db; }\n"
+                + "    @PostConstruct public void schema() throws java.io.IOException {\n"
+                + "        db.execute(\"CREATE TABLE r (v TEXT)\", null);\n"
+                + "    }\n"
+                + "    @Transactional private Answer work(Answer in, boolean fail)\n"
+                + "            throws java.io.IOException {\n"
+                + "        db.execute(\"INSERT INTO r (v) VALUES (?)\", new Object[] {in.v});\n"
+                + "        if (fail) { throw new IllegalStateException(\"undo\"); }\n"
+                + "        return new Answer(in.v + \"!\");\n"
+                + "    }\n"
+                + "    @Async private Future later(Answer in) { return AsyncResult.of(in.v + \"?\"); }\n"
+                + "    public String run() throws Exception {\n"
+                + "        String out = work(new Answer(\"a\"), false).v;\n"
+                + "        try { work(new Answer(\"b\"), true); } catch (IllegalStateException e) { }\n"
+                + "        Map row = db.queryOne(\"SELECT COUNT(*) AS n FROM r\", null);\n"
+                + "        return out + row.get(\"n\") + later(new Answer(\"c\")).get();\n"
+                + "    }\n"
+                + "}\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    private final Rows rows;\n"
+                + "    public Api(Rows rows) { this.rows = rows; }\n"
+                + "    @GetMapping(\"/run\") public String run() throws Exception {\n"
+                + "        return rows.run();\n"
+                + "    }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
+                getClass().getClassLoader());
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        Backend backend = withApplication(Backend.builder(Config.of(settings, "dev")).quiet()
+                .requiresDataSource(), (BackendApplication) loader
+                        .loadClass("com.example.BackendWiring").newInstance())
+                .start();
+        try {
+            // One row: the first call committed, the second was undone.
+            assertEquals("a!1c?", http("GET", port, "/run"));
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    public void whatTheAspectClassCannotNameAtAllIsABuildError() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Outer", PKG + "public class Outer {\n"
+                + "    private static class Hidden {\n"
+                + "        @Timed(\"hidden.work\") void work() { }\n"
+                + "    }\n"
+                + "    private static class Boom extends RuntimeException { }\n"
+                + "    @Transactional(noRollbackFor = Boom.class) void keep() { }\n"
+                + "    private static class Key { }\n"
+                + "    @Counted(\"outer.find\") void find(Key k) { }\n"
+                + "    @Counted(\"outer.find2\") void find(Object k) { }\n"
+                + "    void use() { new Hidden().work(); }\n"
+                + "}\n");
+        String errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("com.example.Outer.Hidden.work has an aspect "
+                + "annotation"));
+        assertTrue(errors, errors.contains("com.example.Outer.Hidden is a private, local or "
+                + "anonymous class"));
+        assertTrue(errors, errors.contains("@Transactional on com.example.Outer.keep lists "
+                + "com.example.Outer.Boom in noRollbackFor, which is a private class"));
+        assertTrue(errors, errors.contains("remove `private` from its declaration"));
+        assertTrue(errors, errors.contains("com.example.Outer has two methods named find with "
+                + "aspect annotations whose parameters differ only in a private class "
+                + "(com.example.Outer.Key)"));
+    }
+
+    @Test
     public void sessionScopedBeansAreDestroyedWhenTheSessionIsInvalidated() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Cart", PKG + "@Component @Scope(\"session\") public class Cart {\n"

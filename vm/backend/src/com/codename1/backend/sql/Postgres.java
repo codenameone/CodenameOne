@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.codename1.backend.Base64;
+import com.codename1.backend.ConcurrencyFailureException;
 import com.codename1.backend.Crypto;
 import com.codename1.backend.Tcp;
 
@@ -917,10 +918,20 @@ public final class Postgres {
             }
             at = end + 1;
         }
-        return new IOException("PostgreSQL error"
+        String text = "PostgreSQL error"
                 + (state == null ? "" : " " + state) + ": "
                 + (detail == null ? "unknown" : detail)
-                + (sql == null ? "" : " [" + sql + "]"));
+                + (sql == null ? "" : " [" + sql + "]");
+        return isConcurrencyFailure(state) ? new ConcurrencyFailureException(text)
+                : new IOException(text);
+    }
+
+    /// Whether a SQLSTATE is the server ending this transaction's statement in
+    /// favour of another transaction: a serialization failure (40001), a
+    /// deadlock (40P01) or a lock that was not available (55P03). The caller may
+    /// answer any of them by running its transaction again.
+    static boolean isConcurrencyFailure(String state) {
+        return "40001".equals(state) || "40P01".equals(state) || "55P03".equals(state);
     }
 
     private static final class Message {

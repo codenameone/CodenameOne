@@ -143,6 +143,30 @@ check_backend_healthz() {
   [ "$greeting" = "Hello, gradle" ] || { cat "$log"; fail "$task did not answer /greet through its injected service (got '$greeting')"; }
 }
 
+# Starts a backend with the given task and checks it answers / with the web
+# app staged for it.
+#   check_backend_webapp <project-dir> <task> <log> <text the app's page holds>
+check_backend_webapp() {
+  local dir="$1" task="$2" log="$3" marker="$4"
+  local port=$((18000 + RANDOM % 2000))
+  (cd "$dir" && CN1_PROFILE=dev PORT=$port JAVA_HOME="$GRADLE_JDK" exec ./gradlew --no-daemon "$task") > "$log" 2>&1 &
+  local pid=$!
+  local health="" i
+  for i in $(seq 1 180); do
+    health=$(curl -fsS "http://127.0.0.1:$port/healthz" 2>/dev/null) && break
+    kill -0 $pid 2>/dev/null || break
+    sleep 1
+  done
+  local page=""
+  [ -n "$health" ] && page=$(curl -fsS "http://127.0.0.1:$port/" 2>/dev/null || true)
+  stop_tree $pid
+  [ -n "$health" ] || { cat "$log"; fail "$task never answered /healthz on port $port"; }
+  case "$page" in
+    *"$marker"*) echo "   $task /: the staged web app" ;;
+    *) cat "$log"; fail "$task did not answer / with the staged web app (got '$page')" ;;
+  esac
+}
+
 # Checks a packaged backend binary answers /healthz, and /greet through the
 # Greeter service the build wired into it.
 #   check_binary_healthz <binary> <working-dir> <log>

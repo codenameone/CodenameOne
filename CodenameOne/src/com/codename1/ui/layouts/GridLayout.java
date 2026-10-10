@@ -335,12 +335,15 @@ public class GridLayout extends Layout {
             width = width * columns;
         }
 
-        if (rows > 1) {
-            if (totalComponentCount > rows * columns) { //if there are more components than planned
-                height = height * (totalComponentCount / columns + (totalComponentCount % columns == 0 ? 0 : 1));
-            } else {
-                height = height * rows;
-            }
+        // The rows the components really take, which layoutContainer() uses:
+        // more components than rows * columns run onto further rows. That
+        // has to be asked for a single row too -- GridLayout(int columns) is
+        // one row that "implicitly grows", and answering the height of one
+        // row for it squeezed every further row into that row's height.
+        if (totalComponentCount > rows * columns) { //if there are more components than planned
+            height = height * (totalComponentCount / columns + (totalComponentCount % columns == 0 ? 0 : 1));
+        } else if (rows > 1) {
+            height = height * rows;
         }
 
         Style s = parent.getStyle();

@@ -838,11 +838,6 @@ ScrollThumb {
 }
 
 /* ---------- Live (phone) preview internals ---------- */
-Images {
-    background-image: url(images/grub.png),
-        url(images/tweet.png);
-}
-
 InitializrLiveFrame {
     margin: 0;
     border: 2px solid #D2D9E6;

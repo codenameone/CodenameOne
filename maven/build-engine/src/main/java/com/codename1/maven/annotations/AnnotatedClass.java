@@ -140,6 +140,17 @@ public final class AnnotatedClass {
     /// enclosing it are public.
     public boolean isAccessibleFromAnywhere() { return accessible; }
 
+    private boolean nameableInPackage = true;
+    void setNameableInPackage(boolean nameableInPackage) {
+        this.nameableInPackage = nameableInPackage;
+    }
+    /// Whether another top-level class of this class's own package can write its
+    /// name: neither it nor a class enclosing it is private, local or anonymous.
+    /// A private member class is package-private in its class file, so calling
+    /// through it is legal bytecode -- it is only Java SOURCE that cannot say
+    /// its name, which is what generated source has to know.
+    public boolean isNameableInPackage() { return nameableInPackage; }
+
     private String sourceName;
 
     public String getInternalName() { return internalName; }

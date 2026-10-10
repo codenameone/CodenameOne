@@ -125,6 +125,21 @@ Any other return type is a build error: a JDK class with no JSON form, such as
 with the build and the request both reporting success. `@ResponseStatus` takes a
 final status between 200 and 599.
 
+A method that returns its own type can't return a refusal, because its return
+type is the body of a success. It throws one:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/RefusalSnippets.java[tag=backend-web-refusal,indent=0]
+----
+
+The reason is sent as the body, in plain text, so keep out of it anything the
+caller shouldn't learn. A status below 500 is an answer: it isn't logged and
+isn't counted as a failed request. A status of 500 or above is reported the way
+any other failure of the handler is, and answered with the status given. The
+exception is unchecked, so inside a `@Transactional` method it rolls the
+transaction back.
+
 ==== Your own classes as JSON
 
 A method can return an entity or any class of your own, or take one as its body,
@@ -316,6 +331,188 @@ Conditional requests and ranges are honoured, and where the platform supports it
 the file is sent from the page cache to the socket without passing through the
 process.
 
+[[backend-hosting-the-app]]
+==== Hosting the app in the browser
+
+A project with an app and a server can have the server host the app's browser
+build. One address is then both the API and the app: somebody opens it and is
+using the app, with nothing to install.
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-web.sh[tag=backend-web-hosting,indent=0]
+----
+<1> Builds the app for the browser and stages it in `backend/target/webapp`.
+<2> Runs the server, which now answers `/` with the app.
+
+`cn1:backend-webapp` runs the project's own JavaScript build on this machine,
+the one `mvn package -Dcodename1.platform=javascript
+-Dcodename1.buildTarget=local-javascript` runs, then unpacks the bundle into the
+server module's `target/webapp`. It's a goal of its own because that build takes
+about a minute. Run it when the app changed, not every time the server restarts;
+what it staged stays until `mvn clean`.
+
+The server looks for the app in a directory named `webapp` in its working
+directory, beside `application.properties`, and serves it when the directory holds
+an `index.html`. There's no setting to turn on. `cn1:backend` points the server at
+`target/webapp` for you, and `cn1:backend-package` leaves the directory beside the
+binary, so a deployment is the binary with `webapp` next to it:
+
+[source,text]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-web.txt[tag=backend-web-hosting-layout,indent=0]
+----
+
+The files aren't linked into the binary. They're sent from the page cache, which
+needs them to be files.
+
+Routes still come first. A request reaches the app's files only when no route
+answered it, so `/api/notes` is the API and `/` is the app, and a file can't
+shadow a route by being named like one.
+
+The files of a build keep their names from one build to the next, so each is
+served with `Cache-Control: no-cache` and an entity tag: a browser asks every
+time and is told `304 Not Modified` for a file that didn't change. A deployment
+that puts a version in the path can set a longer policy. The build also writes a
+gzip copy beside each text file that shrinks, and a browser that accepts gzip is
+sent that copy; a range request, and a browser that doesn't accept it, get the
+file itself.
+
+[cols="1,2"]
+|===
+| Setting | What it does
+
+| `cn1.webapp.root`
+| The directory holding the app. `webapp` in the working directory by default.
+  A directory named here that holds no `index.html` stops the server from
+  starting, since a server told where its app is shouldn't answer 404 there.
+
+| `cn1.webapp.path`
+| Where the app is served. `/` by default.
+
+| `cn1.webapp.cacheControl`
+| The `Cache-Control` header of every file. `no-cache` by default.
+
+| `cn1.webapp.enabled`
+| Set to `false` to serve no app even when the directory is there.
+|===
+
+The goal has a few parameters of its own:
+
+[cols="1,2"]
+|===
+| Parameter | What it does
+
+| `cn1.backend.webapp.bundle`
+| A bundle to stage instead of building one: the archive a JavaScript build
+  produced, or a directory unpacked from it. Use it for a bundle built by an
+  earlier job or by the build server.
+
+| `cn1.backend.webapp.output`
+| Where to stage it. `target/webapp` in the server module by default.
+
+| `cn1.backend.webapp.appRoot`
+| The app's root project. The directory above the server module by default.
+|===
+
+A <<gradle-backend,Gradle project>> has the same step as a task of its `backend`
+project:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-web.sh[tag=backend-web-hosting-gradle,indent=0]
+----
+<1> Builds the app for the browser and stages it in `backend/build/webapp`.
+<2> Runs the server, which now answers `/` with the app.
+
+`backendWebApp` runs the root project's local JavaScript build, the one
+`buildJavascriptLocal` runs, and unpacks the bundle into the backend's
+`build/webapp`. `runBackend` points the server at that directory, and
+`backendPackage` writes the binary into `build`, where `webapp` is beside it
+already. What it staged stays until `./gradlew clean`.
+
+`-Pcn1.backend.webapp.bundle` and `-Pcn1.backend.webapp.output` do what the Maven
+parameters of the same names do. There's no `appRoot`: the app is the root
+project of the build. A backend-only project has no app to build, so its
+`backendWebApp` stages a bundle named with `-Pcn1.backend.webapp.bundle`.
+
+A test that needs the app served names the directory, since a test runs in the
+module directory and not in `target`:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/testing/HostedAppTest.java[tag=backend-web-hosted-test,indent=0]
+----
+
+===== Talking to the server from the hosted app
+
+The hosted app and its API share an origin, so the app needs no server address
+compiled in. In the browser the address of the page is the address of the server:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/HostedAppSnippets.java[tag=backend-web-hosted-origin,indent=0]
+----
+
+A same-origin request needs no CORS configuration and goes straight to the
+server. The JavaScript build can route requests to other origins through a
+proxy servlet; a backend isn't a servlet container, so the hosted build is made
+without one unless the project sets `javascript.inject_proxy` or
+`javascript.proxy.url` itself. A hosted app that calls a third-party service
+directly needs that service to allow the app's origin.
+
+A WebSocket follows the same rule. Replace `http` with `ws` in the origin and
+the socket goes to the server the page came from, over TLS when the page did.
+
+===== Signing in from the hosted app
+
+An installed app that signs in against the server's own authorization server
+usually asks for the code to be sent to a loopback address and reads it off the
+redirect. A page in a browser can't do that. The browser follows a redirect
+itself, shows the page only what was at the end of it, and refuses to show it
+anything from another origin. It also keeps the session cookie to itself: the
+page can neither read `Set-Cookie` nor set `Cookie`.
+
+Three things make the same flow work there:
+
+* Register a redirect address on the server's own origin for the app's client,
+  such as `https://app.example.com/signin/code`, beside the loopback one. A
+  redirect address is matched exactly, scheme, host and port included, so it
+  has to be the address people open the app at.
+* Answer that path with the code it was given, as JSON. The redirect then ends
+  on a same-origin response the app can read. The path needs no sign-in: it
+  repeats what was in its own address, and a code is worth nothing without the
+  PKCE verifier that only the app that started the sign-in holds.
+* Answer the sign-in form with a status and not a redirect, using
+  `formLogin(form -> form.successHandler(...).failureHandler(...))`. The app
+  can't see which page a redirect led to, so `200` and `401` are how it learns
+  whether the password was accepted.
+
+The browser then carries the session cookie from the form to `/oauth2/authorize`
+on its own, because both are the same origin, and the token request is the same
+one the installed app makes. Tokens are kept by the app's token store, which in
+a browser is the browser's storage for that origin.
+
+That cookie changes what the sign-in chain has to defend against. An installed
+app holds its session itself, so no other site can ride on it. A browser sends
+the cookie on its own. If the chain runs without CSRF tokens, because the app
+posts the form itself, two things have to do their work:
+
+* The session cookie is `HttpOnly` and `SameSite=Lax` unless
+  `cn1.session.same-site` says otherwise, and `Secure` under TLS. Leave it that
+  way: `None` sends the session along with another site's requests.
+* Refuse a request that changes something and names another site in `Origin`.
+  A browser sets that header on every such request and a page can't alter it.
+  The installed app sends none, so a request without one passes. A filter added
+  with `addFilterBefore(filter, LogoutFilter.class)` covers the form, the token
+  endpoint and sign-out. Compare against the configured issuer.
+
+With CSRF off, sign-out answers a `GET` as well as a `POST`. Narrow it with
+`logout(logout -> logout.logoutRequestMatcher(...))`, and have the app send
+`POST /logout` once it has its tokens. The session has done its work by then.
+One that's never ended lasts until `cn1.session.timeout` seconds pass without a
+request, which is 1800 unless set.
+
 === Sharing the contract with the app
 
 This is where having the same language on both ends stops being a slogan. An
@@ -349,6 +546,29 @@ drift.
 The server half is off by default. Every existing project carries these
 interfaces for its client alone, and generating server classes into those builds
 would grow them for nothing.
+
+==== A module both sides depend on
+
+A project with an app and a server keeps the contract in a module of its own,
+which `common` and `backend` both depend on. Nothing needs switching on there:
+
+* The app's build finds the contract in the dependency and generates its client,
+  exactly as it does for an interface in `common` itself.
+* The backend's `generate-annotation-stubs` goal writes, for each contract,
+  `NotesApiServer` and a `NotesApiController` into
+  `target/generated-sources/cn1-annotations`. The controller is an ordinary
+  `@RestController` that takes the `@Component` implementing `NotesApiServer`
+  and maps each operation to it, so routing, binding, security rules and
+  filters treat it like one written by hand.
+
+The module holds the data classes and the interfaces and nothing else. It
+compiles against `codenameone-core` for the callback types the interfaces name,
+with `provided` scope, so the server doesn't inherit the client library. A
+contract method can't answer with a status of its own, so the implementation
+throws `ResponseStatusException` to refuse a request.
+
+The ride-hailing application in `scripts/wayline` is built this way, and the
+Initializr generates it as a starting point under your own name and package.
 
 === Real-time with WebSockets
 

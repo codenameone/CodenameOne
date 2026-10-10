@@ -1,0 +1,1696 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+/*
+ * The whole look of the app.
+ *
+ * COLOURS AND SHAPE -- change these and nothing else to re-skin the app. Every
+ * rule below takes its colours from here; none names a colour of its own. Each
+ * colour has a second value for dark mode, used by the block at the end of the
+ * file.
+ */
+#Constants {
+    includeNativeBool: true;
+    defaultSourceDPIInt: "0";
+    /* ONE TYPE SCALE, in millimetres as a phone draws them: 2.1 caption,
+       2.5 secondary, 2.75 body, 2.9 control, 3.5 heading, 4.4 title, 7 display.
+       A desktop draws a millimetre in far fewer pixels and is read from
+       further away, so every size is a quarter larger there. */
+    device-desktop-font-scale: "1.25";
+    /* Screens change quickly: nothing waits for an animation. */
+    transitionSpeedInt: "200";
+    /* The switch, sized from the Switch style's font. */
+    switchThumbScaleY: "1.5";
+    switchTrackScaleY: "1.8";
+    switchTrackScaleX: "3.1";
+    switchThumbInsetMM: "0.35";
+    switchTrackOffOutlineWidthMM: "0";
+    switchTrackOnOutlineWidthMM: "0";
+    switchThumbWidthScale: "1.0";
+    --brand: #1f5eff;
+    --brand-pressed: #1747c4;
+    --brand-contrast: #ffffff;
+    --surface: #ffffff;
+    --surface-alt: #f3f4f7;
+    --surface-press: #e6e9ee;
+    --text: #12161c;
+    --text-muted: #667085;
+    --line: #e6e8ed;
+    --line-strong: #cfd4dc;
+    --success: #12805c;
+    --warning: #b25e09;
+    --danger: #c5292a;
+    /* The pale ground a selected card and a badge sit on. */
+    --brand-tint: #edf2ff;
+    --success-tint: #e4f4ed;
+    --warning-tint: #fcf0df;
+    --danger-tint: #fcebeb;
+
+    --brand-dark: #6d93ff;
+    --brand-pressed-dark: #4f78ee;
+    --brand-contrast-dark: #0b1020;
+    --surface-dark: #12161c;
+    --surface-alt-dark: #1c222b;
+    --surface-press-dark: #2a313c;
+    --text-dark: #f2f4f7;
+    --text-muted-dark: #98a2b3;
+    --line-dark: #2a313c;
+    --line-strong-dark: #3b4452;
+    --success-dark: #47c79a;
+    --warning-dark: #f0a24b;
+    --danger-dark: #ff7a7a;
+    --brand-tint-dark: #1a2440;
+    --success-tint-dark: #15302a;
+    --warning-tint-dark: #33270f;
+    --danger-tint-dark: #3a1f22;
+
+    /* ONE RADIUS for anything card- or button-shaped, a smaller one for what
+       sits inside a card, and the sheet's. */
+    --radius: 2.4mm;
+    --radius-small: 1.5mm;
+
+    /* What floats over the map: the shadow under it, the dimming behind an
+       open menu, and the corners of the sheet. */
+    --shadow: #101828;
+    /* Under a card with square-ish corners. Black, and without a blur where it
+       is used: that is the one shadow a rounded rectangle draws for itself.
+       Any other is rendered to pictures of the card when the theme is
+       compiled, and a build that cannot render them has no card at all. */
+    --shadow-card: rgba(0, 0, 0, 0.14);
+    --scrim: #000000;
+    --radius-sheet: 4.4mm;
+    /* The map's own drawings. The edge is the outline that keeps a pin, the
+       car and the route readable over any tile. */
+    --map-edge: #ffffff;
+    --map-edge-dark: #0b1020;
+    --car: #14171f;
+    --car-dark: #f2f4f7;
+}
+
+/* ---------------------------------------------------------------- surfaces */
+
+WlForm {
+    background-color: var(--surface);
+    padding: 0;
+    margin: 0;
+}
+
+WlPage {
+    background-color: var(--surface);
+    padding: 3mm 3.6mm 4mm 3.6mm;
+    margin: 0;
+}
+
+/* The coloured top of the welcome screen. */
+WlHero {
+    background-color: var(--brand);
+    padding: 14mm 4.4mm 8mm 4.4mm;
+    margin: 0;
+}
+
+WlHeroTitle {
+    color: var(--brand-contrast);
+    font-family: "native:MainBold";
+    font-size: 7mm;
+    padding: 2.4mm 0 0.8mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+WlHeroText {
+    color: var(--brand-contrast);
+    font-family: "native:MainRegular";
+    font-size: 2.9mm;
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+WlHeroIcon {
+    color: var(--brand-contrast);
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+/* The panel that rises over the map. */
+WlCard {
+    background-color: var(--surface);
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+    padding: 3.6mm 3.6mm 4mm 3.6mm;
+    margin: 0;
+}
+
+/* A panel that floats over the map with a gap around it. */
+WlFloat {
+    background-color: var(--surface);
+    border-radius: var(--radius);
+    padding: 2.4mm 3.2mm 2.4mm 3.2mm;
+    margin: 2.4mm;
+}
+
+WlPanel {
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    padding: 2.8mm 3mm 2.8mm 3mm;
+    margin: 1.2mm 0 1.2mm 0;
+}
+
+WlDivider {
+    background-color: var(--line);
+    padding: 0;
+    margin: 2mm 0 2mm 0;
+}
+
+/* -------------------------------------------------------------------- text */
+
+WlTitle {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 4.4mm;
+    padding: 0.6mm 0 1mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+WlHeading {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.5mm;
+    padding: 0.4mm 0 0.4mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+WlText {
+    color: var(--text);
+    font-family: "native:MainRegular";
+    font-size: 2.75mm;
+    padding: 0.4mm 0 0.4mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+WlMuted {
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    padding: 0.4mm 0 0.4mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+WlLabel {
+    color: var(--text-muted);
+    font-family: "native:MainBold";
+    font-size: 2.1mm;
+    padding: 2.6mm 0 1mm 0.3mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+WlPrice {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 4.4mm;
+    padding: 0;
+    margin: 0;
+    text-align: right;
+    background-color: transparent;
+}
+
+/* The same, where it is the headline of a sheet: it starts where the
+   sheet's words start. */
+WlFare {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 5.2mm;
+    padding: 0;
+    margin: 0;
+    text-align: left;
+    background-color: transparent;
+}
+
+WlError {
+    color: var(--danger);
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    padding: 1mm 0 1mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+WlNotice {
+    color: var(--text);
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    padding: 2.4mm 3mm 2.4mm 3mm;
+    margin: 2mm 0 1mm 0;
+}
+
+/* ----------------------------------------------------------------- buttons */
+
+WlPrimary {
+    color: var(--brand-contrast);
+    background-color: var(--brand);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    text-align: center;
+    padding: 2.75mm 4mm 2.75mm 4mm;
+    margin: 1.6mm 0 0.8mm 0;
+}
+
+WlPrimary.pressed {
+    background-color: var(--brand-pressed);
+}
+
+WlPrimary.disabled {
+    color: var(--text-muted);
+    background-color: var(--surface-press);
+}
+
+WlSecondary {
+    color: var(--text);
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    text-align: center;
+    padding: 2.75mm 4mm 2.75mm 4mm;
+    margin: 1.6mm 0 0.8mm 0;
+}
+
+WlSecondary.pressed {
+    background-color: var(--surface-press);
+}
+
+WlDanger {
+    color: var(--danger);
+    background-color: var(--danger-tint);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    text-align: center;
+    padding: 2.75mm 4mm 2.75mm 4mm;
+    margin: 1.6mm 0 0.8mm 0;
+}
+
+WlDanger.pressed {
+    background-color: var(--surface-press);
+}
+
+WlLink {
+    color: var(--brand);
+    background-color: transparent;
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.75mm;
+    text-align: center;
+    padding: 2.4mm 2mm 2.4mm 2mm;
+    margin: 0;
+}
+
+WlSecondary.disabled, WlDanger.disabled, WlLink.disabled {
+    color: var(--line-strong);
+}
+
+WlLink.pressed {
+    color: var(--brand-pressed);
+    background-color: var(--brand-tint);
+}
+
+/* The round buttons that sit on the map. */
+WlMapButton {
+    color: var(--text);
+    background: cn1-round-border;
+    background-color: var(--surface);
+    cn1-box-shadow-spread: 0.5mm;
+    cn1-box-shadow-blur: 1.6mm;
+    cn1-box-shadow-h: 0.5;
+    cn1-box-shadow-v: 0.7;
+    cn1-box-shadow-color: var(--shadow);
+    padding: 2.4mm;
+    margin: 1.2mm 2.4mm 1.2mm 2.4mm;
+}
+
+WlMapButton.pressed {
+    background-color: var(--surface-alt);
+}
+
+/* The same button on a bar: flat, because nothing on a bar floats. */
+WlBarButton {
+    color: var(--text);
+    background: cn1-round-border;
+    background-color: var(--surface);
+    padding: 2.4mm;
+    margin: 0.6mm 0.6mm 0.6mm 1.2mm;
+}
+
+WlBarButton.pressed {
+    background-color: var(--surface-alt);
+}
+
+/* "Where to?" -- looks like a field, behaves like a button. */
+WlSearchBar {
+    color: var(--text);
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 3.1mm;
+    text-align: left;
+    padding: 2.9mm 3.2mm 2.9mm 3.2mm;
+    margin: 0.8mm 0 0.8mm 0;
+}
+
+WlSearchBar.pressed {
+    background-color: var(--surface-press);
+}
+
+/* ------------------------------------------------------------------ fields */
+
+WlField {
+    color: var(--text);
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    font-family: "native:MainRegular";
+    font-size: 2.9mm;
+    padding: 2.7mm 3mm 2.7mm 3mm;
+    margin: 0;
+}
+
+/* The field being typed in says so. */
+WlField.selected {
+    background-color: var(--brand-tint);
+}
+
+WlField.disabled {
+    color: var(--text-muted);
+}
+
+WlFieldHint {
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 2.9mm;
+    padding: 2.7mm 3mm 2.7mm 3mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+/* ------------------------------------------------------------------- lists */
+
+WlRow {
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--line);
+    padding: 2.6mm 0 2.6mm 0;
+    margin: 0;
+}
+
+WlRow.pressed {
+    background-color: var(--surface-alt);
+}
+
+WlRowIcon {
+    color: var(--text-muted);
+    padding: 0 3mm 0 0.4mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+WlRowTitle {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 2.75mm;
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+WlRowDetail {
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 2.4mm;
+    padding: 0.3mm 0 0 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+WlRowValue {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 2.75mm;
+    text-align: right;
+    padding: 0 0 0 2mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+/* ------------------------------------------------------------------ badges */
+
+WlBadge {
+    color: var(--text-muted);
+    background: cn1-pill-border;
+    background-color: var(--surface-alt);
+    font-family: "native:MainBold";
+    font-size: 2.05mm;
+    padding: 0.7mm 2mm 0.7mm 2mm;
+    margin: 0 0 0 2mm;
+}
+
+WlBadgeGood {
+    cn1-derive: WlBadge;
+    color: var(--success);
+    background-color: var(--success-tint);
+}
+
+WlBadgeWarn {
+    cn1-derive: WlBadge;
+    color: var(--warning);
+    background-color: var(--warning-tint);
+}
+
+WlBadgeBad {
+    cn1-derive: WlBadge;
+    color: var(--danger);
+    background-color: var(--danger-tint);
+}
+
+/* ------------------------------------------------------------------- admin */
+
+WlStat {
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    padding: 2.6mm 2.6mm 2.6mm 2.6mm;
+    margin: 0.8mm;
+}
+
+WlStatValue {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.9mm;
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+WlStatLabel {
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 2.3mm;
+    padding: 0.3mm 0 0 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+/* --------------------------------------------------------------- title bar */
+
+/* The strip the clock and the battery are drawn over. */
+StatusBar {
+    background-color: var(--surface);
+    padding: 0;
+    margin: 0;
+}
+
+Toolbar {
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--line);
+    padding: 0.6mm 0 0.6mm 0;
+    margin: 0;
+}
+
+Title {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.05mm;
+    background-color: transparent;
+}
+
+TitleCommand {
+    color: var(--text);
+    background-color: transparent;
+}
+
+BackCommand {
+    color: var(--text);
+    background-color: transparent;
+}
+
+/* ---------------------------------------------------------------------------
+ * MAP. A marker is an icon drawn in its style's colour, and the route is a
+ * line in WlRoute's.
+ */
+WlMarkerPickup {
+    color: var(--success);
+    background-color: var(--map-edge);
+}
+
+WlMarkerDropoff {
+    color: var(--danger);
+    background-color: var(--map-edge);
+}
+
+WlMarkerCar {
+    color: var(--car);
+    background-color: var(--map-edge);
+}
+
+WlRoute {
+    color: var(--brand);
+    background-color: var(--map-edge);
+}
+
+WlStar {
+    color: var(--warning);
+    background-color: transparent;
+    padding: 1.2mm;
+    margin: 0.6mm 0 0.6mm 0;
+}
+
+WlStar.pressed {
+    color: var(--text-muted);
+}
+
+/* The switch: the thumb is the colour, the track the background. */
+Switch {
+    color: #ffffff;
+    background-color: var(--line-strong);
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    padding: 0.6mm 0 0.6mm 2mm;
+    margin: 0;
+}
+
+Switch.selected {
+    color: #ffffff;
+    background-color: var(--brand);
+}
+
+Switch.disabled {
+    color: var(--surface-alt);
+    background-color: var(--line);
+}
+
+/* ---------------------------------------------------------------------------
+ * OVER THE MAP. The clear strip the status bar is drawn in, which the map
+ * runs under, the bar of floating controls,
+ * the sheet at the bottom and what goes in each.
+ */
+WlStatusShade {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+WlMapBar {
+    background-color: transparent;
+    padding: 1.2mm 2.4mm 0 0;
+    margin: 0;
+}
+
+/* "Where to?" -- a card that floats over the map and behaves like a button. */
+WlSearchCard {
+    color: var(--text);
+    background-color: var(--surface);
+    border-radius: var(--radius);
+    cn1-box-shadow-spread: 0.5mm;
+    cn1-box-shadow-blur: 0;
+    cn1-box-shadow-h: 0.5;
+    cn1-box-shadow-v: 0.7;
+    cn1-box-shadow-color: var(--shadow-card);
+    font-family: "native:MainBold";
+    font-size: 3.1mm;
+    text-align: left;
+    padding: 3mm 3.2mm 3mm 3.2mm;
+    margin: 0.5mm 0 0.5mm 0;
+}
+
+WlSearchCard.pressed {
+    background-color: var(--surface-alt);
+}
+
+/* From where to where, once there is somewhere to go. */
+WlTripCard {
+    cn1-derive: WlSearchCard;
+    padding: 1.9mm 3.2mm 1.9mm 3.2mm;
+}
+
+WlTripStop {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.6mm;
+    text-align: left;
+    padding: 0.7mm 0 0.7mm 0;
+    margin: 0;
+}
+
+/* The driver's card at the top: on line or off, and today's takings. */
+WlStatusCard {
+    cn1-derive: WlSearchCard;
+    padding: 1.7mm 3.2mm 1.7mm 2mm;
+}
+
+WlStatusValue {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.3mm;
+    text-align: right;
+    padding: 0;
+    margin: 0;
+}
+
+WlStatusDetail {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.15mm;
+    text-align: right;
+    padding: 0;
+    margin: 0;
+}
+
+WlMapTitle {
+    cn1-derive: WlSearchCard;
+    font-size: 3.05mm;
+    padding: 3mm 3.2mm 3mm 3.2mm;
+}
+
+/* One short fact, in a pill under the bar. */
+WlChip {
+    color: var(--text);
+    background: cn1-pill-border;
+    background-color: var(--surface);
+    cn1-box-shadow-spread: 0.4mm;
+    cn1-box-shadow-blur: 1.4mm;
+    cn1-box-shadow-h: 0.5;
+    cn1-box-shadow-v: 0.7;
+    cn1-box-shadow-color: var(--shadow);
+    font-family: "native:MainBold";
+    font-size: 2.4mm;
+    padding: 1.4mm 3mm 1.4mm 2.6mm;
+    margin: 1.2mm 2mm 1mm 2mm;
+}
+
+WlSheet {
+    background-color: var(--surface);
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+    padding: 0.4mm 3.6mm 3.2mm 3.6mm;
+    margin: 0;
+}
+
+/* The handle of the sheet: the colour is the bar's. */
+WlGrip {
+    color: var(--line-strong);
+    background-color: transparent;
+    padding: 1.6mm 0 1.8mm 0;
+    margin: 0;
+}
+
+/* The countdown: the colour is the time left, the background the time gone. */
+WlRingTrack {
+    color: var(--line);
+    background-color: transparent;
+}
+
+WlRing {
+    color: var(--brand);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.3mm;
+    padding: 0.8mm;
+    margin: 0 0 0 2.4mm;
+}
+
+WlPulse {
+    color: var(--brand);
+    background-color: transparent;
+    padding: 0.8mm;
+    margin: 0.8mm 0 0.8mm 0;
+}
+
+/* Home and Work, side by side on the idle sheet. */
+WlShortcut {
+    color: var(--text);
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.75mm;
+    text-align: left;
+    padding: 2.6mm 3mm 2.6mm 3mm;
+    margin: 2mm 0.8mm 0.8mm 0.8mm;
+}
+
+WlShortcut.pressed {
+    background-color: var(--surface-press);
+}
+
+WlDriverCard {
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    padding: 2.8mm 3mm 2.8mm 3mm;
+    margin: 2mm 0 1mm 0;
+}
+
+WlAvatar {
+    color: var(--brand-contrast);
+    background: cn1-round-border;
+    background-color: var(--brand);
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    text-align: center;
+    padding: 2.3mm;
+    margin: 0 3mm 0 0;
+}
+
+/* A number plate reads as one, so it is boxed like one. */
+WlPlate {
+    color: var(--text);
+    background-color: var(--surface);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-small);
+    font-family: "native:MainBold";
+    font-size: 2.5mm;
+    text-align: center;
+    padding: 0.9mm 2mm 0.9mm 2mm;
+    margin: 1mm 0 0 0;
+}
+
+WlActions {
+    background-color: transparent;
+    padding: 0;
+    margin: 0.8mm 0 0 0;
+}
+
+/* Call, message, share: an icon with a word under it. */
+WlAction {
+    color: var(--text);
+    background-color: transparent;
+    border-radius: var(--radius);
+    font-family: "native:MainRegular";
+    font-size: 2.2mm;
+    text-align: center;
+    padding: 1.8mm 0 1.8mm 0;
+    margin: 0;
+}
+
+WlAction.pressed {
+    color: var(--brand);
+    background-color: var(--surface-alt);
+}
+
+WlActionDanger {
+    cn1-derive: WlAction;
+    color: var(--danger);
+}
+
+WlActionDanger.pressed {
+    color: var(--danger);
+    background-color: var(--danger-tint);
+}
+
+/* The one large round control an off-line driver has. */
+WlGo {
+    color: var(--brand-contrast);
+    background: cn1-round-border;
+    background-color: var(--brand);
+    cn1-box-shadow-spread: 0.6mm;
+    cn1-box-shadow-blur: 2mm;
+    cn1-box-shadow-h: 0.5;
+    cn1-box-shadow-v: 0.7;
+    cn1-box-shadow-color: var(--shadow);
+    font-family: "native:MainBold";
+    font-size: 4.2mm;
+    text-align: center;
+    padding: 5.6mm;
+    margin: 1.6mm;
+}
+
+WlGo.pressed {
+    background-color: var(--brand-pressed);
+}
+
+/* ------------------------------------------------------ records and charts */
+
+/* A list that fills a screen: rows from edge to edge, each with the page's
+   margin inside it. */
+WlList {
+    background-color: var(--surface);
+    padding: 0 3.6mm 3.2mm 3.6mm;
+    margin: 0;
+}
+/* One line of a receipt: what, and how much. */
+WlFact {
+    background-color: transparent;
+    padding: 1.1mm 0 1.1mm 0;
+    margin: 0;
+}
+WlFactLabel {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.6mm;
+    text-align: left;
+    padding: 0;
+    margin: 0;
+}
+WlFactValue {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.6mm;
+    text-align: right;
+    padding: 0 0 0 3mm;
+    margin: 0;
+}
+/* The line the others add up to. */
+WlFactTotal {
+    cn1-derive: WlFactValue;
+    font-family: "native:MainBold";
+    font-size: 3.3mm;
+}
+/* The one thing a screen is about, said large at its top. */
+WlBanner {
+    background-color: transparent;
+    padding: 5mm 3mm 3mm 3mm;
+    margin: 0;
+}
+WlBannerIcon {
+    color: var(--brand);
+    background: cn1-round-border;
+    background-color: var(--brand-tint);
+    padding: 3.4mm;
+    margin: 0 0 2.4mm 0;
+}
+WlBannerIconGood {
+    cn1-derive: WlBannerIcon;
+    color: var(--success);
+    background-color: var(--success-tint);
+}
+WlBannerIconWarn {
+    cn1-derive: WlBannerIcon;
+    color: var(--warning);
+    background-color: var(--warning-tint);
+}
+WlBannerIconBad {
+    cn1-derive: WlBannerIcon;
+    color: var(--danger);
+    background-color: var(--danger-tint);
+}
+WlBannerTitle {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.5mm;
+    text-align: center;
+    padding: 0.4mm 0 0.4mm 0;
+    margin: 0;
+}
+WlBannerText {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.6mm;
+    text-align: center;
+    padding: 0.4mm 2mm 0.4mm 2mm;
+    margin: 0;
+}
+/* The amount a receipt is for. */
+WlAmount {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 7mm;
+    text-align: center;
+    padding: 1mm 0 0.4mm 0;
+    margin: 0;
+}
+/* A group of rows under one heading. */
+WlGroup {
+    background-color: transparent;
+    padding: 0;
+    margin: 0 0 0.8mm 0;
+}
+/* A chart or a breakdown, boxed with its title. */
+WlTile {
+    background-color: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 3mm 3mm 3mm 3mm;
+    margin: 0.8mm 0.8mm 1.6mm 0.8mm;
+}
+/* A bar chart: the colour is the bars'. */
+WlChart {
+    color: var(--brand);
+    background-color: transparent;
+    padding: 1.6mm 0 0 0;
+    margin: 0;
+}
+WlChartPeak {
+    color: var(--brand-pressed);
+    background-color: transparent;
+}
+WlChartGrid {
+    color: var(--line);
+    background-color: transparent;
+}
+WlChartAxis {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2mm;
+    padding: 0.8mm 0 0 0;
+    margin: 0;
+}
+/* The number a chart adds up to, over the chart. */
+WlChartValue {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 4.2mm;
+    text-align: left;
+    padding: 0;
+    margin: 0;
+}
+/* A share along a track: the colour is the share, the background the track. */
+WlMeter {
+    color: var(--brand);
+    background-color: transparent;
+    padding: 0.8mm 0 1.6mm 0;
+    margin: 0;
+}
+/* Something waiting for the admin, at the top of the dashboard. */
+WlAlert {
+    color: var(--warning);
+    background-color: var(--warning-tint);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    text-align: left;
+    padding: 2.6mm 3mm 2.6mm 3mm;
+    margin: 0.8mm;
+}
+WlAlert.pressed {
+    background-color: var(--surface-press);
+}
+
+/* ----------------------------------------------------------------- choosing */
+
+/* One of several things to pick from, of which one is picked: a kind of car,
+   a way to pay. */
+WlOption {
+    background-color: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 2.4mm 3mm 2.4mm 3mm;
+    margin: 0.8mm 0 0.8mm 0;
+}
+WlOption.pressed {
+    background-color: var(--surface-alt);
+}
+WlOptionPicked {
+    cn1-derive: WlOption;
+    background-color: var(--brand-tint);
+    border: 2px solid var(--brand);
+}
+WlOptionIcon {
+    color: var(--text);
+    background-color: transparent;
+    padding: 0 2.4mm 0 0;
+    margin: 0;
+}
+/* A payment card, drawn as one. */
+WlCardFace {
+    background-color: var(--brand);
+    border-radius: var(--radius);
+    padding: 4mm 4mm 3.4mm 4mm;
+    margin: 1mm 0 2.4mm 0;
+}
+WlCardBrand {
+    color: var(--brand-contrast);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    text-align: right;
+    padding: 0;
+    margin: 0;
+}
+WlCardNumber {
+    color: var(--brand-contrast);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.7mm;
+    text-align: left;
+    padding: 4.8mm 0 2.4mm 0;
+    margin: 0;
+}
+WlCardSmall {
+    color: var(--brand-contrast);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.3mm;
+    padding: 0;
+    margin: 0;
+}
+/* Two fields side by side: the space between them is theirs. */
+WlPairLeft {
+    background-color: transparent;
+    padding: 0 1.2mm 0 0;
+    margin: 0;
+}
+WlPairRight {
+    background-color: transparent;
+    padding: 0 0 0 1.2mm;
+    margin: 0;
+}
+/* A picture of a document, small, beside what it is. */
+WlThumb {
+    color: var(--text-muted);
+    background-color: var(--surface-alt);
+    border-radius: var(--radius-small);
+    padding: 2mm;
+    margin: 0 3mm 0 0;
+}
+/* The same picture, filling the screen. */
+WlPicture {
+    background-color: var(--scrim);
+    padding: 0;
+    margin: 0;
+}
+/* How far through the steps of a form: "Step 2 of 5". */
+WlStepLabel {
+    color: var(--brand);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 2.2mm;
+    text-align: left;
+    padding: 0 0 0.4mm 0;
+    margin: 0;
+}
+/* What is fixed to the foot of a form of several steps. */
+WlFooter {
+    background-color: var(--surface);
+    border-top: 1px solid var(--line);
+    padding: 1mm 3.6mm 1.6mm 3.6mm;
+    margin: 0;
+}
+
+/* ---------------------------------------------------------------- the menu */
+
+/* Dimmed by the colour's own alpha. `opacity` would not do it: a style's
+   opacity fades what a component draws over its background, and the
+   background itself is filled at the background's transparency -- so an opaque
+   black with an opacity is still a black screen. */
+WlScrim {
+    background-color: rgba(0, 0, 0, 0.45);
+    padding: 0;
+    margin: 0;
+}
+
+WlMenu {
+    background-color: var(--surface);
+    padding: 0;
+    margin: 0;
+}
+
+WlMenuTop {
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--line);
+    padding: 5mm 4mm 3.6mm 4mm;
+    margin: 0;
+}
+
+WlMenuName {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.5mm;
+    text-align: left;
+    padding: 0;
+    margin: 0;
+}
+
+WlMenuDetail {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.4mm;
+    text-align: left;
+    padding: 0.2mm 0 0 0;
+    margin: 0;
+}
+
+/* Which of the three apps this is. */
+WlModeBadge {
+    color: var(--brand);
+    background: cn1-pill-border;
+    background-color: var(--brand-tint);
+    font-family: "native:MainBold";
+    font-size: 2.1mm;
+    text-align: center;
+    padding: 0.8mm 2.4mm 0.8mm 2.4mm;
+    margin: 2.4mm 0 0 0;
+}
+
+WlMenuLabel {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 2.1mm;
+    text-align: left;
+    padding: 3.6mm 4mm 1mm 4mm;
+    margin: 0;
+}
+
+WlMenuItem {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.9mm;
+    text-align: left;
+    padding: 2.6mm 4mm 2.6mm 4mm;
+    margin: 0;
+}
+
+WlMenuItem.pressed {
+    background-color: var(--surface-alt);
+}
+
+WlMenuBottom {
+    background-color: transparent;
+    border-top: 1px solid var(--line);
+    padding: 0.8mm 0 1.6mm 0;
+    margin: 0;
+}
+
+/* The top of a home screen that has no map: the menu, and what this is. */
+WlHomeBar {
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--line);
+    padding: 0.6mm 3.6mm 0.6mm 0;
+    margin: 0;
+}
+
+/* ---------------------------------------------------------------- settings */
+
+WlSection {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.1mm;
+    text-align: left;
+    padding: 5mm 0 0.8mm 0;
+    margin: 0;
+}
+
+/* A few options side by side, one of them chosen. */
+WlSegments {
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    padding: 0.5mm;
+    margin: 0.8mm 0 1.6mm 0;
+}
+
+WlSegment {
+    color: var(--text-muted);
+    background-color: transparent;
+    border-radius: 1.9mm;
+    font-family: "native:MainBold";
+    font-size: 2.5mm;
+    text-align: center;
+    padding: 2mm 0.8mm 2mm 0.8mm;
+    margin: 0.3mm;
+}
+
+WlSegment.selected {
+    color: var(--text);
+    background-color: var(--surface);
+}
+
+/* A toggle that is on wears the pressed style, so the two say the same. */
+WlSegment.pressed {
+    color: var(--text);
+    background-color: var(--surface);
+}
+
+
+WlSegment.disabled {
+    color: var(--line-strong);
+}
+
+/* The outline of rows that are on their way: the colour is the bars'. */
+WlSkeleton {
+    color: var(--surface-alt);
+    background-color: transparent;
+    padding: 1mm 0 0 0;
+    margin: 0;
+}
+
+/* "Pull to refresh", over a list being pulled. */
+PullToRefresh {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.3mm;
+    text-align: center;
+    padding: 1.6mm;
+    margin: 0;
+}
+
+/* What the app says in passing, over the foot of the screen. */
+ToastBar {
+    background-color: var(--text);
+    border-radius: var(--radius);
+    padding: 2.4mm 3mm 2.4mm 3mm;
+    margin: 2.4mm 3.6mm 3.2mm 3.6mm;
+}
+
+ToastBarMessage {
+    color: var(--surface);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    padding: 0;
+    margin: 0;
+}
+
+/* ------------------------------------------------- the admin console, wide */
+
+/* On a tablet on its side, a desktop or a browser the console is three
+   columns: where to go, a list, and what was picked from it. */
+WlSide {
+    background-color: var(--surface-alt);
+    border-right: 1px solid var(--line);
+    padding: 2.4mm 1.6mm 2.4mm 1.6mm;
+    margin: 0;
+}
+
+WlSideName {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.05mm;
+    padding: 0.8mm 2.4mm 0 2.4mm;
+    margin: 0;
+}
+
+WlSideDetail {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.3mm;
+    padding: 0 2.4mm 2.4mm 2.4mm;
+    margin: 0;
+}
+
+WlSideLabel {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 2.15mm;
+    padding: 3.2mm 2.4mm 0.8mm 2.4mm;
+    margin: 0;
+}
+
+WlSideItem {
+    color: var(--text);
+    background-color: transparent;
+    border-radius: var(--radius-small);
+    font-family: "native:MainRegular";
+    font-size: 2.8mm;
+    text-align: left;
+    padding: 1.9mm 2.4mm 1.9mm 2.4mm;
+    margin: 0.2mm 0 0.2mm 0;
+}
+
+WlSideItem.pressed {
+    background-color: var(--line);
+}
+
+WlSidePicked {
+    cn1-derive: WlSideItem;
+    color: var(--brand-contrast);
+    background-color: var(--brand);
+    font-family: "native:MainBold";
+}
+
+WlMaster {
+    background-color: var(--surface);
+    border-right: 1px solid var(--line);
+    padding: 0;
+    margin: 0;
+}
+
+WlPaneBar {
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--line);
+    padding: 1.2mm 4mm 1.2mm 4mm;
+    margin: 0;
+}
+
+WlPaneTitle {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.5mm;
+    padding: 1.6mm 0 1.6mm 0;
+    margin: 0;
+}
+
+/* The row of a list whose detail is open beside it. */
+WlRowPicked {
+    cn1-derive: WlRow;
+    background-color: var(--surface-alt);
+}
+
+/*
+ * THE DESKTOP'S OWN LOOK. On macOS, Windows and Linux, and in a desktop
+ * browser, the platform's theme is under this one (the nativeTheme=native build
+ * hint), and the admin console wears it: Layouts.dress() gives each component
+ * the WlDesk twin of its style. A twin derives from the platform's control
+ * where there is one -- a button, a field, a segmented control, a group box --
+ * and takes its colours from the palette every desktop theme declares, so the
+ * same rules are Aqua on a Mac, Fluent on Windows and Adwaita on Linux. Nothing
+ * here names the brand; the accent is the platform's.
+ *
+ * The values in WlDeskPalette are only what the compiler needs to resolve
+ * var(): each use is bound to the name, and the installed theme's own value
+ * replaces it when the app runs. They are declared outside #Constants so that
+ * they are not exported over the theme's.
+ */
+WlDeskPalette {
+    --window-bg-color: #ececec;
+    --window-bg-color-dark: #1e1e1e;
+    --view-bg-color: #ffffff;
+    --view-bg-color-dark: #1e1e1e;
+    --control-bg-color: #ffffff;
+    --control-bg-color-dark: #2c2c2c;
+    --headerbar-bg-color: #e8e8e8;
+    --headerbar-bg-color-dark: #2a2a2a;
+    --text-color: #1a1a1a;
+    --text-color-dark: #ffffff;
+    --text-secondary-color: #5d5d5d;
+    --text-secondary-color-dark: #c0c0c0;
+    --separator-color: #d8d8d8;
+    --separator-color-dark: #3a3a3a;
+    --accent-color: #007aff;
+    --accent-color-dark: #0a84ff;
+    --accent-fg-color: #ffffff;
+    --accent-fg-color-dark: #ffffff;
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+WlDeskForm { background-color: var(--window-bg-color); padding: 0; margin: 0; }
+WlDeskPage { background-color: var(--window-bg-color); padding: 3mm 5mm 4mm 5mm; margin: 0; }
+WlDeskList { background-color: var(--view-bg-color); padding: 0 3mm 2mm 3mm; margin: 0; }
+WlDeskMaster { background-color: var(--view-bg-color); border-right: 1px solid #c6c6c8; padding: 0; margin: 0; }
+WlDeskHomeBar { background-color: var(--headerbar-bg-color); border-bottom: 1px solid #c6c6c8; padding: 1mm 4mm 1mm 0; margin: 0; }
+WlDeskPaneBar { background-color: var(--window-bg-color); border-bottom: 1px solid #c6c6c8; padding: 1mm 5mm 1mm 5mm; margin: 0; }
+WlDeskPaneTitle { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 3.2mm; padding: 1.6mm 0 1.6mm 0; margin: 0; }
+WlDeskBarButton { cn1-derive: Button; padding: 1.2mm; margin: 0 2mm 0 0; }
+
+WlDeskSide { background-color: var(--headerbar-bg-color); border-right: 1px solid #c6c6c8; padding: 2.5mm 2mm 2.5mm 2mm; margin: 0; }
+WlDeskSideName { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 2.7mm; padding: 1mm 2.6mm 0 2.6mm; margin: 0; }
+WlDeskSideDetail { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.25mm; padding: 0 2.6mm 2mm 2.6mm; margin: 0; }
+WlDeskSideLabel { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainBold"; font-size: 2.15mm; padding: 3mm 2.6mm 1mm 2.6mm; margin: 0; }
+WlDeskSideItem { color: var(--text-color); background-color: transparent; border-radius: 1.4mm; font-family: "native:MainRegular"; font-size: 2.65mm; text-align: left; padding: 1.6mm 2.6mm 1.6mm 2.6mm; margin: 0.2mm 0 0.2mm 0; }
+WlDeskSideItem.pressed { background-color: var(--separator-color); }
+WlDeskSidePicked { cn1-derive: WlDeskSideItem; color: var(--accent-fg-color); background-color: var(--accent-color); }
+
+WlDeskPrimary { cn1-derive: RaisedButton; text-align: center; margin: 2mm 0 1mm 0; }
+WlDeskSecondary { cn1-derive: Button; text-align: center; margin: 1.5mm 0 1mm 0; }
+WlDeskDanger { cn1-derive: Button; color: var(--danger); text-align: center; margin: 1.5mm 0 1mm 0; }
+WlDeskLink { cn1-derive: Link; padding: 1.6mm 0 1.6mm 0; }
+WlDeskField { cn1-derive: TextField; margin: 0; }
+WlDeskFieldHint { cn1-derive: TextHint; }
+WlDeskSegments { cn1-derive: TabsContainer; border-radius: 1.6mm; padding: 0.4mm; margin: 1mm 0 2mm 0; }
+/* Four of these share the master pane of the console, which is narrow: the
+   platform's own tab padding leaves "Cancelled" no room and it was drawn cut
+   off at both ends. */
+WlDeskSegment { cn1-derive: Tab; text-align: center; padding: 1.4mm 0.4mm 1.4mm 0.4mm; margin: 0; }
+/* Something waiting is the one thing on the console that is not the
+   platform's grey: it wears the warning tint the phone's does. */
+WlDeskAlert { color: var(--warning); background-color: var(--warning-tint); border-radius: 1.6mm; font-family: "native:MainBold"; font-size: 2.6mm; text-align: left; padding: 2mm 3mm 2mm 3mm; margin: 1mm 0 1mm 0; }
+WlDeskAlert.pressed { color: var(--warning); background-color: var(--warning-tint); border-radius: 1.6mm; font-family: "native:MainBold"; font-size: 2.6mm; text-align: left; padding: 2mm 3mm 2mm 3mm; margin: 1mm 0 1mm 0; }
+
+WlDeskRow { background-color: transparent; border-bottom: 1px solid #d8d8d8; padding: 2mm 1mm 2mm 1mm; margin: 0; }
+WlDeskRow.pressed { background-color: var(--separator-color); }
+WlDeskRowPicked { background-color: var(--separator-color); border-bottom: 1px solid #d8d8d8; border-radius: 1.4mm; padding: 2mm 1mm 2mm 1mm; margin: 0; }
+WlDeskRowIcon { color: var(--text-secondary-color); background-color: transparent; padding: 0 2.6mm 0 0; margin: 0; }
+WlDeskRowTitle { color: var(--text-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.7mm; padding: 0; margin: 0; }
+WlDeskRowDetail { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.3mm; padding: 0.4mm 0 0 0; margin: 0; }
+WlDeskRowValue { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 2.65mm; text-align: right; padding: 0; margin: 0; }
+
+WlDeskSection { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 2.8mm; text-align: left; padding: 4mm 0 1.2mm 0; margin: 0; }
+WlDeskTitle { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 4.4mm; padding: 0 0 2mm 0; margin: 0; }
+WlDeskHeading { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 3.2mm; padding: 0; margin: 0; }
+WlDeskText { color: var(--text-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.65mm; padding: 1mm 0 1mm 0; margin: 0; }
+WlDeskMuted { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.4mm; padding: 0.5mm 0 0.5mm 0; margin: 0; }
+WlDeskLabel { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.4mm; padding: 2.4mm 0 0.8mm 0; margin: 0; }
+WlDeskError { color: var(--danger); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; padding: 1mm 0 1mm 0; margin: 0; }
+WlDeskNotice { cn1-derive: GroupBox; color: var(--text-color); font-family: "native:MainRegular"; font-size: 2.55mm; padding: 2.4mm; margin: 2mm 0 1mm 0; }
+WlDeskPanel { cn1-derive: GroupBox; padding: 2.6mm 3mm 2.6mm 3mm; margin: 1mm 0 1mm 0; }
+WlDeskFact { background-color: transparent; padding: 1.2mm 0 1.2mm 0; margin: 0; }
+WlDeskFactLabel { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.55mm; padding: 0; margin: 0; }
+WlDeskFactValue { color: var(--text-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.55mm; text-align: right; padding: 0; margin: 0; }
+WlDeskFactTotal { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 2.7mm; text-align: right; padding: 0; margin: 0; }
+WlDeskAmount { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 6.4mm; text-align: center; padding: 2mm 0 1mm 0; margin: 0; }
+WlDeskBannerIcon { color: var(--text-secondary-color); background-color: transparent; padding: 6mm 0 2mm 0; margin: 0; }
+WlDeskBannerTitle { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 3.05mm; text-align: center; padding: 0; margin: 0; }
+WlDeskBannerText { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; padding: 1mm 0 0 0; margin: 0; }
+
+/* The numbers and the charts have no control on any desktop: they keep their
+   shape, in a group box, in the platform's colours. */
+WlDeskTile { cn1-derive: GroupBox; padding: 3mm 3.4mm 3mm 3.4mm; margin: 1.2mm; }
+WlDeskStat { cn1-derive: GroupBox; padding: 2.6mm 3mm 2.6mm 3mm; margin: 1.2mm; }
+WlDeskStatValue { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 4.3mm; padding: 0; margin: 0; }
+WlDeskStatLabel { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.3mm; padding: 0.6mm 0 0 0; margin: 0; }
+WlDeskChartValue { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 4.3mm; padding: 0.6mm 0 0 0; margin: 0; }
+WlDeskChartAxis { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.1mm; padding: 0.6mm 0 0 0; margin: 0; }
+
+
+/*
+ * DARK MODE. The same rules, with the second value of each colour. A rule added
+ * above that names a colour needs its line here.
+ */
+@media (prefers-color-scheme: dark) {
+    WlForm { background-color: var(--surface-dark); }
+    WlPage { background-color: var(--surface-dark); }
+    WlHero { background-color: var(--brand-dark); }
+    WlHeroTitle { color: var(--brand-contrast-dark); }
+    WlHeroText { color: var(--brand-contrast-dark); }
+    WlHeroIcon { color: var(--brand-contrast-dark); }
+    WlCard { background-color: var(--surface-dark); }
+    WlFloat { background-color: var(--surface-dark); }
+    WlPanel { background-color: var(--surface-alt-dark); }
+    WlDivider { background-color: var(--line-dark); }
+    WlTitle { color: var(--text-dark); }
+    WlHeading { color: var(--text-dark); }
+    WlText { color: var(--text-dark); }
+    WlMuted { color: var(--text-muted-dark); }
+    WlLabel { color: var(--text-muted-dark); }
+    WlPrice { color: var(--text-dark); }
+    WlFare { color: var(--text-dark); }
+    WlError { color: var(--danger-dark); }
+    WlNotice { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    WlPrimary { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    WlPrimary.pressed { background-color: var(--brand-pressed-dark); }
+    WlPrimary.disabled { color: var(--text-muted-dark); background-color: var(--surface-press-dark); }
+    WlSecondary { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    WlSecondary.pressed { background-color: var(--surface-press-dark); }
+    WlDanger { color: var(--danger-dark); background-color: var(--danger-tint-dark); }
+    WlDanger.pressed { background-color: var(--surface-press-dark); }
+    WlLink { color: var(--brand-dark); }
+    WlLink.pressed { color: var(--brand-pressed-dark); background-color: var(--brand-tint-dark); }
+    WlMapButton { background: cn1-round-border; color: var(--text-dark); background-color: var(--surface-dark); }
+    WlMapButton.pressed { background: cn1-round-border; background-color: var(--surface-alt-dark); }
+    WlBarButton { background: cn1-round-border; color: var(--text-dark); background-color: var(--surface-dark); }
+    WlBarButton.pressed { background: cn1-round-border; background-color: var(--surface-alt-dark); }
+    WlSearchBar { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    WlSearchBar.pressed { background-color: var(--surface-press-dark); }
+    WlField { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    WlFieldHint { color: var(--text-muted-dark); }
+    WlRow { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    WlRow.pressed { background-color: var(--surface-alt-dark); }
+    WlRowIcon { color: var(--text-muted-dark); }
+    WlRowTitle { color: var(--text-dark); }
+    WlRowDetail { color: var(--text-muted-dark); }
+    WlRowValue { color: var(--text-dark); }
+    WlBadge { background: cn1-pill-border; color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
+    WlBadgeGood { background: cn1-pill-border; color: var(--success-dark); background-color: var(--success-tint-dark); }
+    WlBadgeWarn { background: cn1-pill-border; color: var(--warning-dark); background-color: var(--warning-tint-dark); }
+    WlBadgeBad { background: cn1-pill-border; color: var(--danger-dark); background-color: var(--danger-tint-dark); }
+    WlStat { background-color: var(--surface-alt-dark); }
+    WlStatValue { color: var(--text-dark); }
+    WlStatLabel { color: var(--text-muted-dark); }
+    StatusBar { background-color: var(--surface-dark); }
+    Toolbar { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    Title { color: var(--text-dark); }
+    TitleCommand { color: var(--text-dark); }
+    BackCommand { color: var(--text-dark); }
+    WlMarkerPickup { color: var(--success-dark); background-color: var(--map-edge-dark); }
+    WlMarkerDropoff { color: var(--danger-dark); background-color: var(--map-edge-dark); }
+    WlMarkerCar { color: var(--car-dark); background-color: var(--map-edge-dark); }
+    WlRoute { color: var(--brand-dark); background-color: var(--map-edge-dark); }
+    WlSearchCard { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    WlSearchCard.pressed { background-color: var(--line-dark); }
+    WlTripCard { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    WlTripStop { color: var(--text-dark); }
+    WlStatusCard { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    WlStatusValue { color: var(--text-dark); }
+    WlStatusDetail { color: var(--text-muted-dark); }
+    WlMapTitle { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    WlChip { background: cn1-pill-border; color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    WlSheet { background-color: var(--surface-dark); }
+    WlGrip { color: var(--line-strong-dark); }
+    WlRing { color: var(--brand-dark); }
+    WlRingTrack { color: var(--line-dark); }
+    WlPulse { color: var(--brand-dark); }
+    WlShortcut { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    WlShortcut.pressed { background-color: var(--surface-press-dark); }
+    WlDriverCard { background-color: var(--surface-alt-dark); }
+    WlAvatar { background: cn1-round-border; color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    WlPlate { color: var(--text-dark); background-color: var(--surface-dark); border: 1px solid var(--line-strong-dark); }
+    WlAction { color: var(--text-dark); }
+    WlAction.pressed { color: var(--brand-dark); background-color: var(--surface-alt-dark); }
+    WlActionDanger { color: var(--danger-dark); }
+    WlActionDanger.pressed { color: var(--danger-dark); background-color: var(--danger-tint-dark); }
+    WlGo { background: cn1-round-border; color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    WlGo.pressed { background: cn1-round-border; background-color: var(--brand-pressed-dark); }
+    WlMenu { background-color: var(--surface-dark); }
+    WlMenuTop { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    WlMenuName { color: var(--text-dark); }
+    WlMenuDetail { color: var(--text-muted-dark); }
+    WlModeBadge { background: cn1-pill-border; color: var(--brand-dark); background-color: var(--brand-tint-dark); }
+    WlMenuLabel { color: var(--text-muted-dark); }
+    WlMenuItem { color: var(--text-dark); }
+    WlMenuItem.pressed { background-color: var(--surface-alt-dark); }
+    WlMenuBottom { border-top: 1px solid var(--line-dark); }
+    WlHomeBar { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    WlSection { color: var(--text-dark); }
+    WlSegments { background-color: var(--surface-alt-dark); }
+    WlSegment { color: var(--text-muted-dark); }
+    WlSegment.selected { color: var(--text-dark); background-color: var(--surface-press-dark); }
+    WlSegment.pressed { color: var(--text-dark); background-color: var(--surface-press-dark); }
+    WlList { background-color: var(--surface-dark); }
+    WlFactLabel { color: var(--text-muted-dark); }
+    WlFactValue { color: var(--text-dark); }
+    WlFactTotal { color: var(--text-dark); }
+    WlBannerIcon { background: cn1-round-border; color: var(--brand-dark); background-color: var(--brand-tint-dark); }
+    WlBannerIconGood { background: cn1-round-border; color: var(--success-dark); background-color: var(--success-tint-dark); }
+    WlBannerIconWarn { background: cn1-round-border; color: var(--warning-dark); background-color: var(--warning-tint-dark); }
+    WlBannerIconBad { background: cn1-round-border; color: var(--danger-dark); background-color: var(--danger-tint-dark); }
+    WlBannerTitle { color: var(--text-dark); }
+    WlBannerText { color: var(--text-muted-dark); }
+    WlAmount { color: var(--text-dark); }
+    WlTile { background-color: var(--surface-dark); border: 1px solid var(--line-dark); }
+    WlChart { color: var(--brand-dark); }
+    WlChartPeak { color: var(--brand-pressed-dark); }
+    WlChartGrid { color: var(--line-dark); }
+    WlChartAxis { color: var(--text-muted-dark); }
+    WlChartValue { color: var(--text-dark); }
+    WlMeter { color: var(--brand-dark); }
+    WlAlert { color: var(--warning-dark); background-color: var(--warning-tint-dark); }
+    WlAlert.pressed { background-color: var(--surface-press-dark); }
+    WlOption { background-color: var(--surface-dark); border: 1px solid var(--line-dark); }
+    WlOption.pressed { background-color: var(--surface-alt-dark); }
+    WlOptionPicked { background-color: var(--brand-tint-dark); border: 2px solid var(--brand-dark); }
+    WlOptionIcon { color: var(--text-dark); }
+    WlCardFace { background-color: var(--brand-dark); }
+    WlCardBrand { color: var(--brand-contrast-dark); }
+    WlCardNumber { color: var(--brand-contrast-dark); }
+    WlCardSmall { color: var(--brand-contrast-dark); }
+    WlThumb { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
+    WlStepLabel { color: var(--brand-dark); }
+    WlFooter { background-color: var(--surface-dark); border-top: 1px solid var(--line-dark); }
+    WlStar { color: var(--warning-dark); }
+    WlSide { background-color: var(--surface-alt-dark); border-right: 1px solid var(--line-dark); }
+    WlSideName { color: var(--text-dark); }
+    WlSideDetail { color: var(--text-muted-dark); }
+    WlSideLabel { color: var(--text-muted-dark); }
+    WlSideItem { color: var(--text-dark); }
+    WlSideItem.pressed { background-color: var(--line-dark); }
+    WlSidePicked { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    WlMaster { background-color: var(--surface-dark); border-right: 1px solid var(--line-dark); }
+    WlPaneBar { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    WlPaneTitle { color: var(--text-dark); }
+    WlRowPicked { background-color: var(--surface-alt-dark); }
+    WlSecondary.disabled, WlDanger.disabled, WlLink.disabled { color: var(--line-strong-dark); }
+    WlField.selected { background-color: var(--brand-tint-dark); }
+    WlField.disabled { color: var(--text-muted-dark); }
+    WlStar.pressed { color: var(--text-muted-dark); }
+    Switch { color: #ffffff; background-color: var(--line-strong-dark); }
+    Switch.selected { color: #ffffff; background-color: var(--brand-dark); }
+    Switch.disabled { color: var(--text-muted-dark); background-color: var(--line-dark); }
+    WlSegment.disabled { color: var(--line-strong-dark); }
+    WlSkeleton { color: var(--surface-alt-dark); }
+    PullToRefresh { color: var(--text-muted-dark); }
+    ToastBar { background-color: var(--text-dark); }
+    ToastBarMessage { color: var(--surface-dark); }
+    WlDeskForm { background-color: var(--window-bg-color-dark); }
+    WlDeskPage { background-color: var(--window-bg-color-dark); }
+    WlDeskList { background-color: var(--view-bg-color-dark); }
+    WlDeskMaster { background-color: var(--view-bg-color-dark); border-right: 1px solid #3a3a3a; }
+    WlDeskHomeBar { background-color: var(--headerbar-bg-color-dark); border-bottom: 1px solid #3a3a3a; }
+    WlDeskPaneBar { background-color: var(--window-bg-color-dark); border-bottom: 1px solid #3a3a3a; }
+    WlDeskPaneTitle { color: var(--text-color-dark); }
+    WlDeskSide { background-color: var(--headerbar-bg-color-dark); border-right: 1px solid #3a3a3a; }
+    WlDeskSideName { color: var(--text-color-dark); }
+    WlDeskSideDetail { color: var(--text-secondary-color-dark); }
+    WlDeskSideLabel { color: var(--text-secondary-color-dark); }
+    WlDeskSideItem { color: var(--text-color-dark); }
+    WlDeskSideItem.pressed { background-color: var(--separator-color-dark); }
+    WlDeskSidePicked { color: var(--accent-fg-color-dark); background-color: var(--accent-color-dark); }
+    WlDeskDanger { color: var(--danger-dark); }
+    WlDeskRow { border-bottom: 1px solid #3a3a3a; }
+    WlDeskRow.pressed { background-color: var(--separator-color-dark); }
+    WlDeskRowPicked { background-color: var(--separator-color-dark); border-bottom: 1px solid #3a3a3a; }
+    WlDeskAlert { color: var(--warning-dark); background-color: var(--warning-tint-dark); }
+    WlDeskAlert.pressed { color: var(--warning-dark); background-color: var(--warning-tint-dark); }
+    WlDeskRowIcon { color: var(--text-secondary-color-dark); }
+    WlDeskRowTitle { color: var(--text-color-dark); }
+    WlDeskRowDetail { color: var(--text-secondary-color-dark); }
+    WlDeskRowValue { color: var(--text-color-dark); }
+    WlDeskSection { color: var(--text-color-dark); }
+    WlDeskTitle { color: var(--text-color-dark); }
+    WlDeskHeading { color: var(--text-color-dark); }
+    WlDeskText { color: var(--text-color-dark); }
+    WlDeskMuted { color: var(--text-secondary-color-dark); }
+    WlDeskLabel { color: var(--text-secondary-color-dark); }
+    WlDeskError { color: var(--danger-dark); }
+    WlDeskNotice { color: var(--text-color-dark); }
+    WlDeskFactLabel { color: var(--text-secondary-color-dark); }
+    WlDeskFactValue { color: var(--text-color-dark); }
+    WlDeskFactTotal { color: var(--text-color-dark); }
+    WlDeskAmount { color: var(--text-color-dark); }
+    WlDeskBannerIcon { color: var(--text-secondary-color-dark); }
+    WlDeskBannerTitle { color: var(--text-color-dark); }
+    WlDeskBannerText { color: var(--text-secondary-color-dark); }
+    WlDeskStatValue { color: var(--text-color-dark); }
+    WlDeskStatLabel { color: var(--text-secondary-color-dark); }
+    WlDeskChartValue { color: var(--text-color-dark); }
+    WlDeskChartAxis { color: var(--text-secondary-color-dark); }
+}

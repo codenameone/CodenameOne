@@ -33,6 +33,11 @@ import java.util.List;
 /// create a thread and dispatch tasks to it.
 public final class EasyThread {
     private static final List<ErrorListener> globalErrorListenenrs = new ArrayList<ErrorListener>();
+
+    /// Every thread that has not left its loop yet, for `#killAll()`. A thread adds itself
+    /// as it starts and takes itself out as it ends, so this holds nothing that is not
+    /// alive anyway. It is its own lock.
+    private static final ArrayList<EasyThread> LIVE = new ArrayList<EasyThread>();
     private final Object LOCK = new Object();
     private final Thread t;
     private final ArrayList<Object> queue = new ArrayList<Object>();
@@ -48,6 +53,9 @@ public final class EasyThread {
     private boolean finished;
 
     private EasyThread(String name) {
+        synchronized (LIVE) {
+            LIVE.add(this);
+        }
         t = Display.getInstance().startThread(new Runnable() {
             @Override
             public void run() {
@@ -99,9 +107,31 @@ public final class EasyThread {
                     finished = true;
                     LOCK.notifyAll();
                 }
+                synchronized (LIVE) {
+                    LIVE.remove(EasyThread.this);
+                }
             }
         }, name);
         t.start();
+    }
+
+    /// Stops every thread started through this class, each as `#kill()` stops it.
+    ///
+    /// Not for an application, which is why it is not public: a thread kept in a static
+    /// field -- the image loader, the map's tile worker -- is expected to be there for as
+    /// long as the process is, and would refuse everything after this. It is for a host
+    /// that runs several generations of Codename One in one process, each in a class loader
+    /// of its own, as the simulator's test runner does with every test. There a thread
+    /// waiting for work it will never be given is a live reference to every class and every
+    /// static of a generation that is over, so none of it can be collected.
+    static void killAll() {
+        ArrayList<EasyThread> all;
+        synchronized (LIVE) {
+            all = new ArrayList<EasyThread>(LIVE);
+        }
+        for (EasyThread thread : all) {
+            thread.kill();
+        }
     }
 
     /// Starts a new thread

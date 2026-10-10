@@ -241,7 +241,14 @@ public final class Backend {
         if (chain == null) {
             throw new IllegalStateException("This server is not serving");
         }
-        HttpServer.Response response = chain.handle(request);
+        HttpServer.Response response;
+        try {
+            response = chain.handle(request);
+        } catch (ResponseStatusException chosen) {
+            // The listener turns this into the answer the handler chose, so a
+            // test that dispatches here has to see that answer and not the throw.
+            return HttpServer.Response.text(chosen.getStatus(), chosen.getReason());
+        }
         if (response == null) {
             response = HttpServer.Response.text(404, "Not Found");
         }
@@ -978,8 +985,11 @@ public final class Backend {
         /// tried, the one whose store call threw among them, and each of the
         /// others is still finished here -- one failing save must not leave the
         /// rest undeleted, or their beans undestroyed.
+        ///
+        /// `answered` is the status the client is sent and `err` what went
+        /// wrong, null when the handler chose that status as its answer.
         private void failed(HttpServer.Request request, List attempted,
-                            long startedMillis, Throwable err) {
+                            long startedMillis, Throwable err, int answered) {
             endRequestBeans(request);
             List ended = request.endedSessions();
             for (int e = 0 ; ended != null && e < ended.size() ; e++) {
@@ -1010,7 +1020,7 @@ public final class Backend {
                             + storeErr);
                 }
             }
-            requestLog.record(request, 500, startedMillis, err);
+            requestLog.record(request, answered, startedMillis, err);
         }
 
         /// Destroy passes over request beans that destroying others created.
@@ -1158,13 +1168,26 @@ public final class Backend {
                             }
                         }
                     }
+                } catch (ResponseStatusException chosen) {
+                    if (response != null) {
+                        response.discard();
+                    }
+                    // The listener answers with the status the handler chose,
+                    // so that is what the request log and the metrics record.
+                    // Left to the clause below, a 409 the client received was
+                    // logged and counted as a 500 with an error attached. Only
+                    // a status of 500 and above is a failure of the handler.
+                    status = chosen.getStatus();
+                    failed(request, attempted, startedMillis,
+                            status >= 500 ? chosen : null, status);
+                    throw chosen;
                 } catch (Exception err) {
                     // The handler's response is replaced by a 500; a
                     // file it carried is closed here or never.
                     if (response != null) {
                         response.discard();
                     }
-                    failed(request, attempted, startedMillis, err);
+                    failed(request, attempted, startedMillis, err, 500);
                     throw err;
                 } catch (Error err) {
                     if (response != null) {
@@ -1173,7 +1196,7 @@ public final class Backend {
                     // The same clean-up: an invalidated session
                     // must still be deleted, or the client's old
                     // cookie keeps its signed-in state.
-                    failed(request, attempted, startedMillis, err);
+                    failed(request, attempted, startedMillis, err, 500);
                     throw err;
                 }
                 if (response != null && (cors != null || compression != null || secured)) {
@@ -1258,6 +1281,47 @@ public final class Backend {
             return "127.0.0.1"; //NOPMD AvoidUsingHardCodedIP - loopback, what a local client reaches a wildcard bind at
         }
         return h.indexOf(':') >= 0 && !h.startsWith("[") ? "[" + h + "]" : h;
+    }
+
+    /// The directory the app's web build is looked for in when
+    /// [Config#WEBAPP_ROOT] names none.
+    static final String DEFAULT_WEBAPP_ROOT = "webapp";
+
+    /// The handler serving the app's web build, or null when there is none to
+    /// serve.
+    ///
+    /// The build puts the browser version of the app in a directory, and the
+    /// server that finds one answers with it: a person opens the server's
+    /// address and is using the app, with nothing installed. Like Spring Boot's
+    /// `static/` it needs no setting when the directory is where it is expected
+    /// -- `webapp` beside the configuration, in the working directory -- and
+    /// like it an `index.html` is what makes a directory a site.
+    ///
+    /// A directory that is NAMED and is not one is a mistake, and a start-up
+    /// error: a server told where its app is and serving a 404 there instead
+    /// is a deployment that looks finished. The default directory being absent
+    /// is the ordinary state of a server with no web build, and says nothing.
+    ///
+    /// Every file is revalidated unless [Config#WEBAPP_CACHE_CONTROL] says
+    /// otherwise, because the files of a build keep their names: a cached
+    /// script from the last deployment running against this one's server is
+    /// the failure, and a 304 for each of a couple of dozen files is the cost.
+    static StaticFiles webApp(Config config) throws IOException {
+        if (!config.getBoolean(Config.WEBAPP_ENABLED, true)) {
+            return null;
+        }
+        String named = config.get(Config.WEBAPP_ROOT);
+        boolean chosen = named != null && named.length() > 0;
+        String root = chosen ? named : DEFAULT_WEBAPP_ROOT;
+        if (FileIo.realPath(root + "/index.html") == null) {
+            if (chosen) {
+                throw new IOException(Config.WEBAPP_ROOT + " is " + root + ", which holds no "
+                        + "index.html; build the app for the web into it, or remove the setting");
+            }
+            return null;
+        }
+        return new StaticFiles(root, config.get(Config.WEBAPP_PATH, "/"), "index.html",
+                config.get(Config.WEBAPP_CACHE_CONTROL, "no-cache"), true);
     }
 
     /// Whether `host` names this machine's loopback interface.
@@ -1982,6 +2046,14 @@ public final class Backend {
                 // shadow a route by being named like one, and which of them won
                 // would depend on what happened to be in a directory.
                 routers.add(staticFiles);
+            }
+            // The app's web build, after even those: it is mounted on / by
+            // default, where it would otherwise answer for every path nothing
+            // else claimed -- including a file under the static prefix that is
+            // simply not there.
+            StaticFiles webApp = webApp(config);
+            if (webApp != null) {
+                routers.add(webApp);
             }
             boolean servesWebSockets = webSocketEndpoints != null || application != null;
             // The management and MCP endpoints are the server's own, not the

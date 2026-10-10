@@ -359,11 +359,43 @@ public final class JavaScriptTextLayer {
                         frame.clipX, frame.clipY, frame.clipW, frame.clipH);
             }
         }
+        if (depth == 0 && component instanceof Form && frame.component == component
+                && !frame.clipEmpty) {
+            releaseUnpaintedWithin(frame.paintPass, frame.clipX, frame.clipY, frame.clipW, frame.clipH);
+        }
         frame.covering = false;
         frame.clipEmpty = false;
         frame.component = null;
         frame.runs = null;
         frame.sequence = 0;
+    }
+
+    /**
+     * Releases the text of every component a paint of the whole form passed over.
+     *
+     * <p>A container does not visit the children its clip leaves out: a vertical box works out
+     * the first and last child the clip can reach and paints those. So a component that a layout
+     * moved far outside the viewport -- content arriving above it and pushing it a screen down --
+     * is not handed an empty clip, it is not painted at all, and neither of its hooks runs. Its
+     * runs stayed where they were last drawn, above whatever the canvas now shows there: the
+     * rows at the bottom of a page were left written across the chart that had just loaded
+     * above them.</p>
+     *
+     * <p>Only the form's own paint can decide this. It walks everything that intersects the
+     * region, so a run inside the region that nothing claimed belongs to a component that is
+     * no longer there. A repaint of one component says nothing about its neighbours, whose text
+     * stands above the canvas untouched.</p>
+     *
+     * @param formPass the pass the form's paint was given; every component it painted has a later one
+     * @param x the repainted region's x, in Codename One pixels
+     * @param y the repainted region's y
+     * @param w the repainted region's width
+     * @param h the repainted region's height
+     */
+    private void releaseUnpaintedWithin(int formPass, int x, int y, int w, int h) {
+        for (ComponentRuns runs : byComponent.values()) {
+            releaseStaleWithin(runs, formPass, x, y, w, h);
+        }
     }
 
     /**

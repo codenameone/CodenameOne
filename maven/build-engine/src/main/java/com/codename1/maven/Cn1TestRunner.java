@@ -111,6 +111,38 @@ public final class Cn1TestRunner {
         }
     }
 
+    /// The runner's exit status when a test failed. Any other status that is
+    /// not 0 means the runner ended without reporting on its tests.
+    static final int EXIT_TESTS_FAILED = 100;
+
+    /// What a failed run is told to the developer as.
+    ///
+    /// A failed test has already been reported by the runner, and is "Tests
+    /// failed". The runner's process ending any other way has reported nothing,
+    /// and "Tests failed" under the output of a test that was passing sends the
+    /// reader looking for a failure in that test. The usual case is the process
+    /// being killed: a status over 128 is 128 plus the signal, and signal 9 on
+    /// Linux is most often the kernel's out-of-memory killer, which leaves no
+    /// stack trace, no message and no crash file behind.
+    ///
+    /// @param status the runner's exit status, which is not 0
+    public static String describeFailure(int status) {
+        if (status == EXIT_TESTS_FAILED) {
+            return "Tests failed";
+        }
+        String text = "The test runner's process ended with exit status " + status
+                + " without reporting a result; no test failed";
+        if (status > 128 && status < 160) {
+            int signal = status - 128;
+            text += ". It was killed by signal " + signal;
+            if (signal == 9) {
+                text += ", which is what the operating system's out-of-memory killer sends:"
+                        + " check the memory available to this machine or container";
+            }
+        }
+        return text;
+    }
+
     /// Forks the test runner.
     ///
     /// @param java the task to fork with, already set up for logging

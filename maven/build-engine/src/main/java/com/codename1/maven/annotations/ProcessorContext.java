@@ -161,6 +161,60 @@ public final class ProcessorContext {
     /// dependency class).
     public AnnotatedClass lookup(String internalName) { return classIndex.get(internalName); }
 
+    /// The annotated classes this module's dependencies contribute, as
+    /// [DependencyClasses] found them. Empty unless a processor asked for them.
+    private Map<String, AnnotatedClass> dependencyIndex = Collections.<String, AnnotatedClass>emptyMap();
+
+    /// Installed by the driver before any dependency class is offered.
+    public void setDependencyIndex(Map<String, AnnotatedClass> index) {
+        this.dependencyIndex = index == null
+                ? Collections.<String, AnnotatedClass>emptyMap()
+                : Collections.unmodifiableMap(new LinkedHashMap<String, AnnotatedClass>(index));
+    }
+
+    public Map<String, AnnotatedClass> getDependencyIndex() { return dependencyIndex; }
+
+    /// Looks a class up among the module's own classes, then among the
+    /// dependency classes.
+    ///
+    /// Separate from [#lookup] on purpose. Several processors read "is in the
+    /// index" as "belongs to this module" -- it is how they decide a class has a
+    /// source here, or is theirs to rewrite -- and answering that from a
+    /// dependency would hand them a class they must not touch.
+    public AnnotatedClass lookupWithDependencies(String internalName) {
+        AnnotatedClass own = classIndex.get(internalName);
+        if (own != null) {
+            return own;
+        }
+        AnnotatedClass scanned = dependencyIndex.get(internalName);
+        if (scanned != null || dependencyIndex.isEmpty()) {
+            // An empty dependency index means no processor asked for dependency
+            // classes in this build, and the classpath is then not read at all.
+            return scanned;
+        }
+        if (referenced.containsKey(internalName)) {
+            return referenced.get(internalName);
+        }
+        AnnotatedClass read = null;
+        try {
+            read = DependencyClasses.read(compileClasspath, internalName);
+        } catch (ProcessingException unreadable) {
+            log.debug("cn1: could not read " + internalName + " off the classpath: "
+                    + unreadable.getMessage());
+        }
+        referenced.put(internalName, read);
+        return read;
+    }
+
+    /// Classes read on demand by [#lookupWithDependencies], misses included, so
+    /// a type many fields share is read once.
+    private final Map<String, AnnotatedClass> referenced = new java.util.HashMap<String, AnnotatedClass>();
+
+    /// Whether `cls` came from a dependency instead of this module's output.
+    public boolean isDependencyClass(AnnotatedClass cls) {
+        return cls != null && !classIndex.containsKey(cls.getInternalName());
+    }
+
     public Log getLog() { return log; }
 
     /// Reports a validation error attributed to `source`. Continues processing.

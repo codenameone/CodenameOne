@@ -22,9 +22,12 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.io.NetworkManager;
 import com.codename1.testing.TestReporting;
 import com.codename1.testing.UnitTest;
+import com.codename1.ui.Accessor;
 import com.codename1.ui.Display;
+import com.codename1.util.EasyThreadAccessor;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -33,6 +36,37 @@ import java.util.TimerTask;
  */
 public class TestExecuter {
     private static boolean failed;
+
+    /**
+     * Ends the threads of the Codename One this class was loaded with, once
+     * its test is over.
+     *
+     * Clean mode gives every test a class loader of its own, and with it a
+     * Codename One of its own: a Display, a port with its skin images and
+     * screen buffers, the application and every form it built. That is
+     * garbage when the test ends only if nothing still running was loaded by
+     * it. The network threads, the threads behind invokeAndBlock and every
+     * EasyThread (the map's tile worker, the image loader) wait for work for
+     * as long as the process lives, and a waiting thread keeps its class, the
+     * class keeps its loader and the loader keeps all of it. Every test's
+     * world stayed in memory this way until the last one finished, and a
+     * suite of a dozen screens grew past two gigabytes.
+     *
+     * Called by the runner, reflectively like {@link #runTest}, and only in
+     * clean mode: a runner that goes on to use this same Codename One for the
+     * next test still needs these threads.
+     */
+    public static void retire() {
+        try {
+            NetworkManager.getInstance().shutdown();
+            Accessor.retireThreadPool();
+            EasyThreadAccessor.killAll();
+        } catch (Throwable t) {
+            // The test has been judged already; failing to tidy up after it
+            // costs memory and is said, but it is not a failed test.
+            t.printStackTrace();
+        }
+    }
     public static boolean runTest(final String mainClass, final String testClass, boolean quietMode) {
         try {
             if(quietMode) {
@@ -98,6 +132,10 @@ public class TestExecuter {
                     } finally {
                         TestReporting.getInstance().finishedTestCase(test.getClass().getName(), !failed);
                         timeoutTask.cancel();
+                        // The timer and not only its task: a cancelled task stays in
+                        // the queue until the time it was set for, and until then the
+                        // timer's thread holds this class and all that was loaded with it.
+                        timeoutKiller.cancel();
                     }
                 }
             } catch(Exception err) {

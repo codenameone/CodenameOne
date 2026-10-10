@@ -28,7 +28,12 @@ import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.ResolutionScope;
 
+import org.apache.maven.project.MavenProject;
+
+import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Checks the compiled application against the Codename One Java runtime API; see
@@ -54,6 +59,7 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
                 copyKotlinIncrementalCompileOutputToOutputDir();
             }
         };
+        check.checkedDependencyRoots(plainSiblingModules());
         try {
             check.execute();
         } catch (com.codename1.build.BuildFailureException ex) {
@@ -61,5 +67,30 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
         } catch (com.codename1.build.BuildExecutionException ex) {
             throw new MojoExecutionException(ex.getMessage(), ex.getCause() == null ? ex : ex.getCause());
         }
+    }
+
+    /// The class directories of the plain jar modules of this build that the
+    /// project depends on -- a `shared` module of DTOs and contracts. A Codename
+    /// One module (an application or a cn1lib) is left out: it runs this check
+    /// itself, on its own classes.
+    private List<File> plainSiblingModules() {
+        List<File> roots = new ArrayList<File>();
+        if (project.getProjectReferences() == null) {
+            return roots;
+        }
+        for (MavenProject sibling : project.getProjectReferences().values()) {
+            if (sibling == null || !"jar".equals(sibling.getPackaging()) || sibling.getBasedir() == null) {
+                continue;
+            }
+            if (new File(sibling.getBasedir(), "codenameone_settings.properties").exists()
+                    || new File(sibling.getBasedir(), "codenameone_library_appended.properties").exists()) {
+                continue;
+            }
+            File classes = new File(sibling.getBuild().getOutputDirectory());
+            if (classes.isDirectory()) {
+                roots.add(classes);
+            }
+        }
+        return roots;
     }
 }

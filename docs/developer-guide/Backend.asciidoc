@@ -250,7 +250,8 @@ image::img/backend-request-lifecycle.svg["A request passing through the MCP endp
   route can't answer a health check.
 . Then the application's routes.
 . Static files from `cn1.static.root` are always last, so a file can't shadow a
-  route by being named like one.
+  route by being named like one. The app's browser build comes after those,
+  when the server hosts one; see <<backend-hosting-the-app>>.
 . A request nothing answered is a 404.
 
 Around the chain sits one wrapper, and it's where the per-request features
@@ -347,6 +348,11 @@ there is nothing next to the binary.
 | `cn1.static.root`
 | A directory to serve files from, after every route.
 
+| `cn1.webapp.root`
+| The directory holding the app's browser build, served at `/` after every
+  route. `webapp` in the working directory by default; see
+  <<backend-hosting-the-app>>.
+
 | `cn1.orm.createTables`
 | Whether the generated daos create their tables at start-up. True on a
   development profile, false everywhere else.
@@ -378,6 +384,10 @@ there is nothing next to the binary.
 | `cn1.static.prefix`, `cn1.static.index`, `cn1.static.cacheControl`
 | Where static files are served (`/static`), the file a directory answers with
   (`index.html`), and their `Cache-Control` header (`public, max-age=3600`).
+
+| `cn1.webapp.path`, `cn1.webapp.cacheControl`, `cn1.webapp.enabled`
+| Where the app's browser build is served (`/`), its `Cache-Control` header
+  (`no-cache`), and whether it's served at all (`true`).
 
 | `cn1.datasource.pool.borrowTimeoutMillis`
 | How long a request waits for a free connection before it fails, 10 seconds by

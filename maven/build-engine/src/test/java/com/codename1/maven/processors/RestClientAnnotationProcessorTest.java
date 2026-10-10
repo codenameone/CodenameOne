@@ -176,6 +176,146 @@ public class RestClientAnnotationProcessorTest {
         assertTrue("expected error on @RestClient applied to a class", ctx.hasErrors());
     }
 
+    /// A primitive parameter cannot be compared with null, so the guard that
+    /// leaves an absent query parameter or header off the request has to be
+    /// written for reference types only. Guarding both generated a client that
+    /// did not compile, for any contract with an `int` page or a `double`
+    /// coordinate in it.
+    @Test
+    public void primitiveQueryAndHeaderParametersAreNotNullChecked() throws Exception {
+        File classes = tmp.newFolder("classes");
+        JavaSourceCompiler.compile(
+                JavaSourceCompiler.singleSource("com.example.GeoApi",
+                        "package com.example;\n"
+                                + "import com.codename1.annotations.rest.*;\n"
+                                + "import com.codename1.io.rest.Response;\n"
+                                + "import com.codename1.util.OnComplete;\n"
+                                + "@RestClient\n"
+                                + "public interface GeoApi {\n"
+                                + "    @GET(\"/geo/search\")\n"
+                                + "    void search(@Query(\"q\") String text,\n"
+                                + "                @Query(\"lat\") double lat,\n"
+                                + "                @Query(\"limit\") int limit,\n"
+                                + "                @Header(\"X-Page\") long page,\n"
+                                + "                OnComplete<Response<String>> callback);\n"
+                                + "}\n"),
+                classes, Arrays.asList(testClassesDir()));
+
+        ProcessorContext ctx = runProcessor(classes);
+        assertFalse("the generated client must compile: " + ctx.getErrors(), ctx.hasErrors());
+        assertTrue(new File(classes, "com/example/GeoApiImpl.class").exists());
+
+        String implSrc = generateImplSourceForFixture(classes);
+        assertTrue("a reference parameter keeps its guard: " + implSrc,
+                implSrc.contains("!= null) _rb.queryParam(\"q\""));
+        assertFalse(implSrc, implSrc.contains("!= null) _rb.queryParam(\"lat\""));
+        assertFalse(implSrc, implSrc.contains("!= null) _rb.queryParam(\"limit\""));
+        assertFalse(implSrc, implSrc.contains("!= null) _rb.header(\"X-Page\""));
+    }
+
+    /// The cookie guard is a block, not a statement, and the header value is a
+    /// String: both had their own way of not compiling for a primitive.
+    @Test
+    public void primitiveCookieAndHeaderParametersCompile() throws Exception {
+        File classes = tmp.newFolder("classes");
+        JavaSourceCompiler.compile(
+                JavaSourceCompiler.singleSource("com.example.VisitApi",
+                        "package com.example;\n"
+                                + "import com.codename1.annotations.rest.*;\n"
+                                + "import com.codename1.io.rest.Response;\n"
+                                + "import com.codename1.util.OnComplete;\n"
+                                + "@RestClient\n"
+                                + "public interface VisitApi {\n"
+                                + "    @GET(\"/visits\")\n"
+                                + "    void count(@Cookie(\"shard\") int shard,\n"
+                                + "               @Cookie(\"sid\") String session,\n"
+                                + "               @Header(\"X-Dry-Run\") boolean dryRun,\n"
+                                + "               @Header(\"X-Trace\") String trace,\n"
+                                + "               OnComplete<Response<String>> callback);\n"
+                                + "}\n"),
+                classes, Arrays.asList(testClassesDir()));
+
+        ProcessorContext ctx = runProcessor(classes);
+        assertFalse("the generated client must compile: " + ctx.getErrors(), ctx.hasErrors());
+        assertTrue(new File(classes, "com/example/VisitApiImpl.class").exists());
+
+        String implSrc = generateImplSourceForFixture(classes);
+        assertFalse(implSrc, implSrc.contains("if (shardCookie != null)"));
+        assertTrue(implSrc, implSrc.contains("if (sidCookie != null) {"));
+        assertTrue(implSrc, implSrc.contains("_rb.header(\"X-Dry-Run\", String.valueOf("));
+        assertTrue(implSrc, implSrc.contains("!= null) _rb.header(\"X-Trace\", "));
+    }
+
+    /// A contract that lives in a library the application depends on gets its
+    /// client generated in the application -- on every build, not only the
+    /// first. The application's output directory is on its own compile
+    /// classpath and holds the client the previous build generated; taking that
+    /// for "a dependency already supplies the client" left the second build
+    /// with a bootstrap that registered nothing, and an application that threw
+    /// on its first call.
+    @Test
+    public void regeneratesADependencyContractOverThePreviousBuildsOutput() throws Exception {
+        File shared = tmp.newFolder("shared");
+        JavaSourceCompiler.compile(
+                JavaSourceCompiler.singleSource("com.example.NotesApi",
+                        "package com.example;\n"
+                                + "import com.codename1.annotations.rest.*;\n"
+                                + "import com.codename1.io.rest.Response;\n"
+                                + "import com.codename1.util.OnComplete;\n"
+                                + "@RestClient\n"
+                                + "public interface NotesApi {\n"
+                                + "    @GET(\"/notes\")\n"
+                                + "    void list(OnComplete<Response<String>> callback);\n"
+                                + "}\n"),
+                shared, Arrays.asList(testClassesDir()));
+
+        // What the previous build left behind.
+        File classes = tmp.newFolder("classes");
+        JavaSourceCompiler.compile(
+                JavaSourceCompiler.singleSource("com.example.NotesApiImpl",
+                        "package com.example;\npublic class NotesApiImpl {}\n"),
+                classes, Arrays.asList(testClassesDir()));
+
+        // The client runtime is what tells the processor this module is an
+        // application, and so one that wants the client half of a contract.
+        File core = new File(com.codename1.io.rest.Rest.class.getProtectionDomain()
+                .getCodeSource().getLocation().toURI());
+        java.util.List<String> classpath = Arrays.asList(classes.getPath(), shared.getPath(),
+                core.getPath());
+        RestClientAnnotationProcessor proc = new RestClientAnnotationProcessor();
+        ProcessorContext ctx = new ProcessorContext(classes, tmp.newFolder(),
+                java.util.Collections.<String, AnnotatedClass>emptyMap(), new SystemStreamLog(),
+                null, null, null, null, null, classpath);
+        assertTrue(proc.acceptsDependencyClasses(ctx));
+        Map<String, AnnotatedClass> dependencies =
+                com.codename1.maven.annotations.DependencyClasses.scan(
+                        classpath, classes, proc.getAnnotationDescriptors());
+        assertTrue("the contract is found in the dependency",
+                dependencies.containsKey("com/example/NotesApi"));
+        ctx.setDependencyIndex(dependencies);
+
+        // The build hands the module's classpath to the generated-source
+        // compile, which is how the client sees the contract it implements.
+        JavaSourceCompiler.setProjectClasspath(Arrays.asList(shared, core));
+        try {
+            proc.start(ctx);
+            for (AnnotatedClass cls : dependencies.values()) {
+                proc.processClass(cls, ctx);
+            }
+            proc.finish(ctx);
+        } finally {
+            JavaSourceCompiler.clearProjectClasspath();
+        }
+
+        assertFalse(String.valueOf(ctx.getErrors()), ctx.hasErrors());
+        assertTrue("the client is registered",
+                new File(classes, "cn1app/RestClientBootstrap.class").exists());
+        AnnotatedClass regenerated = ClassScanner.readClass(
+                new File(classes, "com/example/NotesApiImpl.class"));
+        assertTrue("the stale client is replaced by one that implements the contract",
+                regenerated.getInterfaceInternalNames().contains("com/example/NotesApi"));
+    }
+
     // ---------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------

@@ -94,6 +94,7 @@ public class BytecodeCompliance {
     protected final ProjectHost host;
 
     private List<File> siblingClassRoots = Collections.emptyList();
+    private List<File> checkedDependencyRoots = Collections.emptyList();
 
     private Set<String> pendingProjectClasses = Collections.emptySet();
 
@@ -110,6 +111,21 @@ public class BytecodeCompliance {
     /// none.
     public BytecodeCompliance siblingClassRoots(List<File> roots) {
         this.siblingClassRoots = roots == null ? Collections.<File>emptyList() : new ArrayList<File>(roots);
+        return this;
+    }
+
+    /// Class directories of plain modules this project depends on from the same
+    /// build, which are checked along with the project's own classes.
+    ///
+    /// A module that holds the classes an application shares with its server --
+    /// the DTOs and the `@RestClient` contracts -- is an ordinary jar module, so
+    /// nothing checks it when it is built: it compiles against the whole JDK.
+    /// Its classes end up in the application all the same, and one that names a
+    /// class the device runtime lacks would pass every step here and fail in the
+    /// device build, far from the line that caused it. Checking them where they
+    /// are consumed reports it at once, against the module's own class file.
+    public BytecodeCompliance checkedDependencyRoots(List<File> roots) {
+        this.checkedDependencyRoots = roots == null ? Collections.<File>emptyList() : new ArrayList<File>(roots);
         return this;
     }
 
@@ -321,6 +337,11 @@ public class BytecodeCompliance {
         projectAndDependencyIndex.putAll(buildClassIndex(siblingClassRoots));
 
         List<Violation> violations = scanProjectClasses(outputDir, allowedIndex, projectAndDependencyIndex);
+        for (File root : checkedDependencyRoots) {
+            if (root != null && root.isDirectory()) {
+                violations.addAll(scanProjectClasses(root, allowedIndex, projectAndDependencyIndex));
+            }
+        }
         if (!violations.isEmpty()) {
             writeComplianceReport(violations, outputDir, dependencyJars, rewrittenClassCount);
             logViolationSummary(violations);
@@ -1114,7 +1135,12 @@ public class BytecodeCompliance {
                     || "runtime".equals(artifact.getScope())
                     || "test".equals(artifact.getScope())) {
                 File jar = host.getJar(artifact);
-                if (isClassArchive(jar)) {
+                // A module of the same build resolves to its classes DIRECTORY
+                // whenever the build stops short of `package` -- `mvn compile`,
+                // an IDE's incremental build. Left out, every class of that
+                // module was reported as a forbidden API, hundreds of
+                // violations naming the application's own DTOs.
+                if (isClassArchive(jar) || (jar != null && jar.isDirectory())) {
                     jars.add(jar);
                 }
             }

@@ -1,0 +1,1382 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.codenameone.examples.wayline</groupId>
+        <artifactId>wayline</artifactId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+    <groupId>com.codenameone.examples.wayline</groupId>
+    <artifactId>wayline-common</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <!-- Add your cn1lib dependencies to this section -->
+    <dependencies>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <!-- The contract shared with the server; see shared/pom.xml. -->
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>wayline-shared</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!--
+          Test-scope deps needed if you add JUnit 5 tests under
+          src/test/java that drive the simulator via
+          com.codename1.testing.junit.CodenameOneTest. Surefire stays
+          skipped at this module while a javase module exists (see
+          skipTests on surefire below); that module then runs them,
+          through testSourceDirectory. Without one they run here.
+
+          Apps that prefer the legacy AbstractTest / cn1:test flow can
+          delete both blocks; they are inert unless a test imports
+          them.
+        -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-javase</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.9.3</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- INJECT DEPENDENCIES -->
+    </dependencies>
+
+    <!-- The following are profiles to cover special cases -->
+    <profiles>
+
+        <!-- A profile to install Codename One support libraries to your home directory
+            if they aren't installed yet. -->
+        <profile>
+        <id>install-codenameone</id>
+        <activation><file><missing>${user.home}/.codenameone/guibuilder.jar</missing></file></activation>
+        <build>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-antrun-plugin</artifactId>
+
+                    <executions>
+                        <execution>
+                            <phase>validate</phase>
+                            <goals>
+                                <goal>run</goal>
+                            </goals>
+                            <configuration>
+
+                                <target name="install-cn1">
+                                    <available file="${user.home}/.codenameone/guibuilder.jar" property="codenameone.present"/>
+
+                                    <mkdir dir="${user.home}/.codenameone"/>
+                                    <mkdir dir="${project.build.directory}/codenameone/tmpProject"/>
+                                    <!-- UpdateCodenameOne writes lib/CLDC11.jar without creating parent dirs; the dir
+                                         must exist or the updater dies with FileNotFoundException whenever the
+                                         update server publishes new artifact versions. -->
+                                    <mkdir dir="${project.build.directory}/codenameone/tmpProject/lib"/>
+                                    <get src="https://www.codenameone.com/files/updates/UpdateCodenameOne.jar"
+                                         dest="${user.home}/UpdateCodenameOne.jar"
+                                         skipexisting="true"/>
+                                    <java jar="${user.home}/UpdateCodenameOne.jar" fork="true">
+                                        <arg value="${project.build.directory}/codenameone/tmpProject"/>
+                                        <arg value="force"/>
+                                    </java>
+                                </target>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </build>
+
+    </profile>
+        <!-- Android compatibility: an Android application's AndroidManifest.xml,
+             res/, assets/ and java/ placed in src/main/android build and run
+             unchanged on every Codename One target. The compile-android-res
+             and remap-android goals below are no-ops without this directory. -->
+        <profile>
+            <id>android-compat</id>
+            <activation>
+                <file>
+                    <exists>${basedir}/src/main/android</exists>
+                </file>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-android-compat</artifactId>
+                    <scope>provided</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+        <!-- A profile to add kotlin support.  Activated if the src/main/kotlin
+            directory exists -->
+        <profile>
+            <id>kotlin</id>
+            <activation>
+                <file>
+                    <!-- To enable Kotlin, add the following file to the project base dir -->
+                    <exists>${basedir}/src/main/kotlin</exists>
+                </file>
+            </activation>
+            <properties>
+                <kotlin.version>2.2.10</kotlin.version>
+                <kotlin.compiler.incremental>true</kotlin.compiler.incremental>
+            </properties>
+            <dependencies>
+                <dependency>
+                    <groupId>org.jetbrains.kotlin</groupId>
+                    <artifactId>kotlin-stdlib</artifactId>
+                    <version>${kotlin.version}</version>
+                </dependency>
+        
+                <!-- https://mvnrepository.com/artifact/org.jetbrains.kotlin/kotlin-annotations-jvm -->
+                <!-- https://mvnrepository.com/artifact/org.jetbrains/annotations -->
+                <dependency>
+                    <groupId>org.jetbrains</groupId>
+                    <artifactId>annotations</artifactId>
+                    <version>13.0</version>
+                </dependency>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>java-runtime</artifactId>
+                    <scope>provided</scope>
+                </dependency>
+            </dependencies>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>properties-maven-plugin</artifactId>
+                        <version>1.0.0</version>
+                        <executions>
+                            <execution>
+                                <phase>initialize</phase>
+                                <goals>
+                                    <goal>read-project-properties</goal>
+                                </goals>
+                                <configuration>
+                                    <files>
+                                        <file>${basedir}/codenameone_settings.properties</file>
+                                    </files>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.jetbrains.kotlin</groupId>
+                        <artifactId>kotlin-maven-plugin</artifactId>
+                        <version>${kotlin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>compile</id>
+                                <!-- Ahead of javac, which runs in the compile phase: Java may
+                                     refer to Kotlin classes (the generated Android factory names
+                                     every activity), and javac finds Kotlin's output in
+                                     target/classes. Kotlin reads the Java sources itself.
+                                     process-resources rather than process-sources: the source
+                                     generators (generate-gui-sources) run in process-sources,
+                                     and Kotlin must see what they generate. -->
+                                <phase>process-resources</phase>
+                                <goals>
+                                    <goal>compile</goal>
+                                </goals>
+                                <configuration>
+                                    <sourceDirs>
+                                        <sourceDir>${project.basedir}/src/main/kotlin</sourceDir>
+                                        <sourceDir>${project.basedir}/src/main/java</sourceDir>
+                                        <!-- Android sources (src/main/android): Android Studio keeps
+                                             Kotlin in java/ as often as in kotlin/, and Kotlin compiles
+                                             before javac, so it reads the generated R classes too. -->
+                                        <sourceDir>${project.basedir}/src/main/android/kotlin</sourceDir>
+                                        <sourceDir>${project.basedir}/src/main/android/java</sourceDir>
+                                        <sourceDir>${project.build.directory}/generated-sources/android</sourceDir>
+                                    </sourceDirs>
+                                    <args>
+                                        <arg>-no-reflect</arg>
+                                        <arg>-no-jdk</arg> <!-- No JDK -->
+                                    </args>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>test-compile</id>
+                                <phase>process-test-sources</phase>
+                                <goals> 
+                                    <goal>test-compile</goal> 
+                                </goals>
+                                <configuration>
+                                    <sourceDirs>
+                                        <sourceDir>${project.basedir}/src/test/kotlin</sourceDir>
+                                        <sourceDir>${project.basedir}/src/test/java</sourceDir>
+                                    </sourceDirs>
+                                    <args>
+                                        <arg>-no-reflect</arg>
+                                        <arg>-no-jdk</arg> <!-- No JDK -->
+                                    </args>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        
+
+        <profile>
+            
+            <id>javase</id>
+            <activation>
+                <property>
+                    <name>codename1.platform</name>
+                    <value>javase</value>
+                </property>
+            </activation>
+            <properties>
+                <codename1.targetPlatform>javase</codename1.targetPlatform>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <configuration>
+                            <executable>java</executable>
+                            <longClasspath>true</longClasspath>
+                            <arguments>
+                                <argument>-Xmx1024M</argument>
+                                <!--<argument>-Xdebug</argument>
+                                <argument>-Xrunjdwp:transport=dt_socket,address=8888,server=y,suspend=n</argument>-->
+                                <argument>-classpath</argument>
+                                <classpath />
+                                <argument>${exec.mainClass}</argument>
+                                <argument>${cn1.mainClass}</argument>
+                            </arguments>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <!--
+          The platform modules (javase/, android/, ios/, javascript/, win/, linux/)
+          are optional. The profiles from here to the end-marker let this module do
+          the work of any of them the project does not have. A platform has a module
+          of its own exactly when <root>/<platform>/pom.xml exists; when it does,
+          every goal below steps aside and the module does the work, so adding one
+          later never builds a platform twice. Requires codenameone-maven-plugin
+          7.0.275 or newer.
+
+          Each dependency here either has a version or is one the root pom manages
+          (codenameone-core, codenameone-javase); not every root pom manages
+          cn1-binaries-javase, so it carries ${cn1.version} itself.
+
+          Native interface implementations go where they always have, for example
+          ../android/src/main/java -  cn1:generate-native-interfaces creates the
+          directory - and are picked up from there whether or not a pom sits beside
+          them.
+        -->
+        <profile>
+            <!-- The JavaSE native code (../javase/src/main/java), compiled into
+                 target/cn1-javase/classes for the simulator, the tests and the
+                 desktop builds, and the JUnit tests, which run here when there is
+                 no javase module to run them. -->
+            <id>cn1-javase-natives</id>
+            <activation>
+                <file>
+                    <missing>${basedir}/../javase/pom.xml</missing>
+                </file>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.codenameone</groupId>
+                        <artifactId>codenameone-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>compile-javase-natives</id>
+                                <phase>process-classes</phase>
+                                <goals>
+                                    <goal>compile-javase-natives</goal>
+                                </goals>
+                                <configuration>
+                                    <hostedPlatform>javase</hostedPlatform>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <!--
+                          The root pom gives Surefire Codename One's provider, which runs nothing
+                          (cn1:test runs the AbstractTest classes). On its own it hid every JUnit
+                          test, so a failing @Test passed the build. This provider runs them.
+                        -->
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.apache.maven.surefire</groupId>
+                                <artifactId>surefire-junit-platform</artifactId>
+                                <version>3.0.0-M5</version>
+                            </dependency>
+                        </dependencies>
+                        <configuration>
+                            <skipTests>${skipTests}</skipTests>
+                            <additionalClasspathElements>
+                                <additionalClasspathElement>${project.build.directory}/cn1-javase/classes</additionalClasspathElement>
+                            </additionalClasspathElements>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <!-- Builds for -Dcodename1.platform=javase (desktop targets) without a javase module. -->
+            <id>cn1-host-javase</id>
+            <activation>
+                <property>
+                    <name>codename1.platform</name>
+                    <value>javase</value>
+                </property>
+                <file>
+                    <missing>${basedir}/../javase/pom.xml</missing>
+                </file>
+            </activation>
+            <properties>
+                <codename1.platform>javase</codename1.platform>
+                <codename1.projectPlatform>javase</codename1.projectPlatform>
+                <codename1.defaultBuildTarget>none</codename1.defaultBuildTarget>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.codenameone</groupId>
+                        <artifactId>codenameone-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>hosted-javase</id>
+                                <phase>validate</phase>
+                                <goals>
+                                    <goal>hosted-platform</goal>
+                                </goals>
+                                <configuration>
+                                    <hostedPlatform>javase</hostedPlatform>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>build-javase</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>build</goal>
+                                </goals>
+                                <configuration>
+                                    <hostedPlatform>javase</hostedPlatform>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <!-- Builds for -Dcodename1.platform=android without an android module. -->
+            <id>cn1-host-android</id>
+            <activation>
+                <property>
+                    <name>codename1.platform</name>
+                    <value>android</value>
+                </property>
+                <file>
+                    <missing>${basedir}/../android/pom.xml</missing>
+                </file>
+            </activation>
+            <properties>
+                <codename1.platform>android</codename1.platform>
+                <codename1.projectPlatform>android</codename1.projectPlatform>
+                <codename1.defaultBuildTarget>android-device</codename1.defaultBuildTarget>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.codenameone</groupId>
+                        <artifactId>codenameone-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>hosted-android</id>
+                                <phase>validate</phase>
+                                <goals>
+                                    <goal>hosted-platform</goal>
+                                </goals>
+                                <configuration>
+                                    <hostedPlatform>android</hostedPlatform>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>build-android</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>build</goal>
+                                </goals>
+                                <configuration>
+                                    <hostedPlatform>android</hostedPlatform>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <!-- Builds for -Dcodename1.platform=ios without an ios module. -->
+            <id>cn1-host-ios</id>
+            <activation>
+                <property>
+                    <name>codename1.platform</name>
+                    <value>ios</value>
+                </property>
+                <file>
+                    <missing>${basedir}/../ios/pom.xml</missing>
+                </file>
+            </activation>
+            <properties>
+                <codename1.platform>ios</codename1.platform>
+                <codename1.projectPlatform>ios</codename1.projectPlatform>
+                <codename1.defaultBuildTarget>ios-device</codename1.defaultBuildTarget>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.codenameone</groupId>
+                        <artifactId>codenameone-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>hosted-ios</id>
+                                <phase>validate</phase>
+                                <goals>
+                                    <goal>hosted-platform</goal>
+                                </goals>
+                                <configuration>
+                                    <hostedPlatform>ios</hostedPlatform>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>build-ios</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>build</goal>
+                                </goals>
+                                <configuration>
+                                    <hostedPlatform>ios</hostedPlatform>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <!-- Builds for -Dcodename1.platform=javascript without a javascript module. -->
+            <id>cn1-host-javascript</id>
+            <activation>
+                <property>
+                    <name>codename1.platform</name>
+                    <value>javascript</value>
+                </property>
+                <file>
+                    <missing>${basedir}/../javascript/pom.xml</missing>
+                </file>
+            </activation>
+            <properties>
+                <codename1.platform>javascript</codename1.platform>
+                <codename1.projectPlatform>javascript</codename1.projectPlatform>
+                <codename1.defaultBuildTarget>local-javascript</codename1.defaultBuildTarget>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.codenameone</groupId>
+                        <artifactId>codenameone-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>hosted-javascript</id>
+                                <phase>validate</phase>
+                                <goals>
+                                    <goal>hosted-platform</goal>
+                                </goals>
+                                <configuration>
+                                    <hostedPlatform>javascript</hostedPlatform>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>build-javascript</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>build</goal>
+                                </goals>
+                                <configuration>
+                                    <hostedPlatform>javascript</hostedPlatform>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <!-- Builds for -Dcodename1.platform=win without a win module. -->
+            <id>cn1-host-win</id>
+            <activation>
+                <property>
+                    <name>codename1.platform</name>
+                    <value>win</value>
+                </property>
+                <file>
+                    <missing>${basedir}/../win/pom.xml</missing>
+                </file>
+            </activation>
+            <properties>
+                <codename1.platform>win</codename1.platform>
+                <codename1.projectPlatform>win</codename1.projectPlatform>
+                <codename1.defaultBuildTarget>windows-device</codename1.defaultBuildTarget>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.codenameone</groupId>
+                        <artifactId>codenameone-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>hosted-win</id>
+                                <phase>validate</phase>
+                                <goals>
+                                    <goal>hosted-platform</goal>
+                                </goals>
+                                <configuration>
+                                    <hostedPlatform>win</hostedPlatform>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>build-windows</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>build</goal>
+                                </goals>
+                                <configuration>
+                                    <hostedPlatform>win</hostedPlatform>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <!-- Builds for -Dcodename1.platform=linux without a linux module. -->
+            <id>cn1-host-linux</id>
+            <activation>
+                <property>
+                    <name>codename1.platform</name>
+                    <value>linux</value>
+                </property>
+                <file>
+                    <missing>${basedir}/../linux/pom.xml</missing>
+                </file>
+            </activation>
+            <properties>
+                <codename1.platform>linux</codename1.platform>
+                <codename1.projectPlatform>linux</codename1.projectPlatform>
+                <codename1.defaultBuildTarget>linux-device</codename1.defaultBuildTarget>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.codenameone</groupId>
+                        <artifactId>codenameone-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>hosted-linux</id>
+                                <phase>validate</phase>
+                                <goals>
+                                    <goal>hosted-platform</goal>
+                                </goals>
+                                <configuration>
+                                    <hostedPlatform>linux</hostedPlatform>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>build-linux</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>build</goal>
+                                </goals>
+                                <configuration>
+                                    <hostedPlatform>linux</hostedPlatform>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <!--
+                Runs the app in the Codename One simulator, in a forked JVM:
+                ./mvnw verify -Psimulator -Dcodename1.platform=javase
+                Used by run.sh and NetBeans; IntelliJ uses idea-simulator. When a javase
+                module exists it runs the simulator instead and this profile does nothing.
+            -->
+            <id>simulator</id>
+            <properties>
+                <codename1.targetPlatform>javase</codename1.targetPlatform>
+                <exec.mainClass>com.codename1.impl.javase.Simulator</exec.mainClass>
+            </properties>
+            <dependencies>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-core</artifactId>
+                    <scope>compile</scope>
+                </dependency>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-javase</artifactId>
+                    <scope>runtime</scope>
+                </dependency>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>cn1-binaries-javase</artifactId>
+                    <version>${cn1.version}</version>
+                    <type>pom</type>
+                    <scope>runtime</scope>
+                </dependency>
+            </dependencies>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.codenameone</groupId>
+                        <artifactId>codenameone-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>prepare-simulator-environment</id>
+                                <phase>initialize</phase>
+                                <goals>
+                                    <goal>prepare-simulator-classpath</goal>
+                                </goals>
+                                <configuration>
+                                    <hostedPlatform>javase</hostedPlatform>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>run-in-simulator</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <skip>${cn1.hosted.javase.skip}</skip>
+                                    <workingDirectory>${basedir}</workingDirectory>
+                                    <executable>java</executable>
+                                    <arguments combine.self="override">
+                                        <argument>-Xmx1024M</argument>
+                                        <argument>-Dcodename1.designer.jar=${codename1.designer.jar}</argument>
+                                        <argument>-Dcodename1.css.compiler.args.input=${codename1.css.compiler.args.input}</argument>
+                                        <argument>-Dcodename1.css.compiler.args.output=${codename1.css.compiler.args.output}</argument>
+                                        <argument>-Dcodename1.css.compiler.args.merge=${codename1.css.compiler.args.merge}</argument>
+                                        <argument>${codename1.exec.args.debug}</argument>
+                                        <argument>${codename1.exec.args.runjdwp.transport}</argument>
+                                        <!-- The classpath, with the JavaSE natives; written by prepare-simulator-classpath. -->
+                                        <argument>@${cn1.hosted.classpathArgFile}</argument>
+                                        <argument>${exec.mainClass}</argument>
+                                        <argument>${codename1.mainClass}</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <!-- The simulator for IntelliJ, in-process (exec:java) so its debugger attaches. -->
+            <id>idea-simulator</id>
+            <properties>
+                <exec.mainClass>com.codename1.impl.javase.Simulator</exec.mainClass>
+                <cn1.class.path.required>true</cn1.class.path.required>
+            </properties>
+            <dependencies>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-core</artifactId>
+                    <scope>compile</scope>
+                </dependency>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-javase</artifactId>
+                    <scope>runtime</scope>
+                </dependency>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>cn1-binaries-javase</artifactId>
+                    <version>${cn1.version}</version>
+                    <type>pom</type>
+                    <scope>runtime</scope>
+                </dependency>
+            </dependencies>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.codenameone</groupId>
+                        <artifactId>codenameone-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>prepare-simulator-environment</id>
+                                <phase>initialize</phase>
+                                <goals>
+                                    <goal>prepare-simulator-classpath</goal>
+                                </goals>
+                                <configuration>
+                                    <hostedPlatform>javase</hostedPlatform>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>run-in-simulator-idea</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>java</goal>
+                                </goals>
+                                <configuration>
+                                    <skip>${cn1.hosted.javase.skip}</skip>
+                                    <additionalClasspathElements>
+                                        <additionalClasspathElement>${project.build.directory}/cn1-javase/classes</additionalClasspathElement>
+                                    </additionalClasspathElements>
+                                    <arguments combine.self="override">
+                                        <argument>${codename1.mainClass}</argument>
+                                    </arguments>
+                                    <systemProperties>
+                                        <systemProperty>
+                                            <key>codename1.designer.jar</key>
+                                            <value>${codename1.designer.jar}</value>
+                                        </systemProperty>
+                                        <systemProperty>
+                                            <key>codename1.css.compiler.args.input</key>
+                                            <value>${codename1.css.compiler.args.input}</value>
+                                        </systemProperty>
+                                        <systemProperty>
+                                            <key>codename1.css.compiler.args.output</key>
+                                            <value>${codename1.css.compiler.args.output}</value>
+                                        </systemProperty>
+                                        <systemProperty>
+                                            <key>codename1.css.compiler.args.merge</key>
+                                            <value>${codename1.css.compiler.args.merge}</value>
+                                        </systemProperty>
+                                        <systemProperty>
+                                            <!-- IntelliJ's Maven runner hides java.class.path; the
+                                                 simulator reads its classpath from here instead. -->
+                                            <key>cn1.class.path</key>
+                                            <value>${cn1.class.path}</value>
+                                        </systemProperty>
+                                    </systemProperties>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <!-- Debugging the simulator from NetBeans: connects to its debugger at ${jpda.address}. -->
+            <id>debug-simulator</id>
+            <properties>
+                <exec.mainClass>com.codename1.impl.javase.Simulator</exec.mainClass>
+                <jpda.listen>true</jpda.listen>
+            </properties>
+            <dependencies>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-core</artifactId>
+                    <scope>compile</scope>
+                </dependency>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-javase</artifactId>
+                    <scope>runtime</scope>
+                </dependency>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>cn1-binaries-javase</artifactId>
+                    <version>${cn1.version}</version>
+                    <type>pom</type>
+                    <scope>runtime</scope>
+                </dependency>
+            </dependencies>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.codenameone</groupId>
+                        <artifactId>codenameone-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>prepare-simulator-environment</id>
+                                <phase>initialize</phase>
+                                <goals>
+                                    <goal>prepare-simulator-classpath</goal>
+                                </goals>
+                                <configuration>
+                                    <hostedPlatform>javase</hostedPlatform>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>run-in-simulator</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <skip>${cn1.hosted.javase.skip}</skip>
+                                    <workingDirectory>${basedir}</workingDirectory>
+                                    <executable>java</executable>
+                                    <arguments combine.self="override">
+                                        <argument>-Xdebug</argument>
+                                        <argument>-Xrunjdwp:transport=dt_socket,server=n,address=${jpda.address}</argument>
+                                        <argument>-Xmx1024M</argument>
+                                        <argument>-Dcodename1.designer.jar=${codename1.designer.jar}</argument>
+                                        <argument>-Dcodename1.css.compiler.args.input=${codename1.css.compiler.args.input}</argument>
+                                        <argument>-Dcodename1.css.compiler.args.output=${codename1.css.compiler.args.output}</argument>
+                                        <argument>-Dcodename1.css.compiler.args.merge=${codename1.css.compiler.args.merge}</argument>
+                                        <argument>@${cn1.hosted.classpathArgFile}</argument>
+                                        <argument>${exec.mainClass}</argument>
+                                        <argument>${codename1.mainClass}</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <!-- Debugging the simulator from Eclipse: waits for a debugger on ${jpda.address}. -->
+            <id>debug-eclipse</id>
+            <properties>
+                <exec.mainClass>com.codename1.impl.javase.Simulator</exec.mainClass>
+                <jpda.listen>true</jpda.listen>
+            </properties>
+            <dependencies>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-core</artifactId>
+                    <scope>compile</scope>
+                </dependency>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-javase</artifactId>
+                    <scope>runtime</scope>
+                </dependency>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>cn1-binaries-javase</artifactId>
+                    <version>${cn1.version}</version>
+                    <type>pom</type>
+                    <scope>runtime</scope>
+                </dependency>
+            </dependencies>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.codenameone</groupId>
+                        <artifactId>codenameone-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>prepare-simulator-environment</id>
+                                <phase>initialize</phase>
+                                <goals>
+                                    <goal>prepare-simulator-classpath</goal>
+                                </goals>
+                                <configuration>
+                                    <hostedPlatform>javase</hostedPlatform>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>run-in-simulator</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <skip>${cn1.hosted.javase.skip}</skip>
+                                    <workingDirectory>${basedir}</workingDirectory>
+                                    <executable>java</executable>
+                                    <arguments combine.self="override">
+                                        <argument>-Xdebug</argument>
+                                        <argument>-Xrunjdwp:transport=dt_socket,server=y,address=${jpda.address},suspend=y</argument>
+                                        <argument>-Xmx1024M</argument>
+                                        <argument>-Dcodename1.designer.jar=${codename1.designer.jar}</argument>
+                                        <argument>-Dcodename1.css.compiler.args.input=${codename1.css.compiler.args.input}</argument>
+                                        <argument>-Dcodename1.css.compiler.args.output=${codename1.css.compiler.args.output}</argument>
+                                        <argument>-Dcodename1.css.compiler.args.merge=${codename1.css.compiler.args.merge}</argument>
+                                        <argument>@${cn1.hosted.classpathArgFile}</argument>
+                                        <argument>${exec.mainClass}</argument>
+                                        <argument>${codename1.mainClass}</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <!-- Runs the app as a desktop app: ./mvnw verify -Prun-desktop -Dcodename1.platform=javase -->
+            <id>run-desktop</id>
+            <dependencies>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-core</artifactId>
+                    <scope>compile</scope>
+                </dependency>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-javase</artifactId>
+                    <scope>runtime</scope>
+                </dependency>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>cn1-binaries-javase</artifactId>
+                    <version>${cn1.version}</version>
+                    <type>pom</type>
+                    <scope>runtime</scope>
+                </dependency>
+            </dependencies>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.codenameone</groupId>
+                        <artifactId>codenameone-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>generate-icons</id>
+                                <phase>generate-sources</phase>
+                                <goals>
+                                    <goal>generate-desktop-app-wrapper</goal>
+                                </goals>
+                                <configuration>
+                                    <hostedPlatform>javase</hostedPlatform>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>run-desktop</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>java</goal>
+                                </goals>
+                                <configuration>
+                                    <skip>${cn1.hosted.javase.skip}</skip>
+                                    <mainClass>${codename1.packageName}.${codename1.mainName}Stub</mainClass>
+                                    <arguments combine.self="override"/>
+                                    <additionalClasspathElements>
+                                        <additionalClasspathElement>${project.build.directory}/cn1-javase/classes</additionalClasspathElement>
+                                        <additionalClasspathElement>${project.build.directory}/cn1-javase/desktop</additionalClasspathElement>
+                                        <additionalClasspathElement>${basedir}/src/desktop/resources</additionalClasspathElement>
+                                        <additionalClasspathElement>${basedir}/../javase/src/desktop/resources</additionalClasspathElement>
+                                    </additionalClasspathElements>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <!-- A runnable desktop jar: ./mvnw package -Pexecutable-jar -Dcodename1.platform=javase
+                 writes target/<app>-javase-<version>.jar, target/libs/ and a zip of both. -->
+            <id>executable-jar</id>
+            <dependencies>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-core</artifactId>
+                    <scope>compile</scope>
+                </dependency>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-javase</artifactId>
+                    <scope>runtime</scope>
+                </dependency>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>cn1-binaries-javase</artifactId>
+                    <version>${cn1.version}</version>
+                    <type>pom</type>
+                    <scope>runtime</scope>
+                </dependency>
+            </dependencies>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.codenameone</groupId>
+                        <artifactId>codenameone-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>generate-icons</id>
+                                <phase>generate-sources</phase>
+                                <goals>
+                                    <goal>generate-desktop-app-wrapper</goal>
+                                </goals>
+                                <configuration>
+                                    <hostedPlatform>javase</hostedPlatform>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>javase-executable-jar</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>javase-executable-jar</goal>
+                                </goals>
+                                <configuration>
+                                    <hostedPlatform>javase</hostedPlatform>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <!-- Runs the cn1:test (AbstractTest) unit tests: ./mvnw verify -Ptest -->
+            <id>test</id>
+            <dependencies>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-core</artifactId>
+                    <scope>compile</scope>
+                </dependency>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-javase</artifactId>
+                    <scope>runtime</scope>
+                </dependency>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>cn1-binaries-javase</artifactId>
+                    <version>${cn1.version}</version>
+                    <type>pom</type>
+                    <scope>runtime</scope>
+                </dependency>
+            </dependencies>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.codenameone</groupId>
+                        <artifactId>codenameone-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>cn1-tests</id>
+                                <phase>test</phase>
+                                <goals>
+                                    <goal>test</goal>
+                                </goals>
+                                <configuration>
+                                    <hostedPlatform>javase</hostedPlatform>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <!-- Installs and starts the Android build on a connected device:
+                 ./mvnw verify -Prun-android -Dcodename1.platform=android -->
+            <id>run-android</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.codenameone</groupId>
+                        <artifactId>codenameone-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <!-- Decides cn1.hosted.android.skip for adb-install below. -->
+                                <id>run-android-hosted</id>
+                                <phase>validate</phase>
+                                <goals>
+                                    <goal>hosted-platform</goal>
+                                </goals>
+                                <configuration>
+                                    <hostedPlatform>android</hostedPlatform>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <artifactId>maven-antrun-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>adb-install</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>run</goal>
+                                </goals>
+                                <configuration>
+                                    <skip>${cn1.hosted.android.skip}</skip>
+                                    <target>
+                                        <echo>Running adb install</echo>
+                                        <exec executable="${env.ANDROID_HOME}/platform-tools/adb" failonerror="true">
+                                            <arg value="install"/>
+                                            <arg value="-r"/>
+                                            <arg value="${project.build.directory}/${project.build.finalName}.apk"/>
+                                        </exec>
+                                        <echo>Trying to start app on device using adb</echo>
+                                        <exec executable="${env.ANDROID_HOME}/platform-tools/adb" failonerror="true">
+                                            <arg value="shell"/>
+                                            <arg value="am"/>
+                                            <arg value="start"/>
+                                            <arg value="-n"/>
+                                            <arg value="${codename1.packageName}/.${codename1.mainName}Stub"/>
+                                        </exec>
+                                    </target>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <!-- End of the hosted platform profiles. -->
+
+        <profile>
+            <!--
+                For sending iOS debug builds use:
+                mvn cn:build -P ios-debug
+            -->
+            <id>ios-debug</id>
+            <properties>
+                <!-- Build server target type -->
+                <codename1.targetType>iphone</codename1.targetType>
+                
+                <!-- Used for identifying native interfaces.  Should match correct subdirectory of native -->
+                <codename1.targetPlatform>ios</codename1.targetPlatform>
+            </properties>
+        </profile>
+        <profile>
+            <!--
+                For sending iOS debug builds use:
+                mvn cn:build -P ios-release
+            -->
+            <id>ios-release</id>
+            <properties>
+                <!-- Build server target type -->
+                <codename1.targetType>iphone</codename1.targetType>
+                <codename1.production>true</codename1.production>
+                
+                <!-- Used for identifying native interfaces.  Should match correct subdirectory of native -->
+                <codename1.targetPlatform>ios</codename1.targetPlatform>
+                <codename1.appStoreBuild>true</codename1.appStoreBuild>
+            </properties>
+        </profile>
+        <profile>
+            <!--
+                For sending Javascript builds use:
+                mvn cn:build -P javascript
+            -->
+            <id>javascript</id>
+            <properties>
+                <codename1.targetType>javascript</codename1.targetType>
+                <codename1.targetPlatform>javascript</codename1.targetPlatform>
+            </properties>
+        </profile>
+        <profile>
+            <!--
+                For sending Android builds use:
+                mvn cn:build -P android
+            -->
+            <id>android</id>
+            <properties>
+                <codename1.targetType>android</codename1.targetType>
+                <codename1.targetPlatform>android</codename1.targetPlatform>
+            </properties>
+        </profile>
+        <profile>
+            <!--
+                For sending Windows device builds use:
+                mvn cn:build -P win
+            -->
+            <id>win</id>
+            <properties>
+                <codename1.targetType>windows</codename1.targetType>
+                <codename1.targetPlatform>win</codename1.targetPlatform>
+            </properties>
+        </profile>
+        <profile>
+            <!--
+                For sending Windows desktop builds use:
+                mvn cn:build -P windows
+            -->
+            <id>windows</id>
+            <properties>
+                <codename1.targetType>desktop_windows</codename1.targetType>
+                <codename1.targetPlatform>javase</codename1.targetPlatform>
+            </properties>
+        </profile>
+        <profile>
+            <!--
+                For sending Mac Desktop builds use:
+                mvn cn:build -P mac
+            -->
+            <id>mac</id>
+            <properties>
+                <codename1.targetType>desktop_macosx</codename1.targetType>
+                <codename1.targetPlatform>javase</codename1.targetPlatform>
+            </properties>
+        </profile>
+    </profiles>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>17</source>
+                    <target>17</target>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>properties-maven-plugin</artifactId>
+                <version>1.0.0</version>
+                <executions>
+                    <execution>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>read-project-properties</goal>
+                        </goals>
+                        <configuration>
+                            <files>
+                                <file>${basedir}/codenameone_settings.properties</file>
+                            </files>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-maven-plugin</artifactId>
+
+                <executions>
+                    <execution>
+                        <!-- Build-time SVG transcoder: any SVG dropped into
+                             src/main/css/ or src/main/svg/ is compiled into
+                             a GeneratedSVGImage subclass plus an SVGRegistry,
+                             so theme.css `url(*.svg)` references resolve at
+                             runtime to vector-rendered Image objects on every
+                             port. See docs/developer-guide/svg.md. -->
+                        <id>transcode-svg</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>transcode-svg</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <!-- Android resources (src/main/android): R classes,
+                             the resource table and the activity/view factory. -->
+                        <id>compile-android-res</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>compile-android-res</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>generate-gui-sources</id>
+                        <phase>process-sources</phase>
+                        <goals>
+                            <goal>generate-gui-sources</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>cn1-process-classes</id>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <!-- Relocates Android code onto the compatibility
+                                 runtime; must precede bytecode-compliance. -->
+                            <goal>remap-android</goal>
+                            <goal>bytecode-compliance</goal>
+                            <goal>css</goal>
+                            <!-- Scans the project's compiled bytecode for
+                                 @Route declarations and generates the
+                                 dispatcher class consumed by the per-platform
+                                 application stub. No-op for projects with no
+                                 @Route. -->
+                            <goal>process-annotations</goal>
+                            <!--<goal>compile-javase-sources</goal>-->
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>attach-test-artifact</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>attach-test-artifact</goal>
+                        </goals>
+                    </execution>
+                </executions>
+
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <!--
+                  Surefire is skipped here while the project has a javase
+                  module: that module mounts these test sources through
+                  testSourceDirectory and runs them, and running them here
+                  too would execute every JUnit test twice. Without a javase
+                  module the cn1-javase-natives profile below turns it back
+                  on. Legacy AbstractTest classes run through `cn1:test`
+                  (the "test" profile).
+                  -->
+                <configuration>
+                    <skipTests>true</skipTests>
+                </configuration>
+            </plugin>
+
+        </plugins>
+
+
+    </build>
+
+    
+</project>

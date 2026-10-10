@@ -139,23 +139,16 @@ public class GeneratorModelIntegrationBuildTest extends AbstractTest {
         Path repoDir = Paths.get(repo).toAbsolutePath();
         String version = System.getenv("CN1_GRADLE_PLUGIN_VERSION");
         // Every project type with the Java template, plus each template whose build
-        // script adds something of its own (the Kotlin plugin, Tweet's cn1libs).
+        // script adds something of its own (the Kotlin plugin).
         Object[][] cases = new Object[][] {
                 {Template.BAREBONES, ProjectOptions.ProjectType.APP},
                 {Template.BAREBONES, ProjectOptions.ProjectType.APP_WITH_BACKEND},
                 {Template.BAREBONES, ProjectOptions.ProjectType.BACKEND_ONLY},
-                {Template.KOTLIN, ProjectOptions.ProjectType.APP},
-                // cn1libs by coordinates, CodeRAD XML views and an annotation processor.
-                {Template.TWEET, ProjectOptions.ProjectType.APP}
+                {Template.KOTLIN, ProjectOptions.ProjectType.APP}
         };
         for (int i = 0; i < cases.length; i++) {
             Template template = (Template) cases[i][0];
             ProjectOptions.ProjectType type = (ProjectOptions.ProjectType) cases[i][1];
-            if (!template.supportsGradle()) {
-                // Listed so it is built as soon as the template is enabled for Gradle.
-                System.out.println("[WARN] Skipping " + template + ": " + template.GRADLE_UNSUPPORTED_REASON);
-                continue;
-            }
             String suffix = "gradle" + i;
             ProjectOptions options = new ProjectOptions(ProjectOptions.ThemeMode.LIGHT, ProjectOptions.Accent.DEFAULT,
                     true, true, ProjectOptions.PreviewLanguage.ENGLISH, ProjectOptions.JavaVersion.JAVA_17, null,
@@ -224,6 +217,40 @@ public class GeneratorModelIntegrationBuildTest extends AbstractTest {
         assertTrue(exit == 0, "The minimal app's simulator profile should resolve | exitCode=" + exit);
         assertTrue(Files.isRegularFile(app.resolve("common/target/codenameone/simulator-classpath.args")),
                 "The simulator should be prepared from common");
+
+        buildGeneratedFullStackProject(homeDir, java17, repoLocal, version);
+    }
+
+    /// The full-stack template, in another colour scheme than its own: the server's
+    /// tests pass against the contract module, and the app compiles against the same
+    /// module with its stylesheet. Both halves take their half of the contract from
+    /// `shared`, so a template that reached a download with the two out of step
+    /// fails here in whichever did not follow.
+    private void buildGeneratedFullStackProject(Path homeDir, Path java17, String repoLocal, String version)
+            throws Exception {
+        ProjectOptions options = layoutOptions(ProjectOptions.ProjectType.APP_WITH_BACKEND).forFullStack()
+                .withScheme(0x6d3fd1, false);
+        Path project = generateLayoutProject(Template.WAYLINE, options, "LayoutRideApp", "com.acme.initializr.ride",
+                version);
+        assertTrue(Files.isRegularFile(project.resolve("shared/pom.xml")),
+                "A full-stack project should have its contract module");
+        int exit = runMaven(project, homeDir, java17, repoLocal, "test", "-Dcodename1.platform=backend",
+                "-pl", "shared,backend", "-am");
+        assertTrue(exit == 0, "The full-stack project's server should build and pass its tests | exitCode=" + exit);
+        File[] reports = project.resolve("backend/target/surefire-reports").toFile().listFiles(
+                (d, n) -> n.startsWith("TEST-") && n.endsWith(".xml"));
+        assertTrue(reports != null && reports.length > 0, "The server's tests should have run, not been skipped");
+        assertTrue(Files.isRegularFile(project.resolve(
+                        "backend/target/generated-sources/cn1-annotations/com/acme/initializr/ride/api/RiderApiServer.java")),
+                "The server's half of the contract should be generated from the shared module");
+        exit = runMaven(project, homeDir, java17, repoLocal, "package", "-DskipTests=true",
+                "-Dcodename1.platform=javase");
+        assertTrue(exit == 0, "The full-stack project's app should build from common | exitCode=" + exit);
+        assertTrue(Files.isRegularFile(project.resolve("common/target/classes/theme.res")),
+                "The app's stylesheet should compile in the chosen scheme");
+        assertTrue(Files.isRegularFile(project.resolve(
+                        "common/target/classes/com/acme/initializr/ride/api/RiderApiImpl.class")),
+                "The app's half of the contract should be generated from the shared module");
     }
 
     private ProjectOptions layoutOptions(ProjectOptions.ProjectType type) {
@@ -235,9 +262,15 @@ public class GeneratorModelIntegrationBuildTest extends AbstractTest {
     /// A project generated on the layouts side of the gate, with the poms pointed at `version`.
     private Path generateLayoutProject(ProjectOptions options, String appName, String packageName, String version)
             throws Exception {
+        return generateLayoutProject(Template.BAREBONES, options, appName, packageName, version);
+    }
+
+    private Path generateLayoutProject(Template template, ProjectOptions options, String appName, String packageName,
+                                       String version) throws Exception {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
-        GeneratorModel.createForPluginVersion(IDE.INTELLIJ, Template.BAREBONES, appName, packageName, options,
-                GeneratorModel.MAVEN_LAYOUTS_SINCE).writeProjectZip(output);
+        GeneratorModel.createForPluginVersion(IDE.INTELLIJ, template, appName, packageName, options,
+                template.isFullStack() ? GeneratorModel.FULL_STACK_SINCE : GeneratorModel.MAVEN_LAYOUTS_SINCE)
+                .writeProjectZip(output);
         Path dir = Files.createTempDirectory("initializr-layout-" + appName + "-");
         unzipProject(output.toByteArray(), dir);
         Path pom = dir.resolve("pom.xml");

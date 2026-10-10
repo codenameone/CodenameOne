@@ -390,6 +390,10 @@ final class BackendBeans {
         String security;
         /// Bean name -> Java type, for the beans [#security] calls.
         Map<String, String> securityBeans = Collections.<String, String>emptyMap();
+        /// The method's descriptor with every type the helper class cannot name
+        /// replaced by the nearest superclass it can, or null when it can name
+        /// them all; see [BackendBeans#erasedDescriptor].
+        String erased;
 
         Aspect(MethodInfo method) {
             this.method = method;
@@ -2839,6 +2843,7 @@ final class BackendBeans {
             }
             boolean usesSecurity = classSecurity != null;
             Aspects found = null;
+            Set<String> helperSignatures = new HashSet<String>();
             for (MethodInfo m : cls.getMethods()) {
                 if (m.isConstructor() || m.isSynthetic() || "<clinit>".equals(m.getName())
                         || BackendWeaver.isBody(m.getName())
@@ -2911,6 +2916,10 @@ final class BackendBeans {
                         continue;
                     }
                 }
+                String erased = erasedDescriptor(cls, m.getDescriptor());
+                if (!helperCanReach(cls, m, tx, where, erased, helperSignatures)) {
+                    continue;
+                }
                 if (found == null) {
                     String pkg = RestClientAnnotationProcessor.packageOf(cls.getBinaryName());
                     found = new Aspects(cls, qualify(pkg, baseName(cls.getInternalName())
@@ -2918,6 +2927,7 @@ final class BackendBeans {
                     aspects.put(cls.getInternalName(), found);
                 }
                 Aspect a = new Aspect(m);
+                a.erased = erased.equals(m.getDescriptor()) ? null : erased;
                 if (security != null) {
                     compileSecurity(cls, m, security, a, where);
                 }
@@ -2941,6 +2951,151 @@ final class BackendBeans {
                         + "http.build() -- or remove the annotations.");
             }
         }
+    }
+
+    // An aspect lives in a class GENERATED AS SOURCE beside the one it wraps, so
+    // every type in the wrapped method's signature has to be one that class can
+    // write. A private member class is not, although nothing is wrong with it at
+    // run time: its class file is package-private, and only javac refuses the
+    // name. So the helper is written against the nearest superclass it CAN name,
+    // and the weaver puts the two casts where the real type is in scope -- in the
+    // class itself. Both casts are of a value that already is of the type, so
+    // neither can fail; that matters, because on the translated server a failed
+    // cast does not throw.
+
+    /// Whether source in package `pkg` can write the name of the class.
+    private boolean nameableFrom(String internal, String pkg) {
+        AnnotatedClass c = RestControllerAnnotationProcessor.resolveClass(ctx, internal);
+        if (c == null) {
+            // Not a class of this build or its dependencies: the JDK's, which the
+            // method's own source could only name if it were accessible.
+            return true;
+        }
+        if (!c.isNameableInPackage()) {
+            return false;
+        }
+        // A protected member of a superclass in another package is in scope in
+        // the subclass and nowhere else in the subclass's package.
+        return c.isAccessibleFromAnywhere()
+                || RestClientAnnotationProcessor.packageOf(c.getBinaryName()).equals(pkg);
+    }
+
+    private Type erase(Type t, String pkg) {
+        if (t.getSort() == Type.ARRAY) {
+            Type element = erase(t.getElementType(), pkg);
+            if (element.equals(t.getElementType())) {
+                return t;
+            }
+            // Arrays are covariant, so an Answer[] is a Base[] of the same depth.
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < t.getDimensions(); i++) {
+                sb.append('[');
+            }
+            return Type.getType(sb.append(element.getDescriptor()).toString());
+        }
+        if (t.getSort() != Type.OBJECT) {
+            return t;
+        }
+        String current = t.getInternalName();
+        for (int depth = 0; depth < 64 && !nameableFrom(current, pkg); depth++) {
+            AnnotatedClass c = RestControllerAnnotationProcessor.resolveClass(ctx, current);
+            current = c == null || c.getSuperInternalName() == null || c.isInterface()
+                    ? "java/lang/Object" : c.getSuperInternalName();
+        }
+        return Type.getObjectType(current);
+    }
+
+    /// A method descriptor as the class's aspect helper can write it: each
+    /// parameter and return type the helper cannot name -- a private member
+    /// class, most often -- replaced by the nearest superclass it can. The same
+    /// descriptor when there is nothing to replace.
+    ///
+    /// Decided by the source file alone, as the weaver needs: a type only that
+    /// file can name is declared in it, superclass clause included, so a build
+    /// that changes the answer has recompiled the class and weaves it afresh.
+    String erasedDescriptor(AnnotatedClass cls, String descriptor) {
+        String pkg = RestClientAnnotationProcessor.packageOf(cls.getBinaryName());
+        Type[] args = Type.getArgumentTypes(descriptor);
+        for (int i = 0; i < args.length; i++) {
+            args[i] = erase(args[i], pkg);
+        }
+        return Type.getMethodDescriptor(erase(Type.getReturnType(descriptor), pkg), args);
+    }
+
+    /// Reports what no rewrite of the signature can get the helper past, and
+    /// answers whether the method can have its aspects.
+    private boolean helperCanReach(AnnotatedClass cls, MethodInfo m, AnnotationValues tx,
+                                   String where, String erased, Set<String> signatures) {
+        String pkg = RestClientAnnotationProcessor.packageOf(cls.getBinaryName());
+        if (!nameableFrom(cls.getInternalName(), pkg)) {
+            ctx.error(cls, where + " has an aspect annotation (@Transactional, @Async, @Timed, "
+                    + "@Counted or an authorization check), and " + cls.getSourceName()
+                    + " is a private, local or anonymous class. The aspect is compiled into "
+                    + "a class beside it, which has to name " + cls.getSourceName()
+                    + " to call the method: make it a member class that is not private, or "
+                    + "move the method to one.");
+            return false;
+        }
+        boolean ok = true;
+        if (tx != null) {
+            for (String attribute : new String[] {"rollbackFor", "noRollbackFor"}) {
+                Object listed = tx.get(attribute);
+                if (!(listed instanceof List)) {
+                    continue;
+                }
+                for (Object o : (List<?>) listed) {
+                    if (o instanceof Type && ((Type) o).getSort() == Type.OBJECT
+                            && !nameableFrom(((Type) o).getInternalName(), pkg)) {
+                        ctx.error(cls, "@Transactional on " + where + " lists "
+                                + sourceNameOf(((Type) o).getInternalName()) + " in "
+                                + attribute + ", which is a private class. The rollback rule "
+                                + "is compiled into a class beside " + cls.getSourceName()
+                                + " and tests the exception against that type by name, so "
+                                + "the type has to be one it can name: remove `private` from "
+                                + "its declaration.");
+                        ok = false;
+                    }
+                }
+            }
+        }
+        // Overloads that differ only in a type the helper cannot name become one
+        // signature there. Never the case unless a type was replaced.
+        String key = m.getName() + erased.substring(0, erased.indexOf(')') + 1);
+        if (!signatures.add(key) && ok) {
+            ctx.error(cls, cls.getSourceName() + " has two methods named " + m.getName()
+                    + " with aspect annotations whose parameters differ only in a private "
+                    + "class (" + inaccessibleTypes(cls, m.getName()) + "). The aspects "
+                    + "are compiled into a class beside " + cls.getSourceName() + ", which "
+                    + "sees a private class as its superclass and so cannot tell the two "
+                    + "apart: rename one of them, or remove `private` from the class.");
+            ok = false;
+        }
+        return ok;
+    }
+
+    private String sourceNameOf(String internal) {
+        AnnotatedClass c = RestControllerAnnotationProcessor.resolveClass(ctx, internal);
+        return c != null ? c.getSourceName() : internal.replace('/', '.');
+    }
+
+    /// The parameter types of the class's methods of one name that its helper
+    /// cannot name, for a message.
+    private String inaccessibleTypes(AnnotatedClass cls, String method) {
+        String pkg = RestClientAnnotationProcessor.packageOf(cls.getBinaryName());
+        Set<String> names = new LinkedHashSet<String>();
+        for (MethodInfo m : cls.getMethods()) {
+            if (!m.getName().equals(method)) {
+                continue;
+            }
+            for (Type t : Type.getArgumentTypes(m.getDescriptor())) {
+                Type element = t.getSort() == Type.ARRAY ? t.getElementType() : t;
+                if (element.getSort() == Type.OBJECT
+                        && !nameableFrom(element.getInternalName(), pkg)) {
+                    names.add(sourceNameOf(element.getInternalName()));
+                }
+            }
+        }
+        return names.toString().replace("[", "").replace("]", "");
     }
 
     /// The simple name of a Spring Security annotation the build has nothing
@@ -3113,7 +3268,11 @@ final class BackendBeans {
             if (a != null) {
                 plan = plan(plan, cls, helper);
                 for (Aspect aspect : a.methods) {
-                    plan.aspects.add(aspect.method.getName() + aspect.method.getDescriptor());
+                    String key = aspect.method.getName() + aspect.method.getDescriptor();
+                    plan.aspects.add(key);
+                    if (aspect.erased != null) {
+                        plan.erasedAspects.put(key, aspect.erased);
+                    }
                 }
             }
             if (plan != null) {

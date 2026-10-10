@@ -41,13 +41,18 @@ class MapLabelsTest {
                 layer("poi", named("Museum", VectorFeature.GEOM_POINT, new int[]{1500, 1500}))));
         for (MapStyle style : new MapStyle[]{MapStyle.light(), MapStyle.dark()}) {
             assertEquals(Arrays.asList("Town"), texts(labels(tile, style, 11)));
-            assertEquals(Arrays.asList("Town", "Main Street", "City Park"), texts(labels(tile, style, 12)));
-            List<LabelCandidate> detail = labels(tile, style, 14);
-            assertEquals(Arrays.asList("Town", "Main Street", "City Park", "Museum"), texts(detail));
+            // A park from the first, a side street once there is room for its
+            // name, a landmark only close in: in the order they give way.
+            assertEquals(Arrays.asList("Town", "City Park"), texts(labels(tile, style, 12)));
+            assertEquals(Arrays.asList("Town", "City Park", "Main Street"), texts(labels(tile, style, 14)));
+            List<LabelCandidate> detail = labels(tile, style, 16);
+            assertEquals(Arrays.asList("Town", "City Park", "Main Street", "Museum"), texts(detail));
             for (LabelCandidate label : detail) {
-                assertEquals(detail.get(0).textColor, label.textColor);
                 assertEquals(detail.get(0).haloColor, label.haloColor);
             }
+            // The name of a town is the stronger: a street's is set back.
+            assertTrue(detail.get(0).textColor != detail.get(2).textColor);
+            assertTrue(detail.get(0).sizePx > detail.get(2).sizePx);
         }
     }
 
@@ -56,7 +61,7 @@ class MapLabelsTest {
         for (String source : new String[]{"road", "road_label"}) {
             VectorTile tile = new VectorTile(Arrays.asList(layer(source,
                     named("High Street", VectorFeature.GEOM_LINESTRING, new int[]{0, 100, 4096, 100}))));
-            assertEquals(Arrays.asList("High Street"), texts(labels(tile, MapStyle.light(), 13)));
+            assertEquals(Arrays.asList("High Street"), texts(labels(tile, MapStyle.light(), 14)));
         }
     }
 
@@ -66,10 +71,10 @@ class MapLabelsTest {
         VectorTile tile = new VectorTile(Arrays.asList(layer("transportation_name",
                 named("Bent Street", VectorFeature.GEOM_LINESTRING,
                         new int[]{0, 0, 100, 0, 200, 0, 1000, 0, 1000, 3000}))));
-        LabelCandidate label = labels(tile, MapStyle.light(), 13).get(0);
+        LabelCandidate label = labels(tile, MapStyle.light(), 14).get(0);
         assertEquals(2 * 256 + 1000 / 16.0, label.worldX, 1e-9);
         assertEquals(3 * 256 + 1000 / 16.0, label.worldY, 1e-9);
-        assertEquals(13, label.tileZoom);
+        assertEquals(14, label.tileZoom);
     }
 
     @Test
@@ -77,7 +82,7 @@ class MapLabelsTest {
         VectorTile tile = new VectorTile(Arrays.asList(layer("transportation_name",
                 named("Long Street", VectorFeature.GEOM_LINESTRING,
                         new int[]{0, 0, 20, 0}, new int[]{100, 200, 100, 200, 1100, 200}))));
-        LabelCandidate label = labels(tile, MapStyle.light(), 13).get(0);
+        LabelCandidate label = labels(tile, MapStyle.light(), 14).get(0);
         assertEquals(2 * 256 + 600 / 16.0, label.worldX, 1e-9);
         assertEquals(3 * 256 + 200 / 16.0, label.worldY, 1e-9);
     }
@@ -90,7 +95,7 @@ class MapLabelsTest {
                 named("Empty", VectorFeature.GEOM_LINESTRING, new int[0]),
                 named("Zero", VectorFeature.GEOM_LINESTRING, new int[]{100, 100, 100, 100}),
                 named("Outside", VectorFeature.GEOM_LINESTRING, new int[]{-300, 100, -100, 100}))));
-        assertTrue(labels(tile, MapStyle.light(), 13).isEmpty());
+        assertTrue(labels(tile, MapStyle.light(), 14).isEmpty());
     }
 
     @Test

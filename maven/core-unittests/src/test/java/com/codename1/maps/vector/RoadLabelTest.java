@@ -89,7 +89,7 @@ class RoadLabelTest extends UITestBase {
     }
 
     @FormTest
-    void aGentleBendPlacesEachGlyphOnTheCurve() {
+    void aGentleBendDrawsTheNameInPiecesThatFollowTheCurve() {
         Graphics g = graphics(true);
         List points = new ArrayList();
         for (int i = 0; i <= 20; i++) {
@@ -104,14 +104,39 @@ class RoadLabelTest extends UITestBase {
         assertTrue(new LabelEngine().placeAlongLine(g, "Curved Road Name", 13, TEXT, HALO, road, 5000,
                 0, 0, 800, 800));
         verify(drawing, never()).drawString(any(), eq("Curved Road Name"), anyInt(), anyInt());
-        verify(drawing, atLeastOnce()).drawString(any(), eq("C"), anyInt(), anyInt());
+        // The name goes down in pieces, each on one straight stretch of the
+        // road and turned to it: together they spell the name, and a stretch
+        // long enough for several glyphs is drawn as one string, not several.
+        ArgumentCaptor<String> drawn = ArgumentCaptor.forClass(String.class);
+        verify(drawing, atLeastOnce()).drawString(any(), drawn.capture(), anyInt(), anyInt());
+        List<String> pieces = new ArrayList<String>();
+        for (String piece : drawn.getAllValues()) {
+            if (pieces.isEmpty() || !pieces.get(pieces.size() - 1).equals(piece)) {
+                pieces.add(piece);
+            }
+        }
+        StringBuilder spelled = new StringBuilder();
+        for (String piece : pieces) {
+            spelled.append(piece);
+        }
+        assertEquals("Curved Road Name", spelled.toString());
+        assertTrue(pieces.size() > 1, "one piece for a road that bends");
+        assertTrue(pieces.size() < "Curved Road Name".length(), "a string for every glyph");
     }
 
     @FormTest
     void aSharpCornerUnderTheNameDropsIt() {
         Graphics g = graphics(true);
-        // The corner sits exactly under the middle of the name.
-        double[] road = {100, 100, 300, 100, 300, 300};
+        // A staircase: wherever the name is put, there is a corner under it.
+        // (One corner in a road long enough either side of it is no longer
+        // reason to leave the road unnamed: the name goes beside the corner.)
+        double[] road = new double[44];
+        for (int i = 0; i < 11; i++) {
+            road[i * 4] = 100 + 30 * i;
+            road[i * 4 + 1] = 100 + 30 * i;
+            road[i * 4 + 2] = 130 + 30 * i;
+            road[i * 4 + 3] = 100 + 30 * i;
+        }
         assertFalse(new LabelEngine().placeAlongLine(g, "Corner Street", 13, TEXT, HALO, road, 1000,
                 0, 0, 800, 800));
         verify(drawing, never()).drawString(any(), anyString(), anyInt(), anyInt());
@@ -148,6 +173,53 @@ class RoadLabelTest extends UITestBase {
         assertTrue(engine.placeAlongLine(g, "Other Road", 13, TEXT, HALO, neighbour, 300, 0, 0, 2000, 800));
     }
 
+    /// The collision index against the definition it replaces: a label is
+    /// placed exactly when it overlaps none of those placed before it, taken
+    /// one pair at a time. Points on both sides of zero, so that cells with
+    /// negative coordinates are covered, and dense enough that most are turned
+    /// away.
+    @FormTest
+    void aLabelIsPlacedExactlyWhenItOverlapsNoEarlierOne() {
+        // Drawn for real rather than recorded: nothing here asks what was drawn.
+        Graphics g = Image.createImage(800, 800).getGraphics();
+        LabelEngine engine = new LabelEngine();
+        List<int[]> placed = new ArrayList<int[]>();
+        List<String> names = new ArrayList<String>();
+        long seed = 42;
+        int accepted = 0;
+        int refused = 0;
+        for (int i = 0; i < 48; i++) {
+            seed = seed * 6364136223846793005L + 1442695040888963407L;
+            int x = (int) ((seed >>> 33) % 300) - 140;
+            seed = seed * 6364136223846793005L + 1442695040888963407L;
+            int y = (int) ((seed >>> 33) % 120) - 50;
+            String name = "P" + (100 + i);
+            boolean free = true;
+            for (int at = 0; at < placed.size(); at++) {
+                int[] earlier = placed.get(at);
+                LabelEngine pair = new LabelEngine();
+                assertTrue(pair.place(g, names.get(at), 13, TEXT, HALO, earlier[0], earlier[1]));
+                if (!pair.place(g, name, 13, TEXT, HALO, x, y)) {
+                    free = false;
+                    break;
+                }
+            }
+            assertEquals(free, engine.place(g, name, 13, TEXT, HALO, x, y),
+                    name + " at " + x + "," + y + " after " + placed.size() + " placed");
+            if (free) {
+                placed.add(new int[]{x, y});
+                names.add(name);
+                accepted++;
+            } else {
+                refused++;
+            }
+        }
+        assertTrue(accepted > 6 && refused > 6, accepted + " placed, " + refused + " refused");
+        // A new frame starts with nothing placed.
+        engine.reset();
+        assertTrue(engine.place(g, "Again", 13, TEXT, HALO, placed.get(0)[0], placed.get(0)[1]));
+    }
+
     @FormTest
     void withoutAffineTransformsTheNameIsHorizontalAtTheMidpoint() {
         Graphics g = graphics(false);
@@ -164,7 +236,7 @@ class RoadLabelTest extends UITestBase {
                 layer("transportation_name", named("Main Street", VectorFeature.GEOM_LINESTRING,
                         new int[]{160, 320, 1760, 320})),
                 layer("place", named("Town", VectorFeature.GEOM_POINT, new int[]{100, 100}))));
-        List labels = TileRenderer.extractLabels(tile, MapStyle.light(), 13, 2, 3, 256);
+        List labels = TileRenderer.extractLabels(tile, MapStyle.light(), 14, 2, 3, 256);
         LabelCandidate road = null;
         LabelCandidate town = null;
         for (Object o : labels) {
@@ -309,7 +381,8 @@ class RoadLabelTest extends UITestBase {
         g = graphics(true);
         TileRenderer.renderTile(g, tile, MapStyle.light(), 15, 256, 0, 0, 1);
         ArgumentCaptor<Shape> shape = ArgumentCaptor.forClass(Shape.class);
-        verify(drawing).drawShape(any(), shape.capture(), any(Stroke.class));
+        // Twice: its edge, and then the road over it.
+        verify(drawing, times(2)).drawShape(any(), shape.capture(), any(Stroke.class));
         Rectangle bounds = shape.getValue().getBounds();
         assertEquals(0, bounds.getX());
         assertEquals(0, bounds.getY());
@@ -366,8 +439,7 @@ class RoadLabelTest extends UITestBase {
         assertFalse(engine.hasRenderedVisibleTiles());
         assertEquals(first, source.requests, "no second download of a tile already loading");
         // When the deepest tiles land, the zoom-16 pieces are cut from them.
-        source.release();
-        awaitRendered(engine);
+        awaitRendered(engine, source);
     }
 
     @FormTest
@@ -385,8 +457,7 @@ class RoadLabelTest extends UITestBase {
         for (Object r : source.requests.subList(first.size(), source.requests.size())) {
             assertFalse(first.contains(r), "fetched " + r + " twice");
         }
-        source.release();
-        awaitRendered(engine);
+        awaitRendered(engine, source);
     }
 
     @FormTest
@@ -424,15 +495,92 @@ class RoadLabelTest extends UITestBase {
     }
 
     @FormTest
+    void aRoadThatRunsOffTheScreenIsNamedWhereTheWholeNameFits() {
+        Graphics g = graphics(true);
+        // Its middle is exactly at the right-hand edge of an 800 pixel view.
+        double[] road = {-400, 400, 2000, 400};
+        assertTrue(new LabelEngine().placeAlongLine(g, "Main Street", 13, TEXT, HALO, road, 5000,
+                0, 0, 800, 800));
+        ArgumentCaptor<Integer> x = ArgumentCaptor.forClass(Integer.class);
+        verify(drawing, atLeastOnce()).drawString(any(), eq("Main Street"), x.capture(), anyInt());
+        int width = implementation.stringWidth(drawing.getDefaultFont(), "Main Street");
+        for (Integer left : x.getAllValues()) {
+            assertTrue(left >= -2 && left <= 802 - Math.min(width, 400), "drawn from x=" + left);
+        }
+        // With too little of it in view to hold the name, it is not named at
+        // all rather than named in part.
+        Graphics other = graphics(true);
+        assertFalse(new LabelEngine().placeAlongLine(other, "Main Street", 13, TEXT, HALO,
+                new double[]{790, 400, 2000, 400}, 5000, 0, 0, 800, 800));
+        verify(drawing, never()).drawString(any(), anyString(), anyInt(), anyInt());
+    }
+
+    @FormTest
+    void aNameThatWouldBeCutOffByTheEdgeOfTheMapIsLeftOut() {
+        Graphics g = graphics(true);
+        LabelEngine engine = new LabelEngine();
+        engine.reset(0, 0, 800, 800);
+        assertFalse(engine.place(g, "Pier 41 Gate 2", 13, TEXT, HALO, 799, 400));
+        assertFalse(engine.place(g, "Pier 41 Gate 2", 13, TEXT, HALO, 400, 1));
+        verify(drawing, never()).drawString(any(), anyString(), anyInt(), anyInt());
+        assertTrue(engine.place(g, "Pier 41 Gate 2", 13, TEXT, HALO, 400, 400));
+        // And a wider outline costs no more to draw than a thin one.
+        engine.setHalo(4);
+        assertTrue(engine.place(g, "Hyde Street", 13, TEXT, HALO, 400, 600));
+        verify(drawing, times(5)).drawString(any(), eq("Hyde Street"), anyInt(), anyInt());
+    }
+
+    @FormTest
+    void aMainRoadIsDrawnWiderThanASideStreetAndAPierIsNotOutlined() {
+        VectorFeature main = new VectorFeature(0, VectorFeature.GEOM_LINESTRING, new HashMap(),
+                Arrays.asList(new Object[]{new int[]{0, 1000, 4096, 1000}}));
+        main.getAttributes().put("class", "primary");
+        VectorFeature side = new VectorFeature(0, VectorFeature.GEOM_LINESTRING, new HashMap(),
+                Arrays.asList(new Object[]{new int[]{0, 3000, 4096, 3000}}));
+        side.getAttributes().put("class", "minor");
+        VectorFeature pier = new VectorFeature(0, VectorFeature.GEOM_POLYGON, new HashMap(),
+                Arrays.asList(new Object[]{new int[]{100, 100, 900, 100, 900, 300, 100, 300, 100, 100}}));
+        pier.getAttributes().put("class", "pier");
+        for (MapStyle style : new MapStyle[]{MapStyle.light(), MapStyle.dark()}) {
+            Graphics g = graphics(true);
+            TileRenderer.renderTile(g, new VectorTile(Arrays.asList(layer("transportation", pier))),
+                    style, 15, 256);
+            verify(drawing, never()).drawShape(any(), any(Shape.class), any(Stroke.class));
+
+            g = graphics(true);
+            TileRenderer.renderTile(g, new VectorTile(Arrays.asList(layer("transportation", side))),
+                    style, 15, 256);
+            float street = widest();
+            g = graphics(true);
+            TileRenderer.renderTile(g, new VectorTile(Arrays.asList(layer("transportation", main))),
+                    style, 15, 256);
+            assertTrue(widest() > street, style.getName() + ": " + widest() + " against " + street);
+        }
+    }
+
+    private float widest() {
+        ArgumentCaptor<Stroke> stroke = ArgumentCaptor.forClass(Stroke.class);
+        verify(drawing, atLeastOnce()).drawShape(any(), any(Shape.class), stroke.capture());
+        float widest = 0;
+        for (Stroke one : stroke.getAllValues()) {
+            widest = Math.max(widest, one.getLineWidth());
+        }
+        return widest;
+    }
+
+    @FormTest
     void overzoomStopsAtTwentyTwoButNeverBelowTheSourcesOwnDeepestLevel() {
         assertEquals(22, new VectorMapEngine(new RecordingSource(true, 18), MapStyle.light()).getMaxZoom(), 0);
         assertEquals(24, new VectorMapEngine(new RecordingSource(true, 24), MapStyle.light()).getMaxZoom(), 0);
     }
 
-    private void awaitRendered(VectorMapEngine engine) {
+    // The engine asks for a few tiles at a time, so the source is released
+    // again for each lot the last answers made room for.
+    private void awaitRendered(VectorMapEngine engine, HoldingSource source) {
         long deadline = System.currentTimeMillis() + 5000;
         while (!engine.hasRenderedVisibleTiles()) {
             assertTrue(System.currentTimeMillis() < deadline, "tiles never rendered");
+            source.release();
             flushSerialCalls();
             try {
                 Thread.sleep(10);

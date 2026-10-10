@@ -31,6 +31,7 @@ import com.codename1.initializr.model.GeneratorModel;
 import com.codename1.initializr.model.IDE;
 import com.codename1.initializr.model.ProjectOptions;
 import com.codename1.initializr.model.Template;
+import com.codename1.initializr.ui.AppIcon;
 import com.codename1.initializr.ui.TemplatePreviewPanel;
 import com.codename1.system.Lifecycle;
 import com.codename1.system.NativeLookup;
@@ -43,6 +44,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
+import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.RadioButton;
 import com.codename1.ui.TextField;
@@ -123,6 +125,14 @@ public class Initializr extends Lifecycle {
         final ProjectOptions.BuildTool[] buildTool = new ProjectOptions.BuildTool[]{ProjectOptions.BuildTool.MAVEN};
         final ProjectOptions.ProjectType[] projectType = new ProjectOptions.ProjectType[]{ProjectOptions.ProjectType.APP};
         final boolean[] allPlatformModules = new boolean[]{false};
+        // The colour scheme of a full-stack template: {0xRRGGBB, or -1 for its own}.
+        final int[] brandColor = new int[]{-1};
+        final boolean[] roundedCorners = new boolean[]{true};
+        // The panels a full-stack template settles for itself, {build, localization,
+        // java}, and the one only it has, {look}; filled in below, read by refresh.
+        final Container[] fixedByTemplate = new Container[3];
+        final Container[] lookPanelHolder = new Container[1];
+        final Label lookIcon = new Label();
         // {Java 17, Java 8}: the build panel disables Java 8 while Gradle is selected.
         final RadioButton[] javaButtons = new RadioButton[2];
         final SpanLabel summaryLabel = new SpanLabel();
@@ -133,6 +143,7 @@ public class Initializr extends Lifecycle {
         final Label localeSubtitle = panelSubtitle("No bundles");
         final Label javaSubtitle = panelSubtitle(ProjectOptions.JavaVersion.JAVA_17.label);
         final Label buildSubtitle = panelSubtitle(ProjectOptions.BuildTool.MAVEN.label);
+        final Label lookSubtitle = panelSubtitle(SCHEME_LABELS[0]);
 
         appNameField.setUIID("InitializrField");
         packageField.setUIID("InitializrField");
@@ -153,6 +164,28 @@ public class Initializr extends Lifecycle {
                 ProjectOptions options = currentOptions(includeLocalizationBundles, previewLanguage, javaVersion)
                         .withBuild(buildTool[0], projectType[0])
                         .withPlatformModules(allPlatformModules[0]);
+                boolean fullStack = selectedTemplate[0].isFullStack();
+                if (fullStack) {
+                    options = options.forFullStack().withScheme(brandColor[0], roundedCorners[0]);
+                }
+                // A full-stack template is one build, one project type and one Java
+                // level, so those panels have nothing to ask; it has a look instead.
+                boolean buildChoices = GeneratorModel.isGradleOffered() || GeneratorModel.isMavenLayoutChoiceOffered();
+                for (int i = 0; i < fixedByTemplate.length; i++) {
+                    if (fixedByTemplate[i] != null) {
+                        boolean shown = !fullStack && (i != 0 || buildChoices);
+                        fixedByTemplate[i].setHidden(!shown);
+                        fixedByTemplate[i].setVisible(shown);
+                    }
+                }
+                if (lookPanelHolder[0] != null) {
+                    lookPanelHolder[0].setHidden(!fullStack);
+                    lookPanelHolder[0].setVisible(fullStack);
+                }
+                lookSubtitle.setText(schemeLabel(brandColor[0])
+                        + (roundedCorners[0] ? "" : " . Square corners"));
+                lookIcon.setIcon(AppIcon.create(appNameField.getText(), schemeColor(brandColor[0]),
+                        convertToPixels(12)));
                 previewPanel.setTemplate(selectedTemplate[0]);
                 previewPanel.setOptions(options);
 
@@ -190,6 +223,12 @@ public class Initializr extends Lifecycle {
         Container buildPanel = makePanel("Build Tool", buildSubtitle, true, false,
                 createBuildToolPanel(buildTool, projectType, allPlatformModules, javaVersion, javaButtons, refresh),
                 form);
+        Container lookPanel = makePanel("Look", lookSubtitle, true, true,
+                createLookPanel(brandColor, roundedCorners, lookIcon, refresh), form);
+        fixedByTemplate[0] = buildPanel;
+        fixedByTemplate[1] = localePanel;
+        fixedByTemplate[2] = javaPanel;
+        lookPanelHolder[0] = lookPanel;
         Container settingsPanel = makePanel("Current Settings", panelSubtitle("Generated artifacts"), true, true,
                 BoxLayout.encloseY(summaryLabel), form);
 
@@ -199,10 +238,8 @@ public class Initializr extends Lifecycle {
         // Gradle is offered once the plugin is published at the version the
         // generated projects use, and the Maven project types once that plugin can
         // build them; with neither, the Maven default stands alone.
-        boolean buildChoices = GeneratorModel.isGradleOffered() || GeneratorModel.isMavenLayoutChoiceOffered();
-        buildPanel.setHidden(!buildChoices);
-        buildPanel.setVisible(buildChoices);
-        Container column = BoxLayout.encloseY(hero, essentials, idePanel, buildPanel, localePanel,
+        // Which of these panels show is refresh's to say: it depends on the template.
+        Container column = BoxLayout.encloseY(hero, essentials, lookPanel, idePanel, buildPanel, localePanel,
                 javaPanel, settingsPanel, previewWrap);
         column.setUIID("InitializrColumn");
         column.setScrollableY(true);
@@ -229,6 +266,10 @@ public class Initializr extends Lifecycle {
             ProjectOptions options = downloadOptions(includeLocalizationBundles, previewLanguage, javaVersion)
                     .withBuild(buildTool[0], projectType[0])
                         .withPlatformModules(allPlatformModules[0]);
+            if (selectedTemplate[0].isFullStack()) {
+                options = options.forFullStack().withScheme(brandColor[0], roundedCorners[0])
+                        .withIcon(AppIcon.png(appName, schemeColor(brandColor[0])));
+            }
             GeneratorModel model = GeneratorModel.create(selectedIde[0], selectedTemplate[0], appName, packageName,
                     options);
             if (model.generate()) {
@@ -353,7 +394,8 @@ public class Initializr extends Lifecycle {
                         + "unique. Unique package identifiers are critical for app store submissions because "
                         + "they distinguish your app from others and prevent install/update conflicts."));
         fields.add(packageError);
-        fields.add(labeledField("Language", languageSelector));
+        fields.add(labeledField(GeneratorModel.isTemplateOffered(Template.WAYLINE) ? "Start from" : "Language",
+                languageSelector));
 
         Container bodyWrap = new Container(new BorderLayout());
         bodyWrap.setUIID("InitializrPanelBody");
@@ -364,12 +406,20 @@ public class Initializr extends Lifecycle {
         return panel;
     }
 
+    /// What the project starts as: an empty app in Java or in Kotlin, or -- once the
+    /// plugin the Initializr generates against can build it -- the ride-hailing app
+    /// with its server.
     private Container createLanguageSelector(Template[] selectedTemplate, Runnable onSelectionChanged) {
-        Container selector = new Container(new GridLayout(1, 2));
+        boolean fullStack = GeneratorModel.isTemplateOffered(Template.WAYLINE);
+        Container selector = new Container(new GridLayout(fullStack ? 3 : 1, fullStack ? 1 : 2));
         selector.setUIID("InitializrChoicesGrid");
         ButtonGroup group = new ButtonGroup();
-        Template[] languages = {Template.BAREBONES, Template.KOTLIN};
-        String[] labels = {"Java", "Kotlin"};
+        Template[] languages = fullStack
+                ? new Template[] {Template.BAREBONES, Template.KOTLIN, Template.WAYLINE}
+                : new Template[] {Template.BAREBONES, Template.KOTLIN};
+        String[] labels = fullStack
+                ? new String[] {"Empty app, Java", "Empty app, Kotlin", "Ride-hailing app with its server, Java"}
+                : new String[] {"Java", "Kotlin"};
         for (int i = 0; i < languages.length; i++) {
             final Template template = languages[i];
             RadioButton button = new RadioButton(labels[i]);
@@ -388,6 +438,71 @@ public class Initializr extends Lifecycle {
             });
         }
         return selector;
+    }
+
+    /// The colour schemes a full-stack template is offered in. The first is the
+    /// template's own, which leaves its stylesheet as it is.
+    private static final String[] SCHEME_LABELS = {"Blue", "Teal", "Violet", "Orange", "Rose", "Graphite"};
+    private static final int[] SCHEME_COLORS = {-1, 0x0f766e, 0x6d3fd1, 0xd9540b, 0xc8235d, 0x2f3a4a};
+
+    private static String schemeLabel(int brandColor) {
+        for (int i = 0; i < SCHEME_COLORS.length; i++) {
+            if (SCHEME_COLORS[i] == brandColor) {
+                return SCHEME_LABELS[i];
+            }
+        }
+        return SCHEME_LABELS[0];
+    }
+
+    /// The colour a scheme paints with, which for the template's own is not -1.
+    private static int schemeColor(int brandColor) {
+        return brandColor < 0 ? GeneratorModel.FULL_STACK_BRAND : brandColor;
+    }
+
+    /// The look of a full-stack template: its brand colour, the corners, and the
+    /// icon that follows from the colour and the name. The stylesheet takes every
+    /// colour from a block of variables, so this is all it takes to re-skin it.
+    private Container createLookPanel(int[] brandColor, boolean[] roundedCorners, Label icon,
+                                      Runnable onSelectionChanged) {
+        Container colors = new Container(new GridLayout(2, 3));
+        colors.setUIID("InitializrChoicesGrid");
+        ButtonGroup group = new ButtonGroup();
+        int dot = convertToPixels(3);
+        for (int i = 0; i < SCHEME_COLORS.length; i++) {
+            final int color = SCHEME_COLORS[i];
+            RadioButton button = new RadioButton(SCHEME_LABELS[i]);
+            button.setToggle(true);
+            button.setUIID("InitializrChoice");
+            Image swatch = Image.createImage(dot, dot, 0);
+            swatch.getGraphics().setAntiAliased(true);
+            swatch.getGraphics().setColor(schemeColor(color));
+            swatch.getGraphics().fillArc(0, 0, dot, dot, 0, 360);
+            button.setIcon(swatch);
+            group.add(button);
+            colors.add(button);
+            if (color == brandColor[0]) {
+                button.setSelected(true);
+            }
+            button.addActionListener(evt -> {
+                if (button.isSelected()) {
+                    brandColor[0] = color;
+                    onSelectionChanged.run();
+                }
+            });
+        }
+        final CheckBox rounded = new CheckBox("Rounded corners");
+        rounded.setUIID("InitializrChoice");
+        rounded.setSelected(roundedCorners[0]);
+        rounded.addActionListener(evt -> {
+            roundedCorners[0] = rounded.isSelected();
+            onSelectionChanged.run();
+        });
+        SpanLabel hint = new SpanLabel("The icon is the first letter of the main class on the color you choose. "
+                + "Replace common/icon.png with your own artwork whenever you have it; the colors are the "
+                + "variables theme.css opens with.");
+        hint.setUIID("InitializrTip");
+        hint.setTextUIID("InitializrTip");
+        return BoxLayout.encloseY(labeledField("Color", colors), rounded, labeledField("Icon", icon), hint);
     }
 
     private Container createIdeSelectorPanel(IDE[] selectedIde, Runnable onSelectionChanged) {
@@ -995,6 +1110,7 @@ public class Initializr extends Lifecycle {
         String safePackage = packageName == null ? "" : packageName.trim();
         return "App      " + safeApp + "\n"
                 + "Package  " + safePackage + "\n"
+                + (template.isFullStack() ? "Template RIDE-HAILING APP + SERVER\n" : "")
                 + "Language " + (template.IS_KOTLIN ? "KOTLIN" : "JAVA") + "\n"
                 + "IDE      " + ide.name() + "\n"
                 + "Build    " + options.buildTool.label

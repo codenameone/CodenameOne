@@ -29,6 +29,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.codename1.backend.ConcurrencyFailureException;
 import com.codename1.backend.Crypto;
 import com.codename1.backend.Tcp;
 
@@ -1011,6 +1012,23 @@ public final class MySql {
         byte[] body;
     }
 
+    /// Whether an error is the server ending this transaction's statement in
+    /// favour of another transaction, which the caller may answer by running its
+    /// own again.
+    ///
+    /// By number where the SQLSTATE says nothing: a lock wait that timed out
+    /// (1205), a lock refused under NOWAIT (3572) and a record that changed since
+    /// the transaction read it (1020) all carry the general HY000. The last is
+    /// MariaDB's, raised where the server holds a REPEATABLE READ transaction to
+    /// its snapshot: an UPDATE of a row another transaction changed and committed
+    /// after the snapshot was taken is refused, where it would otherwise have
+    /// read the row as it now is. Class 40 is the standard's "transaction
+    /// rollback", which is where the deadlock (1213, 40001) is.
+    static boolean isConcurrencyFailure(int code, String state) {
+        return code == 1213 || code == 1205 || code == 3572 || code == 1020
+                || (state != null && state.startsWith("40"));
+    }
+
     private static IOException errorFrom(Packet packet, String sql) {
         try {
             Reader reader = new Reader(packet.body);
@@ -1024,9 +1042,11 @@ public final class MySql {
                 state = Wire.fromUtf8(reader.bytes(5));
             }
             String message = Wire.fromUtf8(reader.rest());
-            return new IOException("MySQL error " + code
+            String text = "MySQL error " + code
                     + (state.length() == 0 ? "" : " " + state) + ": " + message
-                    + (sql == null ? "" : " [" + sql + "]"));
+                    + (sql == null ? "" : " [" + sql + "]");
+            return isConcurrencyFailure(code, state) ? new ConcurrencyFailureException(text)
+                    : new IOException(text);
         } catch (IOException malformed) {
             // This method BUILDS the exception rather than throwing one, so a
             // malformed error packet cannot be reported by failing here -- and the

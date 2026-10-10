@@ -3909,7 +3909,16 @@ public class JavaSEPort extends CodenameOneImplementation {
                 public void hierarchyChanged(HierarchyEvent e) {
                     long flags = e.getChangeFlags();
                     if ((flags & HierarchyEvent.DISPLAYABILITY_CHANGED) != 0 || (flags & HierarchyEvent.PARENT_CHANGED) != 0) {
-                        installNativeMagnificationListeners();
+                        if (getParent() == null) {
+                            // Taken out of its window, which is what deinitialize() does
+                            // last. Installing here put the wheel listener straight back
+                            // on the Toolkit, one statement after deinitialize() had taken
+                            // it off: the Toolkit is the process's, so the listener, this
+                            // canvas and the whole port behind it were never collected.
+                            disposeGestureListeners();
+                        } else {
+                            installNativeMagnificationListeners();
+                        }
                     }
                 }
             });
@@ -14255,16 +14264,31 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private Rectangle2D getStringBoundsWithEmojis(java.awt.Font font, String str) {
         if (hasUnsupportedChars(font, str)) {
-            TextLayout textLayout = new TextLayout( 
-                    createAttributedString(font, str).getIterator(), 
-                    canvas.getFRC()
-            );
-            
-            Rectangle2D.Float textBounds = ( Rectangle2D.Float ) textLayout.getBounds();
-            return textBounds;
+            return mixedFontBounds(createAttributedString(font, str).getIterator(), canvas.getFRC());
         } else {
             return font.getStringBounds(str, canvas.getFRC());
         }
+    }
+
+    /**
+     * The box a string drawn in more than one font occupies, measured the way
+     * {@code Font.getStringBounds} measures a single font: by the advance, not
+     * by the ink.
+     *
+     * {@code TextLayout.getBounds()} is the tight box around the pixels. It
+     * leaves out the side bearings of the first and last glyph and every
+     * trailing space, and it starts at the first glyph's bearing rather than
+     * at the pen. drawString() draws from the pen, so a string measured by its
+     * ink ended that bearing past the width it reported: right aligned text in
+     * a component with no side padding lost the edge of its last glyph. Every
+     * string the bundled fonts cannot display takes this path -- Hebrew,
+     * Arabic, CJK, emoji.
+     */
+    static Rectangle2D mixedFontBounds(java.text.AttributedCharacterIterator text, FontRenderContext frc) {
+        TextLayout layout = new TextLayout(text, frc);
+        Rectangle2D ink = layout.getBounds();
+        double width = Math.max(layout.getAdvance(), ink.getX() + ink.getWidth());
+        return new Rectangle2D.Double(0, ink.getY(), width, ink.getHeight());
     }
     
     private java.awt.Font emojiFont;
@@ -17075,6 +17099,17 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     /**
+     * The body of an error response. {@code getErrorStream()} answers null for
+     * one that has no body -- a bare 403 or 404 -- and wrapping that null made
+     * the first read fail with "Stream closed", so a response the server did
+     * send reached the application as an I/O failure with no status to act on.
+     */
+    private static InputStream errorStream(HttpURLConnection connection) {
+        InputStream body = connection.getErrorStream();
+        return body == null ? new ByteArrayInputStream(new byte[0]) : body;
+    }
+
+    /**
      * @inheritDoc
      */
     public InputStream openInputStream(Object connection) throws IOException {
@@ -17111,7 +17146,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 if(con.getResponseCode() >= 200 && con.getResponseCode() < 300){
                     is = con.getInputStream();
                 }else{
-                    is = con.getErrorStream();
+                    is = errorStream(con);
                 }
                 boolean isText = false;
                 String contentType = con.getContentType();
@@ -17160,7 +17195,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if(ht.getResponseCode() < 400) {
                 return new BufferedInputStream(ht.getInputStream());
             }
-            return new BufferedInputStream(ht.getErrorStream());
+            return new BufferedInputStream(errorStream(ht));
         } else {
             return new BufferedInputStream(((URLConnection) connection).getInputStream());
         }        

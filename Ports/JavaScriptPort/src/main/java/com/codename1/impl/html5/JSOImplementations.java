@@ -91,6 +91,16 @@ public class JSOImplementations {
         
         @JSBody(params={}, script="return new Object()")
         JSObject createEmptyObject();
+
+        /// Asks the page for the device's position; js/localforage-shim.js has
+        /// it and says why the Geolocation API is not called directly. `watch`
+        /// keeps the answers coming until [#cn1GeoClear] is given the id this
+        /// returns. A timeout or maximum age of 0 leaves the browser's default.
+        int cn1GeoRequest(GeoCallback callback, boolean watch, int timeoutMillis,
+                int maximumAgeMillis, boolean highAccuracy);
+
+        /// Ends a watch started by [#cn1GeoRequest].
+        void cn1GeoClear(int id);
         
         @JSProperty
         abstract public CN1Native getCn1();
@@ -623,6 +633,13 @@ public class JSOImplementations {
         }
     }
     
+    /// What [WindowExt#cn1GeoRequest] answers with: an event whose data is
+    /// the position or the error as one string.
+    @JSFunctor
+    public interface GeoCallback extends JSObject {
+        public void onAnswer(com.codename1.html5.js.dom.MessageEvent answer);
+    }
+
     @JSFunctor
     public interface PositionCallback extends JSObject {
         public void onLocation(Geolocation.Position position);

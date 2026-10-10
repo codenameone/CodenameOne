@@ -103,8 +103,16 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         validateVersionGate();
         validateMavenProjectTypeBeforeTheGate();
         validateMavenRefusals();
+        validateFullStackTemplate();
         for (Template template : Template.values()) {
             for (ProjectOptions.ProjectType type : ProjectOptions.ProjectType.values()) {
+                if (template.isFullStack() && type == ProjectOptions.ProjectType.APP) {
+                    // An app with its server is not offered without the server.
+                    assertRefused(GeneratorModel.createForPluginVersion(IDE.INTELLIJ, template, "NoServer",
+                            "com.acme.noserver", mavenOptions(type, false), FULL_STACK_VERSION),
+                            "an app and its server", template + " must refuse to leave its server out");
+                    continue;
+                }
                 for (IDE ide : IDE.values()) {
                     validateMavenLayoutCombination(template, type, false, ide);
                     if (type != ProjectOptions.ProjectType.BACKEND_ONLY) {
@@ -127,6 +135,11 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             }
         }
         for (Template template : Template.values()) {
+            if (template.isFullStack()) {
+                // Not generated against a plugin from before the layouts, which is
+                // what this loop uses; the layout loop above covers it for every IDE.
+                continue;
+            }
             for (IDE ide : IDE.values()) {
                 validateCombination(template, ide);
             }
@@ -159,15 +172,22 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             assertFalse(path.startsWith("mvnw") || path.startsWith(".mvn/"), label + "Maven wrapper leaked: " + path);
             assertFalse(path.equals("build.sh") || path.equals("run.sh") || path.equals("build.bat")
                     || path.equals("run.bat"), label + "Maven launcher leaked: " + path);
-            String[] mavenModules = {"android/", "ios/", "javase/", "javascript/", "linux/", "win/", "cn1libs/"};
+            String[] mavenModules = {"android/", "ios/", "javase/", "javascript/", "linux/", "win/"};
             for (int i = 0; i < mavenModules.length; i++) {
                 assertFalse(path.startsWith(mavenModules[i]), label + "Maven module leaked: " + path);
             }
             // Native directories (src/<platform>/<lang>) are created on demand by
             // generateNativeInterfaces, never shipped empty or pre-populated.
-            if (path.startsWith("src/") || path.startsWith("backend/src/")) {
-                String rel = path.startsWith("backend/") ? path.substring("backend/".length()) : path;
-                assertTrue(rel.startsWith("src/main/"), label + "unexpected source set: " + path);
+            // The server is the exception: its @BackendTest samples go along, as
+            // they do in every other backend layout. A backend-only project is
+            // the server, so there they sit at the root.
+            if (path.startsWith("src/")) {
+                boolean serverTest = type == ProjectOptions.ProjectType.BACKEND_ONLY
+                        && path.startsWith("src/test/java/");
+                assertTrue(path.startsWith("src/main/") || serverTest, label + "unexpected source set: " + path);
+            } else if (path.startsWith("backend/src/")) {
+                assertTrue(path.startsWith("backend/src/main/") || path.startsWith("backend/src/test/java/"),
+                        label + "unexpected source set: " + path);
             }
             assertFalse(path.indexOf("com/example/myapp") >= 0, label + "Unrefactored placeholder path found: " + path);
         }
@@ -347,6 +367,131 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 "platform modules", "A backend-only project with every platform module makes no sense");
     }
 
+    /// What a full-stack template adds to an app with a backend: the contract
+    /// module both halves compile against, the template's own server in place of
+    /// the generic one, and nothing left that still carries the template's name.
+    private void assertFullStackProject(Map<String, byte[]> entries, byte[] zipData, String packageName,
+                                        String mainClassName, String label) throws IOException {
+        String packagePath = StringUtil.replaceAll(packageName, ".", "/");
+        String artifact = GeneratorModel.toLowerCaseInvariant(mainClassName);
+        String rootPom = removeWhitespace(getText(entries, "pom.xml"));
+        assertContains(rootPom, "<module>shared</module><module>common</module>",
+                label + "the shared module is built ahead of the app");
+        assertTrue(rootPom.indexOf("<module>shared</module>") == rootPom.lastIndexOf("<module>shared</module>"),
+                label + "the shared module is in the reactor once");
+        String sharedPom = getText(entries, "shared/pom.xml");
+        assertContains(sharedPom, "<artifactId>" + artifact + "-shared</artifactId>", label + "shared module id");
+        assertContains(getText(entries, "common/pom.xml"), "<artifactId>" + artifact + "-shared</artifactId>",
+                label + "the app depends on the contract");
+        assertContains(getText(entries, "backend/pom.xml"), "<artifactId>" + artifact + "-shared</artifactId>",
+                label + "the server depends on the contract");
+        assertContains(getText(entries, "backend/pom.xml"), "<goal>generate-annotation-stubs</goal>",
+                label + "the server generates its half of the contract");
+
+        assertContains(getText(entries, "shared/src/main/java/" + packagePath + "/api/RiderApi.java"),
+                "package " + packageName + ".api;", label + "the contract moves to the project's package");
+        assertContains(getText(entries, "backend/src/main/java/" + packagePath + "/SecurityConfig.java"),
+                "package " + packageName + ";", label + "the server moves to the project's package");
+        assertNotNull(entries.get("backend/src/main/resources/db/migration/V1__accounts.sql"),
+                label + "the server keeps its migrations");
+        assertNotNull(entries.get("backend/src/test/java/" + packagePath + "/RideFlowTest.java"),
+                label + "the server keeps its tests");
+        assertNotNull(entries.get("common/src/main/java/" + packagePath + "/rider/RiderForm.java"),
+                label + "the app's screens move to the project's package");
+        assertNotNull(entries.get("common/src/main/l10n/Bundle.properties"), label + "the app keeps its bundle");
+        // The generic server every other project gets, which this one replaces.
+        assertNull(entries.get("backend/src/main/java/" + packagePath + "/Greeter.java"),
+                label + "the generic server's sources were left beside the template's");
+        assertNull(entries.get("backend/src/test/java/" + packagePath + "/ApiTest.java"),
+                label + "the generic server's tests were left beside the template's");
+        assertTrue(unixMode(zipData, "backend/server.sh") == 0100755, label + "server.sh must extract executable");
+
+        String settings = getText(entries, "common/codenameone_settings.properties");
+        assertContains(settings, "codename1.arg.android.xapplication_attr=", label + "the template's Android hint");
+        assertContains(settings, "codename1.arg.ios.NSLocationWhenInUseUsageDescription=",
+                label + "the template's iOS location prompt");
+        assertContains(settings, "codename1.arg.java.version=17", label + "a full-stack project is Java 17");
+        assertContains(getText(entries, "README.md"), "## The app and its server",
+                label + "README should explain the app and its server");
+
+        for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
+            String path = entry.getKey();
+            assertFalse(path.indexOf("wayline") >= 0 || path.indexOf("Wayline") >= 0,
+                    label + "the template's name is still in the path " + path);
+            if (path.endsWith(".png") || path.endsWith(".jar") || path.endsWith(".res") || path.endsWith(".ttf")) {
+                continue;
+            }
+            String text = StringUtil.newString(entry.getValue());
+            assertFalse(text.indexOf("wayline") >= 0 || text.indexOf("Wayline") >= 0 || text.indexOf("WAYLINE") >= 0,
+                    label + "the template's name is still in " + path);
+            assertFalse(text.indexOf("myappname") >= 0 || text.indexOf("MyAppName") >= 0
+                            || text.indexOf("MYAPPNAME") >= 0,
+                    label + "an unreplaced placeholder is in " + path);
+        }
+    }
+
+    /// The choices a full-stack template adds -- a colour scheme and an icon -- and
+    /// the combinations it refuses.
+    private void validateFullStackTemplate() throws Exception {
+        ProjectOptions base = mavenOptions(ProjectOptions.ProjectType.APP_WITH_BACKEND, false);
+        assertRefused(GeneratorModel.createForPluginVersion(IDE.INTELLIJ, Template.WAYLINE, "TooEarly",
+                "com.acme.tooearly", base, LEGACY_VERSION),
+                "contract module", "A full-stack template needs a plugin that builds its shared module");
+        assertFalse(GeneratorModel.isVersionAtLeast(LEGACY_VERSION, GeneratorModel.FULL_STACK_SINCE),
+                "The gate should be closed before the release that builds a shared module");
+        assertFalse(GeneratorModel.isVersionAtLeast(LAYOUTS_VERSION, GeneratorModel.FULL_STACK_SINCE),
+                "The layouts alone should not open the gate");
+        assertTrue(GeneratorModel.isVersionAtLeast(FULL_STACK_VERSION, GeneratorModel.FULL_STACK_SINCE),
+                "The gate should be open from the release that builds a shared module");
+        ProjectOptions java8 = new ProjectOptions(ProjectOptions.ThemeMode.LIGHT, ProjectOptions.Accent.DEFAULT,
+                true, false, ProjectOptions.PreviewLanguage.ENGLISH, ProjectOptions.JavaVersion.JAVA_8, null,
+                ProjectOptions.BuildTool.MAVEN, ProjectOptions.ProjectType.APP_WITH_BACKEND);
+        assertRefused(GeneratorModel.createForPluginVersion(IDE.INTELLIJ, Template.WAYLINE, "NoJava8",
+                "com.acme.nojava8", java8, FULL_STACK_VERSION), "Java 17", "A full-stack template is Java 17");
+        ProjectOptions forced = java8.withBuild(ProjectOptions.BuildTool.GRADLE, ProjectOptions.ProjectType.APP)
+                .forFullStack();
+        assertTrue(!forced.isGradle() && forced.projectType == ProjectOptions.ProjectType.APP_WITH_BACKEND
+                        && forced.javaVersion == ProjectOptions.JavaVersion.JAVA_17,
+                "forFullStack should settle the build, the project type and the Java level");
+
+        String themePath = "common/src/main/css/theme.css";
+        String stock = getText(mavenEntries(FULL_STACK_VERSION, Template.WAYLINE, IDE.INTELLIJ, "StockApp",
+                "com.acme.stock", base), themePath);
+        String brand = Integer.toHexString(GeneratorModel.FULL_STACK_BRAND);
+        assertContains(stock, "--brand: #" + brand + ";",
+                "GeneratorModel.FULL_STACK_BRAND should be the brand colour the template ships with");
+        assertContains(stock, "--radius: 2.4mm;", "The stock scheme keeps the template's corners");
+        assertTrue(stock.equals(GeneratorModel.applyThemeVariables(stock, base)),
+                "The stock scheme must leave the stylesheet exactly as the template has it");
+
+        byte[] icon = new byte[] {(byte) 0x89, 'P', 'N', 'G', 1, 2, 3};
+        Map<String, byte[]> styled = mavenEntries(FULL_STACK_VERSION, Template.WAYLINE, IDE.INTELLIJ, "StyledApp",
+                "com.acme.styled", base.withScheme(0x0f766e, false).withIcon(icon));
+        String css = getText(styled, themePath);
+        assertContains(css, "--brand: #0f766e;", "The chosen brand colour should be the theme's");
+        assertFalse(css.indexOf("#" + brand) >= 0, "The template's own brand colour should be gone from the theme");
+        assertContains(css, "--radius: 0.6mm;", "Square corners should set the radius");
+        assertContains(css, "--radius-small: 0.4mm;", "Square corners should set the small radius");
+        assertContains(css, "@media (prefers-color-scheme: dark)", "The theme keeps its dark mode");
+        assertFalse(css.indexOf("Initializr Theme Overrides") >= 0,
+                "A scheme is set through the variables, never appended as overrides");
+        assertTrue(css.length() > stock.length() - 64 && css.length() < stock.length() + 64,
+                "Choosing a scheme should rewrite declarations and add no rules");
+        assertTrue(java.util.Arrays.equals(icon, styled.get("common/icon.png")),
+                "The chosen icon should replace the stock one");
+        assertFalse(java.util.Arrays.equals(icon, mavenEntries(FULL_STACK_VERSION, Template.WAYLINE, IDE.INTELLIJ,
+                        "StockApp", "com.acme.stock", base).get("common/icon.png")),
+                "Without a chosen icon the project keeps the stock one");
+
+        String missing = null;
+        try {
+            GeneratorModel.applyThemeVariables("Button { color: red; }", base.withScheme(0x0f766e, true));
+        } catch (IOException expected) {
+            missing = expected.getMessage();
+        }
+        assertNotNull(missing, "A stylesheet without the variables must fail the generation, not drop the choice");
+    }
+
     private void assertRefused(GeneratorModel model, String expectedReason, String message) {
         String reason = null;
         try {
@@ -363,6 +508,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
     /// release the initializr generates against.
     private static final String LEGACY_VERSION = "7.0.274";
     private static final String LAYOUTS_VERSION = "7.0.275";
+    /// The version the full-stack combinations are generated for.
+    private static final String FULL_STACK_VERSION = GeneratorModel.FULL_STACK_SINCE;
 
     private static ProjectOptions mavenOptions(ProjectOptions.ProjectType type, boolean allModules) {
         return ProjectOptions.defaults().withBuild(ProjectOptions.BuildTool.MAVEN, type).withPlatformModules(allModules);
@@ -388,6 +535,20 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         return output.toByteArray();
     }
 
+    private static boolean sameEntries(byte[] zip, byte[] other) throws Exception {
+        Map<String, byte[]> entries = readZipEntries(zip);
+        Map<String, byte[]> others = readZipEntries(other);
+        if (!entries.keySet().equals(others.keySet())) {
+            return false;
+        }
+        for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
+            if (!java.util.Arrays.equals(entry.getValue(), others.get(entry.getKey()))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private void validateVersionGate() throws Exception {
         assertTrue(GeneratorModel.isVersionAtLeast("7.0.275", "7.0.275"), "the gate's own release is in");
         assertFalse(GeneratorModel.isVersionAtLeast("7.0.274", "7.0.275"), "the release before it is not");
@@ -407,7 +568,10 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 mavenOptions(ProjectOptions.ProjectType.APP, false));
         byte[] fullAsked = mavenZip(LEGACY_VERSION, Template.BAREBONES, IDE.INTELLIJ, "GateApp", "com.acme.gate",
                 mavenOptions(ProjectOptions.ProjectType.APP_WITH_BACKEND, true));
-        assertTrue(java.util.Arrays.equals(defaults, minimalAsked) && java.util.Arrays.equals(defaults, fullAsked),
+        // Entry by entry, not byte by byte: an entry is stamped with the time it
+        // was written, to two seconds, so two archives of the same files differ
+        // whenever the clock crosses one of those between them.
+        assertTrue(sameEntries(defaults, minimalAsked) && sameEntries(defaults, fullAsked),
                 "Before the gate the project type and modules choice must not change a Maven download");
         Map<String, byte[]> legacy = readZipEntries(defaults);
         assertNotNull(legacy.get("javase/pom.xml"), "Before the gate a Maven app keeps its platform modules");
@@ -460,11 +624,12 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         String mainClassName = "Mvn" + template.ordinal() + type.ordinal() + (allModules ? 1 : 0) + ide.ordinal() + "App";
         String packageName = "com.acme.m" + template.ordinal() + ".t" + type.ordinal() + ".i" + ide.ordinal();
         String label = template + "/" + type + "/" + (allModules ? "full" : "minimal") + "/" + ide + ": ";
-        byte[] zipData = mavenZip(LAYOUTS_VERSION, template, ide, mainClassName, packageName,
+        String version = template.isFullStack() ? FULL_STACK_VERSION : LAYOUTS_VERSION;
+        byte[] zipData = mavenZip(version, template, ide, mainClassName, packageName,
                 mavenOptions(type, allModules));
         Map<String, byte[]> entries = readZipEntries(zipData);
         String rootPom = getText(entries, "pom.xml");
-        assertContains(rootPom, "<cn1.plugin.version>" + LAYOUTS_VERSION + "</cn1.plugin.version>",
+        assertContains(rootPom, "<cn1.plugin.version>" + version + "</cn1.plugin.version>",
                 label + "the root pom should name the plugin the download was generated against");
         assertCodenameOneRepository(rootPom, label);
         assertNotNull(entries.get("mvnw"), label + "missing mvnw");
@@ -509,6 +674,13 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         if (type == ProjectOptions.ProjectType.APP_WITH_BACKEND) {
             assertNotNull(entries.get("backend/pom.xml"), label + "App + backend has the backend module");
             assertContains(getText(entries, "README.md"), "## Backend", label + "README should explain the backend");
+        }
+        if (template.isFullStack()) {
+            assertFullStackProject(entries, zipData, packageName, mainClassName, label);
+        } else {
+            assertNull(entries.get("shared/pom.xml"), label + "only a full-stack template has a shared module");
+            assertFalse(rootPom.indexOf("<module>shared</module>") >= 0,
+                    label + "the root pom names a shared module the project does not have");
         }
         String[] modules = {"javascript", "ios", "win", "linux", "backend", "android", "javase"};
         for (int i = 0; i < modules.length; i++) {
@@ -567,17 +739,16 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         }
     }
 
-    /// No template that has cn1libs generates for Gradle yet (see Template), so the
-    /// translation from the template's pom to build.gradle.kts is checked directly.
+    /// The translation from a template's pom to build.gradle.kts, checked directly
+    /// on the build script.
     private void validateGradleTemplateDependencies() {
-        String script = GeneratorModel.create(IDE.INTELLIJ, Template.TWEET, "LibsApp", "com.acme.libs",
+        String script = GeneratorModel.create(IDE.INTELLIJ, Template.KOTLIN, "LibsApp", "com.acme.libs",
                 gradleOptions(ProjectOptions.ProjectType.APP)).gradleAppBuildScript("// c\ndependencies {\n}\n");
-        assertContains(script, "dependencies {\n    cn1lib(\"com.codenameone:coderad-lib:2.0.5\")",
-                "Template cn1libs should become cn1lib(...) lines inside dependencies {}");
-        assertContains(script, "cn1lib(\"com.codenameone:tweet-app-ui-kit-lib:1.0-pre1\")",
-                "Every template cn1lib should be declared");
-        assertContains(script, "annotationProcessor(\"com.codenameone:coderad-annotation-processor:2.0.5\")",
-                "The template's annotation processor should be declared");
+        assertContains(script, "dependencies {\n    implementation(\"org.jetbrains.kotlin:kotlin-stdlib:"
+                        + GeneratorModel.KOTLIN_VERSION + "\")",
+                "Template libraries should become lines inside dependencies {}");
+        assertContains(script, "implementation(\"org.jetbrains:annotations:13.0\")",
+                "Every template library should be declared");
         String bare = GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, "LibsApp", "com.acme.libs",
                 gradleOptions(ProjectOptions.ProjectType.APP)).gradleAppBuildScript("dependencies {\n}\n");
         assertEqual("dependencies {\n}\n", bare, "A template with no libraries leaves the build script alone");
@@ -1306,14 +1477,14 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             assertContains(pom, "<source>1.8</source>", "Common pom should use Java 8 source when legacy Java 8 is selected");
             assertContains(pom, "<target>1.8</target>", "Common pom should use Java 8 target when legacy Java 8 is selected");
         }
-        if (template == Template.GRUB) {
-            assertContains(pom, "<artifactId>" + GeneratorModel.toLowerCaseInvariant(mainClassName) + "-CodeRAD</artifactId>", "Grub common pom should include local CodeRAD cn1lib dependency");
-            assertContains(pom, "<version>1.0-SNAPSHOT</version>", "Grub common pom should use local snapshot CodeRAD cn1lib");
-        }
-        if (template == Template.TWEET) {
-            assertContains(pom, "tweet-app-ui-kit-lib", "Tweet common pom should include Tweet UI Kit dependency");
-            assertContains(pom, "<artifactId>coderad-annotation-processor</artifactId>", "Tweet common pom should include CodeRAD annotation processor path");
-            assertContains(pom, "<annotationProcessorPaths>", "Tweet common pom should configure annotation processors");
+        if (template == Template.BAREBONES || template == Template.KOTLIN || template.isFullStack()) {
+            // Without the goal a @Route, a @RestClient interface or a @Mapped class
+            // compiles and then does nothing: no dispatcher, client or mapper is
+            // generated, and the app finds that out when it runs.
+            assertContains(pom, "<goal>process-annotations</goal>",
+                    "Common pom should generate what the project's annotations ask for");
+            assertTrue(pom.indexOf("<goal>css</goal>") < pom.indexOf("<goal>process-annotations</goal>"),
+                    "process-annotations should run in the process-classes execution, after css");
         }
         assertFalse(pom.indexOf("com.example.myapp") >= 0, "Common pom still contains placeholder package");
         assertFalse(pom.indexOf("myappname") >= 0, "Common pom still contains placeholder app name");
@@ -1393,15 +1564,6 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 assertFalse(mainSource.indexOf("setBundle") >= 0, "Barebones starter should not install localization bundle by default");
             }
         }
-        if (template == Template.GRUB) {
-            String grubModel = getText(entries, "common/src/main/java/" + packagePath + "/models/AccountModel.java");
-            assertContains(grubModel, "extends Entity", "Grub models should keep CodeRAD 1 Entity base class");
-            assertFalse(grubModel.indexOf("extends BaseEntity") >= 0, "Grub models should not be rewritten to BaseEntity");
-            assertNotNull(entries.get("cn1libs/pom.xml"), "Grub should include cn1libs parent module");
-            assertNotNull(entries.get("cn1libs/CodeRAD/pom.xml"), "Grub should include bundled CodeRAD cn1lib pom");
-            assertNotNull(entries.get("cn1libs/CodeRAD/jars/main.zip"), "Grub should include bundled CodeRAD common jar");
-            assertNotNull(entries.get("cn1libs/CodeRAD/jars/css.zip"), "Grub should include bundled CodeRAD css artifact");
-        }
     }
 
 
@@ -1433,9 +1595,6 @@ public class GeneratorModelMatrixTest extends AbstractTest {
     private void assertNoTemplatePlaceholders(Map<String, byte[]> entries, Template template) {
         for (String path : entries.keySet()) {
             assertFalse(path.indexOf("com/example/myapp") >= 0, "Unrefactored placeholder path found: " + path);
-            if (template == Template.GRUB) {
-                assertFalse(path.indexOf("com/codename1/demos/grub") >= 0, "Unrefactored grub path found: " + path);
-            }
         }
         String javasePom = getText(entries, "javase/pom.xml");
         // The top-level provided codenameone-core/codenameone-javase blocks are stripped by

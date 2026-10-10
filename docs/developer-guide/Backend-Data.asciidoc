@@ -155,9 +155,10 @@ transaction instead of starting another.
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/OrmSnippets.java[tag=backend-orm-transaction,indent=0]
 ----
 
-Three things this doesn't do, on purpose. Relationships aren't supported --
-`@OneToMany` and friends don't exist, and a field referencing another entity
-fails the build with a message saying to persist the foreign key as a scalar.
+Three things this doesn't do, on purpose. A `Dao` maps one row to one object and
+nothing more: an entity with a relationship, such as `@OneToMany`, is refused by
+it, and belongs to a managed session instead -- see <<annotation-orm-section>>
+and <<backend-transaction-session>>.
 `createTable` creates a table that isn't there and does nothing at all to one
 that is, so it's a convenience for development and for tests rather than a
 migration tool; see <<backend-schema-migrations>> for that. And a boolean, a date and a char are stored as integers on every
@@ -509,6 +510,19 @@ Spring; list it in `rollbackFor` to make it roll back, as the `Signups` example
 does. `noRollbackFor = DataAccessException.class` restores plain commit-on-checked.
 ====
 
+One kind of failure isn't a fault in the statement or the data. When two
+transactions change the same rows, the database may end one of them: as the loser
+of a deadlock, after a lock wait that timed out, or because a row changed after the
+transaction first read it. PostgreSQL, MySQL and MariaDB each report that their own
+way, and every one arrives as `ConcurrencyFailureException`, a
+`DataAccessException`. The transaction rolls back like any other, and the code
+that called the `@Transactional` method can run it again or answer that someone
+else made the change first. A session reports a database failure as an unchecked
+`PersistenceException`, so `ConcurrencyFailureException.isCauseOf(err)` looks for
+it among the causes. Catch it outside the `@Transactional` method, not inside: the
+database has usually ended the whole transaction by then, so nothing in it can
+continue.
+
 A method that joined a transaction can't roll back what the method that began it
 did before it, so when it fails with an exception that rolls back, it marks the
 whole transaction rollback-only instead. The method that began the transaction
@@ -561,6 +575,7 @@ savepoint however it's made.
 The savepoints are named by the runtime and released when the method returns
 normally. All three engines support them.
 
+[[backend-transaction-session]]
 ==== The transaction's session
 
 A bean can inject `com.codename1.orm.session.Session`, the persistence session of
@@ -592,6 +607,13 @@ and the method keeps its name, now starting the transaction, calling that body,
 and committing, with the rollback decision written in. The transaction is
 therefore a property of the method, and every call gets it. The same rewriting
 gives `@Async`, `@Timed` and `@Counted` the same property.
+
+A private method may take and return private nested classes of its bean; the
+method needs no change for that. Two things must stay nameable from the bean's
+package, and the build reports each with the class and method concerned: the class
+that declares the annotated method can't itself be private, local or anonymous,
+and an exception listed in `rollbackFor` or `noRollbackFor` can't be a private
+class.
 
 ==== Pitfalls
 

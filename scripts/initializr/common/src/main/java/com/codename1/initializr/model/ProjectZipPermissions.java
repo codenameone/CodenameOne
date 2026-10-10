@@ -50,8 +50,9 @@ final class ProjectZipPermissions {
             if (next > end) throw new IOException("Truncated project ZIP entry");
             String name = new String(zip, offset + 46, nameLength, "UTF-8");
             // The launchers and wrappers, Maven's and Gradle's, must extract executable.
+            // So must the script a full-stack template starts its server with.
             boolean executable = "build.sh".equals(name) || "run.sh".equals(name) || "mvnw".equals(name)
-                    || "gradlew".equals(name);
+                    || "gradlew".equals(name) || "backend/server.sh".equals(name);
             int mode = name.endsWith("/") ? 040755 : (executable ? 0100755 : 0100644);
             zip[offset + 5] = 3; // version-made-by host: Unix
             int attributes = (mode << 16) | (name.endsWith("/") ? 0x10 : 0);

@@ -174,6 +174,8 @@ public final class AnnotationProcessing {
             }
         }
 
+        offerDependencyClasses(processors, ctx);
+
         // finish()
         for (Iterator<AnnotationProcessor> it = processors.iterator(); it.hasNext(); ) {
             AnnotationProcessor p = it.next();
@@ -271,6 +273,65 @@ public final class AnnotationProcessing {
         } catch (IOException ioe) {
             throw new BuildExecutionException(
                     "Could not stamp the build hint manifest under " + outputDirectory, ioe);
+        }
+    }
+
+    /// Offers the annotated classes of the module's dependencies to the
+    /// processors that asked for them.
+    ///
+    /// This is what lets a library be shared between an application and its
+    /// server: the REST contract and the objects it transfers are compiled once,
+    /// in a module both depend on, and each side generates its own half from
+    /// them here. Without it a class outside the module's own output directory
+    /// was invisible to every processor.
+    ///
+    /// A class is not offered when the module itself defines one of the same
+    /// name -- the module's own definition shadows it on the classpath, and has
+    /// already been processed above.
+    private void offerDependencyClasses(List<AnnotationProcessor> processors, ProcessorContext ctx)
+            throws BuildExecutionException {
+        List<AnnotationProcessor> interested = new ArrayList<AnnotationProcessor>();
+        Set<String> descriptors = new java.util.LinkedHashSet<String>();
+        for (AnnotationProcessor p : processors) {
+            if (p instanceof com.codename1.maven.annotations.ProcessesDependencyClasses
+                    && ((com.codename1.maven.annotations.ProcessesDependencyClasses) p)
+                            .acceptsDependencyClasses(ctx)) {
+                interested.add(p);
+                descriptors.addAll(p.getAnnotationDescriptors());
+            }
+        }
+        if (interested.isEmpty()) {
+            return;
+        }
+        Map<String, AnnotatedClass> dependencies;
+        try {
+            dependencies = com.codename1.maven.annotations.DependencyClasses.scan(
+                    compileClasspath, outputDirectory, descriptors);
+        } catch (ProcessingException e) {
+            throw new BuildExecutionException("Failed to scan the classes of "
+                    + outputDirectory + "'s dependencies: " + e.getMessage(), e);
+        }
+        if (dependencies.isEmpty()) {
+            return;
+        }
+        ctx.setDependencyIndex(dependencies);
+        for (AnnotatedClass cls : dependencies.values()) {
+            if (ctx.lookup(cls.getInternalName()) != null) {
+                continue;
+            }
+            Set<String> present = cls.getAllAnnotationDescriptors();
+            for (AnnotationProcessor p : interested) {
+                if (intersects(p.getAnnotationDescriptors(), present)) {
+                    try {
+                        p.processClass(cls, ctx);
+                    } catch (ProcessingException e) {
+                        throw new BuildFailureException(
+                                "Annotation processor " + p.getClass().getName()
+                                        + " failed on dependency class " + cls.getBinaryName()
+                                        + ": " + e.getMessage(), e);
+                    }
+                }
+            }
         }
     }
 
