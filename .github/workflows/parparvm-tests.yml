@@ -14,6 +14,10 @@ on:
       - 'Ports/WindowsPort/nativeSources/cn1_windows_d3d.cpp'
       - 'Ports/Android/src/com/codename1/impl/android/AndroidGraphicsDevice.java'
       - 'Ports/JavaSE/src/com/codename1/impl/javase/JavaSEGLDevice.java'
+      # NativeFontStyleContractTest compiles the function that reads a native:
+      # font name out of each of these and reads where the style goes.
+      - 'Ports/LinuxPort/nativeSources/cn1_linux_text.c'
+      - 'Ports/WindowsPort/nativeSources/cn1_windows_text.c'
       # The GENERATOR, because the translated backend tests run what it writes:
       # a change to the @Entity processor or BackendPackageMojo alone reaches
       # PostgreSQL and MySQL through the daos it generates, and this is the only
@@ -73,6 +77,10 @@ on:
       - 'Ports/WindowsPort/nativeSources/cn1_windows_d3d.cpp'
       - 'Ports/Android/src/com/codename1/impl/android/AndroidGraphicsDevice.java'
       - 'Ports/JavaSE/src/com/codename1/impl/javase/JavaSEGLDevice.java'
+      # NativeFontStyleContractTest compiles the function that reads a native:
+      # font name out of each of these and reads where the style goes.
+      - 'Ports/LinuxPort/nativeSources/cn1_linux_text.c'
+      - 'Ports/WindowsPort/nativeSources/cn1_windows_text.c'
       # The GENERATOR, because the translated backend tests run what it writes:
       # a change to the @Entity processor or BackendPackageMojo alone reaches
       # PostgreSQL and MySQL through the daos it generates, and this is the only
