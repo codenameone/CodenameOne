@@ -295,18 +295,52 @@ public final class DependencyClassifier {
     }
 
     /// Classifies `jars`, in order, against the desktop `layers`. A file
-    /// that is not a readable jar is left out.
+    /// that is not a readable jar is left out, and a jar that is listed
+    /// twice is read once.
+    ///
+    /// Twice means the same jar, not the same file name. Two libraries of
+    /// different groups share a file name whenever they share an artifact
+    /// id and a version (`com.acme.ui:common:1.0` beside
+    /// `com.acme.data:common:1.0`), and the second is as much a dependency
+    /// as the first: left out here, none of its classes would be unpacked,
+    /// and the application would be assembled without them. So a later
+    /// file is a repeat only when it is the same file, or a copy of it
+    /// under the same name (a build that stages its dependencies hands the
+    /// repository's jar and the staged one).
     public static List<Library> classify(Collection<File> jars, List<Relocation> layers) throws IOException {
         List<Library> out = new ArrayList<Library>();
-        Set<String> seen = new HashSet<String>();
+        Map<String, List<File>> seen = new HashMap<String, List<File>>();
         if (jars != null) {
             for (File jar : jars) {
-                if (jar != null && jar.isFile() && jar.getName().endsWith(".jar") && seen.add(jar.getName())) {
+                if (jar == null || !jar.isFile() || !jar.getName().endsWith(".jar")) {
+                    continue;
+                }
+                List<File> named = seen.get(jar.getName());
+                if (named == null) {
+                    named = new ArrayList<File>();
+                    seen.put(jar.getName(), named);
+                }
+                boolean repeat = false;
+                for (File earlier : named) {
+                    repeat = repeat || sameJar(earlier, jar);
+                }
+                if (!repeat) {
+                    named.add(jar);
                     out.add(read(jar, layers));
                 }
             }
         }
         return out;
+    }
+
+    /// Whether two files of one name are one jar: the same file, or the
+    /// same bytes.
+    private static boolean sameJar(File a, File b) throws IOException {
+        if (a.equals(b) || a.getCanonicalFile().equals(b.getCanonicalFile())) {
+            return true;
+        }
+        return a.length() == b.length()
+                && java.util.Arrays.equals(Files.readAllBytes(a.toPath()), Files.readAllBytes(b.toPath()));
     }
 
     private static Library read(File jar, List<Relocation> layers) throws IOException {

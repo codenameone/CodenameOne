@@ -242,4 +242,26 @@ public class DependencyClassifierTest {
         assertEquals(new TreeSet<String>(Arrays.asList("org/pure/A", "org/pure/D", "org/pure/util/B",
                 "org/pure/util/C")), libs.get(0).shipped());
     }
+
+    /// Two libraries share a file name when they share an artifact id and a
+    /// version; they are still two libraries.
+    @Test
+    public void twoJarsOfOneFileNameAreTwoLibraries() throws Exception {
+        File ui = CompatRemapperTest.jar(new File(tmp.newFolder(), "common-1.0.jar"), "com/acme/ui/A.class",
+                cls("com/acme/ui/A", uses()));
+        File data = CompatRemapperTest.jar(new File(tmp.newFolder(), "common-1.0.jar"), "com/acme/data/B.class",
+                cls("com/acme/data/B", uses()));
+        // The same jar again: as it is, and as a build that stages its
+        // dependencies copies it.
+        File staged = new File(tmp.newFolder(), "common-1.0.jar");
+        Files.copy(ui.toPath(), staged.toPath());
+        List<DependencyClassifier.Library> libs = DependencyClassifier.classify(Arrays.asList(ui, data, ui, staged,
+                data), LAYERS);
+        assertEquals(2, libs.size());
+        DependencyClassifier.reach(new java.util.HashSet<String>(Arrays.asList("com/acme/ui/A", "com/acme/data/B")),
+                libs);
+        assertEquals(Collections.singleton("com/acme/ui/A"), libs.get(0).shipped());
+        assertEquals("The second jar's classes ship too", Collections.singleton("com/acme/data/B"),
+                libs.get(1).shipped());
+    }
 }
