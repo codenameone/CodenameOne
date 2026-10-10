@@ -79,19 +79,23 @@ import java.util.List;
 /// same way, from the first frame the parser resolves.
 public final class VectorImage {
     private final SVGDocument doc;
+    /// Whether the drawing is fitted to the viewport it is painted into.
+    private final boolean scales;
 
-    private VectorImage(SVGDocument doc) {
+    private VectorImage(SVGDocument doc, boolean scales) {
         this.doc = doc;
+        this.scales = scales;
     }
 
     /// Reads an SVG document.
     public static VectorImage readSvg(InputStream in) throws IOException {
-        return new VectorImage(new SVGParser().parse(in));
+        SVGDocument doc = new SVGParser().parse(in);
+        return new VectorImage(doc, doc.isViewBoxDeclared());
     }
 
     /// Reads a Lottie animation.
     public static VectorImage readLottie(InputStream in) throws IOException {
-        return new VectorImage(LottieParser.parse(in));
+        return new VectorImage(LottieParser.parse(in), true);
     }
 
     /// The width the file asks for, in CSS pixels. At least 1.
@@ -104,19 +108,55 @@ public final class VectorImage {
         return doc.getHeight() > 0 ? doc.getHeight() : 1;
     }
 
-    /// Paints the file, its view box stretched over `width` by `height`
-    /// pixels.
-    public BufferedImage paint(int width, int height) {
-        int w = Math.max(1, width);
-        int h = Math.max(1, height);
+    /// Paints the file into a viewport of `width` by `height` CSS pixels.
+    ///
+    /// The view box is fitted to the viewport the way the file's
+    /// `preserveAspectRatio` says, which by default keeps its shape and
+    /// centres it. A file with no view box is not scaled at all, and a Lottie
+    /// animation is fitted like an SVG with one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `width`: viewport width
+    ///
+    /// - `height`: viewport height
+    ///
+    /// - `maxSide`: the most pixels the image may have on a side. A larger
+    ///   viewport is painted smaller, in proportion, for the caller to
+    ///   stretch back.
+    public BufferedImage paint(double width, double height, int maxSide) {
+        double k = Math.min(1.0, maxSide / Math.max(1.0, Math.max(width, height)));
+        if (!(k > 0)) {
+            k = 1;
+        }
+        int w = (int) Math.max(1, Math.min(maxSide, Math.ceil(width * k)));
+        int h = (int) Math.max(1, Math.min(maxSide, Math.ceil(height * k)));
         BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = out.createGraphics();
         try {
             Pixels.hints(g);
-            double vw = doc.getViewBoxWidth() > 0 ? doc.getViewBoxWidth() : getWidth();
-            double vh = doc.getViewBoxHeight() > 0 ? doc.getViewBoxHeight() : getHeight();
-            g.scale(w / vw, h / vh);
-            g.translate(-doc.getViewBoxX(), -doc.getViewBoxY());
+            g.scale(k, k);
+            if (scales) {
+                double vw = doc.getViewBoxWidth() > 0 ? doc.getViewBoxWidth() : getWidth();
+                double vh = doc.getViewBoxHeight() > 0 ? doc.getViewBoxHeight() : getHeight();
+                String par = doc.getPreserveAspectRatio() == null ? "" : doc.getPreserveAspectRatio().trim();
+                double sx = width / vw;
+                double sy = height / vh;
+                double tx = 0;
+                double ty = 0;
+                if (!par.startsWith("none")) {
+                    double s = par.endsWith("slice") ? Math.max(sx, sy) : Math.min(sx, sy);
+                    double freeX = width - vw * s;
+                    double freeY = height - vh * s;
+                    tx = par.startsWith("xMin") ? 0 : (par.startsWith("xMax") ? freeX : freeX / 2);
+                    ty = par.indexOf("YMin") >= 0 ? 0 : (par.indexOf("YMax") >= 0 ? freeY : freeY / 2);
+                    sx = s;
+                    sy = s;
+                }
+                g.translate(tx, ty);
+                g.scale(sx, sy);
+                g.translate(-doc.getViewBoxX(), -doc.getViewBoxY());
+            }
             for (SVGNode child : doc.getChildren()) {
                 paintNode(g, child, doc.getStyle(), w, h);
             }
@@ -124,6 +164,11 @@ public final class VectorImage {
             g.dispose();
         }
         return out;
+    }
+
+    /// Paints the file into a viewport of `width` by `height` pixels.
+    public BufferedImage paint(int width, int height) {
+        return paint(width, height, Math.max(1, Math.max(width, height)));
     }
 
     private void paintNode(Graphics2D g, SVGNode node, SVGStyle parentStyle, int w, int h) {

@@ -45,10 +45,43 @@ class VectorImageTest {
     }
 
     @Test
-    void theViewBoxIsStretchedOverTheImage() throws Exception {
+    void theViewBoxKeepsItsShapeInTheMiddleOfTheImage() throws Exception {
+        // 100 by 100 fitted into 200 by 50 is 50 by 50, from x = 75 to 125.
         BufferedImage img = paint("<rect x=\"50\" width=\"50\" height=\"100\" fill=\"#ff0000\"/>", 200, 50);
-        assertEquals(0, alpha(img, 50, 25), "nothing is drawn on the left");
+        assertEquals(0, alpha(img, 90, 25), "the left half of the drawing is empty");
+        assertEquals(0xffff0000, img.getRGB(112, 25), "its right half");
+        assertEquals(0, alpha(img, 150, 25), "and nothing beside the drawing");
+    }
+
+    @Test
+    void preserveAspectRatioNoneStretchesAndADrawingWithNoViewBoxIsNotScaled() throws Exception {
+        String rect = "<rect x=\"50\" width=\"50\" height=\"100\" fill=\"#ff0000\"/>";
+        VectorImage stretched = VectorImage.readSvg(new ByteArrayInputStream(
+                ("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\" viewBox=\"0 0 100 100\""
+                        + " preserveAspectRatio=\"none\">" + rect + "</svg>").getBytes(StandardCharsets.UTF_8)));
+        BufferedImage img = stretched.paint(200, 50);
+        assertEquals(0, alpha(img, 50, 25));
         assertEquals(0xffff0000, img.getRGB(150, 25));
+
+        VectorImage fixed = VectorImage.readSvg(new ByteArrayInputStream(
+                ("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\">" + rect + "</svg>")
+                        .getBytes(StandardCharsets.UTF_8)));
+        img = fixed.paint(200, 50);
+        assertEquals(0xffff0000, img.getRGB(75, 25), "where it was drawn, in its own units");
+        assertEquals(0, alpha(img, 150, 25));
+    }
+
+    @Test
+    void aViewportTooLargeToAllocateIsPaintedSmallerInProportion() throws Exception {
+        VectorImage image = VectorImage.readSvg(new ByteArrayInputStream(
+                ("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100000\" height=\"50000\""
+                        + " viewBox=\"0 0 2 1\"><rect width=\"1\" height=\"1\" fill=\"#ff0000\"/></svg>")
+                        .getBytes(StandardCharsets.UTF_8)));
+        BufferedImage img = image.paint(image.getWidth(), image.getHeight(), 400);
+        assertEquals(400, img.getWidth());
+        assertEquals(200, img.getHeight());
+        assertEquals(0xffff0000, img.getRGB(100, 100));
+        assertEquals(0, alpha(img, 300, 100));
     }
 
     @Test

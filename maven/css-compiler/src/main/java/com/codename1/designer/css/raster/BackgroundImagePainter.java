@@ -56,8 +56,12 @@ public final class BackgroundImagePainter {
     ///
     /// `{width, height}` in px
     public static double[] tileSize(BackgroundImage bg, double areaW, double areaH) {
-        double iw = bg.image.getWidth();
-        double ih = bg.image.getHeight();
+        return tileSize(bg.image.getWidth(), bg.image.getHeight(), bg, areaW, areaH);
+    }
+
+    /// The size of one tile of an image whose own size is `iw` by `ih`,
+    /// which need not be the size of the pixels `bg` holds.
+    public static double[] tileSize(double iw, double ih, BackgroundImage bg, double areaW, double areaH) {
         switch (bg.size) {
             case COVER: {
                 double s = Math.max(areaW / iw, areaH / ih);

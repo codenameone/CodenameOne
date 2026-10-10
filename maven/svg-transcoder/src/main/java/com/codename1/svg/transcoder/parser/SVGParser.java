@@ -63,6 +63,7 @@ public final class SVGParser {
         applyCommon(doc, a);
         doc.setWidth(NumberParser.parseFloat(a.get("width")));
         doc.setHeight(NumberParser.parseFloat(a.get("height")));
+        doc.setPreserveAspectRatio(a.get("preserveAspectRatio"));
         String vb = a.get("viewBox");
         if (vb != null) {
             NumberParser np = new NumberParser(vb);
@@ -71,6 +72,7 @@ public final class SVGParser {
                 doc.setViewBoxY(np.nextFloat());
                 doc.setViewBoxWidth(np.nextFloat());
                 doc.setViewBoxHeight(np.nextFloat());
+                doc.setViewBoxDeclared(doc.getViewBoxWidth() > 0 && doc.getViewBoxHeight() > 0);
             } catch (RuntimeException e) {
                 // leave defaults
             }

@@ -32,4 +32,15 @@ public final class SVGDocument extends SVGGroup {
     public void setHeight(float h) { this.height = h; }
 
     public Map<String, SVGNode> getDefinitions() { return definitions; }
+
+    private boolean viewBoxDeclared;
+    private String preserveAspectRatio;
+
+    /** Whether the document has a viewBox attribute of its own, as opposed to the one derived from its size. */
+    public boolean isViewBoxDeclared() { return viewBoxDeclared; }
+    public void setViewBoxDeclared(boolean v) { this.viewBoxDeclared = v; }
+
+    /** The preserveAspectRatio attribute as written, or null. */
+    public String getPreserveAspectRatio() { return preserveAspectRatio; }
+    public void setPreserveAspectRatio(String v) { this.preserveAspectRatio = v; }
 }

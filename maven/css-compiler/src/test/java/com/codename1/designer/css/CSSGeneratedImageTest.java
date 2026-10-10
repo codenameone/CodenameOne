@@ -253,7 +253,8 @@ class CSSGeneratedImageTest {
         // The shadow reserves 2px, so the 320px box starts at (2, 2).
         File svg = new File(dir.toFile(), "img/mark.svg");
         svg.getParentFile().mkdirs();
-        Files.write(svg.toPath(), ("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"8\" height=\"8\">"
+        Files.write(svg.toPath(), ("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"8\" height=\"8\""
+                + " viewBox=\"0 0 8 8\" preserveAspectRatio=\"none\">"
                 + "<rect width=\"4\" height=\"8\" fill=\"#ff0000\"/>"
                 + "<rect x=\"4\" width=\"4\" height=\"8\" fill=\"#0000ff\"/></svg>")
                 .getBytes(StandardCharsets.UTF_8));
@@ -267,6 +268,91 @@ class CSSGeneratedImageTest {
         // edge between the halves is one pixel wide.
         assertEquals(0xffff0000, img.getRGB(2 + 158, 50), "red up to the middle");
         assertEquals(0xff0000ff, img.getRGB(2 + 161, 50), "blue from the middle");
+    }
+
+    @Test
+    void anSvgKeepsItsShapeInATileOfAnotherShape(@TempDir Path dir) throws Exception {
+        // A square drawing in a 320 by 100 tile is 100 by 100 in the middle
+        // of it, as a browser fits one. The box starts at (2, 2).
+        File svg = new File(dir.toFile(), "img/square.svg");
+        svg.getParentFile().mkdirs();
+        Files.write(svg.toPath(), ("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"8\" height=\"8\""
+                + " viewBox=\"0 0 8 8\"><rect width=\"8\" height=\"8\" fill=\"#ff0000\"/></svg>")
+                .getBytes(StandardCharsets.UTF_8));
+        Compiled c = compile(dir, "Banner { width: 50%; height: 10%; background-color: #ffffff;"
+                + " background-image: url(img/square.svg); background-size: 100% 100%;"
+                + " background-repeat: no-repeat; box-shadow: 0 0 4px black; }");
+        BufferedImage img = stored(c.res, "Banner_1.png", Display.DENSITY_HD);
+
+        assertEquals(0xffff0000, img.getRGB(2 + 160, 50), "the drawing, in the middle");
+        assertEquals(0xffff0000, img.getRGB(2 + 115, 50), "as wide as the tile is high");
+        assertEquals(0xffffffff, img.getRGB(2 + 100, 50), "and no wider");
+        assertEquals(0xffffffff, img.getRGB(2 + 220, 50), "on either side");
+    }
+
+    @Test
+    void anSvgThatAsksForAnEnormousSizeCostsNoMoreThanItsTile(@TempDir Path dir) throws Exception {
+        File svg = new File(dir.toFile(), "img/huge.svg");
+        svg.getParentFile().mkdirs();
+        Files.write(svg.toPath(), ("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100000\" height=\"100000\""
+                + " viewBox=\"0 0 10 10\"><rect width=\"10\" height=\"10\" fill=\"#00ff00\"/></svg>")
+                .getBytes(StandardCharsets.UTF_8));
+        Compiled c = org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(java.time.Duration.ofSeconds(60),
+                () -> compile(dir, "Banner { width: 50%; height: 10%; background-color: #ffffff;"
+                        + " background-image: url(img/huge.svg); background-size: 20px 20px;"
+                        + " background-repeat: no-repeat; box-shadow: 0 0 4px black; }"));
+        BufferedImage img = stored(c.res, "Banner_1.png", Display.DENSITY_HD);
+        assertEquals(0xff00ff00, img.getRGB(2 + 10, 2 + 10), "the tile");
+        assertEquals(0xffffffff, img.getRGB(2 + 40, 2 + 40), "and nothing past it");
+
+        // As a border image there is no tile to size it by, and it is
+        // painted at the largest size the compiler paints one.
+        Path other = Files.createDirectory(dir.resolve("other"));
+        new File(other.toFile(), "img").mkdirs();
+        Files.copy(svg.toPath(), other.resolve("img/huge.svg"));
+        org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(java.time.Duration.ofSeconds(60),
+                () -> compile(other, "Frame { width: 50%; height: 10%; border: 4px solid black;"
+                        + " border-image: url(img/huge.svg); border-image-slice: 30%; box-shadow: 0 0 4px black; }"));
+    }
+
+    @Test
+    void aGradientWrittenAsABackgroundImageIsPainted(@TempDir Path dir) throws Exception {
+        Compiled c = compile(dir, "Banner { width: 50%; height: 10%;"
+                + " background-image: linear-gradient(to right, #ffffff 50%, #000000 50%);"
+                + " box-shadow: 0 0 4px black; }");
+        BufferedImage img = stored(c.res, "Banner_1.png", Display.DENSITY_HD);
+        assertTrue((img.getRGB(2 + 40, 50) & 0xff) > 0xe0, "white in the left half");
+        assertTrue((img.getRGB(2 + 280, 50) & 0xff) < 0x20, "black in the right half");
+    }
+
+    @Test
+    void aBlockInsideAMediaQualifiedImportNarrowsIt(@TempDir Path dir) throws Exception {
+        Files.write(dir.resolve("part.css"), ("@media density-high { Inner { color: #000001; } }\n"
+                + "After { color: #000002; }\n"
+                + "@media platform-ios { Never { color: #000003; } }\n").getBytes(StandardCharsets.UTF_8));
+        Compiled c = compile(dir, "@import \"part.css\" platform-and;\nPlain { color: #000004; }\n");
+
+        java.util.Set<String> keys = new java.util.TreeSet<String>();
+        for (Object k : c.keys.keySet()) {
+            keys.add(String.valueOf(k));
+        }
+        String all = keys.toString();
+        assertTrue(keys.contains("Plain.fgColor"), all);
+        assertTrue(!keys.contains("Inner.fgColor") && !keys.contains("After.fgColor"),
+                "nothing of the import applies everywhere: " + all);
+        boolean inner = false;
+        boolean after = false;
+        for (String k : keys) {
+            if (k.endsWith("Inner.fgColor")) {
+                inner = k.contains("platform-and") && k.contains("density-high");
+            }
+            if (k.endsWith("After.fgColor")) {
+                after = k.contains("platform-and") && !k.contains("density");
+            }
+            assertTrue(!k.contains("Never"), "two platforms at once select nothing: " + all);
+        }
+        assertTrue(inner, "the inner block keeps the import's platform: " + all);
+        assertTrue(after, "and the rule after it is still under the import's: " + all);
     }
 
     @Test

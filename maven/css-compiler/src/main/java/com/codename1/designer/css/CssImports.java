@@ -255,11 +255,167 @@ public final class CssImports {
             // such as `print` or `screen` selects nothing in a theme and its
             // rules apply, in an import as in a block. Dropping the rules of
             // one here and not the other would make the two forms disagree.
-            out.append("@media ").append(rest).append(" {\n").append(body).append("\n}\n");
+            out.append(underMedia(rest, body));
         } else {
             out.append(body).append('\n');
         }
         return out.toString();
+    }
+
+    /// Puts `body` under the media `outer`.
+    ///
+    /// The parser reads one level of `@media` and drops a block written
+    /// inside another, rules and all. So the blocks `body` already has are
+    /// not wrapped: each is written out beside the others, under its own
+    /// media narrowed by `outer`, and only the rules between them are wrapped
+    /// in a block of their own.
+    private static String underMedia(String outer, String body) {
+        StringBuilder out = new StringBuilder(body.length() + 64);
+        StringBuilder plain = new StringBuilder();
+        int len = body.length();
+        int i = 0;
+        int depth = 0;
+        while (i < len) {
+            char c = body.charAt(i);
+            if (c == '/' && i + 1 < len && body.charAt(i + 1) == '*') {
+                int end = body.indexOf("*/", i + 2);
+                end = end < 0 ? len : end + 2;
+                plain.append(body, i, end);
+                i = end;
+            } else if (c == '"' || c == '\'') {
+                int end = skipString(body, i);
+                plain.append(body, i, end);
+                i = end;
+            } else if (c == '@' && depth == 0 && body.regionMatches(true, i, "@media", 0, 6)
+                    && i + 6 < len && !isIdentChar(body.charAt(i + 6))) {
+                int open = body.indexOf('{', i);
+                int close = open < 0 ? -1 : endOfBlock(body, open);
+                if (close < 0) {
+                    plain.append(body, i, len);
+                    break;
+                }
+                flushPlain(out, outer, plain);
+                String narrowed = narrow(outer, body.substring(i + 6, open).trim());
+                if (narrowed != null) {
+                    out.append("@media ").append(narrowed).append(" {")
+                            .append(body, open + 1, close).append("}\n");
+                }
+                i = close + 1;
+            } else {
+                if (c == '{') {
+                    depth++;
+                } else if (c == '}') {
+                    depth--;
+                }
+                plain.append(c);
+                i++;
+            }
+        }
+        flushPlain(out, outer, plain);
+        return out.toString();
+    }
+
+    private static void flushPlain(StringBuilder out, String outer, StringBuilder plain) {
+        if (plain.toString().trim().length() > 0) {
+            out.append("@media ").append(outer).append(" {\n").append(plain).append("\n}\n");
+        }
+        plain.setLength(0);
+    }
+
+    /// The index of the `}` that closes the block opened at `open`, or -1.
+    private static int endOfBlock(String text, int open) {
+        int depth = 0;
+        int len = text.length();
+        int i = open;
+        while (i < len) {
+            char c = text.charAt(i);
+            if (c == '/' && i + 1 < len && text.charAt(i + 1) == '*') {
+                int end = text.indexOf("*/", i + 2);
+                i = end < 0 ? len : end + 2;
+            } else if (c == '"' || c == '\'') {
+                i = skipString(text, i);
+            } else {
+                if (c == '{') {
+                    depth++;
+                } else if (c == '}' && --depth == 0) {
+                    return i;
+                }
+                i++;
+            }
+        }
+        return -1;
+    }
+
+    /// The media of a block written as `inner` inside one written as
+    /// `outer`, or null when no device is in both.
+    ///
+    /// A theme's media are lists of keys of three kinds -- a platform, a
+    /// density, a device type -- and a rule applies where one key of each
+    /// kind named matches. Inside another block a kind named by both keeps
+    /// the keys they share, and a kind named by one keeps that one's. Keys
+    /// of no kind select nothing in a theme and are carried along as they
+    /// are.
+    private static String narrow(String outer, String inner) {
+        List<String> a = mediaKeys(outer);
+        List<String> b = mediaKeys(inner);
+        List<String> result = new ArrayList<String>();
+        for (String kind : new String[] {"platform-", "density-", "device-"}) {
+            List<String> fromA = ofKind(a, kind);
+            List<String> fromB = ofKind(b, kind);
+            if (!fromA.isEmpty() && !fromB.isEmpty()) {
+                fromA.retainAll(fromB);
+                if (fromA.isEmpty()) {
+                    return null;
+                }
+                result.addAll(fromA);
+            } else {
+                result.addAll(fromA);
+                result.addAll(fromB);
+            }
+        }
+        for (String key : a) {
+            if (!isThemeKey(key) && !result.contains(key)) {
+                result.add(key);
+            }
+        }
+        for (String key : b) {
+            if (!isThemeKey(key) && !result.contains(key)) {
+                result.add(key);
+            }
+        }
+        StringBuilder out = new StringBuilder();
+        for (String key : result) {
+            if (out.length() > 0) {
+                out.append(", ");
+            }
+            out.append(key);
+        }
+        return out.toString();
+    }
+
+    private static boolean isThemeKey(String key) {
+        return key.startsWith("platform-") || key.startsWith("density-") || key.startsWith("device-");
+    }
+
+    private static List<String> ofKind(List<String> keys, String kind) {
+        List<String> out = new ArrayList<String>();
+        for (String key : keys) {
+            if (key.startsWith(kind)) {
+                out.add(key);
+            }
+        }
+        return out;
+    }
+
+    private static List<String> mediaKeys(String media) {
+        List<String> out = new ArrayList<String>();
+        for (String key : media.split(",")) {
+            String trimmed = key.trim();
+            if (trimmed.length() > 0) {
+                out.add(trimmed);
+            }
+        }
+        return out;
     }
 
     /// Decides what one `url()` of a stylesheet becomes, for [#rewriteUrls].

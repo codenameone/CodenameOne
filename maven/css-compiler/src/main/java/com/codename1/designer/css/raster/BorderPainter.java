@@ -397,6 +397,12 @@ public final class BorderPainter {
         double length = length(path);
         double dash = width * (width >= 3 ? 2 : 3);
         double gap = width * (width >= 3 ? 1 : 2);
+        if (!(length / dash < MAX_DOTS)) {
+            // As for dots: dashes too short to be marks are the line they
+            // add up to.
+            return new BasicStroke((float) reach, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL)
+                    .createStrokedShape(path);
+        }
         if (!(length > dash)) {
             return new BasicStroke((float) reach, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL)
                     .createStrokedShape(path);

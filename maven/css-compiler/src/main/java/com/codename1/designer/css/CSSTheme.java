@@ -4204,6 +4204,10 @@ public class CSSTheme {
         return null;
     }
 
+    /// The most pixels on a side an SVG or Lottie file is painted at. One
+    /// drawn larger is painted at this and stretched.
+    private static final int MAX_VECTOR_SIDE = 4096;
+
     /// The SVG or Lottie file `url` names, or null when it names neither.
     private VectorImage readVectorImage(String url) {
         if (!isVectorAsset(url)) {
@@ -4228,8 +4232,9 @@ public class CSSTheme {
     private BufferedImage readRasterImage(String url) {
         VectorImage vector = readVectorImage(url);
         if (vector != null) {
-            // At the size the file asks for, as a browser sizes one.
-            return vector.paint((int) Math.ceil(vector.getWidth()), (int) Math.ceil(vector.getHeight()));
+            // At the size the file asks for, as a browser sizes one, short
+            // of a size no image can be allocated at.
+            return vector.paint(vector.getWidth(), vector.getHeight(), MAX_VECTOR_SIDE);
         }
         // A url is a file or an http address. A `data:` url is not decoded
         // here because it is not decoded anywhere: the theme's own image
@@ -4898,24 +4903,33 @@ public class CSSTheme {
             // the first image. Painting the rest would change images that
             // already ship.
             LexicalUnit bgImage = styles.get("background-image");
+            // The style map keeps the order the properties were declared in.
+            boolean imageDeclaredLater = false;
+            for (String key : styles.keySet()) {
+                if ("background".equals(key)) {
+                    imageDeclaredLater = true;
+                    break;
+                }
+                if ("background-image".equals(key)) {
+                    break;
+                }
+            }
+            if (bgImage != null && isGradient(bgImage)) {
+                // `background-image: linear-gradient(...)` is the same
+                // gradient as one written in `background`, and replaces that
+                // one when it is declared later.
+                if (gradient == null || imageDeclaredLater) {
+                    gradient = bgImage;
+                }
+                bgImage = null;
+            }
             if (bgImage != null && bgImage.getLexicalUnitType() != LexicalUnit.SAC_URI) {
                 bgImage = null;
             }
             if (gradient != null && bgImage != null && !sameShorthand(styles.get("background"), bgImage)) {
                 // A gradient is a background image, so `background` and
                 // `background-image` set the same thing and the one declared
-                // later replaces the other. The style map keeps the order the
-                // properties were declared in.
-                boolean imageDeclaredLater = false;
-                for (String key : styles.keySet()) {
-                    if ("background".equals(key)) {
-                        imageDeclaredLater = true;
-                        break;
-                    }
-                    if ("background-image".equals(key)) {
-                        break;
-                    }
-                }
+                // later replaces the other.
                 if (imageDeclaredLater) {
                     gradient = null;
                 } else {
@@ -5019,7 +5033,11 @@ public class CSSTheme {
         /// percentage `background-size` is a fraction of.
         private BackgroundImage rasterBackgroundImage(Map<String, LexicalUnit> styles, LexicalUnit bgImage,
                 double boxWidth, double boxHeight) {
-            BufferedImage image = readRasterImage(bgImage.getStringValue());
+            VectorImage vector = readVectorImage(bgImage.getStringValue());
+            // A vector image is not painted until the size of its tile is
+            // known. The pixel that stands in for it is never drawn.
+            BufferedImage image = vector == null ? readRasterImage(bgImage.getStringValue())
+                    : new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
             BackgroundImage.Repeat repeat = rasterRepeat(styles);
             BackgroundImage.Size size = BackgroundImage.Size.AUTO;
             double[] explicit = explicitBackgroundSize(styles, boxWidth, boxHeight);
@@ -5040,19 +5058,18 @@ public class CSSTheme {
             // stored properties, so it painted at the top left as well.
             BackgroundImage layer = new BackgroundImage(image).withRepeat(repeat).withPosition(0, true, 0, true);
             layer = explicit != null ? layer.withSize(explicit[0], explicit[1]) : layer.withSize(size);
-            VectorImage vector = readVectorImage(bgImage.getStringValue());
             if (vector != null) {
                 // A vector image has no pixels of its own to stretch. It is
-                // painted again at the size it is drawn at, so a small icon
-                // made to cover a box is as sharp as the box.
-                double[] tile = BackgroundImagePainter.tileSize(layer, boxWidth, boxHeight);
-                int tileW = (int) Math.ceil(tile[0]);
-                int tileH = (int) Math.ceil(tile[1]);
-                if (tileW >= 1 && tileH >= 1 && tileW <= 4096 && tileH <= 4096
-                        && (tileW != image.getWidth() || tileH != image.getHeight())) {
-                    layer = new BackgroundImage(vector.paint(tileW, tileH)).withRepeat(repeat)
-                            .withPosition(0, true, 0, true).withSize(tile[0], tile[1]);
+                // painted at the size it is drawn at, so a small icon made
+                // to cover a box is as sharp as the box, and one that asks
+                // for an enormous size costs no more than its tile.
+                double[] tile = BackgroundImagePainter.tileSize(vector.getWidth(), vector.getHeight(), layer,
+                        boxWidth, boxHeight);
+                if (!(tile[0] > 0) || !(tile[1] > 0) || Double.isInfinite(tile[0]) || Double.isInfinite(tile[1])) {
+                    tile = new double[] {vector.getWidth(), vector.getHeight()};
                 }
+                layer = new BackgroundImage(vector.paint(tile[0], tile[1], MAX_VECTOR_SIDE)).withRepeat(repeat)
+                        .withPosition(0, true, 0, true).withSize(tile[0], tile[1]);
             }
             return layer;
         }
@@ -6841,6 +6858,10 @@ public class CSSTheme {
         }
         
         
+        /// The opacity a style is stored with. A rule that gets a generated
+        /// image stores none, and none is painted into the image either:
+        /// that is how such a rule has always come out, the page its image
+        /// was captured from having been given every property but this one.
         public String getThemeOpacity(Map<String,LexicalUnit> styles) {
             if (styles.get("opacity") != null && !requiresImageBorder(styles) && !requiresBackgroundImageGeneration(styles)) {
                 double opacity = ((ScaledUnit)styles.get("opacity")).getNumericValue();

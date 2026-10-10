@@ -409,6 +409,14 @@ class BorderPainterTest {
     }
 
     @Test
+    void dashesTooShortToCountAreStillPaintedPromptly() {
+        final BorderSide hair = new BorderSide(1e-7, BorderStyle.DASHED, 0xffff0000);
+        org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(java.time.Duration.ofSeconds(20),
+                () -> RasterAssert.paint(BoxStyle.builder().size(40, 40)
+                        .top(hair).right(hair).bottom(hair).left(hair)));
+    }
+
+    @Test
     void dotsTooSmallToCountAreStillPaintedPromptly() {
         final BorderSide hair = new BorderSide(1e-7, BorderStyle.DOTTED, 0xffff0000);
         org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(java.time.Duration.ofSeconds(20),
