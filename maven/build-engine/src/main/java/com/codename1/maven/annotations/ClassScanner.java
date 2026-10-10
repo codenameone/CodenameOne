@@ -141,6 +141,7 @@ public final class ClassScanner {
     private static final class Collector extends ClassVisitor {
         private final File source;
         private String internalName;
+        private String signature;
         private String superInternalName;
         private List<String> interfaces;
         private int access;
@@ -158,6 +159,7 @@ public final class ClassScanner {
                     internalName, superInternalName, interfaces, access,
                     classAnnotations, methods, fields, source);
             out.setSourceFile(sourceFile);
+            out.setSignature(signature);
             out.setSourceName(sourceNameOf(internalName));
             out.setAccessible(accessibleFromAnywhere(internalName));
             return out;
@@ -242,6 +244,7 @@ public final class ClassScanner {
                           String superName, String[] interfacesArr) {
             this.access = access;
             this.internalName = name;
+            this.signature = signature;
             this.superInternalName = superName;
             if (interfacesArr != null) {
                 this.interfaces = new ArrayList<String>(interfacesArr.length);

@@ -1204,6 +1204,175 @@ public class MvcTemplatesTest {
             assertTrue(Html.truth(value));
     }
 
+    @Test
+    public void objectDataUrlsRejectExecutableSchemes() throws Exception {
+        setup();
+        template(
+                "object",
+                "<!-- cn1:model url java.lang.String --><object th:attr=\"DATA=${url}\"></object>");
+        compile();
+        for (String url :
+                Arrays.asList("data:text/html,<script>alert(1)</script>", "JaVaScRiPt:alert(1)")) {
+            try {
+                render("object", new Model().addAttribute("url", url));
+                fail("Accepted executable object data: " + url);
+            } catch (IllegalArgumentException expected) {
+                assertTrue(expected.getMessage(), expected.getMessage().contains("URL"));
+            }
+        }
+        for (String url :
+                Arrays.asList("/static/manual.pdf", "https://example.com/manual.pdf?a=1&b=2")) {
+            assertEquals(
+                    url,
+                    org.jsoup.Jsoup.parse(render("object", new Model().addAttribute("url", url)))
+                            .select("object")
+                            .attr("data"));
+        }
+    }
+
+    @Test
+    public void genericPropertiesRetainOwnerAndInheritedTypeArguments() throws Exception {
+        setup();
+        Map<String, String> fixtures = new LinkedHashMap<String, String>();
+        fixtures.put(
+                "sample.Box",
+                "package sample; public class Box<T> { public T value; public T getValue(){return"
+                        + " value;} public java.util.List<T> getItems(){return"
+                        + " java.util.Collections.singletonList(value);} }");
+        fixtures.put("sample.Middle", "package sample; public class Middle<U> extends Box<U> {}");
+        fixtures.put(
+                "sample.ProductBox",
+                "package sample; public class ProductBox extends Middle<Product> { public"
+                        + " ProductBox(){value=new Product();value.name=\"generic\";} }");
+        fixtures.put("sample.Named", "package sample; public interface Named<T> { T getValue(); }");
+        fixtures.put(
+                "sample.Child", "package sample; public interface Child<U> extends Named<U> {}");
+        fixtures.put(
+                "sample.NamedProduct",
+                "package sample; public class NamedProduct extends ProductBox implements"
+                        + " Child<Product> {}");
+        fixtures.put(
+                "sample.Fields",
+                "package sample; public class Fields<T> { public T value; public T[] values; }");
+        fixtureSources(fixtures);
+        template(
+                "generic",
+                "<!-- cn1:model direct sample.Box<sample.Product> --><!-- cn1:model inherited"
+                    + " sample.ProductBox --><!-- cn1:model named sample.Child<sample.Product>"
+                    + " --><!-- cn1:model fields sample.Fields<sample.Product> --><b"
+                    + " th:text=\"${direct.value.name}\"></b><i"
+                    + " th:text=\"${inherited.value.name}\"></i><em"
+                    + " th:text=\"${named.value.name}\"></em><u th:each=\"item : ${direct.items}\""
+                    + " th:text=\"${item.name}\"></u><s th:text=\"${fields.value.name}\"></s><small"
+                    + " th:text=\"${fields.values[0].name}\"></small>");
+        compile();
+        Object box = loader.loadClass("sample.ProductBox").newInstance();
+        Object fields = loader.loadClass("sample.Fields").newInstance();
+        Object value = box.getClass().getField("value").get(box);
+        fields.getClass().getField("value").set(fields, value);
+        Object array = Array.newInstance(value.getClass(), 1);
+        Array.set(array, 0, value);
+        fields.getClass().getField("values").set(fields, array);
+        String html =
+                render(
+                        "generic",
+                        new Model()
+                                .addAttribute("direct", box)
+                                .addAttribute("inherited", box)
+                                .addAttribute(
+                                        "named",
+                                        loader.loadClass("sample.NamedProduct").newInstance())
+                                .addAttribute("fields", fields));
+        assertTrue(
+                html,
+                html.contains(
+                        "<b>generic</b><i>generic</i><em>generic</em><u>generic</u><s>generic</s><small>generic</small>"));
+    }
+
+    @Test
+    public void inheritedGenericPropertiesSupportNestedAndMultipleArguments() throws Exception {
+        setup();
+        Map<String, String> fixtures = new LinkedHashMap<String, String>();
+        fixtures.put(
+                "sample.Pair",
+                "package sample; public class Pair<A,B> { public B field; public B"
+                    + " getValue(){return field;} }");
+        fixtures.put(
+                "sample.Nested",
+                "package sample; public class Nested<T> extends Pair<String,java.util.List<T>> {}");
+        fixtureSources(fixtures);
+        template(
+                "nested",
+                "<!-- cn1:model nested sample.Nested<sample.Product> --><!-- cn1:model pair"
+                    + " sample.Pair<java.util.Map<java.lang.String,sample.Product>,java.util.List<sample.Product>>"
+                    + " --><b th:text=\"${nested.value[0].name}\"></b><i"
+                    + " th:text=\"${nested.field[0].name}\"></i><em"
+                    + " th:text=\"${pair.value[0].name}\"></em>");
+        compile();
+        Object nested = loader.loadClass("sample.Nested").newInstance();
+        nested.getClass()
+                .getField("field")
+                .set(nested, Collections.singletonList(product("nested", 1)));
+        Object pair = loader.loadClass("sample.Pair").newInstance();
+        pair.getClass().getField("field").set(pair, Collections.singletonList(product("pair", 1)));
+        String html =
+                render(
+                        "nested",
+                        new Model().addAttribute("nested", nested).addAttribute("pair", pair));
+        assertTrue(html, html.contains("<b>nested</b><i>nested</i><em>pair</em>"));
+    }
+
+    @Test
+    public void incrementalBuildRemovesObsoleteAssetClassesFromPackagedOutput() throws Exception {
+        setup();
+        template("home", "<h1>Home</h1>");
+        File assets = new File(project, "src/main/resources/static");
+        assertTrue(assets.mkdirs());
+        Files.write(new File(assets, "a.txt").toPath(), "keep".getBytes(StandardCharsets.UTF_8));
+        File removed = new File(assets, "z.txt");
+        Files.write(removed.toPath(), "removed-private-content".getBytes(StandardCharsets.UTF_8));
+        String pages =
+                "package sample; import com.codename1.backend.annotations.*; @Controller public"
+                    + " class Pages { @GetMapping(\"/\") public String home(){return \"home\";} }";
+        controller(pages);
+        File generated = new File(classes, "com/codename1/generated/mvc");
+        assertTrue(new File(generated, "Asset1.class").isFile());
+        fixtureSources(
+                Collections.singletonMap(
+                        "com.codename1.generated.mvc.Asset99",
+                        "package com.codename1.generated.mvc; public class Asset99 {}"));
+        assertTrue(removed.delete());
+        controller(pages);
+        assertFalse(
+                "Removed asset bytecode survives incremental compilation",
+                new File(generated, "Asset1.class").exists());
+        assertTrue("User classes must be preserved", new File(generated, "Asset99.class").isFile());
+        assertTrue(new File(generated, "Asset0.class").isFile());
+        File jar = new File(project, "application.jar");
+        try (java.util.jar.JarOutputStream out =
+                        new java.util.jar.JarOutputStream(new FileOutputStream(jar));
+                java.util.stream.Stream<java.nio.file.Path> files = Files.walk(classes.toPath())) {
+            for (java.nio.file.Path file :
+                    (Iterable<java.nio.file.Path>) files.filter(Files::isRegularFile)::iterator) {
+                out.putNextEntry(
+                        new java.util.jar.JarEntry(
+                                classes.toPath()
+                                        .relativize(file)
+                                        .toString()
+                                        .replace(File.separatorChar, '/')));
+                Files.copy(file, out);
+                out.closeEntry();
+            }
+        }
+        try (java.util.jar.JarFile packaged = new java.util.jar.JarFile(jar)) {
+            assertNull(packaged.getEntry("com/codename1/generated/mvc/Asset1.class"));
+            assertNotNull(packaged.getEntry("com/codename1/generated/mvc/Asset0.class"));
+        }
+        assertTrue(new File(assets, "a.txt").delete());
+        controller(pages);
+        assertFalse(new File(generated, "Asset0.class").exists());
+    }
+
     private static volatile int benchmarkSink;
 
     @Test

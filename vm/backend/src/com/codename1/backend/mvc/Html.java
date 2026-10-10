@@ -103,6 +103,7 @@ public final class Html {
         if ("href".equals(name)
                 || "xlink:href".equals(name)
                 || "src".equals(name)
+                || "data".equals(name)
                 || "action".equals(name)
                 || "formaction".equals(name)
                 || "hx-get".equals(name)

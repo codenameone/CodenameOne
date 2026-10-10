@@ -22,6 +22,9 @@
  */
 package com.codename1.maven.processors;
 
+import com.codename1.maven.annotations.ClassScanner;
+import com.codename1.maven.annotations.ProcessingException;
+
 import java.io.*;
 import java.nio.file.Files;
 import java.util.*;
@@ -48,6 +51,25 @@ final class MvcAssets {
         registry.append("return null; } }\n");
         sources.put("com.codename1.generated.mvc.Assets", registry.toString());
         return sources;
+    }
+
+    /** Remove only obsolete bytecode carrying our generator marker, after a successful compile. */
+    static void removeObsoleteClasses(File output, Set<String> currentSources)
+            throws IOException, ProcessingException {
+        File directory = new File(output, "com/codename1/generated/mvc");
+        File[] files = directory.listFiles();
+        if (files == null) return;
+        for (File file : files) {
+            String name = file.getName();
+            if (!name.matches("(Assets|Asset[0-9]+)\\.class")) continue;
+            String type = "com.codename1.generated.mvc." + name.substring(0, name.length() - 6);
+            if (!currentSources.contains(type)
+                    && ClassScanner.readClass(file)
+                            .getClassAnnotations()
+                            .containsKey("Lcom/codename1/backend/annotations/Generated;")) {
+                Files.delete(file.toPath());
+            }
+        }
     }
 
     private static void collect(

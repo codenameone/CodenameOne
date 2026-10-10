@@ -277,7 +277,8 @@ final class MvcExpression {
             access = ".length";
         } else {
             String cap = Character.toUpperCase(name.charAt(0)) + name.substring(1);
-            for (AnnotatedClass cls : hierarchy(raw)) {
+            for (MvcTypes resolved : hierarchy(owner.type)) {
+                AnnotatedClass cls = resolved.cls;
                 for (MethodInfo m : cls.getMethods())
                     if (m.isPublic()
                             && !m.isStatic()
@@ -288,10 +289,7 @@ final class MvcExpression {
                                                     .equals(Type.BOOLEAN_TYPE)))) {
                         Type result = Type.getReturnType(m.getDescriptor());
                         if (result.equals(Type.VOID_TYPE)) continue;
-                        String signature = m.getSignature();
-                        if (signature != null)
-                            signature = signature.substring(signature.indexOf(')') + 1);
-                        type = RestClientAnnotationProcessor.javaTypeFor(result, signature);
+                        type = resolved.member(result, m.getSignature(), true);
                         access = "." + m.getName() + "()";
                         break;
                     }
@@ -299,8 +297,10 @@ final class MvcExpression {
                     for (FieldInfo f : cls.getFields())
                         if (f.isPublic() && !f.isStatic() && f.getName().equals(name)) {
                             type =
-                                    RestClientAnnotationProcessor.javaTypeFor(
-                                            Type.getType(f.getDescriptor()), f.getSignature());
+                                    resolved.member(
+                                            Type.getType(f.getDescriptor()),
+                                            f.getSignature(),
+                                            false);
                             access = "." + name;
                             break;
                         }
@@ -321,20 +321,25 @@ final class MvcExpression {
                 boxed);
     }
 
-    private List<AnnotatedClass> hierarchy(String type) {
-        List<AnnotatedClass> result = new ArrayList<AnnotatedClass>();
+    private List<MvcTypes> hierarchy(String type) {
+        List<MvcTypes> result = new ArrayList<MvcTypes>();
         Deque<String> pending = new ArrayDeque<String>();
         Set<String> seen = new HashSet<String>();
-        pending.add(type.replace('.', '/'));
+        pending.add(type);
         while (!pending.isEmpty()) {
-            String name = pending.removeFirst();
+            String owner = pending.removeFirst();
+            String name = raw(owner).replace('.', '/');
             if (!seen.add(name) || "java/lang/Object".equals(name)) continue;
             AnnotatedClass cls = RestControllerAnnotationProcessor.resolveClass(ctx, name);
             if (cls == null) continue;
-            result.add(cls);
+            MvcTypes resolved = new MvcTypes(cls, owner);
+            result.add(resolved);
             // Class declarations take precedence over inherited interface defaults.
-            if (cls.getSuperInternalName() != null) pending.addFirst(cls.getSuperInternalName());
-            pending.addAll(cls.getInterfaceInternalNames());
+            for (int i = 0; i < resolved.parents.size(); i++) {
+                String parent = resolved.parents.get(i).toString();
+                if (i == 0) pending.addFirst(parent);
+                else pending.addLast(parent);
+            }
         }
         return result;
     }

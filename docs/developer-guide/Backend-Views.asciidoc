@@ -45,7 +45,8 @@ include::../demos/backend/src/main/snippets/products.html[tag=backend-views-list
 ----
 
 The build resolves public JavaBean getters or public fields and emits direct
-access. A missing property or undeclared model name fails the build with the
+access. Generic type arguments are preserved through getters, fields, and inherited
+classes or interfaces. A missing property or undeclared model name fails the build with the
 file and source position. At runtime, a referenced model must be present and have
 the declared type. A present null renders as empty text; property navigation
 propagates null. Numeric comparisons require non-null operands. Fragments only

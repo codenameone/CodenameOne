@@ -1529,6 +1529,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 cp.add(new File(element));
             }
             JavaSourceCompiler.compile(sources, ctx.getOutputClassDir(), cp);
+            MvcAssets.removeObsoleteClasses(ctx.getOutputClassDir(), sources.keySet());
             ctx.emitResource(MAIN_CLASS_RESOURCE, asciiBytes(bootstrap));
             ctx.emitResource(WIRING_RESOURCE, asciiBytes(wiringRecord(entryPackage)));
         } catch (IOException ioe) {
