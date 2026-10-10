@@ -538,6 +538,60 @@ public final class DesktopProjectImporter {
         }
     }
 
+    private static final Pattern KOTLIN_DECLARATION = Pattern.compile(
+            "(?<!:)\\b(companion\\s+object|object|class|interface)\\b(?:\\s+(\\w+))?");
+
+    /// The binary name, without its package, of the class a `@JvmStatic`
+    /// function at `at` is a static method of: the `object` it is declared
+    /// in, or the class whose `companion object` it is declared in (the
+    /// static method is generated on the class, not on the companion).
+    /// Nested declarations are joined with `$`. Null when the function is
+    /// inside no declaration this can read, and the caller falls back on the
+    /// file's name.
+    ///
+    /// `code` has its comments and string literals blanked, so every brace
+    /// in it is a block's.
+    static String kotlinDeclaration(String code, int at) {
+        // What each open block is: a declaration's name, "" for a companion
+        // object, null for anything else (a function body, a lambda).
+        List<String> open = new ArrayList<String>();
+        int header = 0;
+        for (int i = 0; i < at; i++) {
+            char c = code.charAt(i);
+            if (c == '{') {
+                String name = null;
+                Matcher m = KOTLIN_DECLARATION.matcher(code.substring(header, i));
+                // The last one before the brace: a property or a function
+                // without a body can stand between two blocks. `X::class`
+                // is not a declaration.
+                while (m.find()) {
+                    name = m.group(1).startsWith("companion") ? "" : m.group(2);
+                }
+                open.add(name);
+                header = i + 1;
+            } else if (c == '}') {
+                if (!open.isEmpty()) {
+                    open.remove(open.size() - 1);
+                }
+                header = i + 1;
+            } else if (c == ';') {
+                header = i + 1;
+            }
+        }
+        StringBuilder out = new StringBuilder();
+        for (String name : open) {
+            if (name == null) {
+                // Inside a function: a local declaration, which has no
+                // name a launcher could use.
+                return null;
+            }
+            if (name.length() > 0) {
+                out.append(out.length() == 0 ? "" : "$").append(name);
+            }
+        }
+        return out.length() == 0 ? null : out.toString();
+    }
+
     static void scanKotlin(String fileClass, String source, Map<String, Candidate> out) {
         // The annotation's argument is a string literal, which code() blanks.
         Matcher named = KOTLIN_FILE_NAME.matcher(source);
@@ -552,8 +606,12 @@ public final class DesktopProjectImporter {
             }
             candidate(out, prefix + ext.group(1)).javafx = true;
         }
-        if (KOTLIN_STATIC_MAIN.matcher(code).find()) {
-            candidate(out, prefix + fileClass);
+        Matcher staticMain = KOTLIN_STATIC_MAIN.matcher(code);
+        while (staticMain.find()) {
+            // The class is the declaration the function is written in, which
+            // Kotlin does not tie to the file's name.
+            String declared = kotlinDeclaration(code, staticMain.start());
+            candidate(out, prefix + (declared == null ? fileClass : declared));
         }
         if (KOTLIN_TOP_MAIN.matcher(code).find()) {
             // A top-level function compiles into the file's facade class.

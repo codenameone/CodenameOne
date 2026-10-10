@@ -643,4 +643,36 @@ public class DesktopProjectImporterTest {
                     "the parent POM org.springframework.boot:spring-boot-starter-parent is not among"));
         }
     }
+
+    /// A Kotlin `@JvmStatic main` is a static method of the class it is
+    /// declared in, whatever the file is called.
+    @Test
+    public void aKotlinEntryClassIsTheDeclarationNotTheFile() {
+        Map<String, DesktopProjectImporter.Candidate> out =
+                new TreeMap<String, DesktopProjectImporter.Candidate>();
+        DesktopProjectImporter.scanKotlin("Launcher", "package k\n\n// object Wrong {\n"
+                + "private val log = java.util.logging.Logger.getLogger(App::class.java.name)\n\n"
+                + "object App {\n    val title = \"object Title {\"\n"
+                + "    fun describe(): String { return title }\n"
+                + "    @JvmStatic fun main(a: Array<String>) {\n    }\n}\n", out);
+        assertEquals(Collections.singleton("k.App"), out.keySet());
+
+        // The static method of a companion object is on the class.
+        out.clear();
+        DesktopProjectImporter.scanKotlin("Start", "package k\n\nclass Tool(val name: String) : Runnable {\n"
+                + "    override fun run() { println(name) }\n"
+                + "    companion object {\n        @JvmStatic\n        fun main(a: Array<String>) {\n        }\n"
+                + "    }\n}\n", out);
+        assertEquals(Collections.singleton("k.Tool"), out.keySet());
+
+        out.clear();
+        DesktopProjectImporter.scanKotlin("Start", "class Outer {\n    object Inner {\n"
+                + "        @JvmStatic fun main(a: Array<String>) {\n        }\n    }\n}\n", out);
+        assertEquals(Collections.singleton("Outer$Inner"), out.keySet());
+
+        // In no declaration this can read: the file's name, as before.
+        out.clear();
+        DesktopProjectImporter.scanKotlin("Odd", "package k\n@JvmStatic fun main(a: Array<String>) {\n}\n", out);
+        assertTrue(out.keySet().toString(), out.containsKey("k.Odd"));
+    }
 }
