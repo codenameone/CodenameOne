@@ -82,6 +82,26 @@
      }
     }
    }
+  },
+  "windows-x64@amd64-family-25-model-17-authenticamd": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.551,
+      "time": 0.777,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.551,
+     "reason": "Recalibrate translator time on AMD64 Family 25 Model 17 from five complete five-round runs. Run medians: this pull request's runs 38052037363 at bbeda29aaa (0.588x, which failed as IMPROVED at -24.4% against the 0.777x row's 20% tolerance), 38020026095 at f0abf10218 (0.756x, passed) and 37974545096 at bb185e0f13 (0.697x, passed), and two master controls, 38016546068 at 6dd059d34b (0.663x) and 37906860757 at 438399d5f1 (0.725x). The 0.777x row came from a single run and all five runs sit below it. Per round, master on this model ranges 0.545-0.749x and the failing run 0.527-0.788x, so master's own rounds reach the failing run's median. Master 438399d5f1 predates d65703afaa, the commit this branch is based on, and 6dd059d34b follows it. In the round timings the ratio moves with the JDK 25 arm rather than with ParparVM: in four of the runs JDK 25 took either 2.95-3.44 s or 4.31-5.20 s for the same workload while ParparVM took 2.27-2.94 s (2.33-2.77 s in the failing run, 2.27-2.94 s in master 38016546068). The failing run drew the slow JDK rounds in four of five, master 38016546068 in two of five, and this pull request's other two runs in one and two of five. The fifth run, master 37906860757, was slower in both arms (JDK 25 3.86-4.13 s with one round at 5.63 s, ParparVM 2.88-3.39 s). That is one run of this branch landing low while two others did not, so no improvement by this pull request is claimed; why the JDK arm has two speeds on this runner was not investigated, and two master runs cannot rule out a small shift inside this spread. The baseline moves to the pooled run median (0.697x) and the time tolerance widens to the 25% the tool derives from the observed spread. RAM is unchanged.",
+     "runs": 5,
+     "time": 0.697,
+     "tolerance": {
+      "time": 0.25
+     }
+    }
+   }
   }
  }
 }

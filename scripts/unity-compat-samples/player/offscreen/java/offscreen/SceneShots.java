@@ -37,6 +37,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import javax.imageio.ImageIO;
 
 /// Shows every scene of a project by itself, one after the other in one
@@ -223,6 +224,7 @@ public final class SceneShots {
                     if (names[i].equals("Canvas")) {
                         checkCanvasPanel(image);
                     }
+                    checkOffEdt(i, names[i], seed, frames, image);
                 } else {
                     check(same(first[i], image), names[i] + ": run again after the other scenes, it shows another image");
                 }
@@ -230,6 +232,122 @@ public final class SceneShots {
         }
         System.out.println(FAILURES.isEmpty() ? "SCENES OK: " + scenes : "SCENES FAILED: " + FAILURES.size());
         return FAILURES.isEmpty() ? 0 : 1;
+    }
+
+    /// The pixels of an image that are, within a little, of one colour.
+    private static int inked(BufferedImage image, int rgb) {
+        int n = 0;
+        for (int y = 0; y < image.getHeight(); y++) {
+            for (int x = 0; x < image.getWidth(); x++) {
+                int p = image.getRGB(x, y);
+                if (Math.abs(((p >> 16) & 0xff) - ((rgb >> 16) & 0xff)) <= 8
+                        && Math.abs(((p >> 8) & 0xff) - ((rgb >> 8) & 0xff)) <= 8
+                        && Math.abs((p & 0xff) - (rgb & 0xff)) <= 8) {
+                    n++;
+                }
+            }
+        }
+        return n;
+    }
+
+    /// The scene again, with its frames on the thread that calls -- a port
+    /// that draws on a thread of its own, as iOS and Android do -- and the
+    /// event dispatch thread held up while they run.
+    ///
+    /// A text is painted on the event dispatch thread and nowhere else: on
+    /// iOS a string drawn into an image from the drawing thread, while a
+    /// component was painted, was dropped, and a capture of the TextMeshPro
+    /// scene came back without its right-aligned line. So while that thread
+    /// is held up a frame must show no text at all -- a text in it was
+    /// painted by the frame itself -- and once it has run, the scene must be
+    /// the picture `expected`, which a frame on that thread drew.
+    private static void checkOffEdt(final int index, String name, final int seed, int frames,
+            BufferedImage expected) throws Exception {
+        final Display display = Display.getInstance();
+        final UnityGameView view = open(index, seed);
+        settle();
+        OffscreenSurface surface = new OffscreenSurface();
+        final CountDownLatch held = new CountDownLatch(1);
+        final CountDownLatch release = new CountDownLatch(1);
+        display.callSerially(new Runnable() {
+            public void run() {
+                held.countDown();
+                try {
+                    release.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+        held.await();
+        BufferedImage before;
+        int texts;
+        try {
+            view.advance(frames, 1f / 60);
+            surface.frameOffEdt(view.getRenderer(), view.getWidth(), view.getHeight());
+            before = copy(surface.frameOffEdt(view.getRenderer(), view.getWidth(), view.getHeight()));
+            texts = view.paintedTextCount();
+        } finally {
+            release.countDown();
+        }
+        settle();
+        BufferedImage after = copy(surface.frameOffEdt(view.getRenderer(), view.getWidth(), view.getHeight()));
+        if (texts > 0) {
+            check(!same(before, expected), name + ": a frame off the event dispatch thread showed its " + texts
+                    + " texts while that thread was held up, so the frame painted them itself");
+        }
+        check(same(after, expected), name + ": drawn off the event dispatch thread, the scene is not the picture"
+                + " a frame on that thread draws (" + ink(after) + " pixels of ink, not " + ink(expected) + ")");
+        if (name.equals("TextMeshPro")) {
+            // m_fontColor of the line "right": 0.5, 0.8, 1.
+            check(inked(after, 0x80ccff) > 0, name + ": the right-aligned line is not drawn");
+        }
+        close(view);
+    }
+
+    /// A held game view on a scene, in a form that is shown.
+    private static UnityGameView open(final int index, final int seed) {
+        final Display display = Display.getInstance();
+        final UnityGameView[] made = new UnityGameView[1];
+        display.callSeriallyAndWait(new Runnable() {
+            public void run() {
+                UnityRuntime.reset();
+                Random.InitState(seed);
+                UnityAppImpl.install();
+                UnityGameView view = new UnityGameView();
+                view.installServices();
+                UnityRuntime.resize(display.getDisplayWidth(), display.getDisplayHeight());
+                UnityRuntime.begin(index);
+                Form form = new Form(new BorderLayout());
+                form.getTitleArea().setHidden(true);
+                if (form.getToolbar() != null) {
+                    form.getToolbar().setHidden(true);
+                }
+                form.setScrollable(false);
+                form.getContentPane().getAllStyles().setPadding(0, 0, 0, 0);
+                form.getContentPane().getAllStyles().setMargin(0, 0, 0, 0);
+                form.add(BorderLayout.CENTER, view);
+                form.show();
+                // Held before it starts: the frames a display draws before
+                // the steps are asked for must not move anything.
+                view.holdClock();
+                view.start();
+                made[0] = view;
+            }
+        });
+        return made[0];
+    }
+
+    /// Takes a view of [#open] down, and the runtime with it.
+    private static void close(final UnityGameView view) {
+        Display.getInstance().callSeriallyAndWait(new Runnable() {
+            public void run() {
+                view.stop();
+                view.remove();
+                UnityRuntime.reset();
+            }
+        });
+        settle();
     }
 
     /// One scene, from an empty runtime to an empty runtime.

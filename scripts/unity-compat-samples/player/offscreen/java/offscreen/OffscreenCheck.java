@@ -327,7 +327,7 @@ public final class OffscreenCheck {
                     key(e[1], e[2] == DOWN);
                 }
             }
-            view.frame(dt);
+            frame(view, dt);
             String expected = null;
             for (String line : trace) {
                 // The line the trace player prints of a frame, and not a
@@ -459,12 +459,12 @@ public final class OffscreenCheck {
         };
         for (int[] c : cases) {
             key(c[0], true);
-            view.frame(dt);
+            frame(view, dt);
             check(held(c[1]) && Input.GetKeyDown(c[1]), "port key " + c[0] + " did not press Unity key " + c[1]);
-            view.frame(dt);
+            frame(view, dt);
             check(held(c[1]) && !Input.GetKeyDown(c[1]), "Unity key " + c[1] + " is not held, or went down twice");
             key(c[0], false);
-            view.frame(dt);
+            frame(view, dt);
             check(!held(c[1]), "port key " + c[0] + " did not release Unity key " + c[1]);
         }
         // The two axes a game steers with, by the keys this project gives
@@ -477,32 +477,32 @@ public final class OffscreenCheck {
         key(OffscreenImplementation.GAME_KEY_CODE_LEFT, true);
         key(OffscreenImplementation.GAME_KEY_CODE_UP, true);
         key(OffscreenImplementation.GAME_KEY_CODE_FIRE, true);
-        view.frame(dt);
+        frame(view, dt);
         check(held(276) && held(273) && held(32), "three keys held together are not all down");
         key(OffscreenImplementation.GAME_KEY_CODE_LEFT, false);
-        view.frame(dt);
+        frame(view, dt);
         check(!held(276) && held(273) && held(32), "left is stuck: its release, with two keys pressed after it, "
                 + "was lost");
         key(OffscreenImplementation.GAME_KEY_CODE_UP, false);
         key(OffscreenImplementation.GAME_KEY_CODE_FIRE, false);
-        view.frame(dt);
+        frame(view, dt);
         check(!Input.get_anyKey(), "a key of three is stuck");
         // Shift let go before the letter: down as `D`, up as `d`.
         key('D', true);
-        view.frame(dt);
+        frame(view, dt);
         check(held('d'), "`D` did not press d");
         key('d', false);
-        view.frame(dt);
+        frame(view, dt);
         check(!held('d'), "d is stuck after going down as `D` and up as `d`");
         // A key that repeats while held.
         key('a', true);
-        view.frame(dt);
+        frame(view, dt);
         key('a', true);
         key('a', true);
-        view.frame(dt);
+        frame(view, dt);
         check(held('a') && !Input.GetKeyDown('a'), "a repeating key went down again");
         key('a', false);
-        view.frame(dt);
+        frame(view, dt);
         check(!held('a'), "a is stuck after repeating");
         // A key held for longer than the display waits before it calls a
         // held key repeating, which is 800 ms by the wall clock. The repeat
@@ -513,7 +513,7 @@ public final class OffscreenCheck {
         // The only trace of it was a run on a slow machine that parted from
         // its trace part of the way through a long hold.
         key(OffscreenImplementation.GAME_KEY_CODE_RIGHT, true);
-        view.frame(dt);
+        frame(view, dt);
         check(held(275) && Input.GetKeyDown(275), "right did not go down");
         try {
             Thread.sleep(1000);
@@ -522,20 +522,20 @@ public final class OffscreenCheck {
         }
         for (int i = 0; i < 5; i++) {
             settle();
-            view.frame(dt);
+            frame(view, dt);
             check(held(275), "right was let go by the display's key repeat, in frame " + i + " after it began");
             check(!Input.GetKeyDown(275) && !Input.GetKeyUp(275), "the display's key repeat pressed or released "
                     + "right, which is held, in frame " + i + " after it began");
         }
         key(OffscreenImplementation.GAME_KEY_CODE_RIGHT, false);
-        view.frame(dt);
+        frame(view, dt);
         check(!held(275) && Input.GetKeyUp(275), "right is stuck after repeating");
         // Down and up between two frames is one frame of down.
         key(OffscreenImplementation.GAME_KEY_CODE_FIRE, true);
         key(OffscreenImplementation.GAME_KEY_CODE_FIRE, false);
-        view.frame(dt);
+        frame(view, dt);
         check(Input.GetKeyDown(32) && !held(32), "a tap between two frames was lost");
-        view.frame(dt);
+        frame(view, dt);
         check(!Input.get_anyKey(), "a key is still held when none is");
         System.out.println("keys: " + cases.length + " keys, shift, repeat, held past the repeat delay and tap "
                 + "checked; " + axes);
@@ -582,11 +582,11 @@ public final class OffscreenCheck {
             }
             float want = i % 2 == 0 ? -1f : 1f;
             key(port, true);
-            view.frame(dt);
+            frame(view, dt);
             check(Input.GetAxisRaw(name) == want, name + " is " + Input.GetAxisRaw(name) + " with Unity key "
                     + keys[i] + " held, which the project's input settings make " + want);
             key(port, false);
-            view.frame(dt);
+            frame(view, dt);
             check(Input.GetAxisRaw(name) == 0f, name + " is stuck at " + Input.GetAxisRaw(name) + " after Unity key "
                     + keys[i] + " was let go");
             pressed++;
@@ -605,37 +605,37 @@ public final class OffscreenCheck {
             // else, and a mouse button that went down would be the bug.
             impl.portPointerPressed(x, y);
             settle();
-            view.frame(dt);
+            frame(view, dt);
             check(Input.get_touchCount() == 1, "a pointer press is " + Input.get_touchCount() + " touches");
             check(!Input.GetMouseButton(0), "a finger pressed mouse button 0 with Input.simulateMouseWithTouches "
                     + "off");
             impl.portPointerReleased(x, y);
             settle();
             // The frame that reports the touch as ended, and the one after.
-            view.frame(dt);
-            view.frame(dt);
+            frame(view, dt);
+            frame(view, dt);
             check(Input.get_touchCount() == 0, "a finger is stuck after its release: " + Input.get_touchCount());
             check(view.getComponentForm().getFocused() == view, "a touch moved the focus off the game view, to "
                     + view.getComponentForm().getFocused());
             key('w', true);
-            view.frame(dt);
+            frame(view, dt);
             check(held('w'), "keys no longer arrive after a touch");
             key('w', false);
-            view.frame(dt);
+            frame(view, dt);
             System.out.println("pointer: touch, release, focus checked; the mouse skipped (the project turned "
                     + "Input.simulateMouseWithTouches off, and this display is a touch screen)");
             return;
         }
         impl.portPointerPressed(x, y);
         settle();
-        view.frame(dt);
+        frame(view, dt);
         Vector3 at = Input.get_mousePosition(new Vector3());
         check(Input.GetMouseButton(0), "a pointer press did not press mouse button 0");
         check(at.x == 100f && at.y == view.getHeight() - 40f, "the pointer is at " + at.x + "," + at.y
                 + " for Unity, and was pressed at 100,40 from the top of a view " + view.getHeight() + " high");
         impl.portPointerReleased(x, y);
         settle();
-        view.frame(dt);
+        frame(view, dt);
         check(!Input.GetMouseButton(0), "a pointer release did not release mouse button 0");
         check(view.getComponentForm().getFocused() == view, "a click moved the focus off the game view, to "
                 + view.getComponentForm().getFocused());
@@ -653,18 +653,18 @@ public final class OffscreenCheck {
                 target.pointerPressed(px, py);
             }
         });
-        view.frame(dt);
-        view.frame(dt);
+        frame(view, dt);
+        frame(view, dt);
         check(Input.GetMouseButton(0) && Input.GetMouseButtonDown(0), "a press that arrived during a frame was lost");
-        view.frame(dt);
+        frame(view, dt);
         check(Input.GetMouseButton(0) && !Input.GetMouseButtonDown(0), "a held button is not held, or went down twice");
         view.callInFrame(new Runnable() {
             public void run() {
                 target.pointerReleased(px, py);
             }
         });
-        view.frame(dt);
-        view.frame(dt);
+        frame(view, dt);
+        frame(view, dt);
         check(!Input.GetMouseButton(0) && Input.GetMouseButtonUp(0), "a release that arrived during a frame was lost");
         // And a whole click inside one frame is one frame of down.
         view.callInFrame(new Runnable() {
@@ -673,21 +673,21 @@ public final class OffscreenCheck {
                 target.pointerReleased(px, py);
             }
         });
-        view.frame(dt);
-        view.frame(dt);
+        frame(view, dt);
+        frame(view, dt);
         check(Input.GetMouseButtonDown(0) && !Input.GetMouseButton(0), "a click inside one frame was lost");
-        view.frame(dt);
+        frame(view, dt);
         check(!Input.GetMouseButton(0) && !Input.GetMouseButtonDown(0), "the button is stuck after a click inside "
                 + "one frame");
         // The finger of it is a touch that began and then one that ended.
-        view.frame(dt);
+        frame(view, dt);
         check(Input.get_touchCount() == 0, "a finger is stuck after a click inside one frame: "
                 + Input.get_touchCount());
         key('w', true);
-        view.frame(dt);
+        frame(view, dt);
         check(held('w'), "keys no longer arrive after a click");
         key('w', false);
-        view.frame(dt);
+        frame(view, dt);
         System.out.println("pointer: press, position, release, focus and events during a frame checked");
     }
 
@@ -697,7 +697,7 @@ public final class OffscreenCheck {
         int height = view.getHeight() * 4 / 3;
         impl.portSizeChanged(width, height);
         settle();
-        view.frame(1f / 60);
+        frame(view, 1f / 60);
         check(view.getWidth() == width && view.getHeight() == height, "the view is " + view.getWidth() + "x"
                 + view.getHeight() + " after the display became " + width + "x" + height);
         check(com.codename1.unitycompat.unityengine.Screen.get_width() == width
@@ -762,6 +762,23 @@ public final class OffscreenCheck {
 
     /// The image the view shows for the text command that reads `text`, or
     /// null if no command of this frame does.
+    /// A frame of the view's logic, on the event dispatch thread. What the
+    /// checks read after it -- a sprite for every command, a text's image
+    /// the size of its rectangle -- is of a frame that is complete, and a
+    /// view whose frame is on another thread has its texts painted on this
+    /// one and shows them a frame later; `SceneShots` holds that path.
+    private static void frame(final UnityGameView view, final double dt) {
+        if (Display.getInstance().isEdt()) {
+            view.frame(dt);
+            return;
+        }
+        Display.getInstance().callSeriallyAndWait(new Runnable() {
+            public void run() {
+                view.frame(dt);
+            }
+        });
+    }
+
     private static Image shown(UnityGameView view, String text) {
         DrawList list = UnityRuntime.render();
         Scene scene = view.getScene();

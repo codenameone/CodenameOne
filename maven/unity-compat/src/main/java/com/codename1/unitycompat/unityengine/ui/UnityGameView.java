@@ -32,6 +32,7 @@ import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.PeerComponent;
+import com.codename1.ui.RGBImage;
 import com.codename1.unitycompat.unityengine.AudioSource;
 import com.codename1.unitycompat.unityengine.PlayerPrefs;
 import com.codename1.unitycompat.unityengine.DrawCommand;
@@ -267,6 +268,27 @@ public class UnityGameView extends GameView {
     /// dropped, however many there are.
     ///
     /// TextMesh Pro text is drawn through the same commands and this cache.
+    ///
+    /// A text is painted on the event dispatch thread and nowhere else. The
+    /// frame runs wherever the port draws -- on iOS the main thread, on
+    /// Android the GL thread -- and painting is `Image.createImage`,
+    /// `Graphics.drawString` and `Image.getRGB`, which belong to the thread
+    /// every other component paints on. On iOS that is not a formality: the
+    /// port keeps ONE "image being drawn into" for the whole process, and a
+    /// component painted to the screen meanwhile ends it, after which the
+    /// string still on its way to the image is dropped without a word. A
+    /// form shown as its game view drew its first frame lost a whole line
+    /// of text that way, for good, since a text is painted once.
+    ///
+    /// So a frame that is not on that thread asks for the text
+    /// (`TextPaint`, by `callSerially`) and goes on: it never waits, because
+    /// the event dispatch thread may itself be waiting for the thread the
+    /// frame is on. Until the pixels arrive the command shows what it showed
+    /// before -- a score that changes keeps its last value for a frame
+    /// rather than blinking -- or nothing, if it is new. What is handed over
+    /// is an `RGBImage`: plain pixels, which the renderer makes a texture of
+    /// without calling the port again. A frame that IS on the event dispatch
+    /// thread paints at once, as it always did.
     private final HashMap paintedTexts = new HashMap();
     /// The entries of `paintedTexts` again, to walk them without an
     /// iterator: this is done once a frame.
@@ -282,7 +304,11 @@ public class UnityGameView extends GameView {
     /// A painted text of the cache.
     private static final class CachedText {
         String key;
+        /// The frame's: null until the text is painted.
         Image image;
+        /// Where the event dispatch thread leaves the pixels of a text the
+        /// frame asked it for; the frame takes them from here into `image`.
+        final AtomicReference painted = new AtomicReference();
         int drawn;
         /// Cleared when the entry leaves the cache: a text command that
         /// still has it must not show its image, which the renderer would
@@ -304,11 +330,70 @@ public class UnityGameView extends GameView {
         boolean fit;
         boolean wrap;
         CachedText cached;
+        /// What the command shows while `cached` is not painted yet: the
+        /// last text of its own that was. Null on a frame that paints for
+        /// itself, where `cached` always is.
+        CachedText shown;
+        /// A text this command asked for and stopped wanting before it was
+        /// painted. It is shown when it arrives if the one wanted now has
+        /// not, so that a text which changes faster than it is painted still
+        /// moves on instead of standing at the last one that made it.
+        CachedText late;
 
         boolean shows(DrawCommand d, int w, int h) {
-            return cached != null && cached.kept && width == w && height == h && color == d.color && alignment == d.alignment
+            return cached != null && cached.kept && laidOutAs(d, w, h) && text.equals(d.text);
+        }
+
+        /// Whether a command is this one in everything but its string: the
+        /// same label saying something else, whose last picture may stand in
+        /// for the new one. Another label that took this place in the frame
+        /// is not, and must not be shown as this one was.
+        boolean laidOutAs(DrawCommand d, int w, int h) {
+            return width == w && height == h && color == d.color && alignment == d.alignment
                     && style == d.fontStyle && size == d.fontSize && min == d.minFontSize && max == d.maxFontSize
-                    && fit == d.bestFit && wrap == d.wrap && text.equals(d.text);
+                    && fit == d.bestFit && wrap == d.wrap;
+        }
+    }
+
+    /// One text to paint, with everything that decides how it looks: a
+    /// draw command is the runtime's to use again in the next frame, and
+    /// this may be read after it. Run on the event dispatch thread when the
+    /// frame is on another; see `paintedTexts`.
+    private final class TextPaint implements Runnable {
+        final CachedText into;
+        final String text;
+        final int width;
+        final int height;
+        final int color;
+        final int alignment;
+        final int style;
+        final float size;
+        final float min;
+        final float max;
+        final boolean fit;
+        final boolean wrap;
+
+        TextPaint(CachedText into, DrawCommand d, int width, int height) {
+            this.into = into;
+            this.text = d.text;
+            this.width = width;
+            this.height = height;
+            this.color = d.color;
+            this.alignment = d.alignment;
+            this.style = d.fontStyle;
+            this.size = d.fontSize;
+            this.min = d.minFontSize;
+            this.max = d.maxFontSize;
+            this.fit = d.bestFit;
+            this.wrap = d.wrap;
+        }
+
+        @Override
+        public void run() {
+            Image image = paint(this);
+            // Read back here, where the image was drawn: the frame is
+            // handed pixels and never the port's image.
+            into.painted.set(new RGBImage(image.getRGB(), width, height));
         }
     }
 
@@ -1104,8 +1189,8 @@ public class UnityGameView extends GameView {
         return out;
     }
 
-    private boolean fits(DrawCommand d, int pixels, int width, int height) {
-        Font f = font(d.fontStyle, pixels);
+    private boolean fits(TextPaint d, int pixels, int width, int height) {
+        Font f = font(d.style, pixels);
         ArrayList lines = lines(d.text, f, width, d.wrap);
         if (lines.size() * f.getHeight() > height) {
             return false;
@@ -1119,7 +1204,8 @@ public class UnityGameView extends GameView {
     }
 
     /// The image of the `index`th text of this frame, painted again only
-    /// if anything about it changed.
+    /// if anything about it changed. Null while there is nothing to show
+    /// for it yet.
     private Image text(int index, DrawCommand d) {
         while (texts.size() <= index) {
             texts.add(new PaintedText());
@@ -1132,7 +1218,7 @@ public class UnityGameView extends GameView {
         }
         if (p.shows(d, width, height)) {
             p.cached.drawn = textFrame;
-            return p.cached.image;
+            return showing(p);
         }
         String key = width + "x" + height + "/" + d.color + "/" + d.alignment + "/" + d.fontStyle + "/" + d.fontSize
                 + "/" + d.minFontSize + "/" + d.maxFontSize + "/" + d.bestFit + "/" + d.wrap + "/" + d.text;
@@ -1140,11 +1226,30 @@ public class UnityGameView extends GameView {
         if (cached == null) {
             cached = new CachedText();
             cached.key = key;
-            cached.image = paint(d, width, height);
+            TextPaint paint = new TextPaint(cached, d, width, height);
+            if (Display.getInstance().isEdt()) {
+                cached.image = paint(paint);
+            } else {
+                // Never painted here, and never waited for: see paintedTexts.
+                Display.getInstance().callSerially(paint);
+            }
             paintedTexts.put(key, cached);
             cachedTexts.add(cached);
         }
         cached.drawn = textFrame;
+        CachedText before = p.cached;
+        if (before == null || !p.laidOutAs(d, width, height)) {
+            // Another text altogether: nothing it showed stands in for this.
+            p.shown = null;
+            p.late = null;
+        } else if (before.kept) {
+            if (picture(before) != null) {
+                p.shown = before;
+                p.late = null;
+            } else {
+                p.late = before;
+            }
+        }
         p.text = d.text;
         p.width = width;
         p.height = height;
@@ -1157,25 +1262,72 @@ public class UnityGameView extends GameView {
         p.fit = d.bestFit;
         p.wrap = d.wrap;
         p.cached = cached;
-        return cached.image;
+        return showing(p);
+    }
+
+    /// The picture of a cached text once it is painted, null before. Only
+    /// the frame calls this: it is where the pixels the event dispatch
+    /// thread left become the frame's own.
+    private static Image picture(CachedText c) {
+        // Not of one that left the cache: its picture would become a
+        // texture that nothing releases.
+        if (c.image == null && c.kept) {
+            c.image = (Image) c.painted.get();
+        }
+        return c.image;
+    }
+
+    /// What a text command draws in this frame: the text it wants if that
+    /// is painted, and until then the newest of its earlier ones that is.
+    /// Whatever stands in is marked as drawn, so that it is not dropped
+    /// from the cache, and its texture released, while it is on the screen.
+    private Image showing(PaintedText p) {
+        Image wanted = picture(p.cached);
+        if (wanted != null) {
+            p.shown = p.cached;
+            p.late = null;
+            return wanted;
+        }
+        CachedText late = p.late;
+        if (late != null) {
+            if (!late.kept) {
+                p.late = null;
+            } else if (picture(late) != null) {
+                p.shown = late;
+                p.late = null;
+            } else {
+                late.drawn = textFrame;
+            }
+        }
+        CachedText shown = p.shown;
+        if (shown == null || !shown.kept || shown.image == null) {
+            p.shown = null;
+            return null;
+        }
+        shown.drawn = textFrame;
+        return shown.image;
     }
 
     /// Lays a text out in its rectangle and paints it into a new image.
-    private Image paint(DrawCommand d, int width, int height) {
-        int pixels = Math.max(1, (int) d.fontSize);
-        if (d.bestFit) {
+    /// On the event dispatch thread only; the fonts it looks up are kept in
+    /// a map that nothing else reads.
+    private Image paint(TextPaint d) {
+        int width = d.width;
+        int height = d.height;
+        int pixels = Math.max(1, (int) d.size);
+        if (d.fit) {
             // Unity's best fit: the largest size of the range at which the
             // text is inside its rectangle, and the smallest if none is.
-            int low = Math.max(1, (int) d.minFontSize);
+            int low = Math.max(1, (int) d.min);
             pixels = low;
-            for (int s = Math.max(low, (int) d.maxFontSize); s > low; s--) {
+            for (int s = Math.max(low, (int) d.max); s > low; s--) {
                 if (fits(d, s, width, height)) {
                     pixels = s;
                     break;
                 }
             }
         }
-        Font f = font(d.fontStyle, pixels);
+        Font f = font(d.style, pixels);
         ArrayList lines = lines(d.text, f, width, d.wrap);
         int block = lines.size() * f.getHeight();
         int row = d.alignment / 3;

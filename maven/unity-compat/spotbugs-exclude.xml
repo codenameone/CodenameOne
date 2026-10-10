@@ -268,7 +268,12 @@
             </And>
             <And>
                 <Class name="com.codename1.unitycompat.unityengine.ui.UnityGameView$PaintedText"/>
-                <Method name="shows"/>
+                <!-- laidOutAs is the part of shows that is not the string:
+                     the same stored sizes against the same command. -->
+                <Or>
+                    <Method name="shows"/>
+                    <Method name="laidOutAs"/>
+                </Or>
             </And>
             <!-- An animated value against the one the object already has:
                  nothing is invalidated when a curve writes what is there. -->

@@ -23,6 +23,7 @@
 package com.codename1.impl.javase;
 
 import com.codename1.gpu.Renderer;
+import com.codename1.ui.Display;
 import java.awt.image.BufferedImage;
 
 /// Drives a renderer into the JavaSE port's software rasteriser with no
@@ -38,7 +39,29 @@ public final class OffscreenSurface {
 
     /// Renders one frame at a size and answers the rasteriser's image,
     /// which the next frame draws over.
-    public BufferedImage frame(Renderer renderer, int width, int height) {
+    ///
+    /// The frame runs on the event dispatch thread, whichever thread asks:
+    /// what a frame shows is then complete when this returns, which is what
+    /// the checks compare. A port that draws on a thread of its own is
+    /// [#frameOffEdt].
+    public BufferedImage frame(final Renderer renderer, final int width, final int height) {
+        if (Display.getInstance().isEdt()) {
+            return frameOffEdt(renderer, width, height);
+        }
+        final BufferedImage[] drawn = new BufferedImage[1];
+        Display.getInstance().callSeriallyAndWait(new Runnable() {
+            public void run() {
+                drawn[0] = frameOffEdt(renderer, width, height);
+            }
+        });
+        return drawn[0];
+    }
+
+    /// Renders one frame on the thread that calls, as iOS does on its main
+    /// thread and Android on its GL thread. A game view asks the event
+    /// dispatch thread for the texts of such a frame and does not wait, so
+    /// one that is new is on the screen a frame after that thread ran.
+    public BufferedImage frameOffEdt(Renderer renderer, int width, int height) {
         device.resize(width, height);
         if (!initialized) {
             renderer.onInit(device);
