@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IntentDates.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.intents</a> &gt; <span class="el_source">IntentDates.java</span></div><h1>IntentDates.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.intents;
+
+import java.util.Date;
+
+/// The one definition of what counts as a moment in time.
+///
+/// This grammar used to exist only inside the generated coercion, and the framework's own
+/// &quot;could this value run?&quot; check had to answer optimistically because of it -- so a donation
+/// carrying &quot;not-a-date&quot;, or 1.5 where epoch milliseconds belong, was published as a durable
+/// shortcut that the coercion then rejected on every replay. Writing a second parser to close
+/// that would have been worse: two grammars drifting apart is a harder bug than the one it
+/// fixes. So there is one, here, and the generated code calls it.
+///
+/// Accepts a `Date`, epoch milliseconds as an integral number or a numeric string, or ISO-8601.
+/// All three arrive in practice: the platforms send milliseconds, and a language model handed
+/// this parameter through `Intents#asTools` writes a date the way it writes dates.
+public final class IntentDates {
+
+    private IntentDates() {
+    }
+
+    /// The string forms [#parse] accepts, written as a JSON-Schema pattern.
+    ///
+    /// It lives here rather than in the schema builder because this class owns the grammar --
+    /// a pattern kept next to the consumer would drift from the parser the first time either
+    /// changed, which is the whole reason the parsing was consolidated in the first place.
+    ///
+    /// Deliberately ISO-8601 only, even though [#parse] also reads a number written as text.
+    /// A pattern constrains the string branch of a union and nothing else -- the minimum and
+    /// maximum beside it apply only to the numeric branch -- so a digits-only alternative here
+    /// would be unbounded, and &quot;999999999999999999999999&quot; would be schema-valid and then
+    /// rejected by Long.parseLong before the handler ran. Epoch milliseconds already have an
+    /// exactly-bounded home in that union: the integer branch. Advertising a second, looser way
+    /// to spell them bought nothing and cost the bound.
+    ///
+    /// The parser stays permissive -- a platform that sends &quot;1770000000000&quot; is still read
+    /// correctly -- because what a caller may send and what a schema recommends are different
+    /// questions.
+    ///
+    /// It describes the *shape* and cannot describe the meaning: &quot;2026-13-40&quot; matches and is
+    /// still refused, because no regex says a year has twelve months. That is the right split.
+    /// The value of the pattern is that it rules out text which was never a date at all --
+    /// &quot;not-a-date&quot; was schema-valid before, so a model obeying the schema could make a call
+    /// that was certain to fail. Narrowing it to a grammar the parser recognizes removes the
+    /// entire class of well-formed-but-unparseable calls; the remaining rejections are values
+    /// that look like dates and are not.
+    static final String SCHEMA_PATTERN =
+            &quot;^[0-9]{4}-[0-9]{2}-[0-9]{2}&quot;
+            + &quot;([Tt ][0-9]{2}:[0-9]{2}(:[0-9]{2}(\\.[0-9]+)?)?&quot;
+            + &quot;([Zz]|[+-][0-9]{2}:?[0-9]{2})?)?$&quot;;
+
+    /// The moment this value names, or null when it names none.
+    ///
+    /// Null rather than an exception because both callers want to decide for themselves what an
+    /// unusable value means: dispatch rejects the invocation naming the parameter, while the
+    /// donation check refuses to publish a shortcut that could never run.
+    public static Date parse(Object o) {
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (o instanceof Date) {</span>
+<span class="fc" id="L81">            return (Date) o;</span>
+        }
+        // Epoch millis are a number like any other: longValue() would truncate 1.5 and
+        // saturate 1e20, naming a moment nobody chose.
+<span class="pc bpc" id="L85" title="3 of 8 branches missed.">        if (o instanceof Long || o instanceof Integer || o instanceof Short</span>
+                || o instanceof Byte) {
+<span class="fc" id="L87">            return new Date(((Number) o).longValue());</span>
+        }
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (o instanceof Number) {</span>
+<span class="fc" id="L90">            double d = ((Number) o).doubleValue();</span>
+<span class="pc bpc" id="L91" title="9 of 10 branches missed.">            if (d != Math.floor(d) || Double.isInfinite(d) || Double.isNaN(d)</span>
+                    || d &lt; -9223372036854775808.0 || d &gt;= 9223372036854775808.0) {
+<span class="fc" id="L93">                return null;</span>
+            }
+<span class="nc" id="L95">            return new Date(((Number) o).longValue());</span>
+        }
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if (o instanceof String) {</span>
+<span class="fc" id="L98">            String s = ((String) o).trim();</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">            if (s.length() == 0) {</span>
+<span class="nc" id="L100">                return null;</span>
+            }
+            try {
+<span class="fc" id="L103">                return new Date(Long.parseLong(s));</span>
+<span class="fc" id="L104">            } catch (NumberFormatException e) {</span>
+<span class="fc" id="L105">                return parseIso8601(s);</span>
+            }
+        }
+<span class="nc" id="L108">        return null;</span>
+    }
+
+    /// Parses ISO-8601, strictly, using arithmetic rather than Calendar.
+    ///
+    /// #### Why not Calendar
+    ///
+    /// Codename One's `java.util.Calendar` is far smaller than the JDK's: it has `set(int,int)`
+    /// and no `clear()`, no `setLenient()` and no multi-argument `set`. The version of this
+    /// parser that lived in generated code used all three, so an application declaring a date
+    /// parameter could not have compiled for a device at all -- and nothing caught it, because
+    /// the processor's tests compile their fixtures against the full JDK. Moving the grammar
+    /// here is what surfaced it, since core is built against the reduced runtime.
+    ///
+    /// Civil-date arithmetic is the better answer anyway. It is exact for the proleptic
+    /// Gregorian calendar, which is the calendar ISO-8601 defines, and it is strict by
+    /// construction: there is no leniency to switch off, so 2026-13-40 is rejected because 13
+    /// is not a month rather than because a flag was set.
+    private static Date parseIso8601(String s) {
+<span class="pc bpc" id="L127" title="2 of 6 branches missed.">        if (s.length() &lt; 10 || s.charAt(4) != '-' || s.charAt(7) != '-') {</span>
+<span class="fc" id="L128">            return null;</span>
+        }
+<span class="fc" id="L130">        int offsetMinutes = 0;</span>
+        try {
+<span class="fc" id="L132">            int year = Integer.parseInt(s.substring(0, 4));</span>
+<span class="fc" id="L133">            int month = Integer.parseInt(s.substring(5, 7));</span>
+<span class="fc" id="L134">            int day = Integer.parseInt(s.substring(8, 10));</span>
+<span class="pc bpc" id="L135" title="4 of 8 branches missed.">            if (month &lt; 1 || month &gt; 12 || day &lt; 1 || day &gt; daysInMonth(year, month)) {</span>
+<span class="nc" id="L136">                return null;</span>
+            }
+<span class="fc" id="L138">            int hour = 0;</span>
+<span class="fc" id="L139">            int minute = 0;</span>
+<span class="fc" id="L140">            int second = 0;</span>
+<span class="fc" id="L141">            int millis = 0;</span>
+<span class="fc" id="L142">            String rest = s.substring(10);</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">            if (rest.length() &gt; 0) {</span>
+<span class="fc" id="L144">                char sep = rest.charAt(0);</span>
+<span class="pc bpc" id="L145" title="2 of 6 branches missed.">                if (sep != 'T' &amp;&amp; sep != 't' &amp;&amp; sep != ' ') {</span>
+<span class="nc" id="L146">                    return null;</span>
+                }
+<span class="fc" id="L148">                rest = rest.substring(1);</span>
+<span class="fc" id="L149">                int zone = -1;</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">                for (int i = 0; i &lt; rest.length(); i++) {</span>
+<span class="fc" id="L151">                    char ch = rest.charAt(i);</span>
+<span class="pc bpc" id="L152" title="2 of 10 branches missed.">                    if (ch == 'Z' || ch == 'z' || ch == '+' || (ch == '-' &amp;&amp; i &gt; 0)) {</span>
+<span class="fc" id="L153">                        zone = i;</span>
+<span class="fc" id="L154">                        break;</span>
+                    }
+                }
+<span class="fc bfc" id="L157" title="All 2 branches covered.">                String time = zone &lt; 0 ? rest : rest.substring(0, zone);</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">                String tz = zone &lt; 0 ? &quot;&quot; : rest.substring(zone);</span>
+<span class="pc bpc" id="L159" title="2 of 4 branches missed.">                if (time.length() &lt; 5 || time.charAt(2) != ':') {</span>
+<span class="nc" id="L160">                    return null;</span>
+                }
+<span class="fc" id="L162">                hour = Integer.parseInt(time.substring(0, 2));</span>
+<span class="fc" id="L163">                minute = Integer.parseInt(time.substring(3, 5));</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">                if (time.length() &gt;= 8) {</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">                    if (time.charAt(5) != ':') {</span>
+<span class="nc" id="L166">                        return null;</span>
+                    }
+<span class="fc" id="L168">                    second = Integer.parseInt(time.substring(6, 8));</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">                    if (time.length() &gt; 8) {</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">                        if (time.charAt(8) != '.') {</span>
+<span class="nc" id="L171">                            return null;</span>
+                        }
+                        // Only the leading three digits are milliseconds; ISO allows more
+                        // precision than a Date can hold, and truncating is the honest answer.
+<span class="fc" id="L175">                        String frac = time.substring(9);</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">                        for (int i = 0; i &lt; frac.length(); i++) {</span>
+<span class="pc bpc" id="L177" title="2 of 4 branches missed.">                            if (frac.charAt(i) &lt; '0' || frac.charAt(i) &gt; '9') {</span>
+<span class="nc" id="L178">                                return null;</span>
+                            }
+                        }
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">                        if (frac.length() == 0) {</span>
+<span class="nc" id="L182">                            return null;</span>
+                        }
+<span class="fc" id="L184">                        String three = (frac + &quot;000&quot;).substring(0, 3);</span>
+<span class="fc" id="L185">                        millis = Integer.parseInt(three);</span>
+<span class="fc" id="L186">                    }</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">                } else if (time.length() != 5) {</span>
+<span class="nc" id="L188">                    return null;</span>
+                }
+<span class="pc bpc" id="L190" title="3 of 6 branches missed.">                if (hour &gt; 23 || minute &gt; 59 || second &gt; 59) {</span>
+<span class="nc" id="L191">                    return null;</span>
+                }
+<span class="pc bpc" id="L193" title="1 of 6 branches missed.">                if (tz.length() &gt; 0 &amp;&amp; (tz.charAt(0) == 'Z' || tz.charAt(0) == 'z')) {</span>
+                    // Zulu is the whole suffix or the string is not a date. Taking the Z and
+                    // ignoring what followed accepted &quot;...T12:00:00Zjunk&quot;, and worse
+                    // &quot;...Z+05:00&quot;, as UTC -- so a value that names two different moments, or
+                    // none, reached a handler looking valid. Every caller shares this parser,
+                    // so that reached declared defaults, donations and dispatch alike.
+<span class="fc bfc" id="L199" title="All 2 branches covered.">                    if (tz.length() != 1) {</span>
+<span class="fc" id="L200">                        return null;</span>
+                    }
+<span class="fc bfc" id="L202" title="All 2 branches covered.">                } else if (tz.length() &gt; 0) {</span>
+                    // Built by hand: this runtime's String has replace(char,char) and not the
+                    // CharSequence overload, and an offset may be written +0200 or +02:00.
+<span class="fc" id="L205">                    StringBuilder buf = new StringBuilder();</span>
+<span class="fc" id="L206">                    String off = tz.substring(1);</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">                    for (int i = 0; i &lt; off.length(); i++) {</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">                        if (off.charAt(i) != ':') {</span>
+<span class="fc" id="L209">                            buf.append(off.charAt(i));</span>
+                        }
+                    }
+<span class="fc" id="L212">                    String digits = buf.toString();</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">                    if (digits.length() != 4) {</span>
+<span class="nc" id="L214">                        return null;</span>
+                    }
+<span class="fc" id="L216">                    int oh = Integer.parseInt(digits.substring(0, 2));</span>
+<span class="fc" id="L217">                    int om = Integer.parseInt(digits.substring(2, 4));</span>
+                    // No real zone is further from UTC than 18 hours, and a number past that is
+                    // a typo rather than a place; accepting it would silently move the moment.
+<span class="pc bpc" id="L220" title="3 of 6 branches missed.">                    if (oh &gt; 18 || om &gt; 59 || oh * 60 + om &gt; 18 * 60) {</span>
+<span class="nc" id="L221">                        return null;</span>
+                    }
+<span class="fc" id="L223">                    offsetMinutes = oh * 60 + om;</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">                    if (tz.charAt(0) == '-') {</span>
+<span class="fc" id="L225">                        offsetMinutes = -offsetMinutes;</span>
+                    }
+                }
+            }
+<span class="fc" id="L229">            long epochDay = daysFromCivil(year, month, day);</span>
+<span class="fc" id="L230">            long millisOfDay = hour * 3600000L + minute * 60000L + second * 1000L + millis;</span>
+<span class="fc" id="L231">            return new Date(epochDay * 86400000L + millisOfDay - offsetMinutes * 60000L);</span>
+<span class="nc" id="L232">        } catch (NumberFormatException e) {</span>
+<span class="nc" id="L233">            return null;</span>
+<span class="nc" id="L234">        } catch (IndexOutOfBoundsException e) {</span>
+<span class="nc" id="L235">            return null;</span>
+        }
+    }
+
+    /// Days from 1970-01-01 to this civil date, proleptic Gregorian.
+    ///
+    /// Shifting the year to start in March puts the leap day at the end of the cycle, which is
+    /// what removes every special case from the arithmetic below.
+    private static long daysFromCivil(int year, int month, int day) {
+<span class="fc" id="L244">        long y = year;</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">        y -= month &lt;= 2 ? 1 : 0;</span>
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">        long era = (y &gt;= 0 ? y : y - 399) / 400;</span>
+<span class="fc" id="L247">        long yoe = y - era * 400;</span>
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">        long doy = (153 * (month + (month &gt; 2 ? -3 : 9)) + 2) / 5 + day - 1;</span>
+<span class="fc" id="L249">        long doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;</span>
+<span class="fc" id="L250">        return era * 146097 + doe - 719468;</span>
+    }
+
+    private static int daysInMonth(int year, int month) {
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">        if (month == 2) {</span>
+<span class="nc bnc" id="L255" title="All 6 branches missed.">            boolean leap = (year % 4 == 0 &amp;&amp; year % 100 != 0) || year % 400 == 0;</span>
+<span class="nc bnc" id="L256" title="All 2 branches missed.">            return leap ? 29 : 28;</span>
+        }
+<span class="pc bpc" id="L258" title="4 of 8 branches missed.">        if (month == 4 || month == 6 || month == 9 || month == 11) {</span>
+<span class="nc" id="L259">            return 30;</span>
+        }
+<span class="fc" id="L261">        return 31;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

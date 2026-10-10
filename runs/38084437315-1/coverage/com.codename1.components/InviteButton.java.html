@@ -1,0 +1,450 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InviteButton.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">InviteButton.java</span></div><h1>InviteButton.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.components;
+
+import com.codename1.analytics.invite.Invite;
+import com.codename1.analytics.invite.InviteRequest;
+import com.codename1.analytics.invite.Invites;
+import com.codename1.share.ShareResultListener;
+import com.codename1.io.Log;
+import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.events.ActionEvent;
+
+/// A [ShareButton] that mints an invite and shares it, so the whole invite
+/// funnel is wired with one component.
+///
+/// A press mints a new invite unless one is already outstanding for the SAME
+/// campaign, channel and payload, in which case that one is shared again. Two
+/// presses of an unchanged button are one invitation, not two codes with the
+/// first left registered and never shared; changing any of the three before
+/// the next press mints afresh, because the invite has to carry what the
+/// application last asked for.
+///
+/// ```java
+/// InviteButton invite = new InviteButton(&quot;Invite a friend&quot;);
+/// invite.setCampaign(&quot;spring&quot;);
+/// invite.setMessage(&quot;Come and try this with me&quot;);
+/// form.add(invite);
+/// ```
+///
+/// The button owns the share result, so `invite_shared` is reported only when
+/// the platform confirms the user really shared. Your own
+/// [#setShareResultListener] still works and is still called.
+///
+/// See [Invites] for the receiving half and for how attribution reaches your
+/// analytics reports.
+public class InviteButton extends ShareButton {
+    private String campaign;
+    private String channel;
+    private String payload;
+    private String message;
+    // Two fields, because they answer two different questions and clearing
+    // one on a result silently broke the other. `invite` is what getInvite()
+    // reports -- the invite minted for the most recent press, which an
+    // application reads from inside its own ShareResultListener to tell which
+    // invite the ShareResult belongs to, so it has to survive the result.
+    // `outstanding` is the one still awaiting a result, and exists only to
+    // stop a second press minting a second code; it is cleared as soon as the
+    // outcome is taken, so that outcome can be reported exactly once.
+    private Invite invite;
+    private Invite outstanding;
+
+    // What the outstanding invite was minted from, so a press can tell a
+    // double tap from a request the application has changed since.
+    private String outstandingCampaign;
+
+    private String outstandingChannel;
+
+    private String outstandingPayload;
+    private ShareResultListener appListener;
+    // The chained listener super was given. Package private so a test can
+    // deliver a ShareResult without the share sheet -- getShareResultListener()
+    // is overridden to answer with the application's listener, so the chain is
+    // otherwise unreachable from outside a real press.
+    ShareResultListener chain;
+    // True from a press until the next EDT cycle, which is when ShareButton's
+    // deferred runnable has already presented. Its ONLY job is to collapse
+    // presses that arrive before that; it is never a &quot;share in progress&quot;
+    // flag, because nothing guarantees a share ever reports.
+    private boolean presenting;
+
+    /// Default constructor.
+<span class="fc" id="L93">    public InviteButton() {</span>
+<span class="fc" id="L94">        setUIID(&quot;InviteButton&quot;);</span>
+<span class="fc" id="L95">        FontImage.setMaterialIcon(this, FontImage.MATERIAL_GROUP_ADD);</span>
+<span class="fc" id="L96">        installChain();</span>
+<span class="fc" id="L97">    }</span>
+
+    /// Creates a button with the given label.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the button label
+    public InviteButton(String text) {
+<span class="fc" id="L105">        this();</span>
+<span class="fc" id="L106">        setText(text);</span>
+<span class="fc" id="L107">    }</span>
+
+    // ShareButton.actionPerformed reads its private listener FIELD, not the
+    // getter, so the chaining listener has to be installed through super's
+    // setter exactly once. The overridden accessors below then keep the
+    // application's listener in a field of our own -- without that, setting a
+    // listener would silently replace the chain and the funnel would lose
+    // every share.
+    // Unconditional, and it has to be. invite_shared is a MEASUREMENT -- it
+    // carries the package the user actually picked -- so a press with no
+    // listener installed could only report that a chooser was opened, which is
+    // the assumption this event exists to replace.
+    //
+    // What that costs on Android is one dynamically registered receiver, and
+    // it used to be one PER PRESS: the receiver unregisters itself from inside
+    // onReceive, and a dismissed chooser sends nothing, so every cancelled
+    // share left one behind holding this chain, the button and its form.
+    // AndroidImplementation.buildShareChooserWithCallback now reuses a single
+    // receiver for the process, so a cancel replaces the held listener instead
+    // of adding to a pile of them. The fix is there rather than here because
+    // every ShareButton with a result listener had the same leak, invites or
+    // not.
+    /// Null-tolerant equality, because every one of these may be unset.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: one value, may be null
+    /// - `b`: the other, may be null
+    ///
+    /// #### Returns
+    ///
+    /// true when they are the same value or both unset
+    private static boolean same(String a, String b) {
+<span class="pc bpc" id="L140" title="1 of 4 branches missed.">        return a == null ? b == null : a.equals(b);</span>
+    }
+
+    private void installChain() {
+<span class="fc" id="L144">        chain = new ShareResultListener() {</span>
+            @Override
+            public void onResult(com.codename1.share.ShareResult result) {
+                // Taken and CLEARED, so the next press mints again and this
+                // outcome can only ever be reported once. Only the outstanding
+                // mark is cleared -- getInvite() still answers, because the
+                // application's listener runs below and correlating the result
+                // with its invite is the whole reason that accessor exists.
+<span class="fc" id="L152">                Invite current = outstanding;</span>
+<span class="fc" id="L153">                outstanding = null;</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">                if (current != null) {</span>
+<span class="fc" id="L155">                    Invites.reportShareResult(current, result);</span>
+                }
+<span class="fc bfc" id="L157" title="All 2 branches covered.">                if (appListener != null) {</span>
+<span class="fc" id="L158">                    appListener.onResult(result);</span>
+                }
+<span class="fc" id="L160">            }</span>
+        };
+<span class="fc" id="L162">        super.setShareResultListener(chain);</span>
+<span class="fc" id="L163">    }</span>
+
+    /// Groups the invites this button mints under a campaign.
+    ///
+    /// #### Parameters
+    ///
+    /// - `campaign`: the campaign name
+    public void setCampaign(String campaign) {
+<span class="fc" id="L171">        this.campaign = campaign;</span>
+<span class="fc" id="L172">    }</span>
+
+    /// The campaign, or null.
+    ///
+    /// #### Returns
+    ///
+    /// the campaign
+    public String getCampaign() {
+<span class="nc" id="L180">        return campaign;</span>
+    }
+
+    /// Records how the invite is being sent.
+    ///
+    /// #### Parameters
+    ///
+    /// - `channel`: the channel name
+    public void setChannel(String channel) {
+<span class="nc" id="L189">        this.channel = channel;</span>
+<span class="nc" id="L190">    }</span>
+
+    /// The channel, or null.
+    ///
+    /// #### Returns
+    ///
+    /// the channel
+    public String getChannel() {
+<span class="nc" id="L198">        return channel;</span>
+    }
+
+    /// An application defined string handed to the invited device.
+    ///
+    /// #### Parameters
+    ///
+    /// - `payload`: the payload
+    public void setPayload(String payload) {
+<span class="nc" id="L207">        this.payload = payload;</span>
+<span class="nc" id="L208">    }</span>
+
+    /// The payload, or null.
+    ///
+    /// #### Returns
+    ///
+    /// the payload
+    public String getPayload() {
+<span class="nc" id="L216">        return payload;</span>
+    }
+
+    /// The text placed before the link in the shared message.
+    ///
+    /// #### Parameters
+    ///
+    /// - `message`: the message
+    public void setMessage(String message) {
+<span class="nc" id="L225">        this.message = message;</span>
+<span class="nc" id="L226">    }</span>
+
+    /// The message, or null.
+    ///
+    /// #### Returns
+    ///
+    /// the message
+    public String getMessage() {
+<span class="nc" id="L234">        return message;</span>
+    }
+
+    /// The invite minted for the most recent press, or null before the first
+    /// press.
+    ///
+    /// #### Returns
+    ///
+    /// the invite
+    public Invite getInvite() {
+<span class="fc" id="L244">        return invite;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void setShareResultListener(ShareResultListener listener) {
+<span class="fc" id="L250">        this.appListener = listener;</span>
+<span class="fc" id="L251">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public ShareResultListener getShareResultListener() {
+<span class="nc" id="L256">        return appListener;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void actionPerformed(ActionEvent evt) {
+        // A press is dropped only while ANOTHER PRESS IS STILL ON ITS WAY to
+        // the share sheet -- not for as long as a share is outstanding.
+        //
+        // ShareButton defers to the next EDT cycle and then shares
+        // unconditionally, so two presses within one cycle enqueue two
+        // presentations: two native sheets attempted, the application's
+        // listener called twice, and -- because the first result takes
+        // `outstanding` -- the second share reported to nobody.
+        //
+        // Keying that on `outstanding` instead would have been a far worse
+        // bug than the one it fixed. Display.share() documents that the
+        // listener always runs, but on Android the API 22+ chooser callback
+        // deliberately does not: &quot;Android does not expose a dismissal signal
+        // for the chooser, so the listener simply does not fire on user-cancel&quot;
+        // (AndroidImplementation.buildShareChooserWithCallback). A user who
+        // opens the sheet and backs out would leave `outstanding` set with
+        // nothing to clear it, and the button would never share again until
+        // the form was rebuilt.
+        //
+        // This flag cannot do that: it is cleared on the next EDT cycle
+        // whatever happens, by a runnable queued behind the one ShareButton
+        // itself queues. Nothing about the sheet, the platform or the user's
+        // answer can hold it.
+<span class="fc bfc" id="L285" title="All 2 branches covered.">        if (presenting) {</span>
+<span class="fc" id="L286">            return;</span>
+        }
+<span class="fc" id="L288">        presenting = true;</span>
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">        if (mintForShare() == null) {</span>
+            // Nothing was minted -- the device could not supply secure
+            // randomness -- so there is no link to share. Presenting anyway
+            // would open the sheet on whatever text was set last.
+<span class="nc" id="L293">            presenting = false;</span>
+<span class="nc" id="L294">            return;</span>
+        }
+<span class="fc" id="L296">        presentShare(evt);</span>
+<span class="fc" id="L297">        Display d = Display.getInstance();</span>
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">        if (d == null) {</span>
+            // No EDT to clear it on, so it was never set.
+<span class="nc" id="L300">            presenting = false;</span>
+<span class="nc" id="L301">            return;</span>
+        }
+<span class="fc" id="L303">        d.callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L306">                presenting = false;</span>
+<span class="fc" id="L307">            }</span>
+        });
+<span class="fc" id="L309">    }</span>
+
+    /// Hands the press to [ShareButton], which presents the sheet.
+    ///
+    /// Package private so a test can count presentations. Whether a second
+    /// press presents a second time is not observable otherwise: ShareButton
+    /// defers to the next EDT cycle, and the sheet it opens there is the one
+    /// part of a press that cannot run headless.
+    ///
+    /// ShareButton defers by one EDT cycle, so the text set in
+    /// `mintForShare()` is in time.
+    ///
+    /// #### Parameters
+    ///
+    /// - `evt`: the press
+    void presentShare(ActionEvent evt) {
+<span class="nc" id="L325">        super.actionPerformed(evt);</span>
+<span class="nc" id="L326">    }</span>
+
+    /// Mints the invite this press will share, or keeps the one still
+    /// outstanding, and sets the text.
+    ///
+    /// Package private so a test can drive it without the share sheet: the
+    /// sheet is the one part of a press that cannot run headless, and the
+    /// question this answers -- how many invites two presses mint -- is
+    /// decided before it opens.
+    Invite mintForShare() {
+<span class="fc" id="L336">        InviteRequest.Builder b = InviteRequest.create();</span>
+<span class="fc bfc" id="L337" title="All 2 branches covered.">        if (campaign != null) {</span>
+<span class="fc" id="L338">            b.campaign(campaign);</span>
+        }
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">        if (channel != null) {</span>
+<span class="nc" id="L341">            b.channel(channel);</span>
+        }
+<span class="pc bpc" id="L343" title="1 of 2 branches missed.">        if (payload != null) {</span>
+<span class="nc" id="L344">            b.payload(payload);</span>
+        }
+        // One outstanding invite at a time, and a second press before the
+        // first sheet has answered reuses it rather than minting another.
+        //
+        // The share sheet is modal, so a double tap does not open two of them
+        // -- it mints two codes and shares the later one, leaving the first
+        // registered, counted as invite_created, and never shared by anybody.
+        // Worse, the result is reported against whichever invite the field
+        // held when it arrived, so with two sheets the answer for one could be
+        // recorded against the other.
+        //
+        // Reusing removes both: the outcome belongs to exactly one invite by
+        // construction. Sharing one code more than once is the ordinary shape
+        // of a referral anyway -- a code is not per recipient, it is the
+        // inviter's -- so nothing is lost by not minting a second.
+        // ... and only while the request is UNCHANGED.
+        //
+        // The reuse above is about a double tap, where nothing can have
+        // changed between the two presses. It was keyed on the field alone,
+        // and a chooser reports nothing when it is dismissed -- so a cancelled
+        // share left the invite outstanding for the life of the button, and
+        // every later press shared it no matter what the application had set
+        // since. setCampaign() before the next press was silently ignored, and
+        // the invite kept reporting the campaign it was minted under.
+<span class="fc bfc" id="L369" title="All 2 branches covered.">        if (outstanding == null</span>
+<span class="fc bfc" id="L370" title="All 2 branches covered.">                || !same(outstandingCampaign, campaign)</span>
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">                || !same(outstandingChannel, channel)</span>
+<span class="pc bpc" id="L372" title="1 of 2 branches missed.">                || !same(outstandingPayload, payload)) {</span>
+            try {
+<span class="fc" id="L374">                outstanding = Invites.create(b.build());</span>
+<span class="fc" id="L375">                outstandingCampaign = campaign;</span>
+<span class="fc" id="L376">                outstandingChannel = channel;</span>
+<span class="fc" id="L377">                outstandingPayload = payload;</span>
+<span class="nc" id="L378">            } catch (IllegalStateException e) {</span>
+                // The device could not supply secure randomness, so there is
+                // no invite to share. Nothing is presented rather than
+                // sharing a link somebody else could claim -- see
+                // Invites.create().
+<span class="nc" id="L383">                Log.e(e);</span>
+<span class="nc" id="L384">                return null;</span>
+<span class="fc" id="L385">            }</span>
+<span class="fc" id="L386">            invite = outstanding;</span>
+        }
+        // The outstanding one, not the accessor's: this is the invite whose
+        // url goes into the sheet, and the two only ever differ if a future
+        // change lets them.
+<span class="pc bpc" id="L391" title="3 of 4 branches missed.">        String text = message == null || message.length() == 0</span>
+<span class="pc" id="L392">                ? outstanding.getUrl() : message + &quot; &quot; + outstanding.getUrl();</span>
+<span class="fc" id="L393">        setTextToShare(text);</span>
+<span class="fc" id="L394">        return outstanding;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String[] getPropertyNames() {
+<span class="nc" id="L400">        return new String[]{&quot;textToShare&quot;, &quot;campaign&quot;, &quot;channel&quot;, &quot;payload&quot;, &quot;message&quot;};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Class[] getPropertyTypes() {
+<span class="nc" id="L406">        return new Class[]{String.class, String.class, String.class, String.class, String.class};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Object getPropertyValue(String name) {
+<span class="nc bnc" id="L412" title="All 2 branches missed.">        if (&quot;campaign&quot;.equals(name)) {</span>
+<span class="nc" id="L413">            return getCampaign();</span>
+        }
+<span class="nc bnc" id="L415" title="All 2 branches missed.">        if (&quot;channel&quot;.equals(name)) {</span>
+<span class="nc" id="L416">            return getChannel();</span>
+        }
+<span class="nc bnc" id="L418" title="All 2 branches missed.">        if (&quot;payload&quot;.equals(name)) {</span>
+<span class="nc" id="L419">            return getPayload();</span>
+        }
+<span class="nc bnc" id="L421" title="All 2 branches missed.">        if (&quot;message&quot;.equals(name)) {</span>
+<span class="nc" id="L422">            return getMessage();</span>
+        }
+<span class="nc" id="L424">        return super.getPropertyValue(name);</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String setPropertyValue(String name, Object value) {
+<span class="nc bnc" id="L430" title="All 2 branches missed.">        String v = value instanceof String ? (String) value : null;</span>
+<span class="nc bnc" id="L431" title="All 2 branches missed.">        if (&quot;campaign&quot;.equals(name)) {</span>
+<span class="nc" id="L432">            setCampaign(v);</span>
+<span class="nc" id="L433">            return null;</span>
+        }
+<span class="nc bnc" id="L435" title="All 2 branches missed.">        if (&quot;channel&quot;.equals(name)) {</span>
+<span class="nc" id="L436">            setChannel(v);</span>
+<span class="nc" id="L437">            return null;</span>
+        }
+<span class="nc bnc" id="L439" title="All 2 branches missed.">        if (&quot;payload&quot;.equals(name)) {</span>
+<span class="nc" id="L440">            setPayload(v);</span>
+<span class="nc" id="L441">            return null;</span>
+        }
+<span class="nc bnc" id="L443" title="All 2 branches missed.">        if (&quot;message&quot;.equals(name)) {</span>
+<span class="nc" id="L444">            setMessage(v);</span>
+<span class="nc" id="L445">            return null;</span>
+        }
+<span class="nc" id="L447">        return super.setPropertyValue(name, value);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

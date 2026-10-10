@@ -1,0 +1,607 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TelemetryConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.telemetry</a> &gt; <span class="el_source">TelemetryConfig.java</span></div><h1>TelemetryConfig.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.telemetry;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// Where [Telemetry] sends spans, and how.
+///
+/// Two ways to reach a collector:
+///
+/// - **Relay** (the default): the app posts OTLP/JSON to its own backend -- a
+///   Codename One backend with `cn1.otel.relay=true` -- which adds the collector's
+///   credentials and forwards the spans. Nothing secret ships in the app, and a
+///   browser never has to reach a third-party collector, so the JavaScript port
+///   needs no CORS setup on it.
+/// - **Direct**: the app posts to an OTLP/HTTP collector itself. Simpler to stand
+///   up, but whatever header authenticates the export is inside the app package,
+///   and anything inside an app package is public. Use an ingest token scoped to
+///   writing traces and nothing else.
+///
+/// ```java
+/// Telemetry.install(new TelemetryConfig()
+///         .relay(&quot;https://api.example.com&quot;)
+///         .serviceName(&quot;shop-app&quot;));
+/// ```
+<span class="fc" id="L47">public final class TelemetryConfig {</span>
+    /// How spans leave the app.
+<span class="fc" id="L49">    public enum Mode {</span>
+        /// Through the app's own backend, which forwards to the collector.
+<span class="fc" id="L51">        RELAY,</span>
+        /// Straight to an OTLP/HTTP collector.
+<span class="fc" id="L53">        DIRECT</span>
+    }
+
+<span class="fc" id="L56">    Mode mode = Mode.RELAY;</span>
+    String endpoint;
+    String serviceName;
+    String relayToken;
+<span class="fc" id="L60">    boolean protobuf = true;</span>
+<span class="fc" id="L61">    double sampleRatio = 1;</span>
+<span class="fc" id="L62">    int batchSize = 32;</span>
+<span class="fc" id="L63">    int flushIntervalMillis = 10000;</span>
+<span class="fc" id="L64">    final List&lt;String[]&gt; headers = new ArrayList&lt;String[]&gt;();</span>
+<span class="fc" id="L65">    final List&lt;String&gt; propagateTo = new ArrayList&lt;String&gt;();</span>
+    boolean propagateToAll;
+    boolean requireAnalyticsConsent;
+
+    /// A copy the caller cannot reach, taken when telemetry is installed. The
+    /// installation read the caller's object live, while caching what it derives
+    /// from it (the export URL, the relay's origin) -- so reusing the config after
+    /// install, say `direct(...)` on one installed as a relay, sent direct-mode
+    /// protobuf to the old relay, which dropped every batch. EVERY field goes
+    /// here; a new one that is not copied is read live again.
+    TelemetryConfig copy() {
+<span class="fc" id="L76">        TelemetryConfig out = new TelemetryConfig();</span>
+<span class="fc" id="L77">        out.mode = mode;</span>
+<span class="fc" id="L78">        out.endpoint = endpoint;</span>
+<span class="fc" id="L79">        out.serviceName = serviceName;</span>
+<span class="fc" id="L80">        out.relayToken = relayToken;</span>
+<span class="fc" id="L81">        out.protobuf = protobuf;</span>
+<span class="fc" id="L82">        out.sampleRatio = sampleRatio;</span>
+<span class="fc" id="L83">        out.batchSize = batchSize;</span>
+<span class="fc" id="L84">        out.flushIntervalMillis = flushIntervalMillis;</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        for (String[] header : headers) {</span>
+<span class="fc" id="L86">            out.headers.add(new String[] {header[0], header[1]});</span>
+<span class="fc" id="L87">        }</span>
+<span class="fc" id="L88">        out.propagateTo.addAll(propagateTo);</span>
+<span class="fc" id="L89">        out.propagateToAll = propagateToAll;</span>
+<span class="fc" id="L90">        out.requireAnalyticsConsent = requireAnalyticsConsent;</span>
+<span class="fc" id="L91">        return out;</span>
+    }
+
+    /// Sends spans through a Codename One backend's relay.
+    ///
+    /// #### Parameters
+    ///
+    /// - `backendUrl`: the backend's base URL, such as `https://api.example.com`;
+    ///   `/otel/v1/traces` is appended. A URL that already names a path ending in
+    ///   `/v1/traces` is used as it is, for a relay mounted elsewhere.
+    ///
+    /// #### Returns
+    ///
+    /// this configuration
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when the URL is not http or https with a
+    ///   host and a valid port
+    public TelemetryConfig relay(String backendUrl) {
+<span class="fc" id="L111">        this.mode = Mode.RELAY;</span>
+<span class="fc" id="L112">        this.endpoint = checkedEndpoint(backendUrl);</span>
+<span class="fc" id="L113">        return this;</span>
+    }
+
+    /// Sends spans straight to an OTLP/HTTP collector.
+    ///
+    /// #### Parameters
+    ///
+    /// - `collectorUrl`: the collector's base URL, `/v1/traces` appended unless
+    ///   it is already there -- the same rule `OTEL_EXPORTER_OTLP_ENDPOINT`
+    ///   follows everywhere
+    ///
+    /// #### Returns
+    ///
+    /// this configuration
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when the URL is not http or https with a
+    ///   host and a valid port
+    public TelemetryConfig direct(String collectorUrl) {
+<span class="fc" id="L133">        this.mode = Mode.DIRECT;</span>
+<span class="fc" id="L134">        this.endpoint = checkedEndpoint(collectorUrl);</span>
+<span class="fc" id="L135">        return this;</span>
+    }
+
+    /// Refuses an endpoint no export could reach, when it is given. The build
+    /// checks an annotation's URL, but a configuration written in code never meets
+    /// that check: `direct(&quot;https://&quot;)` became `https:/v1/traces`, telemetry
+    /// reported itself installed, and every export -- which fails silently by
+    /// design -- was lost. Null or empty still means &quot;no endpoint&quot;.
+    private static String checkedEndpoint(String url) {
+<span class="fc bfc" id="L144" title="All 4 branches covered.">        if (url == null || url.trim().length() == 0) {</span>
+<span class="fc" id="L145">            return url;</span>
+        }
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        if (!isHttpUrl(url.trim())) {</span>
+<span class="fc" id="L148">            throw new IllegalArgumentException(&quot;A telemetry endpoint must be an http or https &quot;</span>
+                    + &quot;URL with a host, such as https://collector.example:4318; it is '&quot;
+<span class="fc" id="L150">                    + Telemetry.redact(url.trim()) + &quot;'&quot;);</span>
+        }
+<span class="fc" id="L152">        return url;</span>
+    }
+
+    /// Whether `url` is http or https with a host (a DNS name, an IPv4 address or
+    /// a bracketed IPv6 literal) and, if it names one, a port from 1 to 65535.
+    static boolean isHttpUrl(String url) {
+        // No fragment. HTTP never sends one, so a credential kept there
+        // (&quot;#api-key=...&quot;) never reached the collector: telemetry installed and
+        // every export was refused, silently.
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        if (url.indexOf('#') &gt;= 0) {</span>
+<span class="fc" id="L162">            return false;</span>
+        }
+        // The WHOLE URL first: no space, control or DEL anywhere. Only the
+        // authority was checked, so a space in the path passed and every export
+        // then failed at transport, silently.
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        for (int i = 0; i &lt; url.length(); i++) {</span>
+<span class="fc" id="L168">            char c = url.charAt(i);</span>
+<span class="pc bpc" id="L169" title="1 of 4 branches missed.">            if (c &lt;= 0x20 || c == 0x7f) {</span>
+<span class="fc" id="L170">                return false;</span>
+            }
+        }
+        int start;
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        if (url.regionMatches(true, 0, &quot;http://&quot;, 0, 7)) {</span>
+<span class="fc" id="L175">            start = 7;</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        } else if (url.regionMatches(true, 0, &quot;https://&quot;, 0, 8)) {</span>
+<span class="fc" id="L177">            start = 8;</span>
+        } else {
+<span class="fc" id="L179">            return false;</span>
+        }
+<span class="fc" id="L181">        int end = url.length();</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        for (int i = start; i &lt; url.length(); i++) {</span>
+<span class="fc" id="L183">            char c = url.charAt(i);</span>
+<span class="pc bpc" id="L184" title="2 of 6 branches missed.">            if (c == '/' || c == '?' || c == '#') {</span>
+<span class="fc" id="L185">                end = i;</span>
+<span class="fc" id="L186">                break;</span>
+            }
+        }
+<span class="fc" id="L189">        String authority = url.substring(start, end);</span>
+<span class="fc" id="L190">        int at = authority.lastIndexOf('@');</span>
+<span class="fc bfc" id="L191" title="All 4 branches covered.">        if (at &gt;= 0 &amp;&amp; !validUserinfo(authority.substring(0, at))) {</span>
+<span class="fc" id="L192">            return false;</span>
+        }
+<span class="fc" id="L194">        String hostPort = authority.substring(at + 1);</span>
+        String host;
+<span class="fc" id="L196">        String port = null;</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        if (hostPort.startsWith(&quot;[&quot;)) {</span>
+<span class="fc" id="L198">            int close = hostPort.indexOf(']');</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">            if (close &lt; 0) {</span>
+<span class="nc" id="L200">                return false;</span>
+            }
+<span class="fc" id="L202">            host = hostPort.substring(1, close);</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">            if (!isIpv6(host)) {</span>
+<span class="fc" id="L204">                return false;</span>
+            }
+<span class="fc" id="L206">            String rest = hostPort.substring(close + 1);</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">            if (rest.length() &gt; 0) {</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">                if (rest.charAt(0) != ':') {</span>
+<span class="nc" id="L209">                    return false;</span>
+                }
+<span class="fc" id="L211">                port = rest.substring(1);</span>
+            }
+<span class="fc" id="L213">        } else {</span>
+<span class="fc" id="L214">            int colon = hostPort.lastIndexOf(':');</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">            host = colon &lt; 0 ? hostPort : hostPort.substring(0, colon);</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">            port = colon &lt; 0 ? null : hostPort.substring(colon + 1);</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">            if (!onlyChars(host, &quot;-._~&quot;)) {</span>
+<span class="nc" id="L218">                return false;</span>
+            }
+        }
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        if (host.length() == 0) {</span>
+<span class="fc" id="L222">            return false;</span>
+        }
+<span class="pc bpc" id="L224" title="1 of 4 branches missed.">        if (port == null || port.length() == 0) {</span>
+<span class="fc" id="L225">            return true;</span>
+        }
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        if (port.length() &gt; 5) {</span>
+<span class="nc" id="L228">            return false;</span>
+        }
+<span class="fc" id="L230">        int value = 0;</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        for (int i = 0; i &lt; port.length(); i++) {</span>
+<span class="fc" id="L232">            char c = port.charAt(i);</span>
+<span class="pc bpc" id="L233" title="2 of 4 branches missed.">            if (c &lt; '0' || c &gt; '9') {</span>
+<span class="nc" id="L234">                return false;</span>
+            }
+<span class="fc" id="L236">            value = value * 10 + (c - '0');</span>
+        }
+<span class="pc bpc" id="L238" title="1 of 4 branches missed.">        return value &gt;= 1 &amp;&amp; value &lt;= 65535;</span>
+    }
+
+    /// RFC 3986 userinfo: unreserved characters, sub-delims, ':' and complete
+    /// percent escapes. Skipped over, a space, a control or a stray '%' in it passed
+    /// validation and failed only at transport, where the export fails silently.
+    static boolean validUserinfo(String userinfo) {
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        for (int i = 0; i &lt; userinfo.length(); i++) {</span>
+<span class="fc" id="L246">            char c = userinfo.charAt(i);</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">            if (c == '%') {</span>
+<span class="fc bfc" id="L248" title="All 4 branches covered.">                if (i + 2 &gt;= userinfo.length() || !isHex(userinfo.charAt(i + 1))</span>
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">                        || !isHex(userinfo.charAt(i + 2))) {</span>
+<span class="fc" id="L250">                    return false;</span>
+                }
+<span class="fc" id="L252">                i += 2;</span>
+<span class="fc" id="L253">                continue;</span>
+            }
+<span class="pc bpc" id="L255" title="6 of 12 branches missed.">            if (!((c &gt;= 'a' &amp;&amp; c &lt;= 'z') || (c &gt;= 'A' &amp;&amp; c &lt;= 'Z') || (c &gt;= '0' &amp;&amp; c &lt;= '9')</span>
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">                    || &quot;-._~!$&amp;'()*+,;=:&quot;.indexOf(c) &gt;= 0)) {</span>
+<span class="nc" id="L257">                return false;</span>
+            }
+        }
+<span class="fc" id="L260">        return true;</span>
+    }
+
+    private static boolean isHex(char c) {
+<span class="pc bpc" id="L264" title="5 of 12 branches missed.">        return (c &gt;= '0' &amp;&amp; c &lt;= '9') || (c &gt;= 'a' &amp;&amp; c &lt;= 'f') || (c &gt;= 'A' &amp;&amp; c &lt;= 'F');</span>
+    }
+
+    /// An IPv6 address by its STRUCTURE (RFC 4291 2.2), not its characters: groups
+    /// of one to four hex digits, at most one &quot;::&quot;, eight groups without it and at
+    /// most seven with it, and optionally a dotted IPv4 tail counting as two. A
+    /// character check let &quot;[:::]&quot; through, and the transport refused every export.
+    static boolean isIpv6(String s) {
+<span class="fc" id="L272">        int n = s.length();</span>
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">        if (n == 0) {</span>
+<span class="nc" id="L274">            return false;</span>
+        }
+<span class="fc" id="L276">        int groups = 0;</span>
+<span class="fc" id="L277">        boolean compressed = false;</span>
+<span class="fc" id="L278">        int i = 0;</span>
+<span class="fc bfc" id="L279" title="All 2 branches covered.">        if (s.startsWith(&quot;::&quot;)) {</span>
+<span class="fc" id="L280">            compressed = true;</span>
+<span class="fc" id="L281">            i = 2;</span>
+<span class="fc bfc" id="L282" title="All 2 branches covered.">            if (i == n) {</span>
+<span class="fc" id="L283">                return true;</span>
+            }
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">        } else if (s.charAt(0) == ':') {</span>
+<span class="nc" id="L286">            return false;</span>
+        }
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">        while (i &lt; n) {</span>
+<span class="fc" id="L289">            int j = i;</span>
+<span class="fc bfc" id="L290" title="All 4 branches covered.">            while (j &lt; n &amp;&amp; s.charAt(j) != ':') {</span>
+<span class="fc" id="L291">                j++;</span>
+            }
+<span class="fc" id="L293">            String part = s.substring(i, j);</span>
+<span class="fc bfc" id="L294" title="All 2 branches covered.">            if (part.indexOf('.') &gt;= 0) {</span>
+<span class="pc bpc" id="L295" title="1 of 4 branches missed.">                if (j != n || !isIpv4(part)) {</span>
+<span class="fc" id="L296">                    return false;</span>
+                }
+<span class="fc" id="L298">                groups += 2;</span>
+            } else {
+<span class="fc bfc" id="L300" title="All 4 branches covered.">                if (part.length() &lt; 1 || part.length() &gt; 4) {</span>
+<span class="fc" id="L301">                    return false;</span>
+                }
+<span class="fc bfc" id="L303" title="All 2 branches covered.">                for (int k = 0; k &lt; part.length(); k++) {</span>
+<span class="fc" id="L304">                    char c = part.charAt(k);</span>
+<span class="pc bpc" id="L305" title="4 of 12 branches missed.">                    if (!((c &gt;= '0' &amp;&amp; c &lt;= '9') || (c &gt;= 'a' &amp;&amp; c &lt;= 'f') || (c &gt;= 'A' &amp;&amp; c &lt;= 'F'))) {</span>
+<span class="fc" id="L306">                        return false;</span>
+                    }
+                }
+<span class="fc" id="L309">                groups++;</span>
+            }
+<span class="fc bfc" id="L311" title="All 2 branches covered.">            if (j == n) {</span>
+<span class="fc" id="L312">                break;</span>
+            }
+<span class="pc bpc" id="L314" title="1 of 4 branches missed.">            if (j + 1 &lt; n &amp;&amp; s.charAt(j + 1) == ':') {</span>
+<span class="fc bfc" id="L315" title="All 2 branches covered.">                if (compressed) {</span>
+<span class="fc" id="L316">                    return false;</span>
+                }
+<span class="fc" id="L318">                compressed = true;</span>
+<span class="fc" id="L319">                i = j + 2;</span>
+            } else {
+<span class="fc" id="L321">                i = j + 1;</span>
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">                if (i == n) {</span>
+<span class="nc" id="L323">                    return false;</span>
+                }
+            }
+<span class="fc" id="L326">        }</span>
+<span class="pc bpc" id="L327" title="1 of 6 branches missed.">        return compressed ? groups &lt;= 7 : groups == 8;</span>
+    }
+
+    /// Four decimal parts, each 0 to 255.
+    static boolean isIpv4(String s) {
+<span class="fc" id="L332">        int parts = 0;</span>
+<span class="fc" id="L333">        int i = 0;</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">        while (i &lt;= s.length()) {</span>
+<span class="fc" id="L335">            int j = s.indexOf('.', i);</span>
+<span class="fc bfc" id="L336" title="All 2 branches covered.">            if (j &lt; 0) {</span>
+<span class="fc" id="L337">                j = s.length();</span>
+            }
+<span class="fc" id="L339">            String part = s.substring(i, j);</span>
+<span class="pc bpc" id="L340" title="2 of 4 branches missed.">            if (part.length() &lt; 1 || part.length() &gt; 3) {</span>
+<span class="nc" id="L341">                return false;</span>
+            }
+<span class="fc" id="L343">            int value = 0;</span>
+<span class="fc bfc" id="L344" title="All 2 branches covered.">            for (int k = 0; k &lt; part.length(); k++) {</span>
+<span class="fc" id="L345">                char c = part.charAt(k);</span>
+<span class="pc bpc" id="L346" title="2 of 4 branches missed.">                if (c &lt; '0' || c &gt; '9') {</span>
+<span class="nc" id="L347">                    return false;</span>
+                }
+<span class="fc" id="L349">                value = value * 10 + (c - '0');</span>
+            }
+<span class="fc bfc" id="L351" title="All 2 branches covered.">            if (value &gt; 255) {</span>
+<span class="fc" id="L352">                return false;</span>
+            }
+<span class="fc" id="L354">            parts++;</span>
+<span class="fc" id="L355">            i = j + 1;</span>
+<span class="fc" id="L356">        }</span>
+<span class="pc bpc" id="L357" title="1 of 2 branches missed.">        return parts == 4;</span>
+    }
+
+    /// The headers the exporter owns: its body's type and framing, and the
+    /// destination, which come from what it sends and where.
+    static boolean isExporterOwned(String name) {
+<span class="fc bfc" id="L363" title="All 4 branches covered.">        return &quot;Content-Type&quot;.equalsIgnoreCase(name) || &quot;Content-Length&quot;.equalsIgnoreCase(name)</span>
+<span class="pc bpc" id="L364" title="2 of 4 branches missed.">                || &quot;Host&quot;.equalsIgnoreCase(name) || &quot;Transfer-Encoding&quot;.equalsIgnoreCase(name);</span>
+    }
+
+    private static boolean onlyChars(String value, String extra) {
+<span class="fc bfc" id="L368" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L369">            char c = value.charAt(i);</span>
+<span class="pc bpc" id="L370" title="7 of 12 branches missed.">            if (!((c &gt;= 'a' &amp;&amp; c &lt;= 'z') || (c &gt;= 'A' &amp;&amp; c &lt;= 'Z') || (c &gt;= '0' &amp;&amp; c &lt;= '9')</span>
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">                    || extra.indexOf(c) &gt;= 0)) {</span>
+<span class="nc" id="L372">                return false;</span>
+            }
+        }
+<span class="fc" id="L375">        return true;</span>
+    }
+
+    /// The `service.name` the app's spans are reported under. Defaults to the
+    /// app's name.
+    ///
+    /// #### Returns
+    ///
+    /// this configuration
+    public TelemetryConfig serviceName(String name) {
+<span class="fc" id="L385">        this.serviceName = name;</span>
+<span class="fc" id="L386">        return this;</span>
+    }
+
+    /// A header sent with every direct export -- the collector's credential.
+    /// Ignored in relay mode, where the backend holds the credential.
+    ///
+    /// #### Returns
+    ///
+    /// this configuration
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when the name is not an HTTP token or the
+    ///   value holds a control character
+    public TelemetryConfig header(String name, String value) {
+<span class="pc bpc" id="L401" title="2 of 4 branches missed.">        if (name != null &amp;&amp; value != null) {</span>
+<span class="fc" id="L402">            checkHeader(name, value);</span>
+<span class="fc" id="L403">            headers.add(new String[] {name, value});</span>
+        }
+<span class="fc" id="L405">        return this;</span>
+    }
+
+    /// The rules the annotation processor applies to a header, for one written in
+    /// code, which never meets it. A bad header is refused only when an export
+    /// runs -- after its batch has left the buffer, and silently, by design -- so
+    /// accepting it here lost every batch. The message names the header, never
+    /// the value, which is usually a credential.
+    private static void checkHeader(String name, String value) {
+<span class="fc bfc" id="L414" title="All 2 branches covered.">        if (name.length() == 0) {</span>
+<span class="fc" id="L415">            throw new IllegalArgumentException(&quot;A telemetry header needs a name&quot;);</span>
+        }
+<span class="fc bfc" id="L417" title="All 2 branches covered.">        if (isExporterOwned(name)) {</span>
+            // The exporter sets these from what it sends. A Content-Type given
+            // here replaced the media type -- addRequestHeader treats it as
+            // setContentType -- so protobuf went out labelled JSON and every batch
+            // was refused, after it had left the buffer.
+<span class="fc" id="L422">            throw new IllegalArgumentException(name + &quot; is set by the exporter from what it &quot;</span>
+                    + &quot;sends and cannot be configured&quot;);
+        }
+<span class="fc bfc" id="L425" title="All 2 branches covered.">        for (int i = 0; i &lt; name.length(); i++) {</span>
+<span class="fc" id="L426">            char c = name.charAt(i);</span>
+<span class="pc bpc" id="L427" title="3 of 12 branches missed.">            if (!((c &gt;= 'a' &amp;&amp; c &lt;= 'z') || (c &gt;= 'A' &amp;&amp; c &lt;= 'Z') || (c &gt;= '0' &amp;&amp; c &lt;= '9')</span>
+<span class="fc bfc" id="L428" title="All 2 branches covered.">                    || &quot;!#$%&amp;'*+-.^_`|~&quot;.indexOf(c) &gt;= 0)) {</span>
+<span class="fc" id="L429">                throw new IllegalArgumentException(&quot;'&quot; + name + &quot;' is not a valid HTTP header name&quot;);</span>
+            }
+        }
+<span class="fc bfc" id="L432" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L433">            char c = value.charAt(i);</span>
+<span class="fc bfc" id="L434" title="All 6 branches covered.">            if ((c &lt; 0x20 &amp;&amp; c != '\t') || c == 0x7f) {</span>
+<span class="fc" id="L435">                throw new IllegalArgumentException(&quot;The value of telemetry header &quot; + name</span>
+                        + &quot; holds a control character, which no HTTP header may carry&quot;);
+            }
+        }
+<span class="fc" id="L439">    }</span>
+
+    /// The shared secret a backend's relay may require
+    /// (`cn1.otel.relay.token`). It keeps casual traffic off the relay; it is not
+    /// a credential, since it ships in the app.
+    ///
+    /// #### Returns
+    ///
+    /// this configuration
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when the token holds a control character, or
+    ///   begins or ends with whitespace
+    public TelemetryConfig relayToken(String token) {
+<span class="pc bpc" id="L454" title="1 of 2 branches missed.">        if (token != null) {</span>
+            // Sent as a header, so held to the same rules -- and compared exactly,
+            // while the backend trims the spaces and tabs around a header value, so
+            // a token with them could never match.
+<span class="fc" id="L458">            checkHeader(&quot;X-CN1-Telemetry-Token&quot;, token);</span>
+<span class="fc" id="L459">            int last = token.length() - 1;</span>
+<span class="pc bpc" id="L460" title="2 of 6 branches missed.">            if (last &gt;= 0 &amp;&amp; (token.charAt(0) == ' ' || token.charAt(0) == '\t'</span>
+<span class="fc bfc" id="L461" title="All 4 branches covered.">                    || token.charAt(last) == ' ' || token.charAt(last) == '\t')) {</span>
+<span class="fc" id="L462">                throw new IllegalArgumentException(&quot;The relay token begins or ends with &quot;</span>
+                        + &quot;whitespace, which a header cannot carry&quot;);
+            }
+        }
+<span class="fc" id="L466">        this.relayToken = token;</span>
+<span class="fc" id="L467">        return this;</span>
+    }
+
+    /// Whether direct exports use binary protobuf (the default) or JSON. Some
+    /// collectors accept only protobuf. The relay always receives JSON, and
+    /// re-encodes it for the collector as the backend is configured to.
+    ///
+    /// #### Returns
+    ///
+    /// this configuration
+    public TelemetryConfig protobuf(boolean protobuf) {
+<span class="fc" id="L478">        this.protobuf = protobuf;</span>
+<span class="fc" id="L479">        return this;</span>
+    }
+
+    /// The share of NEW traces recorded, from 0 to 1. A request made inside a
+    /// span follows that span's decision, and the backend follows the app's.
+    ///
+    /// #### Returns
+    ///
+    /// this configuration
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for NaN
+    public TelemetryConfig sampleRatio(double ratio) {
+        // NaN fails both comparisons below, so it was stored as it was, and the
+        // sampler then declined every trace while telemetry reported itself on.
+        // A range can be clamped into; NaN has no nearest value, so it is refused
+        // -- as the annotation processor refuses it.
+<span class="fc bfc" id="L497" title="All 2 branches covered.">        if (Double.isNaN(ratio)) {</span>
+<span class="fc" id="L498">            throw new IllegalArgumentException(&quot;The telemetry sample ratio is NaN; &quot;</span>
+                    + &quot;give a number from 0 to 1&quot;);
+        }
+<span class="pc bpc" id="L501" title="1 of 4 branches missed.">        this.sampleRatio = ratio &lt; 0 ? 0 : ratio &gt; 1 ? 1 : ratio;</span>
+<span class="fc" id="L502">        return this;</span>
+    }
+
+    /// How many ended spans are buffered before an export. Defaults to 32.
+    ///
+    /// #### Returns
+    ///
+    /// this configuration
+    public TelemetryConfig batchSize(int size) {
+<span class="pc bpc" id="L511" title="1 of 2 branches missed.">        this.batchSize = size &lt; 1 ? 1 : size;</span>
+<span class="fc" id="L512">        return this;</span>
+    }
+
+    /// How often buffered spans are exported even when the batch is not full.
+    /// Defaults to ten seconds.
+    ///
+    /// #### Returns
+    ///
+    /// this configuration
+    public TelemetryConfig flushIntervalMillis(int millis) {
+<span class="pc bpc" id="L522" title="1 of 2 branches missed.">        this.flushIntervalMillis = millis &lt; 1000 ? 1000 : millis;</span>
+<span class="fc" id="L523">        return this;</span>
+    }
+
+    /// Sends the W3C trace context to requests for this host as well.
+    ///
+    /// By default the context goes to the relay's host -- the app's own backend --
+    /// and, on every platform except the web, to every host. The web is the
+    /// exception because `traceparent` is not a CORS-safelisted header: sending it
+    /// to a server that does not allow it turns a working cross-origin request
+    /// into a failed preflight. Name the hosts that do allow it here.
+    ///
+    /// #### Returns
+    ///
+    /// this configuration
+    public TelemetryConfig propagateTo(String host) {
+<span class="pc bpc" id="L538" title="2 of 4 branches missed.">        if (host != null &amp;&amp; host.length() &gt; 0) {</span>
+<span class="fc" id="L539">            propagateTo.add(host);</span>
+        }
+<span class="fc" id="L541">        return this;</span>
+    }
+
+    /// Sends the trace context to every host, on every platform, the web
+    /// included. For an app whose every request goes to servers that allow the
+    /// header.
+    ///
+    /// #### Returns
+    ///
+    /// this configuration
+    public TelemetryConfig propagateToAllHosts() {
+<span class="fc" id="L552">        this.propagateToAll = true;</span>
+<span class="fc" id="L553">        return this;</span>
+    }
+
+    /// Records and propagates traces only while the user has granted ANALYTICS
+    /// consent through `com.codename1.analytics.Analytics`, the same consent the
+    /// analytics providers honour. Off by default: whether trace data needs consent
+    /// is the app's decision, and depends on what it records and where it ships.
+    ///
+    /// With it on and no consent, requests are sent exactly as they would be
+    /// without telemetry -- no span, and no `traceparent` header -- and spans
+    /// already buffered are dropped rather than exported. Before the user answers,
+    /// the analytics `ConsentMode` decides: `OPT_IN` (the default) means no.
+    ///
+    /// #### Returns
+    ///
+    /// this configuration
+    public TelemetryConfig requireAnalyticsConsent(boolean require) {
+<span class="fc" id="L570">        this.requireAnalyticsConsent = require;</span>
+<span class="fc" id="L571">        return this;</span>
+    }
+
+    /// The URL spans are posted to, or null when no endpoint was given.
+    String exportUrl() {
+<span class="fc bfc" id="L576" title="All 4 branches covered.">        if (endpoint == null || endpoint.length() == 0) {</span>
+<span class="fc" id="L577">            return null;</span>
+        }
+<span class="fc" id="L579">        String url = endpoint.trim();</span>
+        // The path is what gets the suffix; a query or fragment -- where a
+        // collector's api-key often travels -- is set aside and put back after it.
+        // Appending to the whole string put the path inside the credential and
+        // sent the export to the base path.
+<span class="fc" id="L584">        int cut = url.length();</span>
+<span class="fc" id="L585">        int query = url.indexOf('?');</span>
+<span class="fc" id="L586">        int fragment = url.indexOf('#');</span>
+<span class="fc bfc" id="L587" title="All 2 branches covered.">        if (query &gt;= 0) {</span>
+<span class="fc" id="L588">            cut = query;</span>
+        }
+<span class="pc bpc" id="L590" title="3 of 4 branches missed.">        if (fragment &gt;= 0 &amp;&amp; fragment &lt; cut) {</span>
+<span class="nc" id="L591">            cut = fragment;</span>
+        }
+<span class="fc" id="L593">        String base = url.substring(0, cut);</span>
+<span class="fc" id="L594">        String suffix = url.substring(cut);</span>
+        // Trailing slashes first: &quot;.../v1/traces/&quot; is the full URL too, and testing
+        // before stripping appended the path a second time -- a route no collector
+        // serves, and the export fails silently by design.
+<span class="fc bfc" id="L598" title="All 2 branches covered.">        while (base.endsWith(&quot;/&quot;)) {</span>
+<span class="fc" id="L599">            base = base.substring(0, base.length() - 1);</span>
+        }
+<span class="fc bfc" id="L601" title="All 2 branches covered.">        if (base.endsWith(&quot;/v1/traces&quot;)) {</span>
+<span class="fc" id="L602">            return base + suffix;</span>
+        }
+<span class="fc bfc" id="L604" title="All 2 branches covered.">        return base + (mode == Mode.RELAY ? &quot;/otel/v1/traces&quot; : &quot;/v1/traces&quot;) + suffix;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

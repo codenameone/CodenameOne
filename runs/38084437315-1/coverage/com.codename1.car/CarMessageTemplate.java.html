@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CarMessageTemplate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.car</a> &gt; <span class="el_source">CarMessageTemplate.java</span></div><h1>CarMessageTemplate.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.car;
+
+import com.codename1.ui.Image;
+import java.util.ArrayList;
+import java.util.List;
+
+/// A short message with an icon and action buttons -- an error/empty state, a permission prompt, or
+/// (for communication apps) an incoming-message card with read-aloud and voice-reply actions. Maps
+/// to `androidx.car.app.model.MessageTemplate` and `CPInformationTemplate` / a CarPlay messaging
+/// list item.
+///
+/// Communication apps must additionally hold the platform messaging entitlement
+/// (`ios.carplay.messaging` build hint on iOS; the `androidx.car.app.category.MESSAGING` intent
+/// filter the builder injects on Android). Without it the message still renders but voice reply is
+/// unavailable.
+public class CarMessageTemplate extends CarTemplate {
+    private String message;
+    private Image icon;
+    private boolean loading;
+<span class="nc" id="L42">    private final List&lt;CarAction&gt; actions = new ArrayList&lt;CarAction&gt;();</span>
+    private CarActionStrip headerActions;
+
+    /// Creates an empty message template.
+<span class="nc" id="L46">    public CarMessageTemplate() {</span>
+<span class="nc" id="L47">    }</span>
+
+    /// Creates a message template with the supplied body text.
+    ///
+    /// #### Parameters
+    ///
+    /// - `message`: the body text
+<span class="nc" id="L54">    public CarMessageTemplate(String message) {</span>
+<span class="nc" id="L55">        this.message = message;</span>
+<span class="nc" id="L56">    }</span>
+
+    /// Sets the header title.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: the header title
+    ///
+    /// #### Returns
+    ///
+    /// this template, for chaining
+    public CarMessageTemplate setTitle(String title) {
+<span class="nc" id="L68">        setTitleInternal(title);</span>
+<span class="nc" id="L69">        return this;</span>
+    }
+
+    /// Returns the body text.
+    public String getMessage() {
+<span class="nc" id="L74">        return message;</span>
+    }
+
+    /// Sets the body text shown to (and optionally read aloud to) the driver.
+    ///
+    /// #### Parameters
+    ///
+    /// - `message`: the body text
+    ///
+    /// #### Returns
+    ///
+    /// this template, for chaining
+    public CarMessageTemplate setMessage(String message) {
+<span class="nc" id="L87">        this.message = message;</span>
+<span class="nc" id="L88">        return this;</span>
+    }
+
+    /// Returns the leading icon, or null.
+    public Image getIcon() {
+<span class="nc" id="L93">        return icon;</span>
+    }
+
+    /// Sets the leading icon (e.g. the sender avatar, an error glyph).
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: the icon image
+    ///
+    /// #### Returns
+    ///
+    /// this template, for chaining
+    public CarMessageTemplate setIcon(Image icon) {
+<span class="nc" id="L106">        this.icon = icon;</span>
+<span class="nc" id="L107">        return this;</span>
+    }
+
+    /// Adds an action button (e.g. &quot;Reply&quot;, &quot;Mark read&quot;, &quot;Retry&quot;). The head unit shows at most two.
+    ///
+    /// #### Parameters
+    ///
+    /// - `action`: the action button
+    ///
+    /// #### Returns
+    ///
+    /// this template, for chaining
+    public CarMessageTemplate addAction(CarAction action) {
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        if (action != null) {</span>
+<span class="nc" id="L121">            actions.add(action);</span>
+        }
+<span class="nc" id="L123">        return this;</span>
+    }
+
+    /// Returns the action buttons, in order.
+    public List&lt;CarAction&gt; getActions() {
+<span class="nc" id="L128">        return actions;</span>
+    }
+
+    /// Returns the header action strip, or null.
+    public CarActionStrip getHeaderActions() {
+<span class="nc" id="L133">        return headerActions;</span>
+    }
+
+    /// Sets the header action strip.
+    ///
+    /// #### Parameters
+    ///
+    /// - `headerActions`: the action strip
+    ///
+    /// #### Returns
+    ///
+    /// this template, for chaining
+    public CarMessageTemplate setHeaderActions(CarActionStrip headerActions) {
+<span class="nc" id="L146">        this.headerActions = headerActions;</span>
+<span class="nc" id="L147">        return this;</span>
+    }
+
+    /// Returns true when the template should render a loading spinner instead of content.
+    public boolean isLoading() {
+<span class="nc" id="L152">        return loading;</span>
+    }
+
+    /// Marks the template as loading; the head unit renders a spinner.
+    ///
+    /// #### Parameters
+    ///
+    /// - `loading`: true to show a spinner
+    ///
+    /// #### Returns
+    ///
+    /// this template, for chaining
+    public CarMessageTemplate setLoading(boolean loading) {
+<span class="nc" id="L165">        this.loading = loading;</span>
+<span class="nc" id="L166">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ShieldEngineRegistry.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security.shield.spi</a> &gt; <span class="el_source">ShieldEngineRegistry.java</span></div><h1>ShieldEngineRegistry.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security.shield.spi;
+
+/// Where the attestation engine registers itself.
+///
+/// Registration is by direct instance, not by class name. Codename One obfuscates and renames
+/// classes -- ProGuard/R8 on Android, the bytecode-to-C translation on iOS -- so a
+/// `Class.forName` lookup is unreliable by construction. The port or the build-server-generated
+/// bootstrap instantiates the engine itself and passes the instance here, which survives renaming
+/// because it is an ordinary symbol reference. The same convention is used elsewhere in the
+/// framework for port-supplied implementations.
+///
+/// Registration happens in one of three places:
+///
+/// - **Device builds**: the build server splices a bootstrap into the generated application stub,
+///   ahead of `Display.init`, when the project is entitled to the enterprise engine.
+/// - **Simulator**: the desktop port's post-init bootstrap scan picks it up, which is the one
+///   place a name-based lookup is safe because the desktop port is not obfuscated.
+/// - **Tests**: call [#setEngine(ShieldEngine)] directly.
+///
+/// The first registration wins and the registry then seals. Without that, any code running later
+/// in the process -- including code an attacker injected -- could swap in an engine that returns
+/// whatever it likes. Sealing does not make the app tamper-proof (an attacker who can patch the
+/// binary can patch this too); it removes the version of the attack that needs no patching at all.
+public final class ShieldEngineRegistry {
+
+    private static ShieldEngine engine;
+    private static boolean sealed;
+
+    private ShieldEngineRegistry() {
+    }
+
+    /// Registers the engine. The first call wins.
+    ///
+    /// @throws IllegalStateException if an engine is already registered
+    public static void setEngine(ShieldEngine e) {
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if (e == null) {</span>
+<span class="nc" id="L59">            throw new IllegalArgumentException(&quot;engine is null&quot;);</span>
+        }
+<span class="fc" id="L61">        synchronized (ShieldEngineRegistry.class) {</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">            if (sealed) {</span>
+<span class="nc" id="L63">                throw new IllegalStateException(</span>
+<span class="nc" id="L64">                        &quot;A shield engine is already registered: &quot; + engine.getName());</span>
+            }
+<span class="fc" id="L66">            engine = e;</span>
+<span class="fc" id="L67">            sealed = true;</span>
+<span class="fc" id="L68">        }</span>
+<span class="fc" id="L69">    }</span>
+
+    /// The registered engine, or the inert default when none was registered. Never null, so no
+    /// caller needs a null check and no code path can silently skip a check that should have run.
+    public static ShieldEngine getEngine() {
+<span class="fc" id="L74">        synchronized (ShieldEngineRegistry.class) {</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">            return engine != null ? engine : UnprotectedEngine.INSTANCE;</span>
+        }
+    }
+
+    /// The framework-backed [EngineContext] an engine is initialized with. Exposed so a port or a
+    /// test can construct an engine against the real services without reimplementing them.
+    public static EngineContext getDefaultContext() {
+<span class="fc" id="L82">        return DefaultEngineContext.INSTANCE;</span>
+    }
+
+    /// True when a real engine was registered, whatever it currently reports about its
+    /// availability.
+    ///
+    /// Distinct from [com.codename1.security.shield.AppShield#isProtected()], which asks
+    /// whether attestation can run *right now*. A fail-closed host must refuse when a
+    /// registered engine cannot attest -- that is the case it exists for -- and relax only
+    /// for a build that has no engine at all.
+    public static boolean isEngineRegistered() {
+<span class="fc" id="L93">        synchronized (ShieldEngineRegistry.class) {</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">            return engine != null;</span>
+        }
+    }
+
+    /// Test hook: drops the registration and unseals. Not for application use -- there is no
+    /// legitimate reason for a shipping app to replace its engine at runtime.
+    static void resetForTesting() {
+<span class="fc" id="L101">        synchronized (ShieldEngineRegistry.class) {</span>
+<span class="fc" id="L102">            engine = null;</span>
+<span class="fc" id="L103">            sealed = false;</span>
+<span class="fc" id="L104">        }</span>
+<span class="fc" id="L105">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

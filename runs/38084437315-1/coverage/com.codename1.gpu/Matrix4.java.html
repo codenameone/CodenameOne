@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Matrix4.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gpu</a> &gt; <span class="el_source">Matrix4.java</span></div><h1>Matrix4.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ */
+package com.codename1.gpu;
+
+/// Portable column-major 4x4 float matrix math used by the 3D API. Every
+/// operation works on plain `float[16]` arrays so it behaves identically on
+/// every platform without relying on native transform support. The layout
+/// matches OpenGL/Metal column-major convention: element `m[c * 4 + r]` is
+/// column `c`, row `r`.
+public final class Matrix4 {
+    private Matrix4() {
+    }
+
+    /// Allocates a new identity matrix.
+    public static float[] identity() {
+<span class="fc" id="L23">        float[] m = new float[16];</span>
+<span class="fc" id="L24">        setIdentity(m);</span>
+<span class="fc" id="L25">        return m;</span>
+    }
+
+    /// Resets the supplied matrix to the identity matrix.
+    public static void setIdentity(float[] m) {
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        for (int i = 0; i &lt; 16; i++) {</span>
+<span class="fc" id="L31">            m[i] = 0.0f;</span>
+        }
+<span class="fc" id="L33">        m[0] = 1.0f;</span>
+<span class="fc" id="L34">        m[5] = 1.0f;</span>
+<span class="fc" id="L35">        m[10] = 1.0f;</span>
+<span class="fc" id="L36">        m[15] = 1.0f;</span>
+<span class="fc" id="L37">    }</span>
+
+    /// Copies the contents of `src` into `dst`. Both arrays must hold 16 floats.
+    public static void copy(float[] src, float[] dst) {
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        for (int i = 0; i &lt; 16; i++) {</span>
+<span class="fc" id="L42">            dst[i] = src[i];</span>
+        }
+<span class="fc" id="L44">    }</span>
+
+    /// Multiplies `a * b` and stores the result in `dst`. `dst` may not alias
+    /// `a` or `b`.
+    public static void multiply(float[] a, float[] b, float[] dst) {
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        for (int c = 0; c &lt; 4; c++) {</span>
+<span class="fc" id="L50">            int cb = c * 4;</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">            for (int r = 0; r &lt; 4; r++) {</span>
+<span class="fc" id="L52">                dst[cb + r] = a[r] * b[cb]</span>
+                        + a[4 + r] * b[cb + 1]
+                        + a[8 + r] * b[cb + 2]
+                        + a[12 + r] * b[cb + 3];
+            }
+        }
+<span class="fc" id="L58">    }</span>
+
+    /// Builds a perspective projection matrix. `fovYRadians` is the vertical
+    /// field of view in radians, `aspect` the width/height ratio.
+    public static float[] perspective(float fovYRadians, float aspect, float near, float far) {
+<span class="fc" id="L63">        float[] m = new float[16];</span>
+<span class="fc" id="L64">        float f = (float) (1.0 / Math.tan(fovYRadians / 2.0));</span>
+<span class="fc" id="L65">        m[0] = f / aspect;</span>
+<span class="fc" id="L66">        m[5] = f;</span>
+<span class="fc" id="L67">        m[10] = (far + near) / (near - far);</span>
+<span class="fc" id="L68">        m[11] = -1.0f;</span>
+<span class="fc" id="L69">        m[14] = (2.0f * far * near) / (near - far);</span>
+<span class="fc" id="L70">        return m;</span>
+    }
+
+    /// Builds an orthographic projection matrix.
+    public static float[] ortho(float left, float right, float bottom, float top, float near, float far) {
+<span class="nc" id="L75">        float[] m = new float[16];</span>
+<span class="nc" id="L76">        m[0] = 2.0f / (right - left);</span>
+<span class="nc" id="L77">        m[5] = 2.0f / (top - bottom);</span>
+<span class="nc" id="L78">        m[10] = -2.0f / (far - near);</span>
+<span class="nc" id="L79">        m[12] = -(right + left) / (right - left);</span>
+<span class="nc" id="L80">        m[13] = -(top + bottom) / (top - bottom);</span>
+<span class="nc" id="L81">        m[14] = -(far + near) / (far - near);</span>
+<span class="nc" id="L82">        m[15] = 1.0f;</span>
+<span class="nc" id="L83">        return m;</span>
+    }
+
+    /// Builds a right-handed look-at view matrix from eye, target and up vectors.
+    public static float[] lookAt(float eyeX, float eyeY, float eyeZ,
+                                 float centerX, float centerY, float centerZ,
+                                 float upX, float upY, float upZ) {
+<span class="fc" id="L90">        float fx = centerX - eyeX;</span>
+<span class="fc" id="L91">        float fy = centerY - eyeY;</span>
+<span class="fc" id="L92">        float fz = centerZ - eyeZ;</span>
+<span class="fc" id="L93">        float rlf = 1.0f / length(fx, fy, fz);</span>
+<span class="fc" id="L94">        fx *= rlf;</span>
+<span class="fc" id="L95">        fy *= rlf;</span>
+<span class="fc" id="L96">        fz *= rlf;</span>
+
+<span class="fc" id="L98">        float sx = fy * upZ - fz * upY;</span>
+<span class="fc" id="L99">        float sy = fz * upX - fx * upZ;</span>
+<span class="fc" id="L100">        float sz = fx * upY - fy * upX;</span>
+<span class="fc" id="L101">        float rls = 1.0f / length(sx, sy, sz);</span>
+<span class="fc" id="L102">        sx *= rls;</span>
+<span class="fc" id="L103">        sy *= rls;</span>
+<span class="fc" id="L104">        sz *= rls;</span>
+
+<span class="fc" id="L106">        float ux = sy * fz - sz * fy;</span>
+<span class="fc" id="L107">        float uy = sz * fx - sx * fz;</span>
+<span class="fc" id="L108">        float uz = sx * fy - sy * fx;</span>
+
+<span class="fc" id="L110">        float[] m = new float[16];</span>
+<span class="fc" id="L111">        m[0] = sx;</span>
+<span class="fc" id="L112">        m[4] = sy;</span>
+<span class="fc" id="L113">        m[8] = sz;</span>
+<span class="fc" id="L114">        m[1] = ux;</span>
+<span class="fc" id="L115">        m[5] = uy;</span>
+<span class="fc" id="L116">        m[9] = uz;</span>
+<span class="fc" id="L117">        m[2] = -fx;</span>
+<span class="fc" id="L118">        m[6] = -fy;</span>
+<span class="fc" id="L119">        m[10] = -fz;</span>
+<span class="fc" id="L120">        m[12] = -(sx * eyeX + sy * eyeY + sz * eyeZ);</span>
+<span class="fc" id="L121">        m[13] = -(ux * eyeX + uy * eyeY + uz * eyeZ);</span>
+<span class="fc" id="L122">        m[14] = fx * eyeX + fy * eyeY + fz * eyeZ;</span>
+<span class="fc" id="L123">        m[15] = 1.0f;</span>
+<span class="fc" id="L124">        return m;</span>
+    }
+
+    /// Returns a translation matrix.
+    public static float[] translation(float x, float y, float z) {
+<span class="fc" id="L129">        float[] m = identity();</span>
+<span class="fc" id="L130">        m[12] = x;</span>
+<span class="fc" id="L131">        m[13] = y;</span>
+<span class="fc" id="L132">        m[14] = z;</span>
+<span class="fc" id="L133">        return m;</span>
+    }
+
+    /// Returns a scale matrix.
+    public static float[] scaling(float x, float y, float z) {
+<span class="fc" id="L138">        float[] m = new float[16];</span>
+<span class="fc" id="L139">        m[0] = x;</span>
+<span class="fc" id="L140">        m[5] = y;</span>
+<span class="fc" id="L141">        m[10] = z;</span>
+<span class="fc" id="L142">        m[15] = 1.0f;</span>
+<span class="fc" id="L143">        return m;</span>
+    }
+
+    /// Returns a rotation matrix around an arbitrary axis. `angleRadians` is the
+    /// rotation angle, `(x, y, z)` the rotation axis (need not be normalized).
+    public static float[] rotation(float angleRadians, float x, float y, float z) {
+<span class="fc" id="L149">        float len = length(x, y, z);</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if (len != 0.0f) {</span>
+<span class="fc" id="L151">            float inv = 1.0f / len;</span>
+<span class="fc" id="L152">            x *= inv;</span>
+<span class="fc" id="L153">            y *= inv;</span>
+<span class="fc" id="L154">            z *= inv;</span>
+        }
+<span class="fc" id="L156">        float c = (float) Math.cos(angleRadians);</span>
+<span class="fc" id="L157">        float s = (float) Math.sin(angleRadians);</span>
+<span class="fc" id="L158">        float omc = 1.0f - c;</span>
+<span class="fc" id="L159">        float[] m = new float[16];</span>
+<span class="fc" id="L160">        m[0] = x * x * omc + c;</span>
+<span class="fc" id="L161">        m[1] = y * x * omc + z * s;</span>
+<span class="fc" id="L162">        m[2] = z * x * omc - y * s;</span>
+<span class="fc" id="L163">        m[4] = x * y * omc - z * s;</span>
+<span class="fc" id="L164">        m[5] = y * y * omc + c;</span>
+<span class="fc" id="L165">        m[6] = z * y * omc + x * s;</span>
+<span class="fc" id="L166">        m[8] = x * z * omc + y * s;</span>
+<span class="fc" id="L167">        m[9] = y * z * omc - x * s;</span>
+<span class="fc" id="L168">        m[10] = z * z * omc + c;</span>
+<span class="fc" id="L169">        m[15] = 1.0f;</span>
+<span class="fc" id="L170">        return m;</span>
+    }
+
+    /// Computes the transpose of the upper-left 3x3 of the inverse of `m`,
+    /// expanded to a 4x4. This is the correct matrix for transforming normals.
+    /// Returns the identity when `m` is not invertible.
+    public static float[] normalMatrix(float[] m) {
+<span class="nc" id="L177">        float[] inv = new float[16];</span>
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        if (!invert(m, inv)) {</span>
+<span class="nc" id="L179">            return identity();</span>
+        }
+<span class="nc" id="L181">        float[] out = identity();</span>
+<span class="nc" id="L182">        out[0] = inv[0];</span>
+<span class="nc" id="L183">        out[1] = inv[4];</span>
+<span class="nc" id="L184">        out[2] = inv[8];</span>
+<span class="nc" id="L185">        out[4] = inv[1];</span>
+<span class="nc" id="L186">        out[5] = inv[5];</span>
+<span class="nc" id="L187">        out[6] = inv[9];</span>
+<span class="nc" id="L188">        out[8] = inv[2];</span>
+<span class="nc" id="L189">        out[9] = inv[6];</span>
+<span class="nc" id="L190">        out[10] = inv[10];</span>
+<span class="nc" id="L191">        return out;</span>
+    }
+
+    /// Inverts `m` into `dst`. Returns false (leaving `dst` untouched) when the
+    /// matrix is singular.
+    public static boolean invert(float[] m, float[] dst) {
+<span class="nc" id="L197">        float[] inv = new float[16];</span>
+<span class="nc" id="L198">        inv[0] = m[5] * m[10] * m[15] - m[5] * m[11] * m[14] - m[9] * m[6] * m[15]</span>
+                + m[9] * m[7] * m[14] + m[13] * m[6] * m[11] - m[13] * m[7] * m[10];
+<span class="nc" id="L200">        inv[4] = -m[4] * m[10] * m[15] + m[4] * m[11] * m[14] + m[8] * m[6] * m[15]</span>
+                - m[8] * m[7] * m[14] - m[12] * m[6] * m[11] + m[12] * m[7] * m[10];
+<span class="nc" id="L202">        inv[8] = m[4] * m[9] * m[15] - m[4] * m[11] * m[13] - m[8] * m[5] * m[15]</span>
+                + m[8] * m[7] * m[13] + m[12] * m[5] * m[11] - m[12] * m[7] * m[9];
+<span class="nc" id="L204">        inv[12] = -m[4] * m[9] * m[14] + m[4] * m[10] * m[13] + m[8] * m[5] * m[14]</span>
+                - m[8] * m[6] * m[13] - m[12] * m[5] * m[10] + m[12] * m[6] * m[9];
+<span class="nc" id="L206">        inv[1] = -m[1] * m[10] * m[15] + m[1] * m[11] * m[14] + m[9] * m[2] * m[15]</span>
+                - m[9] * m[3] * m[14] - m[13] * m[2] * m[11] + m[13] * m[3] * m[10];
+<span class="nc" id="L208">        inv[5] = m[0] * m[10] * m[15] - m[0] * m[11] * m[14] - m[8] * m[2] * m[15]</span>
+                + m[8] * m[3] * m[14] + m[12] * m[2] * m[11] - m[12] * m[3] * m[10];
+<span class="nc" id="L210">        inv[9] = -m[0] * m[9] * m[15] + m[0] * m[11] * m[13] + m[8] * m[1] * m[15]</span>
+                - m[8] * m[3] * m[13] - m[12] * m[1] * m[11] + m[12] * m[3] * m[9];
+<span class="nc" id="L212">        inv[13] = m[0] * m[9] * m[14] - m[0] * m[10] * m[13] - m[8] * m[1] * m[14]</span>
+                + m[8] * m[2] * m[13] + m[12] * m[1] * m[10] - m[12] * m[2] * m[9];
+<span class="nc" id="L214">        inv[2] = m[1] * m[6] * m[15] - m[1] * m[7] * m[14] - m[5] * m[2] * m[15]</span>
+                + m[5] * m[3] * m[14] + m[13] * m[2] * m[7] - m[13] * m[3] * m[6];
+<span class="nc" id="L216">        inv[6] = -m[0] * m[6] * m[15] + m[0] * m[7] * m[14] + m[4] * m[2] * m[15]</span>
+                - m[4] * m[3] * m[14] - m[12] * m[2] * m[7] + m[12] * m[3] * m[6];
+<span class="nc" id="L218">        inv[10] = m[0] * m[5] * m[15] - m[0] * m[7] * m[13] - m[4] * m[1] * m[15]</span>
+                + m[4] * m[3] * m[13] + m[12] * m[1] * m[7] - m[12] * m[3] * m[5];
+<span class="nc" id="L220">        inv[14] = -m[0] * m[5] * m[14] + m[0] * m[6] * m[13] + m[4] * m[1] * m[14]</span>
+                - m[4] * m[2] * m[13] - m[12] * m[1] * m[6] + m[12] * m[2] * m[5];
+<span class="nc" id="L222">        inv[3] = -m[1] * m[6] * m[11] + m[1] * m[7] * m[10] + m[5] * m[2] * m[11]</span>
+                - m[5] * m[3] * m[10] - m[9] * m[2] * m[7] + m[9] * m[3] * m[6];
+<span class="nc" id="L224">        inv[7] = m[0] * m[6] * m[11] - m[0] * m[7] * m[10] - m[4] * m[2] * m[11]</span>
+                + m[4] * m[3] * m[10] + m[8] * m[2] * m[7] - m[8] * m[3] * m[6];
+<span class="nc" id="L226">        inv[11] = -m[0] * m[5] * m[11] + m[0] * m[7] * m[9] + m[4] * m[1] * m[11]</span>
+                - m[4] * m[3] * m[9] - m[8] * m[1] * m[7] + m[8] * m[3] * m[5];
+<span class="nc" id="L228">        inv[15] = m[0] * m[5] * m[10] - m[0] * m[6] * m[9] - m[4] * m[1] * m[10]</span>
+                + m[4] * m[2] * m[9] + m[8] * m[1] * m[6] - m[8] * m[2] * m[5];
+
+<span class="nc" id="L231">        float det = m[0] * inv[0] + m[1] * inv[4] + m[2] * inv[8] + m[3] * inv[12];</span>
+<span class="nc bnc" id="L232" title="All 2 branches missed.">        if (det == 0.0f) {</span>
+<span class="nc" id="L233">            return false;</span>
+        }
+<span class="nc" id="L235">        float invDet = 1.0f / det;</span>
+<span class="nc bnc" id="L236" title="All 2 branches missed.">        for (int i = 0; i &lt; 16; i++) {</span>
+<span class="nc" id="L237">            dst[i] = inv[i] * invDet;</span>
+        }
+<span class="nc" id="L239">        return true;</span>
+    }
+
+    private static float length(float x, float y, float z) {
+<span class="fc" id="L243">        return (float) Math.sqrt(x * x + y * y + z * z);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

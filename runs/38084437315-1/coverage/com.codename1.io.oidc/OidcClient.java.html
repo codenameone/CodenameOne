@@ -1,0 +1,1415 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OidcClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.oidc</a> &gt; <span class="el_source">OidcClient.java</span></div><h1>OidcClient.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.io.oidc;
+
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.JSONParser;
+import com.codename1.io.NetworkManager;
+import com.codename1.io.RequestAuthorizer;
+import com.codename1.io.Util;
+import com.codename1.security.Jwt;
+import com.codename1.security.SecureRandom;
+import com.codename1.ui.CN;
+import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.Base64;
+import com.codename1.util.StringUtil;
+import com.codename1.util.SuccessCallback;
+import com.codename1.util.regex.StringReader;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Modern OpenID Connect / OAuth 2.0 client. Built around the
+/// authorization-code flow with PKCE (RFC 7636) and the system browser. Use
+/// it as the foundation for all new sign-in integrations:
+///
+/// ```java
+/// OidcClient.discover(&quot;https://accounts.google.com&quot;).ready(new SuccessCallback&lt;OidcClient&gt;() {
+///     public void onSucess(OidcClient client) {
+///         client.setClientId(&quot;YOUR_CLIENT_ID&quot;)
+///               .setRedirectUri(&quot;com.example.app:/oauth2redirect&quot;)
+///               .setScopes(&quot;openid&quot;, &quot;email&quot;, &quot;profile&quot;);
+///         client.authorize().ready(new SuccessCallback&lt;OidcTokens&gt;() {
+///             public void onSucess(OidcTokens tokens) {
+///                 // use tokens.getAccessToken() / tokens.getIdToken()
+///             }
+///         });
+///     }
+/// });
+/// ```
+///
+/// ### What this gives you that [com.codename1.io.Oauth2] does not
+///
+/// - Discovery via `.well-known/openid-configuration` so you only configure
+///   the issuer URL, not five separate endpoints
+/// - PKCE S256 on every flow (mandatory; many providers now require it)
+/// - System-browser sign-in via [SystemBrowser] (the previous class used
+///   an in-app WebView that modern IdPs reject)
+/// - Refresh-token flow surfaced as a first-class method
+/// - ID-token claim decoding via [OidcTokens#getClaim(String)]
+/// - Pluggable [TokenStore] persistence
+/// - Nonce + state verification on every authorization round-trip
+///
+/// ### What is checked before tokens are handed over
+///
+/// - The authorization response: its `state`, and the issuer it names. A response that
+///   names another issuer than this client's is refused, and so is one that names none
+///   when the provider's discovery document says it always does (RFC 9207). That is what
+///   stops a response from one provider being taken for another's.
+/// - The ID token's claims: `iss` is the provider, `aud` is this client, `exp` has not
+///   passed, `nonce` is the one the request carried, and `at_hash`, when the token has
+///   one, is the hash of the access token it came with.
+/// - The ID token's signature, against the provider's keys. The keys are fetched from the
+///   configuration's `jwks_uri` once and kept, and fetched again when a token names a key
+///   that is not among them. `RS256`, `RS384`, `RS512`, `ES256` and `ES384` are accepted;
+///   an unsigned token, or one signed with the client secret, is not.
+///
+/// A token that fails any of this is not stored and not returned: the resource fails
+/// with [OidcException#INVALID_ID_TOKEN], [OidcException#NONCE_MISMATCH] or
+/// [OidcException#ISSUER_MISMATCH]. That includes a signature this platform has no way
+/// to check. Nothing is skipped quietly -- see [#setVerifyIdTokenSignature(boolean)] for
+/// the one switch there is, and what turning it off gives up.
+///
+/// ### Things this class deliberately does NOT do
+///
+/// - **Implicit and hybrid flows.** Use the lower-level
+///   [com.codename1.io.ConnectionRequest] APIs if you need those.
+///
+/// ### A device without a browser or a keyboard
+///
+/// [#requestDeviceAuthorization()] and [#pollDeviceToken(OidcDeviceAuthorization)]
+/// run the device authorization grant (RFC 8628): the device shows a short
+/// code, the user approves it on a phone or a computer, and the device
+/// receives its tokens.
+///
+/// ### Using the tokens
+///
+/// [OidcRequestAuthorizer] attaches the access token to the application's
+/// requests and renews it with the refresh token when the service refuses it.
+///
+public final class OidcClient {
+
+    private final OidcConfiguration configuration;
+    private String clientId;
+    private String clientSecret;
+    private String redirectUri;
+    private String[] scopes;
+<span class="fc" id="L123">    private String[] additionalAuthParams = new String[0];</span>
+<span class="fc" id="L124">    private String[] additionalTokenParams = new String[0];</span>
+<span class="fc" id="L125">    private TokenStore tokenStore = new TokenStore.DefaultStorageTokenStore();</span>
+    private String storeKey;
+<span class="fc" id="L127">    private final List&lt;StoreWrite&gt; storeWrites = new ArrayList&lt;StoreWrite&gt;();</span>
+    private String responseMode;
+<span class="fc" id="L129">    private boolean enforceNonce = true;</span>
+<span class="fc" id="L130">    private boolean verifyIdTokenSignature = true;</span>
+<span class="fc" id="L131">    private int idTokenClockSkewSeconds = 300;</span>
+    /// The provider's JWK Set as it was last fetched, and when. Read and written where
+    /// token responses are read. Two responses read at the same moment can both fetch the
+    /// set; each keeps a whole one, and nothing is guarded for the sake of that.
+    private List&lt;Map&lt;String, Object&gt;&gt; jwks;
+    private long jwksFetchedAt;
+    private OidcRequestAuthorizer tokenListener;
+    /// How long one second of a device grant's polling interval lasts. A test shortens it.
+<span class="fc" id="L139">    int devicePollUnitMillis = 1000;</span>
+
+<span class="fc" id="L141">    private OidcClient(OidcConfiguration configuration) {</span>
+<span class="fc" id="L142">        this.configuration = configuration;</span>
+<span class="fc" id="L143">    }</span>
+
+    /// Constructs a client from an already-known [OidcConfiguration]. Use
+    /// [#discover(String)] when you'd rather pull the endpoints from the
+    /// provider's `.well-known/openid-configuration` document.
+    public static OidcClient create(OidcConfiguration configuration) {
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        if (configuration == null) {</span>
+<span class="fc" id="L150">            throw new IllegalArgumentException(&quot;configuration must not be null&quot;);</span>
+        }
+<span class="fc" id="L152">        return new OidcClient(configuration);</span>
+    }
+
+    /// Fetches `&lt;issuer&gt;/.well-known/openid-configuration` and resolves with
+    /// an [OidcClient] pre-populated with the discovered endpoints. The
+    /// returned client still needs `clientId`, `redirectUri` and `scopes`
+    /// before [#authorize()] will work.
+    ///
+    /// Trailing slashes are removed when building the discovery request URL. The
+    /// metadata's `issuer` must still exactly match the supplied issuer, including
+    /// its trailing slashes, before any discovered endpoints are accepted.
+    public static AsyncResource&lt;OidcClient&gt; discover(final String issuer) {
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        if (issuer == null) {</span>
+<span class="fc" id="L165">            throw new IllegalArgumentException(&quot;issuer must not be null&quot;);</span>
+        }
+<span class="fc" id="L167">        final AsyncResource&lt;OidcClient&gt; out = new AsyncResource&lt;OidcClient&gt;();</span>
+<span class="fc" id="L168">        String base = issuer;</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        while (base.endsWith(&quot;/&quot;)) {</span>
+<span class="fc" id="L170">            base = base.substring(0, base.length() - 1);</span>
+        }
+<span class="fc" id="L172">        final String url = base + &quot;/.well-known/openid-configuration&quot;;</span>
+<span class="fc" id="L173">        ConnectionRequest req = new ConnectionRequest() {</span>
+            @Override
+            protected void readResponse(InputStream input) throws IOException {
+                try {
+<span class="fc" id="L177">                    byte[] body = Util.readInputStream(input);</span>
+<span class="fc" id="L178">                    String json = StringUtil.newString(body);</span>
+<span class="fc" id="L179">                    Map&lt;String, Object&gt; parsed = new JSONParser()</span>
+<span class="fc" id="L180">                            .parseJSON(new StringReader(json));</span>
+<span class="pc bpc" id="L181" title="1 of 4 branches missed.">                    if (parsed == null || parsed.isEmpty()) {</span>
+<span class="fc" id="L182">                        out.error(new OidcException(OidcException.DISCOVERY_FAILED,</span>
+                                &quot;Discovery document was empty&quot;));
+<span class="fc" id="L184">                        return;</span>
+                    }
+                    // Discovery establishes the identity trusted by subsequent token
+                    // verification. Do not let metadata select a different issuer.
+<span class="fc bfc" id="L188" title="All 2 branches covered.">                    if (!issuer.equals(parsed.get(&quot;issuer&quot;))) {</span>
+<span class="fc" id="L189">                        out.error(new OidcException(OidcException.DISCOVERY_FAILED,</span>
+                                &quot;Discovery document issuer does not match the requested issuer&quot;));
+<span class="fc" id="L191">                        return;</span>
+                    }
+<span class="fc" id="L193">                    OidcConfiguration cfg = OidcConfiguration.fromDiscoveryJson(parsed);</span>
+<span class="fc" id="L194">                    out.complete(new OidcClient(cfg));</span>
+<span class="nc" id="L195">                } catch (Throwable t) {</span>
+<span class="nc" id="L196">                    out.error(new OidcException(OidcException.DISCOVERY_FAILED,</span>
+<span class="nc" id="L197">                            &quot;Failed to parse discovery document: &quot; + t.getMessage(), t));</span>
+<span class="fc" id="L198">                }</span>
+<span class="fc" id="L199">            }</span>
+
+            @Override
+            protected void handleException(Exception err) {
+<span class="nc" id="L203">                out.error(new OidcException(OidcException.TRANSPORT_ERROR,</span>
+                        &quot;Failed to fetch discovery document at &quot; + url + &quot;: &quot;
+<span class="nc" id="L205">                                + err.getMessage(), err));</span>
+<span class="nc" id="L206">            }</span>
+
+            @Override
+            protected void handleErrorResponseCode(int code, String message) {
+                // The answer's body carries the error and readResponse() reports it. The
+                // default handling would put an error dialog in front of the user for what
+                // is an ordinary answer here -- a refused refresh token, a device not yet
+                // approved.
+<span class="nc" id="L214">            }</span>
+        };
+<span class="fc" id="L216">        req.setUrl(url);</span>
+<span class="fc" id="L217">        req.setPost(false);</span>
+<span class="fc" id="L218">        req.setReadResponseForErrors(true);</span>
+        // Never the application's own authorizer: these are the requests that fetch its
+        // token, and one of them waiting on a renewal would be waiting on itself.
+<span class="fc" id="L221">        req.setAuthorizer(RequestAuthorizer.NONE);</span>
+<span class="fc" id="L222">        NetworkManager.getInstance().addToQueue(req);</span>
+<span class="fc" id="L223">        return out;</span>
+    }
+
+    public OidcConfiguration getConfiguration() {
+<span class="fc" id="L227">        return configuration;</span>
+    }
+
+    public OidcClient setClientId(String clientId) {
+<span class="fc" id="L231">        this.clientId = clientId;</span>
+<span class="fc" id="L232">        return this;</span>
+    }
+
+    public OidcClient setClientSecret(String clientSecret) {
+<span class="fc" id="L236">        this.clientSecret = clientSecret;</span>
+<span class="fc" id="L237">        return this;</span>
+    }
+
+    public OidcClient setRedirectUri(String redirectUri) {
+<span class="fc" id="L241">        this.redirectUri = redirectUri;</span>
+<span class="fc" id="L242">        return this;</span>
+    }
+
+    public OidcClient setScopes(String... scopes) {
+<span class="fc bfc" id="L246" title="All 2 branches covered.">        if (scopes == null) {</span>
+<span class="fc" id="L247">            this.scopes = null;</span>
+        } else {
+<span class="fc" id="L249">            this.scopes = (String[]) scopes.clone();</span>
+        }
+<span class="fc" id="L251">        return this;</span>
+    }
+
+    public OidcClient setScopes(List&lt;String&gt; scopes) {
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">        if (scopes == null) {</span>
+<span class="nc" id="L256">            this.scopes = null;</span>
+        } else {
+<span class="fc" id="L258">            this.scopes = scopes.toArray(new String[0]);</span>
+        }
+<span class="fc" id="L260">        return this;</span>
+    }
+
+    /// Extra `name=value` parameters appended to the authorization-endpoint
+    /// URL. Use for provider-specific options like Google's `prompt=consent`
+    /// or Apple's `response_mode=form_post`. Values are URL-encoded.
+    public OidcClient setAuthorizationParameters(String... kv) {
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">        if (kv.length % 2 != 0) {</span>
+<span class="fc" id="L268">            throw new IllegalArgumentException(&quot;Expected key/value pairs&quot;);</span>
+        }
+<span class="nc" id="L270">        this.additionalAuthParams = (String[]) kv.clone();</span>
+<span class="nc" id="L271">        return this;</span>
+    }
+
+    /// Extra `name=value` parameters sent as form data on every token-endpoint
+    /// POST.
+    public OidcClient setTokenParameters(String... kv) {
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">        if (kv.length % 2 != 0) {</span>
+<span class="fc" id="L278">            throw new IllegalArgumentException(&quot;Expected key/value pairs&quot;);</span>
+        }
+<span class="nc" id="L280">        this.additionalTokenParams = (String[]) kv.clone();</span>
+<span class="nc" id="L281">        return this;</span>
+    }
+
+    /// Swaps the token persistence strategy. Defaults to
+    /// [TokenStore.DefaultStorageTokenStore].
+    public OidcClient setTokenStore(TokenStore store) {
+<span class="fc bfc" id="L287" title="All 2 branches covered.">        this.tokenStore = store == null</span>
+                ? new TokenStore.DefaultStorageTokenStore()
+                : store;
+<span class="fc" id="L290">        return this;</span>
+    }
+
+    /// Override the key under which tokens are stored. Defaults to the
+    /// issuer + client-id pair so that multiple clients can coexist.
+    public OidcClient setStoreKey(String key) {
+<span class="fc" id="L296">        this.storeKey = key;</span>
+<span class="fc" id="L297">        return this;</span>
+    }
+
+    /// `false` skips the `nonce` claim check on the returned ID token. Only
+    /// disable when you have a very good reason (e.g. provider known not to
+    /// echo the nonce); the default is to enforce.
+    public OidcClient setEnforceNonce(boolean enforce) {
+<span class="fc" id="L304">        this.enforceNonce = enforce;</span>
+<span class="fc" id="L305">        return this;</span>
+    }
+
+    /// Whether an ID token's signature is verified against the provider's keys before the
+    /// token is accepted. True unless set.
+    ///
+    /// With it on, a token whose signature cannot be checked is refused -- because it does
+    /// not verify, because the configuration names no `jwks_uri`, or because the platform
+    /// the app is running on cannot verify a signature of that algorithm. The last one is
+    /// the reason this switch exists: turn it off for a provider whose ID tokens cannot be
+    /// verified on a platform you ship to, and for no other reason.
+    ///
+    /// With it off, the claims are still checked, but they are only as good as the TLS
+    /// connection to the token endpoint. Do not make a decision on your server from an ID
+    /// token the app forwards: verify it there.
+    public OidcClient setVerifyIdTokenSignature(boolean verify) {
+<span class="fc" id="L321">        this.verifyIdTokenSignature = verify;</span>
+<span class="fc" id="L322">        return this;</span>
+    }
+
+    /// How far the device's clock may be from the provider's when an ID token's `exp` is
+    /// checked. Five minutes unless set: phones are set by hand more often than servers.
+    public OidcClient setIdTokenClockSkew(int seconds) {
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">        if (seconds &lt; 0) {</span>
+<span class="nc" id="L329">            throw new IllegalArgumentException(&quot;seconds must not be negative&quot;);</span>
+        }
+<span class="fc" id="L331">        this.idTokenClockSkewSeconds = seconds;</span>
+<span class="fc" id="L332">        return this;</span>
+    }
+
+    /// Sets the `response_mode` parameter sent on the authorization URL
+    /// (e.g. `&quot;form_post&quot;` for Apple Sign-In with the web fallback).
+    public OidcClient setResponseMode(String mode) {
+<span class="fc" id="L338">        this.responseMode = mode;</span>
+<span class="fc" id="L339">        return this;</span>
+    }
+
+    /// Launches an authorization-code flow with PKCE. The user is sent to the
+    /// system browser to sign in; the returned [AsyncResource] completes with
+    /// the token set or errors with [OidcException] (e.g. `USER_CANCELLED`,
+    /// `STATE_MISMATCH`).
+    public AsyncResource&lt;OidcTokens&gt; authorize() {
+<span class="nc" id="L347">        requireConfigured();</span>
+<span class="nc" id="L348">        final AsyncResource&lt;OidcTokens&gt; out = new AsyncResource&lt;OidcTokens&gt;();</span>
+<span class="nc" id="L349">        final PkceChallenge pkce = PkceChallenge.generate();</span>
+<span class="nc" id="L350">        final String state = randomToken(16);</span>
+<span class="nc" id="L351">        final String nonce = randomToken(16);</span>
+<span class="nc" id="L352">        String authUrl = buildAuthorizationUrl(state, nonce, pkce);</span>
+<span class="nc" id="L353">        SystemBrowser.authenticate(authUrl, redirectUri)</span>
+<span class="nc" id="L354">                .ready(new SuccessCallback&lt;String&gt;() {</span>
+                    @Override
+                    public void onSucess(String redirectUrl) {
+<span class="nc" id="L357">                        handleRedirect(redirectUrl, state, nonce, pkce, out);</span>
+<span class="nc" id="L358">                    }</span>
+                })
+<span class="nc" id="L360">                .except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                    @Override
+                    public void onSucess(Throwable err) {
+<span class="nc" id="L363">                        out.error(err);</span>
+<span class="nc" id="L364">                    }</span>
+                });
+<span class="nc" id="L366">        return out;</span>
+    }
+
+    /// Exchanges a stored refresh token for a fresh access token. Pass the
+    /// value returned from [OidcTokens#getRefreshToken()] on a previous flow.
+    /// The stored session supplies the original subject for any refreshed ID token.
+    /// A refresh response cannot change that subject. The new tokens are persisted
+    /// via the current [TokenStore].
+    ///
+    /// Cancelling the returned resource before it completes drops the answer: nothing is
+    /// stored and no [OidcRequestAuthorizer] is given the new tokens.
+    public AsyncResource&lt;OidcTokens&gt; refresh(final String refreshToken) {
+<span class="fc" id="L378">        requireRefresh(refreshToken);</span>
+<span class="fc" id="L379">        final AsyncResource&lt;OidcTokens&gt; out = new AsyncResource&lt;OidcTokens&gt;();</span>
+        try {
+<span class="fc" id="L381">            loadStoredTokens().ready(new SuccessCallback&lt;OidcTokens&gt;() {</span>
+                @Override
+                public void onSucess(OidcTokens stored) {
+<span class="pc bpc" id="L384" title="1 of 2 branches missed.">                    if (out.isCancelled()) {</span>
+<span class="nc" id="L385">                        return;</span>
+                    }
+<span class="pc bpc" id="L387" title="1 of 4 branches missed.">                    if (stored != null &amp;&amp; !refreshToken.equals(stored.getRefreshToken())) {</span>
+<span class="nc" id="L388">                        out.error(new OidcException(OidcException.INVALID_GRANT,</span>
+                                &quot;The refresh token does not belong to the stored session&quot;));
+<span class="nc" id="L390">                        return;</span>
+                    }
+<span class="fc" id="L392">                    refreshTokens(refreshToken, stored, out);</span>
+<span class="fc" id="L393">                }</span>
+<span class="fc" id="L394">            }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                @Override
+                public void onSucess(Throwable error) {
+<span class="nc" id="L397">                    out.error(error);</span>
+<span class="nc" id="L398">                }</span>
+            });
+<span class="nc" id="L400">        } catch (Throwable error) {</span>
+<span class="nc" id="L401">            out.error(error);</span>
+<span class="fc" id="L402">        }</span>
+<span class="fc" id="L403">        return out;</span>
+    }
+
+    /// Refreshes a session already loaded by the authorizer without reading storage again.
+    AsyncResource&lt;OidcTokens&gt; refreshTokens(OidcTokens previous) {
+<span class="pc bpc" id="L408" title="1 of 2 branches missed.">        String refreshToken = previous == null ? null : previous.getRefreshToken();</span>
+<span class="fc" id="L409">        requireRefresh(refreshToken);</span>
+<span class="fc" id="L410">        AsyncResource&lt;OidcTokens&gt; out = new AsyncResource&lt;OidcTokens&gt;();</span>
+<span class="fc" id="L411">        refreshTokens(refreshToken, previous, out);</span>
+<span class="fc" id="L412">        return out;</span>
+    }
+
+    private void requireRefresh(String refreshToken) {
+        // Only what the exchange itself uses. A client that signed in with the device grant
+        // has no redirect URI, and asking for one here would leave it unable to refresh.
+<span class="pc bpc" id="L418" title="1 of 2 branches missed.">        if (clientId == null) {</span>
+<span class="nc" id="L419">            throw new IllegalStateException(&quot;clientId is required&quot;);</span>
+        }
+<span class="fc bfc" id="L421" title="All 2 branches covered.">        if (refreshToken == null) {</span>
+<span class="fc" id="L422">            throw new IllegalArgumentException(&quot;refreshToken must not be null&quot;);</span>
+        }
+<span class="fc bfc" id="L424" title="All 2 branches covered.">        if (configuration.getTokenEndpoint() == null) {</span>
+<span class="fc" id="L425">            throw new IllegalStateException(&quot;OIDC configuration is missing tokenEndpoint&quot;);</span>
+        }
+<span class="fc" id="L427">    }</span>
+
+    private void refreshTokens(String refreshToken, OidcTokens previous, AsyncResource&lt;OidcTokens&gt; out) {
+<span class="fc" id="L430">        Map&lt;String, String&gt; args = new HashMap&lt;String, String&gt;();</span>
+<span class="fc" id="L431">        args.put(&quot;grant_type&quot;, &quot;refresh_token&quot;);</span>
+<span class="fc" id="L432">        args.put(&quot;refresh_token&quot;, refreshToken);</span>
+<span class="pc bpc" id="L433" title="1 of 4 branches missed.">        if (scopes != null &amp;&amp; scopes.length &gt; 0) {</span>
+<span class="fc" id="L434">            args.put(&quot;scope&quot;, join(scopes));</span>
+        }
+<span class="fc" id="L436">        appendBaseTokenArgs(args);</span>
+<span class="fc" id="L437">        postToTokenEndpoint(args, refreshToken, null, out, out, previous);</span>
+<span class="fc" id="L438">    }</span>
+
+    /// Returns previously-saved tokens for this client (or `null`). Combine
+    /// with [#refreshIfExpired(int)] to silently bring the session back to
+    /// life on app launch.
+    public AsyncResource&lt;OidcTokens&gt; loadStoredTokens() {
+<span class="fc" id="L444">        return tokenStore.load(storageKey());</span>
+    }
+
+    /// Loads stored tokens; if they are within `leewaySeconds` of expiring,
+    /// runs a refresh and saves the new tokens. Completes with `null` when
+    /// nothing is stored or when the stored token has no refresh token and
+    /// has already expired.
+    public AsyncResource&lt;OidcTokens&gt; refreshIfExpired(final int leewaySeconds) {
+<span class="fc" id="L452">        final AsyncResource&lt;OidcTokens&gt; out = new AsyncResource&lt;OidcTokens&gt;();</span>
+<span class="fc" id="L453">        loadStoredTokens()</span>
+<span class="fc" id="L454">                .ready(new SuccessCallback&lt;OidcTokens&gt;() {</span>
+                    @Override
+                    public void onSucess(OidcTokens stored) {
+<span class="pc bpc" id="L457" title="1 of 2 branches missed.">                        if (stored == null) {</span>
+<span class="fc" id="L458">                            out.complete(null);</span>
+<span class="fc" id="L459">                            return;</span>
+                        }
+<span class="nc bnc" id="L461" title="All 2 branches missed.">                        if (!stored.isExpiringWithin(leewaySeconds)) {</span>
+<span class="nc" id="L462">                            out.complete(stored);</span>
+<span class="nc" id="L463">                            return;</span>
+                        }
+<span class="nc" id="L465">                        String rt = stored.getRefreshToken();</span>
+<span class="nc bnc" id="L466" title="All 2 branches missed.">                        if (rt == null) {</span>
+<span class="nc" id="L467">                            out.complete(null);</span>
+<span class="nc" id="L468">                            return;</span>
+                        }
+<span class="nc" id="L470">                        refreshTokens(stored)</span>
+<span class="nc" id="L471">                                .ready(new SuccessCallback&lt;OidcTokens&gt;() {</span>
+                                    @Override
+                                    public void onSucess(OidcTokens fresh) {
+<span class="nc" id="L474">                                        out.complete(fresh);</span>
+<span class="nc" id="L475">                                    }</span>
+                                })
+<span class="nc" id="L477">                                .except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                                    @Override
+                                    public void onSucess(Throwable err) {
+<span class="nc" id="L480">                                        out.error(err);</span>
+<span class="nc" id="L481">                                    }</span>
+                                });
+<span class="nc" id="L483">                    }</span>
+                })
+<span class="fc" id="L485">                .except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                    @Override
+                    public void onSucess(Throwable err) {
+<span class="nc" id="L488">                        out.error(err);</span>
+<span class="nc" id="L489">                    }</span>
+                });
+<span class="fc" id="L491">        return out;</span>
+    }
+
+    /// Sends a token-revocation request to the issuer (RFC 7009). Silently
+    /// no-ops when the issuer does not advertise a `revocation_endpoint`.
+    /// A refused request reports the OAuth error, or a transport error when the
+    /// non-success HTTP response contains no OAuth error.
+    public AsyncResource&lt;Boolean&gt; revoke(final String token) {
+<span class="fc" id="L499">        final AsyncResource&lt;Boolean&gt; out = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="fc bfc" id="L500" title="All 4 branches covered.">        if (token == null || configuration.getRevocationEndpoint() == null) {</span>
+<span class="fc" id="L501">            out.complete(Boolean.FALSE);</span>
+<span class="fc" id="L502">            return out;</span>
+        }
+<span class="fc" id="L504">        ConnectionRequest req = new ConnectionRequest() {</span>
+            @Override
+            protected void readResponse(InputStream input) throws IOException {
+<span class="fc" id="L507">                byte[] body = Util.readInputStream(input);</span>
+<span class="fc" id="L508">                int status = getResponseCode();</span>
+<span class="pc bpc" id="L509" title="1 of 4 branches missed.">                if (status &lt; 200 || status &gt;= 300) {</span>
+<span class="fc" id="L510">                    Map&lt;String, Object&gt; parsed = null;</span>
+<span class="fc" id="L511">                    Exception parseFailure = null;</span>
+                    try {
+<span class="fc" id="L513">                        parsed = new JSONParser().parseJSON(new StringReader(StringUtil.newString(body)));</span>
+<span class="nc" id="L514">                    } catch (Exception malformed) {</span>
+                        // An empty body or a gateway page still reports the HTTP failure.
+<span class="nc" id="L516">                        parseFailure = malformed;</span>
+<span class="fc" id="L517">                    }</span>
+<span class="pc bpc" id="L518" title="1 of 4 branches missed.">                    if (parsed != null &amp;&amp; parsed.get(&quot;error&quot;) instanceof String) {</span>
+<span class="fc" id="L519">                        Object description = parsed.get(&quot;error_description&quot;);</span>
+<span class="pc bpc" id="L520" title="1 of 2 branches missed.">                        out.error(new OidcException((String) parsed.get(&quot;error&quot;),</span>
+<span class="fc" id="L521">                                description == null ? null : description.toString()));</span>
+<span class="fc" id="L522">                    } else {</span>
+<span class="fc" id="L523">                        out.error(new OidcException(OidcException.TRANSPORT_ERROR,</span>
+                                &quot;Token revocation answered HTTP &quot; + status + &quot; without an OAuth error&quot;, parseFailure));
+                    }
+<span class="fc" id="L526">                    return;</span>
+                }
+<span class="fc" id="L528">                out.complete(Boolean.TRUE);</span>
+<span class="fc" id="L529">            }</span>
+
+            @Override
+            protected void handleException(Exception err) {
+<span class="nc" id="L533">                out.error(new OidcException(OidcException.TRANSPORT_ERROR,</span>
+<span class="nc" id="L534">                        &quot;Token revocation failed: &quot; + err.getMessage(), err));</span>
+<span class="nc" id="L535">            }</span>
+
+            @Override
+            protected void handleErrorResponseCode(int code, String message) {
+                // readResponse() reports the status and any OAuth error without a dialog.
+<span class="fc" id="L540">            }</span>
+        };
+<span class="fc" id="L542">        req.setUrl(configuration.getRevocationEndpoint());</span>
+<span class="fc" id="L543">        req.setPost(true);</span>
+<span class="fc" id="L544">        req.setReadResponseForErrors(true);</span>
+        // Never the application's own authorizer: these are the requests that fetch its
+        // token, and one of them waiting on a renewal would be waiting on itself.
+<span class="fc" id="L547">        req.setAuthorizer(RequestAuthorizer.NONE);</span>
+<span class="fc" id="L548">        req.addRequestHeader(&quot;Content-Type&quot;, &quot;application/x-www-form-urlencoded&quot;);</span>
+<span class="fc" id="L549">        req.addArgument(&quot;token&quot;, token);</span>
+<span class="fc" id="L550">        req.addArgument(&quot;client_id&quot;, clientId);</span>
+<span class="pc bpc" id="L551" title="1 of 2 branches missed.">        if (clientSecret != null) {</span>
+<span class="nc" id="L552">            req.addArgument(&quot;client_secret&quot;, clientSecret);</span>
+        }
+<span class="fc" id="L554">        NetworkManager.getInstance().addToQueue(req);</span>
+<span class="fc" id="L555">        return out;</span>
+    }
+
+    /// Clears any stored tokens for this client. Does not call the issuer's
+    /// revocation endpoint -- combine with [#revoke(String)] if you want a
+    /// proper sign-out. The returned resource completes after earlier saves and
+    /// this clear finish, so a delayed save cannot restore the cleared session.
+    public AsyncResource&lt;Boolean&gt; clearStoredTokens() {
+<span class="fc" id="L563">        tokensChanged(null);</span>
+<span class="fc" id="L564">        return queueStoreWrite(null);</span>
+    }
+
+    /// Starts the device authorization grant (RFC 8628), for a device with no browser or no
+    /// practical way to type: a television, a watch, a kiosk, a command line.
+    ///
+    /// The answer holds a short code. Show it with the verification address; the user opens
+    /// that address on another device, signs in and types the code. Meanwhile pass the answer
+    /// to [#pollDeviceToken(OidcDeviceAuthorization)], which completes once they have.
+    ///
+    /// Needs a client id, the scopes, and a provider whose configuration names a
+    /// `device_authorization_endpoint`. No redirect URI is involved.
+    ///
+    /// #### Returns
+    ///
+    /// a resource that completes with the codes, or fails with an [OidcException] carrying the
+    /// server's error code
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: when the client id is missing, or the provider does not
+    ///   offer the grant
+    public AsyncResource&lt;OidcDeviceAuthorization&gt; requestDeviceAuthorization() {
+<span class="fc" id="L587">        requireDeviceGrant();</span>
+<span class="fc" id="L588">        final AsyncResource&lt;OidcDeviceAuthorization&gt; out =</span>
+                new AsyncResource&lt;OidcDeviceAuthorization&gt;();
+<span class="fc" id="L590">        ConnectionRequest req = new ConnectionRequest() {</span>
+            @Override
+            protected void readResponse(InputStream input) throws IOException {
+<span class="fc" id="L593">                String json = StringUtil.newString(Util.readInputStream(input));</span>
+                Map&lt;String, Object&gt; parsed;
+                try {
+<span class="fc" id="L596">                    parsed = new JSONParser().parseJSON(new StringReader(json));</span>
+<span class="nc" id="L597">                } catch (Exception e) {</span>
+<span class="nc" id="L598">                    parsed = null;</span>
+<span class="fc" id="L599">                }</span>
+<span class="pc bpc" id="L600" title="2 of 4 branches missed.">                if (parsed == null || parsed.isEmpty()) {</span>
+<span class="nc" id="L601">                    out.error(new OidcException(OidcException.INVALID_RESPONSE,</span>
+                            &quot;Device authorization endpoint returned no JSON (HTTP &quot;
+<span class="nc" id="L603">                                    + getResponseCode() + &quot;)&quot;));</span>
+<span class="nc" id="L604">                    return;</span>
+                }
+<span class="fc bfc" id="L606" title="All 2 branches covered.">                if (parsed.get(&quot;error&quot;) != null) {</span>
+<span class="fc" id="L607">                    Object desc = parsed.get(&quot;error_description&quot;);</span>
+<span class="pc bpc" id="L608" title="1 of 2 branches missed.">                    out.error(new OidcException(parsed.get(&quot;error&quot;).toString(),</span>
+<span class="pc" id="L609">                            desc != null ? desc.toString() : null));</span>
+<span class="fc" id="L610">                    return;</span>
+                }
+                try {
+<span class="fc" id="L613">                    out.complete(OidcDeviceAuthorization.fromJson(parsed));</span>
+<span class="fc" id="L614">                } catch (IllegalArgumentException incomplete) {</span>
+<span class="fc" id="L615">                    out.error(new OidcException(OidcException.INVALID_RESPONSE,</span>
+<span class="fc" id="L616">                            incomplete.getMessage(), incomplete));</span>
+<span class="fc" id="L617">                }</span>
+<span class="fc" id="L618">            }</span>
+
+            @Override
+            protected void handleException(Exception err) {
+<span class="nc" id="L622">                out.error(new OidcException(OidcException.TRANSPORT_ERROR,</span>
+<span class="nc" id="L623">                        &quot;Device authorization request failed: &quot; + err.getMessage(), err));</span>
+<span class="nc" id="L624">            }</span>
+
+            @Override
+            protected void handleErrorResponseCode(int code, String message) {
+                // The body says why, and readResponse() reports it.
+<span class="fc" id="L629">            }</span>
+        };
+<span class="fc" id="L631">        req.setUrl(configuration.getDeviceAuthorizationEndpoint());</span>
+<span class="fc" id="L632">        req.setPost(true);</span>
+<span class="fc" id="L633">        req.setReadResponseForErrors(true);</span>
+<span class="fc" id="L634">        req.setAuthorizer(RequestAuthorizer.NONE);</span>
+<span class="fc" id="L635">        req.addRequestHeader(&quot;Content-Type&quot;, &quot;application/x-www-form-urlencoded&quot;);</span>
+<span class="fc" id="L636">        req.addRequestHeader(&quot;Accept&quot;, &quot;application/json&quot;);</span>
+<span class="fc" id="L637">        req.addArgument(&quot;client_id&quot;, clientId);</span>
+<span class="pc bpc" id="L638" title="1 of 2 branches missed.">        if (clientSecret != null) {</span>
+<span class="nc" id="L639">            req.addArgument(&quot;client_secret&quot;, clientSecret);</span>
+        }
+<span class="pc bpc" id="L641" title="2 of 4 branches missed.">        if (scopes != null &amp;&amp; scopes.length &gt; 0) {</span>
+<span class="fc" id="L642">            req.addArgument(&quot;scope&quot;, join(scopes));</span>
+        }
+<span class="fc" id="L644">        NetworkManager.getInstance().addToQueue(req);</span>
+<span class="fc" id="L645">        return out;</span>
+    }
+
+    /// Waits for the user to approve a device, by asking the token endpoint at the pace the
+    /// server set.
+    ///
+    /// The wait is a timer, not a thread: each request is queued when the previous answer's
+    /// interval has passed. The interval starts at
+    /// [OidcDeviceAuthorization#getInterval()] and grows by five seconds every time the
+    /// server answers `slow_down`, and doubles after a request that failed to reach the server
+    /// at all.
+    ///
+    /// The resource completes with the tokens, which are saved to the [TokenStore] the way
+    /// [#authorize()] saves them. It fails with an [OidcException] whose code is
+    /// [OidcException#ACCESS_DENIED] when the user refused, [OidcException#EXPIRED_TOKEN]
+    /// when the codes ran out -- by the server's word or by the clock -- or whatever other
+    /// code the server sent. Cancelling the resource stops the polling.
+    ///
+    /// #### Parameters
+    ///
+    /// - `authorization`: the answer of [#requestDeviceAuthorization()]
+    ///
+    /// #### Returns
+    ///
+    /// a resource that completes with the tokens
+    public AsyncResource&lt;OidcTokens&gt; pollDeviceToken(final OidcDeviceAuthorization authorization) {
+<span class="fc bfc" id="L671" title="All 2 branches covered.">        if (authorization == null) {</span>
+<span class="fc" id="L672">            throw new IllegalArgumentException(&quot;authorization must not be null&quot;);</span>
+        }
+<span class="fc" id="L674">        requireDeviceGrant();</span>
+<span class="fc" id="L675">        final AsyncResource&lt;OidcTokens&gt; out = new AsyncResource&lt;OidcTokens&gt;();</span>
+<span class="fc" id="L676">        scheduleDevicePoll(authorization, authorization.getInterval(), out);</span>
+<span class="fc" id="L677">        return out;</span>
+    }
+
+    private void scheduleDevicePoll(final OidcDeviceAuthorization authorization,
+            final long intervalSeconds, final AsyncResource&lt;OidcTokens&gt; out) {
+<span class="fc" id="L682">        long delay = intervalSeconds * devicePollUnitMillis;</span>
+<span class="pc bpc" id="L683" title="3 of 8 branches missed.">        if (intervalSeconds &lt; 1 || devicePollUnitMillis &lt; 1 || delay &gt; Integer.MAX_VALUE || delay &lt; 1) {</span>
+<span class="fc" id="L684">            out.error(new OidcException(OidcException.INVALID_RESPONSE,</span>
+                    &quot;The device polling interval does not fit the timer&quot;));
+<span class="fc" id="L686">            return;</span>
+        }
+<span class="fc" id="L688">        CN.setTimeout((int) delay, new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L691">                devicePoll(authorization, intervalSeconds, out);</span>
+<span class="fc" id="L692">            }</span>
+        });
+<span class="fc" id="L694">    }</span>
+
+    private void devicePoll(final OidcDeviceAuthorization authorization,
+            final long intervalSeconds, final AsyncResource&lt;OidcTokens&gt; out) {
+<span class="pc bpc" id="L698" title="1 of 2 branches missed.">        if (out.isDone()) {</span>
+            // Cancelled while the timer ran.
+<span class="nc" id="L700">            return;</span>
+        }
+<span class="fc bfc" id="L702" title="All 2 branches covered.">        if (authorization.isExpired()) {</span>
+<span class="fc" id="L703">            out.error(new OidcException(OidcException.EXPIRED_TOKEN,</span>
+                    &quot;The device code expired before the user approved it&quot;));
+<span class="fc" id="L705">            return;</span>
+        }
+<span class="fc" id="L707">        Map&lt;String, String&gt; args = new HashMap&lt;String, String&gt;();</span>
+<span class="fc" id="L708">        args.put(&quot;grant_type&quot;, &quot;urn:ietf:params:oauth:grant-type:device_code&quot;);</span>
+<span class="fc" id="L709">        args.put(&quot;device_code&quot;, authorization.getDeviceCode());</span>
+<span class="fc" id="L710">        appendBaseTokenArgs(args);</span>
+<span class="fc" id="L711">        AsyncResource&lt;OidcTokens&gt; attempt = new AsyncResource&lt;OidcTokens&gt;();</span>
+<span class="fc" id="L712">        attempt.ready(new SuccessCallback&lt;OidcTokens&gt;() {</span>
+            @Override
+            public void onSucess(OidcTokens tokens) {
+<span class="pc bpc" id="L715" title="1 of 2 branches missed.">                if (!out.isDone()) {</span>
+<span class="fc" id="L716">                    out.complete(tokens);</span>
+                }
+<span class="fc" id="L718">            }</span>
+<span class="fc" id="L719">        }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+            @Override
+            public void onSucess(Throwable err) {
+<span class="fc bfc" id="L722" title="All 2 branches covered.">                if (out.isDone()) {</span>
+<span class="fc" id="L723">                    return;</span>
+                }
+<span class="pc bpc" id="L725" title="1 of 2 branches missed.">                String code = err instanceof OidcException ? ((OidcException) err).getError() : null;</span>
+<span class="fc bfc" id="L726" title="All 2 branches covered.">                if (OidcException.AUTHORIZATION_PENDING.equals(code)) {</span>
+<span class="fc" id="L727">                    scheduleDevicePoll(authorization, intervalSeconds, out);</span>
+<span class="fc bfc" id="L728" title="All 2 branches covered.">                } else if (OidcException.SLOW_DOWN.equals(code)) {</span>
+<span class="fc" id="L729">                    scheduleDevicePoll(authorization, intervalSeconds + 5, out);</span>
+<span class="pc bpc" id="L730" title="1 of 2 branches missed.">                } else if (OidcException.TRANSPORT_ERROR.equals(code)) {</span>
+                    // The server was not reached, so it has not said no. Asking less often
+                    // is what the grant requires of a device that cannot get through.
+<span class="nc" id="L733">                    scheduleDevicePoll(authorization, intervalSeconds * 2, out);</span>
+                } else {
+<span class="fc" id="L735">                    out.error(err);</span>
+                }
+<span class="fc" id="L737">            }</span>
+        });
+<span class="fc" id="L739">        postToTokenEndpoint(args, null, null, attempt, out);</span>
+<span class="fc" id="L740">    }</span>
+
+    private void requireDeviceGrant() {
+<span class="fc bfc" id="L743" title="All 2 branches covered.">        if (clientId == null) {</span>
+<span class="fc" id="L744">            throw new IllegalStateException(&quot;clientId is required&quot;);</span>
+        }
+<span class="fc bfc" id="L746" title="All 2 branches covered.">        if (configuration.getDeviceAuthorizationEndpoint() == null) {</span>
+<span class="fc" id="L747">            throw new IllegalStateException(</span>
+                    &quot;deviceAuthorizationEndpoint missing from configuration&quot;);
+        }
+<span class="pc bpc" id="L750" title="1 of 2 branches missed.">        if (configuration.getTokenEndpoint() == null) {</span>
+<span class="nc" id="L751">            throw new IllegalStateException(&quot;OIDC configuration is missing tokenEndpoint&quot;);</span>
+        }
+<span class="fc" id="L753">    }</span>
+
+    /// Lets one [OidcRequestAuthorizer] follow the tokens this client obtains and clears.
+    /// Called on the event dispatch thread.
+    void setTokenListener(OidcRequestAuthorizer listener) {
+<span class="fc" id="L758">        this.tokenListener = listener;</span>
+<span class="fc" id="L759">    }</span>
+
+    /// Takes a verified token set: stores it, tells the authorizer and completes `out`.
+    ///
+    /// All three happen on the event dispatch thread, and none of them if `waiting` was
+    /// cancelled first. A token response is read on a network thread, and whoever asked
+    /// for it may have stopped wanting it while it was on its way -- the user signed out
+    /// during a refresh, or the application gave up on a device code. The set used to be
+    /// saved on the network thread as it arrived, so that sign-out was undone a moment
+    /// later: the store held tokens again and the authorizer was handed them. Cancelling
+    /// happens on the EDT and so does this, which makes &quot;was it cancelled&quot; a question with
+    /// one answer rather than a race.
+    private void accept(final OidcTokens tokens, final AsyncResource&lt;OidcTokens&gt; waiting,
+            final AsyncResource&lt;OidcTokens&gt; out) {
+<span class="fc" id="L773">        Runnable take = new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="pc bpc" id="L776" title="1 of 4 branches missed.">                if (waiting.isCancelled() || out.isCancelled()) {</span>
+<span class="fc" id="L777">                    return;</span>
+                }
+<span class="fc" id="L779">                queueStoreWrite(tokens)</span>
+<span class="fc" id="L780">                        .except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                            @Override
+                            public void onSucess(Throwable t) {
+                                // Token persistence failure is non-fatal; tokens are still valid in-memory.
+<span class="fc" id="L784">                            }</span>
+                        });
+<span class="fc" id="L786">                tellTokenListener(tokens);</span>
+<span class="fc" id="L787">                out.complete(tokens);</span>
+<span class="fc" id="L788">            }</span>
+        };
+<span class="pc bpc" id="L790" title="2 of 4 branches missed.">        if (Display.isInitialized() &amp;&amp; !CN.isEdt()) {</span>
+<span class="fc" id="L791">            CN.callSerially(take);</span>
+        } else {
+<span class="nc" id="L793">            take.run();</span>
+        }
+<span class="fc" id="L795">    }</span>
+
+    /// Serialize writes, including clears, so an asynchronous save cannot restore a
+    /// signed-out session after clear has completed. Cancellation of a resource does
+    /// not prove a custom store stopped writing, so clear waits for prior writes.
+    private AsyncResource&lt;Boolean&gt; queueStoreWrite(OidcTokens tokens) {
+<span class="fc" id="L801">        StoreWrite write = new StoreWrite(tokenStore, storageKey(), tokens);</span>
+        boolean start;
+<span class="fc" id="L803">        synchronized (storeWrites) {</span>
+<span class="fc" id="L804">            start = storeWrites.isEmpty();</span>
+<span class="fc" id="L805">            storeWrites.add(write);</span>
+<span class="fc" id="L806">        }</span>
+<span class="fc bfc" id="L807" title="All 2 branches covered.">        if (start) {</span>
+<span class="fc" id="L808">            write.start();</span>
+        }
+<span class="fc" id="L810">        return write.result;</span>
+    }
+
+    private final class StoreWrite {
+        private final TokenStore store;
+        private final String key;
+        private final OidcTokens tokens;
+<span class="fc" id="L817">        private final AsyncResource&lt;Boolean&gt; result = new AsyncResource&lt;Boolean&gt;();</span>
+
+<span class="fc" id="L819">        StoreWrite(TokenStore store, String key, OidcTokens tokens) {</span>
+<span class="fc" id="L820">            this.store = store;</span>
+<span class="fc" id="L821">            this.key = key;</span>
+<span class="fc" id="L822">            this.tokens = tokens;</span>
+<span class="fc" id="L823">        }</span>
+
+        void start() {
+            try {
+<span class="fc bfc" id="L827" title="All 2 branches covered.">                AsyncResource&lt;Boolean&gt; operation = tokens == null ? store.clear(key) : store.save(key, tokens);</span>
+<span class="fc" id="L828">                operation.ready(new SuccessCallback&lt;Boolean&gt;() {</span>
+                    @Override
+                    public void onSucess(Boolean value) {
+<span class="fc" id="L831">                        finish(value, null);</span>
+<span class="fc" id="L832">                    }</span>
+<span class="fc" id="L833">                }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                    @Override
+                    public void onSucess(Throwable error) {
+<span class="fc" id="L836">                        finish(null, error);</span>
+<span class="fc" id="L837">                    }</span>
+                });
+<span class="nc" id="L839">            } catch (Throwable error) {</span>
+<span class="nc" id="L840">                finish(null, error);</span>
+<span class="fc" id="L841">            }</span>
+<span class="fc" id="L842">        }</span>
+
+        @SuppressWarnings(&quot;PMD.CompareObjectsWithEquals&quot;) // Only this queued operation may remove itself.
+        void finish(Boolean value, Throwable error) {
+            StoreWrite next;
+<span class="fc" id="L847">            synchronized (storeWrites) {</span>
+                // A synchronous callback can throw back through start(). It must not
+                // remove the next operation or complete this one a second time.
+<span class="pc bpc" id="L850" title="2 of 4 branches missed.">                if (storeWrites.isEmpty() || storeWrites.get(0) != this) {</span>
+<span class="nc" id="L851">                    return;</span>
+                }
+<span class="fc" id="L853">                storeWrites.remove(0);</span>
+<span class="fc bfc" id="L854" title="All 2 branches covered.">                next = storeWrites.isEmpty() ? null : storeWrites.get(0);</span>
+<span class="fc" id="L855">            }</span>
+            try {
+<span class="fc bfc" id="L857" title="All 2 branches covered.">                if (error == null) {</span>
+<span class="fc" id="L858">                    result.complete(value);</span>
+                } else {
+<span class="fc" id="L860">                    result.error(error);</span>
+                }
+            } finally {
+<span class="fc bfc" id="L863" title="All 2 branches covered.">                if (next != null) {</span>
+<span class="fc" id="L864">                    next.start();</span>
+                }
+            }
+<span class="fc" id="L867">        }</span>
+    }
+
+    /// Tells the authorizer following this client that the tokens were cleared, on the
+    /// event dispatch thread, where the authorizer's state lives.
+    private void tokensChanged(final OidcTokens tokens) {
+<span class="pc bpc" id="L873" title="1 of 4 branches missed.">        if (Display.isInitialized() &amp;&amp; !CN.isEdt()) {</span>
+<span class="fc" id="L874">            CN.callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="fc" id="L877">                    tellTokenListener(tokens);</span>
+<span class="fc" id="L878">                }</span>
+            });
+<span class="fc" id="L880">            return;</span>
+        }
+<span class="fc" id="L882">        tellTokenListener(tokens);</span>
+<span class="fc" id="L883">    }</span>
+
+    private void tellTokenListener(OidcTokens tokens) {
+<span class="fc bfc" id="L886" title="All 2 branches covered.">        if (tokenListener != null) {</span>
+<span class="fc" id="L887">            tokenListener.tokensChanged(tokens);</span>
+        }
+<span class="fc" id="L889">    }</span>
+
+    // -----------------------------------------------------------
+    // internals
+
+    private void requireConfigured() {
+<span class="fc bfc" id="L895" title="All 2 branches covered.">        if (clientId == null) {</span>
+<span class="fc" id="L896">            throw new IllegalStateException(&quot;clientId is required&quot;);</span>
+        }
+<span class="pc bpc" id="L898" title="1 of 2 branches missed.">        if (redirectUri == null) {</span>
+<span class="fc" id="L899">            throw new IllegalStateException(&quot;redirectUri is required&quot;);</span>
+        }
+<span class="nc bnc" id="L901" title="All 2 branches missed.">        if (configuration.getAuthorizationEndpoint() == null) {</span>
+<span class="nc" id="L902">            throw new IllegalStateException(&quot;authorizationEndpoint missing from configuration&quot;);</span>
+        }
+<span class="nc" id="L904">    }</span>
+
+    private String storageKey() {
+<span class="pc bpc" id="L907" title="1 of 2 branches missed.">        if (storeKey != null) {</span>
+<span class="nc" id="L908">            return storeKey;</span>
+        }
+<span class="fc" id="L910">        String issuer = configuration.getIssuer();</span>
+<span class="pc bpc" id="L911" title="1 of 2 branches missed.">        if (issuer == null) {</span>
+<span class="nc" id="L912">            issuer = configuration.getAuthorizationEndpoint();</span>
+        }
+<span class="fc" id="L914">        return issuer + &quot;|&quot; + clientId;</span>
+    }
+
+    private String buildAuthorizationUrl(String state, String nonce, PkceChallenge pkce) {
+<span class="nc" id="L918">        StringBuilder b = new StringBuilder(configuration.getAuthorizationEndpoint());</span>
+<span class="nc bnc" id="L919" title="All 2 branches missed.">        b.append(configuration.getAuthorizationEndpoint().indexOf('?') &gt;= 0 ? '&amp;' : '?');</span>
+<span class="nc" id="L920">        appendParam(b, &quot;response_type&quot;, &quot;code&quot;);</span>
+<span class="nc" id="L921">        appendParam(b, &quot;client_id&quot;, clientId);</span>
+<span class="nc" id="L922">        appendParam(b, &quot;redirect_uri&quot;, redirectUri);</span>
+<span class="nc bnc" id="L923" title="All 4 branches missed.">        if (scopes != null &amp;&amp; scopes.length &gt; 0) {</span>
+<span class="nc" id="L924">            appendParam(b, &quot;scope&quot;, join(scopes));</span>
+        }
+<span class="nc" id="L926">        appendParam(b, &quot;state&quot;, state);</span>
+<span class="nc bnc" id="L927" title="All 2 branches missed.">        if (enforceNonce) {</span>
+<span class="nc" id="L928">            appendParam(b, &quot;nonce&quot;, nonce);</span>
+        }
+<span class="nc" id="L930">        appendParam(b, &quot;code_challenge&quot;, pkce.getChallenge());</span>
+<span class="nc" id="L931">        appendParam(b, &quot;code_challenge_method&quot;, pkce.getMethod());</span>
+<span class="nc bnc" id="L932" title="All 2 branches missed.">        if (responseMode != null) {</span>
+<span class="nc" id="L933">            appendParam(b, &quot;response_mode&quot;, responseMode);</span>
+        }
+<span class="nc bnc" id="L935" title="All 2 branches missed.">        for (int i = 0; i + 1 &lt; additionalAuthParams.length; i += 2) {</span>
+<span class="nc" id="L936">            appendParam(b, additionalAuthParams[i], additionalAuthParams[i + 1]);</span>
+        }
+<span class="nc" id="L938">        return b.toString();</span>
+    }
+
+    private static void appendParam(StringBuilder b, String k, String v) {
+<span class="nc" id="L942">        char last = b.charAt(b.length() - 1);</span>
+<span class="nc bnc" id="L943" title="All 4 branches missed.">        if (last != '?' &amp;&amp; last != '&amp;') {</span>
+<span class="nc" id="L944">            b.append('&amp;');</span>
+        }
+<span class="nc" id="L946">        b.append(Util.encodeUrl(k)).append('=').append(Util.encodeUrl(v));</span>
+<span class="nc" id="L947">    }</span>
+
+    void handleRedirect(String redirectUrl,
+                                String expectedState,
+                                String expectedNonce,
+                                PkceChallenge pkce,
+                                final AsyncResource&lt;OidcTokens&gt; out) {
+<span class="fc" id="L954">        Map&lt;String, String&gt; params = parseRedirectParams(redirectUrl);</span>
+        // Before anything the response says is believed, who it says it is from (RFC 9207).
+        // A response another provider produced -- one this app also signs in with, and an
+        // attacker steered the browser to -- names that provider here, and its code must
+        // not be taken to this provider's token endpoint.
+<span class="fc" id="L959">        String issuer = configuration.getIssuer();</span>
+<span class="fc" id="L960">        String named = params.get(&quot;iss&quot;);</span>
+<span class="pc bpc" id="L961" title="1 of 6 branches missed.">        if (named != null &amp;&amp; issuer != null &amp;&amp; !named.equals(issuer)) {</span>
+<span class="fc" id="L962">            out.error(new OidcException(OidcException.ISSUER_MISMATCH,</span>
+                    &quot;The authorization response is from &quot; + named + &quot;, not from &quot; + issuer));
+<span class="fc" id="L964">            return;</span>
+        }
+<span class="fc bfc" id="L966" title="All 4 branches covered.">        if (named == null &amp;&amp; configuration.isAuthorizationResponseIssParameterSupported()) {</span>
+<span class="fc" id="L967">            out.error(new OidcException(OidcException.ISSUER_MISMATCH,</span>
+                    &quot;The authorization response names no issuer, and &quot; + issuer
+                            + &quot; says it always names itself&quot;));
+<span class="fc" id="L970">            return;</span>
+        }
+        // The state before the error, not after it. The state is what ties a response to
+        // the request this client made, and an error is as much a claim about that request
+        // as a code is: the server returns the state with both (RFC 6749 section 4.1.2.1).
+        // Read the other way round, a link anyone could send -- the redirect URI with
+        // error=access_denied -- was reported to the application as the provider's refusal.
+<span class="fc" id="L977">        String returnedState = params.get(&quot;state&quot;);</span>
+<span class="fc bfc" id="L978" title="All 4 branches covered.">        if (returnedState == null || !returnedState.equals(expectedState)) {</span>
+<span class="fc" id="L979">            out.error(new OidcException(OidcException.STATE_MISMATCH,</span>
+                    &quot;Authorization server returned a different 'state' than the one we sent&quot;));
+<span class="fc" id="L981">            return;</span>
+        }
+<span class="fc" id="L983">        String error = params.get(&quot;error&quot;);</span>
+<span class="fc bfc" id="L984" title="All 2 branches covered.">        if (error != null) {</span>
+<span class="fc" id="L985">            String description = params.get(&quot;error_description&quot;);</span>
+<span class="pc bpc" id="L986" title="1 of 2 branches missed.">            String code = &quot;access_denied&quot;.equals(error) ? OidcException.ACCESS_DENIED : error;</span>
+<span class="pc bpc" id="L987" title="1 of 2 branches missed.">            out.error(new OidcException(code,</span>
+                    description != null ? description : error));
+<span class="fc" id="L989">            return;</span>
+        }
+<span class="fc" id="L991">        String code = params.get(&quot;code&quot;);</span>
+<span class="pc bpc" id="L992" title="1 of 2 branches missed.">        if (code == null) {</span>
+<span class="nc" id="L993">            out.error(new OidcException(OidcException.INVALID_RESPONSE,</span>
+                    &quot;Authorization redirect was missing the 'code' parameter&quot;));
+<span class="nc" id="L995">            return;</span>
+        }
+<span class="fc" id="L997">        exchangeCode(code, expectedNonce, pkce, out);</span>
+<span class="fc" id="L998">    }</span>
+
+    private void exchangeCode(String code,
+                              final String expectedNonce,
+                              PkceChallenge pkce,
+                              final AsyncResource&lt;OidcTokens&gt; out) {
+<span class="pc bpc" id="L1004" title="1 of 2 branches missed.">        if (configuration.getTokenEndpoint() == null) {</span>
+<span class="nc" id="L1005">            out.error(new OidcException(OidcException.INVALID_RESPONSE,</span>
+                    &quot;OIDC configuration is missing tokenEndpoint&quot;));
+<span class="nc" id="L1007">            return;</span>
+        }
+<span class="fc" id="L1009">        Map&lt;String, String&gt; args = new HashMap&lt;String, String&gt;();</span>
+<span class="fc" id="L1010">        args.put(&quot;grant_type&quot;, &quot;authorization_code&quot;);</span>
+<span class="fc" id="L1011">        args.put(&quot;code&quot;, code);</span>
+<span class="fc" id="L1012">        args.put(&quot;redirect_uri&quot;, redirectUri);</span>
+<span class="fc" id="L1013">        args.put(&quot;code_verifier&quot;, pkce.getVerifier());</span>
+<span class="fc" id="L1014">        appendBaseTokenArgs(args);</span>
+<span class="fc" id="L1015">        postToTokenEndpoint(args, null, expectedNonce, out);</span>
+<span class="fc" id="L1016">    }</span>
+
+    private void appendBaseTokenArgs(Map&lt;String, String&gt; args) {
+<span class="fc" id="L1019">        args.put(&quot;client_id&quot;, clientId);</span>
+<span class="pc bpc" id="L1020" title="1 of 2 branches missed.">        if (clientSecret != null) {</span>
+<span class="nc" id="L1021">            args.put(&quot;client_secret&quot;, clientSecret);</span>
+        }
+<span class="pc bpc" id="L1023" title="1 of 2 branches missed.">        for (int i = 0; i + 1 &lt; additionalTokenParams.length; i += 2) {</span>
+<span class="nc" id="L1024">            args.put(additionalTokenParams[i], additionalTokenParams[i + 1]);</span>
+        }
+<span class="fc" id="L1026">    }</span>
+
+    private void postToTokenEndpoint(final Map&lt;String, String&gt; args,
+                                     final String refreshTokenFallback,
+                                     final String expectedNonce,
+                                     final AsyncResource&lt;OidcTokens&gt; out) {
+<span class="fc" id="L1032">        postToTokenEndpoint(args, refreshTokenFallback, expectedNonce, out, out);</span>
+<span class="fc" id="L1033">    }</span>
+
+    /// `waiting` is the resource the caller of this client holds, when that is not `out`:
+    /// the device grant polls with a resource of its own per request.
+    private void postToTokenEndpoint(final Map&lt;String, String&gt; args,
+                                     final String refreshTokenFallback,
+                                     final String expectedNonce,
+                                     final AsyncResource&lt;OidcTokens&gt; out,
+                                     final AsyncResource&lt;OidcTokens&gt; waiting) {
+<span class="fc" id="L1042">        postToTokenEndpoint(args, refreshTokenFallback, expectedNonce, out, waiting, null);</span>
+<span class="fc" id="L1043">    }</span>
+
+    private void postToTokenEndpoint(final Map&lt;String, String&gt; args,
+                                     final String refreshTokenFallback,
+                                     final String expectedNonce,
+                                     final AsyncResource&lt;OidcTokens&gt; out,
+                                     final AsyncResource&lt;OidcTokens&gt; waiting,
+                                     final OidcTokens previous) {
+<span class="fc" id="L1051">        final boolean[] completed = new boolean[1];</span>
+<span class="fc" id="L1052">        ConnectionRequest req = new ConnectionRequest() {</span>
+            @Override
+            protected void readResponse(InputStream input) throws IOException {
+<span class="pc bpc" id="L1055" title="1 of 2 branches missed.">                if (completed[0]) {</span>
+<span class="nc" id="L1056">                    return;</span>
+                }
+<span class="fc" id="L1058">                byte[] body = Util.readInputStream(input);</span>
+<span class="fc" id="L1059">                String json = StringUtil.newString(body);</span>
+<span class="fc" id="L1060">                Map&lt;String, Object&gt; parsed = null;</span>
+<span class="fc" id="L1061">                Exception malformed = null;</span>
+                try {
+<span class="fc" id="L1063">                    parsed = new JSONParser().parseJSON(new StringReader(json));</span>
+<span class="nc" id="L1064">                } catch (Exception e) {</span>
+<span class="nc" id="L1065">                    malformed = e;</span>
+<span class="fc" id="L1066">                }</span>
+<span class="fc" id="L1067">                completed[0] = true;</span>
+<span class="pc bpc" id="L1068" title="1 of 4 branches missed.">                if (parsed != null &amp;&amp; parsed.get(&quot;error&quot;) != null) {</span>
+<span class="fc" id="L1069">                    Object desc = parsed.get(&quot;error_description&quot;);</span>
+<span class="fc bfc" id="L1070" title="All 2 branches covered.">                    out.error(new OidcException(parsed.get(&quot;error&quot;).toString(),</span>
+<span class="fc" id="L1071">                            desc != null ? desc.toString() : null));</span>
+<span class="fc" id="L1072">                    return;</span>
+                }
+                // From here on the body is not an OAuth error, so it is a token set or it
+                // is nothing this client can use. A status that is not a success with no
+                // OAuth error in it -- a gateway's 502 page, a 500 with a message of the
+                // server's own -- is the server failing, not the server refusing: it is
+                // reported as a failure to get an answer, so that a session is kept and a
+                // device keeps polling. It used to be read as tokens whenever it parsed.
+<span class="fc" id="L1080">                int status = getResponseCode();</span>
+<span class="pc bpc" id="L1081" title="1 of 4 branches missed.">                if (status &lt; 200 || status &gt;= 300) {</span>
+<span class="fc" id="L1082">                    out.error(new OidcException(OidcException.TRANSPORT_ERROR,</span>
+                            &quot;Token endpoint answered HTTP &quot; + status + &quot; without an OAuth error&quot;));
+<span class="fc" id="L1084">                    return;</span>
+                }
+<span class="pc bpc" id="L1086" title="1 of 2 branches missed.">                if (malformed != null) {</span>
+<span class="nc" id="L1087">                    out.error(new OidcException(OidcException.INVALID_RESPONSE,</span>
+                            &quot;Token endpoint returned malformed JSON: &quot; + json, malformed));
+<span class="nc" id="L1089">                    return;</span>
+                }
+<span class="pc bpc" id="L1091" title="1 of 2 branches missed.">                if (parsed == null) {</span>
+<span class="nc" id="L1092">                    out.error(new OidcException(OidcException.INVALID_RESPONSE,</span>
+                            &quot;Token endpoint returned no body&quot;));
+<span class="nc" id="L1094">                    return;</span>
+                }
+                // A success carries an access token (RFC 6749 section 5.1). One without was
+                // stored and returned as a session nothing could be sent with, and on a
+                // refresh it replaced tokens that still worked.
+<span class="fc" id="L1099">                Object access = parsed.get(&quot;access_token&quot;);</span>
+<span class="pc bpc" id="L1100" title="1 of 4 branches missed.">                if (!(access instanceof String) || ((String) access).length() == 0) {</span>
+<span class="fc" id="L1101">                    out.error(new OidcException(OidcException.INVALID_RESPONSE,</span>
+                            &quot;Token endpoint response has no access_token&quot;));
+<span class="fc" id="L1103">                    return;</span>
+                }
+<span class="fc" id="L1105">                Object tokenType = parsed.get(&quot;token_type&quot;);</span>
+<span class="fc bfc" id="L1106" title="All 4 branches covered.">                if (!(tokenType instanceof String) || !&quot;Bearer&quot;.equalsIgnoreCase((String) tokenType)) {</span>
+<span class="fc" id="L1107">                    out.error(new OidcException(OidcException.INVALID_RESPONSE,</span>
+                            &quot;Token endpoint response must use the Bearer token_type&quot;));
+<span class="fc" id="L1109">                    return;</span>
+                }
+                OidcTokens received;
+                try {
+<span class="fc" id="L1113">                    received = OidcTokens.fromTokenResponse(parsed, refreshTokenFallback);</span>
+<span class="fc" id="L1114">                } catch (IllegalArgumentException invalid) {</span>
+<span class="fc" id="L1115">                    out.error(new OidcException(OidcException.INVALID_RESPONSE, invalid.getMessage(), invalid));</span>
+<span class="fc" id="L1116">                    return;</span>
+<span class="fc" id="L1117">                }</span>
+<span class="fc bfc" id="L1118" title="All 4 branches covered.">                final OidcTokens tokens = received.getIdToken() == null &amp;&amp; previous != null</span>
+<span class="fc" id="L1119">                        ? received.withIdentityFrom(previous) : received;</span>
+<span class="fc bfc" id="L1120" title="All 6 branches covered.">                if (refreshTokenFallback == null &amp;&amp; requestsOpenId() &amp;&amp; tokens.getIdToken() == null) {</span>
+<span class="fc" id="L1121">                    out.error(new OidcException(OidcException.INVALID_ID_TOKEN,</span>
+                            &quot;An initial OpenID Connect response must contain an ID token&quot;));
+<span class="fc" id="L1123">                    return;</span>
+                }
+                // Nothing is stored, told or returned until the ID token has been held to
+                // its issuer, its audience and its signature.
+<span class="fc bfc" id="L1127" title="All 2 branches covered.">                checkIdToken(tokens, enforceNonce ? expectedNonce : null, new Runnable() {</span>
+                    @Override
+                    public void run() {
+<span class="fc bfc" id="L1130" title="All 6 branches covered.">                        if (refreshTokenFallback != null &amp;&amp; tokens.getIdToken() != null</span>
+<span class="pc bpc" id="L1131" title="1 of 2 branches missed.">                                &amp;&amp; (previous == null || previous.getSubject() == null</span>
+<span class="fc bfc" id="L1132" title="All 2 branches covered.">                                || !previous.getSubject().equals(tokens.getSubject()))) {</span>
+<span class="fc" id="L1133">                            out.error(new OidcException(OidcException.INVALID_ID_TOKEN,</span>
+                                    &quot;The refreshed ID token must match the previous subject&quot;));
+<span class="fc" id="L1135">                            return;</span>
+                        }
+<span class="fc" id="L1137">                        accept(tokens, waiting, out);</span>
+<span class="fc" id="L1138">                    }</span>
+                }, out);
+<span class="fc" id="L1140">            }</span>
+
+            @Override
+            protected void handleException(Exception err) {
+<span class="pc bpc" id="L1144" title="1 of 2 branches missed.">                if (completed[0]) {</span>
+<span class="nc" id="L1145">                    return;</span>
+                }
+<span class="fc" id="L1147">                completed[0] = true;</span>
+<span class="fc" id="L1148">                out.error(new OidcException(OidcException.TRANSPORT_ERROR,</span>
+<span class="fc" id="L1149">                        &quot;Token endpoint request failed: &quot; + err.getMessage(), err));</span>
+<span class="fc" id="L1150">            }</span>
+
+            @Override
+            protected void handleErrorResponseCode(int code, String message) {
+                // The answer's body carries the error and readResponse() reports it. The
+                // default handling would put an error dialog in front of the user for what
+                // is an ordinary answer here -- a refused refresh token, a device not yet
+                // approved.
+<span class="fc" id="L1158">            }</span>
+        };
+<span class="fc" id="L1160">        req.setUrl(configuration.getTokenEndpoint());</span>
+<span class="fc" id="L1161">        req.setPost(true);</span>
+<span class="fc" id="L1162">        req.setReadResponseForErrors(true);</span>
+        // Never the application's own authorizer: these are the requests that fetch its
+        // token, and one of them waiting on a renewal would be waiting on itself.
+<span class="fc" id="L1165">        req.setAuthorizer(RequestAuthorizer.NONE);</span>
+<span class="fc" id="L1166">        req.addRequestHeader(&quot;Content-Type&quot;, &quot;application/x-www-form-urlencoded&quot;);</span>
+<span class="fc" id="L1167">        req.addRequestHeader(&quot;Accept&quot;, &quot;application/json&quot;);</span>
+<span class="fc bfc" id="L1168" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; e : args.entrySet()) {</span>
+<span class="fc" id="L1169">            req.addArgument(e.getKey(), e.getValue());</span>
+<span class="fc" id="L1170">        }</span>
+<span class="fc" id="L1171">        NetworkManager.getInstance().addToQueue(req);</span>
+<span class="fc" id="L1172">    }</span>
+
+    /// How long a fetched JWK Set is trusted to be complete: a token that names a key it
+    /// does not hold has the set fetched again, but not more often than this. A test
+    /// shortens it.
+<span class="fc" id="L1177">    long jwksRefetchMillis = 60000;</span>
+
+    private boolean requestsOpenId() {
+<span class="pc bpc" id="L1180" title="1 of 2 branches missed.">        if (scopes != null) {</span>
+<span class="fc bfc" id="L1181" title="All 2 branches covered.">            for (String scope : scopes) {</span>
+<span class="fc bfc" id="L1182" title="All 2 branches covered.">                if (&quot;openid&quot;.equals(scope)) {</span>
+<span class="fc" id="L1183">                    return true;</span>
+                }
+            }
+        }
+<span class="fc" id="L1187">        return false;</span>
+    }
+
+    /// Holds the ID token of a token response to what [IdTokenVerifier] asks of one, then
+    /// runs `accepted`; fails `out` otherwise. A response with no ID token has nothing to
+    /// check. Called on a network thread.
+    private void checkIdToken(final OidcTokens tokens, String expectedNonce,
+            final Runnable accepted, final AsyncResource&lt;OidcTokens&gt; out) {
+<span class="fc" id="L1195">        String idToken = tokens.getIdToken();</span>
+<span class="fc bfc" id="L1196" title="All 2 branches covered.">        if (idToken == null) {</span>
+<span class="fc" id="L1197">            accepted.run();</span>
+<span class="fc" id="L1198">            return;</span>
+        }
+        final Jwt jwt;
+        try {
+<span class="fc" id="L1202">            jwt = Jwt.parse(idToken);</span>
+<span class="fc" id="L1203">        } catch (RuntimeException malformed) {</span>
+<span class="fc" id="L1204">            out.error(new OidcException(OidcException.INVALID_ID_TOKEN,</span>
+<span class="fc" id="L1205">                    &quot;The ID token is not a JWT: &quot; + malformed.getMessage(), malformed));</span>
+<span class="fc" id="L1206">            return;</span>
+<span class="fc" id="L1207">        }</span>
+<span class="fc" id="L1208">        OidcException refused = IdTokenVerifier.checkClaims(jwt, configuration.getIssuer(),</span>
+<span class="fc" id="L1209">                clientId, expectedNonce, tokens.getAccessToken(), idTokenClockSkewSeconds,</span>
+<span class="fc" id="L1210">                System.currentTimeMillis());</span>
+<span class="fc bfc" id="L1211" title="All 2 branches covered.">        if (refused != null) {</span>
+<span class="fc" id="L1212">            out.error(refused);</span>
+<span class="fc" id="L1213">            return;</span>
+        }
+<span class="fc bfc" id="L1215" title="All 2 branches covered.">        if (!verifyIdTokenSignature) {</span>
+<span class="fc" id="L1216">            accepted.run();</span>
+<span class="fc" id="L1217">            return;</span>
+        }
+<span class="fc bfc" id="L1219" title="All 2 branches covered.">        if (IdTokenVerifier.keyType(jwt.getAlgorithm()) == null) {</span>
+<span class="fc" id="L1220">            out.error(IdTokenVerifier.verifySignature(jwt, null));</span>
+<span class="fc" id="L1221">            return;</span>
+        }
+<span class="fc bfc" id="L1223" title="All 2 branches covered.">        if (configuration.getJwksUri() == null) {</span>
+<span class="fc" id="L1224">            out.error(new OidcException(OidcException.INVALID_ID_TOKEN, &quot;The configuration &quot;</span>
+                    + &quot;names no jwksUri, so the ID token's signature cannot be verified and &quot;
+                    + &quot;the token was not accepted. Discover the provider, or give the &quot;
+                    + &quot;configuration its jwksUri; setVerifyIdTokenSignature(false) accepts &quot;
+                    + &quot;the token unverified.&quot;));
+<span class="fc" id="L1229">            return;</span>
+        }
+<span class="fc" id="L1231">        List&lt;Map&lt;String, Object&gt;&gt; known = jwks;</span>
+<span class="fc" id="L1232">        long fetchedAt = jwksFetchedAt;</span>
+<span class="fc" id="L1233">        List&lt;Map&lt;String, Object&gt;&gt; candidates = IdTokenVerifier.candidates(jwt, known);</span>
+<span class="fc" id="L1234">        OidcException signatureFailure = IdTokenVerifier.verifySignature(jwt, candidates);</span>
+<span class="fc bfc" id="L1235" title="All 2 branches covered.">        if (signatureFailure == null) {</span>
+<span class="fc" id="L1236">            accepted.run();</span>
+<span class="fc" id="L1237">            return;</span>
+        }
+<span class="fc bfc" id="L1239" title="All 4 branches covered.">        if (known != null &amp;&amp; System.currentTimeMillis() - fetchedAt &lt; jwksRefetchMillis) {</span>
+<span class="fc" id="L1240">            out.error(signatureFailure);</span>
+<span class="fc" id="L1241">            return;</span>
+        }
+        // Rotation may omit kid or reuse it. Failed cached verification can refetch
+        // after the same interval as an unknown kid; the fetched keys get one try.
+<span class="fc" id="L1245">        fetchJwks(new SuccessCallback&lt;List&lt;Map&lt;String, Object&gt;&gt;&gt;() {</span>
+            @Override
+            public void onSucess(List&lt;Map&lt;String, Object&gt;&gt; fetched) {
+<span class="fc" id="L1248">                finishIdToken(jwt, IdTokenVerifier.candidates(jwt, fetched), accepted, out);</span>
+<span class="fc" id="L1249">            }</span>
+        }, out);
+<span class="fc" id="L1251">    }</span>
+
+    private static void finishIdToken(Jwt jwt, List&lt;Map&lt;String, Object&gt;&gt; candidates,
+            Runnable accepted, AsyncResource&lt;OidcTokens&gt; out) {
+<span class="fc" id="L1255">        OidcException refused = IdTokenVerifier.verifySignature(jwt, candidates);</span>
+<span class="fc bfc" id="L1256" title="All 2 branches covered.">        if (refused != null) {</span>
+<span class="fc" id="L1257">            out.error(refused);</span>
+        } else {
+<span class="fc" id="L1259">            accepted.run();</span>
+        }
+<span class="fc" id="L1261">    }</span>
+
+    /// Fetches the provider's JWK Set and keeps it. A set that cannot be fetched or read
+    /// fails `out`: a signature nothing could check is not a signature that was checked.
+    private void fetchJwks(final SuccessCallback&lt;List&lt;Map&lt;String, Object&gt;&gt;&gt; then,
+            final AsyncResource&lt;OidcTokens&gt; out) {
+<span class="fc" id="L1267">        final String url = configuration.getJwksUri();</span>
+<span class="fc" id="L1268">        final boolean[] answered = new boolean[1];</span>
+<span class="fc" id="L1269">        ConnectionRequest req = new ConnectionRequest() {</span>
+            @Override
+            protected void readResponse(InputStream input) throws IOException {
+<span class="pc bpc" id="L1272" title="1 of 2 branches missed.">                if (answered[0]) {</span>
+<span class="nc" id="L1273">                    return;</span>
+                }
+<span class="fc" id="L1275">                answered[0] = true;</span>
+<span class="fc" id="L1276">                List&lt;Map&lt;String, Object&gt;&gt; keys = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="fc" id="L1277">                Map&lt;String, Object&gt; parsed = null;</span>
+<span class="fc bfc" id="L1278" title="All 2 branches covered.">                if (getResponseCode() == 200) {</span>
+                    try {
+<span class="fc" id="L1280">                        parsed = new JSONParser().parseJSON(new StringReader(</span>
+<span class="fc" id="L1281">                                StringUtil.newString(Util.readInputStream(input))));</span>
+<span class="nc" id="L1282">                    } catch (Exception unreadable) {</span>
+<span class="nc" id="L1283">                        parsed = null;</span>
+<span class="fc" id="L1284">                    }</span>
+                }
+<span class="fc bfc" id="L1286" title="All 2 branches covered.">                Object listed = parsed == null ? null : parsed.get(&quot;keys&quot;);</span>
+<span class="fc bfc" id="L1287" title="All 2 branches covered.">                if (!(listed instanceof List)) {</span>
+<span class="fc" id="L1288">                    out.error(new OidcException(OidcException.INVALID_ID_TOKEN, &quot;The provider's &quot;</span>
+                            + &quot;keys at &quot; + url + &quot; could not be read, so the ID token's &quot;
+                            + &quot;signature was not verified and the token was not accepted&quot;));
+<span class="fc" id="L1291">                    return;</span>
+                }
+<span class="fc bfc" id="L1293" title="All 2 branches covered.">                for (Object key : (List) listed) {</span>
+<span class="pc bpc" id="L1294" title="1 of 2 branches missed.">                    if (key instanceof Map) {</span>
+<span class="fc" id="L1295">                        keys.add((Map&lt;String, Object&gt;) key);</span>
+                    }
+<span class="fc" id="L1297">                }</span>
+<span class="fc" id="L1298">                jwksFetchedAt = System.currentTimeMillis();</span>
+<span class="fc" id="L1299">                jwks = keys;</span>
+<span class="fc" id="L1300">                then.onSucess(keys);</span>
+<span class="fc" id="L1301">            }</span>
+
+            @Override
+            protected void handleException(Exception err) {
+<span class="pc bpc" id="L1305" title="1 of 2 branches missed.">                if (answered[0]) {</span>
+<span class="nc" id="L1306">                    return;</span>
+                }
+<span class="fc" id="L1308">                answered[0] = true;</span>
+<span class="fc" id="L1309">                out.error(new OidcException(OidcException.TRANSPORT_ERROR, &quot;The provider's keys &quot;</span>
+                        + &quot;at &quot; + url + &quot; could not be fetched, so the ID token was not &quot;
+<span class="fc" id="L1311">                        + &quot;accepted: &quot; + err.getMessage(), err));</span>
+<span class="fc" id="L1312">            }</span>
+
+            @Override
+            protected void handleErrorResponseCode(int code, String message) {
+                // readResponse reports it: an answer that is not a key set.
+<span class="fc" id="L1317">            }</span>
+        };
+<span class="fc" id="L1319">        req.setUrl(url);</span>
+<span class="fc" id="L1320">        req.setPost(false);</span>
+<span class="fc" id="L1321">        req.setReadResponseForErrors(true);</span>
+<span class="fc" id="L1322">        req.setAuthorizer(RequestAuthorizer.NONE);</span>
+<span class="fc" id="L1323">        req.addRequestHeader(&quot;Accept&quot;, &quot;application/json&quot;);</span>
+<span class="fc" id="L1324">        NetworkManager.getInstance().addToQueue(req);</span>
+<span class="fc" id="L1325">    }</span>
+
+    private static Map&lt;String, String&gt; parseRedirectParams(String url) {
+<span class="fc" id="L1328">        Map&lt;String, String&gt; out = new HashMap&lt;String, String&gt;();</span>
+<span class="fc" id="L1329">        int qm = url.indexOf('?');</span>
+<span class="fc" id="L1330">        int hash = url.indexOf('#');</span>
+<span class="fc" id="L1331">        String tail = null;</span>
+<span class="pc bpc" id="L1332" title="1 of 2 branches missed.">        if (qm &gt;= 0) {</span>
+<span class="fc" id="L1333">            tail = url.substring(qm + 1);</span>
+<span class="fc" id="L1334">            int h2 = tail.indexOf('#');</span>
+<span class="pc bpc" id="L1335" title="1 of 2 branches missed.">            if (h2 &gt;= 0) {</span>
+<span class="nc" id="L1336">                String fragment = tail.substring(h2 + 1);</span>
+<span class="nc" id="L1337">                tail = tail.substring(0, h2);</span>
+<span class="nc" id="L1338">                merge(out, fragment);</span>
+            }
+<span class="pc bnc" id="L1340" title="All 2 branches missed.">        } else if (hash &gt;= 0) {</span>
+<span class="nc" id="L1341">            tail = url.substring(hash + 1);</span>
+        }
+<span class="pc bpc" id="L1343" title="1 of 2 branches missed.">        if (tail != null) {</span>
+<span class="fc" id="L1344">            merge(out, tail);</span>
+        }
+<span class="fc" id="L1346">        return out;</span>
+    }
+
+    private static void merge(Map&lt;String, String&gt; out, String query) {
+<span class="fc" id="L1350">        String[] pairs = Util.split(query, &quot;&amp;&quot;);</span>
+<span class="fc bfc" id="L1351" title="All 2 branches covered.">        for (String p : pairs) {</span>
+<span class="fc" id="L1352">            int eq = p.indexOf('=');</span>
+<span class="pc bpc" id="L1353" title="1 of 2 branches missed.">            if (eq &lt; 0) {</span>
+<span class="nc" id="L1354">                continue;</span>
+            }
+<span class="fc" id="L1356">            String k = decode(p.substring(0, eq));</span>
+<span class="fc" id="L1357">            String v = decode(p.substring(eq + 1));</span>
+<span class="fc" id="L1358">            out.put(k, v);</span>
+        }
+<span class="fc" id="L1360">    }</span>
+
+    private static String decode(String s) {
+<span class="fc" id="L1363">        StringBuilder b = new StringBuilder(s.length());</span>
+<span class="fc" id="L1364">        int i = 0;</span>
+<span class="fc" id="L1365">        int len = s.length();</span>
+<span class="fc bfc" id="L1366" title="All 2 branches covered.">        while (i &lt; len) {</span>
+<span class="fc" id="L1367">            char c = s.charAt(i);</span>
+<span class="pc bpc" id="L1368" title="1 of 2 branches missed.">            if (c == '+') {</span>
+<span class="nc" id="L1369">                b.append(' ');</span>
+<span class="nc" id="L1370">                i++;</span>
+<span class="pc bpc" id="L1371" title="1 of 4 branches missed.">            } else if (c == '%' &amp;&amp; i + 2 &lt; len) {</span>
+<span class="fc" id="L1372">                int hi = Character.digit(s.charAt(i + 1), 16);</span>
+<span class="fc" id="L1373">                int lo = Character.digit(s.charAt(i + 2), 16);</span>
+<span class="pc bpc" id="L1374" title="2 of 4 branches missed.">                if (hi &gt;= 0 &amp;&amp; lo &gt;= 0) {</span>
+<span class="fc" id="L1375">                    b.append((char) ((hi &lt;&lt; 4) | lo));</span>
+<span class="fc" id="L1376">                    i += 3;</span>
+                } else {
+<span class="nc" id="L1378">                    b.append(c);</span>
+<span class="nc" id="L1379">                    i++;</span>
+                }
+<span class="fc" id="L1381">            } else {</span>
+<span class="fc" id="L1382">                b.append(c);</span>
+<span class="fc" id="L1383">                i++;</span>
+            }
+<span class="fc" id="L1385">        }</span>
+<span class="fc" id="L1386">        return b.toString();</span>
+    }
+
+    private static String join(String[] items) {
+<span class="fc" id="L1390">        StringBuilder b = new StringBuilder();</span>
+<span class="fc bfc" id="L1391" title="All 2 branches covered.">        for (int i = 0; i &lt; items.length; i++) {</span>
+<span class="fc bfc" id="L1392" title="All 2 branches covered.">            if (i &gt; 0) {</span>
+<span class="fc" id="L1393">                b.append(' ');</span>
+            }
+<span class="fc" id="L1395">            b.append(items[i]);</span>
+        }
+<span class="fc" id="L1397">        return b.toString();</span>
+    }
+
+    private static String randomToken(int byteLength) {
+<span class="nc" id="L1401">        byte[] bytes = SecureRandom.bytes(byteLength);</span>
+<span class="nc" id="L1402">        String s = Base64.encodeUrlSafe(bytes);</span>
+<span class="nc" id="L1403">        StringBuilder b = new StringBuilder(s.length());</span>
+<span class="nc" id="L1404">        int len = s.length();</span>
+<span class="nc bnc" id="L1405" title="All 2 branches missed.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L1406">            char c = s.charAt(i);</span>
+<span class="nc bnc" id="L1407" title="All 6 branches missed.">            if (c == '=' || c == '\n' || c == '\r') {</span>
+<span class="nc" id="L1408">                continue;</span>
+            }
+<span class="nc" id="L1410">            b.append(c);</span>
+        }
+<span class="nc" id="L1412">        return b.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

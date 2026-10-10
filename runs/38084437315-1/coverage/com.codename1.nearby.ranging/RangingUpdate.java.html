@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RangingUpdate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.nearby.ranging</a> &gt; <span class="el_source">RangingUpdate.java</span></div><h1>RangingUpdate.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.nearby.ranging;
+
+/// One measurement of where the peer is, delivered to
+/// [RangingListener#updated] on the EDT.
+///
+/// Every field except the timestamp is optional, and they drop out
+/// independently: a peer directly behind the phone commonly reports a
+/// distance with no direction, and a peer at the edge of range reports
+/// neither. Guard each read with its `has` method rather than assuming a
+/// sentinel value.
+///
+/// ```java
+/// public void updated(RangingUpdate u) {
+///     if (u.hasDistance()) {
+///         label.setText(String.format(&quot;%.1f m&quot;, u.getDistance(RangingUnit.METERS)));
+///     }
+///     if (u.hasDirection()) {
+///         arrow.setAngle(u.getAzimuth());
+///     }
+/// }
+/// ```
+public final class RangingUpdate {
+
+    private final boolean hasDistance;
+    private final double distanceMeters;
+    private final boolean hasDirection;
+    private final double azimuth;
+    private final boolean hasElevation;
+    private final double elevation;
+    private final float[] vector;
+    private final long timestamp;
+
+    /// Ports construct these; application code receives them through
+    /// [RangingListener].
+    ///
+    /// #### Parameters
+    ///
+    /// - `hasDistance`: whether this update carries a distance
+    /// - `distanceMeters`: the distance in meters, ignored when
+    ///   `hasDistance` is false
+    /// - `hasDirection`: whether this update carries an azimuth
+    /// - `azimuth`: horizontal angle in degrees, ignored when `hasDirection`
+    ///   is false
+    /// - `hasElevation`: whether this update carries an elevation
+    /// - `elevation`: vertical angle in degrees, ignored when `hasElevation`
+    ///   is false
+    /// - `vector`: the platform's raw unit direction vector, or `null`
+    /// - `timestamp`: `System.currentTimeMillis()` when the port received
+    ///   the measurement
+    public RangingUpdate(boolean hasDistance, double distanceMeters,
+            boolean hasDirection, double azimuth,
+            boolean hasElevation, double elevation,
+<span class="fc" id="L75">            float[] vector, long timestamp) {</span>
+<span class="fc" id="L76">        this.hasDistance = hasDistance;</span>
+<span class="fc" id="L77">        this.distanceMeters = distanceMeters;</span>
+<span class="fc" id="L78">        this.hasDirection = hasDirection;</span>
+<span class="fc" id="L79">        this.azimuth = azimuth;</span>
+<span class="fc" id="L80">        this.hasElevation = hasElevation;</span>
+<span class="fc" id="L81">        this.elevation = elevation;</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        this.vector = vector == null ? null : new float[] {</span>
+            vector[0], vector[1], vector[2]
+        };
+<span class="fc" id="L85">        this.timestamp = timestamp;</span>
+<span class="fc" id="L86">    }</span>
+
+    /// `true` when this update carries a distance measurement.
+    public boolean hasDistance() {
+<span class="fc" id="L90">        return hasDistance;</span>
+    }
+
+    /// The straight-line distance to the peer, in the unit you name.
+    ///
+    /// Undefined when [#hasDistance()] is `false` -- check first. There is
+    /// no zero-argument form on purpose; see [RangingUnit].
+    ///
+    /// #### Parameters
+    ///
+    /// - `unit`: the unit to read the distance in
+    ///
+    /// #### Returns
+    ///
+    /// the distance expressed in `unit`
+    public double getDistance(RangingUnit unit) {
+<span class="fc" id="L106">        return unit.fromMeters(distanceMeters);</span>
+    }
+
+    /// `true` when this update carries a horizontal direction.
+    public boolean hasDirection() {
+<span class="fc" id="L111">        return hasDirection;</span>
+    }
+
+    /// The horizontal angle to the peer in degrees. Zero is straight ahead --
+    /// out of the top of a phone held upright -- and positive is to the
+    /// right.
+    ///
+    /// Undefined when [#hasDirection()] is `false`.
+    ///
+    /// **The range is platform-dependent, and the difference is meaningful.**
+    /// Apple reports a unit direction vector, which the port folds with
+    /// `atan2(x, -z)` into -180 to 180 -- so it distinguishes a peer in front
+    /// from one directly behind. Jetpack UWB reports the angle itself, in
+    /// degrees, but only over -90 to 90, which does not. Code that needs to
+    /// know which side of the device a peer is on cannot get that from
+    /// azimuth alone on Android.
+    ///
+    /// [#getDirectionVector()] still hands back Apple's untouched vector for
+    /// code that wants it.
+    public double getAzimuth() {
+<span class="fc" id="L131">        return azimuth;</span>
+    }
+
+    /// `true` when this update carries a vertical direction.
+    public boolean hasElevation() {
+<span class="nc" id="L136">        return hasElevation;</span>
+    }
+
+    /// The vertical angle to the peer in degrees, in the range -90 to 90,
+    /// where positive is above the device.
+    ///
+    /// Undefined when [#hasElevation()] is `false`. Fewer devices report
+    /// elevation than azimuth, so this drops out on its own.
+    public double getElevation() {
+<span class="fc" id="L145">        return elevation;</span>
+    }
+
+    /// The platform's raw unit direction vector as `{x, y, z}` -- x to the
+    /// right, y up, z toward the user, so the forward direction is negative
+    /// z. iOS only; `null` everywhere else and `null` on iOS whenever
+    /// [#hasDirection()] is `false`.
+    ///
+    /// Prefer [#getAzimuth()] and [#getElevation()], which are derived from
+    /// this on iOS and reported natively on Android, so they work on both.
+    /// A fresh copy is returned each call.
+    public float[] getDirectionVector() {
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">        return vector == null ? null : new float[] {</span>
+            vector[0], vector[1], vector[2]
+        };
+    }
+
+    /// `System.currentTimeMillis()` at the moment the port received this
+    /// measurement. The platforms disagree on what clock their own
+    /// timestamps use -- Android reports elapsed realtime nanoseconds and
+    /// iOS reports nothing at all -- so this is stamped on arrival rather
+    /// than translated, and is comparable only with other values from this
+    /// same clock.
+    public long getTimestamp() {
+<span class="fc" id="L169">        return timestamp;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L174">        StringBuilder b = new StringBuilder(&quot;RangingUpdate[&quot;);</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">        if (hasDistance) {</span>
+<span class="nc" id="L176">            b.append(&quot;distance=&quot;).append(distanceMeters).append(&quot;m&quot;);</span>
+        } else {
+<span class="nc" id="L178">            b.append(&quot;distance=none&quot;);</span>
+        }
+<span class="nc bnc" id="L180" title="All 2 branches missed.">        if (hasDirection) {</span>
+<span class="nc" id="L181">            b.append(&quot;, azimuth=&quot;).append(azimuth);</span>
+        }
+<span class="nc bnc" id="L183" title="All 2 branches missed.">        if (hasElevation) {</span>
+<span class="nc" id="L184">            b.append(&quot;, elevation=&quot;).append(elevation);</span>
+        }
+<span class="nc" id="L186">        return b.append(']').toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

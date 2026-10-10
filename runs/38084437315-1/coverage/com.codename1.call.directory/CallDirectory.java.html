@@ -1,0 +1,309 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CallDirectory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.call.directory</a> &gt; <span class="el_source">CallDirectory.java</span></div><h1>CallDirectory.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.call.directory;
+
+import com.codename1.call.CallError;
+import com.codename1.call.CallException;
+import com.codename1.call.spi.CallBridge;
+import com.codename1.impl.async.EdtResult;
+import com.codename1.impl.call.CallRequests;
+import com.codename1.impl.call.CallWire;
+import com.codename1.io.FileSystemStorage;
+import com.codename1.util.AsyncResource;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.Arrays;
+import java.util.Comparator;
+
+/// Naming and blocking numbers, for calls that have nothing to do with this
+/// app.
+///
+/// This is the caller-ID and spam-blocking feature: an ordinary cellular call
+/// arrives, and the system asks the installed directories whether any of them
+/// recognises the number.
+///
+/// ```java
+/// DirectoryEntry[] entries = {
+///     new DirectoryEntry(14155551212L, &quot;Acme Support&quot;),
+///     new DirectoryEntry(14155559999L, null, true)     // blocked
+/// };
+/// CallDirectory.setEntries(entries).ready(v -&gt; CallDirectory.reload());
+/// ```
+///
+/// #### It is a different process, and it is not fast
+///
+/// On iOS the numbers are read by a separate app extension that the system
+/// starts on its own schedule, with a tight memory limit and no access to
+/// anything this app holds in memory. The data therefore has to be written to
+/// a shared container before it can be used, which is what [#setEntries] does
+/// -- and why installing it and asking the system to read it are two steps.
+///
+/// #### The user has to switch it on
+///
+/// On iOS caller identification is **off until the user enables this app** in
+/// Settings, and nothing the app does can turn it on. Check
+/// [DirectoryStatus#isEnabled()] before concluding that a load failed.
+///
+/// #### Referencing this package does not make an app a calling app
+///
+/// This is deliberately separate from `com.codename1.call.session`: a
+/// caller-ID app carries no telephony permissions and no VoIP background
+/// mode, because it never owns a call.
+public final class CallDirectory {
+
+    private CallDirectory() {
+    }
+
+    /// Whether this platform can install caller identification or blocking.
+    public static boolean isSupported() {
+<span class="fc" id="L80">        CallBridge b = CallRequests.bridge();</span>
+<span class="pc bpc" id="L81" title="3 of 4 branches missed.">        return b != null &amp;&amp; b.isDirectorySupported();</span>
+    }
+
+    /// Writes `entries` where the system can read them, sorting them first.
+    ///
+    /// The sort is not a convenience. Both platforms reject an out-of-order
+    /// list wholesale, naming no row, so doing it here removes a failure mode
+    /// that is otherwise very hard to diagnose from the error the platform
+    /// gives.
+    ///
+    /// Duplicate numbers are collapsed, keeping the first, because a
+    /// duplicate is also grounds for rejection.
+    public static AsyncResource&lt;Boolean&gt; setEntries(DirectoryEntry[] entries) {
+<span class="fc" id="L94">        CallBridge b = CallRequests.bridge();</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (b == null) {</span>
+<span class="fc" id="L96">            EdtResult&lt;Boolean&gt; r = new EdtResult&lt;Boolean&gt;();</span>
+<span class="fc" id="L97">            r.error(new CallException(CallError.NOT_SUPPORTED));</span>
+<span class="fc" id="L98">            return r;</span>
+        }
+        // The write AND the handoff, together. The file has one canonical
+        // name -- the Android screening service reads exactly that path, and
+        // the iOS port copies from it into the App Group -- so releasing the
+        // lock in between let a second caller replace it before the port had
+        // consumed the first caller's, and both requests then described the
+        // second caller's entries. The port consumes the file inside this
+        // call, so the lock is held only for that.
+<span class="fc" id="L107">        synchronized (WRITE_LOCK) {</span>
+            String path;
+            try {
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">                path = writeLocked(entries == null</span>
+                        ? new DirectoryEntry[0] : entries);
+<span class="fc" id="L112">            } catch (IOException e) {</span>
+<span class="fc" id="L113">                EdtResult&lt;Boolean&gt; r = new EdtResult&lt;Boolean&gt;();</span>
+<span class="fc" id="L114">                r.error(new CallException(CallError.DIRECTORY_FAILED,</span>
+<span class="fc" id="L115">                        &quot;Could not stage the directory: &quot; + e.getMessage(),</span>
+                        e));
+<span class="fc" id="L117">                return r;</span>
+<span class="fc" id="L118">            }</span>
+<span class="fc" id="L119">            int id = CallRequests.nextId();</span>
+<span class="fc" id="L120">            EdtResult&lt;Boolean&gt; r = CallRequests.openAck(id);</span>
+<span class="fc" id="L121">            b.setDirectorySource(id, path);</span>
+<span class="fc" id="L122">            return r;</span>
+        }
+    }
+
+    /// Asks the system to re-read what [#setEntries] installed.
+    public static AsyncResource&lt;Boolean&gt; reload() {
+<span class="fc" id="L128">        CallBridge b = CallRequests.bridge();</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        if (b == null) {</span>
+<span class="fc" id="L130">            EdtResult&lt;Boolean&gt; r = new EdtResult&lt;Boolean&gt;();</span>
+<span class="fc" id="L131">            r.error(new CallException(CallError.NOT_SUPPORTED));</span>
+<span class="fc" id="L132">            return r;</span>
+        }
+<span class="nc" id="L134">        int id = CallRequests.nextId();</span>
+<span class="nc" id="L135">        EdtResult&lt;Boolean&gt; r = CallRequests.openAck(id);</span>
+<span class="nc" id="L136">        b.reloadDirectory(id);</span>
+<span class="nc" id="L137">        return r;</span>
+    }
+
+    /// Asks the system what it currently thinks of this app's directory.
+    public static AsyncResource&lt;DirectoryStatus&gt; getStatus() {
+<span class="fc" id="L142">        final EdtResult&lt;DirectoryStatus&gt; out = new EdtResult&lt;DirectoryStatus&gt;();</span>
+<span class="fc" id="L143">        CallBridge b = CallRequests.bridge();</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if (b == null) {</span>
+<span class="fc" id="L145">            out.error(new CallException(CallError.NOT_SUPPORTED));</span>
+<span class="fc" id="L146">            return out;</span>
+        }
+<span class="nc" id="L148">        int id = CallRequests.nextId();</span>
+<span class="nc" id="L149">        EdtResult&lt;String&gt; raw = CallRequests.openString(id);</span>
+<span class="nc" id="L150">        raw.onResult(new StatusDecoder(out));</span>
+<span class="nc" id="L151">        b.getDirectoryStatus(id);</span>
+<span class="nc" id="L152">        return out;</span>
+    }
+
+    /// Asks the user to let this app screen incoming calls.
+    ///
+    /// Android only; on iOS the equivalent is the user enabling the app in
+    /// Settings, which an app cannot prompt for. Resolves false where the
+    /// role was refused or does not exist.
+    public static AsyncResource&lt;Boolean&gt; requestScreeningRole() {
+<span class="fc" id="L161">        CallBridge b = CallRequests.bridge();</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        if (b == null) {</span>
+<span class="fc" id="L163">            EdtResult&lt;Boolean&gt; r = new EdtResult&lt;Boolean&gt;();</span>
+<span class="fc" id="L164">            r.error(new CallException(CallError.NOT_SUPPORTED));</span>
+<span class="fc" id="L165">            return r;</span>
+        }
+<span class="fc" id="L167">        int id = CallRequests.nextId();</span>
+<span class="fc" id="L168">        EdtResult&lt;Boolean&gt; r = CallRequests.openAck(id);</span>
+<span class="fc" id="L169">        b.requestScreeningRole(id);</span>
+<span class="fc" id="L170">        return r;</span>
+    }
+
+    /// Serialises writers. Two concurrent setEntries calls opened the same
+    /// staging path, so the second truncated the first's file and either
+    /// could rename it into place half-written -- which is what the staging
+    /// was added to make impossible.
+<span class="fc" id="L177">    private static final Object WRITE_LOCK = new Object();</span>
+
+    /// Sorts, de-duplicates and writes the entries, answering with the path.
+    private static String writeLocked(DirectoryEntry[] entries)
+            throws IOException {
+<span class="fc" id="L182">        DirectoryEntry[] sorted = new DirectoryEntry[entries.length];</span>
+<span class="fc" id="L183">        System.arraycopy(entries, 0, sorted, 0, entries.length);</span>
+<span class="fc" id="L184">        Arrays.sort(sorted, new ByNumber());</span>
+<span class="fc" id="L185">        FileSystemStorage fs = FileSystemStorage.getInstance();</span>
+<span class="fc" id="L186">        String path = fs.getAppHomePath();</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        if (!path.endsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L188">            path = path + &quot;/&quot;;</span>
+        }
+<span class="fc" id="L190">        path = path + &quot;cn1calldirectory.tsv&quot;;</span>
+        // Written beside the live file and moved into place, because the
+        // reader is ANOTHER PROCESS: Android starts the screening service to
+        // judge a call whenever one arrives, including while this list is
+        // being written. Opening the live path truncates it first, so a
+        // screening that landed in the middle read an empty or half-written
+        // directory and let a number through that both the old list and the
+        // new one blocked -- and invalidating the cache afterwards cannot
+        // take back a call that has already rung.
+<span class="fc" id="L199">        String staging = path + &quot;.new&quot;;</span>
+<span class="fc" id="L200">        OutputStream os = fs.openOutputStream(staging);</span>
+        try {
+<span class="fc" id="L202">            StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L203">            long previous = -1;</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">            for (DirectoryEntry entry : sorted) {</span>
+<span class="pc bpc" id="L205" title="2 of 4 branches missed.">                if (entry == null || entry.getNumber() == previous) {</span>
+<span class="nc" id="L206">                    continue;</span>
+                }
+<span class="fc" id="L208">                previous = entry.getNumber();</span>
+<span class="fc" id="L209">                sb.append(previous).append(CallWire.SEPARATOR)</span>
+<span class="fc" id="L210">                        .append(CallWire.sanitize(entry.getLabel()))</span>
+<span class="fc" id="L211">                        .append(CallWire.SEPARATOR)</span>
+<span class="fc" id="L212">                        .append(CallWire.flagOf(entry.isBlocked()))</span>
+<span class="fc" id="L213">                        .append('\n');</span>
+            }
+<span class="fc" id="L215">            os.write(sb.toString().getBytes(&quot;UTF-8&quot;));</span>
+        } finally {
+<span class="fc" id="L217">            os.close();</span>
+        }
+        // The move, WITHOUT deleting first. rename() takes a name rather than
+        // a path, and on the platform where this matters it is File.renameTo,
+        // which replaces the destination in one step -- so a screening that
+        // lands mid-replacement sees either the whole old list or the whole
+        // new one. Removing the old file first reintroduced the very window
+        // the staging was added to close, a moment in which a number the
+        // replacement blocks is allowed through.
+<span class="fc" id="L226">        fs.rename(staging, &quot;cn1calldirectory.tsv&quot;);</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        if (fs.exists(staging)) {</span>
+            // A platform whose rename cannot replace. Nothing else is
+            // available there, and no such platform runs the reader in
+            // another process.
+<span class="fc" id="L231">            fs.delete(path);</span>
+<span class="fc" id="L232">            fs.rename(staging, &quot;cn1calldirectory.tsv&quot;);</span>
+<span class="pc bpc" id="L233" title="3 of 4 branches missed.">            if (fs.exists(staging) || !fs.exists(path)) {</span>
+                // CHECKED, because this branch has already deleted the live
+                // list. A rename that fails here leaves no directory at all,
+                // and returning the path regardless had the bridge
+                // acknowledge success and drop its cache -- after which every
+                // screened call consulted an empty list and numbers the app
+                // had blocked were allowed straight through, silently and for
+                // as long as the app kept running. Failing is the only honest
+                // answer; setEntries reports it and the app can retry.
+<span class="fc" id="L242">                throw new IOException(&quot;The call directory could not be&quot;</span>
+                        + &quot; published: the replacement is still at &quot; + staging);
+            }
+        }
+<span class="fc" id="L246">        return path;</span>
+    }
+
+    /// Orders entries by number ascending, which is what both platforms
+    /// require. A named class rather than an anonymous one so it carries no
+    /// synthetic outer reference.
+    private static final class ByNumber implements Comparator&lt;DirectoryEntry&gt; {
+        @Override
+        public int compare(DirectoryEntry a, DirectoryEntry b) {
+<span class="nc bnc" id="L255" title="All 2 branches missed.">            long x = a == null ? 0 : a.getNumber();</span>
+<span class="nc bnc" id="L256" title="All 2 branches missed.">            long y = b == null ? 0 : b.getNumber();</span>
+<span class="nc bnc" id="L257" title="All 4 branches missed.">            return x &lt; y ? -1 : (x &gt; y ? 1 : 0);</span>
+        }
+    }
+
+    /// Turns the port's status record into a [DirectoryStatus].
+    private static final class StatusDecoder
+            implements com.codename1.util.AsyncResult&lt;String&gt; {
+        private final EdtResult&lt;DirectoryStatus&gt; out;
+
+<span class="nc" id="L266">        StatusDecoder(EdtResult&lt;DirectoryStatus&gt; out) {</span>
+<span class="nc" id="L267">            this.out = out;</span>
+<span class="nc" id="L268">        }</span>
+
+        @Override
+        public void onReady(String value, Throwable error) {
+<span class="nc bnc" id="L272" title="All 2 branches missed.">            if (error != null) {</span>
+<span class="nc" id="L273">                out.error(error);</span>
+<span class="nc" id="L274">                return;</span>
+            }
+<span class="nc" id="L276">            String[] f = CallWire.split(value);</span>
+<span class="nc" id="L277">            out.complete(new DirectoryStatus(CallWire.flag(f, 0),</span>
+<span class="nc" id="L278">                    CallWire.integer(f, 1, -1), CallWire.field(f, 2)));</span>
+<span class="nc" id="L279">        }</span>
+    }
+
+    /// Answers [#getStatus] with a wire record.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverStatus(int requestId, String statusWire) {
+<span class="nc" id="L286">        EdtResult&lt;String&gt; r = CallRequests.takeString(requestId);</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">        if (r != null) {</span>
+<span class="nc bnc" id="L288" title="All 2 branches missed.">            r.complete(statusWire == null ? &quot;&quot; : statusWire);</span>
+        }
+<span class="nc" id="L290">    }</span>
+
+    /// Fails a status request.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverStatusFailed(int requestId, int errorOrdinal,
+            String message) {
+<span class="nc" id="L297">        EdtResult&lt;String&gt; r = CallRequests.takeString(requestId);</span>
+<span class="nc bnc" id="L298" title="All 2 branches missed.">        if (r != null) {</span>
+<span class="nc" id="L299">            r.error(CallWire.decodeError(errorOrdinal, message));</span>
+        }
+<span class="nc" id="L301">    }</span>
+
+    /// No static state to clear; present so the family's reset is uniform.
+    ///
+    /// @hidden not part of the public API; test-only.
+    public static void resetForTest() {
+<span class="fc" id="L307">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

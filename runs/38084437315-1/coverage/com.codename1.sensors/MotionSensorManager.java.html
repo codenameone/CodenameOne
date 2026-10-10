@@ -1,0 +1,644 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MotionSensorManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.sensors</a> &gt; <span class="el_source">MotionSensorManager.java</span></div><h1>MotionSensorManager.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.sensors;
+
+import com.codename1.ui.Display;
+import com.codename1.util.MathUtil;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Cross platform access to the device motion sensors (accelerometer,
+/// gyroscope, magnetometer and the derived gravity, linear acceleration and
+/// orientation) together with high level gesture detection (shake, flip, tilt,
+/// pick up and free fall).
+///
+/// Obtain the singleton through [#getInstance()]. The instance is always non
+/// `null`; on a device or port without motion sensors every sensor simply
+/// reports as unsupported and no events are delivered.
+///
+/// #### Reading a sensor
+///
+/// ```java
+/// MotionSensorManager m = MotionSensorManager.getInstance();
+/// MotionSensor accel = m.getSensor(MotionSensorManager.TYPE_ACCELEROMETER);
+/// if (accel != null) {
+///     accel.addListener(new MotionSensorListener() {
+///         public void motionReceived(MotionEvent evt) {
+///             // evt.getX(), evt.getY(), evt.getZ() are in m/s^2
+///         }
+///     });
+/// }
+/// ```
+///
+/// #### Listening for a gesture
+///
+/// ```java
+/// MotionSensorManager.getInstance().addGestureListener(GestureEvent.TYPE_SHAKE, new GestureListener() {
+///     public void gestureDetected(GestureEvent evt) {
+///         Dialog.show(&quot;Shaken&quot;, &quot;You shook the device&quot;, &quot;OK&quot;, null);
+///     }
+/// });
+/// ```
+///
+/// All callbacks are delivered on the EDT. Sampling is reference counted so the
+/// hardware sensors are only powered while at least one listener (sensor or
+/// gesture) is registered; remember to remove your listeners to save battery.
+///
+/// **iOS note:** access to the motion hardware requires the build argument
+/// `ios.NSMotionUsageDescription` describing why the app reads motion data.
+<span class="fc" id="L72">public abstract class MotionSensorManager {</span>
+
+    /// Accelerometer including the effect of gravity, in meters per second
+    /// squared.
+    public static final int TYPE_ACCELEROMETER = 1;
+
+    /// Acceleration with the effect of gravity removed, in meters per second
+    /// squared. Derived in the core from the accelerometer when the platform
+    /// does not provide it natively.
+    public static final int TYPE_LINEAR_ACCELERATION = 2;
+
+    /// The gravity vector in meters per second squared. Derived in the core
+    /// from the accelerometer when the platform does not provide it natively.
+    public static final int TYPE_GRAVITY = 3;
+
+    /// Rate of rotation around the three axes in radians per second.
+    public static final int TYPE_GYROSCOPE = 4;
+
+    /// The ambient magnetic field in microtesla.
+    public static final int TYPE_MAGNETOMETER = 5;
+
+    /// Device orientation as azimuth, pitch and roll in radians. Derived in the
+    /// core from the gravity vector (and the magnetometer for the azimuth).
+    public static final int TYPE_ORIENTATION = 6;
+
+    /// Standard earth gravity in meters per second squared, the unit used by the
+    /// acceleration sensors.
+    public static final double STANDARD_GRAVITY = 9.80665;
+
+    private static final int MAX_TYPE = 6;
+    private static final float GRAVITY_FILTER_ALPHA = 0.8f;
+
+    private static MotionSensorManager unsupportedInstance;
+
+<span class="fc" id="L106">    private final Object lock = new Object();</span>
+<span class="fc" id="L107">    private final Map&lt;Integer, MotionSensor&gt; sensors = new HashMap&lt;Integer, MotionSensor&gt;();</span>
+<span class="fc" id="L108">    private final Map&lt;Integer, ArrayList&lt;GestureListener&gt;&gt; gestureListeners =</span>
+            new HashMap&lt;Integer, ArrayList&lt;GestureListener&gt;&gt;();
+<span class="fc" id="L110">    private final GestureEngine engine = new GestureEngine();</span>
+
+<span class="fc" id="L112">    private final boolean[] nativeStarted = new boolean[MAX_TYPE + 1];</span>
+<span class="fc" id="L113">    private final float[] readBuffer = new float[3];</span>
+<span class="fc" id="L114">    private final float[] gravityEstimate = new float[3];</span>
+    private boolean gravityInitialized;
+    private boolean threadRunning;
+    private int gestureListenerCount;
+<span class="fc" id="L118">    private int samplingInterval = 50;</span>
+
+<span class="fc" id="L120">    private final Runnable pollRunnable = new Runnable() {</span>
+        @Override
+        public void run() {
+<span class="fc" id="L123">            pollLoop();</span>
+<span class="fc" id="L124">        }</span>
+    };
+
+    /// Returns the shared motion sensor manager. Never `null`: when the active
+    /// port does not provide motion sensors a no-op manager is returned whose
+    /// sensors all report as unsupported.
+    public static MotionSensorManager getInstance() {
+<span class="fc" id="L131">        MotionSensorManager m = Display.getInstance().getMotionSensorManager();</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (m != null) {</span>
+<span class="fc" id="L133">            return m;</span>
+        }
+<span class="nc" id="L135">        synchronized (MotionSensorManager.class) {</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">            if (unsupportedInstance == null) {</span>
+<span class="nc" id="L137">                unsupportedInstance = new UnsupportedMotionSensorManager();</span>
+            }
+<span class="nc" id="L139">            return unsupportedInstance;</span>
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Hooks implemented by the platform ports
+    // ------------------------------------------------------------------
+
+    /// Whether the named hardware sensor is present on this device. Only the
+    /// hardware backed types (`TYPE_ACCELEROMETER`, `TYPE_GYROSCOPE`,
+    /// `TYPE_MAGNETOMETER` and, where the OS exposes them, `TYPE_GRAVITY` and
+    /// `TYPE_LINEAR_ACCELERATION`) are queried here; derived types are resolved
+    /// by [#isSensorSupported(int)].
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: one of the `TYPE_*` constants
+    protected abstract boolean isNativeSensorSupported(int type);
+
+    /// Starts the named hardware sensor. Called when the first listener that
+    /// needs it is registered.
+    protected abstract void startNativeSensor(int type);
+
+    /// Stops the named hardware sensor. Called when the last listener that
+    /// needed it is removed.
+    protected abstract void stopNativeSensor(int type);
+
+    /// Reads the latest value of the named hardware sensor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: one of the `TYPE_*` constants
+    /// - `out`: a three element array to receive the x, y and z values
+    ///
+    /// #### Returns
+    ///
+    /// `true` if a value was written, `false` if no reading is available yet
+    protected abstract boolean readNativeSensor(int type, float[] out);
+
+    // ------------------------------------------------------------------
+    // Public API
+    // ------------------------------------------------------------------
+
+    /// Whether the given sensor type can deliver readings on this device. Takes
+    /// into account values that the core derives from other sensors, so for
+    /// example `TYPE_ORIENTATION` is supported whenever the accelerometer is.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: one of the `TYPE_*` constants
+    public boolean isSensorSupported(int type) {
+<span class="pc bpc" id="L190" title="3 of 4 branches missed.">        switch (type) {</span>
+            case TYPE_ACCELEROMETER:
+            case TYPE_GYROSCOPE:
+            case TYPE_MAGNETOMETER:
+<span class="fc" id="L194">                return isNativeSensorSupported(type);</span>
+            case TYPE_GRAVITY:
+            case TYPE_LINEAR_ACCELERATION:
+<span class="nc bnc" id="L197" title="All 4 branches missed.">                return isNativeSensorSupported(type) || isNativeSensorSupported(TYPE_ACCELEROMETER);</span>
+            case TYPE_ORIENTATION:
+<span class="nc bnc" id="L199" title="All 4 branches missed.">                return isNativeSensorSupported(TYPE_GRAVITY) || isNativeSensorSupported(TYPE_ACCELEROMETER);</span>
+            default:
+<span class="nc" id="L201">                return false;</span>
+        }
+    }
+
+    /// Returns the sensor object for the given type, or `null` if the type is
+    /// not supported on this device. The same instance is returned for repeated
+    /// calls with the same type.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: one of the `TYPE_*` constants
+    public MotionSensor getSensor(int type) {
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">        if (!isSensorSupported(type)) {</span>
+<span class="nc" id="L214">            return null;</span>
+        }
+<span class="fc" id="L216">        Integer key = Integer.valueOf(type);</span>
+<span class="fc" id="L217">        synchronized (lock) {</span>
+<span class="fc" id="L218">            MotionSensor s = sensors.get(key);</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">            if (s == null) {</span>
+<span class="fc" id="L220">                s = new MotionSensor(this, type);</span>
+<span class="fc" id="L221">                sensors.put(key, s);</span>
+            }
+<span class="fc" id="L223">            return s;</span>
+        }
+    }
+
+    /// Registers a listener for a specific gesture. The accelerometer is powered
+    /// automatically while at least one gesture listener is registered.
+    ///
+    /// #### Parameters
+    ///
+    /// - `gestureType`: one of the `GestureEvent.TYPE_*` constants
+    /// - `l`: the listener to invoke when the gesture occurs
+    public void addGestureListener(int gestureType, GestureListener l) {
+<span class="nc bnc" id="L235" title="All 2 branches missed.">        if (l == null) {</span>
+<span class="nc" id="L236">            return;</span>
+        }
+<span class="nc" id="L238">        Integer key = Integer.valueOf(gestureType);</span>
+<span class="nc" id="L239">        synchronized (lock) {</span>
+<span class="nc" id="L240">            ArrayList&lt;GestureListener&gt; list = gestureListeners.get(key);</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">            if (list == null) {</span>
+<span class="nc" id="L242">                list = new ArrayList&lt;GestureListener&gt;();</span>
+<span class="nc" id="L243">                gestureListeners.put(key, list);</span>
+            }
+<span class="nc bnc" id="L245" title="All 2 branches missed.">            if (!list.contains(l)) {</span>
+<span class="nc" id="L246">                list.add(l);</span>
+<span class="nc" id="L247">                gestureListenerCount++;</span>
+            }
+<span class="nc" id="L249">        }</span>
+<span class="nc" id="L250">        ensureRunning();</span>
+<span class="nc" id="L251">    }</span>
+
+    /// Removes a previously registered gesture listener.
+    ///
+    /// #### Parameters
+    ///
+    /// - `gestureType`: the gesture the listener was registered for
+    /// - `l`: the listener to remove
+    public void removeGestureListener(int gestureType, GestureListener l) {
+<span class="nc" id="L260">        Integer key = Integer.valueOf(gestureType);</span>
+<span class="nc" id="L261">        synchronized (lock) {</span>
+<span class="nc" id="L262">            ArrayList&lt;GestureListener&gt; list = gestureListeners.get(key);</span>
+<span class="nc bnc" id="L263" title="All 4 branches missed.">            if (list != null &amp;&amp; list.remove(l)) {</span>
+<span class="nc" id="L264">                gestureListenerCount--;</span>
+<span class="nc bnc" id="L265" title="All 2 branches missed.">                if (list.isEmpty()) {</span>
+<span class="nc" id="L266">                    gestureListeners.remove(key);</span>
+                }
+            }
+<span class="nc" id="L269">        }</span>
+<span class="nc" id="L270">    }</span>
+
+    /// The requested time between sensor samples in milliseconds. Defaults to
+    /// 50ms (20Hz). The actual rate the hardware delivers may differ.
+    public int getSamplingInterval() {
+<span class="nc" id="L275">        return samplingInterval;</span>
+    }
+
+    /// Sets the requested time between sensor samples in milliseconds. Smaller
+    /// values give more responsive gestures at a higher battery cost. Values are
+    /// clamped to the range 10ms..1000ms.
+    ///
+    /// #### Parameters
+    ///
+    /// - `millis`: the requested interval
+    public void setSamplingInterval(int millis) {
+<span class="nc bnc" id="L286" title="All 2 branches missed.">        if (millis &lt; 10) {</span>
+<span class="nc" id="L287">            millis = 10;</span>
+        }
+<span class="nc bnc" id="L289" title="All 2 branches missed.">        if (millis &gt; 1000) {</span>
+<span class="nc" id="L290">            millis = 1000;</span>
+        }
+<span class="nc" id="L292">        synchronized (lock) {</span>
+<span class="nc" id="L293">            samplingInterval = millis;</span>
+<span class="nc" id="L294">        }</span>
+<span class="nc" id="L295">    }</span>
+
+    /// Sets the linear acceleration spike, in meters per second squared, above
+    /// which jolts are counted towards a shake. Larger values require a more
+    /// vigorous shake. The default is 12.0.
+    public void setShakeThreshold(double threshold) {
+<span class="nc" id="L301">        engine.shakeThreshold = threshold;</span>
+<span class="nc" id="L302">    }</span>
+
+    /// Sets the tilt angle, in radians, at which the tilt gestures fire. The
+    /// default is roughly 0.6 (about 34 degrees).
+    public void setTiltThreshold(double radians) {
+<span class="nc" id="L307">        engine.tiltEnterAngle = radians;</span>
+<span class="nc" id="L308">        engine.tiltExitAngle = radians * 0.5;</span>
+<span class="nc" id="L309">    }</span>
+
+    /// Sets the total acceleration, in meters per second squared, below which
+    /// the device is considered to be in free fall. The default is 3.0.
+    public void setFreeFallThreshold(double threshold) {
+<span class="nc" id="L314">        engine.freeFallThreshold = threshold;</span>
+<span class="nc" id="L315">    }</span>
+
+    /// Stops every sensor and removes all registered listeners. Mostly useful
+    /// for tests and for an explicit shutdown.
+    public void stop() {
+<span class="nc" id="L320">        synchronized (lock) {</span>
+<span class="nc" id="L321">            sensors.clear();</span>
+<span class="nc" id="L322">            gestureListeners.clear();</span>
+<span class="nc" id="L323">            gestureListenerCount = 0;</span>
+<span class="nc bnc" id="L324" title="All 2 branches missed.">            for (int t = 1; t &lt;= MAX_TYPE; t++) {</span>
+<span class="nc bnc" id="L325" title="All 2 branches missed.">                if (nativeStarted[t]) {</span>
+<span class="nc" id="L326">                    stopNativeSensor(t);</span>
+<span class="nc" id="L327">                    nativeStarted[t] = false;</span>
+                }
+            }
+<span class="nc" id="L330">            threadRunning = false;</span>
+<span class="nc" id="L331">        }</span>
+<span class="nc" id="L332">    }</span>
+
+    // ------------------------------------------------------------------
+    // Internal plumbing used by MotionSensor
+    // ------------------------------------------------------------------
+
+    void sensorActivityChanged() {
+<span class="fc" id="L339">        ensureRunning();</span>
+<span class="fc" id="L340">    }</span>
+
+    void runOnEventThread(Runnable r) {
+<span class="fc" id="L343">        Display.getInstance().callSerially(r);</span>
+<span class="fc" id="L344">    }</span>
+
+    // ------------------------------------------------------------------
+    // Sampling loop
+    // ------------------------------------------------------------------
+
+    private void ensureRunning() {
+<span class="fc" id="L351">        synchronized (lock) {</span>
+<span class="fc bfc" id="L352" title="All 2 branches covered.">            if (threadRunning) {</span>
+<span class="fc" id="L353">                return;</span>
+            }
+<span class="fc" id="L355">            boolean[] needed = computeNeeded();</span>
+<span class="pc bpc" id="L356" title="1 of 2 branches missed.">            if (!anyNeeded(needed)) {</span>
+<span class="nc" id="L357">                return;</span>
+            }
+<span class="fc" id="L359">            threadRunning = true;</span>
+<span class="fc" id="L360">            gravityInitialized = false;</span>
+<span class="fc" id="L361">            engine.reset();</span>
+<span class="fc" id="L362">            Display.getInstance().startThread(pollRunnable, &quot;CN1 Motion Sensors&quot;).start();</span>
+<span class="fc" id="L363">        }</span>
+<span class="fc" id="L364">    }</span>
+
+    private void pollLoop() {
+        while (true) {
+            int sleep;
+<span class="fc" id="L369">            synchronized (lock) {</span>
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">                if (!threadRunning) {</span>
+<span class="nc" id="L371">                    return;</span>
+                }
+<span class="fc bfc" id="L373" title="All 2 branches covered.">                if (!tick()) {</span>
+<span class="fc" id="L374">                    return;</span>
+                }
+<span class="fc" id="L376">                sleep = samplingInterval;</span>
+<span class="fc" id="L377">            }</span>
+            try {
+<span class="fc" id="L379">                Thread.sleep(sleep);</span>
+<span class="nc" id="L380">            } catch (InterruptedException ignored) {</span>
+                // resume sampling on the next iteration
+<span class="fc" id="L382">            }</span>
+<span class="fc" id="L383">        }</span>
+    }
+
+    // Runs one sampling cycle. Caller holds lock. Returns false to stop the loop.
+    private boolean tick() {
+<span class="fc" id="L388">        boolean[] needed = computeNeeded();</span>
+<span class="fc" id="L389">        applyNativeDiff(needed);</span>
+<span class="fc bfc" id="L390" title="All 2 branches covered.">        if (!anyNeeded(needed)) {</span>
+<span class="fc" id="L391">            threadRunning = false;</span>
+<span class="fc" id="L392">            return false;</span>
+        }
+
+<span class="fc" id="L395">        long time = System.currentTimeMillis();</span>
+
+<span class="pc bpc" id="L397" title="1 of 4 branches missed.">        boolean accelOk = needed[TYPE_ACCELEROMETER] &amp;&amp; read(TYPE_ACCELEROMETER);</span>
+<span class="fc" id="L398">        float ax = readBuffer[0];</span>
+<span class="fc" id="L399">        float ay = readBuffer[1];</span>
+<span class="fc" id="L400">        float az = readBuffer[2];</span>
+
+<span class="pc bpc" id="L402" title="3 of 4 branches missed.">        boolean nativeGravityOk = needed[TYPE_GRAVITY] &amp;&amp; read(TYPE_GRAVITY);</span>
+<span class="fc" id="L403">        float ngx = readBuffer[0];</span>
+<span class="fc" id="L404">        float ngy = readBuffer[1];</span>
+<span class="fc" id="L405">        float ngz = readBuffer[2];</span>
+
+<span class="fc" id="L407">        updateGravityEstimate(accelOk, ax, ay, az, nativeGravityOk, ngx, ngy, ngz);</span>
+
+<span class="fc" id="L409">        dispatchSensors(accelOk, ax, ay, az, nativeGravityOk, ngx, ngy, ngz, time);</span>
+
+<span class="pc bpc" id="L411" title="5 of 6 branches missed.">        if (gestureListenerCount &gt; 0 &amp;&amp; accelOk &amp;&amp; gravityInitialized) {</span>
+<span class="nc" id="L412">            List&lt;GestureEvent&gt; events = engine.onSample(ax, ay, az,</span>
+                    gravityEstimate[0], gravityEstimate[1], gravityEstimate[2], time);
+<span class="nc bnc" id="L414" title="All 2 branches missed.">            for (GestureEvent event : events) {</span>
+<span class="nc" id="L415">                dispatchGesture(event);</span>
+<span class="nc" id="L416">            }</span>
+        }
+<span class="fc" id="L418">        return true;</span>
+    }
+
+    private void dispatchSensors(boolean accelOk, float ax, float ay, float az,
+                                 boolean nativeGravityOk, float ngx, float ngy, float ngz,
+                                 long time) {
+<span class="fc bfc" id="L424" title="All 2 branches covered.">        for (MotionSensor s : sensors.values()) {</span>
+<span class="fc bfc" id="L425" title="All 2 branches covered.">            if (!s.hasListeners()) {</span>
+<span class="fc" id="L426">                continue;</span>
+            }
+<span class="fc" id="L428">            int type = s.getType();</span>
+<span class="pc bpc" id="L429" title="5 of 7 branches missed.">            switch (type) {</span>
+                case TYPE_ACCELEROMETER:
+<span class="pc bpc" id="L431" title="1 of 2 branches missed.">                    if (accelOk) {</span>
+<span class="nc" id="L432">                        s.dispatch(ax, ay, az, time);</span>
+                    }
+                    break;
+                case TYPE_GRAVITY:
+<span class="nc bnc" id="L436" title="All 2 branches missed.">                    if (nativeGravityOk) {</span>
+<span class="nc" id="L437">                        s.dispatch(ngx, ngy, ngz, time);</span>
+<span class="nc bnc" id="L438" title="All 2 branches missed.">                    } else if (gravityInitialized) {</span>
+<span class="nc" id="L439">                        s.dispatch(gravityEstimate[0], gravityEstimate[1], gravityEstimate[2], time);</span>
+                    }
+                    break;
+                case TYPE_LINEAR_ACCELERATION:
+<span class="nc bnc" id="L443" title="All 4 branches missed.">                    if (isNativeSensorSupported(TYPE_LINEAR_ACCELERATION) &amp;&amp; read(TYPE_LINEAR_ACCELERATION)) {</span>
+<span class="nc" id="L444">                        s.dispatch(readBuffer[0], readBuffer[1], readBuffer[2], time);</span>
+<span class="nc bnc" id="L445" title="All 4 branches missed.">                    } else if (accelOk &amp;&amp; gravityInitialized) {</span>
+<span class="nc" id="L446">                        s.dispatch(ax - gravityEstimate[0], ay - gravityEstimate[1],</span>
+                                az - gravityEstimate[2], time);
+                    }
+                    break;
+                case TYPE_GYROSCOPE:
+<span class="pc bpc" id="L451" title="1 of 2 branches missed.">                    if (read(TYPE_GYROSCOPE)) {</span>
+<span class="nc" id="L452">                        s.dispatch(readBuffer[0], readBuffer[1], readBuffer[2], time);</span>
+                    }
+                    break;
+                case TYPE_MAGNETOMETER:
+<span class="nc bnc" id="L456" title="All 2 branches missed.">                    if (read(TYPE_MAGNETOMETER)) {</span>
+<span class="nc" id="L457">                        s.dispatch(readBuffer[0], readBuffer[1], readBuffer[2], time);</span>
+                    }
+                    break;
+                case TYPE_ORIENTATION:
+<span class="nc bnc" id="L461" title="All 2 branches missed.">                    if (gravityInitialized) {</span>
+<span class="nc" id="L462">                        float[] o = computeOrientation();</span>
+<span class="nc" id="L463">                        s.dispatch(o[0], o[1], o[2], time);</span>
+<span class="nc" id="L464">                    }</span>
+                    break;
+                default:
+                    break;
+            }
+<span class="fc" id="L469">        }</span>
+<span class="fc" id="L470">    }</span>
+
+    private void updateGravityEstimate(boolean accelOk, float ax, float ay, float az,
+                                       boolean nativeGravityOk, float ngx, float ngy, float ngz) {
+<span class="pc bpc" id="L474" title="1 of 2 branches missed.">        if (nativeGravityOk) {</span>
+<span class="nc" id="L475">            gravityEstimate[0] = ngx;</span>
+<span class="nc" id="L476">            gravityEstimate[1] = ngy;</span>
+<span class="nc" id="L477">            gravityEstimate[2] = ngz;</span>
+<span class="nc" id="L478">            gravityInitialized = true;</span>
+<span class="pc bpc" id="L479" title="1 of 2 branches missed.">        } else if (accelOk) {</span>
+<span class="nc bnc" id="L480" title="All 2 branches missed.">            if (!gravityInitialized) {</span>
+<span class="nc" id="L481">                gravityEstimate[0] = ax;</span>
+<span class="nc" id="L482">                gravityEstimate[1] = ay;</span>
+<span class="nc" id="L483">                gravityEstimate[2] = az;</span>
+<span class="nc" id="L484">                gravityInitialized = true;</span>
+            } else {
+<span class="nc" id="L486">                gravityEstimate[0] = GRAVITY_FILTER_ALPHA * gravityEstimate[0] + (1 - GRAVITY_FILTER_ALPHA) * ax;</span>
+<span class="nc" id="L487">                gravityEstimate[1] = GRAVITY_FILTER_ALPHA * gravityEstimate[1] + (1 - GRAVITY_FILTER_ALPHA) * ay;</span>
+<span class="nc" id="L488">                gravityEstimate[2] = GRAVITY_FILTER_ALPHA * gravityEstimate[2] + (1 - GRAVITY_FILTER_ALPHA) * az;</span>
+            }
+        }
+<span class="fc" id="L491">    }</span>
+
+    // Computes azimuth, pitch and roll (radians). Pitch and roll come directly
+    // from the gravity estimate; the azimuth (compass heading) needs the
+    // magnetometer and follows the rotation matrix derivation used by Android's
+    // SensorManager.getRotationMatrix / getOrientation.
+    private float[] computeOrientation() {
+<span class="nc" id="L498">        double gx = gravityEstimate[0];</span>
+<span class="nc" id="L499">        double gy = gravityEstimate[1];</span>
+<span class="nc" id="L500">        double gz = gravityEstimate[2];</span>
+
+<span class="nc" id="L502">        float azimuth = 0;</span>
+<span class="nc bnc" id="L503" title="All 4 branches missed.">        if (isNativeSensorSupported(TYPE_MAGNETOMETER) &amp;&amp; read(TYPE_MAGNETOMETER)) {</span>
+<span class="nc" id="L504">            double ex = readBuffer[0];</span>
+<span class="nc" id="L505">            double ey = readBuffer[1];</span>
+<span class="nc" id="L506">            double ez = readBuffer[2];</span>
+            // H = E x A : the device &quot;east&quot; axis
+<span class="nc" id="L508">            double hx = ey * gz - ez * gy;</span>
+<span class="nc" id="L509">            double hy = ez * gx - ex * gz;</span>
+<span class="nc" id="L510">            double hz = ex * gy - ey * gx;</span>
+<span class="nc" id="L511">            double normH = Math.sqrt(hx * hx + hy * hy + hz * hz);</span>
+<span class="nc" id="L512">            double normA = Math.sqrt(gx * gx + gy * gy + gz * gz);</span>
+<span class="nc bnc" id="L513" title="All 4 branches missed.">            if (normH &gt;= 0.1 &amp;&amp; normA &gt;= 0.1) {</span>
+<span class="nc" id="L514">                hx /= normH;</span>
+<span class="nc" id="L515">                hy /= normH;</span>
+<span class="nc" id="L516">                hz /= normH;</span>
+<span class="nc" id="L517">                double axn = gx / normA;</span>
+<span class="nc" id="L518">                double azn = gz / normA;</span>
+                // M = A x H : the device &quot;north&quot; axis; we only need its y term
+<span class="nc" id="L520">                double my = azn * hx - axn * hz;</span>
+<span class="nc" id="L521">                azimuth = (float) MathUtil.atan2(hy, my);</span>
+            }
+        }
+
+<span class="nc" id="L525">        double horizontal = Math.sqrt(gx * gx + gz * gz);</span>
+<span class="nc" id="L526">        float roll = (float) MathUtil.atan2(gx, gz);</span>
+<span class="nc" id="L527">        float pitch = (float) MathUtil.atan2(-gy, horizontal);</span>
+<span class="nc" id="L528">        return new float[]{azimuth, pitch, roll};</span>
+    }
+
+    private void dispatchGesture(GestureEvent evt) {
+<span class="nc" id="L532">        Integer key = Integer.valueOf(evt.getType());</span>
+<span class="nc" id="L533">        ArrayList&lt;GestureListener&gt; list = gestureListeners.get(key);</span>
+<span class="nc bnc" id="L534" title="All 4 branches missed.">        if (list == null || list.isEmpty()) {</span>
+<span class="nc" id="L535">            return;</span>
+        }
+<span class="nc" id="L537">        GestureListener[] targets = new GestureListener[list.size()];</span>
+<span class="nc" id="L538">        list.toArray(targets);</span>
+<span class="nc" id="L539">        runOnEventThread(new DispatchGesture(targets, evt));</span>
+<span class="nc" id="L540">    }</span>
+
+    // Delivers a gesture to a snapshot of listeners on the EDT. A named static
+    // class (rather than an anonymous one) since it only needs the captured
+    // values, not the enclosing manager.
+    private static final class DispatchGesture implements Runnable {
+        private final GestureListener[] targets;
+        private final GestureEvent event;
+
+<span class="nc" id="L549">        DispatchGesture(GestureListener[] targets, GestureEvent event) {</span>
+<span class="nc" id="L550">            this.targets = targets;</span>
+<span class="nc" id="L551">            this.event = event;</span>
+<span class="nc" id="L552">        }</span>
+
+        @Override
+        public void run() {
+<span class="nc bnc" id="L556" title="All 2 branches missed.">            for (GestureListener target : targets) {</span>
+<span class="nc" id="L557">                target.gestureDetected(event);</span>
+            }
+<span class="nc" id="L559">        }</span>
+    }
+
+    private boolean read(int type) {
+<span class="fc" id="L563">        return readNativeSensor(type, readBuffer);</span>
+    }
+
+    private boolean[] computeNeeded() {
+<span class="fc" id="L567">        boolean[] needed = new boolean[MAX_TYPE + 1];</span>
+<span class="fc bfc" id="L568" title="All 2 branches covered.">        for (MotionSensor s : sensors.values()) {</span>
+<span class="fc bfc" id="L569" title="All 2 branches covered.">            if (s.hasListeners()) {</span>
+<span class="fc" id="L570">                addSources(needed, s.getType());</span>
+            }
+<span class="fc" id="L572">        }</span>
+<span class="pc bpc" id="L573" title="1 of 2 branches missed.">        if (gestureListenerCount &gt; 0) {</span>
+<span class="nc" id="L574">            need(needed, TYPE_ACCELEROMETER);</span>
+        }
+<span class="fc" id="L576">        return needed;</span>
+    }
+
+    private void addSources(boolean[] needed, int type) {
+<span class="pc bpc" id="L580" title="5 of 7 branches missed.">        switch (type) {</span>
+            case TYPE_ACCELEROMETER:
+<span class="fc" id="L582">                need(needed, TYPE_ACCELEROMETER);</span>
+<span class="fc" id="L583">                break;</span>
+            case TYPE_GYROSCOPE:
+<span class="fc" id="L585">                need(needed, TYPE_GYROSCOPE);</span>
+<span class="fc" id="L586">                break;</span>
+            case TYPE_MAGNETOMETER:
+<span class="nc" id="L588">                need(needed, TYPE_MAGNETOMETER);</span>
+<span class="nc" id="L589">                break;</span>
+            case TYPE_GRAVITY:
+<span class="nc bnc" id="L591" title="All 2 branches missed.">                if (isNativeSensorSupported(TYPE_GRAVITY)) {</span>
+<span class="nc" id="L592">                    need(needed, TYPE_GRAVITY);</span>
+                } else {
+<span class="nc" id="L594">                    need(needed, TYPE_ACCELEROMETER);</span>
+                }
+<span class="nc" id="L596">                break;</span>
+            case TYPE_LINEAR_ACCELERATION:
+<span class="nc bnc" id="L598" title="All 2 branches missed.">                if (isNativeSensorSupported(TYPE_LINEAR_ACCELERATION)) {</span>
+<span class="nc" id="L599">                    need(needed, TYPE_LINEAR_ACCELERATION);</span>
+                } else {
+<span class="nc" id="L601">                    need(needed, TYPE_ACCELEROMETER);</span>
+                }
+<span class="nc" id="L603">                break;</span>
+            case TYPE_ORIENTATION:
+<span class="nc bnc" id="L605" title="All 2 branches missed.">                if (isNativeSensorSupported(TYPE_GRAVITY)) {</span>
+<span class="nc" id="L606">                    need(needed, TYPE_GRAVITY);</span>
+                } else {
+<span class="nc" id="L608">                    need(needed, TYPE_ACCELEROMETER);</span>
+                }
+<span class="nc" id="L610">                need(needed, TYPE_MAGNETOMETER);</span>
+<span class="nc" id="L611">                break;</span>
+            default:
+                break;
+        }
+<span class="fc" id="L615">    }</span>
+
+    private void need(boolean[] needed, int type) {
+<span class="pc bpc" id="L618" title="1 of 2 branches missed.">        if (isNativeSensorSupported(type)) {</span>
+<span class="fc" id="L619">            needed[type] = true;</span>
+        }
+<span class="fc" id="L621">    }</span>
+
+    private void applyNativeDiff(boolean[] needed) {
+<span class="fc bfc" id="L624" title="All 2 branches covered.">        for (int t = 1; t &lt;= MAX_TYPE; t++) {</span>
+<span class="fc bfc" id="L625" title="All 4 branches covered.">            if (needed[t] &amp;&amp; !nativeStarted[t]) {</span>
+<span class="fc" id="L626">                startNativeSensor(t);</span>
+<span class="fc" id="L627">                nativeStarted[t] = true;</span>
+<span class="fc bfc" id="L628" title="All 4 branches covered.">            } else if (!needed[t] &amp;&amp; nativeStarted[t]) {</span>
+<span class="fc" id="L629">                stopNativeSensor(t);</span>
+<span class="fc" id="L630">                nativeStarted[t] = false;</span>
+            }
+        }
+<span class="fc" id="L633">    }</span>
+
+    private boolean anyNeeded(boolean[] needed) {
+<span class="fc bfc" id="L636" title="All 2 branches covered.">        for (int t = 1; t &lt;= MAX_TYPE; t++) {</span>
+<span class="fc bfc" id="L637" title="All 2 branches covered.">            if (needed[t]) {</span>
+<span class="fc" id="L638">                return true;</span>
+            }
+        }
+<span class="fc" id="L641">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

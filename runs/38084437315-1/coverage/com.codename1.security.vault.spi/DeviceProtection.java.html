@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DeviceProtection.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security.vault.spi</a> &gt; <span class="el_source">DeviceProtection.java</span></div><h1>DeviceProtection.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security.vault.spi;
+
+import com.codename1.security.vault.ProtectionReport;
+import com.codename1.util.AsyncResource;
+
+/// How one device holds the key that lets a vault be reopened without asking for the password
+/// again -- the port's half of &quot;remember this device&quot;.
+///
+/// #### Why wrap rather than fetch
+///
+/// The obvious shape for this is &quot;give me the device key&quot; followed by encryption in shared code.
+/// It is the wrong shape, and the browser is why. A browser can hold an AES key as a `CryptoKey`
+/// created with `extractable: false`, stored in IndexedDB: the page can ask it to encrypt and
+/// decrypt, and `crypto.subtle.exportKey` on it rejects. There is no sequence of calls that turns
+/// it back into bytes. An SPI that returned bytes could not express that, so the port would have
+/// to fall back to a key the page can read -- which is the plaintext-in-local-storage situation
+/// this package exists to end.
+///
+/// So the operations are [#wrap] and [#unwrap], and a port implements them however it can. The
+/// portable implementation keeps a random key in
+/// [com.codename1.security.SecureStorage] and performs AES-GCM in shared code, which is correct
+/// on every port whose secure storage is the OS key store. The browser overrides it.
+///
+/// #### What a port must get right
+///
+/// - **[#ensureKey] must converge.** Two browser tabs, or two Android processes, can reach it at
+///   once with nothing stored. Both must end up using the same key, which means a create-if-absent
+///   that is atomic in the store rather than a read followed by a write.
+/// - **It must never replace a key it merely failed to read.** [#keyState] exists so a caller can
+///   tell absence from unreadability; a port that answers `ENTRY_ABSENT` when it is not sure has
+///   destroyed every record that key protected.
+/// - **[#protection] must describe what happened, not what is available.** An API being present
+///   is not evidence the write survived.
+public abstract class DeviceProtection {
+
+    /// The key is stored on this device.
+    public static final int KEY_PRESENT = 1;
+
+    /// The store answered, and there is no key. The only state in which creating one is safe.
+    public static final int KEY_ABSENT = 0;
+
+    /// The store could not be asked. Not the same as absent, and callers must not write.
+    public static final int KEY_UNKNOWN = -1;
+
+    /// Subclasses are constructed by the port.
+<span class="fc" id="L68">    protected DeviceProtection() {</span>
+<span class="fc" id="L69">    }</span>
+
+    /// What this device protection actually provides, as observed rather than as advertised.
+    ///
+    /// A port that has not yet tried an operation may only report what it can verify; several
+    /// answers are legitimately [ProtectionReport#UNKNOWN] -- no browser can say whether a key
+    /// is hardware backed, and reporting `NO` there would understate an authenticator that uses a
+    /// secure element.
+    public abstract ProtectionReport protection();
+
+    /// Whether a device key exists for this id.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyId`: the vault's device key id
+    ///
+    /// #### Returns
+    ///
+    /// [#KEY_PRESENT], [#KEY_ABSENT] or [#KEY_UNKNOWN]
+    public abstract int keyState(String keyId);
+
+    /// Creates the device key if there is none, and converges when two callers race.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyId`: the vault's device key id
+    ///
+    /// #### Returns
+    ///
+    /// a resource completing with `true` when a key is in place -- whether this call created it
+    /// or found another one already there -- and erroring with a
+    /// [com.codename1.security.vault.VaultException] when no key could be established
+    public abstract AsyncResource&lt;Boolean&gt; ensureKey(String keyId);
+
+    /// Encrypts under the device key.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyId`: the vault's device key id
+    ///
+    /// - `plaintext`: what to protect, normally a vault's 32 byte data key
+    ///
+    /// - `aad`: associated data the result is bound to; the same bytes must be supplied to
+    ///   [#unwrap]
+    ///
+    /// #### Returns
+    ///
+    /// a resource completing with the wrapped bytes. The format is the port's own and is never
+    /// interpreted by shared code, but it must be authenticated
+    public abstract AsyncResource&lt;byte[]&gt; wrap(String keyId, byte[] plaintext, byte[] aad);
+
+    /// Decrypts what [#wrap] produced.
+    ///
+    /// A failure to authenticate must arrive as
+    /// [com.codename1.security.vault.VaultError#AUTHENTICATION_FAILED], a missing key as
+    /// [com.codename1.security.vault.VaultError#KEY_MISSING], and a store that could not be read
+    /// as [com.codename1.security.vault.VaultError#TEMPORARILY_UNREADABLE]. Collapsing the last
+    /// two is how a vault regenerates a key and orphans its data.
+    public abstract AsyncResource&lt;byte[]&gt; unwrap(String keyId, byte[] wrapped, byte[] aad);
+
+    /// Removes the device key, which is what &quot;forget this device&quot; does.
+    ///
+    /// Everything wrapped under it becomes unopenable on this device. That is the intent; it is
+    /// not revocation, because a copy taken while the key existed is beyond reach.
+    public abstract AsyncResource&lt;Boolean&gt; deleteKey(String keyId);
+
+    /// Whether reaching the key requires the user to verify themselves -- a biometric, a
+    /// passcode, a passkey with user verification.
+    ///
+    /// Defaults to false. A port that gates its device key on user verification overrides this
+    /// and reports [com.codename1.security.vault.Protection#USER_VERIFICATION] in
+    /// [#protection()] to match.
+    public boolean requiresUserVerification() {
+<span class="nc" id="L142">        return false;</span>
+    }
+
+    /// Requires that a key created by this protection cannot leave the device.
+    ///
+    /// Set from [com.codename1.security.vault.VaultOptions#requireDeviceBoundPasskey()] before
+    /// the key is created. The default ignores it, which is correct for a store whose key is
+    /// local by construction -- an OS key store does not sync. It matters where the key is a
+    /// passkey, because most passkeys do.
+    ///
+    /// A port that accepts this must **refuse** creation when it cannot verify the guarantee,
+    /// rather than creating a key that may sync. An unverifiable answer is not a pass.
+    ///
+    /// #### Parameters
+    ///
+    /// - `required`: whether the key must be device bound
+    public void setDeviceBoundRequired(boolean required) {
+<span class="fc" id="L159">    }</span>
+
+    /// The variant of this protection whose key cannot be reached without the user verifying
+    /// themselves, or null when this platform has none.
+    ///
+    /// A port can have two genuinely different mechanisms rather than one with a flag. The
+    /// browser does: the unattended key is a non-extractable `CryptoKey` in IndexedDB, and the
+    /// gated one is a passkey whose authenticator derives key material through the WebAuthn PRF
+    /// extension -- different storage, different failure modes, and material that does not exist
+    /// at all until the user verifies. A native port whose single key store can be created with a
+    /// user-authentication requirement returns `this` and reports
+    /// [com.codename1.security.vault.Protection#USER_VERIFICATION].
+    ///
+    /// Returning null is the honest answer where there is no such mechanism, and
+    /// [com.codename1.security.vault.UnlockPolicy#REQUIRE_USER_VERIFICATION] is then refused with
+    /// [com.codename1.security.vault.VaultError#POLICY_NOT_MET] rather than quietly enrolled
+    /// under the weaker one.
+    ///
+    /// #### Returns
+    ///
+    /// a protection whose [#requiresUserVerification()] is true, or null
+    public DeviceProtection userVerifying() {
+<span class="nc bnc" id="L181" title="All 2 branches missed.">        return requiresUserVerification() ? this : null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

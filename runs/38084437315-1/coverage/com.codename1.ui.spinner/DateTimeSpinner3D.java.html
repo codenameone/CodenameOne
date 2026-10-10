@@ -1,0 +1,412 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DateTimeSpinner3D.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.spinner</a> &gt; <span class="el_source">DateTimeSpinner3D.java</span></div><h1>DateTimeSpinner3D.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.spinner;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Label;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.plaf.Style;
+
+import java.util.Calendar;
+import java.util.Date;
+
+import static com.codename1.ui.CN.convertToPixels;
+
+/// The date and time spinner extends the time spinner by allowing to pick a specific day as well
+///
+/// Used by Picker in lightweight mode.
+class DateTimeSpinner3D extends Container implements InternalPickerWidget {
+<span class="fc" id="L43">    private final Date today = new Date();</span>
+    private final int off;
+<span class="fc" id="L45">    private final Container wrapper = new Container(BoxLayout.x());</span>
+    private Spinner3D date;
+    private TimeSpinner3D time;
+<span class="fc" id="L48">    private Date currentDate = today;</span>
+<span class="fc" id="L49">    private Date startDate = new Date(0);</span>
+<span class="fc" id="L50">    private Date endDate = new Date(System.currentTimeMillis() + 10000L * 24L * 60L * 60000L);</span>
+<span class="fc" id="L51">    private boolean markToday = true;</span>
+    private boolean includeYear;
+
+    /// Default constructor
+<span class="fc" id="L55">    public DateTimeSpinner3D(int minuteStep) {</span>
+<span class="fc" id="L56">        off = 0;</span>
+<span class="fc" id="L57">        initSpinner(minuteStep);</span>
+<span class="fc" id="L58">    }</span>
+
+    public DateTimeSpinner3D() {
+<span class="fc" id="L61">        this(TimeSpinner3D.DEFAULT_MINUTE_STEP);</span>
+<span class="fc" id="L62">    }</span>
+
+    void initSpinner(int minuteStep) {
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        if (date == null) {</span>
+<span class="fc" id="L66">            date = Spinner3D.createDate(startDate.getTime() + off, endDate.getTime() + off, currentDate.getTime());</span>
+<span class="fc" id="L67">            date.setPreferredW((int) (new Label(&quot;Thu Dec 27&quot;, &quot;Spinner3DRow&quot;).getPreferredW() * 1.5f));</span>
+<span class="fc" id="L68">            Style dateStyle = Style.createProxyStyle(date.getRowStyle(), date.getSelectedRowStyle());</span>
+<span class="fc" id="L69">            dateStyle.setAlignment(Component.RIGHT);</span>
+<span class="fc" id="L70">            dateStyle.setPaddingRight(3f);</span>
+
+<span class="fc" id="L72">            this.setCurrentDate(currentDate);</span>
+<span class="fc" id="L73">            this.setStartDate(startDate);</span>
+<span class="fc" id="L74">            this.setEndDate(endDate);</span>
+
+<span class="fc" id="L76">            time = new TimeSpinner3D(minuteStep);</span>
+<span class="fc" id="L77">            addComponents();</span>
+        }
+<span class="fc" id="L79">    }</span>
+
+    public int getMinuteStep() {
+<span class="nc" id="L82">        return time.getMinuteStep();</span>
+    }
+
+    public void setMinuteStep(int minuteStep) {
+<span class="nc" id="L86">        time.setMinuteStep(minuteStep);</span>
+<span class="nc" id="L87">    }</span>
+
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="fc" id="L91">        Dimension size = super.calcPreferredSize();</span>
+<span class="fc" id="L92">        Label l = new Label(&quot;Thu Dec 27    55  55  AM&quot;, &quot;Spinner3DRow&quot;);</span>
+<span class="fc" id="L93">        size.setWidth((int) (l.getPreferredW() * 1.5f + convertToPixels(10f)));</span>
+<span class="fc" id="L94">        return size;</span>
+    }
+
+
+    void addComponents() {
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (date != null) {</span>
+            //setLayout(new LayeredLayout());
+<span class="fc" id="L101">            setLayout(new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE));</span>
+<span class="fc" id="L102">            add(BorderLayout.CENTER, wrapper);</span>
+<span class="fc" id="L103">            wrapper.addComponent(date);</span>
+<span class="fc" id="L104">            wrapper.addComponent(time);</span>
+            //LayeredLayout ll = (LayeredLayout)getLayout();
+            //ll.setInsets(date, &quot;0 auto 0 0&quot;)
+            //        .setInsets(time, &quot;0 auto 0 0&quot;)
+            //        .setReferenceComponentLeft(time, date, 1f);
+
+        }
+<span class="fc" id="L111">    }</span>
+
+    /// #### Returns
+    ///
+    /// the currentDate
+    public Date getCurrentDate() {
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        if (date != null) {</span>
+<span class="nc" id="L118">            Date dt = (Date) date.getValue();</span>
+<span class="nc" id="L119">            Calendar cld = Calendar.getInstance();</span>
+<span class="nc" id="L120">            cld.setTime(dt);</span>
+<span class="nc" id="L121">            cld.set(Calendar.HOUR_OF_DAY, 0);</span>
+<span class="nc" id="L122">            cld.set(Calendar.MINUTE, 0);</span>
+<span class="nc" id="L123">            cld.set(Calendar.SECOND, 0);</span>
+<span class="nc" id="L124">            cld.set(Calendar.MILLISECOND, 0);</span>
+
+<span class="nc" id="L126">            Integer minutesInDay = (Integer) time.getValue();</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">            if (minutesInDay == null) {</span>
+<span class="nc" id="L128">                minutesInDay = 0;</span>
+            }
+<span class="nc" id="L130">            cld.setTime(new Date(cld.getTime().getTime() + minutesInDay * 60L * 1000L));</span>
+<span class="nc" id="L131">            return cld.getTime();</span>
+        }
+<span class="nc" id="L133">        return currentDate;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `currentDate`: the currentDate to set
+    public void setCurrentDate(Date currentDate) {
+<span class="fc" id="L140">        this.currentDate = currentDate;</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (date != null) {</span>
+
+<span class="fc" id="L143">            date.setValue(currentDate);</span>
+        }
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        if (time != null) {</span>
+<span class="fc" id="L146">            Calendar cld = Calendar.getInstance();</span>
+<span class="fc" id="L147">            cld.setTime(currentDate);</span>
+
+<span class="fc" id="L149">            Calendar zero = Calendar.getInstance();</span>
+<span class="fc" id="L150">            zero.setTime(currentDate);</span>
+<span class="fc" id="L151">            zero.set(Calendar.HOUR_OF_DAY, 0);</span>
+<span class="fc" id="L152">            zero.set(Calendar.MINUTE, 0);</span>
+<span class="fc" id="L153">            zero.set(Calendar.SECOND, 0);</span>
+<span class="fc" id="L154">            zero.set(Calendar.MILLISECOND, 0);</span>
+
+<span class="fc" id="L156">            int minutesInDay = (int) ((cld.getTime().getTime() - zero.getTime().getTime()) / 60L / 1000L);</span>
+<span class="fc" id="L157">            time.setValue(minutesInDay);</span>
+        }
+<span class="fc" id="L159">    }</span>
+
+
+    /// #### Returns
+    ///
+    /// the startDate
+    public Date getStartDate() {
+<span class="nc" id="L166">        return startDate;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `startDate`: the startDate to set
+    public void setStartDate(Date startDate) {
+<span class="fc" id="L173">        this.startDate = startDate;</span>
+<span class="fc" id="L174">        rebuildDate();</span>
+<span class="fc" id="L175">    }</span>
+
+    private void rebuildDate() {
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        if (date != null) {</span>
+<span class="fc" id="L179">            long currTime = Math.max(startDate.getTime() + off, Math.min(endDate.getTime() + off, currentDate.getTime() + off));</span>
+<span class="fc" id="L180">            date.setModel(new SpinnerDateModel(startDate.getTime() + off, endDate.getTime() + off, currTime));</span>
+        }
+<span class="fc" id="L182">    }</span>
+
+    /// #### Returns
+    ///
+    /// the endDate
+    public Date getEndDate() {
+<span class="nc" id="L188">        return endDate;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `endDate`: the endDate to set
+    public void setEndDate(Date endDate) {
+<span class="fc" id="L195">        this.endDate = endDate;</span>
+<span class="fc" id="L196">        rebuildDate();</span>
+<span class="fc" id="L197">    }</span>
+
+    /// #### Returns
+    ///
+    /// the markToday
+    public boolean isMarkToday() {
+<span class="nc" id="L203">        return markToday;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `markToday`: the markToday to set
+    public void setMarkToday(boolean markToday) {
+<span class="nc" id="L210">        this.markToday = markToday;</span>
+<span class="nc" id="L211">    }</span>
+
+    /// #### Returns
+    ///
+    /// the includeYear
+    public boolean isIncludeYear() {
+<span class="nc" id="L217">        return includeYear;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `includeYear`: the includeYear to set
+    public void setIncludeYear(boolean includeYear) {
+<span class="nc" id="L224">        this.includeYear = includeYear;</span>
+<span class="nc" id="L225">    }</span>
+
+    /// Checks if time is shown in 12 hour format with AM/PM selector.
+    ///
+    /// #### Returns
+    ///
+    /// True if time is in 12 hour format.  False otherwise.
+    ///
+    /// #### See also
+    ///
+    /// - #setShowMeridiem(boolean)
+    public boolean isShowMeridiem() {
+<span class="nc bnc" id="L237" title="All 2 branches missed.">        if (time == null) {</span>
+<span class="nc" id="L238">            return false;</span>
+        }
+<span class="nc" id="L240">        return time.isShowMeridiem();</span>
+    }
+
+    /// Sets whether the time spinner should show times 12 hour format with an AM/PM selector.
+    ///
+    /// #### Parameters
+    ///
+    /// - `showMeridiem`: True to show times in 12 hour format (the default).  False to show in 24 hour format.
+    ///
+    /// #### See also
+    ///
+    /// - #isShowMeridiem()
+    public void setShowMeridiem(boolean showMeridiem) {
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">        if (time == null) {</span>
+<span class="nc" id="L254">            return;</span>
+        }
+<span class="fc" id="L256">        time.setShowMeridiem(showMeridiem);</span>
+<span class="fc" id="L257">    }</span>
+
+    /// Sets the hour range to show for the time selector.  Setting the range will automatically switch
+    /// the time to 24 hour format.
+    ///
+    /// #### Parameters
+    ///
+    /// - `min`: The minimum hour to display (0-24).  -1 for no limit.
+    ///
+    /// - `max`: The max hour to display (0-24).  -1 for no limit.
+    ///
+    /// #### See also
+    ///
+    /// - #getMinHour()
+    ///
+    /// - #getMaxHour()
+    public void setHourRange(int min, int max) {
+<span class="nc bnc" id="L274" title="All 2 branches missed.">        if (time == null) {</span>
+<span class="nc" id="L275">            return;</span>
+        }
+<span class="nc bnc" id="L277" title="All 6 branches missed.">        if (min &gt;= 0 &amp;&amp; max &gt; min &amp;&amp; isShowMeridiem()) {</span>
+<span class="nc" id="L278">            time.setShowMeridiem(false);</span>
+        }
+<span class="nc" id="L280">        time.setHourRange(min, max);</span>
+
+<span class="nc" id="L282">    }</span>
+
+    /// Gets the minimum hour to display.  Default -1 (for no limit).
+    ///
+    /// #### Returns
+    ///
+    /// Min hour (0-24) or -1 for no limit.
+    ///
+    /// #### See also
+    ///
+    /// - #getMaxHour()
+    ///
+    /// - #setHourRange(int, int)
+    public int getMinHour() {
+<span class="nc bnc" id="L296" title="All 2 branches missed.">        if (time == null) {</span>
+<span class="nc" id="L297">            return -1;</span>
+        }
+<span class="nc" id="L299">        return time.getMinHour();</span>
+    }
+
+    /// Gets the maximum hour to display.  Default -1 (for no limit).
+    ///
+    /// #### Returns
+    ///
+    /// Max hour (0-24) or -1 for no limit.
+    ///
+    /// #### See also
+    ///
+    /// - #getMinHour()
+    ///
+    /// - #setHourRange(int, int)
+    public int getMaxHour() {
+<span class="nc bnc" id="L314" title="All 2 branches missed.">        if (time == null) {</span>
+<span class="nc" id="L315">            return -1;</span>
+        }
+<span class="nc" id="L317">        return time.getMaxHour();</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String[] getPropertyNames() {
+<span class="nc" id="L323">        return new String[]{&quot;currentHour&quot;, &quot;currentMinute&quot;, &quot;minuteStep&quot;, &quot;currentMeridiem&quot;, &quot;showMeridiem&quot;,</span>
+                &quot;currentDate&quot;, &quot;startDate&quot;, &quot;endDate&quot;, &quot;markToday&quot;, &quot;includeYear&quot;};
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Class[] getPropertyTypes() {
+<span class="nc" id="L330">        return new Class[]{Integer.class, Integer.class, Integer.class, Boolean.class, Boolean.class,</span>
+                Date.class, Date.class, Date.class, Boolean.class, Boolean.class};
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Object getPropertyValue(String name) {
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">        if (&quot;currentDate&quot;.equals(name)) {</span>
+<span class="fc" id="L338">            return currentDate;</span>
+        }
+<span class="nc bnc" id="L340" title="All 2 branches missed.">        if (&quot;startDate&quot;.equals(name)) {</span>
+<span class="nc" id="L341">            return startDate;</span>
+        }
+<span class="nc bnc" id="L343" title="All 2 branches missed.">        if (&quot;endDate&quot;.equals(name)) {</span>
+<span class="nc" id="L344">            return endDate;</span>
+        }
+<span class="nc bnc" id="L346" title="All 2 branches missed.">        if (&quot;markToday&quot;.equals(name)) {</span>
+<span class="nc" id="L347">            return Boolean.valueOf(markToday);</span>
+        }
+<span class="nc bnc" id="L349" title="All 2 branches missed.">        if (&quot;includeYear&quot;.equals(name)) {</span>
+<span class="nc" id="L350">            return Boolean.valueOf(includeYear);</span>
+        }
+<span class="nc" id="L352">        return super.getPropertyValue(name);</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String setPropertyValue(String name, Object value) {
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">        if (&quot;currentDate&quot;.equals(name)) {</span>
+<span class="fc" id="L359">            setCurrentDate((Date) value);</span>
+<span class="fc" id="L360">            return null;</span>
+        }
+<span class="nc bnc" id="L362" title="All 2 branches missed.">        if (&quot;startDate&quot;.equals(name)) {</span>
+<span class="nc" id="L363">            setStartDate((Date) value);</span>
+<span class="nc" id="L364">            return null;</span>
+        }
+<span class="nc bnc" id="L366" title="All 2 branches missed.">        if (&quot;endDate&quot;.equals(name)) {</span>
+<span class="nc" id="L367">            setEndDate((Date) value);</span>
+<span class="nc" id="L368">            return null;</span>
+        }
+<span class="nc bnc" id="L370" title="All 2 branches missed.">        if (&quot;markToday&quot;.equals(name)) {</span>
+<span class="nc" id="L371">            setMarkToday(((Boolean) value).booleanValue());</span>
+<span class="nc" id="L372">            return null;</span>
+        }
+<span class="nc bnc" id="L374" title="All 2 branches missed.">        if (&quot;includeYear&quot;.equals(name)) {</span>
+<span class="nc" id="L375">            setIncludeYear(((Boolean) value).booleanValue());</span>
+<span class="nc" id="L376">            return null;</span>
+        }
+
+<span class="nc" id="L379">        return super.setPropertyValue(name, value);</span>
+    }
+
+    @Override
+    public Object getValue() {
+<span class="nc" id="L384">        return getCurrentDate();</span>
+    }
+
+    @Override
+    public void setValue(Object value) {
+<span class="pc bpc" id="L389" title="1 of 2 branches missed.">        if (value == null) {</span>
+            // A null value (e.g. Picker.setDate(null) while the popup is on
+            // screen) has no meaningful representation on the wheels; leave the
+            // current selection untouched instead of NPE'ing. Mirrors
+            // TimeSpinner3D's null tolerance. #5069
+<span class="nc" id="L394">            return;</span>
+        }
+<span class="fc" id="L396">        setCurrentDate((Date) value);</span>
+<span class="fc" id="L397">    }</span>
+
+    @Override
+    public void paint(Graphics g) {
+
+<span class="nc" id="L402">        int alpha = g.getAlpha();</span>
+<span class="nc" id="L403">        g.setColor(date.getSelectedOverlayStyle().getBgColor());</span>
+<span class="nc" id="L404">        g.setAlpha(255);</span>
+<span class="nc" id="L405">        g.fillRect(getX(), getY(), getWidth(), getHeight());</span>
+<span class="nc" id="L406">        g.setAlpha(alpha);</span>
+<span class="nc" id="L407">        super.paint(g); //To change body of generated methods, choose Tools | Templates.</span>
+<span class="nc" id="L408">    }</span>
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

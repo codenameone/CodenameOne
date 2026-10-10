@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WiFiDirectPeer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.wifi</a> &gt; <span class="el_source">WiFiDirectPeer.java</span></div><h1>WiFiDirectPeer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ */
+package com.codename1.io.wifi;
+
+/// One peer discovered by `WiFiDirect.startDiscovery(...)`. Immutable.
+public final class WiFiDirectPeer {
+    /// Discovery state: peer has not been contacted.
+    public static final int STATE_AVAILABLE = 0;
+    /// Discovery state: pairing in progress.
+    public static final int STATE_INVITED = 1;
+    /// Discovery state: pairing established.
+    public static final int STATE_CONNECTED = 2;
+    /// Discovery state: peer transitioned out of range or refused pairing.
+    public static final int STATE_FAILED = 3;
+    /// Discovery state: peer no longer responding to discovery probes.
+    public static final int STATE_UNAVAILABLE = 4;
+
+    private final String deviceName;
+    private final String deviceAddress;
+    private final int state;
+
+<span class="nc" id="L29">    public WiFiDirectPeer(String deviceName, String deviceAddress, int state) {</span>
+<span class="nc" id="L30">        this.deviceName = deviceName;</span>
+<span class="nc" id="L31">        this.deviceAddress = deviceAddress;</span>
+<span class="nc" id="L32">        this.state = state;</span>
+<span class="nc" id="L33">    }</span>
+
+    /// User-visible device name (e.g. &quot;Pixel 9&quot;).
+    public String getDeviceName() {
+<span class="nc" id="L37">        return deviceName;</span>
+    }
+
+    /// Stable peer identifier (MAC address on Android).
+    public String getDeviceAddress() {
+<span class="nc" id="L42">        return deviceAddress;</span>
+    }
+
+    /// One of the `STATE_*` constants.
+    public int getState() {
+<span class="nc" id="L47">        return state;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

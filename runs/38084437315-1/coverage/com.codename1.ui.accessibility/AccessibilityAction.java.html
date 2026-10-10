@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AccessibilityAction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.accessibility</a> &gt; <span class="el_source">AccessibilityAction.java</span></div><h1>AccessibilityAction.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.accessibility;
+
+import com.codename1.ui.Component;
+
+/// An action that assistive technology can invoke on a semantic node.
+public final class AccessibilityAction {
+    public static final String ACTIVATE = &quot;activate&quot;;
+    public static final String LONG_PRESS = &quot;longPress&quot;;
+    public static final String INCREMENT = &quot;increment&quot;;
+    public static final String DECREMENT = &quot;decrement&quot;;
+    public static final String SET_VALUE = &quot;setValue&quot;;
+    public static final String SET_TEXT = &quot;setText&quot;;
+    public static final String FOCUS = &quot;focus&quot;;
+    public static final String DISMISS = &quot;dismiss&quot;;
+    public static final String EXPAND = &quot;expand&quot;;
+    public static final String COLLAPSE = &quot;collapse&quot;;
+    public static final String SCROLL_FORWARD = &quot;scrollForward&quot;;
+    public static final String SCROLL_BACKWARD = &quot;scrollBackward&quot;;
+    public static final String COPY = &quot;copy&quot;;
+    public static final String CUT = &quot;cut&quot;;
+    public static final String PASTE = &quot;paste&quot;;
+    public static final String SHOW_ON_SCREEN = &quot;showOnScreen&quot;;
+    public static final String SET_SELECTION = &quot;setSelection&quot;;
+    public static final String MOVE_CURSOR_FORWARD_BY_CHARACTER = &quot;moveCursorForwardByCharacter&quot;;
+    public static final String MOVE_CURSOR_BACKWARD_BY_CHARACTER = &quot;moveCursorBackwardByCharacter&quot;;
+    public static final String MOVE_CURSOR_FORWARD_BY_WORD = &quot;moveCursorForwardByWord&quot;;
+    public static final String MOVE_CURSOR_BACKWARD_BY_WORD = &quot;moveCursorBackwardByWord&quot;;
+
+    /// Handles an accessibility action on the Codename One EDT.
+    public interface Handler {
+        boolean perform(Component component, Object argument);
+    }
+
+    private final String id;
+    private final String label;
+    private final Handler handler;
+    private final boolean enabled;
+
+    public AccessibilityAction(String id, String label, Handler handler) {
+<span class="fc" id="L62">        this(id, label, handler, true);</span>
+<span class="fc" id="L63">    }</span>
+
+<span class="fc" id="L65">    public AccessibilityAction(String id, String label, Handler handler, boolean enabled) {</span>
+<span class="pc bpc" id="L66" title="2 of 4 branches missed.">        if (id == null || id.length() == 0) {</span>
+<span class="nc" id="L67">            throw new IllegalArgumentException(&quot;Accessibility action id must not be empty&quot;);</span>
+        }
+<span class="fc" id="L69">        this.id = id;</span>
+<span class="fc" id="L70">        this.label = label;</span>
+<span class="fc" id="L71">        this.handler = handler;</span>
+<span class="fc" id="L72">        this.enabled = enabled;</span>
+<span class="fc" id="L73">    }</span>
+
+    public String getId() {
+<span class="fc" id="L76">        return id;</span>
+    }
+    public String getLabel() {
+<span class="fc" id="L79">        return label;</span>
+    }
+    public boolean isEnabled() {
+<span class="fc" id="L82">        return enabled;</span>
+    }
+
+    public boolean perform(Component component, Object argument) {
+<span class="pc bpc" id="L86" title="3 of 6 branches missed.">        return enabled &amp;&amp; handler != null &amp;&amp; handler.perform(component, argument);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

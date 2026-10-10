@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HomeError.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.home</a> &gt; <span class="el_source">HomeError.java</span></div><h1>HomeError.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.home;
+
+/// Typed failure reasons carried by [HomeException]. Ports map their platform
+/// error codes onto these so cross-platform code can branch on a stable value
+/// instead of parsing messages.
+///
+/// #### Crossing the boundary by name, not by ordinal
+///
+/// The native bridges send the [#name()] of one of these, not its ordinal, and
+/// [#forName(String)] resolves it. Ordinals are a wire format that breaks
+/// silently: a port built against a build where a constant was inserted in the
+/// middle would map every error past the insertion point to the wrong one, and
+/// a mis-mapped `UNAUTHORIZED` looks exactly like a mis-mapped `TIMEOUT` to
+/// everyone downstream. Names cost a few bytes per failure -- and a failure is
+/// not the hot path.
+<span class="fc" id="L38">public enum HomeError {</span>
+
+    /// The port, device or OS version has no smart-home support at all, or
+    /// the requested capability is unavailable on this platform. Returned by
+    /// every operation on the fallback [SmartHome] base class.
+<span class="fc" id="L43">    NOT_SUPPORTED,</span>
+
+    /// The accessory does not expose this trait, or the backend cannot
+    /// express it. Distinct from [#ACCESSORY_NOT_FOUND]: the accessory is
+    /// there and this particular capability is not.
+    ///
+    /// Some traits can never succeed on a given backend rather than merely
+    /// being absent from one accessory -- [Trait#OUTLET_IN_USE] and
+    /// [Trait#TARGET_HUMIDITY] have no Matter equivalent at all. The javadoc
+    /// on each such constant says so.
+<span class="fc" id="L53">    TRAIT_NOT_SUPPORTED,</span>
+
+    /// No accessory with the supplied id is in the graph. Usually means the
+    /// snapshot the caller is holding is stale; call [SmartHome#refresh()] and
+    /// wait for it before reading [SmartHome#getStructures()] again.
+<span class="fc" id="L58">    ACCESSORY_NOT_FOUND,</span>
+
+    /// The accessory is in the graph but the platform could not talk to it --
+    /// unplugged, out of Thread range, or its bridge is offline. Retryable.
+<span class="fc" id="L62">    ACCESSORY_UNREACHABLE,</span>
+
+    /// The operation was refused for lack of authorization.
+<span class="fc" id="L65">    UNAUTHORIZED,</span>
+
+    /// The user has not yet been asked. Recoverable by calling
+    /// [SmartHome#requestAuthorization()].
+<span class="fc" id="L69">    AUTHORIZATION_REQUIRED,</span>
+
+    /// No signed-in account. Google Home only: the Home APIs need an account
+    /// and a per-structure grant before any accessory is visible.
+<span class="fc" id="L73">    SIGN_IN_REQUIRED,</span>
+
+    /// Smart-home access is blocked by parental controls or device
+    /// management. Not recoverable from inside the app.
+<span class="fc" id="L77">    RESTRICTED,</span>
+
+    /// The user dismissed a platform authorization, setup or commissioning
+    /// flow.
+<span class="fc" id="L81">    USER_CANCELED,</span>
+
+    /// A request was rejected before reaching the platform because it was
+    /// malformed -- an empty write batch, a trait written with the wrong
+    /// [TraitValueKind], a negative timeout.
+<span class="fc" id="L86">    INVALID_ARGUMENT,</span>
+
+    /// A write fell outside the range the accessory declares in its
+    /// [TraitConstraint].
+    ///
+    /// Deliberately an error rather than a clamp. An app that asked for 40
+    /// degrees and silently got 38 never learns it was wrong, and the bug
+    /// surfaces as a user complaint about a thermostat rather than as a
+    /// failure at the call site.
+<span class="fc" id="L95">    VALUE_OUT_OF_RANGE,</span>
+
+    /// A [TraitUnit] was supplied that measures a different dimension than
+    /// the trait requires.
+<span class="fc" id="L99">    UNIT_MISMATCH,</span>
+
+    /// The trait can be read but not written.
+<span class="fc" id="L102">    READ_ONLY_TRAIT,</span>
+
+    /// The trait can be written but not read. Rare; some Matter attributes
+    /// are write-only commands in disguise.
+<span class="fc" id="L106">    WRITE_ONLY_TRAIT,</span>
+
+    /// A door lock refused the operation because it requires a PIN and none
+    /// was supplied. Set one with
+    /// [TraitWrite#setAuthorizationData(java.lang.String)].
+    ///
+    /// Matter locks with `RequirePINforRemoteOperation` set behave this way.
+    /// HomeKit never takes a PIN.
+<span class="fc" id="L114">    PIN_REQUIRED,</span>
+
+    /// A door lock rejected the supplied PIN.
+<span class="fc" id="L117">    PIN_REJECTED,</span>
+
+    /// The platform's smart-home provider is not installed -- Google Play
+    /// services on Android. Recoverable via [SmartHome#openProviderSetup()].
+<span class="fc" id="L121">    PROVIDER_UNAVAILABLE,</span>
+
+    /// The installed provider is too old. Also recoverable via
+    /// [SmartHome#openProviderSetup()].
+<span class="fc" id="L125">    PROVIDER_UPDATE_REQUIRED,</span>
+
+    /// The app is missing build configuration the backend needs -- an
+    /// entitlement, a project id, an OAuth client. Always accompanied by
+    /// [HomeConfigurationException] and by text from
+    /// [SmartHome#getConfigurationProblems()] naming what is missing.
+<span class="fc" id="L131">    NOT_CONFIGURED,</span>
+
+    /// Commissioning ran and did not add the accessory. The message carries
+    /// the platform's own text.
+<span class="fc" id="L135">    COMMISSIONING_FAILED,</span>
+
+    /// This platform cannot commission at all -- watchOS, tvOS, macOS, or an
+    /// Android device with no Play services.
+<span class="fc" id="L139">    COMMISSIONING_UNAVAILABLE,</span>
+
+    /// The ecosystem app a flow needs -- Apple Home, Google Home -- is not
+    /// installed, so there was nothing to hand off to.
+<span class="fc" id="L143">    ECOSYSTEM_APP_MISSING,</span>
+
+    /// The platform rate-limited the request.
+<span class="fc" id="L146">    RATE_LIMITED,</span>
+
+    /// The platform refused because an operation of this kind is already in
+    /// flight. Retryable once it settles.
+<span class="fc" id="L150">    BUSY,</span>
+
+    /// The operation did not complete within its safety timeout.
+<span class="fc" id="L153">    TIMEOUT,</span>
+
+    /// A payload could not be decoded -- a malformed Matter setup payload, a
+    /// platform value the port could not map onto a [TraitValue]. Never
+    /// surfaces as an unchecked exception from a parser.
+<span class="fc" id="L158">    INVALID_DATA,</span>
+
+    /// Anything the port could not classify. The message carries the
+    /// platform's own text.
+<span class="fc" id="L162">    UNKNOWN;</span>
+
+    /// Resolves a constant by name, total: an unrecognized or `null` name
+    /// answers [#UNKNOWN] rather than throwing.
+    ///
+    /// This exists so the boundary cannot throw. `Enum.valueOf` raises
+    /// `IllegalArgumentException` on an unknown name, and the one place this
+    /// is called is while decoding a failure that has already happened -- so
+    /// the throw would replace a real error the caller could act on with an
+    /// unrelated one they cannot. A port from a newer build naming an error
+    /// this one does not have degrades to `UNKNOWN` with the platform text
+    /// intact.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the [#name()] of a constant, or `null`
+    ///
+    /// #### Returns
+    ///
+    /// the matching constant, or [#UNKNOWN]
+    public static HomeError forName(String name) {
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        if (name == null) {</span>
+<span class="nc" id="L184">            return UNKNOWN;</span>
+        }
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        for (HomeError candidate : values()) {</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">            if (candidate.name().equals(name)) {</span>
+<span class="fc" id="L188">                return candidate;</span>
+            }
+        }
+<span class="fc" id="L191">        return UNKNOWN;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

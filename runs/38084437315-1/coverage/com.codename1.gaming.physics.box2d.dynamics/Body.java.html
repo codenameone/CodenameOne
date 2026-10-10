@@ -1,0 +1,1086 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Body.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.dynamics</a> &gt; <span class="el_source">Body.java</span></div><h1>Body.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+package com.codename1.gaming.physics.box2d.dynamics;
+
+import com.codename1.gaming.physics.box2d.collision.broadphase.BroadPhase;
+import com.codename1.gaming.physics.box2d.collision.shapes.MassData;
+import com.codename1.gaming.physics.box2d.collision.shapes.Shape;
+import com.codename1.gaming.physics.box2d.common.MathUtils;
+import com.codename1.gaming.physics.box2d.common.Rot;
+import com.codename1.gaming.physics.box2d.common.Sweep;
+import com.codename1.gaming.physics.box2d.common.Transform;
+import com.codename1.gaming.physics.box2d.common.Vec2;
+import com.codename1.gaming.physics.box2d.dynamics.contacts.Contact;
+import com.codename1.gaming.physics.box2d.dynamics.contacts.ContactEdge;
+import com.codename1.gaming.physics.box2d.dynamics.joints.JointEdge;
+
+/// A rigid body. These are created via World.createBody.
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">public class Body {</span>
+  public static final int e_islandFlag = 0x0001;
+  public static final int e_awakeFlag = 0x0002;
+  public static final int e_autoSleepFlag = 0x0004;
+  public static final int e_bulletFlag = 0x0008;
+  public static final int e_fixedRotationFlag = 0x0010;
+  public static final int e_activeFlag = 0x0020;
+  public static final int e_toiFlag = 0x0040;
+
+  public BodyType m_type;
+
+  public int m_flags;
+
+  public int m_islandIndex;
+
+  /// The body origin transform.
+<span class="fc" id="L55">  public final Transform m_xf = new Transform();</span>
+
+  /// The swept motion for CCD
+<span class="fc" id="L58">  public final Sweep m_sweep = new Sweep();</span>
+
+<span class="fc" id="L60">  public final Vec2 m_linearVelocity = new Vec2();</span>
+<span class="fc" id="L61">  public float m_angularVelocity = 0;</span>
+
+<span class="fc" id="L63">  public final Vec2 m_force = new Vec2();</span>
+<span class="fc" id="L64">  public float m_torque = 0;</span>
+
+  public World m_world;
+  public Body m_prev;
+  public Body m_next;
+
+  public Fixture m_fixtureList;
+  public int m_fixtureCount;
+
+  public JointEdge m_jointList;
+  public ContactEdge m_contactList;
+
+  public float m_mass, m_invMass;
+
+  // Rotational inertia about the center of mass.
+  public float m_I, m_invI;
+
+  public float m_linearDamping;
+  public float m_angularDamping;
+  public float m_gravityScale;
+
+  public float m_sleepTime;
+
+  public Object m_userData;
+
+
+<span class="fc" id="L90">  public Body(final BodyDef bd, World world) {</span>
+<span class="pc bpc" id="L91" title="2 of 4 branches missed.">    assert (bd.position.isValid());</span>
+<span class="pc bpc" id="L92" title="2 of 4 branches missed.">    assert (bd.linearVelocity.isValid());</span>
+<span class="pc bpc" id="L93" title="2 of 4 branches missed.">    assert (bd.gravityScale &gt;= 0.0f);</span>
+<span class="pc bpc" id="L94" title="2 of 4 branches missed.">    assert (bd.angularDamping &gt;= 0.0f);</span>
+<span class="pc bpc" id="L95" title="2 of 4 branches missed.">    assert (bd.linearDamping &gt;= 0.0f);</span>
+
+<span class="fc" id="L97">    m_flags = 0;</span>
+
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">    if (bd.bullet) {</span>
+<span class="nc" id="L100">      m_flags |= e_bulletFlag;</span>
+    }
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">    if (bd.fixedRotation) {</span>
+<span class="nc" id="L103">      m_flags |= e_fixedRotationFlag;</span>
+    }
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">    if (bd.allowSleep) {</span>
+<span class="fc" id="L106">      m_flags |= e_autoSleepFlag;</span>
+    }
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">    if (bd.awake) {</span>
+<span class="fc" id="L109">      m_flags |= e_awakeFlag;</span>
+    }
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">    if (bd.active) {</span>
+<span class="fc" id="L112">      m_flags |= e_activeFlag;</span>
+    }
+
+<span class="fc" id="L115">    m_world = world;</span>
+
+<span class="fc" id="L117">    m_xf.p.set(bd.position);</span>
+<span class="fc" id="L118">    m_xf.q.set(bd.angle);</span>
+
+<span class="fc" id="L120">    m_sweep.localCenter.setZero();</span>
+<span class="fc" id="L121">    m_sweep.c0.set(m_xf.p);</span>
+<span class="fc" id="L122">    m_sweep.c.set(m_xf.p);</span>
+<span class="fc" id="L123">    m_sweep.a0 = bd.angle;</span>
+<span class="fc" id="L124">    m_sweep.a = bd.angle;</span>
+<span class="fc" id="L125">    m_sweep.alpha0 = 0.0f;</span>
+
+<span class="fc" id="L127">    m_jointList = null;</span>
+<span class="fc" id="L128">    m_contactList = null;</span>
+<span class="fc" id="L129">    m_prev = null;</span>
+<span class="fc" id="L130">    m_next = null;</span>
+
+<span class="fc" id="L132">    m_linearVelocity.set(bd.linearVelocity);</span>
+<span class="fc" id="L133">    m_angularVelocity = bd.angularVelocity;</span>
+
+<span class="fc" id="L135">    m_linearDamping = bd.linearDamping;</span>
+<span class="fc" id="L136">    m_angularDamping = bd.angularDamping;</span>
+<span class="fc" id="L137">    m_gravityScale = bd.gravityScale;</span>
+
+<span class="fc" id="L139">    m_force.setZero();</span>
+<span class="fc" id="L140">    m_torque = 0.0f;</span>
+
+<span class="fc" id="L142">    m_sleepTime = 0.0f;</span>
+
+<span class="fc" id="L144">    m_type = bd.type;</span>
+
+<span class="fc bfc" id="L146" title="All 2 branches covered.">    if (m_type == BodyType.DYNAMIC) {</span>
+<span class="fc" id="L147">      m_mass = 1f;</span>
+<span class="fc" id="L148">      m_invMass = 1f;</span>
+    } else {
+<span class="fc" id="L150">      m_mass = 0f;</span>
+<span class="fc" id="L151">      m_invMass = 0f;</span>
+    }
+
+<span class="fc" id="L154">    m_I = 0.0f;</span>
+<span class="fc" id="L155">    m_invI = 0.0f;</span>
+
+<span class="fc" id="L157">    m_userData = bd.userData;</span>
+
+<span class="fc" id="L159">    m_fixtureList = null;</span>
+<span class="fc" id="L160">    m_fixtureCount = 0;</span>
+<span class="fc" id="L161">  }</span>
+
+  /// Creates a fixture and attach it to this body. Use this function if you need to set some fixture
+  /// parameters, like friction. Otherwise you can create the fixture directly from a shape. If the
+  /// density is non-zero, this function automatically updates the mass of the body. Contacts are not
+  /// created until the next time step.
+  ///
+  /// @param def the fixture definition.
+  /// @warning This function is locked during callbacks.
+  public final Fixture createFixture(FixtureDef def) {
+<span class="pc bpc" id="L171" title="2 of 4 branches missed.">    assert (m_world.isLocked() == false);</span>
+
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">    if (m_world.isLocked() == true) {</span>
+<span class="nc" id="L174">      return null;</span>
+    }
+
+<span class="fc" id="L177">    Fixture fixture = new Fixture();</span>
+<span class="fc" id="L178">    fixture.create(this, def);</span>
+
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">    if ((m_flags &amp; e_activeFlag) == e_activeFlag) {</span>
+<span class="fc" id="L181">      BroadPhase broadPhase = m_world.m_contactManager.m_broadPhase;</span>
+<span class="fc" id="L182">      fixture.createProxies(broadPhase, m_xf);</span>
+    }
+
+<span class="fc" id="L185">    fixture.m_next = m_fixtureList;</span>
+<span class="fc" id="L186">    m_fixtureList = fixture;</span>
+<span class="fc" id="L187">    ++m_fixtureCount;</span>
+
+<span class="fc" id="L189">    fixture.m_body = this;</span>
+
+    // Adjust mass properties if needed.
+<span class="fc bfc" id="L192" title="All 2 branches covered.">    if (fixture.m_density &gt; 0.0f) {</span>
+<span class="fc" id="L193">      resetMassData();</span>
+    }
+
+    // Let the world know we have a new fixture. This will cause new contacts
+    // to be created at the beginning of the next time step.
+<span class="fc" id="L198">    m_world.m_flags |= World.NEW_FIXTURE;</span>
+
+<span class="fc" id="L200">    return fixture;</span>
+  }
+
+<span class="fc" id="L203">  private final FixtureDef fixDef = new FixtureDef();</span>
+
+  /// Creates a fixture from a shape and attach it to this body. This is a convenience function. Use
+  /// FixtureDef if you need to set parameters like friction, restitution, user data, or filtering.
+  /// If the density is non-zero, this function automatically updates the mass of the body.
+  ///
+  /// @param shape the shape to be cloned.
+  /// @param density the shape density (set to zero for static bodies).
+  /// @warning This function is locked during callbacks.
+  public final Fixture createFixture(Shape shape, float density) {
+<span class="fc" id="L213">    fixDef.shape = shape;</span>
+<span class="fc" id="L214">    fixDef.density = density;</span>
+
+<span class="fc" id="L216">    return createFixture(fixDef);</span>
+  }
+
+  /// Destroy a fixture. This removes the fixture from the broad-phase and destroys all contacts
+  /// associated with this fixture. This will automatically adjust the mass of the body if the body
+  /// is dynamic and the fixture has positive density. All fixtures attached to a body are implicitly
+  /// destroyed when the body is destroyed.
+  ///
+  /// @param fixture the fixture to be removed.
+  /// @warning This function is locked during callbacks.
+  public final void destroyFixture(Fixture fixture) {
+<span class="nc bnc" id="L227" title="All 4 branches missed.">    assert (m_world.isLocked() == false);</span>
+<span class="nc bnc" id="L228" title="All 2 branches missed.">    if (m_world.isLocked() == true) {</span>
+<span class="nc" id="L229">      return;</span>
+    }
+
+<span class="nc bnc" id="L232" title="All 4 branches missed.">    assert (fixture.m_body == this);</span>
+
+    // Remove the fixture from this body's singly linked list.
+<span class="nc bnc" id="L235" title="All 4 branches missed.">    assert (m_fixtureCount &gt; 0);</span>
+<span class="nc" id="L236">    Fixture node = m_fixtureList;</span>
+<span class="nc" id="L237">    Fixture last = null; // java change</span>
+<span class="nc" id="L238">    boolean found = false;</span>
+<span class="nc bnc" id="L239" title="All 2 branches missed.">    while (node != null) {</span>
+<span class="nc bnc" id="L240" title="All 2 branches missed.">      if (node == fixture) {</span>
+<span class="nc" id="L241">        node = fixture.m_next;</span>
+<span class="nc" id="L242">        found = true;</span>
+<span class="nc" id="L243">        break;</span>
+      }
+<span class="nc" id="L245">      last = node;</span>
+<span class="nc" id="L246">      node = node.m_next;</span>
+    }
+
+    // You tried to remove a shape that is not attached to this body.
+<span class="nc bnc" id="L250" title="All 4 branches missed.">    assert (found);</span>
+
+    // java change, remove it from the list
+<span class="nc bnc" id="L253" title="All 2 branches missed.">    if (last == null) {</span>
+<span class="nc" id="L254">      m_fixtureList = fixture.m_next;</span>
+    } else {
+<span class="nc" id="L256">      last.m_next = fixture.m_next;</span>
+    }
+
+    // Destroy any contacts associated with the fixture.
+<span class="nc" id="L260">    ContactEdge edge = m_contactList;</span>
+<span class="nc bnc" id="L261" title="All 2 branches missed.">    while (edge != null) {</span>
+<span class="nc" id="L262">      Contact c = edge.contact;</span>
+<span class="nc" id="L263">      edge = edge.next;</span>
+
+<span class="nc" id="L265">      Fixture fixtureA = c.getFixtureA();</span>
+<span class="nc" id="L266">      Fixture fixtureB = c.getFixtureB();</span>
+
+<span class="nc bnc" id="L268" title="All 4 branches missed.">      if (fixture == fixtureA || fixture == fixtureB) {</span>
+        // This destroys the contact and removes it from
+        // this body's contact list.
+<span class="nc" id="L271">        m_world.m_contactManager.destroy(c);</span>
+      }
+<span class="nc" id="L273">    }</span>
+
+<span class="nc bnc" id="L275" title="All 2 branches missed.">    if ((m_flags &amp; e_activeFlag) == e_activeFlag) {</span>
+<span class="nc" id="L276">      BroadPhase broadPhase = m_world.m_contactManager.m_broadPhase;</span>
+<span class="nc" id="L277">      fixture.destroyProxies(broadPhase);</span>
+    }
+
+<span class="nc" id="L280">    fixture.destroy();</span>
+<span class="nc" id="L281">    fixture.m_body = null;</span>
+<span class="nc" id="L282">    fixture.m_next = null;</span>
+<span class="nc" id="L283">    fixture = null;</span>
+
+<span class="nc" id="L285">    --m_fixtureCount;</span>
+
+    // Reset the mass data.
+<span class="nc" id="L288">    resetMassData();</span>
+<span class="nc" id="L289">  }</span>
+
+  /// Set the position of the body's origin and rotation. This breaks any contacts and wakes the
+  /// other bodies. Manipulating a body's transform may cause non-physical behavior.
+  ///
+  /// @param position the world position of the body's local origin.
+  /// @param angle the world rotation in radians.
+  public final void setTransform(Vec2 position, float angle) {
+<span class="pc bpc" id="L297" title="2 of 4 branches missed.">    assert (m_world.isLocked() == false);</span>
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">    if (m_world.isLocked() == true) {</span>
+<span class="nc" id="L299">      return;</span>
+    }
+
+<span class="fc" id="L302">    m_xf.q.set(angle);</span>
+<span class="fc" id="L303">    m_xf.p.set(position);</span>
+
+    // m_sweep.c0 = m_sweep.c = Mul(m_xf, m_sweep.localCenter);
+<span class="fc" id="L306">    Transform.mulToOutUnsafe(m_xf, m_sweep.localCenter, m_sweep.c);</span>
+<span class="fc" id="L307">    m_sweep.a = angle;</span>
+
+<span class="fc" id="L309">    m_sweep.c0.set(m_sweep.c);</span>
+<span class="fc" id="L310">    m_sweep.a0 = m_sweep.a;</span>
+
+<span class="fc" id="L312">    BroadPhase broadPhase = m_world.m_contactManager.m_broadPhase;</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">    for (Fixture f = m_fixtureList; f != null; f = f.m_next) {</span>
+<span class="fc" id="L314">      f.synchronize(broadPhase, m_xf, m_xf);</span>
+    }
+
+<span class="fc" id="L317">    m_world.m_contactManager.findNewContacts();</span>
+<span class="fc" id="L318">  }</span>
+
+  /// Get the body transform for the body's origin.
+  ///
+  /// @return the world transform of the body's origin.
+  public final Transform getTransform() {
+<span class="fc" id="L324">    return m_xf;</span>
+  }
+
+  /// Get the world body origin position. Do not modify.
+  ///
+  /// @return the world position of the body's origin.
+  public final Vec2 getPosition() {
+<span class="fc" id="L331">    return m_xf.p;</span>
+  }
+
+  /// Get the angle in radians.
+  ///
+  /// @return the current world rotation angle in radians.
+  public final float getAngle() {
+<span class="fc" id="L338">    return m_sweep.a;</span>
+  }
+
+  /// Get the world position of the center of mass. Do not modify.
+  public final Vec2 getWorldCenter() {
+<span class="fc" id="L343">    return m_sweep.c;</span>
+  }
+
+  /// Get the local position of the center of mass. Do not modify.
+  public final Vec2 getLocalCenter() {
+<span class="fc" id="L348">    return m_sweep.localCenter;</span>
+  }
+
+  /// Set the linear velocity of the center of mass.
+  ///
+  /// @param v the new linear velocity of the center of mass.
+  public final void setLinearVelocity(Vec2 v) {
+<span class="pc bpc" id="L355" title="1 of 2 branches missed.">    if (m_type == BodyType.STATIC) {</span>
+<span class="nc" id="L356">      return;</span>
+    }
+
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">    if (Vec2.dot(v, v) &gt; 0.0f) {</span>
+<span class="fc" id="L360">      setAwake(true);</span>
+    }
+
+<span class="fc" id="L363">    m_linearVelocity.set(v);</span>
+<span class="fc" id="L364">  }</span>
+
+  /// Get the linear velocity of the center of mass. Do not modify, instead use
+  /// {@link #setLinearVelocity(Vec2)}.
+  ///
+  /// @return the linear velocity of the center of mass.
+  public final Vec2 getLinearVelocity() {
+<span class="fc" id="L371">    return m_linearVelocity;</span>
+  }
+
+  /// Set the angular velocity.
+  ///
+  /// @param w the new angular velocity in radians/second.
+  public final void setAngularVelocity(float w) {
+<span class="pc bpc" id="L378" title="1 of 2 branches missed.">    if (m_type == BodyType.STATIC) {</span>
+<span class="nc" id="L379">      return;</span>
+    }
+
+<span class="pc bpc" id="L382" title="1 of 2 branches missed.">    if (w * w &gt; 0f) {</span>
+<span class="fc" id="L383">      setAwake(true);</span>
+    }
+
+<span class="fc" id="L386">    m_angularVelocity = w;</span>
+<span class="fc" id="L387">  }</span>
+
+  /// Get the angular velocity.
+  ///
+  /// @return the angular velocity in radians/second.
+  public final float getAngularVelocity() {
+<span class="fc" id="L393">    return m_angularVelocity;</span>
+  }
+
+  /// Get the gravity scale of the body.
+  ///
+  /// @return
+  public float getGravityScale() {
+<span class="fc" id="L400">    return m_gravityScale;</span>
+  }
+
+  /// Set the gravity scale of the body.
+  ///
+  /// @param gravityScale
+  public void setGravityScale(float gravityScale) {
+<span class="fc" id="L407">    this.m_gravityScale = gravityScale;</span>
+<span class="fc" id="L408">  }</span>
+
+  /// Apply a force at a world point. If the force is not applied at the center of mass, it will
+  /// generate a torque and affect the angular velocity. This wakes up the body.
+  ///
+  /// @param force the world force vector, usually in Newtons (N).
+  /// @param point the world position of the point of application.
+  public final void applyForce(Vec2 force, Vec2 point) {
+<span class="pc bpc" id="L416" title="1 of 2 branches missed.">    if (m_type != BodyType.DYNAMIC) {</span>
+<span class="nc" id="L417">      return;</span>
+    }
+
+<span class="pc bpc" id="L420" title="1 of 2 branches missed.">    if (isAwake() == false) {</span>
+<span class="nc" id="L421">      setAwake(true);</span>
+    }
+
+    // m_force.addLocal(force);
+    // Vec2 temp = tltemp.get();
+    // temp.set(point).subLocal(m_sweep.c);
+    // m_torque += Vec2.cross(temp, force);
+
+<span class="fc" id="L429">    m_force.x += force.x;</span>
+<span class="fc" id="L430">    m_force.y += force.y;</span>
+
+<span class="fc" id="L432">    m_torque += (point.x - m_sweep.c.x) * force.y - (point.y - m_sweep.c.y) * force.x;</span>
+<span class="fc" id="L433">  }</span>
+
+  /// Apply a force to the center of mass. This wakes up the body.
+  ///
+  /// @param force the world force vector, usually in Newtons (N).
+  public final void applyForceToCenter(Vec2 force) {
+<span class="pc bpc" id="L439" title="1 of 2 branches missed.">    if (m_type != BodyType.DYNAMIC) {</span>
+<span class="nc" id="L440">      return;</span>
+    }
+
+<span class="pc bpc" id="L443" title="1 of 2 branches missed.">    if (isAwake() == false) {</span>
+<span class="nc" id="L444">      setAwake(true);</span>
+    }
+
+<span class="fc" id="L447">    m_force.x += force.x;</span>
+<span class="fc" id="L448">    m_force.y += force.y;</span>
+<span class="fc" id="L449">  }</span>
+
+  /// Apply a torque. This affects the angular velocity without affecting the linear velocity of the
+  /// center of mass. This wakes up the body.
+  ///
+  /// @param torque about the z-axis (out of the screen), usually in N-m.
+  public final void applyTorque(float torque) {
+<span class="pc bpc" id="L456" title="1 of 2 branches missed.">    if (m_type != BodyType.DYNAMIC) {</span>
+<span class="nc" id="L457">      return;</span>
+    }
+
+<span class="pc bpc" id="L460" title="1 of 2 branches missed.">    if (isAwake() == false) {</span>
+<span class="nc" id="L461">      setAwake(true);</span>
+    }
+
+<span class="fc" id="L464">    m_torque += torque;</span>
+<span class="fc" id="L465">  }</span>
+
+  /// Apply an impulse at a point. This immediately modifies the velocity. It also modifies the
+  /// angular velocity if the point of application is not at the center of mass. This wakes up the
+  /// body.
+  ///
+  /// @param impulse the world impulse vector, usually in N-seconds or kg-m/s.
+  /// @param point the world position of the point of application.
+  public final void applyLinearImpulse(Vec2 impulse, Vec2 point) {
+<span class="pc bpc" id="L474" title="1 of 2 branches missed.">    if (m_type != BodyType.DYNAMIC) {</span>
+<span class="nc" id="L475">      return;</span>
+    }
+
+<span class="pc bpc" id="L478" title="1 of 2 branches missed.">    if (isAwake() == false) {</span>
+<span class="nc" id="L479">      setAwake(true);</span>
+    }
+
+    // Vec2 temp = tltemp.get();
+    // temp.set(impulse).mulLocal(m_invMass);
+    // m_linearVelocity.addLocal(temp);
+    //
+    // temp.set(point).subLocal(m_sweep.c);
+    // m_angularVelocity += m_invI * Vec2.cross(temp, impulse);
+
+<span class="fc" id="L489">    m_linearVelocity.x += impulse.x * m_invMass;</span>
+<span class="fc" id="L490">    m_linearVelocity.y += impulse.y * m_invMass;</span>
+
+<span class="fc" id="L492">    m_angularVelocity +=</span>
+        m_invI * ((point.x - m_sweep.c.x) * impulse.y - (point.y - m_sweep.c.y) * impulse.x);
+<span class="fc" id="L494">  }</span>
+
+  /// Apply an angular impulse.
+  ///
+  /// @param impulse the angular impulse in units of kg*m*m/s
+  public void applyAngularImpulse(float impulse) {
+<span class="pc bpc" id="L500" title="1 of 2 branches missed.">    if (m_type != BodyType.DYNAMIC) {</span>
+<span class="nc" id="L501">      return;</span>
+    }
+
+<span class="pc bpc" id="L504" title="1 of 2 branches missed.">    if (isAwake() == false) {</span>
+<span class="nc" id="L505">      setAwake(true);</span>
+    }
+<span class="fc" id="L507">    m_angularVelocity += m_invI * impulse;</span>
+<span class="fc" id="L508">  }</span>
+
+  /// Get the total mass of the body.
+  ///
+  /// @return the mass, usually in kilograms (kg).
+  public final float getMass() {
+<span class="fc" id="L514">    return m_mass;</span>
+  }
+
+  /// Get the central rotational inertia of the body.
+  ///
+  /// @return the rotational inertia, usually in kg-m^2.
+  public final float getInertia() {
+<span class="fc" id="L521">    return m_I</span>
+        + m_mass
+        * (m_sweep.localCenter.x * m_sweep.localCenter.x + m_sweep.localCenter.y
+            * m_sweep.localCenter.y);
+  }
+
+  /// Get the mass data of the body. The rotational inertia is relative to the center of mass.
+  ///
+  /// @param data receives the mass, inertia and center of the body.
+  public final void getMassData(MassData data) {
+    // data.mass = m_mass;
+    // data.I = m_I + m_mass * Vec2.dot(m_sweep.localCenter, m_sweep.localCenter);
+    // data.center.set(m_sweep.localCenter);
+
+<span class="fc" id="L535">    data.mass = m_mass;</span>
+<span class="fc" id="L536">    data.I =</span>
+        m_I
+            + m_mass
+            * (m_sweep.localCenter.x * m_sweep.localCenter.x + m_sweep.localCenter.y
+                * m_sweep.localCenter.y);
+<span class="fc" id="L541">    data.center.x = m_sweep.localCenter.x;</span>
+<span class="fc" id="L542">    data.center.y = m_sweep.localCenter.y;</span>
+<span class="fc" id="L543">  }</span>
+
+  /// Set the mass properties to override the mass properties of the fixtures. Note that this changes
+  /// the center of mass position. Note that creating or destroying fixtures can also alter the mass.
+  /// This function has no effect if the body isn't dynamic.
+  ///
+  /// @param massData the mass properties.
+  public final void setMassData(MassData massData) {
+    // TODO_ERIN adjust linear velocity and torque to account for movement of center.
+<span class="pc bpc" id="L552" title="2 of 4 branches missed.">    assert (m_world.isLocked() == false);</span>
+<span class="pc bpc" id="L553" title="1 of 2 branches missed.">    if (m_world.isLocked() == true) {</span>
+<span class="nc" id="L554">      return;</span>
+    }
+
+<span class="pc bpc" id="L557" title="1 of 2 branches missed.">    if (m_type != BodyType.DYNAMIC) {</span>
+<span class="nc" id="L558">      return;</span>
+    }
+
+<span class="fc" id="L561">    m_invMass = 0.0f;</span>
+<span class="fc" id="L562">    m_I = 0.0f;</span>
+<span class="fc" id="L563">    m_invI = 0.0f;</span>
+
+<span class="fc" id="L565">    m_mass = massData.mass;</span>
+<span class="pc bpc" id="L566" title="1 of 2 branches missed.">    if (m_mass &lt;= 0.0f) {</span>
+<span class="nc" id="L567">      m_mass = 1f;</span>
+    }
+
+<span class="fc" id="L570">    m_invMass = 1.0f / m_mass;</span>
+
+<span class="pc bpc" id="L572" title="2 of 4 branches missed.">    if (massData.I &gt; 0.0f &amp;&amp; (m_flags &amp; e_fixedRotationFlag) == 0) {</span>
+<span class="fc" id="L573">      m_I = massData.I - m_mass * Vec2.dot(massData.center, massData.center);</span>
+<span class="pc bpc" id="L574" title="2 of 4 branches missed.">      assert (m_I &gt; 0.0f);</span>
+<span class="fc" id="L575">      m_invI = 1.0f / m_I;</span>
+    }
+
+<span class="fc" id="L578">    final Vec2 oldCenter = m_world.getPool().popVec2();</span>
+    // Move center of mass.
+<span class="fc" id="L580">    oldCenter.set(m_sweep.c);</span>
+<span class="fc" id="L581">    m_sweep.localCenter.set(massData.center);</span>
+    // m_sweep.c0 = m_sweep.c = Mul(m_xf, m_sweep.localCenter);
+<span class="fc" id="L583">    Transform.mulToOutUnsafe(m_xf, m_sweep.localCenter, m_sweep.c0);</span>
+<span class="fc" id="L584">    m_sweep.c.set(m_sweep.c0);</span>
+
+    // Update center of mass velocity.
+    // m_linearVelocity += Cross(m_angularVelocity, m_sweep.c - oldCenter);
+<span class="fc" id="L588">    final Vec2 temp = m_world.getPool().popVec2();</span>
+<span class="fc" id="L589">    temp.set(m_sweep.c).subLocal(oldCenter);</span>
+<span class="fc" id="L590">    Vec2.crossToOut(m_angularVelocity, temp, temp);</span>
+<span class="fc" id="L591">    m_linearVelocity.addLocal(temp);</span>
+
+<span class="fc" id="L593">    m_world.getPool().pushVec2(2);</span>
+<span class="fc" id="L594">  }</span>
+
+<span class="fc" id="L596">  private final MassData pmd = new MassData();</span>
+
+  /// This resets the mass properties to the sum of the mass properties of the fixtures. This
+  /// normally does not need to be called unless you called setMassData to override the mass and you
+  /// later want to reset the mass.
+  public final void resetMassData() {
+    // Compute mass data from shapes. Each shape has its own density.
+<span class="fc" id="L603">    m_mass = 0.0f;</span>
+<span class="fc" id="L604">    m_invMass = 0.0f;</span>
+<span class="fc" id="L605">    m_I = 0.0f;</span>
+<span class="fc" id="L606">    m_invI = 0.0f;</span>
+<span class="fc" id="L607">    m_sweep.localCenter.setZero();</span>
+
+    // Static and kinematic bodies have zero mass.
+<span class="fc bfc" id="L610" title="All 4 branches covered.">    if (m_type == BodyType.STATIC || m_type == BodyType.KINEMATIC) {</span>
+      // m_sweep.c0 = m_sweep.c = m_xf.position;
+<span class="fc" id="L612">      m_sweep.c0.set(m_xf.p);</span>
+<span class="fc" id="L613">      m_sweep.c.set(m_xf.p);</span>
+<span class="fc" id="L614">      m_sweep.a0 = m_sweep.a;</span>
+<span class="fc" id="L615">      return;</span>
+    }
+
+<span class="pc bpc" id="L618" title="2 of 4 branches missed.">    assert (m_type == BodyType.DYNAMIC);</span>
+
+    // Accumulate mass over all fixtures.
+<span class="fc" id="L621">    final Vec2 localCenter = m_world.getPool().popVec2();</span>
+<span class="fc" id="L622">    localCenter.setZero();</span>
+<span class="fc" id="L623">    final Vec2 temp = m_world.getPool().popVec2();</span>
+<span class="fc" id="L624">    final MassData massData = pmd;</span>
+<span class="fc bfc" id="L625" title="All 2 branches covered.">    for (Fixture f = m_fixtureList; f != null; f = f.m_next) {</span>
+<span class="pc bpc" id="L626" title="1 of 2 branches missed.">      if (f.m_density == 0.0f) {</span>
+<span class="nc" id="L627">        continue;</span>
+      }
+<span class="fc" id="L629">      f.getMassData(massData);</span>
+<span class="fc" id="L630">      m_mass += massData.mass;</span>
+      // center += massData.mass * massData.center;
+<span class="fc" id="L632">      temp.set(massData.center).mulLocal(massData.mass);</span>
+<span class="fc" id="L633">      localCenter.addLocal(temp);</span>
+<span class="fc" id="L634">      m_I += massData.I;</span>
+    }
+
+    // Compute center of mass.
+<span class="pc bpc" id="L638" title="1 of 2 branches missed.">    if (m_mass &gt; 0.0f) {</span>
+<span class="fc" id="L639">      m_invMass = 1.0f / m_mass;</span>
+<span class="fc" id="L640">      localCenter.mulLocal(m_invMass);</span>
+    } else {
+      // Force all dynamic bodies to have a positive mass.
+<span class="nc" id="L643">      m_mass = 1.0f;</span>
+<span class="nc" id="L644">      m_invMass = 1.0f;</span>
+    }
+
+<span class="pc bpc" id="L647" title="1 of 4 branches missed.">    if (m_I &gt; 0.0f &amp;&amp; (m_flags &amp; e_fixedRotationFlag) == 0) {</span>
+      // Center the inertia about the center of mass.
+<span class="fc" id="L649">      m_I -= m_mass * Vec2.dot(localCenter, localCenter);</span>
+<span class="pc bpc" id="L650" title="2 of 4 branches missed.">      assert (m_I &gt; 0.0f);</span>
+<span class="fc" id="L651">      m_invI = 1.0f / m_I;</span>
+    } else {
+<span class="fc" id="L653">      m_I = 0.0f;</span>
+<span class="fc" id="L654">      m_invI = 0.0f;</span>
+    }
+
+<span class="fc" id="L657">    Vec2 oldCenter = m_world.getPool().popVec2();</span>
+    // Move center of mass.
+<span class="fc" id="L659">    oldCenter.set(m_sweep.c);</span>
+<span class="fc" id="L660">    m_sweep.localCenter.set(localCenter);</span>
+    // m_sweep.c0 = m_sweep.c = Mul(m_xf, m_sweep.localCenter);
+<span class="fc" id="L662">    Transform.mulToOutUnsafe(m_xf, m_sweep.localCenter, m_sweep.c0);</span>
+<span class="fc" id="L663">    m_sweep.c.set(m_sweep.c0);</span>
+
+    // Update center of mass velocity.
+    // m_linearVelocity += Cross(m_angularVelocity, m_sweep.c - oldCenter);
+<span class="fc" id="L667">    temp.set(m_sweep.c).subLocal(oldCenter);</span>
+
+<span class="fc" id="L669">    final Vec2 temp2 = oldCenter;</span>
+<span class="fc" id="L670">    Vec2.crossToOutUnsafe(m_angularVelocity, temp, temp2);</span>
+<span class="fc" id="L671">    m_linearVelocity.addLocal(temp2);</span>
+
+<span class="fc" id="L673">    m_world.getPool().pushVec2(3);</span>
+<span class="fc" id="L674">  }</span>
+
+  /// Get the world coordinates of a point given the local coordinates.
+  ///
+  /// @param localPoint a point on the body measured relative the the body's origin.
+  /// @return the same point expressed in world coordinates.
+  public final Vec2 getWorldPoint(Vec2 localPoint) {
+<span class="fc" id="L681">    Vec2 v = new Vec2();</span>
+<span class="fc" id="L682">    getWorldPointToOut(localPoint, v);</span>
+<span class="fc" id="L683">    return v;</span>
+  }
+
+  public final void getWorldPointToOut(Vec2 localPoint, Vec2 out) {
+<span class="fc" id="L687">    Transform.mulToOut(m_xf, localPoint, out);</span>
+<span class="fc" id="L688">  }</span>
+
+  /// Get the world coordinates of a vector given the local coordinates.
+  ///
+  /// @param localVector a vector fixed in the body.
+  /// @return the same vector expressed in world coordinates.
+  public final Vec2 getWorldVector(Vec2 localVector) {
+<span class="fc" id="L695">    Vec2 out = new Vec2();</span>
+<span class="fc" id="L696">    getWorldVectorToOut(localVector, out);</span>
+<span class="fc" id="L697">    return out;</span>
+  }
+
+  public final void getWorldVectorToOut(Vec2 localVector, Vec2 out) {
+<span class="fc" id="L701">    Rot.mulToOut(m_xf.q, localVector, out);</span>
+<span class="fc" id="L702">  }</span>
+
+  public final void getWorldVectorToOutUnsafe(Vec2 localVector, Vec2 out) {
+<span class="fc" id="L705">    Rot.mulToOutUnsafe(m_xf.q, localVector, out);</span>
+<span class="fc" id="L706">  }</span>
+
+  /// Gets a local point relative to the body's origin given a world point.
+  ///
+  /// @param worldPoint a point in world coordinates.
+  /// @return the corresponding local point relative to the body's origin.
+  public final Vec2 getLocalPoint(Vec2 worldPoint) {
+<span class="fc" id="L713">    Vec2 out = new Vec2();</span>
+<span class="fc" id="L714">    getLocalPointToOut(worldPoint, out);</span>
+<span class="fc" id="L715">    return out;</span>
+  }
+
+  public final void getLocalPointToOut(Vec2 worldPoint, Vec2 out) {
+<span class="fc" id="L719">    Transform.mulTransToOut(m_xf, worldPoint, out);</span>
+<span class="fc" id="L720">  }</span>
+
+  /// Gets a local vector given a world vector.
+  ///
+  /// @param worldVector a vector in world coordinates.
+  /// @return the corresponding local vector.
+  public final Vec2 getLocalVector(Vec2 worldVector) {
+<span class="fc" id="L727">    Vec2 out = new Vec2();</span>
+<span class="fc" id="L728">    getLocalVectorToOut(worldVector, out);</span>
+<span class="fc" id="L729">    return out;</span>
+  }
+
+  public final void getLocalVectorToOut(Vec2 worldVector, Vec2 out) {
+<span class="fc" id="L733">    Rot.mulTrans(m_xf.q, worldVector, out);</span>
+<span class="fc" id="L734">  }</span>
+
+  public final void getLocalVectorToOutUnsafe(Vec2 worldVector, Vec2 out) {
+<span class="nc" id="L737">    Rot.mulTransUnsafe(m_xf.q, worldVector, out);</span>
+<span class="nc" id="L738">  }</span>
+
+  /// Get the world linear velocity of a world point attached to this body.
+  ///
+  /// @param worldPoint a point in world coordinates.
+  /// @return the world velocity of a point.
+  public final Vec2 getLinearVelocityFromWorldPoint(Vec2 worldPoint) {
+<span class="fc" id="L745">    Vec2 out = new Vec2();</span>
+<span class="fc" id="L746">    getLinearVelocityFromWorldPointToOut(worldPoint, out);</span>
+<span class="fc" id="L747">    return out;</span>
+  }
+
+  public final void getLinearVelocityFromWorldPointToOut(Vec2 worldPoint, Vec2 out) {
+<span class="fc" id="L751">    out.set(worldPoint).subLocal(m_sweep.c);</span>
+<span class="fc" id="L752">    Vec2.crossToOut(m_angularVelocity, out, out);</span>
+<span class="fc" id="L753">    out.addLocal(m_linearVelocity);</span>
+<span class="fc" id="L754">  }</span>
+
+  /// Get the world velocity of a local point.
+  ///
+  /// @param localPoint a point in local coordinates.
+  /// @return the world velocity of a point.
+  public final Vec2 getLinearVelocityFromLocalPoint(Vec2 localPoint) {
+<span class="fc" id="L761">    Vec2 out = new Vec2();</span>
+<span class="fc" id="L762">    getLinearVelocityFromLocalPointToOut(localPoint, out);</span>
+<span class="fc" id="L763">    return out;</span>
+  }
+
+  public final void getLinearVelocityFromLocalPointToOut(Vec2 localPoint, Vec2 out) {
+<span class="fc" id="L767">    getWorldPointToOut(localPoint, out);</span>
+<span class="fc" id="L768">    getLinearVelocityFromWorldPointToOut(out, out);</span>
+<span class="fc" id="L769">  }</span>
+
+  /// Get the linear damping of the body.
+  public final float getLinearDamping() {
+<span class="fc" id="L773">    return m_linearDamping;</span>
+  }
+
+  /// Set the linear damping of the body.
+  public final void setLinearDamping(float linearDamping) {
+<span class="fc" id="L778">    m_linearDamping = linearDamping;</span>
+<span class="fc" id="L779">  }</span>
+
+  /// Get the angular damping of the body.
+  public final float getAngularDamping() {
+<span class="fc" id="L783">    return m_angularDamping;</span>
+  }
+
+  /// Set the angular damping of the body.
+  public final void setAngularDamping(float angularDamping) {
+<span class="fc" id="L788">    m_angularDamping = angularDamping;</span>
+<span class="fc" id="L789">  }</span>
+
+  public BodyType getType() {
+<span class="fc" id="L792">    return m_type;</span>
+  }
+
+  /// Set the type of this body. This may alter the mass and velocity.
+  ///
+  /// @param type
+  public void setType(BodyType type) {
+<span class="pc bpc" id="L799" title="2 of 4 branches missed.">    assert (m_world.isLocked() == false);</span>
+<span class="pc bpc" id="L800" title="1 of 2 branches missed.">    if (m_world.isLocked() == true) {</span>
+<span class="nc" id="L801">      return;</span>
+    }
+
+<span class="pc bpc" id="L804" title="1 of 2 branches missed.">    if (m_type == type) {</span>
+<span class="nc" id="L805">      return;</span>
+    }
+
+<span class="fc" id="L808">    m_type = type;</span>
+
+<span class="fc" id="L810">    resetMassData();</span>
+
+<span class="pc bpc" id="L812" title="1 of 2 branches missed.">    if (m_type == BodyType.STATIC) {</span>
+<span class="nc" id="L813">      m_linearVelocity.setZero();</span>
+<span class="nc" id="L814">      m_angularVelocity = 0.0f;</span>
+<span class="nc" id="L815">      m_sweep.a0 = m_sweep.a;</span>
+<span class="nc" id="L816">      m_sweep.c0.set(m_sweep.c);</span>
+<span class="nc" id="L817">      synchronizeFixtures();</span>
+    }
+
+<span class="fc" id="L820">    setAwake(true);</span>
+
+<span class="fc" id="L822">    m_force.setZero();</span>
+<span class="fc" id="L823">    m_torque = 0.0f;</span>
+
+    // Delete the attached contacts.
+<span class="fc" id="L826">    ContactEdge ce = m_contactList;</span>
+<span class="pc bpc" id="L827" title="1 of 2 branches missed.">    while (ce != null) {</span>
+<span class="nc" id="L828">      ContactEdge ce0 = ce;</span>
+<span class="nc" id="L829">      ce = ce.next;</span>
+<span class="nc" id="L830">      m_world.m_contactManager.destroy(ce0.contact);</span>
+<span class="nc" id="L831">    }</span>
+<span class="fc" id="L832">    m_contactList = null;</span>
+
+    // Touch the proxies so that new contacts will be created (when appropriate)
+<span class="fc" id="L835">    BroadPhase broadPhase = m_world.m_contactManager.m_broadPhase;</span>
+<span class="fc bfc" id="L836" title="All 2 branches covered.">    for (Fixture f = m_fixtureList; f != null; f = f.m_next) {</span>
+<span class="fc" id="L837">      int proxyCount = f.m_proxyCount;</span>
+<span class="fc bfc" id="L838" title="All 2 branches covered.">      for (int i = 0; i &lt; proxyCount; ++i) {</span>
+<span class="fc" id="L839">        broadPhase.touchProxy(f.m_proxies[i].proxyId);</span>
+      }
+    }
+<span class="fc" id="L842">  }</span>
+
+  /// Is this body treated like a bullet for continuous collision detection?
+  public final boolean isBullet() {
+<span class="fc bfc" id="L846" title="All 2 branches covered.">    return (m_flags &amp; e_bulletFlag) == e_bulletFlag;</span>
+  }
+
+  /// Should this body be treated like a bullet for continuous collision detection?
+  public final void setBullet(boolean flag) {
+<span class="pc bpc" id="L851" title="1 of 2 branches missed.">    if (flag) {</span>
+<span class="fc" id="L852">      m_flags |= e_bulletFlag;</span>
+    } else {
+<span class="nc" id="L854">      m_flags &amp;= ~e_bulletFlag;</span>
+    }
+<span class="fc" id="L856">  }</span>
+
+  /// You can disable sleeping on this body. If you disable sleeping, the body will be woken.
+  ///
+  /// @param flag
+  public void setSleepingAllowed(boolean flag) {
+<span class="pc bpc" id="L862" title="1 of 2 branches missed.">    if (flag) {</span>
+<span class="fc" id="L863">      m_flags |= e_autoSleepFlag;</span>
+    } else {
+<span class="nc" id="L865">      m_flags &amp;= ~e_autoSleepFlag;</span>
+<span class="nc" id="L866">      setAwake(true);</span>
+    }
+<span class="fc" id="L868">  }</span>
+
+  /// Is this body allowed to sleep
+  ///
+  /// @return
+  public boolean isSleepingAllowed() {
+<span class="pc bpc" id="L874" title="1 of 2 branches missed.">    return (m_flags &amp; e_autoSleepFlag) == e_autoSleepFlag;</span>
+  }
+
+  /// Set the sleep state of the body. A sleeping body has very low CPU cost.
+  ///
+  /// @param flag set to true to put body to sleep, false to wake it.
+  public void setAwake(boolean flag) {
+<span class="fc bfc" id="L881" title="All 2 branches covered.">    if (flag) {</span>
+<span class="fc bfc" id="L882" title="All 2 branches covered.">      if ((m_flags &amp; e_awakeFlag) == 0) {</span>
+<span class="fc" id="L883">        m_flags |= e_awakeFlag;</span>
+<span class="fc" id="L884">        m_sleepTime = 0.0f;</span>
+      }
+    } else {
+<span class="fc" id="L887">      m_flags &amp;= ~e_awakeFlag;</span>
+<span class="fc" id="L888">      m_sleepTime = 0.0f;</span>
+<span class="fc" id="L889">      m_linearVelocity.setZero();</span>
+<span class="fc" id="L890">      m_angularVelocity = 0.0f;</span>
+<span class="fc" id="L891">      m_force.setZero();</span>
+<span class="fc" id="L892">      m_torque = 0.0f;</span>
+    }
+<span class="fc" id="L894">  }</span>
+
+  /// Get the sleeping state of this body.
+  ///
+  /// @return true if the body is sleeping.
+  public boolean isAwake() {
+<span class="fc bfc" id="L900" title="All 2 branches covered.">    return (m_flags &amp; e_awakeFlag) == e_awakeFlag;</span>
+  }
+
+  /// Set the active state of the body. An inactive body is not simulated and cannot be collided with
+  /// or woken up. If you pass a flag of true, all fixtures will be added to the broad-phase. If you
+  /// pass a flag of false, all fixtures will be removed from the broad-phase and all contacts will
+  /// be destroyed. Fixtures and joints are otherwise unaffected. You may continue to create/destroy
+  /// fixtures and joints on inactive bodies. Fixtures on an inactive body are implicitly inactive
+  /// and will not participate in collisions, ray-casts, or queries. Joints connected to an inactive
+  /// body are implicitly inactive. An inactive body is still owned by a World object and remains in
+  /// the body list.
+  ///
+  /// @param flag
+  public void setActive(boolean flag) {
+<span class="pc bpc" id="L914" title="2 of 4 branches missed.">    assert (m_world.isLocked() == false);</span>
+
+<span class="pc bpc" id="L916" title="1 of 2 branches missed.">    if (flag == isActive()) {</span>
+<span class="fc" id="L917">      return;</span>
+    }
+
+<span class="nc bnc" id="L920" title="All 2 branches missed.">    if (flag) {</span>
+<span class="nc" id="L921">      m_flags |= e_activeFlag;</span>
+
+      // Create all proxies.
+<span class="nc" id="L924">      BroadPhase broadPhase = m_world.m_contactManager.m_broadPhase;</span>
+<span class="nc bnc" id="L925" title="All 2 branches missed.">      for (Fixture f = m_fixtureList; f != null; f = f.m_next) {</span>
+<span class="nc" id="L926">        f.createProxies(broadPhase, m_xf);</span>
+      }
+
+      // Contacts are created the next time step.
+<span class="nc" id="L930">    } else {</span>
+<span class="nc" id="L931">      m_flags &amp;= ~e_activeFlag;</span>
+
+      // Destroy all proxies.
+<span class="nc" id="L934">      BroadPhase broadPhase = m_world.m_contactManager.m_broadPhase;</span>
+<span class="nc bnc" id="L935" title="All 2 branches missed.">      for (Fixture f = m_fixtureList; f != null; f = f.m_next) {</span>
+<span class="nc" id="L936">        f.destroyProxies(broadPhase);</span>
+      }
+
+      // Destroy the attached contacts.
+<span class="nc" id="L940">      ContactEdge ce = m_contactList;</span>
+<span class="nc bnc" id="L941" title="All 2 branches missed.">      while (ce != null) {</span>
+<span class="nc" id="L942">        ContactEdge ce0 = ce;</span>
+<span class="nc" id="L943">        ce = ce.next;</span>
+<span class="nc" id="L944">        m_world.m_contactManager.destroy(ce0.contact);</span>
+<span class="nc" id="L945">      }</span>
+<span class="nc" id="L946">      m_contactList = null;</span>
+    }
+<span class="nc" id="L948">  }</span>
+
+  /// Get the active state of the body.
+  ///
+  /// @return
+  public boolean isActive() {
+<span class="pc bpc" id="L954" title="1 of 2 branches missed.">    return (m_flags &amp; e_activeFlag) == e_activeFlag;</span>
+  }
+
+  /// Set this body to have fixed rotation. This causes the mass to be reset.
+  ///
+  /// @param flag
+  public void setFixedRotation(boolean flag) {
+<span class="pc bpc" id="L961" title="1 of 2 branches missed.">    if (flag) {</span>
+<span class="fc" id="L962">      m_flags |= e_fixedRotationFlag;</span>
+    } else {
+<span class="nc" id="L964">      m_flags &amp;= ~e_fixedRotationFlag;</span>
+    }
+
+<span class="fc" id="L967">    resetMassData();</span>
+<span class="fc" id="L968">  }</span>
+
+  /// Does this body have fixed rotation?
+  ///
+  /// @return
+  public boolean isFixedRotation() {
+<span class="pc bpc" id="L974" title="1 of 2 branches missed.">    return (m_flags &amp; e_fixedRotationFlag) == e_fixedRotationFlag;</span>
+  }
+
+  /// Get the list of all fixtures attached to this body.
+  public final Fixture getFixtureList() {
+<span class="fc" id="L979">    return m_fixtureList;</span>
+  }
+
+  /// Get the list of all joints attached to this body.
+  public final JointEdge getJointList() {
+<span class="fc" id="L984">    return m_jointList;</span>
+  }
+
+  /// Get the list of all contacts attached to this body.
+  ///
+  /// @warning this list changes during the time step and you may miss some collisions if you don't
+  ///          use ContactListener.
+  public final ContactEdge getContactList() {
+<span class="fc" id="L992">    return m_contactList;</span>
+  }
+
+  /// Get the next body in the world's body list.
+  public final Body getNext() {
+<span class="fc" id="L997">    return m_next;</span>
+  }
+
+  /// Get the user data pointer that was provided in the body definition.
+  public final Object getUserData() {
+<span class="fc" id="L1002">    return m_userData;</span>
+  }
+
+  /// Set the user data. Use this to store your application specific data.
+  public final void setUserData(Object data) {
+<span class="fc" id="L1007">    m_userData = data;</span>
+<span class="fc" id="L1008">  }</span>
+
+  /// Get the parent world of this body.
+  public final World getWorld() {
+<span class="fc" id="L1012">    return m_world;</span>
+  }
+
+  // djm pooling
+<span class="fc" id="L1016">  private final Transform pxf = new Transform();</span>
+
+  protected final void synchronizeFixtures() {
+<span class="fc" id="L1019">    final Transform xf1 = pxf;</span>
+    // xf1.position = m_sweep.c0 - Mul(xf1.R, m_sweep.localCenter);
+
+    // xf1.q.set(m_sweep.a0);
+    // Rot.mulToOutUnsafe(xf1.q, m_sweep.localCenter, xf1.p);
+    // xf1.p.mulLocal(-1).addLocal(m_sweep.c0);
+    // inlined:
+<span class="fc" id="L1026">    xf1.q.s = MathUtils.sin(m_sweep.a0);</span>
+<span class="fc" id="L1027">    xf1.q.c = MathUtils.cos(m_sweep.a0);</span>
+<span class="fc" id="L1028">    xf1.p.x = m_sweep.c0.x - xf1.q.c * m_sweep.localCenter.x + xf1.q.s * m_sweep.localCenter.y;</span>
+<span class="fc" id="L1029">    xf1.p.y = m_sweep.c0.y - xf1.q.s * m_sweep.localCenter.x - xf1.q.c * m_sweep.localCenter.y;</span>
+    // end inline
+
+<span class="fc bfc" id="L1032" title="All 2 branches covered.">    for (Fixture f = m_fixtureList; f != null; f = f.m_next) {</span>
+<span class="fc" id="L1033">      f.synchronize(m_world.m_contactManager.m_broadPhase, xf1, m_xf);</span>
+    }
+<span class="fc" id="L1035">  }</span>
+
+  public final void synchronizeTransform() {
+    // m_xf.q.set(m_sweep.a);
+    //
+    // // m_xf.position = m_sweep.c - Mul(m_xf.R, m_sweep.localCenter);
+    // Rot.mulToOutUnsafe(m_xf.q, m_sweep.localCenter, m_xf.p);
+    // m_xf.p.mulLocal(-1).addLocal(m_sweep.c);
+    //
+<span class="fc" id="L1044">    m_xf.q.s = MathUtils.sin(m_sweep.a);</span>
+<span class="fc" id="L1045">    m_xf.q.c = MathUtils.cos(m_sweep.a);</span>
+<span class="fc" id="L1046">    Rot q = m_xf.q;</span>
+<span class="fc" id="L1047">    Vec2 v = m_sweep.localCenter;</span>
+<span class="fc" id="L1048">    m_xf.p.x = m_sweep.c.x - q.c * v.x + q.s * v.y;</span>
+<span class="fc" id="L1049">    m_xf.p.y = m_sweep.c.y - q.s * v.x - q.c * v.y;</span>
+<span class="fc" id="L1050">  }</span>
+
+  /// This is used to prevent connected bodies from colliding. It may lie, depending on the
+  /// collideConnected flag.
+  ///
+  /// @param other
+  /// @return
+  public boolean shouldCollide(Body other) {
+    // At least one body should be dynamic.
+<span class="pc bpc" id="L1059" title="3 of 4 branches missed.">    if (m_type != BodyType.DYNAMIC &amp;&amp; other.m_type != BodyType.DYNAMIC) {</span>
+<span class="nc" id="L1060">      return false;</span>
+    }
+
+    // Does a joint prevent collision?
+<span class="fc bfc" id="L1064" title="All 2 branches covered.">    for (JointEdge jn = m_jointList; jn != null; jn = jn.next) {</span>
+<span class="fc bfc" id="L1065" title="All 2 branches covered.">      if (jn.other == other) {</span>
+<span class="pc bpc" id="L1066" title="1 of 2 branches missed.">        if (jn.joint.getCollideConnected() == false) {</span>
+<span class="fc" id="L1067">          return false;</span>
+        }
+      }
+    }
+
+<span class="fc" id="L1072">    return true;</span>
+  }
+
+  protected final void advance(float t) {
+    // Advance to the new safe time. This doesn't sync the broad-phase.
+<span class="fc" id="L1077">    m_sweep.advance(t);</span>
+<span class="fc" id="L1078">    m_sweep.c.set(m_sweep.c0);</span>
+<span class="fc" id="L1079">    m_sweep.a = m_sweep.a0;</span>
+<span class="fc" id="L1080">    m_xf.q.set(m_sweep.a);</span>
+    // m_xf.position = m_sweep.c - Mul(m_xf.R, m_sweep.localCenter);
+<span class="fc" id="L1082">    Rot.mulToOutUnsafe(m_xf.q, m_sweep.localCenter, m_xf.p);</span>
+<span class="fc" id="L1083">    m_xf.p.mulLocal(-1).addLocal(m_sweep.c);</span>
+<span class="fc" id="L1084">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

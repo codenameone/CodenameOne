@@ -1,0 +1,873 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RichTextComponent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">RichTextComponent.java</span></div><h1>RichTextComponent.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui;
+
+import com.codename1.ui.editor.HtmlImporter;
+import com.codename1.ui.editor.RichBlocks;
+import com.codename1.ui.editor.RichRunPainter;
+import com.codename1.ui.editor.RichTextImporter;
+import com.codename1.ui.editor.TextStyle;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.util.EventDispatcher;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// A read-only component that renders multi-styled, word-wrapped rich text: headings, bold / italic /
+/// underline / strike, inline code, colored and highlighted spans, per-paragraph alignment and
+/// indentation, ordered and unordered lists, block quotes, preformatted blocks, inline images and
+/// tappable hyperlinks. Content is supplied as HTML, Markdown, AsciiDoc, RTF or plain text, or built
+/// up programmatically from styled runs.
+///
+/// &lt;p&gt;Unlike a single-style {@code Label}/{@code SpanLabel} it keeps a distinct style per character,
+/// and unlike a full {@code BrowserComponent} it is a lightweight native component that measures and
+/// paints text directly, so it embeds cleanly inside ordinary layouts and reports an accurate
+/// height-for-width preferred size. It is the read-only counterpart to the rich text editor: both
+/// share the same content model and {@link RichRunPainter} styling, so styled text rendered by one
+/// matches the other.&lt;/p&gt;
+///
+/// &lt;p&gt;Typical use:&lt;/p&gt;
+/// &lt;pre&gt;{@code
+/// RichTextComponent rt = new RichTextComponent();
+/// rt.setMarkdown(&quot;# Title\n\nSome **bold** and *italic* text with a [link](https://codenameone.com).&quot;);
+/// rt.addLinkListener(e -&gt; CN.execute((String) e.getSource()));
+/// form.add(rt);
+/// }&lt;/pre&gt;
+///
+/// &lt;p&gt;The default {@link SizeMode#SHRINK} makes the component as tall as its wrapped content at the
+/// width it is given (ideal inside a scrollable {@code Form}); {@link SizeMode#SCROLL} keeps the
+/// component at the size its parent assigns and scrolls its content vertically.&lt;/p&gt;
+public class RichTextComponent extends Component {
+
+    /// Controls how the component sizes itself relative to its content.
+<span class="fc" id="L69">    public enum SizeMode {</span>
+        /// Report a preferred height equal to the wrapped content height at the assigned width.
+<span class="fc" id="L71">        SHRINK,</span>
+        /// Keep the parent-assigned size and scroll content vertically when it overflows.
+<span class="fc" id="L73">        SCROLL</span>
+    }
+
+    /// Resolves an image source string (as it appears in the markup, e.g. an {@code &lt;img src&gt;} URL or
+    /// a Markdown image target) to a loaded {@link Image}. Return {@code null} to render a placeholder.
+    public interface ImageResolver {
+        /// Resolves a source to an image.
+        /// @param source the source string from the markup
+        /// @return the image, or null if it cannot be resolved
+        Image resolve(String source);
+    }
+
+    private static final char OBJECT_REPLACEMENT = '\uFFFC';
+
+    // --- content model (parallel per-character arrays + per-paragraph blocks) ---
+<span class="fc" id="L88">    private final StringBuilder text = new StringBuilder(); // NOPMD - intentional owned buffer</span>
+<span class="fc" id="L89">    private List&lt;TextStyle&gt; charStyles = new ArrayList&lt;TextStyle&gt;();</span>
+<span class="fc" id="L90">    private List&lt;String&gt; charLinks = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L91">    private List&lt;String&gt; charImages = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L92">    private List&lt;RichBlocks.BlockAttr&gt; blocks = new ArrayList&lt;RichBlocks.BlockAttr&gt;();</span>
+
+<span class="fc" id="L94">    private SizeMode sizeMode = SizeMode.SHRINK;</span>
+<span class="fc" id="L95">    private int linkColor = 0x1a73e8;</span>
+<span class="fc" id="L96">    private int alignOverride = -1;</span>
+    private ImageResolver imageResolver;
+    private EventDispatcher linkListeners;
+
+<span class="fc" id="L100">    private final RichRunPainter painter = new RichRunPainter();</span>
+<span class="fc" id="L101">    private final Map&lt;String, Image&gt; imageCache = new HashMap&lt;String, Image&gt;();</span>
+
+    // --- layout cache ---
+    private List&lt;Row&gt; rows;
+<span class="fc" id="L105">    private int layoutWidth = -1;</span>
+    private int contentW;
+    private int contentH;
+
+    /// Creates an empty rich text component.
+<span class="fc" id="L110">    public RichTextComponent() {</span>
+<span class="fc" id="L111">        setUIID(&quot;RichTextComponent&quot;);</span>
+<span class="fc" id="L112">        setFocusable(false);</span>
+<span class="fc" id="L113">        getAllStyles().setBgTransparency(0);</span>
+<span class="fc" id="L114">        blocks.add(new RichBlocks.BlockAttr());</span>
+<span class="fc" id="L115">    }</span>
+
+    /// Creates a rich text component showing the given plain text.
+    /// @param plainText the text
+    public RichTextComponent(String plainText) {
+<span class="fc" id="L120">        this();</span>
+<span class="fc" id="L121">        setText(plainText);</span>
+<span class="fc" id="L122">    }</span>
+
+    // ------------------------------------------------------------------
+    // Content setters
+    // ------------------------------------------------------------------
+
+    /// Replaces the content with the given HTML fragment.
+    /// @param html the HTML markup
+    /// @return this, for chaining
+    public RichTextComponent setHtml(String html) {
+<span class="fc" id="L132">        load(HtmlImporter.parse(html));</span>
+<span class="fc" id="L133">        return this;</span>
+    }
+
+    /// Replaces the content with the given Markdown source.
+    /// @param markdown the Markdown source
+    /// @return this, for chaining
+    public RichTextComponent setMarkdown(String markdown) {
+<span class="fc" id="L140">        load(RichTextImporter.parse(markdown, RichTextFormat.MARKDOWN));</span>
+<span class="fc" id="L141">        return this;</span>
+    }
+
+    /// Replaces the content parsed from the given format.
+    /// @param content the source content
+    /// @param format the format the content is written in
+    /// @return this, for chaining
+    public RichTextComponent setContent(String content, RichTextFormat format) {
+<span class="nc bnc" id="L149" title="All 2 branches missed.">        load(RichTextImporter.parse(content, format == null ? RichTextFormat.PLAIN_TEXT : format));</span>
+<span class="nc" id="L150">        return this;</span>
+    }
+
+    /// Replaces the content with unstyled plain text. Newlines become paragraph breaks.
+    /// @param plainText the text
+    /// @return this, for chaining
+    public RichTextComponent setText(String plainText) {
+<span class="fc" id="L157">        clearContent();</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">        String value = plainText == null ? &quot;&quot; : plainText;</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L160">            appendChar(value.charAt(i), TextStyle.DEFAULT, null, null);</span>
+        }
+<span class="fc" id="L162">        syncBlocksToText();</span>
+<span class="fc" id="L163">        invalidateLayout();</span>
+<span class="fc" id="L164">        return this;</span>
+    }
+
+    /// Removes all content, leaving the component empty. Useful before rebuilding content run by run
+    /// with {@link #append(String, TextStyle)}.
+    /// @return this, for chaining
+    public RichTextComponent clear() {
+<span class="fc" id="L171">        clearContent();</span>
+<span class="fc" id="L172">        blocks.add(new RichBlocks.BlockAttr());</span>
+<span class="fc" id="L173">        invalidateLayout();</span>
+<span class="fc" id="L174">        return this;</span>
+    }
+
+    /// Appends a run of text in the given style to the current content (builder style). A run may
+    /// contain newlines to start new paragraphs.
+    /// @param runText the run text
+    /// @param style the run style, or null for the default style
+    /// @return this, for chaining
+    public RichTextComponent append(String runText, TextStyle style) {
+<span class="fc" id="L183">        return append(runText, style, null);</span>
+    }
+
+    /// Appends a run of styled text that acts as a hyperlink.
+    /// @param runText the run text
+    /// @param style the run style, or null for the default style
+    /// @param link the hyperlink target reported to link listeners, or null for none
+    /// @return this, for chaining
+    public RichTextComponent append(String runText, TextStyle style, String link) {
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">        if (runText != null) {</span>
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">            TextStyle s = style == null ? TextStyle.DEFAULT : style;</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">            for (int i = 0; i &lt; runText.length(); i++) {</span>
+<span class="fc" id="L195">                appendChar(runText.charAt(i), s, link, null);</span>
+            }
+<span class="fc" id="L197">            syncBlocksToText();</span>
+<span class="fc" id="L198">            invalidateLayout();</span>
+        }
+<span class="fc" id="L200">        return this;</span>
+    }
+
+    /// The plain text of the current content (styling and structure removed).
+    /// @return the plain text
+    public String getText() {
+<span class="fc" id="L206">        return text.toString();</span>
+    }
+
+    /// Overrides the horizontal alignment of every paragraph, ignoring any alignment carried by the
+    /// markup. Pass one of {@link Component#LEFT}, {@link Component#CENTER}, {@link Component#RIGHT},
+    /// or {@code -1} to restore per-paragraph alignment from the content.
+    /// @param align the alignment constant, or -1 to clear the override
+    /// @return this, for chaining
+    public RichTextComponent setTextAlign(int align) {
+<span class="nc bnc" id="L215" title="All 2 branches missed.">        if (align != alignOverride) {</span>
+<span class="nc" id="L216">            alignOverride = align;</span>
+<span class="nc" id="L217">            invalidateLayout();</span>
+        }
+<span class="nc" id="L219">        return this;</span>
+    }
+
+    /// Lays the content out at the given outer width and returns the resulting preferred size
+    /// (including this component's padding). This is a stateless height-for-width query useful for
+    /// custom layout managers that need the wrapped size before assigning bounds.
+    /// @param width the outer width available to the component
+    /// @return the preferred size at that width
+    public Dimension preferredSizeForWidth(int width) {
+<span class="fc" id="L228">        ensurePainter();</span>
+<span class="fc" id="L229">        Style style = getStyle();</span>
+<span class="fc" id="L230">        int hPad = style.getHorizontalPadding();</span>
+<span class="fc" id="L231">        int vPad = style.getVerticalPadding();</span>
+<span class="fc" id="L232">        layout(Math.max(1, width - hPad));</span>
+<span class="fc" id="L233">        return new Dimension(contentW + hPad, contentH + vPad);</span>
+    }
+
+    // ------------------------------------------------------------------
+    // Configuration
+    // ------------------------------------------------------------------
+
+    /// Sets the sizing behavior. Defaults to {@link SizeMode#SHRINK}.
+    /// @param mode the size mode
+    /// @return this, for chaining
+    public RichTextComponent setSizeMode(SizeMode mode) {
+<span class="nc bnc" id="L244" title="All 4 branches missed.">        if (mode != null &amp;&amp; mode != sizeMode) {</span>
+<span class="nc" id="L245">            sizeMode = mode;</span>
+<span class="nc" id="L246">            invalidateLayout();</span>
+        }
+<span class="nc" id="L248">        return this;</span>
+    }
+
+    /// The current size mode.
+    /// @return the size mode
+    public SizeMode getSizeMode() {
+<span class="fc" id="L254">        return sizeMode;</span>
+    }
+
+    @Override
+    public boolean isScrollableY() {
+<span class="pc bpc" id="L259" title="3 of 4 branches missed.">        return sizeMode == SizeMode.SCROLL &amp;&amp; getScrollDimension().getHeight() &gt; getHeight();</span>
+    }
+
+    /// Sets the color (0xRRGGBB) used for hyperlink text that does not carry an explicit color.
+    /// @param rgb the link color
+    /// @return this, for chaining
+    public RichTextComponent setLinkColor(int rgb) {
+<span class="nc" id="L266">        linkColor = rgb;</span>
+<span class="nc" id="L267">        repaint();</span>
+<span class="nc" id="L268">        return this;</span>
+    }
+
+    /// Sets the resolver used to load inline images from their source strings.
+    /// @param resolver the image resolver, or null to render placeholders
+    /// @return this, for chaining
+    public RichTextComponent setImageResolver(ImageResolver resolver) {
+<span class="nc" id="L275">        imageResolver = resolver;</span>
+<span class="nc" id="L276">        imageCache.clear();</span>
+<span class="nc" id="L277">        invalidateLayout();</span>
+<span class="nc" id="L278">        return this;</span>
+    }
+
+    /// Adds a listener notified when a hyperlink is tapped. The {@link ActionEvent#getSource()} is the
+    /// link target string.
+    /// @param l the listener
+    public void addLinkListener(ActionListener l) {
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">        if (linkListeners == null) {</span>
+<span class="fc" id="L286">            linkListeners = new EventDispatcher();</span>
+        }
+<span class="fc" id="L288">        linkListeners.addListener(l);</span>
+<span class="fc" id="L289">    }</span>
+
+    /// Removes a previously added link listener.
+    /// @param l the listener
+    public void removeLinkListener(ActionListener l) {
+<span class="nc bnc" id="L294" title="All 2 branches missed.">        if (linkListeners != null) {</span>
+<span class="nc" id="L295">            linkListeners.removeListener(l);</span>
+        }
+<span class="nc" id="L297">    }</span>
+
+    // ------------------------------------------------------------------
+    // Model plumbing
+    // ------------------------------------------------------------------
+
+    private void load(HtmlImporter.Result r) {
+<span class="fc" id="L304">        clearContent();</span>
+<span class="fc" id="L305">        text.append(r.getText());</span>
+<span class="fc" id="L306">        charStyles = new ArrayList&lt;TextStyle&gt;(r.getStyles());</span>
+<span class="fc" id="L307">        charLinks = new ArrayList&lt;String&gt;(r.getLinks());</span>
+<span class="fc" id="L308">        charImages = new ArrayList&lt;String&gt;(r.getImageSources());</span>
+<span class="fc" id="L309">        blocks = new ArrayList&lt;RichBlocks.BlockAttr&gt;();</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">        for (RichBlocks.BlockAttr b : r.getBlocks()) {</span>
+<span class="fc" id="L311">            blocks.add(b);</span>
+<span class="fc" id="L312">        }</span>
+<span class="fc" id="L313">        normalizeModel();</span>
+<span class="fc" id="L314">        invalidateLayout();</span>
+<span class="fc" id="L315">    }</span>
+
+    private void clearContent() {
+<span class="fc" id="L318">        text.setLength(0);</span>
+<span class="fc" id="L319">        charStyles = new ArrayList&lt;TextStyle&gt;();</span>
+<span class="fc" id="L320">        charLinks = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L321">        charImages = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L322">        blocks = new ArrayList&lt;RichBlocks.BlockAttr&gt;();</span>
+<span class="fc" id="L323">    }</span>
+
+    private void appendChar(char c, TextStyle style, String link, String image) {
+<span class="fc" id="L326">        text.append(c);</span>
+<span class="fc" id="L327">        charStyles.add(style);</span>
+<span class="fc" id="L328">        charLinks.add(link);</span>
+<span class="fc" id="L329">        charImages.add(image);</span>
+<span class="fc" id="L330">    }</span>
+
+    /// Ensures per-character lists match the text length and there is one block per paragraph.
+    private void normalizeModel() {
+<span class="fc" id="L334">        int len = text.length();</span>
+<span class="pc bpc" id="L335" title="1 of 2 branches missed.">        while (charStyles.size() &lt; len) {</span>
+<span class="nc" id="L336">            charStyles.add(TextStyle.DEFAULT);</span>
+        }
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">        while (charLinks.size() &lt; len) {</span>
+<span class="nc" id="L339">            charLinks.add(null);</span>
+        }
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">        while (charImages.size() &lt; len) {</span>
+<span class="nc" id="L342">            charImages.add(null);</span>
+        }
+<span class="fc" id="L344">        syncBlocksToText();</span>
+<span class="fc" id="L345">    }</span>
+
+    /// Keeps the block list length equal to the paragraph count (newlines + 1).
+    private void syncBlocksToText() {
+<span class="fc" id="L349">        int paragraphs = 1;</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">        for (int i = 0; i &lt; text.length(); i++) {</span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">            if (text.charAt(i) == '\n') {</span>
+<span class="fc" id="L352">                paragraphs++;</span>
+            }
+        }
+<span class="fc bfc" id="L355" title="All 2 branches covered.">        if (blocks.isEmpty()) {</span>
+<span class="fc" id="L356">            blocks.add(new RichBlocks.BlockAttr());</span>
+        }
+<span class="fc bfc" id="L358" title="All 2 branches covered.">        while (blocks.size() &lt; paragraphs) {</span>
+<span class="fc" id="L359">            blocks.add(new RichBlocks.BlockAttr());</span>
+        }
+<span class="pc bpc" id="L361" title="1 of 2 branches missed.">        while (blocks.size() &gt; paragraphs) {</span>
+<span class="nc" id="L362">            blocks.remove(blocks.size() - 1);</span>
+        }
+<span class="fc" id="L364">    }</span>
+
+    private void invalidateLayout() {
+<span class="fc" id="L367">        layoutWidth = -1;</span>
+<span class="fc" id="L368">        rows = null;</span>
+<span class="fc" id="L369">        setShouldCalcPreferredSize(true);</span>
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">        if (sizeMode == SizeMode.SCROLL) {</span>
+<span class="nc" id="L371">            setScrollSize(null);</span>
+        }
+<span class="fc" id="L373">        repaint();</span>
+<span class="fc" id="L374">    }</span>
+
+    // ------------------------------------------------------------------
+    // Sizing (height-for-width)
+    // ------------------------------------------------------------------
+
+    @Override
+    public void setWidth(int width) {
+<span class="pc bpc" id="L382" title="1 of 4 branches missed.">        if (width != getWidth() &amp;&amp; sizeMode == SizeMode.SHRINK) {</span>
+<span class="fc" id="L383">            layoutWidth = -1;</span>
+<span class="fc" id="L384">            rows = null;</span>
+<span class="fc" id="L385">            setShouldCalcPreferredSize(true);</span>
+        }
+<span class="fc" id="L387">        super.setWidth(width);</span>
+<span class="fc" id="L388">    }</span>
+
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="fc" id="L392">        Style style = getStyle();</span>
+<span class="fc" id="L393">        int hPad = style.getHorizontalPadding();</span>
+<span class="fc" id="L394">        int vPad = style.getVerticalPadding();</span>
+<span class="fc" id="L395">        int w = getWidth();</span>
+        int avail;
+<span class="fc bfc" id="L397" title="All 2 branches covered.">        if (w &gt; 0) {</span>
+<span class="fc" id="L398">            avail = w - hPad;</span>
+        } else {
+            // no width assigned yet: measure the natural (unwrapped) width
+<span class="fc" id="L401">            avail = Integer.MAX_VALUE / 4;</span>
+        }
+<span class="fc" id="L403">        layout(Math.max(1, avail));</span>
+<span class="fc" id="L404">        return new Dimension(contentW + hPad, contentH + vPad);</span>
+    }
+
+    @Override
+    protected Dimension calcScrollSize() {
+<span class="nc" id="L409">        Style style = getStyle();</span>
+<span class="nc" id="L410">        int hPad = style.getHorizontalPadding();</span>
+<span class="nc" id="L411">        int vPad = style.getVerticalPadding();</span>
+<span class="nc" id="L412">        int avail = Math.max(1, getWidth() - hPad);</span>
+<span class="nc" id="L413">        layout(avail);</span>
+<span class="nc" id="L414">        return new Dimension(contentW + hPad, contentH + vPad);</span>
+    }
+
+    // ------------------------------------------------------------------
+    // Layout
+    // ------------------------------------------------------------------
+
+    private int baseSize() {
+<span class="fc" id="L422">        return painter.getBaseSizePx();</span>
+    }
+
+    private void ensurePainter() {
+<span class="fc" id="L426">        Style style = getStyle();</span>
+<span class="fc" id="L427">        Font f = style.getFont();</span>
+<span class="fc" id="L428">        painter.setBaseSizePx(0);</span>
+<span class="pc bpc" id="L429" title="1 of 2 branches missed.">        painter.setBaseFont(f == null ? Font.getDefaultFont() : f);</span>
+<span class="fc" id="L430">        painter.setTextColor(style.getFgColor());</span>
+<span class="fc" id="L431">    }</span>
+
+    /// Lays the content out into visual rows for the given available (inner) width; caches by width.
+    private void layout(int availWidth) {
+<span class="fc bfc" id="L435" title="All 4 branches covered.">        if (rows != null &amp;&amp; layoutWidth == availWidth) {</span>
+<span class="fc" id="L436">            return;</span>
+        }
+<span class="fc" id="L438">        ensurePainter();</span>
+<span class="fc" id="L439">        normalizeModel();</span>
+<span class="fc" id="L440">        List&lt;Row&gt; out = new ArrayList&lt;Row&gt;();</span>
+<span class="fc" id="L441">        int base = baseSize();</span>
+<span class="fc" id="L442">        int indentUnit = Math.round(base * 1.6f);</span>
+<span class="fc" id="L443">        int lineGap = Math.round(base * 0.2f);</span>
+<span class="fc" id="L444">        int paraGap = Math.round(base * 0.45f);</span>
+
+<span class="fc" id="L446">        int y = 0;</span>
+<span class="fc" id="L447">        int maxRowWidth = 0;</span>
+<span class="fc" id="L448">        int paraStart = 0;</span>
+<span class="fc" id="L449">        int paraIndex = 0;</span>
+<span class="fc" id="L450">        int textLen = text.length();</span>
+<span class="fc bfc" id="L451" title="All 2 branches covered.">        for (int i = 0; i &lt;= textLen; i++) {</span>
+<span class="fc bfc" id="L452" title="All 4 branches covered.">            if (i &lt; textLen &amp;&amp; text.charAt(i) != '\n') {</span>
+<span class="fc" id="L453">                continue;</span>
+            }
+            // paragraph is [paraStart, i)
+<span class="fc" id="L456">            RichBlocks.BlockAttr b = blocks.get(Math.min(paraIndex, blocks.size() - 1));</span>
+<span class="fc bfc" id="L457" title="All 2 branches covered.">            boolean wrap = b.type != RichBlocks.PRE;</span>
+<span class="fc" id="L458">            int indentPx = b.indent * indentUnit;</span>
+<span class="fc bfc" id="L459" title="All 2 branches covered.">            if (b.type == RichBlocks.BLOCKQUOTE) {</span>
+<span class="fc" id="L460">                indentPx += Math.round(base * 0.8f);</span>
+            }
+<span class="fc" id="L462">            String bullet = null;</span>
+<span class="fc" id="L463">            int bulletWidth = 0;</span>
+<span class="fc bfc" id="L464" title="All 2 branches covered.">            if (b.listType != RichBlocks.LIST_NONE) {</span>
+<span class="fc" id="L465">                bullet = markerFor(b, paraIndex);</span>
+<span class="fc" id="L466">                Font mf = painter.fontFor(base, false, false);</span>
+<span class="fc" id="L467">                bulletWidth = mf.stringWidth(bullet);</span>
+<span class="fc" id="L468">                indentPx += Math.round(base * 1.4f);</span>
+            }
+<span class="fc bfc" id="L470" title="All 2 branches covered.">            if (paraIndex &gt; 0) {</span>
+<span class="fc" id="L471">                y += paraGap;</span>
+            }
+<span class="pc bpc" id="L473" title="1 of 4 branches missed.">            if (RichRunPainter.isHeading(b.type) &amp;&amp; paraIndex &gt; 0) {</span>
+<span class="nc" id="L474">                y += Math.round(base * 0.3f);</span>
+            }
+
+<span class="fc bfc" id="L477" title="All 2 branches covered.">            int avail = wrap ? Math.max(1, availWidth - indentPx) : Integer.MAX_VALUE / 4;</span>
+<span class="fc" id="L478">            List&lt;Token&gt; tokens = tokenize(paraStart, i, b.type);</span>
+<span class="fc" id="L479">            List&lt;Row&gt; paraRows = wrapTokens(tokens, avail, base);</span>
+<span class="fc bfc" id="L480" title="All 2 branches covered.">            for (int r = 0; r &lt; paraRows.size(); r++) {</span>
+<span class="fc" id="L481">                Row row = paraRows.get(r);</span>
+<span class="fc" id="L482">                row.y = y;</span>
+<span class="fc" id="L483">                row.indentPx = indentPx;</span>
+<span class="pc bpc" id="L484" title="1 of 2 branches missed.">                row.align = alignOverride &gt;= 0 ? toBlockAlign(alignOverride) : b.align;</span>
+<span class="fc bfc" id="L485" title="All 2 branches covered.">                row.blockquote = b.type == RichBlocks.BLOCKQUOTE;</span>
+<span class="fc bfc" id="L486" title="All 4 branches covered.">                if (r == 0 &amp;&amp; bullet != null) {</span>
+<span class="fc" id="L487">                    row.bullet = bullet;</span>
+<span class="fc" id="L488">                    row.bulletWidth = bulletWidth;</span>
+                }
+<span class="fc" id="L490">                y += row.height + lineGap;</span>
+<span class="fc" id="L491">                maxRowWidth = Math.max(maxRowWidth, indentPx + row.contentWidth);</span>
+<span class="fc" id="L492">                out.add(row);</span>
+            }
+
+<span class="fc" id="L495">            paraStart = i + 1;</span>
+<span class="fc" id="L496">            paraIndex++;</span>
+        }
+
+<span class="fc" id="L499">        rows = out;</span>
+<span class="fc" id="L500">        layoutWidth = availWidth;</span>
+<span class="fc" id="L501">        contentW = maxRowWidth;</span>
+<span class="fc" id="L502">        contentH = Math.max(base, y);</span>
+<span class="fc" id="L503">    }</span>
+
+    /// Ordered-list ordinal or bullet glyph for a list paragraph.
+    private String markerFor(RichBlocks.BlockAttr b, int paraIndex) {
+<span class="fc bfc" id="L507" title="All 2 branches covered.">        if (b.listType == RichBlocks.LIST_ORDERED) {</span>
+<span class="fc" id="L508">            int ordinal = 1;</span>
+<span class="pc bpc" id="L509" title="1 of 2 branches missed.">            for (int p = paraIndex - 1; p &gt;= 0; p--) {</span>
+<span class="fc" id="L510">                RichBlocks.BlockAttr prev = blocks.get(p);</span>
+<span class="pc bpc" id="L511" title="1 of 4 branches missed.">                if (prev.listType == RichBlocks.LIST_ORDERED &amp;&amp; prev.indent == b.indent) {</span>
+<span class="fc" id="L512">                    ordinal++;</span>
+<span class="pc bpc" id="L513" title="1 of 2 branches missed.">                } else if (prev.indent &lt; b.indent) {</span>
+<span class="nc" id="L514">                    continue;</span>
+                } else {
+                    break;
+                }
+            }
+<span class="fc" id="L519">            return ordinal + &quot;. &quot;;</span>
+        }
+<span class="fc" id="L521">        return &quot;\u2022 &quot;;</span>
+    }
+
+    /// Splits a paragraph into word / space / image tokens. A word may span several styles (each style
+    /// boundary is a piece), so multi-styled words render and wrap as a unit.
+    private List&lt;Token&gt; tokenize(int start, int end, int blockType) {
+<span class="fc" id="L527">        List&lt;Token&gt; tokens = new ArrayList&lt;Token&gt;();</span>
+<span class="fc" id="L528">        Token word = null;</span>
+<span class="fc bfc" id="L529" title="All 2 branches covered.">        for (int i = start; i &lt; end; i++) {</span>
+<span class="fc" id="L530">            char c = text.charAt(i);</span>
+<span class="fc" id="L531">            TextStyle st = styleAt(i);</span>
+<span class="fc" id="L532">            String link = linkAt(i);</span>
+<span class="pc bpc" id="L533" title="1 of 2 branches missed.">            if (c == OBJECT_REPLACEMENT) {</span>
+<span class="nc bnc" id="L534" title="All 2 branches missed.">                if (word != null) {</span>
+<span class="nc" id="L535">                    tokens.add(word);</span>
+<span class="nc" id="L536">                    word = null;</span>
+                }
+<span class="nc" id="L538">                tokens.add(imageToken(i, st, link));</span>
+<span class="nc" id="L539">                continue;</span>
+            }
+<span class="pc bpc" id="L541" title="1 of 4 branches missed.">            if (c == ' ' || c == '\t') {</span>
+<span class="fc bfc" id="L542" title="All 2 branches covered.">                if (word != null) {</span>
+<span class="fc" id="L543">                    tokens.add(word);</span>
+<span class="fc" id="L544">                    word = null;</span>
+                }
+<span class="fc" id="L546">                Font f = painter.runFont(blockType, st);</span>
+<span class="fc" id="L547">                Token sp = new Token(Token.SPACE);</span>
+<span class="fc" id="L548">                Piece p = new Piece();</span>
+<span class="fc" id="L549">                p.text = &quot; &quot;;</span>
+<span class="fc" id="L550">                p.style = st;</span>
+<span class="fc" id="L551">                p.link = link;</span>
+<span class="fc" id="L552">                p.font = f;</span>
+<span class="fc" id="L553">                p.width = f.charWidth(' ');</span>
+<span class="fc" id="L554">                p.height = f.getHeight();</span>
+<span class="fc" id="L555">                sp.pieces.add(p);</span>
+<span class="fc" id="L556">                sp.width = p.width;</span>
+<span class="fc" id="L557">                tokens.add(sp);</span>
+<span class="fc" id="L558">                continue;</span>
+            }
+<span class="fc bfc" id="L560" title="All 2 branches covered.">            if (word == null) {</span>
+<span class="fc" id="L561">                word = new Token(Token.WORD);</span>
+            }
+<span class="fc" id="L563">            Font f = painter.runFont(blockType, st);</span>
+            // extend the current piece if the style/font is unchanged, else start a new piece
+<span class="fc bfc" id="L565" title="All 2 branches covered.">            Piece last = word.pieces.isEmpty() ? null : word.pieces.get(word.pieces.size() - 1);</span>
+<span class="pc bpc" id="L566" title="2 of 8 branches missed.">            if (last != null &amp;&amp; f.equals(last.font) &amp;&amp; eq(last.link, link) &amp;&amp; last.style.equals(st)) {</span>
+<span class="fc" id="L567">                last.text += c;</span>
+            } else {
+<span class="fc" id="L569">                Piece p = new Piece();</span>
+<span class="fc" id="L570">                p.text = String.valueOf(c);</span>
+<span class="fc" id="L571">                p.style = st;</span>
+<span class="fc" id="L572">                p.link = link;</span>
+<span class="fc" id="L573">                p.font = f;</span>
+<span class="fc" id="L574">                word.pieces.add(p);</span>
+            }
+        }
+<span class="fc bfc" id="L577" title="All 2 branches covered.">        if (word != null) {</span>
+<span class="fc" id="L578">            tokens.add(word);</span>
+        }
+        // finalize per-piece and per-word widths
+<span class="fc bfc" id="L581" title="All 2 branches covered.">        for (Token t : tokens) {</span>
+<span class="fc bfc" id="L582" title="All 2 branches covered.">            if (t.type == Token.WORD) {</span>
+<span class="fc" id="L583">                int w = 0;</span>
+<span class="fc bfc" id="L584" title="All 2 branches covered.">                for (Piece p : t.pieces) {</span>
+<span class="fc" id="L585">                    p.width = p.font.stringWidth(p.text);</span>
+<span class="fc" id="L586">                    p.height = p.font.getHeight();</span>
+<span class="fc" id="L587">                    w += p.width;</span>
+<span class="fc" id="L588">                }</span>
+<span class="fc" id="L589">                t.width = w;</span>
+            }
+<span class="fc" id="L591">        }</span>
+<span class="fc" id="L592">        return tokens;</span>
+    }
+
+    private Token imageToken(int index, TextStyle st, String link) {
+<span class="nc" id="L596">        Token t = new Token(Token.IMAGE);</span>
+<span class="nc" id="L597">        Piece p = new Piece();</span>
+<span class="nc" id="L598">        p.style = st;</span>
+<span class="nc" id="L599">        p.link = link;</span>
+<span class="nc bnc" id="L600" title="All 2 branches missed.">        String src = index &lt; charImages.size() ? charImages.get(index) : null;</span>
+<span class="nc" id="L601">        Image img = resolveImage(src);</span>
+<span class="nc" id="L602">        int base = baseSize();</span>
+<span class="nc bnc" id="L603" title="All 2 branches missed.">        if (img != null) {</span>
+<span class="nc" id="L604">            p.image = img;</span>
+<span class="nc" id="L605">            p.width = img.getWidth();</span>
+<span class="nc" id="L606">            p.height = img.getHeight();</span>
+        } else {
+            // placeholder square keeps layout stable when an image cannot be resolved
+<span class="nc" id="L609">            p.width = base;</span>
+<span class="nc" id="L610">            p.height = base;</span>
+        }
+<span class="nc" id="L612">        t.pieces.add(p);</span>
+<span class="nc" id="L613">        t.width = p.width;</span>
+<span class="nc" id="L614">        return t;</span>
+    }
+
+    private Image resolveImage(String source) {
+<span class="nc bnc" id="L618" title="All 6 branches missed.">        if (source == null || source.length() == 0 || imageResolver == null) {</span>
+<span class="nc" id="L619">            return null;</span>
+        }
+<span class="nc bnc" id="L621" title="All 2 branches missed.">        if (imageCache.containsKey(source)) {</span>
+<span class="nc" id="L622">            return imageCache.get(source);</span>
+        }
+<span class="nc" id="L624">        Image img = null;</span>
+        try {
+<span class="nc" id="L626">            img = imageResolver.resolve(source);</span>
+<span class="nc" id="L627">        } catch (Throwable t) { // NOPMD - a bad resolver must not break layout</span>
+<span class="nc" id="L628">            img = null;</span>
+<span class="nc" id="L629">        }</span>
+<span class="nc" id="L630">        imageCache.put(source, img);</span>
+<span class="nc" id="L631">        return img;</span>
+    }
+
+    /// Greedy line breaking of tokens into rows at the available width.
+    private List&lt;Row&gt; wrapTokens(List&lt;Token&gt; tokens, int avail, int base) {
+<span class="fc" id="L636">        List&lt;Row&gt; paraRows = new ArrayList&lt;Row&gt;();</span>
+<span class="fc" id="L637">        Row row = new Row();</span>
+<span class="fc" id="L638">        int curX = 0;</span>
+<span class="fc" id="L639">        List&lt;Token&gt; pendingSpaces = new ArrayList&lt;Token&gt;();</span>
+<span class="fc bfc" id="L640" title="All 2 branches covered.">        for (Token t : tokens) {</span>
+<span class="fc bfc" id="L641" title="All 2 branches covered.">            if (t.type == Token.SPACE) {</span>
+<span class="fc" id="L642">                pendingSpaces.add(t);</span>
+<span class="fc" id="L643">                continue;</span>
+            }
+<span class="fc" id="L645">            int spaceW = 0;</span>
+<span class="fc bfc" id="L646" title="All 2 branches covered.">            for (Token sp : pendingSpaces) {</span>
+<span class="fc" id="L647">                spaceW += sp.width;</span>
+<span class="fc" id="L648">            }</span>
+<span class="fc bfc" id="L649" title="All 4 branches covered.">            if (!row.segs.isEmpty() &amp;&amp; curX + spaceW + t.width &gt; avail) {</span>
+                // wrap: discard the trailing spaces and start a new row with this token
+<span class="fc" id="L651">                finishRow(row, base);</span>
+<span class="fc" id="L652">                paraRows.add(row);</span>
+<span class="fc" id="L653">                row = new Row();</span>
+<span class="fc" id="L654">                curX = 0;</span>
+<span class="fc" id="L655">                pendingSpaces.clear();</span>
+            } else {
+<span class="fc bfc" id="L657" title="All 2 branches covered.">                for (Token sp : pendingSpaces) {</span>
+<span class="fc" id="L658">                    curX = placeToken(row, sp, curX);</span>
+<span class="fc" id="L659">                }</span>
+<span class="fc" id="L660">                pendingSpaces.clear();</span>
+            }
+<span class="fc" id="L662">            curX = placeToken(row, t, curX);</span>
+<span class="fc" id="L663">        }</span>
+<span class="fc" id="L664">        finishRow(row, base);</span>
+<span class="fc" id="L665">        paraRows.add(row);</span>
+<span class="fc" id="L666">        return paraRows;</span>
+    }
+
+    private int placeToken(Row row, Token t, int x) {
+<span class="fc bfc" id="L670" title="All 2 branches covered.">        for (Piece p : t.pieces) {</span>
+<span class="fc" id="L671">            Seg seg = new Seg();</span>
+<span class="fc" id="L672">            seg.text = p.text;</span>
+<span class="fc" id="L673">            seg.image = p.image;</span>
+<span class="fc" id="L674">            seg.style = p.style;</span>
+<span class="fc" id="L675">            seg.link = p.link;</span>
+<span class="fc" id="L676">            seg.font = p.font;</span>
+<span class="fc" id="L677">            seg.x = x;</span>
+<span class="fc" id="L678">            seg.width = p.width;</span>
+<span class="fc" id="L679">            seg.height = p.height;</span>
+<span class="fc" id="L680">            row.segs.add(seg);</span>
+<span class="fc" id="L681">            x += p.width;</span>
+<span class="fc" id="L682">        }</span>
+<span class="fc" id="L683">        row.contentWidth = x;</span>
+<span class="fc" id="L684">        return x;</span>
+    }
+
+    private void finishRow(Row row, int base) {
+<span class="fc" id="L688">        int h = 0;</span>
+<span class="fc bfc" id="L689" title="All 2 branches covered.">        for (Seg s : row.segs) {</span>
+<span class="fc" id="L690">            h = Math.max(h, s.height);</span>
+<span class="fc" id="L691">        }</span>
+<span class="fc bfc" id="L692" title="All 2 branches covered.">        row.height = h &gt; 0 ? h : base;</span>
+<span class="fc" id="L693">    }</span>
+
+    // ------------------------------------------------------------------
+    // Paint
+    // ------------------------------------------------------------------
+
+    @Override
+    public void paint(Graphics g) {
+<span class="fc" id="L701">        Style style = getStyle();</span>
+<span class="fc" id="L702">        int hPad = style.getPaddingLeftNoRTL();</span>
+<span class="fc" id="L703">        int vPad = style.getPaddingTop();</span>
+<span class="fc" id="L704">        int avail = Math.max(1, getWidth() - style.getHorizontalPadding());</span>
+<span class="fc" id="L705">        layout(avail);</span>
+<span class="fc" id="L706">        int originX = getX() + hPad;</span>
+<span class="fc" id="L707">        int originY = getY() + vPad;</span>
+<span class="fc" id="L708">        int clipY = g.getClipY();</span>
+<span class="fc" id="L709">        int clipBottom = clipY + g.getClipHeight();</span>
+
+<span class="fc bfc" id="L711" title="All 2 branches covered.">        for (Row row : rows) {</span>
+<span class="fc" id="L712">            int rowTop = originY + row.y;</span>
+<span class="pc bpc" id="L713" title="2 of 4 branches missed.">            if (rowTop + row.height &lt; clipY || rowTop &gt; clipBottom) {</span>
+<span class="nc" id="L714">                continue;</span>
+            }
+<span class="fc" id="L716">            int shift = 0;</span>
+<span class="fc" id="L717">            int free = avail - row.indentPx - row.contentWidth;</span>
+<span class="pc bpc" id="L718" title="1 of 4 branches missed.">            if (row.align == RichBlocks.ALIGN_CENTER &amp;&amp; free &gt; 0) {</span>
+<span class="fc" id="L719">                shift = free / 2;</span>
+<span class="pc bpc" id="L720" title="3 of 4 branches missed.">            } else if (row.align == RichBlocks.ALIGN_RIGHT &amp;&amp; free &gt; 0) {</span>
+<span class="nc" id="L721">                shift = free;</span>
+            }
+<span class="fc" id="L723">            int rowLeft = originX + row.indentPx + shift;</span>
+<span class="fc bfc" id="L724" title="All 2 branches covered.">            if (row.blockquote) {</span>
+<span class="fc" id="L725">                g.setColor(0xcccccc);</span>
+<span class="fc" id="L726">                int barX = originX + row.indentPx - Math.round(baseSize() * 0.6f);</span>
+<span class="fc" id="L727">                g.fillRect(barX, rowTop, Math.max(2, Math.round(baseSize() * 0.15f)), row.height);</span>
+            }
+<span class="fc bfc" id="L729" title="All 2 branches covered.">            if (row.bullet != null) {</span>
+<span class="fc" id="L730">                Font mf = painter.fontFor(baseSize(), false, false);</span>
+<span class="fc" id="L731">                g.setColor(style.getFgColor());</span>
+<span class="fc" id="L732">                g.setFont(mf);</span>
+<span class="fc" id="L733">                g.drawString(row.bullet, rowLeft - row.bulletWidth, rowTop</span>
+<span class="fc" id="L734">                        + Math.max(0, row.height - mf.getHeight()));</span>
+            }
+<span class="fc bfc" id="L736" title="All 2 branches covered.">            for (Seg seg : row.segs) {</span>
+<span class="fc" id="L737">                int sx = rowLeft + seg.x;</span>
+<span class="pc bpc" id="L738" title="1 of 2 branches missed.">                if (seg.image != null) {</span>
+<span class="nc" id="L739">                    g.drawImage(seg.image, sx, rowTop + Math.max(0, row.height - seg.height));</span>
+<span class="pc bpc" id="L740" title="1 of 2 branches missed.">                } else if (seg.text != null) {</span>
+<span class="fc" id="L741">                    TextStyle st = seg.style;</span>
+<span class="pc bpc" id="L742" title="2 of 6 branches missed.">                    if (seg.link != null &amp;&amp; (st == null || st.getForeColor() &lt; 0)) {</span>
+<span class="pc bpc" id="L743" title="1 of 2 branches missed.">                        st = (st == null ? TextStyle.DEFAULT : st).withForeColor(linkColor).withUnderline(true);</span>
+                    }
+<span class="fc" id="L745">                    painter.paintRun(g, seg.text, st, seg.font, sx, rowTop, row.height);</span>
+                }
+<span class="fc" id="L747">            }</span>
+<span class="fc" id="L748">        }</span>
+<span class="fc" id="L749">    }</span>
+
+    // ------------------------------------------------------------------
+    // Link hit-testing
+    // ------------------------------------------------------------------
+
+    @Override
+    public void pointerReleased(int x, int y) {
+<span class="fc" id="L757">        super.pointerReleased(x, y);</span>
+<span class="pc bpc" id="L758" title="1 of 2 branches missed.">        if (linkListeners == null) {</span>
+<span class="nc" id="L759">            return;</span>
+        }
+<span class="fc" id="L761">        Style style = getStyle();</span>
+<span class="fc" id="L762">        int avail = Math.max(1, getWidth() - style.getHorizontalPadding());</span>
+<span class="fc" id="L763">        layout(avail);</span>
+<span class="fc" id="L764">        int localX = x - getAbsoluteX() - style.getPaddingLeftNoRTL();</span>
+<span class="fc" id="L765">        int localY = y - getAbsoluteY() + getScrollY() - style.getPaddingTop();</span>
+<span class="fc bfc" id="L766" title="All 2 branches covered.">        for (Row row : rows) {</span>
+<span class="pc bpc" id="L767" title="2 of 4 branches missed.">            if (localY &lt; row.y || localY &gt; row.y + row.height) {</span>
+<span class="nc" id="L768">                continue;</span>
+            }
+<span class="fc" id="L770">            int shift = 0;</span>
+<span class="fc" id="L771">            int free = avail - row.indentPx - row.contentWidth;</span>
+<span class="pc bpc" id="L772" title="3 of 4 branches missed.">            if (row.align == RichBlocks.ALIGN_CENTER &amp;&amp; free &gt; 0) {</span>
+<span class="nc" id="L773">                shift = free / 2;</span>
+<span class="pc bpc" id="L774" title="3 of 4 branches missed.">            } else if (row.align == RichBlocks.ALIGN_RIGHT &amp;&amp; free &gt; 0) {</span>
+<span class="nc" id="L775">                shift = free;</span>
+            }
+<span class="fc" id="L777">            int rowLeft = row.indentPx + shift;</span>
+<span class="fc bfc" id="L778" title="All 2 branches covered.">            for (Seg seg : row.segs) {</span>
+<span class="fc" id="L779">                int sx = rowLeft + seg.x;</span>
+<span class="pc bpc" id="L780" title="2 of 6 branches missed.">                if (seg.link != null &amp;&amp; localX &gt;= sx &amp;&amp; localX &lt;= sx + seg.width) {</span>
+<span class="fc" id="L781">                    ActionEvent ev = new ActionEvent(seg.link, x, y);</span>
+<span class="fc" id="L782">                    linkListeners.fireActionEvent(ev);</span>
+<span class="fc" id="L783">                    return;</span>
+                }
+<span class="fc" id="L785">            }</span>
+<span class="fc" id="L786">        }</span>
+<span class="fc" id="L787">    }</span>
+
+    // ------------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------------
+
+    private TextStyle styleAt(int i) {
+<span class="pc bpc" id="L794" title="2 of 4 branches missed.">        if (i &gt;= 0 &amp;&amp; i &lt; charStyles.size()) {</span>
+<span class="fc" id="L795">            TextStyle s = charStyles.get(i);</span>
+<span class="pc bpc" id="L796" title="1 of 2 branches missed.">            return s == null ? TextStyle.DEFAULT : s;</span>
+        }
+<span class="nc" id="L798">        return TextStyle.DEFAULT;</span>
+    }
+
+    private String linkAt(int i) {
+<span class="pc bpc" id="L802" title="2 of 4 branches missed.">        return i &gt;= 0 &amp;&amp; i &lt; charLinks.size() ? charLinks.get(i) : null;</span>
+    }
+
+    private static boolean eq(String a, String b) {
+<span class="pc bpc" id="L806" title="1 of 4 branches missed.">        return a == null ? b == null : a.equals(b);</span>
+    }
+
+    private static int toBlockAlign(int componentAlign) {
+<span class="nc bnc" id="L810" title="All 2 branches missed.">        if (componentAlign == CENTER) {</span>
+<span class="nc" id="L811">            return RichBlocks.ALIGN_CENTER;</span>
+        }
+<span class="nc bnc" id="L813" title="All 2 branches missed.">        if (componentAlign == RIGHT) {</span>
+<span class="nc" id="L814">            return RichBlocks.ALIGN_RIGHT;</span>
+        }
+<span class="nc" id="L816">        return RichBlocks.ALIGN_LEFT;</span>
+    }
+
+    // ------------------------------------------------------------------
+    // Layout structures
+    // ------------------------------------------------------------------
+
+    /// A styling piece within a token: a same-style text fragment or an image.
+    private static final class Piece {
+        String text;
+        Image image;
+        TextStyle style;
+        String link;
+        Font font;
+        int width;
+        int height;
+    }
+
+    /// A wrap unit: a word (one or more style pieces), a single space, or an image.
+    private static final class Token {
+        static final int WORD = 0;
+        static final int SPACE = 1;
+        static final int IMAGE = 2;
+        final int type;
+<span class="fc" id="L840">        final List&lt;Piece&gt; pieces = new ArrayList&lt;Piece&gt;();</span>
+        int width;
+
+<span class="fc" id="L843">        Token(int type) {</span>
+<span class="fc" id="L844">            this.type = type;</span>
+<span class="fc" id="L845">        }</span>
+    }
+
+    /// A positioned run within a visual row.
+    private static final class Seg {
+        String text;
+        Image image;
+        TextStyle style;
+        String link;
+        Font font;
+        int x;
+        int width;
+        int height;
+    }
+
+    /// A single visual (wrapped) row.
+<span class="fc" id="L861">    private static final class Row {</span>
+<span class="fc" id="L862">        final List&lt;Seg&gt; segs = new ArrayList&lt;Seg&gt;();</span>
+        int y;
+        int height;
+        int contentWidth;
+        int indentPx;
+        int align;
+        boolean blockquote;
+        String bullet;
+        int bulletWidth;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

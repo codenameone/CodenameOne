@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VaultCapabilities.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security.vault</a> &gt; <span class="el_source">VaultCapabilities.java</span></div><h1>VaultCapabilities.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security.vault;
+
+import com.codename1.security.vault.spi.DeviceProtection;
+
+/// What this device can do, asked before an application offers the user a choice.
+///
+/// The distinction this class draws is between **available** and **in use**. A platform can offer
+/// a remembered device without this vault having one; [Vault#protection()] answers the second
+/// question, this one answers the first. An application building a settings screen needs both: it
+/// shows the switch based on this, and shows the switch's state based on that.
+public final class VaultCapabilities {
+
+    private final DeviceProtection device;
+
+    /// Whether ordinary Storage and AES-GCM are both usable, measured directly rather than read
+    /// off the device protection -- see Vault.canKeepAndSealARecord for why the report is the
+    /// wrong source for it.
+    private final boolean canKeepARecord;
+
+<span class="fc" id="L42">    VaultCapabilities(DeviceProtection device, boolean canKeepARecord) {</span>
+<span class="fc" id="L43">        this.device = device;</span>
+<span class="fc" id="L44">        this.canKeepARecord = canKeepARecord;</span>
+<span class="fc" id="L45">    }</span>
+
+    /// Whether an unlock policy can be honoured on this device.
+    ///
+    /// [UnlockPolicy#SESSION_ONLY] needs no key STORAGE, because it stores no key -- but it is
+    /// not free of platform prerequisites, and saying it was unconditionally supported was
+    /// wrong. Enrolling under it still persists a metadata record and still seals it with
+    /// AES-GCM, so a browser with no usable IndexedDB or Web Crypto -- a restricted private
+    /// window -- advertised a policy that could only fail, and fail after the user had already
+    /// typed a password.
+    ///
+    /// Those prerequisites are measured DIRECTLY -- can Storage answer for an entry, and does a
+    /// small AES-GCM seal succeed -- and deliberately not read off the device protection's
+    /// report. That was the first attempt and it was wrong in both directions: a device store is
+    /// not what session-only uses, so an application-supplied DeviceProtection reporting no
+    /// persistence, an unplugged hardware token say, refused a policy that never touches it.
+    ///
+    /// The other two share those prerequisites and also need a device key. The strongest
+    /// additionally needs that key to be gated on user verification.
+    public boolean supports(UnlockPolicy policy) {
+        // Every policy persists encrypted metadata, even when its device key store is healthy.
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (!canKeepARecord) {</span>
+<span class="fc" id="L67">            return false;</span>
+        }
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        if (policy == UnlockPolicy.SESSION_ONLY) {</span>
+<span class="fc" id="L70">            return true;</span>
+        }
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (policy == UnlockPolicy.REQUIRE_USER_VERIFICATION) {</span>
+<span class="fc" id="L73">            DeviceProtection gated = device.userVerifying();</span>
+<span class="pc bpc" id="L74" title="1 of 4 branches missed.">            if (gated == null || !gated.requiresUserVerification()) {</span>
+<span class="fc" id="L75">                return false;</span>
+            }
+<span class="fc" id="L77">            ProtectionReport gatedReport = gated.protection();</span>
+            // The GATED mechanism's own persistence, not the base's. They can be different
+            // objects -- a passkey beside a stored key in the browser, an application's own
+            // adapter anywhere -- and checking only the base accepted a variant that does not
+            // survive a restart, so a vault enrolled under this policy was not remembered at all
+            // while the capability said it would be.
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">            return gatedReport.provides(Protection.PERSISTENT)</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">                    &amp;&amp; gatedReport.provides(Protection.USER_VERIFICATION);</span>
+        }
+<span class="fc" id="L86">        return device.protection().provides(Protection.PERSISTENT);</span>
+    }
+
+    /// What a vault enrolled under this policy would be protected by, if it were enrolled now.
+    ///
+    /// Under [UnlockPolicy#SESSION_ONLY] the key-storage answers are all `NO`, because there is
+    /// no stored key to protect -- which is a stronger position than any of them and reads as a
+    /// weaker one, so an application showing this to a user should say &quot;the password is required
+    /// every time&quot; rather than listing flags.
+    public ProtectionReport protectionFor(UnlockPolicy policy) {
+<span class="fc" id="L96">        ProtectionReport.Builder b = ProtectionReport.builder();</span>
+<span class="fc" id="L97">        b.set(Protection.ISOLATED_FROM_APPLICATION_CODE, false);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (policy == UnlockPolicy.SESSION_ONLY) {</span>
+            // What session-only needs in order to persist anything is ordinary Storage and the
+            // cipher, which is what canKeepARecord measures -- not a device store it never uses.
+<span class="fc" id="L101">            b.set(Protection.PERSISTENT, canKeepARecord);</span>
+            // Nothing that can reopen the vault is written, so what is at rest is ciphertext under
+            // a key derived from a password that is stored nowhere. Genuinely encrypted at rest.
+<span class="fc" id="L104">            b.set(Protection.ENCRYPTED_AT_REST, true);</span>
+<span class="fc" id="L105">            b.set(Protection.NON_EXTRACTABLE_KEY, false);</span>
+<span class="fc" id="L106">            b.set(Protection.OS_PROTECTED, false);</span>
+<span class="fc" id="L107">            b.set(Protection.HARDWARE_BACKED, false);</span>
+<span class="fc" id="L108">            b.set(Protection.USER_VERIFICATION, false);</span>
+<span class="fc" id="L109">            return b.build();</span>
+        }
+        // Reported from the protection that policy would actually use, which on the browser is a
+        // different mechanism for the gated policy than for the unattended one.
+        // Asked ONCE and reused. userVerifying() is a live question -- on the browser it
+        // depends on a capability probe that resolves asynchronously at startup -- so the null
+        // check and the use could see different answers, and a provider that appeared for the
+        // first and vanished for the second made this a null whose protection() call threw.
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        DeviceProtection gated = policy == UnlockPolicy.REQUIRE_USER_VERIFICATION</span>
+<span class="fc" id="L118">                ? device.userVerifying() : null;</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        DeviceProtection forPolicy = gated != null ? gated : device;</span>
+<span class="fc" id="L120">        ProtectionReport report = forPolicy.protection();</span>
+        // PERSISTENT from the mechanism this policy would actually use, not hardcoded. It used
+        // to be set to true at the top of this method for every policy, so a gated variant that
+        // does not survive a restart -- an application's own adapter, a token that is not
+        // present -- was still described as persistent, and Vault.requireProtections then
+        // accepted a PERSISTENT guarantee for an enrolment that would not be remembered at all.
+<span class="fc" id="L126">        b.set(Protection.PERSISTENT, report.answer(Protection.PERSISTENT));</span>
+        // Taken from the store rather than assumed. A remembered vault is only as encrypted at
+        // rest as the wrapping key is: where that key sits in the clear beside the ciphertext --
+        // the simulator, and Android before the keystore existed -- the records are ciphertext and
+        // the protection is not there, so a caller requiring it must be refused rather than
+        // reassured. Hardcoding yes here would have defeated those stores reporting honestly.
+<span class="fc" id="L132">        b.set(Protection.ENCRYPTED_AT_REST, report.answer(Protection.ENCRYPTED_AT_REST));</span>
+<span class="fc" id="L133">        b.set(Protection.NON_EXTRACTABLE_KEY, report.answer(Protection.NON_EXTRACTABLE_KEY));</span>
+<span class="fc" id="L134">        b.set(Protection.OS_PROTECTED, report.answer(Protection.OS_PROTECTED));</span>
+<span class="fc" id="L135">        b.set(Protection.HARDWARE_BACKED, report.answer(Protection.HARDWARE_BACKED));</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        b.set(Protection.USER_VERIFICATION,</span>
+                policy == UnlockPolicy.REQUIRE_USER_VERIFICATION
+<span class="fc" id="L138">                        ? report.answer(Protection.USER_VERIFICATION) : ProtectionReport.NO);</span>
+<span class="fc" id="L139">        return b.build();</span>
+    }
+
+    /// What the device key store itself reports, unfiltered by any policy.
+    public ProtectionReport deviceProtection() {
+<span class="nc" id="L144">        return device.protection();</span>
+    }
+
+    /// Whether this device's key store gates access on the user proving they are present.
+    public boolean requiresUserVerification() {
+<span class="nc" id="L149">        return device.requiresUserVerification();</span>
+    }
+
+    /// A line per capability, for a diagnostics screen.
+    @Override
+    public String toString() {
+<span class="nc" id="L155">        return &quot;session=&quot; + supports(UnlockPolicy.SESSION_ONLY)</span>
+<span class="nc" id="L156">                + &quot;, remember=&quot; + supports(UnlockPolicy.REMEMBER_DEVICE)</span>
+<span class="nc" id="L157">                + &quot;, userVerification=&quot; + supports(UnlockPolicy.REQUIRE_USER_VERIFICATION)</span>
+<span class="nc" id="L158">                + &quot;, device[&quot; + device.protection() + &quot;]&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

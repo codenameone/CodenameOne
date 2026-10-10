@@ -1,0 +1,847 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CSSThemeCompiler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.css</a> &gt; <span class="el_source">CSSThemeCompiler.java</span></div><h1>CSSThemeCompiler.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.css;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Image;
+import com.codename1.ui.plaf.CSSBorder;
+import com.codename1.ui.util.MutableResource;
+import java.util.ArrayList;
+import java.util.Hashtable;
+
+/// Compiles a subset of Codename One CSS into theme properties stored in a {@link MutableResource}.
+///
+/// ## Supported selector syntax
+///
+/// - `UIID`
+/// - `UIID:selected`
+/// - `UIID:pressed`
+/// - `UIID:disabled`
+/// - `UIID:hover`
+/// - `*` (mapped to `Component`)
+/// - `:root` (for constants only)
+///
+/// ## Supported declarations
+///
+/// - `color`
+/// - `background-color`
+/// - `padding`
+/// - `margin`
+/// - `font-family` (mapped to `font` string for later resolution)
+/// - `cn1-derive`
+/// - `cn1-image-id`
+/// - `cn1-mutable-image`
+/// - border-related properties: `border`, `border-*`, `background-image`, `background-position`, `background-repeat`
+///
+/// ## Theme constants
+///
+/// - CSS custom property definitions in `:root`, e.g. `--primary: #ff00ff;`
+/// - `@constants { name: value; other: value; }`
+/// - `var(--name)` dereferencing in declaration values.
+<span class="fc" id="L62">public class CSSThemeCompiler {</span>
+
+    public static class CSSSyntaxException extends IllegalArgumentException {
+        public CSSSyntaxException(String message) {
+<span class="fc" id="L66">            super(message);</span>
+<span class="fc" id="L67">        }</span>
+
+        public CSSSyntaxException(String message, Throwable cause) {
+<span class="nc" id="L70">            super(message, cause);</span>
+<span class="nc" id="L71">        }</span>
+    }
+
+    public void compile(String css, MutableResource resources, String themeName) {
+<span class="fc" id="L75">        Hashtable theme = resources.getTheme(themeName);</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (theme == null) {</span>
+<span class="fc" id="L77">            theme = new Hashtable();</span>
+        }
+
+<span class="fc" id="L80">        String strippedCss = stripComments(css);</span>
+<span class="fc" id="L81">        compileConstants(strippedCss, theme);</span>
+<span class="fc" id="L82">        Rule[] rules = parseRulesWithMedia(strippedCss);</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        for (Rule rule : rules) {</span>
+<span class="fc" id="L84">            applyRule(theme, resources, rule);</span>
+        }
+<span class="fc" id="L86">        inheritHoverDerivations(theme);</span>
+<span class="fc" id="L87">        resolveThemeConstantVars(theme);</span>
+<span class="fc" id="L88">        resources.setTheme(themeName, theme);</span>
+<span class="fc" id="L89">    }</span>
+
+    private void inheritHoverDerivations(Hashtable theme) {
+<span class="fc" id="L92">        ArrayList&lt;String&gt; ids = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        for (Object keyObj : theme.keySet()) {</span>
+<span class="fc" id="L94">            String key = String.valueOf(keyObj);</span>
+<span class="fc" id="L95">            int dot = key.indexOf('.');</span>
+<span class="pc bpc" id="L96" title="1 of 4 branches missed.">            if (key.startsWith(&quot;@&quot;) || dot &lt; 0) {</span>
+<span class="nc" id="L97">                continue;</span>
+            }
+<span class="fc" id="L99">            String id = key.substring(0, dot);</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">            if (id.startsWith(&quot;$Dark&quot;)) {</span>
+<span class="fc" id="L101">                id = id.substring(5);</span>
+            }
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            if (!ids.contains(id)) {</span>
+<span class="fc" id="L104">                ids.add(id);</span>
+            }
+<span class="fc" id="L106">        }</span>
+        // Prefixed style lookup does not follow the normal derive key. Materialize
+        // only hover derivations whose base actually declares that state.
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        for (int appearance = 0; appearance &lt; 2; appearance++) {</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            boolean dark = appearance == 1;</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            String prefix = dark ? &quot;$Dark&quot; : &quot;&quot;;</span>
+            // Each pass can expose another link in a derive chain; this is a
+            // convergence bound, not an iteration over individual component IDs.
+<span class="fc" id="L114">            int remainingPasses = ids.size();</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">            while (remainingPasses-- &gt; 0) {</span>
+<span class="fc" id="L116">                boolean changed = false;</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">                for (String id : ids) {</span>
+<span class="fc" id="L118">                    String base = hoverBase(theme, id, dark);</span>
+<span class="fc" id="L119">                    String key = prefix + id + &quot;.hover#derive&quot;;</span>
+<span class="fc bfc" id="L120" title="All 6 branches covered.">                    if (base == null || theme.containsKey(key) || cyclicDerivation(theme, id, dark)) {</span>
+<span class="fc" id="L121">                        continue;</span>
+                    }
+<span class="fc" id="L123">                    boolean baseHasHover = hasHoverDefinition(theme, prefix + base);</span>
+<span class="pc bpc" id="L124" title="1 of 4 branches missed.">                    if (dark &amp;&amp; theme.containsKey(&quot;$Dark&quot; + id + &quot;.derive&quot;)) {</span>
+<span class="nc" id="L125">                        baseHasHover |= hasHoverDefinition(theme, base);</span>
+                    }
+<span class="fc bfc" id="L127" title="All 2 branches covered.">                    if (baseHasHover) {</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">                        if (dark) {</span>
+                            // An explicit dark derive bypasses UIManager's light-style
+                            // fallback, so retain the child's own light hover overrides.
+<span class="fc" id="L131">                            ArrayList&lt;Object&gt; keys = new ArrayList&lt;Object&gt;(theme.keySet());</span>
+<span class="fc" id="L132">                            String lightPrefix = id + &quot;.hover#&quot;;</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">                            for (Object property : keys) {</span>
+<span class="fc" id="L134">                                String lightKey = String.valueOf(property);</span>
+<span class="pc bpc" id="L135" title="1 of 4 branches missed.">                                if (lightKey.startsWith(lightPrefix) &amp;&amp; !lightKey.endsWith(&quot;#derive&quot;)</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">                                        &amp;&amp; !theme.containsKey(&quot;$Dark&quot; + lightKey)) {</span>
+<span class="fc" id="L137">                                    theme.put(&quot;$Dark&quot; + lightKey, theme.get(property));</span>
+                                }
+<span class="fc" id="L139">                            }</span>
+                        }
+<span class="fc" id="L141">                        theme.put(key, base + &quot;.hover&quot;);</span>
+<span class="fc" id="L142">                        changed = true;</span>
+                    }
+<span class="fc" id="L144">                }</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">                if (!changed) {</span>
+<span class="fc" id="L146">                    break;</span>
+                }
+<span class="fc" id="L148">            }</span>
+        }
+<span class="fc" id="L150">    }</span>
+
+    private String hoverBase(Hashtable theme, String id, boolean dark) {
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        Object base = dark ? theme.get(&quot;$Dark&quot; + id + &quot;.derive&quot;) : null;</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        if (base == null) {</span>
+<span class="fc" id="L155">            base = theme.get(id + &quot;.derive&quot;);</span>
+        }
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        return base instanceof String ? (String) base : null;</span>
+    }
+
+    private boolean cyclicDerivation(Hashtable theme, String id, boolean dark) {
+<span class="fc" id="L161">        ArrayList&lt;String&gt; seen = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        while (id != null) {</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">            if (seen.contains(id)) {</span>
+<span class="fc" id="L164">                return true;</span>
+            }
+<span class="fc" id="L166">            seen.add(id);</span>
+<span class="fc" id="L167">            id = hoverBase(theme, id, dark);</span>
+        }
+<span class="fc" id="L169">        return false;</span>
+    }
+
+    private boolean hasHoverDefinition(Hashtable theme, String id) {
+<span class="fc" id="L173">        String prefix = id + &quot;.hover#&quot;;</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        for (Object key : theme.keySet()) {</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">            if (String.valueOf(key).startsWith(prefix)) {</span>
+<span class="fc" id="L176">                return true;</span>
+            }
+<span class="fc" id="L178">        }</span>
+<span class="fc" id="L179">        return false;</span>
+    }
+
+    private void resolveThemeConstantVars(Hashtable theme) {
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        for (Object keyObj : theme.keySet()) {</span>
+<span class="fc" id="L184">            String key = String.valueOf(keyObj);</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">            if (!key.startsWith(&quot;@&quot;)) {</span>
+<span class="fc" id="L186">                continue;</span>
+            }
+<span class="fc" id="L188">            Object value = theme.get(key);</span>
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">            if (!(value instanceof String)) {</span>
+<span class="nc" id="L190">                continue;</span>
+            }
+<span class="fc" id="L192">            theme.put(key, resolveVars(theme, (String) value));</span>
+<span class="fc" id="L193">        }</span>
+<span class="fc" id="L194">    }</span>
+
+    private void compileConstants(String css, Hashtable theme) {
+<span class="fc" id="L197">        int constantsStart = css.indexOf(&quot;@constants&quot;);</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        if (constantsStart &lt; 0) {</span>
+<span class="fc" id="L199">            return;</span>
+        }
+<span class="fc" id="L201">        int open = css.indexOf('{', constantsStart);</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">        if (open &lt; 0) {</span>
+<span class="nc" id="L203">            return;</span>
+        }
+<span class="fc" id="L205">        int close = css.indexOf('}', open + 1);</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">        if (close &lt;= open) {</span>
+<span class="nc" id="L207">            throw new CSSSyntaxException(&quot;Unterminated @constants block&quot;);</span>
+        }
+<span class="fc" id="L209">        Declaration[] declarations = parseDeclarations(css.substring(open + 1, close));</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">        for (Declaration declaration : declarations) {</span>
+<span class="fc" id="L211">            theme.put(&quot;@&quot; + declaration.property, declaration.value);</span>
+        }
+<span class="fc" id="L213">    }</span>
+
+    private void applyRule(Hashtable theme, MutableResource resources, Rule rule) {
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        if (&quot;:root&quot;.equals(rule.selector)) {</span>
+<span class="fc" id="L217">            applyRootDeclarations(theme, rule.declarations);</span>
+<span class="fc" id="L218">            return;</span>
+        }
+
+<span class="fc" id="L221">        String[] selectorParts = selector(rule.selector);</span>
+<span class="fc" id="L222">        String uiid = selectorParts[0];</span>
+<span class="fc" id="L223">        String statePrefix = selectorParts[1];</span>
+<span class="fc" id="L224">        StringBuilder borderCss = new StringBuilder();</span>
+
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        for (int i = 0; i &lt; rule.declarations.length; i++) {</span>
+<span class="fc" id="L227">            Declaration declaration = rule.declarations[i];</span>
+<span class="fc" id="L228">            String property = declaration.property;</span>
+<span class="fc" id="L229">            String value = resolveVars(theme, declaration.value);</span>
+
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">            if (applyThemeConstantProperty(theme, property, value)) {</span>
+<span class="nc" id="L232">                continue;</span>
+            }
+<span class="fc bfc" id="L234" title="All 2 branches covered.">            if (applySimpleThemeProperty(theme, uiid, statePrefix, property, value)) {</span>
+<span class="fc" id="L235">                continue;</span>
+            }
+<span class="fc bfc" id="L237" title="All 2 branches covered.">            if (applyImageProperty(theme, resources, uiid, statePrefix, property, value)) {</span>
+<span class="fc" id="L238">                continue;</span>
+            }
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">            if (appendBorderProperty(borderCss, property, value)) {</span>
+<span class="fc" id="L241">                continue;</span>
+            }
+        }
+
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        if (borderCss.length() == 0) {</span>
+<span class="fc" id="L246">            return;</span>
+        }
+<span class="fc" id="L248">        theme.put(uiid + &quot;.&quot; + statePrefix + &quot;border&quot;, new CSSBorder(null, borderCss.toString()));</span>
+<span class="fc" id="L249">    }</span>
+
+    private void applyRootDeclarations(Hashtable theme, Declaration[] declarations) {
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        for (Declaration declaration : declarations) {</span>
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">            if (!declaration.property.startsWith(&quot;--&quot;)) {</span>
+<span class="nc" id="L254">                continue;</span>
+            }
+<span class="fc" id="L256">            theme.put(&quot;@&quot; + declaration.property.substring(2), resolveVars(theme, declaration.value));</span>
+        }
+<span class="fc" id="L258">    }</span>
+
+    private boolean applyThemeConstantProperty(Hashtable theme, String property, String value) {
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">        if (!property.startsWith(&quot;--&quot;)) {</span>
+<span class="fc" id="L262">            return false;</span>
+        }
+<span class="nc" id="L264">        theme.put(&quot;@&quot; + property.substring(2), value);</span>
+<span class="nc" id="L265">        return true;</span>
+    }
+
+    private boolean applySimpleThemeProperty(Hashtable theme, String uiid, String statePrefix, String property, String value) {
+<span class="fc bfc" id="L269" title="All 2 branches covered.">        if (&quot;color&quot;.equals(property)) {</span>
+<span class="fc" id="L270">            theme.put(uiid + &quot;.&quot; + statePrefix + &quot;fgColor&quot;, normalizeHexColor(value));</span>
+<span class="fc" id="L271">            return true;</span>
+        }
+<span class="fc bfc" id="L273" title="All 2 branches covered.">        if (&quot;background-color&quot;.equals(property)) {</span>
+<span class="fc" id="L274">            theme.put(uiid + &quot;.&quot; + statePrefix + &quot;bgColor&quot;, normalizeHexColor(value));</span>
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">            if (!&quot;transparent&quot;.equalsIgnoreCase(value)) {</span>
+<span class="fc" id="L276">                theme.put(uiid + &quot;.&quot; + statePrefix + &quot;transparency&quot;, &quot;255&quot;);</span>
+            }
+<span class="fc" id="L278">            return true;</span>
+        }
+<span class="fc bfc" id="L280" title="All 4 branches covered.">        if (&quot;padding&quot;.equals(property) || &quot;margin&quot;.equals(property)) {</span>
+<span class="fc" id="L281">            theme.put(uiid + &quot;.&quot; + statePrefix + property, normalizeBox(value));</span>
+<span class="fc" id="L282">            return true;</span>
+        }
+<span class="fc bfc" id="L284" title="All 2 branches covered.">        if (&quot;cn1-derive&quot;.equals(property)) {</span>
+<span class="fc" id="L285">            theme.put(uiid + &quot;.&quot; + statePrefix + &quot;derive&quot;, value);</span>
+<span class="fc" id="L286">            return true;</span>
+        }
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">        if (&quot;font-family&quot;.equals(property)) {</span>
+<span class="nc" id="L289">            theme.put(uiid + &quot;.&quot; + statePrefix + &quot;font&quot;, value);</span>
+<span class="nc" id="L290">            return true;</span>
+        }
+<span class="fc bfc" id="L292" title="All 2 branches covered.">        if (&quot;text-align&quot;.equals(property)) {</span>
+<span class="fc" id="L293">            Integer align = normalizeAlignment(value);</span>
+<span class="fc" id="L294">            theme.put(uiid + &quot;.&quot; + statePrefix + &quot;align&quot;, align);</span>
+<span class="fc" id="L295">            return true;</span>
+        }
+<span class="fc" id="L297">        return false;</span>
+    }
+
+    private boolean applyImageProperty(Hashtable theme, MutableResource resources, String uiid, String statePrefix, String property, String value) {
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">        if (&quot;cn1-image-id&quot;.equals(property)) {</span>
+<span class="nc" id="L302">            Image image = resources.getImage(value);</span>
+<span class="nc bnc" id="L303" title="All 2 branches missed.">            if (image == null) {</span>
+<span class="nc" id="L304">                return true;</span>
+            }
+<span class="nc" id="L306">            theme.put(uiid + &quot;.&quot; + statePrefix + &quot;bgImage&quot;, image);</span>
+<span class="nc" id="L307">            return true;</span>
+        }
+<span class="fc bfc" id="L309" title="All 2 branches covered.">        if (!&quot;cn1-mutable-image&quot;.equals(property)) {</span>
+<span class="fc" id="L310">            return false;</span>
+        }
+<span class="fc" id="L312">        String[] parts = splitOnWhitespace(value);</span>
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">        if (parts.length &lt; 2) {</span>
+<span class="nc" id="L314">            return true;</span>
+        }
+<span class="fc" id="L316">        String imageId = parts[0];</span>
+<span class="fc" id="L317">        Image image = createSolidImage(parts[1]);</span>
+<span class="fc" id="L318">        resources.setImage(imageId, image);</span>
+<span class="fc" id="L319">        theme.put(uiid + &quot;.&quot; + statePrefix + &quot;bgImage&quot;, image);</span>
+<span class="fc" id="L320">        return true;</span>
+    }
+
+    private boolean appendBorderProperty(StringBuilder borderCss, String property, String value) {
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">        if (!isBorderProperty(property)) {</span>
+<span class="nc" id="L325">            return false;</span>
+        }
+<span class="fc bfc" id="L327" title="All 2 branches covered.">        if (&quot;border&quot;.equals(property)) {</span>
+<span class="fc" id="L328">            String expanded = expandBorderShorthand(value);</span>
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">            if (expanded.length() == 0) {</span>
+<span class="nc" id="L330">                return true;</span>
+            }
+<span class="pc bpc" id="L332" title="1 of 2 branches missed.">            if (borderCss.length() &gt; 0) {</span>
+<span class="nc" id="L333">                borderCss.append(';');</span>
+            }
+<span class="fc" id="L335">            borderCss.append(expanded);</span>
+<span class="fc" id="L336">            return true;</span>
+        }
+<span class="fc bfc" id="L338" title="All 2 branches covered.">        if (borderCss.length() &gt; 0) {</span>
+<span class="fc" id="L339">            borderCss.append(';');</span>
+        }
+<span class="fc" id="L341">        borderCss.append(property).append(':').append(value);</span>
+<span class="fc" id="L342">        return true;</span>
+    }
+
+    private String expandBorderShorthand(String value) {
+<span class="fc" id="L346">        String[] parts = splitOnWhitespace(value);</span>
+<span class="pc bpc" id="L347" title="1 of 2 branches missed.">        if (parts.length == 0) {</span>
+<span class="nc" id="L348">            throw new CSSSyntaxException(&quot;border shorthand is missing value&quot;);</span>
+        }
+<span class="fc" id="L350">        String width = null;</span>
+<span class="fc" id="L351">        String style = null;</span>
+<span class="fc" id="L352">        String color = null;</span>
+<span class="fc bfc" id="L353" title="All 2 branches covered.">        for (String part : parts) {</span>
+<span class="fc" id="L354">            String token = part.trim().toLowerCase();</span>
+<span class="pc bpc" id="L355" title="1 of 2 branches missed.">            if (token.length() == 0) {</span>
+<span class="nc" id="L356">                continue;</span>
+            }
+<span class="pc bpc" id="L358" title="4 of 12 branches missed.">            if (width == null &amp;&amp; (token.endsWith(&quot;px&quot;) || token.endsWith(&quot;mm&quot;) || token.endsWith(&quot;pt&quot;) || token.endsWith(&quot;%&quot;) || &quot;0&quot;.equals(token))) {</span>
+<span class="fc" id="L359">                width = part;</span>
+<span class="fc" id="L360">                continue;</span>
+            }
+<span class="pc bpc" id="L362" title="5 of 10 branches missed.">            if (style == null &amp;&amp; (&quot;none&quot;.equals(token) || &quot;solid&quot;.equals(token) || &quot;dashed&quot;.equals(token) || &quot;dotted&quot;.equals(token))) {</span>
+<span class="fc" id="L363">                style = token;</span>
+<span class="fc" id="L364">                continue;</span>
+            }
+<span class="pc bpc" id="L366" title="1 of 2 branches missed.">            if (color == null) {</span>
+<span class="fc" id="L367">                normalizeHexColor(part);</span>
+<span class="fc" id="L368">                color = part;</span>
+<span class="fc" id="L369">                continue;</span>
+            }
+<span class="nc" id="L371">            throw new CSSSyntaxException(&quot;Unsupported border shorthand token: &quot; + part);</span>
+        }
+<span class="fc" id="L373">        StringBuilder out = new StringBuilder();</span>
+<span class="fc bfc" id="L374" title="All 2 branches covered.">        if (width != null) {</span>
+<span class="fc" id="L375">            out.append(&quot;border-width:&quot;).append(width);</span>
+        }
+<span class="pc bpc" id="L377" title="1 of 2 branches missed.">        if (style != null) {</span>
+<span class="fc bfc" id="L378" title="All 2 branches covered.">            if (out.length() &gt; 0) {</span>
+<span class="fc" id="L379">                out.append(';');</span>
+            }
+<span class="fc" id="L381">            out.append(&quot;border-style:&quot;).append(style);</span>
+        }
+<span class="fc bfc" id="L383" title="All 2 branches covered.">        if (color != null) {</span>
+<span class="pc bpc" id="L384" title="1 of 2 branches missed.">            if (out.length() &gt; 0) {</span>
+<span class="fc" id="L385">                out.append(';');</span>
+            }
+<span class="fc" id="L387">            out.append(&quot;border-color:&quot;).append(color);</span>
+        }
+<span class="fc" id="L389">        return out.toString();</span>
+    }
+
+    private String resolveVars(Hashtable theme, String value) {
+<span class="fc" id="L393">        String out = value;</span>
+<span class="fc" id="L394">        int varPos = out.indexOf(&quot;var(--&quot;);</span>
+<span class="fc bfc" id="L395" title="All 2 branches covered.">        while (varPos &gt; -1) {</span>
+<span class="fc" id="L396">            int end = out.indexOf(')', varPos);</span>
+<span class="pc bpc" id="L397" title="1 of 2 branches missed.">            if (end &lt; 0) {</span>
+<span class="nc" id="L398">                break;</span>
+            }
+<span class="fc" id="L400">            String key = out.substring(varPos + &quot;var(--&quot;.length(), end).trim();</span>
+<span class="fc" id="L401">            Object replacement = theme.get(&quot;@&quot; + key);</span>
+<span class="pc bpc" id="L402" title="1 of 2 branches missed.">            String replaceValue = replacement == null ? &quot;&quot; : replacement.toString();</span>
+<span class="fc" id="L403">            out = out.substring(0, varPos) + replaceValue + out.substring(end + 1);</span>
+<span class="fc" id="L404">            varPos = out.indexOf(&quot;var(--&quot;);</span>
+<span class="fc" id="L405">        }</span>
+<span class="fc" id="L406">        return out;</span>
+    }
+
+    private String[] selector(String selector) {
+<span class="fc" id="L410">        String statePrefix = &quot;&quot;;</span>
+<span class="fc" id="L411">        String uiid = selector.trim();</span>
+
+<span class="fc" id="L413">        int pseudoPos = uiid.indexOf(':');</span>
+<span class="fc" id="L414">        int classStatePos = uiid.indexOf('.');</span>
+<span class="fc" id="L415">        int statePos = -1;</span>
+<span class="pc bpc" id="L416" title="1 of 4 branches missed.">        if (pseudoPos &gt; -1 &amp;&amp; classStatePos &gt; -1) {</span>
+<span class="nc" id="L417">            statePos = Math.min(pseudoPos, classStatePos);</span>
+<span class="fc bfc" id="L418" title="All 2 branches covered.">        } else if (pseudoPos &gt; -1) {</span>
+<span class="fc" id="L419">            statePos = pseudoPos;</span>
+<span class="fc bfc" id="L420" title="All 2 branches covered.">        } else if (classStatePos &gt; -1) {</span>
+<span class="fc" id="L421">            statePos = classStatePos;</span>
+        }
+
+<span class="fc bfc" id="L424" title="All 2 branches covered.">        if (statePos &gt; -1) {</span>
+<span class="fc" id="L425">            String pseudo = uiid.substring(statePos + 1).trim();</span>
+<span class="fc" id="L426">            uiid = uiid.substring(0, statePos).trim();</span>
+<span class="fc" id="L427">            statePrefix = statePrefix(pseudo);</span>
+        }
+<span class="pc bpc" id="L429" title="2 of 4 branches missed.">        if (&quot;*&quot;.equals(uiid) || uiid.length() == 0) {</span>
+<span class="nc" id="L430">            uiid = &quot;Component&quot;;</span>
+        }
+<span class="fc" id="L432">        return new String[]{uiid, statePrefix};</span>
+    }
+
+    private String statePrefix(String pseudo) {
+<span class="fc bfc" id="L436" title="All 2 branches covered.">        if (&quot;unselected&quot;.equals(pseudo)) {</span>
+<span class="fc" id="L437">            return &quot;&quot;;</span>
+        }
+<span class="pc bpc" id="L439" title="1 of 2 branches missed.">        if (&quot;selected&quot;.equals(pseudo)) {</span>
+<span class="nc" id="L440">            return &quot;sel#&quot;;</span>
+        }
+<span class="fc bfc" id="L442" title="All 2 branches covered.">        if (&quot;pressed&quot;.equals(pseudo)) {</span>
+<span class="fc" id="L443">            return &quot;press#&quot;;</span>
+        }
+<span class="pc bpc" id="L445" title="1 of 2 branches missed.">        if (&quot;disabled&quot;.equals(pseudo)) {</span>
+<span class="nc" id="L446">            return &quot;dis#&quot;;</span>
+        }
+        // The desktop state. This runtime compiler is a separate implementation from the
+        // build-time one in maven/css-compiler and shares none of its code, so a sheet using
+        // .hover compiled at run time -- CSS live reload, a theme built by an application --
+        // threw &quot;Unsupported pseudo state&quot; until it was taught the same prefix.
+<span class="fc bfc" id="L452" title="All 2 branches covered.">        if (&quot;hover&quot;.equals(pseudo)) {</span>
+<span class="fc" id="L453">            return &quot;hover#&quot;;</span>
+        }
+<span class="fc" id="L455">        throw new CSSSyntaxException(&quot;Unsupported pseudo state: &quot; + pseudo);</span>
+    }
+
+    private Image createSolidImage(String color) {
+<span class="fc" id="L459">        int rgb = parseColor(color);</span>
+<span class="fc" id="L460">        return EncodedImage.createFromRGB(new int[]{rgb}, 1, 1, false);</span>
+    }
+
+    private int parseColor(String cssColor) {
+<span class="fc" id="L464">        String hex = normalizeHexColor(cssColor);</span>
+<span class="fc" id="L465">        return Integer.parseInt(hex, 16) | 0xff000000;</span>
+    }
+
+    private boolean isBorderProperty(String property) {
+<span class="fc bfc" id="L469" title="All 2 branches covered.">        return &quot;border&quot;.equals(property)</span>
+<span class="pc bpc" id="L470" title="1 of 2 branches missed.">                || property.startsWith(&quot;border-&quot;)</span>
+<span class="nc bnc" id="L471" title="All 2 branches missed.">                || property.startsWith(&quot;background-image&quot;)</span>
+<span class="nc bnc" id="L472" title="All 2 branches missed.">                || property.startsWith(&quot;background-position&quot;)</span>
+<span class="pc bnc" id="L473" title="All 2 branches missed.">                || property.startsWith(&quot;background-repeat&quot;);</span>
+    }
+
+    private String normalizeHexColor(String cssColor) {
+<span class="pc bpc" id="L477" title="1 of 2 branches missed.">        String value = cssColor == null ? &quot;&quot; : cssColor.trim().toLowerCase();</span>
+<span class="pc bpc" id="L478" title="1 of 2 branches missed.">        if (value.length() == 0) {</span>
+<span class="nc" id="L479">            throw new CSSSyntaxException(&quot;Color value cannot be empty&quot;);</span>
+        }
+<span class="pc bpc" id="L481" title="1 of 2 branches missed.">        if (&quot;transparent&quot;.equals(value)) {</span>
+<span class="nc" id="L482">            return &quot;000000&quot;;</span>
+        }
+
+<span class="pc bpc" id="L485" title="1 of 2 branches missed.">        if (value.startsWith(&quot;rgb(&quot;)) {</span>
+<span class="nc bnc" id="L486" title="All 2 branches missed.">            if (!value.endsWith(&quot;)&quot;)) {</span>
+<span class="nc" id="L487">                throw new CSSSyntaxException(&quot;Malformed rgb() color: &quot; + cssColor);</span>
+            }
+<span class="nc" id="L489">            String[] parts = splitOnComma(value.substring(4, value.length() - 1));</span>
+<span class="nc bnc" id="L490" title="All 2 branches missed.">            if (parts.length != 3) {</span>
+<span class="nc" id="L491">                throw new CSSSyntaxException(&quot;rgb() must have exactly 3 components: &quot; + cssColor);</span>
+            }
+<span class="nc" id="L493">            int r = parseRgbChannel(parts[0], cssColor);</span>
+<span class="nc" id="L494">            int g = parseRgbChannel(parts[1], cssColor);</span>
+<span class="nc" id="L495">            int b = parseRgbChannel(parts[2], cssColor);</span>
+<span class="nc" id="L496">            return toHexColor((r &lt;&lt; 16) | (g &lt;&lt; 8) | b);</span>
+        }
+
+<span class="fc" id="L499">        String keyword = cssColorKeyword(value);</span>
+<span class="fc bfc" id="L500" title="All 2 branches covered.">        if (keyword != null) {</span>
+<span class="fc" id="L501">            return keyword;</span>
+        }
+
+<span class="pc bpc" id="L504" title="1 of 2 branches missed.">        if (value.startsWith(&quot;#&quot;)) {</span>
+<span class="fc" id="L505">            value = value.substring(1);</span>
+        }
+<span class="fc bfc" id="L507" title="All 2 branches covered.">        if (value.length() == 3) {</span>
+<span class="fc" id="L508">            value = &quot;&quot; + value.charAt(0) + value.charAt(0)</span>
+<span class="fc" id="L509">                    + value.charAt(1) + value.charAt(1)</span>
+<span class="fc" id="L510">                    + value.charAt(2) + value.charAt(2);</span>
+        }
+<span class="pc bpc" id="L512" title="1 of 4 branches missed.">        if (value.length() != 6 || !isHexColor(value)) {</span>
+<span class="fc" id="L513">            throw new CSSSyntaxException(&quot;Unsupported color value: &quot; + cssColor);</span>
+        }
+<span class="fc" id="L515">        return value;</span>
+    }
+
+    private Integer normalizeAlignment(String value) {
+<span class="pc bpc" id="L519" title="1 of 2 branches missed.">        String v = value == null ? &quot;&quot; : value.trim().toLowerCase();</span>
+<span class="pc bpc" id="L520" title="2 of 4 branches missed.">        if (&quot;left&quot;.equals(v) || &quot;start&quot;.equals(v)) {</span>
+<span class="nc" id="L521">            return Integer.valueOf(Component.LEFT);</span>
+        }
+<span class="fc bfc" id="L523" title="All 2 branches covered.">        if (&quot;center&quot;.equals(v)) {</span>
+<span class="fc" id="L524">            return Integer.valueOf(Component.CENTER);</span>
+        }
+<span class="pc bpc" id="L526" title="2 of 4 branches missed.">        if (&quot;right&quot;.equals(v) || &quot;end&quot;.equals(v)) {</span>
+<span class="nc" id="L527">            return Integer.valueOf(Component.RIGHT);</span>
+        }
+<span class="fc" id="L529">        throw new CSSSyntaxException(&quot;Unsupported text-align value: &quot; + value);</span>
+    }
+
+    private String cssColorKeyword(String value) {
+<span class="pc bpc" id="L533" title="1 of 2 branches missed.">        if (&quot;black&quot;.equals(value)) {</span>
+<span class="nc" id="L534">            return &quot;000000&quot;;</span>
+        }
+<span class="fc bfc" id="L536" title="All 2 branches covered.">        if (&quot;white&quot;.equals(value)) {</span>
+<span class="fc" id="L537">            return &quot;ffffff&quot;;</span>
+        }
+<span class="pc bpc" id="L539" title="1 of 2 branches missed.">        if (&quot;red&quot;.equals(value)) {</span>
+<span class="nc" id="L540">            return &quot;ff0000&quot;;</span>
+        }
+<span class="pc bpc" id="L542" title="1 of 2 branches missed.">        if (&quot;green&quot;.equals(value)) {</span>
+<span class="nc" id="L543">            return &quot;008000&quot;;</span>
+        }
+<span class="pc bpc" id="L545" title="1 of 2 branches missed.">        if (&quot;blue&quot;.equals(value)) {</span>
+<span class="nc" id="L546">            return &quot;0000ff&quot;;</span>
+        }
+<span class="fc bfc" id="L548" title="All 2 branches covered.">        if (&quot;pink&quot;.equals(value)) {</span>
+<span class="fc" id="L549">            return &quot;ffc0cb&quot;;</span>
+        }
+<span class="pc bpc" id="L551" title="1 of 2 branches missed.">        if (&quot;orange&quot;.equals(value)) {</span>
+<span class="nc" id="L552">            return &quot;ffa500&quot;;</span>
+        }
+<span class="pc bpc" id="L554" title="1 of 2 branches missed.">        if (&quot;yellow&quot;.equals(value)) {</span>
+<span class="nc" id="L555">            return &quot;ffff00&quot;;</span>
+        }
+<span class="pc bpc" id="L557" title="1 of 2 branches missed.">        if (&quot;purple&quot;.equals(value)) {</span>
+<span class="nc" id="L558">            return &quot;800080&quot;;</span>
+        }
+<span class="pc bpc" id="L560" title="2 of 4 branches missed.">        if (&quot;gray&quot;.equals(value) || &quot;grey&quot;.equals(value)) {</span>
+<span class="nc" id="L561">            return &quot;808080&quot;;</span>
+        }
+<span class="fc" id="L563">        return null;</span>
+    }
+
+    private int parseRgbChannel(String value, String originalColor) {
+        int out;
+        try {
+<span class="nc" id="L569">            out = Integer.parseInt(value.trim());</span>
+<span class="nc" id="L570">        } catch (RuntimeException err) {</span>
+<span class="nc" id="L571">            throw new CSSSyntaxException(&quot;Invalid rgb() channel value in &quot; + originalColor + &quot;: &quot; + value, err);</span>
+<span class="nc" id="L572">        }</span>
+<span class="nc bnc" id="L573" title="All 4 branches missed.">        if (out &lt; 0 || out &gt; 255) {</span>
+<span class="nc" id="L574">            throw new CSSSyntaxException(&quot;rgb() channel out of range in &quot; + originalColor + &quot;: &quot; + value);</span>
+        }
+<span class="nc" id="L576">        return out;</span>
+    }
+
+    private boolean isHexColor(String value) {
+<span class="fc bfc" id="L580" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L581">            char c = value.charAt(i);</span>
+<span class="pc bpc" id="L582" title="7 of 12 branches missed.">            boolean hex = (c &gt;= '0' &amp;&amp; c &lt;= '9')</span>
+                    || (c &gt;= 'a' &amp;&amp; c &lt;= 'f')
+                    || (c &gt;= 'A' &amp;&amp; c &lt;= 'F');
+<span class="pc bpc" id="L585" title="1 of 2 branches missed.">            if (!hex) {</span>
+<span class="nc" id="L586">                return false;</span>
+            }
+        }
+<span class="fc" id="L589">        return true;</span>
+    }
+
+    private String toHexColor(int color) {
+<span class="nc" id="L593">        String hex = Integer.toHexString(color &amp; 0xffffff);</span>
+<span class="nc bnc" id="L594" title="All 2 branches missed.">        while (hex.length() &lt; 6) {</span>
+<span class="nc" id="L595">            hex = &quot;0&quot; + hex;</span>
+        }
+<span class="nc" id="L597">        return hex;</span>
+    }
+
+    private String normalizeBox(String cssValue) {
+<span class="fc" id="L601">        String[] parts = splitOnWhitespace(cssValue.trim());</span>
+<span class="pc bpc" id="L602" title="1 of 2 branches missed.">        if (parts.length == 1) {</span>
+<span class="nc" id="L603">            return scalar(parts[0]) + &quot;,&quot; + scalar(parts[0]) + &quot;,&quot; + scalar(parts[0]) + &quot;,&quot; + scalar(parts[0]);</span>
+        }
+<span class="fc bfc" id="L605" title="All 2 branches covered.">        if (parts.length == 2) {</span>
+<span class="fc" id="L606">            return scalar(parts[0]) + &quot;,&quot; + scalar(parts[1]) + &quot;,&quot; + scalar(parts[0]) + &quot;,&quot; + scalar(parts[1]);</span>
+        }
+<span class="pc bpc" id="L608" title="1 of 2 branches missed.">        if (parts.length == 3) {</span>
+<span class="nc" id="L609">            return scalar(parts[0]) + &quot;,&quot; + scalar(parts[1]) + &quot;,&quot; + scalar(parts[2]) + &quot;,&quot; + scalar(parts[1]);</span>
+        }
+<span class="pc bpc" id="L611" title="1 of 2 branches missed.">        if (parts.length &gt;= 4) {</span>
+<span class="fc" id="L612">            return scalar(parts[0]) + &quot;,&quot; + scalar(parts[1]) + &quot;,&quot; + scalar(parts[2]) + &quot;,&quot; + scalar(parts[3]);</span>
+        }
+<span class="nc" id="L614">        return &quot;0,0,0,0&quot;;</span>
+    }
+
+    private String scalar(String value) {
+<span class="fc" id="L618">        String out = value.trim();</span>
+<span class="pc bpc" id="L619" title="1 of 2 branches missed.">        if (out.endsWith(&quot;px&quot;)) {</span>
+<span class="fc" id="L620">            out = out.substring(0, out.length() - 2);</span>
+        }
+<span class="fc" id="L622">        return out;</span>
+    }
+
+    private Rule[] parseRulesWithMedia(String css) {
+<span class="fc" id="L626">        ArrayList&lt;Rule&gt; out = new ArrayList&lt;Rule&gt;();</span>
+<span class="fc" id="L627">        parseRulesInto(css, out, false);</span>
+<span class="fc" id="L628">        return out.toArray(new Rule[out.size()]);</span>
+    }
+
+    private void parseRulesInto(String css, ArrayList&lt;Rule&gt; out, boolean darkContext) {
+<span class="fc" id="L632">        int pos = 0;</span>
+<span class="fc" id="L633">        int len = css.length();</span>
+<span class="fc bfc" id="L634" title="All 2 branches covered.">        while (pos &lt; len) {</span>
+<span class="fc bfc" id="L635" title="All 4 branches covered.">            while (pos &lt; len &amp;&amp; Character.isWhitespace(css.charAt(pos))) {</span>
+<span class="fc" id="L636">                pos++;</span>
+            }
+<span class="fc bfc" id="L638" title="All 2 branches covered.">            if (pos &gt;= len) {</span>
+<span class="fc" id="L639">                break;</span>
+            }
+<span class="fc" id="L641">            int open = css.indexOf('{', pos);</span>
+<span class="pc bpc" id="L642" title="1 of 2 branches missed.">            if (open &lt; 0) {</span>
+<span class="nc" id="L643">                throw new CSSSyntaxException(&quot;Missing '{' in CSS rule near: &quot; + css.substring(pos));</span>
+            }
+
+<span class="fc" id="L646">            String selectors = css.substring(pos, open).trim();</span>
+<span class="fc" id="L647">            int close = findMatchingBrace(css, open);</span>
+<span class="pc bpc" id="L648" title="1 of 2 branches missed.">            if (close &lt; 0) {</span>
+<span class="nc" id="L649">                throw new CSSSyntaxException(&quot;Missing '}' for CSS rule: &quot; + selectors);</span>
+            }
+
+<span class="fc bfc" id="L652" title="All 2 branches covered.">            if (selectors.startsWith(&quot;@constants&quot;)) {</span>
+<span class="fc" id="L653">                pos = close + 1;</span>
+<span class="fc" id="L654">                continue;</span>
+            }
+<span class="fc bfc" id="L656" title="All 2 branches covered.">            if (selectors.startsWith(&quot;@media&quot;)) {</span>
+<span class="fc" id="L657">                String mediaQuery = selectors.substring(&quot;@media&quot;.length()).trim();</span>
+<span class="pc bpc" id="L658" title="2 of 4 branches missed.">                boolean nextDarkContext = darkContext || isDarkModeMediaQuery(mediaQuery);</span>
+<span class="fc" id="L659">                parseRulesInto(css.substring(open + 1, close), out, nextDarkContext);</span>
+<span class="fc" id="L660">                pos = close + 1;</span>
+<span class="fc" id="L661">                continue;</span>
+            }
+<span class="pc bpc" id="L663" title="1 of 2 branches missed.">            if (selectors.length() == 0) {</span>
+<span class="nc" id="L664">                throw new CSSSyntaxException(&quot;Missing selector before '{'&quot;);</span>
+            }
+
+<span class="fc" id="L667">            String body = css.substring(open + 1, close).trim();</span>
+<span class="fc" id="L668">            Declaration[] declarations = parseDeclarations(body);</span>
+<span class="fc" id="L669">            String[] selectorsList = splitOnChar(selectors, ',');</span>
+<span class="fc bfc" id="L670" title="All 2 branches covered.">            for (String selectorEntry : selectorsList) {</span>
+<span class="fc" id="L671">                String selector = selectorEntry.trim();</span>
+<span class="pc bpc" id="L672" title="1 of 2 branches missed.">                if (selector.length() == 0) {</span>
+<span class="nc" id="L673">                    throw new CSSSyntaxException(&quot;Empty selector in selector list: &quot; + selectors);</span>
+                }
+<span class="fc" id="L675">                Rule rule = new Rule();</span>
+<span class="fc bfc" id="L676" title="All 2 branches covered.">                rule.selector = darkContext ? toDarkSelector(selector) : selector;</span>
+<span class="fc" id="L677">                rule.declarations = declarations;</span>
+<span class="fc" id="L678">                out.add(rule);</span>
+            }
+
+<span class="fc" id="L681">            pos = close + 1;</span>
+<span class="fc" id="L682">        }</span>
+<span class="fc" id="L683">    }</span>
+
+    private int findMatchingBrace(String css, int openPos) {
+<span class="fc" id="L686">        int depth = 0;</span>
+<span class="fc" id="L687">        int len = css.length();</span>
+<span class="pc bpc" id="L688" title="1 of 2 branches missed.">        for (int i = openPos; i &lt; len; i++) {</span>
+<span class="fc" id="L689">            char c = css.charAt(i);</span>
+<span class="fc bfc" id="L690" title="All 2 branches covered.">            if (c == '{') {</span>
+<span class="fc" id="L691">                depth++;</span>
+<span class="fc bfc" id="L692" title="All 2 branches covered.">            } else if (c == '}') {</span>
+<span class="fc" id="L693">                depth--;</span>
+<span class="fc bfc" id="L694" title="All 2 branches covered.">                if (depth == 0) {</span>
+<span class="fc" id="L695">                    return i;</span>
+                }
+            }
+        }
+<span class="nc" id="L699">        return -1;</span>
+    }
+
+    private boolean isDarkModeMediaQuery(String mediaQuery) {
+<span class="pc bpc" id="L703" title="1 of 2 branches missed.">        String normalized = mediaQuery == null ? &quot;&quot; : mediaQuery.toLowerCase();</span>
+<span class="pc bpc" id="L704" title="2 of 4 branches missed.">        return normalized.indexOf(&quot;prefers-color-scheme&quot;) &gt; -1 &amp;&amp; normalized.indexOf(&quot;dark&quot;) &gt; -1;</span>
+    }
+
+    private String toDarkSelector(String selector) {
+<span class="pc bpc" id="L708" title="1 of 2 branches missed.">        String trimmed = selector == null ? &quot;&quot; : selector.trim();</span>
+<span class="pc bpc" id="L709" title="2 of 4 branches missed.">        if (trimmed.length() == 0 || &quot;:root&quot;.equals(trimmed)) {</span>
+<span class="nc" id="L710">            return trimmed;</span>
+        }
+<span class="pc bpc" id="L712" title="1 of 2 branches missed.">        if (trimmed.startsWith(&quot;$Dark&quot;)) {</span>
+<span class="nc" id="L713">            return trimmed;</span>
+        }
+
+<span class="fc" id="L716">        int pseudoPos = trimmed.indexOf(':');</span>
+<span class="fc" id="L717">        int classStatePos = trimmed.indexOf('.');</span>
+<span class="fc" id="L718">        int statePos = -1;</span>
+<span class="pc bpc" id="L719" title="1 of 4 branches missed.">        if (pseudoPos &gt; -1 &amp;&amp; classStatePos &gt; -1) {</span>
+<span class="nc" id="L720">            statePos = Math.min(pseudoPos, classStatePos);</span>
+<span class="fc bfc" id="L721" title="All 2 branches covered.">        } else if (pseudoPos &gt; -1) {</span>
+<span class="fc" id="L722">            statePos = pseudoPos;</span>
+<span class="pc bpc" id="L723" title="1 of 2 branches missed.">        } else if (classStatePos &gt; -1) {</span>
+<span class="nc" id="L724">            statePos = classStatePos;</span>
+        }
+<span class="fc bfc" id="L726" title="All 2 branches covered.">        String baseSelector = statePos &gt; -1 ? trimmed.substring(0, statePos) : trimmed;</span>
+<span class="fc bfc" id="L727" title="All 2 branches covered.">        String stateSelector = statePos &gt; -1 ? trimmed.substring(statePos) : &quot;&quot;;</span>
+<span class="pc bpc" id="L728" title="2 of 4 branches missed.">        if (&quot;*&quot;.equals(baseSelector) || baseSelector.length() == 0) {</span>
+<span class="nc" id="L729">            baseSelector = &quot;Component&quot;;</span>
+        }
+<span class="fc" id="L731">        return &quot;$Dark&quot; + baseSelector + stateSelector;</span>
+    }
+
+    private String stripComments(String css) {
+<span class="fc" id="L735">        StringBuilder out = new StringBuilder();</span>
+<span class="fc" id="L736">        int i = 0;</span>
+<span class="fc bfc" id="L737" title="All 2 branches covered.">        while (i &lt; css.length()) {</span>
+<span class="fc" id="L738">            char c = css.charAt(i);</span>
+<span class="pc bpc" id="L739" title="5 of 6 branches missed.">            if (c == '/' &amp;&amp; i + 1 &lt; css.length() &amp;&amp; css.charAt(i + 1) == '*') {</span>
+<span class="nc" id="L740">                i += 2;</span>
+<span class="nc" id="L741">                boolean closed = false;</span>
+<span class="nc bnc" id="L742" title="All 2 branches missed.">                while (i + 1 &lt; css.length()) {</span>
+<span class="nc bnc" id="L743" title="All 4 branches missed.">                    if (css.charAt(i) == '*' &amp;&amp; css.charAt(i + 1) == '/') {</span>
+<span class="nc" id="L744">                        i += 2;</span>
+<span class="nc" id="L745">                        closed = true;</span>
+<span class="nc" id="L746">                        break;</span>
+                    }
+<span class="nc" id="L748">                    i++;</span>
+                }
+<span class="nc bnc" id="L750" title="All 2 branches missed.">                if (!closed) {</span>
+<span class="nc" id="L751">                    throw new CSSSyntaxException(&quot;Unterminated CSS comment&quot;);</span>
+                }
+                continue;
+            }
+<span class="fc" id="L755">            out.append(c);</span>
+<span class="fc" id="L756">            i++;</span>
+<span class="fc" id="L757">        }</span>
+<span class="fc" id="L758">        return out.toString();</span>
+    }
+
+    private Declaration[] parseDeclarations(String body) {
+<span class="fc" id="L762">        ArrayList&lt;Declaration&gt; out = new ArrayList&lt;Declaration&gt;();</span>
+<span class="fc" id="L763">        String[] segments = splitOnChar(body, ';');</span>
+<span class="fc bfc" id="L764" title="All 2 branches covered.">        for (String line : segments) {</span>
+<span class="fc" id="L765">            String trimmed = line.trim();</span>
+<span class="fc bfc" id="L766" title="All 2 branches covered.">            if (trimmed.length() == 0) {</span>
+<span class="fc" id="L767">                continue;</span>
+            }
+<span class="fc" id="L769">            int colon = trimmed.indexOf(':');</span>
+<span class="pc bpc" id="L770" title="2 of 4 branches missed.">            if (colon &lt;= 0 || colon == trimmed.length() - 1) {</span>
+<span class="nc" id="L771">                throw new CSSSyntaxException(&quot;Malformed declaration: &quot; + trimmed);</span>
+            }
+<span class="fc" id="L773">            Declaration dec = new Declaration();</span>
+<span class="fc" id="L774">            dec.property = trimmed.substring(0, colon).trim().toLowerCase();</span>
+<span class="fc" id="L775">            dec.value = trimmed.substring(colon + 1).trim();</span>
+<span class="pc bpc" id="L776" title="2 of 4 branches missed.">            if (dec.property.length() == 0 || dec.value.length() == 0) {</span>
+<span class="nc" id="L777">                throw new CSSSyntaxException(&quot;Malformed declaration: &quot; + trimmed);</span>
+            }
+<span class="fc" id="L779">            out.add(dec);</span>
+        }
+<span class="fc" id="L781">        return out.toArray(new Declaration[out.size()]);</span>
+    }
+
+    private String[] splitOnChar(String input, char delimiter) {
+<span class="fc" id="L785">        ArrayList&lt;String&gt; out = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L786">        int start = 0;</span>
+<span class="fc bfc" id="L787" title="All 2 branches covered.">        for (int i = 0; i &lt; input.length(); i++) {</span>
+<span class="fc bfc" id="L788" title="All 2 branches covered.">            if (input.charAt(i) != delimiter) {</span>
+<span class="fc" id="L789">                continue;</span>
+            }
+<span class="fc" id="L791">            out.add(input.substring(start, i));</span>
+<span class="fc" id="L792">            start = i + 1;</span>
+        }
+<span class="fc" id="L794">        out.add(input.substring(start));</span>
+<span class="fc" id="L795">        return out.toArray(new String[out.size()]);</span>
+    }
+
+    private String[] splitOnComma(String input) {
+<span class="nc" id="L799">        ArrayList&lt;String&gt; parts = new ArrayList&lt;String&gt;();</span>
+<span class="nc" id="L800">        int start = 0;</span>
+<span class="nc bnc" id="L801" title="All 2 branches missed.">        for (int i = 0; i &lt; input.length(); i++) {</span>
+<span class="nc bnc" id="L802" title="All 2 branches missed.">            if (input.charAt(i) == ',') {</span>
+<span class="nc" id="L803">                String token = input.substring(start, i).trim();</span>
+<span class="nc bnc" id="L804" title="All 2 branches missed.">                if (token.length() &gt; 0) {</span>
+<span class="nc" id="L805">                    parts.add(token);</span>
+                }
+<span class="nc" id="L807">                start = i + 1;</span>
+            }
+        }
+<span class="nc" id="L810">        String tail = input.substring(start).trim();</span>
+<span class="nc bnc" id="L811" title="All 2 branches missed.">        if (tail.length() &gt; 0) {</span>
+<span class="nc" id="L812">            parts.add(tail);</span>
+        }
+<span class="nc" id="L814">        return parts.toArray(new String[parts.size()]);</span>
+    }
+
+    private String[] splitOnWhitespace(String input) {
+<span class="fc" id="L818">        ArrayList&lt;String&gt; out = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L819">        StringBuilder token = new StringBuilder();</span>
+<span class="fc bfc" id="L820" title="All 2 branches covered.">        for (int i = 0; i &lt; input.length(); i++) {</span>
+<span class="fc" id="L821">            char c = input.charAt(i);</span>
+<span class="fc bfc" id="L822" title="All 2 branches covered.">            if (Character.isWhitespace(c)) {</span>
+<span class="pc bpc" id="L823" title="1 of 2 branches missed.">                if (token.length() &gt; 0) {</span>
+<span class="fc" id="L824">                    out.add(token.toString());</span>
+<span class="fc" id="L825">                    token.setLength(0);</span>
+                }
+                continue;
+            }
+<span class="fc" id="L829">            token.append(c);</span>
+        }
+<span class="pc bpc" id="L831" title="1 of 2 branches missed.">        if (token.length() &gt; 0) {</span>
+<span class="fc" id="L832">            out.add(token.toString());</span>
+        }
+<span class="fc" id="L834">        return out.toArray(new String[out.size()]);</span>
+    }
+
+    private static class Rule {
+        String selector;
+        Declaration[] declarations;
+    }
+
+    private static class Declaration {
+        String property;
+        String value;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

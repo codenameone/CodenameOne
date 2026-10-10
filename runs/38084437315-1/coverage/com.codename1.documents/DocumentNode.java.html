@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DocumentNode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.documents</a> &gt; <span class="el_source">DocumentNode.java</span></div><h1>DocumentNode.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.documents;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// One entry in the tree an app publishes through `DocumentProvider`: a folder or a file, as the
+/// system file browser will show it.
+///
+/// A node is identified by an `id` that is stable for the lifetime of the item. The platform
+/// remembers ids -- a favourite in the Files app, a recent document, a running download -- so
+/// reusing an id for different content, or renumbering ids on every publish, makes the browser
+/// point at the wrong thing. Derive the id from your own record key rather than from list order.
+///
+/// A file node names its content in one of two ways, matching the two modes described on
+/// `DocumentProvider`:
+///
+/// - `setPath` -- a path relative to `DocumentProvider.getSharedDirectory()`, for bytes the app
+///   has already written into the shared container.
+/// - `setRemoteId` -- an opaque key the app's HTTPS endpoint understands, for content fetched on
+///   demand.
+///
+/// A node with neither is a placeholder: it is listed, and opening it fails. A node with both
+/// prefers the local path, which is what makes a cached copy of a remote document open instantly.
+///
+/// ```java
+/// DocumentNode root = DocumentNode.folder(&quot;root&quot;, &quot;Invoices&quot;);
+/// root.add(DocumentNode.file(&quot;inv-2031&quot;, &quot;January.pdf&quot;)
+///         .setContentType(&quot;application/pdf&quot;)
+///         .setPath(&quot;invoices/january.pdf&quot;)
+///         .setSize(len));
+/// ```
+public class DocumentNode {
+    private final String id;
+    private final boolean folder;
+    private String name;
+    private String contentType;
+    private String path;
+    private String remoteId;
+<span class="fc" id="L62">    private long size = -1;</span>
+<span class="fc" id="L63">    private long lastModified = -1;</span>
+<span class="fc" id="L64">    private final List&lt;DocumentNode&gt; children = new ArrayList&lt;DocumentNode&gt;();</span>
+
+    /// Creates a node.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the stable identity of this item; must not be null or empty
+    /// - `name`: the display name shown in the file browser
+    /// - `folder`: true for a folder, false for a file
+<span class="fc" id="L73">    public DocumentNode(String id, String name, boolean folder) {</span>
+<span class="fc bfc" id="L74" title="All 4 branches covered.">        if (id == null || id.length() == 0) {</span>
+<span class="fc" id="L75">            throw new IllegalArgumentException(&quot;A document node needs a non-empty id&quot;);</span>
+        }
+<span class="fc" id="L77">        this.id = id;</span>
+<span class="fc" id="L78">        this.name = name;</span>
+<span class="fc" id="L79">        this.folder = folder;</span>
+<span class="fc" id="L80">    }</span>
+
+    /// Creates a folder node.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the stable identity of this folder
+    /// - `name`: the display name
+    ///
+    /// #### Returns
+    ///
+    /// the new folder
+    public static DocumentNode folder(String id, String name) {
+<span class="fc" id="L93">        return new DocumentNode(id, name, true);</span>
+    }
+
+    /// Creates a file node.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the stable identity of this file
+    /// - `name`: the display name, normally including an extension
+    ///
+    /// #### Returns
+    ///
+    /// the new file
+    public static DocumentNode file(String id, String name) {
+<span class="fc" id="L107">        return new DocumentNode(id, name, false);</span>
+    }
+
+    /// Returns the stable identity of this item.
+    public String getId() {
+<span class="fc" id="L112">        return id;</span>
+    }
+
+    /// Returns true when this node is a folder.
+    public boolean isFolder() {
+<span class="fc" id="L117">        return folder;</span>
+    }
+
+    /// Returns the display name shown in the file browser.
+    public String getName() {
+<span class="fc" id="L122">        return name;</span>
+    }
+
+    /// Sets the display name shown in the file browser.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the display name
+    ///
+    /// #### Returns
+    ///
+    /// this node, for chaining
+    public DocumentNode setName(String name) {
+<span class="nc" id="L135">        this.name = name;</span>
+<span class="nc" id="L136">        return this;</span>
+    }
+
+    /// Returns the MIME type of this item's content, or null when unknown.
+    public String getContentType() {
+<span class="fc" id="L141">        return contentType;</span>
+    }
+
+    /// Sets the MIME type of this item's content. Worth setting: it is how the browser decides
+    /// which apps can open the item and which preview to draw. Ignored for folders.
+    ///
+    /// #### Parameters
+    ///
+    /// - `contentType`: a MIME type such as `application/pdf`
+    ///
+    /// #### Returns
+    ///
+    /// this node, for chaining
+    public DocumentNode setContentType(String contentType) {
+<span class="fc" id="L155">        this.contentType = contentType;</span>
+<span class="fc" id="L156">        return this;</span>
+    }
+
+    /// Returns the path of this item's content relative to the shared directory, or null.
+    public String getPath() {
+<span class="fc" id="L161">        return path;</span>
+    }
+
+    /// Points this item at bytes the app has written under
+    /// `DocumentProvider.getSharedDirectory()`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: a relative path such as `invoices/january.pdf`; a leading separator is ignored
+    ///
+    /// #### Returns
+    ///
+    /// this node, for chaining
+    public DocumentNode setPath(String path) {
+<span class="fc" id="L175">        this.path = path;</span>
+<span class="fc" id="L176">        return this;</span>
+    }
+
+    /// Returns the key this item's content is fetched by from the remote endpoint, or null.
+    public String getRemoteId() {
+<span class="fc" id="L181">        return remoteId;</span>
+    }
+
+    /// Points this item at content fetched on demand from the endpoint given to
+    /// `DocumentProvider.setRemoteEndpoint`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `remoteId`: an opaque key the endpoint understands
+    ///
+    /// #### Returns
+    ///
+    /// this node, for chaining
+    public DocumentNode setRemoteId(String remoteId) {
+<span class="fc" id="L195">        this.remoteId = remoteId;</span>
+<span class="fc" id="L196">        return this;</span>
+    }
+
+    /// Returns the size in bytes, or -1 when unknown.
+    public long getSize() {
+<span class="fc" id="L201">        return size;</span>
+    }
+
+    /// Sets the size in bytes. The browser shows this before any content is fetched, so it is
+    /// worth setting for remote items even though it costs a round trip to learn.
+    ///
+    /// For a remote item the size is NOT how the browser learns that content changed: content
+    /// can change to different bytes of the same length -- a corrected total, a redacted page --
+    /// and the size would not move. `setLastModified` is the signal. Declare it and keep it
+    /// accurate across republishes; a remote item that declares no date is versioned by the
+    /// publication instead, which means it is re-fetched whenever anything is published, and one
+    /// that declares a date it never updates is served from the cache for good.
+    ///
+    /// Items backed by the shared directory need none of this; their bytes are measured
+    /// directly.
+    ///
+    /// #### Parameters
+    ///
+    /// - `size`: the size in bytes, or -1 when unknown
+    ///
+    /// #### Returns
+    ///
+    /// this node, for chaining
+    public DocumentNode setSize(long size) {
+<span class="fc" id="L225">        this.size = size;</span>
+<span class="fc" id="L226">        return this;</span>
+    }
+
+    /// Returns the last-modified time in milliseconds since the epoch, or -1 when unknown.
+    public long getLastModified() {
+<span class="fc" id="L231">        return lastModified;</span>
+    }
+
+    /// Sets the last-modified time.
+    ///
+    /// #### Parameters
+    ///
+    /// - `lastModified`: milliseconds since the epoch, or -1 when unknown
+    ///
+    /// #### Returns
+    ///
+    /// this node, for chaining
+    public DocumentNode setLastModified(long lastModified) {
+<span class="fc" id="L244">        this.lastModified = lastModified;</span>
+<span class="fc" id="L245">        return this;</span>
+    }
+
+
+    /// Adds a child to this folder.
+    ///
+    /// #### Parameters
+    ///
+    /// - `child`: the child node
+    ///
+    /// #### Returns
+    ///
+    /// this node, for chaining
+    public DocumentNode add(DocumentNode child) {
+<span class="pc bpc" id="L259" title="1 of 2 branches missed.">        if (child == null) {</span>
+<span class="nc" id="L260">            return this;</span>
+        }
+<span class="fc bfc" id="L262" title="All 2 branches covered.">        if (!folder) {</span>
+<span class="fc" id="L263">            throw new IllegalStateException(&quot;Cannot add a child to the file node &quot; + id);</span>
+        }
+<span class="fc" id="L265">        children.add(child);</span>
+<span class="fc" id="L266">        return this;</span>
+    }
+
+    /// Returns the children of this folder, empty for a file.
+    public List&lt;DocumentNode&gt; getChildren() {
+<span class="fc" id="L271">        return Collections.unmodifiableList(children);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

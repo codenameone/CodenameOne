@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RichTextClipboardData.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">RichTextClipboardData.java</span></div><h1>RichTextClipboardData.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui;
+
+/// Clipboard content with both a plain-text fallback and optional rich representations. Platform
+/// ports may return this from `Display#getPasteDataFromClipboard()` when the native clipboard exposes
+/// multiple MIME types. Applications may also pass it to `Display#copyToClipboard(Object)` for rich
+/// round-tripping inside the application.
+public final class RichTextClipboardData extends ClipboardContent {
+
+    /// Creates clipboard data with a required plain-text fallback.
+<span class="fc" id="L33">    public RichTextClipboardData(String plainText) {</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        setData(MIME_TEXT, plainText == null ? &quot;&quot; : plainText);</span>
+<span class="fc" id="L35">    }</span>
+
+    public String getPlainText() {
+<span class="nc" id="L38">        return getText(MIME_TEXT);</span>
+    }
+
+    public RichTextClipboardData setPlainText(String value) {
+<span class="nc bnc" id="L42" title="All 2 branches missed.">        setData(MIME_TEXT, value == null ? &quot;&quot; : value);</span>
+<span class="nc" id="L43">        return this;</span>
+    }
+
+    public String getHtml() {
+<span class="nc" id="L47">        return getText(MIME_HTML);</span>
+    }
+
+    public RichTextClipboardData setHtml(String value) {
+<span class="fc" id="L51">        setData(MIME_HTML, value);</span>
+<span class="fc" id="L52">        return this;</span>
+    }
+
+    public String getRtf() {
+<span class="nc" id="L56">        return getText(MIME_RTF);</span>
+    }
+
+    public RichTextClipboardData setRtf(String value) {
+<span class="fc" id="L60">        setData(MIME_RTF, value);</span>
+<span class="fc" id="L61">        return this;</span>
+    }
+
+    public String getMarkdown() {
+<span class="nc" id="L65">        return getText(MIME_MARKDOWN);</span>
+    }
+
+    public RichTextClipboardData setMarkdown(String value) {
+<span class="fc" id="L69">        setData(MIME_MARKDOWN, value);</span>
+<span class="fc" id="L70">        return this;</span>
+    }
+
+    public String getAsciiDoc() {
+<span class="nc" id="L74">        return getText(MIME_ASCIIDOC);</span>
+    }
+
+    public RichTextClipboardData setAsciiDoc(String value) {
+<span class="fc" id="L78">        setData(MIME_ASCIIDOC, value);</span>
+<span class="fc" id="L79">        return this;</span>
+    }
+
+    /// Returns the richest available format, preferring native rich formats over lightweight markup.
+    public RichTextFormat getPreferredFormat() {
+<span class="nc bnc" id="L84" title="All 4 branches missed.">        if (getHtml() != null &amp;&amp; getHtml().length() &gt; 0) {</span>
+<span class="nc" id="L85">            return RichTextFormat.HTML;</span>
+        }
+<span class="nc bnc" id="L87" title="All 4 branches missed.">        if (getRtf() != null &amp;&amp; getRtf().length() &gt; 0) {</span>
+<span class="nc" id="L88">            return RichTextFormat.RTF;</span>
+        }
+<span class="nc bnc" id="L90" title="All 4 branches missed.">        if (getMarkdown() != null &amp;&amp; getMarkdown().length() &gt; 0) {</span>
+<span class="nc" id="L91">            return RichTextFormat.MARKDOWN;</span>
+        }
+<span class="nc bnc" id="L93" title="All 4 branches missed.">        if (getAsciiDoc() != null &amp;&amp; getAsciiDoc().length() &gt; 0) {</span>
+<span class="nc" id="L94">            return RichTextFormat.ASCIIDOC;</span>
+        }
+<span class="nc" id="L96">        return RichTextFormat.PLAIN_TEXT;</span>
+    }
+
+    /// Returns the content for the requested format.
+    public String getContent(RichTextFormat format) {
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        if (format == RichTextFormat.HTML) {</span>
+<span class="nc" id="L102">            return getHtml();</span>
+        }
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        if (format == RichTextFormat.RTF) {</span>
+<span class="nc" id="L105">            return getRtf();</span>
+        }
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        if (format == RichTextFormat.MARKDOWN) {</span>
+<span class="nc" id="L108">            return getMarkdown();</span>
+        }
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        if (format == RichTextFormat.ASCIIDOC) {</span>
+<span class="nc" id="L111">            return getAsciiDoc();</span>
+        }
+<span class="nc" id="L113">        return getPlainText();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L118">        return getPlainText();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

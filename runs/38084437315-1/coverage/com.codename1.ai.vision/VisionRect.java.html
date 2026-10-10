@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VisionRect.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai.vision</a> &gt; <span class="el_source">VisionRect.java</span></div><h1>VisionRect.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai.vision;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.geom.Rectangle;
+
+/// Immutable normalized rectangle using a top-left origin. X/Y identify the
+/// upper-left corner and width/height are fractions of the oriented input
+/// dimensions. {@link #EMPTY} represents unavailable geometry.
+///
+/// {@link #toBounds(int, int, int, int)} converts one back to pixels for
+/// drawing:
+///
+/// ```java
+/// public void paint(Graphics g) {
+///     super.paint(g);
+///     g.setColor(0x34c759);
+///     for (Barcode code : lastCodes) {
+///         Rectangle r = code.getBounds().toBounds(this);
+///         g.drawRect(r.getX(), r.getY(), r.getWidth(), r.getHeight(), 3);
+///     }
+/// }
+/// ```
+public final class VisionRect {
+<span class="fc" id="L46">    public static final VisionRect EMPTY = new VisionRect(0, 0, 0, 0);</span>
+
+    private final float x;
+    private final float y;
+    private final float width;
+    private final float height;
+
+    /// Creates a rectangle in the oriented input image's top-left coordinate space.
+    /// @param x left coordinate
+    /// @param y top coordinate
+    /// @param width non-negative rectangle width
+    /// @param height non-negative rectangle height
+<span class="fc" id="L58">    public VisionRect(float x, float y, float width, float height) {</span>
+<span class="fc" id="L59">        this.x = x;</span>
+<span class="fc" id="L60">        this.y = y;</span>
+<span class="fc" id="L61">        this.width = width;</span>
+<span class="fc" id="L62">        this.height = height;</span>
+<span class="fc" id="L63">    }</span>
+
+    /// @return normalized left coordinate
+    public float getX() {
+<span class="nc" id="L67">        return x;</span>
+    }
+
+    /// @return normalized top coordinate
+    public float getY() {
+<span class="nc" id="L72">        return y;</span>
+    }
+
+    /// @return width as a fraction of oriented input width
+    public float getWidth() {
+<span class="nc" id="L77">        return width;</span>
+    }
+
+    /// @return height as a fraction of oriented input height
+    public float getHeight() {
+<span class="nc" id="L82">        return height;</span>
+    }
+
+    /// Whether this rectangle carries no geometry, which is what a backend
+    /// that located a result without reporting where reports.
+    ///
+    /// @return {@code true} when the rectangle has no area
+    public boolean isEmpty() {
+<span class="pc bpc" id="L90" title="1 of 4 branches missed.">        return width &lt;= 0 || height &lt;= 0;</span>
+    }
+
+    /// Maps this normalized rectangle onto a pixel rectangle.
+    ///
+    /// The mapping stretches the whole 0..1 range across {@code width} and
+    /// {@code height}. That is correct when the destination has the same
+    /// aspect ratio as the analyzed image, which is the usual case for an
+    /// image drawn to fit. A live preview scaled with
+    /// {@link com.codename1.camera.ScaleType#CROP} does not: pass the
+    /// rectangle the frame actually occupies rather than the component's own
+    /// bounds.
+    ///
+    /// @param x left edge of the destination rectangle in pixels
+    /// @param y top edge of the destination rectangle in pixels
+    /// @param width destination width in pixels
+    /// @param height destination height in pixels
+    /// @return the corresponding pixel rectangle, rounded to whole pixels
+    public Rectangle toBounds(int x, int y, int width, int height) {
+<span class="fc" id="L109">        int left = Math.round(this.x * width);</span>
+<span class="fc" id="L110">        int top = Math.round(this.y * height);</span>
+<span class="fc" id="L111">        int right = Math.round((this.x + this.width) * width);</span>
+<span class="fc" id="L112">        int bottom = Math.round((this.y + this.height) * height);</span>
+<span class="fc" id="L113">        return new Rectangle(x + left, y + top, right - left, bottom - top);</span>
+    }
+
+    /// Maps this normalized rectangle onto a component's absolute on-screen
+    /// bounds, which is the coordinate space a {@code paint} method draws in.
+    ///
+    /// @param target component the analyzed image is displayed in
+    /// @return the corresponding absolute pixel rectangle
+    /// @throws NullPointerException if {@code target} is {@code null}
+    public Rectangle toBounds(Component target) {
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        if (target == null) {</span>
+<span class="fc" id="L124">            throw new NullPointerException(&quot;target&quot;);</span>
+        }
+<span class="nc" id="L126">        return toBounds(target.getAbsoluteX(), target.getAbsoluteY(),</span>
+<span class="nc" id="L127">                target.getWidth(), target.getHeight());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,2293 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Border.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.plaf</a> &gt; <span class="el_source">Border.java</span></div><h1>Border.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.plaf;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.ImageFactory;
+import com.codename1.ui.Painter;
+import com.codename1.ui.RGBImage;
+import com.codename1.ui.geom.Rectangle;
+
+/// Base class that allows us to render a border for a component, a border is drawn before
+/// the component and is drawn within the padding region of the component. It is the
+/// responsibility of the component not to draw outside of the border line.
+///
+/// This class can be extended to provide additional border types and custom made
+/// border types.
+///
+/// A border can optionally paint the background of the component, this depends on
+/// the border type and is generally required for rounded borders that &quot;know&quot; the area
+/// that should be filled.
+public class Border {
+    private static final int TYPE_EMPTY = 0;
+    private static final int TYPE_LINE = 1;
+    private static final int TYPE_ROUNDED = 2;
+    private static final int TYPE_ROUNDED_PRESSED = 3;
+    private static final int TYPE_ETCHED_LOWERED = 4;
+    private static final int TYPE_ETCHED_RAISED = 5;
+    private static final int TYPE_BEVEL_RAISED = 6;
+    private static final int TYPE_BEVEL_LOWERED = 7;
+    private static final int TYPE_IMAGE = 8;
+    private static final int TYPE_COMPOUND = 9;
+    private static final int TYPE_IMAGE_HORIZONTAL = 10;
+    private static final int TYPE_IMAGE_VERTICAL = 11;
+    private static final int TYPE_DASHED = 12;
+    private static final int TYPE_DOTTED = 13;
+    private static final int TYPE_DOUBLE = 14;
+    private static final int TYPE_GROOVE = 15;
+    private static final int TYPE_RIDGE = 16;
+    private static final int TYPE_INSET = 17;
+    private static final int TYPE_OUTSET = 18;
+    private static final int TYPE_IMAGE_SCALED = 19;
+    private static final int TYPE_UNDERLINE = 21;
+    private static final int TITLE_MARGIN = 10;
+    private static final int TITLE_SPACE = 5;
+<span class="fc" id="L70">    private static Border defaultBorder = Border.createEtchedRaised(0x020202, 0xBBBBBB);</span>
+    // variables are package protected for the benefit of the resource editor!
+    int type;
+    Image[] images;
+    /// Indicates whether theme colors should be used or whether colors are specified
+    /// in the border
+    boolean themeColors;
+    int colorA;
+    int colorB;
+    int colorC;
+    int colorD;
+<span class="fc" id="L81">    float thickness = 0;</span>
+    boolean millimeters;
+    int arcWidth;
+    int arcHeight;
+<span class="fc" id="L85">    boolean outline = true;</span>
+    Border pressedBorder;
+    Border focusBorder;
+    Border[] compoundBorders;
+    Border outerBorder; // A border added outside of this border (Used for CSS outline property, but can also be used for other purposes)
+    String borderTitle; // border title, currently supported only for line borders
+    private Image[] specialTile;
+    private Rectangle trackComponent;
+    private boolean paintOuterBorderFirst;
+    private boolean emptyType;
+    /// Prevents usage of new operator, use the factory methods in the class or subclass
+    /// to create new border types.
+<span class="fc" id="L97">    protected Border() {</span>
+<span class="fc" id="L98">    }</span>
+
+    /// Returns an empty border, this is mostly useful for overriding components that
+    /// have a border by default
+    ///
+    /// #### Returns
+    ///
+    /// a border than draws nothing
+    ///
+    /// #### Deprecated
+    ///
+    /// use createEmpty instead
+    public static Border getEmpty() {
+<span class="fc" id="L111">        return EmptyBorderHolder.EMPTY;</span>
+    }
+
+    /// Creates an empty border, this is useful where we don't want a border for a
+    /// component but want a focus border etc...
+    ///
+    /// #### Returns
+    ///
+    /// a border than draws nothing
+    public static Border createEmpty() {
+<span class="fc" id="L121">        Border b = new Border();</span>
+<span class="fc" id="L122">        b.emptyType = true;</span>
+<span class="fc" id="L123">        return b;</span>
+    }
+
+    /// The given top/bottom/left/right images are tiled appropriately across the matching sides of the border and the corners are placed
+    /// as expected in the four corners. The background image is optional and it will be tiled in  the background if necessary.
+    ///
+    /// By default this border does not override background unless a background image is specified
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the image of the top line
+    ///
+    /// - `bottom`: the image of the bottom line
+    ///
+    /// - `left`: the image of the left line
+    ///
+    /// - `right`: the image of the right line
+    ///
+    /// - `topLeft`: the image of the top left corner
+    ///
+    /// - `topRight`: the image of the top right corner
+    ///
+    /// - `bottomLeft`: the image of the bottom left corner
+    ///
+    /// - `bottomRight`: the image of the bottom right corner
+    ///
+    /// - `background`: the image of the background (optional)
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    public static Border createImageBorder(Image top, Image bottom, Image left, Image right, Image topLeft, Image topRight,
+                                           Image bottomLeft, Image bottomRight, Image background) {
+<span class="nc" id="L156">        Border b = new Border();</span>
+<span class="nc" id="L157">        b.type = TYPE_IMAGE;</span>
+<span class="nc" id="L158">        b.images = new Image[]{top, bottom, left, right, topLeft, topRight, bottomLeft,</span>
+                bottomRight, background};
+<span class="nc" id="L160">        return b;</span>
+    }
+
+    /// The given image is spliced into 9 pieces based on the provided top, right, bottom, and left insets, and the resulting
+    /// sub-images are used to form a 9-piece image border via `com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image)`
+    ///
+    /// Insets are all given in a (u,v) coordinate space where (0,0) is the top-left corner of the image, and (1.0, 1.0) is the bottom-right corner of the image.
+    ///
+    /// #### Parameters
+    ///
+    /// - `img`: The image to be used as a background image and spliced.
+    ///
+    /// - `topInset`
+    ///
+    /// - `rightInset`
+    ///
+    /// - `bottomInset`
+    ///
+    /// - `leftInset`
+    ///
+    /// #### Returns
+    ///
+    /// A 9-piece image border.
+    public static Border createImageSplicedBorder(Image img, double topInset, double rightInset, double bottomInset, double leftInset) {
+
+<span class="fc" id="L185">        Border b = new Border();</span>
+<span class="fc" id="L186">        b.type = TYPE_IMAGE;</span>
+<span class="fc" id="L187">        int w = img.getWidth();</span>
+<span class="fc" id="L188">        int h = img.getHeight();</span>
+<span class="fc" id="L189">        int topInsetPx = (int) Math.round(h * topInset);</span>
+<span class="fc" id="L190">        int leftInsetPx = (int) Math.round(w * leftInset);</span>
+<span class="fc" id="L191">        int rightInsetPx = (int) Math.round(w * rightInset);</span>
+<span class="fc" id="L192">        int bottomInsetPx = (int) Math.round(h * bottomInset);</span>
+
+        //We need to make sure that every splice has a positive width and height
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        if (topInsetPx + bottomInsetPx &gt;= h) {</span>
+<span class="fc" id="L196">            bottomInsetPx = h - topInsetPx - 1;</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">            if (bottomInsetPx &lt; 1) {</span>
+<span class="fc" id="L198">                bottomInsetPx = 1;</span>
+<span class="fc" id="L199">                topInsetPx = h - bottomInsetPx - 1;</span>
+            }
+        }
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        if (leftInsetPx + rightInsetPx &gt;= w) {</span>
+<span class="fc" id="L203">            rightInsetPx = w - leftInsetPx - 1;</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">            if (rightInsetPx &lt; 1) {</span>
+<span class="fc" id="L205">                rightInsetPx = 1;</span>
+<span class="fc" id="L206">                leftInsetPx = w - rightInsetPx - 1;</span>
+            }
+        }
+<span class="fc" id="L209">        Image top = img.subImage(leftInsetPx, 0, w - leftInsetPx - rightInsetPx, topInsetPx, true);</span>
+<span class="fc" id="L210">        Image bottom = img.subImage(leftInsetPx, h - bottomInsetPx, w - leftInsetPx - rightInsetPx, bottomInsetPx, true);</span>
+<span class="fc" id="L211">        Image left = img.subImage(0, topInsetPx, leftInsetPx, h - topInsetPx - bottomInsetPx, true);</span>
+<span class="fc" id="L212">        Image right = img.subImage(w - rightInsetPx, topInsetPx, rightInsetPx, h - topInsetPx - bottomInsetPx, true);</span>
+<span class="fc" id="L213">        Image topLeft = img.subImage(0, 0, leftInsetPx, topInsetPx, true);</span>
+<span class="fc" id="L214">        Image topRight = img.subImage(w - rightInsetPx, 0, rightInsetPx, topInsetPx, true);</span>
+<span class="fc" id="L215">        Image bottomLeft = img.subImage(0, h - bottomInsetPx, leftInsetPx, bottomInsetPx, true);</span>
+<span class="fc" id="L216">        Image bottomRight = img.subImage(w - rightInsetPx, h - bottomInsetPx, rightInsetPx, bottomInsetPx, true);</span>
+<span class="fc" id="L217">        Image background = img.subImage(leftInsetPx, topInsetPx, w - leftInsetPx - rightInsetPx, h - topInsetPx - bottomInsetPx, true);</span>
+<span class="fc" id="L218">        b.images = new Image[]{top, bottom, left, right, topLeft, topRight, bottomLeft,</span>
+                bottomRight, background};
+<span class="fc" id="L220">        return b;</span>
+    }
+
+    /// The given top/bottom/left/right images are scaled appropriately across the matching sides of the border and the corners are placed
+    /// as expected in the four corners. The background image is optional and it will be tiled in  the background if necessary.
+    ///
+    /// By default this border does not override background unless a background image is specified
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the image of the top line
+    ///
+    /// - `bottom`: the image of the bottom line
+    ///
+    /// - `left`: the image of the left line
+    ///
+    /// - `right`: the image of the right line
+    ///
+    /// - `topLeft`: the image of the top left corner
+    ///
+    /// - `topRight`: the image of the top right corner
+    ///
+    /// - `bottomLeft`: the image of the bottom left corner
+    ///
+    /// - `bottomRight`: the image of the bottom right corner
+    ///
+    /// - `background`: the image of the background (optional)
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    public static Border createImageScaledBorder(Image top, Image bottom, Image left, Image right, Image topLeft, Image topRight,
+                                                 Image bottomLeft, Image bottomRight, Image background) {
+<span class="nc" id="L253">        Border b = new Border();</span>
+<span class="nc" id="L254">        b.type = TYPE_IMAGE_SCALED;</span>
+<span class="nc" id="L255">        b.images = new Image[]{top, bottom, left, right, topLeft, topRight, bottomLeft,</span>
+                bottomRight, background};
+<span class="nc" id="L257">        return b;</span>
+    }
+
+    /// This is an image border that can only grow horizontally
+    ///
+    /// #### Parameters
+    ///
+    /// - `left`: the image of the left side
+    ///
+    /// - `right`: the image of the right side
+    ///
+    /// - `center`: the image of the center
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    public static Border createHorizonalImageBorder(Image left, Image right, Image center) {
+<span class="nc" id="L274">        Border b = new Border();</span>
+<span class="nc" id="L275">        b.type = TYPE_IMAGE_HORIZONTAL;</span>
+<span class="nc" id="L276">        b.images = new Image[]{left, right, center};</span>
+<span class="nc" id="L277">        return b;</span>
+    }
+
+    /// This is an image border that can only grow vertically
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the image of the top
+    ///
+    /// - `bottom`: the image of the bottom
+    ///
+    /// - `center`: the image of the center
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    public static Border createVerticalImageBorder(Image top, Image bottom, Image center) {
+<span class="nc" id="L294">        Border b = new Border();</span>
+<span class="nc" id="L295">        b.type = TYPE_IMAGE_VERTICAL;</span>
+<span class="nc" id="L296">        b.images = new Image[]{top, bottom, center};</span>
+<span class="nc" id="L297">        return b;</span>
+    }
+
+    /// The given images are tiled appropriately across the matching side of the border, rotated and placed
+    /// as expected in the four corners. The background image is optional and it will be tiled in
+    /// the background if necessary.
+    ///
+    /// By default this border does not override background unless a background image is specified.
+    ///
+    /// Notice that this version of the method is potentially much more efficient since images
+    /// are rotated internally and this might save quite a bit of memory!
+    ///
+    /// **The top and topLeft images must be square!** The width and height of these images
+    /// must be equal otherwise rotation won't work as you expect.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the image of the top line
+    ///
+    /// - `topLeft`: the image of the top left corner
+    ///
+    /// - `background`: the image of the background (optional)
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    public static Border createImageBorder(Image top, Image topLeft, Image background) {
+<span class="nc" id="L324">        Border b = new Border();</span>
+<span class="nc" id="L325">        b.type = TYPE_IMAGE;</span>
+<span class="nc" id="L326">        b.images = new Image[]{top, top.rotate(180), top.rotate(270), top.rotate(90), topLeft, topLeft.rotate(90),</span>
+<span class="nc" id="L327">                topLeft.rotate(270), topLeft.rotate(180), background};</span>
+<span class="nc" id="L328">        return b;</span>
+    }
+
+    /// Creates a line border that uses the color of the component foreground for drawing
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: thickness of the border in pixels
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    public static Border createLineBorder(int thickness) {
+<span class="fc" id="L341">        Border b = new Border();</span>
+<span class="fc" id="L342">        b.type = TYPE_LINE;</span>
+<span class="fc" id="L343">        b.themeColors = true;</span>
+<span class="fc" id="L344">        b.thickness = thickness;</span>
+<span class="fc" id="L345">        b.millimeters = false;</span>
+<span class="fc" id="L346">        return b;</span>
+    }
+
+    /// Creates a line border that uses the color of the component foreground for drawing
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: thickness of the border in millimeters
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    public static Border createLineBorder(float thickness) {
+<span class="nc" id="L359">        Border b = new Border();</span>
+<span class="nc" id="L360">        b.type = TYPE_LINE;</span>
+<span class="nc" id="L361">        b.themeColors = true;</span>
+<span class="nc" id="L362">        b.thickness = thickness;</span>
+<span class="nc" id="L363">        b.millimeters = true;</span>
+<span class="nc" id="L364">        return b;</span>
+    }
+
+    /// Creates an underline border that uses the color of the component foreground for drawing
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: thickness of the border in pixels
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    ///
+    /// #### Deprecated
+    ///
+    /// due to a spelling mistake. Use `thickness)`
+    public static Border createUndelineBorder(int thickness) {
+<span class="nc" id="L381">        Border b = new Border();</span>
+<span class="nc" id="L382">        b.type = TYPE_UNDERLINE;</span>
+<span class="nc" id="L383">        b.themeColors = true;</span>
+<span class="nc" id="L384">        b.thickness = thickness;</span>
+<span class="nc" id="L385">        return b;</span>
+    }
+
+    /// Creates an underline border that uses the color of the component foreground for drawing
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: thickness of the border in pixels
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    public static Border createUnderlineBorder(int thickness) {
+<span class="nc" id="L398">        Border b = new Border();</span>
+<span class="nc" id="L399">        b.type = TYPE_UNDERLINE;</span>
+<span class="nc" id="L400">        b.themeColors = true;</span>
+<span class="nc" id="L401">        b.thickness = thickness;</span>
+<span class="nc" id="L402">        return b;</span>
+    }
+
+    /// Creates an underline border that uses the color of the component foreground for drawing
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: thickness of the border in millimeters
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    ///
+    /// #### Deprecated
+    ///
+    /// due to a spelling mistake. Use `thickness)`
+    public static Border createUndelineBorder(float thickness) {
+<span class="nc" id="L419">        Border b = new Border();</span>
+<span class="nc" id="L420">        b.type = TYPE_UNDERLINE;</span>
+<span class="nc" id="L421">        b.themeColors = true;</span>
+<span class="nc" id="L422">        b.thickness = thickness;</span>
+<span class="nc" id="L423">        b.millimeters = true;</span>
+<span class="nc" id="L424">        return b;</span>
+    }
+
+    /// Creates an underline border that uses the color of the component foreground for drawing
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: thickness of the border in millimeters
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    public static Border createUnderlineBorder(float thickness) {
+<span class="nc" id="L437">        Border b = new Border();</span>
+<span class="nc" id="L438">        b.type = TYPE_UNDERLINE;</span>
+<span class="nc" id="L439">        b.themeColors = true;</span>
+<span class="nc" id="L440">        b.thickness = thickness;</span>
+<span class="nc" id="L441">        b.millimeters = true;</span>
+<span class="nc" id="L442">        return b;</span>
+    }
+
+    /// Creates an underline border that uses the given color
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: thickness of the border in pixels
+    ///
+    /// - `color`: the color
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    public static Border createUnderlineBorder(int thickness, int color) {
+<span class="nc" id="L457">        Border b = new Border();</span>
+<span class="nc" id="L458">        b.type = TYPE_UNDERLINE;</span>
+<span class="nc" id="L459">        b.themeColors = false;</span>
+<span class="nc" id="L460">        b.thickness = thickness;</span>
+<span class="nc" id="L461">        b.colorA = color;</span>
+<span class="nc" id="L462">        return b;</span>
+    }
+
+    /// Creates an underline border that uses the given color
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: thickness of the border in millimeters
+    ///
+    /// - `color`: the color
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    public static Border createUnderlineBorder(float thickness, int color) {
+<span class="nc" id="L477">        Border b = new Border();</span>
+<span class="nc" id="L478">        b.type = TYPE_UNDERLINE;</span>
+<span class="nc" id="L479">        b.themeColors = false;</span>
+<span class="nc" id="L480">        b.thickness = thickness;</span>
+<span class="nc" id="L481">        b.millimeters = true;</span>
+<span class="nc" id="L482">        b.colorA = color;</span>
+<span class="nc" id="L483">        return b;</span>
+    }
+
+    /// Creates a dotted border with the specified thickness and color
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: The border thickness in pixels
+    ///
+    /// - `color`: The border color
+    ///
+    /// #### Returns
+    ///
+    /// The border
+    public static Border createDottedBorder(int thickness, int color) {
+<span class="nc" id="L498">        return createCSSBorder(TYPE_DOTTED, thickness, color);</span>
+    }
+
+    /// Creates a dashed border with the specified thickness and color
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: The border thickness in pixels
+    ///
+    /// - `color`: The border color
+    ///
+    /// #### Returns
+    ///
+    /// The border
+    public static Border createDashedBorder(int thickness, int color) {
+<span class="nc" id="L513">        return createCSSBorder(TYPE_DASHED, thickness, color);</span>
+    }
+
+    /// Creates a double border with the specified thickness and color
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: The border thickness in pixels
+    ///
+    /// - `color`: The border color
+    ///
+    /// #### Returns
+    ///
+    /// The border
+    public static Border createDoubleBorder(int thickness, int color) {
+<span class="nc" id="L528">        return createCSSBorder(TYPE_DOUBLE, thickness, color);</span>
+    }
+
+    /// Creates a dotted border with the specified thickness and the theme colors
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: The border thickness in pixels
+    ///
+    /// #### Returns
+    ///
+    /// The border
+    public static Border createDottedBorder(int thickness) {
+<span class="nc" id="L541">        return createCSSBorder(TYPE_DOTTED, thickness);</span>
+    }
+
+    /// Creates a dashed border with the specified thickness and the theme colors
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: The border thickness in pixels
+    ///
+    /// #### Returns
+    ///
+    /// The border
+    public static Border createDashedBorder(int thickness) {
+<span class="nc" id="L554">        return createCSSBorder(TYPE_DASHED, thickness);</span>
+    }
+
+    /// Creates a double border with the specified thickness and color
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: The border thickness in pixels
+    ///
+    /// #### Returns
+    ///
+    /// The border
+    public static Border createDoubleBorder(int thickness) {
+<span class="nc" id="L567">        return createCSSBorder(TYPE_DOUBLE, thickness);</span>
+    }
+
+    /// Creates an outset border with the specified thickness and theme colors
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: The border thickness in pixels
+    ///
+    /// #### Returns
+    ///
+    /// The border
+    public static Border createOutsetBorder(int thickness) {
+<span class="nc" id="L580">        return createCSSBorder(TYPE_OUTSET, thickness);</span>
+    }
+
+    /// Creates an outset border with the specified thickness and color
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: The border thickness in pixels
+    ///
+    /// - `color`: The border color
+    ///
+    /// #### Returns
+    ///
+    /// The border
+    public static Border createOutsetBorder(int thickness, int color) {
+<span class="nc" id="L595">        return createCSSBorder(TYPE_OUTSET, thickness, color);</span>
+    }
+
+    /// Creates an inset border with the specified thickness and theme colors
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: The border thickness in pixels
+    ///
+    /// #### Returns
+    ///
+    /// The border
+    public static Border createInsetBorder(int thickness) {
+<span class="nc" id="L608">        return createCSSBorder(TYPE_INSET, thickness);</span>
+    }
+
+    /// Creates an inset border with the specified thickness and color
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: The border thickness in pixels
+    ///
+    /// - `color`: The border color
+    ///
+    /// #### Returns
+    ///
+    /// The border
+    public static Border createInsetBorder(int thickness, int color) {
+<span class="nc" id="L623">        return createCSSBorder(TYPE_INSET, thickness, color);</span>
+    }
+
+    /// Creates a groove border with the specified thickness and theme colors
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: The border thickness in pixels
+    ///
+    /// #### Returns
+    ///
+    /// The border
+    public static Border createGrooveBorder(int thickness) {
+<span class="nc" id="L636">        return createCSSBorder(TYPE_GROOVE, thickness);</span>
+    }
+
+    /// Creates a groove border with the specified thickness and color
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: The border thickness in pixels
+    ///
+    /// - `color`: The border color
+    ///
+    /// #### Returns
+    ///
+    /// The border
+    public static Border createGrooveBorder(int thickness, int color) {
+<span class="nc" id="L651">        return createCSSBorder(TYPE_GROOVE, thickness, color);</span>
+    }
+
+    /// Creates a ridge border with the specified thickness and theme colors
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: The border thickness in pixels
+    ///
+    /// #### Returns
+    ///
+    /// The border
+    public static Border createRidgeBorder(int thickness) {
+<span class="nc" id="L664">        return createCSSBorder(TYPE_RIDGE, thickness);</span>
+    }
+
+    /// Creates a ridge border with the specified thickness and color
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: The border thickness in pixels
+    ///
+    /// - `color`: The border color
+    ///
+    /// #### Returns
+    ///
+    /// The border
+    public static Border createRidgeBorder(int thickness, int color) {
+<span class="nc" id="L679">        return createCSSBorder(TYPE_RIDGE, thickness, color);</span>
+    }
+
+    private static Border createCSSBorder(int type, int thickness) {
+<span class="nc" id="L683">        Border b = new Border();</span>
+<span class="nc" id="L684">        b.type = type;</span>
+<span class="nc" id="L685">        b.themeColors = true;</span>
+<span class="nc" id="L686">        b.thickness = thickness;</span>
+<span class="nc" id="L687">        return b;</span>
+    }
+
+    private static Border createCSSBorder(int type, int thickness, int color) {
+<span class="nc" id="L691">        Border b = new Border();</span>
+<span class="nc" id="L692">        b.type = type;</span>
+<span class="nc" id="L693">        b.colorA = color;</span>
+<span class="nc" id="L694">        b.thickness = thickness;</span>
+<span class="nc" id="L695">        return b;</span>
+    }
+
+    /// Creates a line border with the specified title
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: thickness of the border in pixels
+    ///
+    /// - `title`: The borders title
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    public static Border createLineBorder(int thickness, String title) {
+<span class="nc" id="L710">        Border b = new Border();</span>
+<span class="nc" id="L711">        b.type = TYPE_LINE;</span>
+<span class="nc" id="L712">        b.themeColors = true;</span>
+<span class="nc" id="L713">        b.thickness = thickness;</span>
+<span class="nc" id="L714">        b.borderTitle = title;</span>
+<span class="nc" id="L715">        return b;</span>
+    }
+
+    /// Creates a line border that uses the given color for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: thickness of the border in pixels
+    ///
+    /// - `color`: the color for the border
+    ///
+    /// - `title`: The borders title
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    public static Border createLineBorder(int thickness, int color, String title) {
+<span class="nc" id="L732">        Border b = new Border();</span>
+<span class="nc" id="L733">        b.type = TYPE_LINE;</span>
+<span class="nc" id="L734">        b.themeColors = false;</span>
+<span class="nc" id="L735">        b.thickness = thickness;</span>
+<span class="nc" id="L736">        b.colorA = color;</span>
+<span class="nc" id="L737">        b.borderTitle = title;</span>
+<span class="nc" id="L738">        return b;</span>
+    }
+
+    /// Creates a line border that uses the given color for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: thickness of the border in pixels
+    ///
+    /// - `color`: the color for the border
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    public static Border createLineBorder(int thickness, int color) {
+<span class="fc" id="L753">        Border b = new Border();</span>
+<span class="fc" id="L754">        b.type = TYPE_LINE;</span>
+<span class="fc" id="L755">        b.themeColors = false;</span>
+<span class="fc" id="L756">        b.thickness = thickness;</span>
+<span class="fc" id="L757">        b.colorA = color;</span>
+<span class="fc" id="L758">        return b;</span>
+    }
+
+    /// Creates a line border that uses the given color for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: thickness of the border in millimeters
+    ///
+    /// - `color`: the color for the border
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    public static Border createLineBorder(float thickness, int color) {
+<span class="nc" id="L773">        Border b = new Border();</span>
+<span class="nc" id="L774">        b.type = TYPE_LINE;</span>
+<span class="nc" id="L775">        b.themeColors = false;</span>
+<span class="nc" id="L776">        b.thickness = thickness;</span>
+<span class="nc" id="L777">        b.millimeters = true;</span>
+<span class="nc" id="L778">        b.colorA = color;</span>
+<span class="nc" id="L779">        return b;</span>
+    }
+
+    /// Creates a rounded corner border that uses the color of the component foreground for drawing.
+    /// Due to technical issues (lack of shaped clipping) performance and memory overhead of round
+    /// borders can be low if used with either a bgImage or translucency!
+    ///
+    /// This border overrides any painter used on the component and would ignor such a painter.
+    ///
+    /// #### Parameters
+    ///
+    /// - `arcWidth`: the horizontal diameter of the arc at the four corners.
+    ///
+    /// - `arcHeight`: the vertical diameter of the arc at the four corners.
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated the performance of round rect borders is REALLY slow, we recommend people use image borders
+    /// which are faster, more portable and better looking
+    public static Border createRoundBorder(int arcWidth, int arcHeight) {
+<span class="nc" id="L803">        Border b = new Border();</span>
+<span class="nc" id="L804">        b.type = TYPE_ROUNDED;</span>
+<span class="nc" id="L805">        b.themeColors = true;</span>
+<span class="nc" id="L806">        b.arcHeight = arcHeight;</span>
+<span class="nc" id="L807">        b.arcWidth = arcWidth;</span>
+<span class="nc" id="L808">        return b;</span>
+    }
+
+    /// Creates a rounded corner border that uses the color of the component foreground for drawing.
+    /// Due to technical issues (lack of shaped clipping) performance and memory overhead of round
+    /// borders can be low if used with either a bgImage or translucency!
+    ///
+    /// This border overrides any painter used on the component and would ignor such a painter.
+    ///
+    /// #### Parameters
+    ///
+    /// - `arcWidth`: the horizontal diameter of the arc at the four corners.
+    ///
+    /// - `arcHeight`: the vertical diameter of the arc at the four corners.
+    ///
+    /// - `outline`: whether the round rect border outline should be drawn
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated the performance of round rect borders is REALLY slow, we recommend people use image borders
+    /// which are faster, more portable and better looking
+    public static Border createRoundBorder(int arcWidth, int arcHeight, boolean outline) {
+<span class="nc" id="L834">        Border b = createRoundBorder(arcWidth, arcHeight);</span>
+<span class="nc" id="L835">        b.outline = outline;</span>
+<span class="nc" id="L836">        return b;</span>
+    }
+
+    /// Creates a rounded border that uses the given color for the component.
+    /// Due to technical issues (lack of shaped clipping) performance and memory overhead of round
+    /// borders can be low if used with either a bgImage or translucency!
+    ///
+    /// This border overrides any painter used on the component and would ignor such a painter.
+    ///
+    /// #### Parameters
+    ///
+    /// - `arcWidth`: the horizontal diameter of the arc at the four corners.
+    ///
+    /// - `arcHeight`: the vertical diameter of the arc at the four corners.
+    ///
+    /// - `color`: the color for the border
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated the performance of round rect borders is REALLY slow, we recommend people use image borders
+    /// which are faster, more portable and better looking
+    public static Border createRoundBorder(int arcWidth, int arcHeight, int color) {
+<span class="nc" id="L862">        Border b = new Border();</span>
+<span class="nc" id="L863">        b.type = TYPE_ROUNDED;</span>
+<span class="nc" id="L864">        b.themeColors = false;</span>
+<span class="nc" id="L865">        b.colorA = color;</span>
+<span class="nc" id="L866">        b.arcHeight = arcHeight;</span>
+<span class="nc" id="L867">        b.arcWidth = arcWidth;</span>
+<span class="nc" id="L868">        return b;</span>
+    }
+
+    /// Creates a rounded border that uses the given color for the component.
+    /// Due to technical issues (lack of shaped clipping) performance and memory overhead of round
+    /// borders can be low if used with either a bgImage or translucency!
+    ///
+    /// This border overrides any painter used on the component and would ignor such a painter.
+    ///
+    /// #### Parameters
+    ///
+    /// - `arcWidth`: the horizontal diameter of the arc at the four corners.
+    ///
+    /// - `arcHeight`: the vertical diameter of the arc at the four corners.
+    ///
+    /// - `color`: the color for the border
+    ///
+    /// - `outline`: whether the round rect border outline should be drawn
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated the performance of round rect borders is REALLY slow, we recommend people use image borders
+    /// which are faster, more portable and better looking
+    public static Border createRoundBorder(int arcWidth, int arcHeight, int color, boolean outline) {
+<span class="nc" id="L896">        Border b = createRoundBorder(arcWidth, arcHeight, color);</span>
+<span class="nc" id="L897">        b.outline = outline;</span>
+<span class="nc" id="L898">        return b;</span>
+    }
+
+    /// Creates a lowered etched border with default colors, highlight is derived
+    /// from the component and shadow is a plain dark color
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    public static Border createEtchedLowered() {
+<span class="nc" id="L908">        Border b = new Border();</span>
+<span class="nc" id="L909">        b.type = TYPE_ETCHED_LOWERED;</span>
+<span class="nc" id="L910">        b.themeColors = true;</span>
+<span class="nc" id="L911">        return b;</span>
+    }
+
+    /// Creates a raised etched border with the given colors
+    ///
+    /// #### Parameters
+    ///
+    /// - `highlight`: color RGB value
+    ///
+    /// - `shadow`: color RGB value
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    public static Border createEtchedLowered(int highlight, int shadow) {
+<span class="fc" id="L926">        Border b = new Border();</span>
+<span class="fc" id="L927">        b.type = TYPE_ETCHED_LOWERED;</span>
+<span class="fc" id="L928">        b.themeColors = false;</span>
+<span class="fc" id="L929">        b.colorA = shadow;</span>
+<span class="fc" id="L930">        b.colorB = highlight;</span>
+<span class="fc" id="L931">        return b;</span>
+    }
+
+    /// Creates a lowered etched border with default colors, highlight is derived
+    /// from the component and shadow is a plain dark color
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    public static Border createEtchedRaised() {
+<span class="nc" id="L941">        Border b = new Border();</span>
+<span class="nc" id="L942">        b.type = TYPE_ETCHED_RAISED;</span>
+<span class="nc" id="L943">        b.themeColors = true;</span>
+<span class="nc" id="L944">        b.thickness = 2;</span>
+<span class="nc" id="L945">        return b;</span>
+    }
+
+    /// Creates a raised etched border with the given colors
+    ///
+    /// #### Parameters
+    ///
+    /// - `highlight`: color RGB value
+    ///
+    /// - `shadow`: color RGB value
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    public static Border createEtchedRaised(int highlight, int shadow) {
+<span class="fc" id="L960">        Border b = new Border();</span>
+<span class="fc" id="L961">        b.type = TYPE_ETCHED_RAISED;</span>
+<span class="fc" id="L962">        b.themeColors = false;</span>
+<span class="fc" id="L963">        b.colorA = highlight;</span>
+<span class="fc" id="L964">        b.colorB = shadow;</span>
+<span class="fc" id="L965">        b.thickness = 2;</span>
+<span class="fc" id="L966">        return b;</span>
+    }
+
+    /// Compares two object including the scenario one of them is null (thus avoiding equals pitfalls)
+    ///
+    /// #### Parameters
+    ///
+    /// - `obj1`: The first object to compare
+    ///
+    /// - `obj2`: The second object to compare
+    ///
+    /// #### Returns
+    ///
+    /// true if the two object are equal (or both null), false otherwise
+    private static boolean isSame(Object obj1, Object obj2) {
+<span class="fc bfc" id="L981" title="All 2 branches covered.">        if (obj1 == null) {</span>
+<span class="pc bpc" id="L982" title="1 of 2 branches missed.">            return (obj2 == null);</span>
+<span class="fc bfc" id="L983" title="All 2 branches covered.">        } else if (obj2 == null) {</span>
+<span class="pc bpc" id="L984" title="1 of 2 branches missed.">            return (obj1 == null);</span>
+        }
+<span class="fc" id="L986">        return obj1.equals(obj2);</span>
+    }
+
+    /// Creates a border that is comprised of multiple border types so one border type can be used on top
+    /// while another one can be used at the bottom. Notice that this doesn't work well with all border types (e.g. image borders)
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top border
+    ///
+    /// - `bottom`: the bottom border
+    ///
+    /// - `left`: the left border
+    ///
+    /// - `right`: the right border
+    ///
+    /// #### Returns
+    ///
+    /// a compound border
+    public static Border createCompoundBorder(Border top, Border bottom, Border left, Border right) {
+
+<span class="pc bpc" id="L1007" title="2 of 6 branches missed.">        if ((top != null &amp;&amp; !top.isRectangleType()) ||</span>
+<span class="pc bpc" id="L1008" title="1 of 4 branches missed.">                (bottom != null &amp;&amp; !bottom.isRectangleType()) ||</span>
+<span class="pc bpc" id="L1009" title="1 of 4 branches missed.">                (left != null &amp;&amp; !left.isRectangleType()) ||</span>
+<span class="pc bpc" id="L1010" title="1 of 2 branches missed.">                (right != null &amp;&amp; !right.isRectangleType())) {</span>
+<span class="nc" id="L1011">            throw new IllegalArgumentException(&quot;Compound Border can be created &quot;</span>
+                    + &quot;only from Rectangle types Borders&quot;);
+        }
+<span class="pc bpc" id="L1014" title="3 of 6 branches missed.">        if ((isSame(top, bottom)) &amp;&amp; (isSame(top, left)) &amp;&amp; (isSame(top, right))) {</span>
+<span class="nc" id="L1015">            return top; // Borders are all the same, returning one of them instead of creating a compound border which is more resource consuming</span>
+        }
+
+<span class="fc" id="L1018">        Border b = new Border();</span>
+<span class="fc" id="L1019">        b.type = TYPE_COMPOUND;</span>
+<span class="fc" id="L1020">        b.compoundBorders = new Border[4];</span>
+<span class="fc" id="L1021">        b.compoundBorders[Component.TOP] = top;</span>
+<span class="fc" id="L1022">        b.compoundBorders[Component.BOTTOM] = bottom;</span>
+<span class="fc" id="L1023">        b.compoundBorders[Component.LEFT] = left;</span>
+<span class="fc" id="L1024">        b.compoundBorders[Component.RIGHT] = right;</span>
+
+        // Calculates the thickness of the entire border as the maximum of all 4 sides
+<span class="fc" id="L1027">        b.thickness = 0;</span>
+<span class="fc bfc" id="L1028" title="All 2 branches covered.">        for (int i = Component.TOP; i &lt;= Component.RIGHT; i++) {</span>
+<span class="fc bfc" id="L1029" title="All 2 branches covered.">            if (b.compoundBorders[i] != null) {</span>
+<span class="fc" id="L1030">                int sideThickness = (int) b.compoundBorders[i].thickness;</span>
+<span class="fc bfc" id="L1031" title="All 2 branches covered.">                if (sideThickness &gt; b.thickness) {</span>
+<span class="fc" id="L1032">                    b.thickness = sideThickness;</span>
+                }
+            }
+        }
+
+<span class="fc" id="L1037">        return b;</span>
+    }
+
+    /// Creates a lowered bevel border with default colors, highlight is derived
+    /// from the component and shadow is a plain dark color
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    public static Border createBevelLowered() {
+<span class="nc" id="L1047">        Border b = new Border();</span>
+<span class="nc" id="L1048">        b.type = TYPE_BEVEL_LOWERED;</span>
+<span class="nc" id="L1049">        b.themeColors = true;</span>
+<span class="nc" id="L1050">        b.thickness = 2;</span>
+<span class="nc" id="L1051">        return b;</span>
+    }
+
+    /// Creates a raised bevel border with the given colors
+    ///
+    /// #### Parameters
+    ///
+    /// - `highlightOuter`: RGB of the outer edge of the highlight area
+    ///
+    /// - `highlightInner`: RGB of the inner edge of the highlight area
+    ///
+    /// - `shadowOuter`: RGB of the outer edge of the shadow area
+    ///
+    /// - `shadowInner`: RGB of the inner edge of the shadow area
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    public static Border createBevelLowered(int highlightOuter, int highlightInner,
+                                            int shadowOuter, int shadowInner) {
+<span class="nc" id="L1071">        Border b = new Border();</span>
+<span class="nc" id="L1072">        b.type = TYPE_BEVEL_LOWERED;</span>
+<span class="nc" id="L1073">        b.themeColors = false;</span>
+<span class="nc" id="L1074">        b.colorA = highlightOuter;</span>
+<span class="nc" id="L1075">        b.colorB = highlightInner;</span>
+<span class="nc" id="L1076">        b.colorC = shadowOuter;</span>
+<span class="nc" id="L1077">        b.colorD = shadowInner;</span>
+<span class="nc" id="L1078">        b.thickness = 2;</span>
+<span class="nc" id="L1079">        return b;</span>
+    }
+
+    /// Creates a lowered bevel border with default colors, highlight is derived
+    /// from the component and shadow is a plain dark color
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    public static Border createBevelRaised() {
+<span class="fc" id="L1089">        Border b = new Border();</span>
+<span class="fc" id="L1090">        b.type = TYPE_BEVEL_RAISED;</span>
+<span class="fc" id="L1091">        b.themeColors = true;</span>
+<span class="fc" id="L1092">        b.thickness = 2;</span>
+<span class="fc" id="L1093">        return b;</span>
+    }
+
+    /// Creates a raised bevel border with the given colors
+    ///
+    /// #### Parameters
+    ///
+    /// - `highlightOuter`: RGB of the outer edge of the highlight area
+    ///
+    /// - `highlightInner`: RGB of the inner edge of the highlight area
+    ///
+    /// - `shadowOuter`: RGB of the outer edge of the shadow area
+    ///
+    /// - `shadowInner`: RGB of the inner edge of the shadow area
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    public static Border createBevelRaised(int highlightOuter, int highlightInner,
+                                           int shadowOuter, int shadowInner) {
+<span class="nc" id="L1113">        Border b = new Border();</span>
+<span class="nc" id="L1114">        b.type = TYPE_BEVEL_RAISED;</span>
+<span class="nc" id="L1115">        b.themeColors = false;</span>
+<span class="nc" id="L1116">        b.colorA = highlightOuter;</span>
+<span class="nc" id="L1117">        b.colorB = highlightInner;</span>
+<span class="nc" id="L1118">        b.colorC = shadowOuter;</span>
+<span class="nc" id="L1119">        b.colorD = shadowInner;</span>
+<span class="nc" id="L1120">        b.thickness = 2;</span>
+<span class="nc" id="L1121">        return b;</span>
+    }
+
+    /// Gets the default border to the given value
+    ///
+    /// #### Returns
+    ///
+    /// the default border
+    public static Border getDefaultBorder() {
+<span class="fc" id="L1130">        return defaultBorder;</span>
+    }
+
+    /// Sets the default border to the given value
+    ///
+    /// #### Parameters
+    ///
+    /// - `border`: new border value
+    public static void setDefaultBorder(Border border) {
+<span class="nc" id="L1139">        defaultBorder = border;</span>
+<span class="nc" id="L1140">    }</span>
+
+    /// If a border is a horizontal image border it can be mirrored which is useful for an RTL scenario
+    ///
+    /// #### Returns
+    ///
+    /// the current border or a mirrored instance
+    public Border mirrorBorder() {
+<span class="nc bnc" id="L1148" title="All 2 branches missed.">        if (type == TYPE_IMAGE_HORIZONTAL) {</span>
+<span class="nc" id="L1149">            return createHorizonalImageBorder(images[1].mirror(), images[0].mirror(), images[2].mirror());</span>
+        }
+<span class="nc" id="L1151">        return this;</span>
+    }
+
+    /// This method is designed mainly for the purpose of creating an arrow that will track a specific component using the image border
+    /// the tile given would be an arrow like image just like the ones used for the top/bottom/left/right images. This image would be positioned
+    /// so it points at the center of the track component
+    ///
+    /// #### Parameters
+    ///
+    /// - `tileTop`: an image that will replace one of the tiles on the top if the track component is there
+    ///
+    /// - `tileBottom`: an image that will replace one of the tiles on the bottom if the track component is there
+    ///
+    /// - `tileLeft`: an image that will replace one of the tiles on the left if the track component is there
+    ///
+    /// - `tileRight`: an image that will replace one of the tiles on the right if the track component is there
+    ///
+    /// - `trackComponent`: the component that will be tracked for the positioning of the tile
+    public void setImageBorderSpecialTile(Image tileTop, Image tileBottom, Image tileLeft, Image tileRight, Component trackComponent) {
+<span class="nc" id="L1170">        specialTile = new Image[]{tileTop, tileBottom, tileLeft, tileRight};</span>
+<span class="nc" id="L1171">        this.trackComponent = new Rectangle(trackComponent.getAbsoluteX(), trackComponent.getAbsoluteY(), trackComponent.getWidth(), trackComponent.getHeight());</span>
+<span class="nc" id="L1172">    }</span>
+
+    /// The track component is an area to which an arrow based border should point at.
+    /// It's assumed to be outside of the border region in absolute screen coordinates.
+    ///
+    /// #### Returns
+    ///
+    /// the rectangle to point at or null if this isn't an arrow border
+    protected Rectangle getTrackComponent() {
+<span class="fc" id="L1181">        return trackComponent;</span>
+    }
+
+    /// In the case of an arrow border the track component lets us track the position
+    /// to which the border is pointing
+    ///
+    /// #### Parameters
+    ///
+    /// - `trackComponent`: the track component
+    public void setTrackComponent(Component trackComponent) {
+<span class="fc" id="L1191">        this.trackComponent = new Rectangle(trackComponent.getAbsoluteX(), trackComponent.getAbsoluteY(), trackComponent.getWidth(), trackComponent.getHeight());</span>
+<span class="fc" id="L1192">    }</span>
+
+    /// In the case of an arrow border the track component lets us track the position
+    /// to which the border is pointing
+    ///
+    /// #### Parameters
+    ///
+    /// - `trackComponent`: the track component
+    public void setTrackComponent(Rectangle trackComponent) {
+<span class="fc" id="L1201">        this.trackComponent = trackComponent;</span>
+<span class="fc" id="L1202">    }</span>
+
+    /// This method is designed mainly for the purpose of creating an arrow that will track a specific component using the image border
+    /// the tile given would be an arrow like image just like the ones used for the top/bottom/left/right images. This image would be positioned
+    /// so it points at the center of the track component
+    ///
+    /// #### Parameters
+    ///
+    /// - `tileTop`: an image that will replace one of the tiles on the top if the track component is there
+    ///
+    /// - `tileBottom`: an image that will replace one of the tiles on the bottom if the track component is there
+    ///
+    /// - `tileLeft`: an image that will replace one of the tiles on the left if the track component is there
+    ///
+    /// - `tileRight`: an image that will replace one of the tiles on the right if the track component is there
+    ///
+    /// - `trackComponent`: the component that will be tracked for the positioning of the tile
+    public void setImageBorderSpecialTile(Image tileTop, Image tileBottom, Image tileLeft, Image tileRight, Rectangle trackComponent) {
+<span class="nc" id="L1220">        specialTile = new Image[]{tileTop, tileBottom, tileLeft, tileRight};</span>
+<span class="nc" id="L1221">        this.trackComponent = trackComponent;</span>
+<span class="nc" id="L1222">    }</span>
+
+    /// Cleans the tile tracking state allowing the garbage collector to pick up the component and the image data
+    public void clearImageBorderSpecialTile() {
+<span class="nc" id="L1226">        specialTile = null;</span>
+<span class="nc" id="L1227">        trackComponent = null;</span>
+<span class="nc" id="L1228">    }</span>
+
+    /// Ads a border that wraps this border
+    ///
+    /// #### Parameters
+    ///
+    /// - `outer`: The outer border
+    public void addOuterBorder(Border outer) {
+<span class="nc" id="L1236">        outerBorder = outer;</span>
+<span class="nc" id="L1237">    }</span>
+
+    /// Returns the minimum size required to properly display this border, normally this
+    /// is 0 but a border might deem itself undisplayable with too small a size e.g. for
+    /// the case of an image border the minimum height would be top + bottom and the minimum
+    /// width would be left+right
+    ///
+    /// #### Returns
+    ///
+    /// 0 if not applicable or a dimension if it is.
+    public int getMinimumHeight() {
+<span class="pc bpc" id="L1248" title="1 of 2 branches missed.">        if (images != null) {</span>
+<span class="nc bnc" id="L1249" title="All 2 branches missed.">            if (images.length &lt; 4) {</span>
+<span class="nc bnc" id="L1250" title="All 2 branches missed.">                if (type == TYPE_IMAGE_HORIZONTAL) {</span>
+<span class="nc" id="L1251">                    return images[0].getHeight();</span>
+                } else {
+<span class="nc" id="L1253">                    return images[0].getHeight() + images[1].getHeight();</span>
+                }
+            }
+<span class="nc" id="L1256">            Image topLeft = images[4];</span>
+<span class="nc" id="L1257">            Image bottomRight = images[7];</span>
+<span class="nc" id="L1258">            return topLeft.getHeight() + bottomRight.getHeight();</span>
+        }
+<span class="fc" id="L1260">        return 0;</span>
+    }
+
+    /// Returns the minimum size required to properly display this border, normally this
+    /// is 0 but a border might deem itself undisplayable with too small a size e.g. for
+    /// the case of an image border the minimum height would be top + bottom and the minimum
+    /// width would be left+right
+    ///
+    /// #### Returns
+    ///
+    /// 0 if not applicable or a dimension if it is.
+    public int getMinimumWidth() {
+<span class="pc bpc" id="L1272" title="1 of 2 branches missed.">        if (images != null) {</span>
+<span class="nc bnc" id="L1273" title="All 2 branches missed.">            if (images.length &lt; 4) {</span>
+<span class="nc bnc" id="L1274" title="All 2 branches missed.">                if (type == TYPE_IMAGE_HORIZONTAL) {</span>
+<span class="nc" id="L1275">                    return images[0].getWidth() + images[1].getWidth();</span>
+                } else {
+<span class="nc" id="L1277">                    return images[0].getWidth();</span>
+                }
+            }
+<span class="nc" id="L1280">            Image topLeft = images[4];</span>
+<span class="nc" id="L1281">            Image topRight = images[5];</span>
+<span class="nc" id="L1282">            return topLeft.getWidth() + topRight.getWidth();</span>
+        }
+<span class="fc" id="L1284">        return 0;</span>
+    }
+
+    /// Indicates whether this is an empty border
+    ///
+    /// #### Returns
+    ///
+    /// true if this is an empty border
+    public boolean isEmptyBorder() {
+<span class="fc" id="L1293">        return emptyType;</span>
+    }
+
+    /// {{@inheritDoc}}
+    @Override
+    public boolean equals(Object obj) {
+<span class="fc bfc" id="L1299" title="All 4 branches covered.">        if (obj != null &amp;&amp; obj.getClass() == getClass()) {</span>
+<span class="fc" id="L1300">            Border b = (Border) obj;</span>
+
+<span class="pc bpc" id="L1302" title="3 of 4 branches missed.">            if ((b.type == TYPE_COMPOUND) &amp;&amp; (type == TYPE_COMPOUND)) {</span>
+<span class="nc bnc" id="L1303" title="All 2 branches missed.">                for (int i = Component.TOP; i &lt;= Component.RIGHT; i++) {</span>
+<span class="nc bnc" id="L1304" title="All 2 branches missed.">                    if (!isSame(compoundBorders[i], b.compoundBorders[i])) {</span>
+<span class="nc" id="L1305">                        return false;</span>
+                    }
+                }
+<span class="nc" id="L1308">                return true;</span>
+            }
+
+<span class="fc bfc" id="L1311" title="All 4 branches covered.">            boolean v = ((themeColors == b.themeColors) &amp;&amp;</span>
+                    (type == b.type) &amp;&amp;
+<span class="pc bpc" id="L1313" title="8 of 16 branches missed.">                    (com.codename1.util.MathUtil.compare(thickness, b.thickness) == 0) &amp;&amp;</span>
+                    (colorA == b.colorA) &amp;&amp;
+                    (colorB == b.colorB) &amp;&amp;
+                    (colorC == b.colorC) &amp;&amp;
+                    (colorD == b.colorD) &amp;&amp;
+                    (arcWidth == b.arcWidth) &amp;&amp;
+                    (arcHeight == b.arcHeight) &amp;&amp;
+                    (outline == b.outline) &amp;&amp;
+<span class="pc bpc" id="L1321" title="1 of 2 branches missed.">                    (isSame(borderTitle, b.borderTitle)) &amp;&amp;</span>
+<span class="pc bpc" id="L1322" title="1 of 2 branches missed.">                    (isSame(outerBorder, b.outerBorder))</span>
+            );
+<span class="pc bpc" id="L1324" title="4 of 10 branches missed.">            if (v &amp;&amp; (type == TYPE_IMAGE || type == TYPE_IMAGE_HORIZONTAL || type == TYPE_IMAGE_VERTICAL || type == TYPE_IMAGE_SCALED)) {</span>
+<span class="nc" id="L1325">                int ilen = images.length;</span>
+<span class="nc bnc" id="L1326" title="All 2 branches missed.">                for (int iter = 0; iter &lt; ilen; iter++) {</span>
+<span class="nc bnc" id="L1327" title="All 2 branches missed.">                    if (images[iter] != b.images[iter]) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L1328">                        return false;</span>
+                    }
+                }
+            }
+<span class="fc" id="L1332">            return v;</span>
+        }
+<span class="fc" id="L1334">        return false;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public int hashCode() {
+<span class="fc" id="L1340">        int hash = 7;</span>
+<span class="fc" id="L1341">        hash = 31 * hash + type;</span>
+<span class="pc bpc" id="L1342" title="1 of 2 branches missed.">        hash = 31 * hash + (themeColors ? 1 : 0);</span>
+<span class="fc" id="L1343">        hash = 31 * hash + colorA;</span>
+<span class="fc" id="L1344">        hash = 31 * hash + colorB;</span>
+<span class="fc" id="L1345">        hash = 31 * hash + colorC;</span>
+<span class="fc" id="L1346">        hash = 31 * hash + colorD;</span>
+<span class="fc" id="L1347">        hash = 31 * hash + Float.floatToIntBits(thickness);</span>
+<span class="fc" id="L1348">        hash = 31 * hash + arcWidth;</span>
+<span class="fc" id="L1349">        hash = 31 * hash + arcHeight;</span>
+<span class="pc bpc" id="L1350" title="1 of 2 branches missed.">        hash = 31 * hash + (outline ? 1 : 0);</span>
+<span class="fc" id="L1351">        return hash;</span>
+    }
+
+    /// Returns true if installing this border will override the painting of the component background
+    ///
+    /// #### Returns
+    ///
+    /// true if this border replaces the painter
+    public boolean isBackgroundPainter() {
+<span class="pc bpc" id="L1360" title="6 of 12 branches missed.">        return type == TYPE_ROUNDED || type == TYPE_ROUNDED_PRESSED || type == TYPE_IMAGE</span>
+                || type == TYPE_IMAGE_HORIZONTAL || type == TYPE_IMAGE_VERTICAL || type == TYPE_IMAGE_SCALED;
+    }
+
+    /// Returns true if this border type is a rectangle border.
+    ///
+    /// #### Returns
+    ///
+    /// true if this border is rectangle
+    public boolean isRectangleType() {
+<span class="pc bpc" id="L1370" title="19 of 28 branches missed.">        return type == TYPE_LINE || type == TYPE_BEVEL_LOWERED ||</span>
+                type == TYPE_BEVEL_RAISED || type == TYPE_ETCHED_LOWERED ||
+                type == TYPE_ETCHED_RAISED || type == TYPE_COMPOUND
+                || type == TYPE_EMPTY || type == TYPE_DOTTED || type == TYPE_DASHED || type == TYPE_DOUBLE
+                || type == TYPE_OUTSET || type == TYPE_INSET || type == TYPE_GROOVE || type == TYPE_RIDGE;
+    }
+
+    /// Returns the focused version of the border if one is installed
+    ///
+    /// #### Returns
+    ///
+    /// a focused version of this border if one exists
+    ///
+    /// #### Deprecated
+    ///
+    /// use the getSelectedStyle() method in the component class
+    public Border getFocusedInstance() {
+<span class="nc bnc" id="L1387" title="All 2 branches missed.">        if (focusBorder != null) {</span>
+<span class="nc" id="L1388">            return focusBorder;</span>
+        }
+<span class="nc" id="L1390">        return this;</span>
+    }
+
+    /// Allows us to define a border that will act as the focused version of this border
+    ///
+    /// #### Parameters
+    ///
+    /// - `focused`: a border that will be returned by the focused version method
+    ///
+    /// #### Deprecated
+    ///
+    /// use the getSelectedStyle() method in the component class
+    public void setFocusedInstance(Border focused) {
+<span class="nc" id="L1403">        focusBorder = focused;</span>
+<span class="nc" id="L1404">    }</span>
+
+    /// Returns the pressed version of the border if one is set by the user
+    ///
+    /// #### Returns
+    ///
+    /// the pressed instance of this border
+    public Border getPressedInstance() {
+<span class="nc bnc" id="L1412" title="All 2 branches missed.">        if (pressedBorder != null) {</span>
+<span class="nc" id="L1413">            return pressedBorder;</span>
+        }
+<span class="nc" id="L1415">        return this;</span>
+    }
+
+    /// Allows us to define a border that will act as the pressed version of this border
+    ///
+    /// #### Parameters
+    ///
+    /// - `pressed`: a border that will be returned by the pressed version method
+    public void setPressedInstance(Border pressed) {
+<span class="nc" id="L1424">        pressedBorder = pressed;</span>
+<span class="nc" id="L1425">    }</span>
+
+    /// When applied to buttons borders produce a version that reverses the effects
+    /// of the border providing a pressed feel
+    ///
+    /// #### Returns
+    ///
+    /// a border that will make the button feel pressed
+    public Border createPressedVersion() {
+<span class="pc bpc" id="L1434" title="1 of 2 branches missed.">        if (pressedBorder != null) {</span>
+<span class="nc" id="L1435">            return pressedBorder;</span>
+        }
+<span class="pc bpc" id="L1437" title="7 of 8 branches missed.">        switch (type) {</span>
+            case TYPE_LINE:
+<span class="nc bnc" id="L1439" title="All 2 branches missed.">                if (millimeters) {</span>
+<span class="nc" id="L1440">                    return createLineBorder(thickness + 0.1f, colorA);</span>
+                }
+<span class="nc" id="L1442">                return createLineBorder((int) thickness + 1, colorA);</span>
+            case TYPE_ETCHED_LOWERED: {
+<span class="nc" id="L1444">                Border b = createEtchedRaised(colorA, colorB);</span>
+<span class="nc" id="L1445">                b.themeColors = themeColors;</span>
+<span class="nc" id="L1446">                return b;</span>
+            }
+            case TYPE_ETCHED_RAISED: {
+<span class="fc" id="L1449">                Border b = createEtchedLowered(colorA, colorB);</span>
+<span class="fc" id="L1450">                b.themeColors = themeColors;</span>
+<span class="fc" id="L1451">                return b;</span>
+            }
+            case TYPE_BEVEL_RAISED: {
+<span class="nc" id="L1454">                Border b = createBevelLowered(colorA, colorB, colorC, colorD);</span>
+<span class="nc" id="L1455">                b.themeColors = themeColors;</span>
+<span class="nc" id="L1456">                return b;</span>
+            }
+            case TYPE_BEVEL_LOWERED: {
+<span class="nc" id="L1459">                Border b = createBevelRaised(colorA, colorB, colorC, colorD);</span>
+<span class="nc" id="L1460">                b.themeColors = themeColors;</span>
+<span class="nc" id="L1461">                return b;</span>
+            }
+            case TYPE_ROUNDED: {
+<span class="nc" id="L1464">                Border b = createRoundBorder(arcWidth, arcHeight, colorA);</span>
+<span class="nc" id="L1465">                b.themeColors = themeColors;</span>
+<span class="nc" id="L1466">                b.type = TYPE_ROUNDED_PRESSED;</span>
+<span class="nc" id="L1467">                return b;</span>
+            }
+            case TYPE_ROUNDED_PRESSED: {
+<span class="nc" id="L1470">                Border b = createRoundBorder(arcWidth, arcHeight, colorA);</span>
+<span class="nc" id="L1471">                b.themeColors = themeColors;</span>
+<span class="nc" id="L1472">                return b;</span>
+            }
+            default:
+<span class="nc" id="L1475">                return this;</span>
+        }
+    }
+
+    /// Has effect when the border demands responsibility for background painting
+    /// normally the painter will perform this work but in this case the border might
+    /// do it instead.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context to draw onto
+    ///
+    /// - `c`: component whose border should be drawn
+    public void paintBorderBackground(Graphics g, Component c) {
+<span class="fc" id="L1489">        int x = c.getX();</span>
+<span class="fc" id="L1490">        int y = c.getY();</span>
+<span class="fc" id="L1491">        int width = c.getWidth();</span>
+<span class="fc" id="L1492">        int height = c.getHeight();</span>
+<span class="pc bpc" id="L1493" title="1 of 2 branches missed.">        if (outerBorder != null) {</span>
+            int ac;
+<span class="nc bnc" id="L1495" title="All 2 branches missed.">            if (millimeters) {</span>
+<span class="nc" id="L1496">                ac = Display.getInstance().convertToPixels(thickness);</span>
+            } else {
+<span class="nc" id="L1498">                ac = (int) thickness;</span>
+            }
+<span class="nc bnc" id="L1500" title="All 2 branches missed.">            if (paintOuterBorderFirst) {</span>
+<span class="nc" id="L1501">                outerBorder.paintBorderBackground(g, c);</span>
+<span class="nc" id="L1502">                paintBorderBackground(g, x + ac, y + ac, width - ac * 2, height - ac * 2, c);</span>
+            } else {
+<span class="nc" id="L1504">                paintBorderBackground(g, x + ac, y + ac, width - ac * 2, height - ac * 2, c);</span>
+<span class="nc" id="L1505">                outerBorder.paintBorderBackground(g, c);</span>
+            }
+<span class="nc" id="L1507">        } else {</span>
+<span class="fc" id="L1508">            paintBorderBackground(g, x, y, width, height, c);</span>
+        }
+<span class="fc" id="L1510">    }</span>
+
+    @SuppressWarnings(&quot;PMD.SwitchStmtsShouldHaveDefault&quot;)
+    private void paintBorderBackground(Graphics g, final int xParameter, final int yParameter,
+                                       final int widthParameter, final int heightParameter, Component c) {
+<span class="fc" id="L1515">        int originalColor = g.getColor();</span>
+<span class="fc" id="L1516">        int x = xParameter;</span>
+<span class="fc" id="L1517">        int y = yParameter;</span>
+<span class="fc" id="L1518">        int width = widthParameter;</span>
+<span class="fc" id="L1519">        int height = heightParameter;</span>
+<span class="pc bpc" id="L1520" title="6 of 7 branches missed.">        switch (type) {</span>
+            case TYPE_ROUNDED_PRESSED:
+<span class="nc" id="L1522">                paintRoundedBorder(g, c, width - 2, height - 2, x + 1, y + 1);</span>
+<span class="nc" id="L1523">                break;</span>
+            case TYPE_ROUNDED:
+<span class="nc" id="L1525">                paintRoundedBorder(g, c, width, height, x, y);</span>
+<span class="nc" id="L1526">                break;</span>
+            case TYPE_IMAGE: {
+<span class="fc" id="L1528">                Image topLeft = images[4];</span>
+<span class="fc" id="L1529">                Image topRight = images[5];</span>
+<span class="fc" id="L1530">                Image bottomLeft = images[6];</span>
+<span class="fc" id="L1531">                Image center = images[8];</span>
+<span class="fc" id="L1532">                x += topLeft.getWidth();</span>
+<span class="fc" id="L1533">                y += topLeft.getHeight();</span>
+<span class="fc" id="L1534">                height -= (topLeft.getHeight() + bottomLeft.getHeight());</span>
+<span class="fc" id="L1535">                width -= (topLeft.getWidth() + topRight.getWidth());</span>
+<span class="pc bpc" id="L1536" title="1 of 2 branches missed.">                if (center != null) {</span>
+<span class="fc" id="L1537">                    g.tileImage(center, x, y, width, height);</span>
+                }
+<span class="fc" id="L1539">                Image top = images[0];</span>
+<span class="fc" id="L1540">                Image bottom = images[1];</span>
+<span class="fc" id="L1541">                Image left = images[2];</span>
+<span class="fc" id="L1542">                Image right = images[3];</span>
+<span class="fc" id="L1543">                Image bottomRight = images[7];</span>
+
+<span class="fc" id="L1545">                x = xParameter;</span>
+<span class="fc" id="L1546">                y = yParameter;</span>
+<span class="fc" id="L1547">                width = widthParameter;</span>
+<span class="fc" id="L1548">                height = heightParameter;</span>
+
+<span class="fc" id="L1550">                g.drawImage(topLeft, x, y);</span>
+<span class="fc" id="L1551">                g.drawImage(bottomLeft, x, y + height - bottomLeft.getHeight());</span>
+<span class="fc" id="L1552">                g.drawImage(topRight, x + width - topRight.getWidth(), y);</span>
+<span class="fc" id="L1553">                g.drawImage(bottomRight, x + width - bottomRight.getWidth(), y + height - bottomRight.getHeight());</span>
+
+<span class="fc" id="L1555">                Image arrowDownImage = null;</span>
+<span class="fc" id="L1556">                Image arrowUpImage = null;</span>
+<span class="fc" id="L1557">                Image arrowLeftImage = null;</span>
+<span class="fc" id="L1558">                Image arrowRightImage = null;</span>
+<span class="fc" id="L1559">                int arrowPosition = 0;</span>
+
+                // we need to draw an arrow on one of the sides
+<span class="pc bpc" id="L1562" title="3 of 4 branches missed.">                if (trackComponent != null &amp;&amp; specialTile != null) {</span>
+<span class="nc" id="L1563">                    int cabsY = c.getAbsoluteY();</span>
+<span class="nc" id="L1564">                    int trackY = trackComponent.getY();</span>
+<span class="nc" id="L1565">                    int trackX = trackComponent.getX();</span>
+<span class="nc" id="L1566">                    int cabsX = c.getAbsoluteX();</span>
+<span class="nc bnc" id="L1567" title="All 2 branches missed.">                    if (cabsY &gt;= trackY + trackComponent.getHeight()) {</span>
+                        // we are below the component
+<span class="nc" id="L1569">                        arrowUpImage = specialTile[0];</span>
+<span class="nc" id="L1570">                        arrowPosition = (trackX + trackComponent.getWidth() / 2) - cabsX - arrowUpImage.getWidth() / 2;</span>
+                    } else {
+<span class="nc bnc" id="L1572" title="All 2 branches missed.">                        if (cabsY + c.getHeight() &lt;= trackY) {</span>
+                            // we are above the component
+<span class="nc" id="L1574">                            arrowDownImage = specialTile[1];</span>
+<span class="nc" id="L1575">                            arrowPosition = (trackX + trackComponent.getWidth() / 2) - cabsX - arrowDownImage.getWidth() / 2;</span>
+                        } else {
+<span class="nc bnc" id="L1577" title="All 2 branches missed.">                            if (cabsX &gt;= trackX + trackComponent.getWidth()) {</span>
+                                // we are to the right of the component
+<span class="nc" id="L1579">                                arrowLeftImage = specialTile[2];</span>
+<span class="nc" id="L1580">                                arrowPosition = (trackY + trackComponent.getHeight() / 2) - cabsY - arrowLeftImage.getHeight() / 2;</span>
+                            } else {
+<span class="nc bnc" id="L1582" title="All 2 branches missed.">                                if (cabsX + c.getWidth() &lt;= trackX) {</span>
+                                    // we are to the left of the component
+<span class="nc" id="L1584">                                    arrowRightImage = specialTile[3];</span>
+<span class="nc" id="L1585">                                    arrowPosition = (trackY + trackComponent.getHeight() / 2) - cabsY - arrowRightImage.getHeight() / 2;</span>
+                                }
+                            }
+                        }
+                    }
+                }
+
+<span class="fc" id="L1592">                drawImageBorderLine(g, topLeft, topRight, top, x, y, width, arrowUpImage, arrowPosition, false);</span>
+<span class="fc" id="L1593">                drawImageBorderLine(g, bottomLeft, bottomRight, bottom, x, y + height - bottom.getHeight(), width, arrowDownImage, arrowPosition, true);</span>
+<span class="fc" id="L1594">                drawImageBorderColumn(g, topLeft, bottomLeft, left, x, y, height, arrowLeftImage, arrowPosition, false);</span>
+<span class="fc" id="L1595">                drawImageBorderColumn(g, topRight, bottomRight, right, x + width - right.getWidth(), y, height, arrowRightImage, arrowPosition, true);</span>
+
+<span class="fc" id="L1597">                break;</span>
+            }
+            case TYPE_IMAGE_SCALED: {
+<span class="nc" id="L1600">                int clipX = g.getClipX();</span>
+<span class="nc" id="L1601">                int clipY = g.getClipY();</span>
+<span class="nc" id="L1602">                int clipWidth = g.getClipWidth();</span>
+<span class="nc" id="L1603">                int clipHeight = g.getClipHeight();</span>
+                //g.pushClip();
+<span class="nc" id="L1605">                Image topLeft = images[4];</span>
+<span class="nc" id="L1606">                Image topRight = images[5];</span>
+<span class="nc" id="L1607">                Image bottomLeft = images[6];</span>
+<span class="nc" id="L1608">                Image center = images[8];</span>
+<span class="nc" id="L1609">                x += topLeft.getWidth();</span>
+<span class="nc" id="L1610">                y += topLeft.getHeight();</span>
+<span class="nc" id="L1611">                height -= (topLeft.getHeight() + bottomLeft.getHeight());</span>
+<span class="nc" id="L1612">                width -= (topLeft.getWidth() + topRight.getWidth());</span>
+<span class="nc" id="L1613">                g.clipRect(x, y, width, height);</span>
+<span class="nc bnc" id="L1614" title="All 6 branches missed.">                if (center != null &amp;&amp; width &gt; 0 &amp;&amp; height &gt; 0) {</span>
+<span class="nc" id="L1615">                    g.drawImage(center, x, y, width, height);</span>
+                }
+<span class="nc" id="L1617">                Image top = images[0];</span>
+<span class="nc" id="L1618">                Image bottom = images[1];</span>
+<span class="nc" id="L1619">                Image left = images[2];</span>
+<span class="nc" id="L1620">                Image right = images[3];</span>
+<span class="nc" id="L1621">                Image bottomRight = images[7];</span>
+
+<span class="nc" id="L1623">                g.setClip(clipX, clipY, clipWidth, clipHeight);</span>
+                //g.popClip();
+                //g.pushClip();
+<span class="nc" id="L1626">                x = xParameter;</span>
+<span class="nc" id="L1627">                y = yParameter;</span>
+<span class="nc" id="L1628">                width = widthParameter;</span>
+<span class="nc" id="L1629">                height = heightParameter;</span>
+
+<span class="nc" id="L1631">                g.drawImage(topLeft, x, y);</span>
+<span class="nc" id="L1632">                g.drawImage(bottomLeft, x, y + height - bottomLeft.getHeight());</span>
+<span class="nc" id="L1633">                g.drawImage(topRight, x + width - topRight.getWidth(), y);</span>
+<span class="nc" id="L1634">                g.drawImage(bottomRight, x + width - bottomRight.getWidth(), y + height - bottomRight.getHeight());</span>
+
+<span class="nc" id="L1636">                drawImageBorderLineScale(g, topLeft, topRight, top, x, y, width);</span>
+<span class="nc" id="L1637">                drawImageBorderLineScale(g, bottomLeft, bottomRight, bottom, x, y + height - bottom.getHeight(), width);</span>
+<span class="nc" id="L1638">                drawImageBorderColumnScale(g, topLeft, bottomLeft, left, x, y, height);</span>
+<span class="nc" id="L1639">                drawImageBorderColumnScale(g, topRight, bottomRight, right, x + width - right.getWidth(), y, height);</span>
+
+<span class="nc" id="L1641">                g.setClip(clipX, clipY, clipWidth, clipHeight);</span>
+                //g.popClip();
+<span class="nc" id="L1643">                break;</span>
+            }
+            case TYPE_IMAGE_HORIZONTAL: {
+<span class="nc" id="L1646">                Image left = images[0];</span>
+<span class="nc" id="L1647">                Image right = images[1];</span>
+<span class="nc" id="L1648">                Image center = images[2];</span>
+<span class="nc bnc" id="L1649" title="All 2 branches missed.">                Boolean centerAlignHBorderBool = c == null ? null : (Boolean) c.getClientProperty(&quot;@centerAlignHBorderBool&quot;);</span>
+<span class="nc bnc" id="L1650" title="All 4 branches missed.">                boolean b = centerAlignHBorderBool != null &amp;&amp; centerAlignHBorderBool;</span>
+<span class="nc bnc" id="L1651" title="All 4 branches missed.">                if (b || c.getUIManager().isThemeConstant(&quot;centerAlignHBorderBool&quot;, false)) {</span>
+<span class="nc" id="L1652">                    y += Math.max(0, height / 2 - center.getHeight() / 2);</span>
+                }
+
+<span class="nc" id="L1655">                g.drawImage(left, x, y);</span>
+<span class="nc" id="L1656">                g.drawImage(right, x + width - right.getWidth(), y);</span>
+<span class="nc" id="L1657">                g.tileImage(center, x + left.getWidth(), y, width - left.getWidth() - right.getWidth(), center.getHeight());</span>
+<span class="nc" id="L1658">                break;</span>
+            }
+            case TYPE_IMAGE_VERTICAL: {
+<span class="nc" id="L1661">                Image top = images[0];</span>
+<span class="nc" id="L1662">                Image bottom = images[1];</span>
+<span class="nc" id="L1663">                Image center = images[2];</span>
+<span class="nc" id="L1664">                g.drawImage(top, x, y);</span>
+<span class="nc" id="L1665">                g.drawImage(bottom, x, y + height - bottom.getHeight());</span>
+<span class="nc" id="L1666">                g.tileImage(center, x, y + top.getHeight(), center.getWidth(), height - top.getHeight() - bottom.getHeight());</span>
+<span class="nc" id="L1667">                break;</span>
+            }
+        }
+<span class="fc" id="L1670">        g.setColor(originalColor);</span>
+<span class="fc" id="L1671">    }</span>
+
+    private boolean paintRoundedBorder(Graphics g, Component c, int width, int height, int x, int y) {
+        // rounded is also responsible for drawing the background
+<span class="nc" id="L1675">        Style s = c.getStyle();</span>
+<span class="nc bnc" id="L1676" title="All 4 branches missed.">        if ((s.getBgImage() != null &amp;&amp; s.getBackgroundType() == Style.BACKGROUND_IMAGE_SCALED) ||</span>
+<span class="nc bnc" id="L1677" title="All 2 branches missed.">                s.getBackgroundType() &gt; 1) {</span>
+<span class="nc" id="L1678">            Object w = s.roundRectCache;</span>
+<span class="nc" id="L1679">            Image i = null;</span>
+<span class="nc bnc" id="L1680" title="All 2 branches missed.">            if (w != null) {</span>
+<span class="nc" id="L1681">                i = (Image) Display.getInstance().extractHardRef(w);</span>
+            }
+<span class="nc bnc" id="L1683" title="All 6 branches missed.">            if (i != null &amp;&amp; i.getWidth() == width &amp;&amp; i.getHeight() == height) {</span>
+<span class="nc" id="L1684">                g.drawImage(i, x, y);</span>
+            } else {
+                // we need to draw a background image!
+<span class="nc" id="L1687">                i = ImageFactory.createImage(c, width, height, 0);</span>
+<span class="nc" id="L1688">                Graphics imageG = i.getGraphics();</span>
+<span class="nc" id="L1689">                imageG.setColor(0);</span>
+<span class="nc" id="L1690">                imageG.fillRoundRect(0, 0, width, height, arcWidth, arcHeight);</span>
+<span class="nc" id="L1691">                int[] rgb = i.getRGBCached();</span>
+<span class="nc" id="L1692">                int transColor = rgb[0];</span>
+                int[] imageRGB;
+<span class="nc bnc" id="L1694" title="All 2 branches missed.">                if (s.getBackgroundType() == Style.BACKGROUND_IMAGE_SCALED) {</span>
+<span class="nc" id="L1695">                    imageRGB = s.getBgImage().scaled(width, height).getRGBCached();</span>
+                } else {
+<span class="nc" id="L1697">                    Image bgPaint = ImageFactory.createImage(c, width, height, 0);</span>
+<span class="nc" id="L1698">                    Painter p = s.getBgPainter();</span>
+
+                    // might occur during temporary conditions in the theme switching
+<span class="nc bnc" id="L1701" title="All 2 branches missed.">                    if (p == null) {</span>
+<span class="nc" id="L1702">                        return true;</span>
+                    }
+<span class="nc" id="L1704">                    p.paint(bgPaint.getGraphics(), new Rectangle(0, 0, width, height));</span>
+<span class="nc" id="L1705">                    imageRGB = bgPaint.getRGB();</span>
+                }
+<span class="nc" id="L1707">                int rlen = rgb.length;</span>
+<span class="nc bnc" id="L1708" title="All 2 branches missed.">                for (int iter = 0; iter &lt; rlen; iter++) {</span>
+<span class="nc bnc" id="L1709" title="All 2 branches missed.">                    if (rgb[iter] == transColor) {</span>
+<span class="nc" id="L1710">                        imageRGB[iter] = 0;</span>
+                    }
+                }
+<span class="nc" id="L1713">                i = Image.createImage(imageRGB, width, height);</span>
+<span class="nc" id="L1714">                s.roundRectCache = Display.getInstance().createSoftWeakRef(i);</span>
+<span class="nc" id="L1715">                g.drawImage(i, x, y);</span>
+            }
+<span class="nc" id="L1717">        } else {</span>
+<span class="nc" id="L1718">            int foreground = g.getColor();</span>
+<span class="nc" id="L1719">            g.setColor(s.getBgColor());</span>
+
+            // Its opaque much easier job!
+<span class="nc bnc" id="L1722" title="All 2 branches missed.">            if (s.getBgTransparency() == ((byte) 0xff)) {</span>
+<span class="nc" id="L1723">                g.fillRoundRect(x, y, width, height, arcWidth, arcHeight);</span>
+            } else {
+<span class="nc bnc" id="L1725" title="All 2 branches missed.">                if (g.isAlphaSupported()) {</span>
+<span class="nc" id="L1726">                    int alpha = g.getAlpha();</span>
+<span class="nc" id="L1727">                    g.setAlpha(s.getBgTransparency() &amp; 0xff);</span>
+<span class="nc" id="L1728">                    g.fillRoundRect(x, y, width, height, arcWidth, arcHeight);</span>
+<span class="nc" id="L1729">                    g.setAlpha(alpha);</span>
+<span class="nc" id="L1730">                } else {</span>
+                    // if its transparent we don't need to do anything, if its
+                    // translucent... well....
+<span class="nc bnc" id="L1733" title="All 2 branches missed.">                    if (s.getBgTransparency() != 0) {</span>
+<span class="nc" id="L1734">                        Image i = ImageFactory.createImage(c, width, height, 0);</span>
+                        int[] imageRgb;
+<span class="nc bnc" id="L1736" title="All 2 branches missed.">                        if (g.getColor() != 0xffffff) {</span>
+<span class="nc" id="L1737">                            Graphics imageG = i.getGraphics();</span>
+<span class="nc" id="L1738">                            imageG.setColor(g.getColor());</span>
+<span class="nc" id="L1739">                            imageG.fillRoundRect(0, 0, width, height, arcWidth, arcHeight);</span>
+<span class="nc" id="L1740">                            imageRgb = i.getRGBCached();</span>
+<span class="nc" id="L1741">                        } else {</span>
+                            // background color is white we need to remove a different color
+                            // black is the only other &quot;reliable&quot; color on the device
+<span class="nc" id="L1744">                            Graphics imageG = i.getGraphics();</span>
+<span class="nc" id="L1745">                            imageG.setColor(0);</span>
+<span class="nc" id="L1746">                            imageG.fillRect(0, 0, width, height);</span>
+<span class="nc" id="L1747">                            imageG.setColor(g.getColor());</span>
+<span class="nc" id="L1748">                            imageG.fillRoundRect(0, 0, width, height, arcWidth, arcHeight);</span>
+<span class="nc" id="L1749">                            imageRgb = i.getRGBCached();</span>
+                        }
+<span class="nc" id="L1751">                        int removeColor = imageRgb[0];</span>
+<span class="nc" id="L1752">                        int size = width * height;</span>
+<span class="nc" id="L1753">                        int alphaInt = ((s.getBgTransparency() &amp; 0xff) &lt;&lt; 24) &amp; 0xff000000;</span>
+<span class="nc bnc" id="L1754" title="All 2 branches missed.">                        for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="nc bnc" id="L1755" title="All 2 branches missed.">                            if (removeColor == imageRgb[iter]) {</span>
+<span class="nc" id="L1756">                                imageRgb[iter] = 0;</span>
+<span class="nc" id="L1757">                                continue;</span>
+                            }
+<span class="nc bnc" id="L1759" title="All 2 branches missed.">                            if ((imageRgb[iter] &amp; 0xff000000) != 0) {</span>
+<span class="nc" id="L1760">                                imageRgb[iter] = (imageRgb[iter] &amp; 0xffffff) | alphaInt;</span>
+                            }
+                        }
+<span class="nc" id="L1763">                        g.drawImage(new RGBImage(imageRgb, width, height), x, y);</span>
+                    }
+                }
+            }
+
+<span class="nc" id="L1768">            g.setColor(foreground);</span>
+        }
+<span class="nc" id="L1770">        return false;</span>
+    }
+
+    /// Draws the border for the given component, this method is called before a call to
+    /// background painting is made.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context to draw onto
+    ///
+    /// - `c`: component whose border should be drawn
+    public void paint(Graphics g, Component c) {
+<span class="fc" id="L1782">        int x = c.getX();</span>
+<span class="fc" id="L1783">        int y = c.getY();</span>
+<span class="fc" id="L1784">        int width = c.getWidth();</span>
+<span class="fc" id="L1785">        int height = c.getHeight();</span>
+<span class="pc bpc" id="L1786" title="1 of 2 branches missed.">        if (outerBorder != null) {</span>
+            int ac;
+<span class="nc bnc" id="L1788" title="All 2 branches missed.">            if (millimeters) {</span>
+<span class="nc" id="L1789">                ac = Display.getInstance().convertToPixels(thickness);</span>
+            } else {
+<span class="nc" id="L1791">                ac = (int) thickness;</span>
+            }
+<span class="nc bnc" id="L1793" title="All 2 branches missed.">            if (paintOuterBorderFirst) {</span>
+<span class="nc" id="L1794">                outerBorder.paint(g, x, y, width, height, c);</span>
+<span class="nc" id="L1795">                paint(g, x + ac, y + ac, width - ac * 2, height - ac * 2, c);</span>
+            } else {
+<span class="nc" id="L1797">                paint(g, x + ac, y + ac, width - ac * 2, height - ac * 2, c);</span>
+<span class="nc" id="L1798">                outerBorder.paint(g, x, y, width, height, c);</span>
+            }
+<span class="nc" id="L1800">        } else {</span>
+<span class="fc" id="L1801">            paint(g, x, y, width, height, c);</span>
+        }
+<span class="fc" id="L1803">    }</span>
+
+    void paint(Graphics g, int x, int y, int width, int height, Component c) {
+<span class="fc" id="L1806">        int originalColor = g.getColor();</span>
+<span class="fc bfc" id="L1807" title="All 2 branches covered.">        if (!themeColors) {</span>
+<span class="fc" id="L1808">            g.setColor(colorA);</span>
+        }
+<span class="fc" id="L1810">        int ac = 1;</span>
+<span class="fc bfc" id="L1811" title="All 2 branches covered.">        if (thickness &gt; 0) {</span>
+<span class="pc bpc" id="L1812" title="1 of 2 branches missed.">            if (millimeters) {</span>
+<span class="nc" id="L1813">                ac = Display.getInstance().convertToPixels(thickness);</span>
+            } else {
+<span class="fc" id="L1815">                ac = (int) thickness;</span>
+            }
+        }
+<span class="pc bpc" id="L1818" title="9 of 13 branches missed.">        switch (type) {</span>
+            case TYPE_LINE:
+<span class="pc bpc" id="L1820" title="1 of 2 branches missed.">                if (borderTitle == null) {</span>
+<span class="pc bpc" id="L1821" title="1 of 2 branches missed.">                    if (millimeters) {</span>
+<span class="nc" id="L1822">                        g.drawRect(x, y, width, height, ac);</span>
+                    } else {
+<span class="fc" id="L1824">                        g.drawRect(x, y, width, height, ac);</span>
+                    }
+                } else {
+<span class="nc" id="L1827">                    Font f = c.getStyle().getFont();</span>
+<span class="nc" id="L1828">                    int titleW = f.stringWidth(borderTitle);</span>
+<span class="nc" id="L1829">                    int topPad = c.getStyle().getPaddingTop();</span>
+<span class="nc" id="L1830">                    int topY = y + (topPad - ac) / 2;</span>
+<span class="nc bnc" id="L1831" title="All 2 branches missed.">                    if (c.isRTL()) {</span>
+<span class="nc" id="L1832">                        g.fillRect(x + width - TITLE_MARGIN, topY, TITLE_MARGIN, ac); //top (segment before the title)</span>
+<span class="nc" id="L1833">                        g.fillRect(x, topY, width - (TITLE_MARGIN + titleW + TITLE_SPACE * 2), ac); //top (segment after the title)</span>
+<span class="nc" id="L1834">                        g.drawString(borderTitle, x + width - (TITLE_MARGIN + titleW + TITLE_SPACE), y + (topPad - f.getHeight()) / 2);</span>
+                    } else {
+<span class="nc" id="L1836">                        g.fillRect(x, topY, TITLE_MARGIN, ac); //top (segment before the title)</span>
+<span class="nc" id="L1837">                        g.fillRect(x + TITLE_MARGIN + titleW + TITLE_SPACE * 2, topY, width - (TITLE_MARGIN + titleW + TITLE_SPACE * 2), ac); //top (segment after the title)</span>
+<span class="nc" id="L1838">                        g.drawString(borderTitle, x + TITLE_MARGIN + TITLE_SPACE, y + (topPad - f.getHeight()) / 2);</span>
+                    }
+
+<span class="nc" id="L1841">                    g.fillRect(x, y + height - ac, width, ac); //bottom</span>
+<span class="nc" id="L1842">                    g.fillRect(x, topY, ac, height); //left</span>
+<span class="nc" id="L1843">                    g.fillRect(x + width - ac, topY, ac, height); //right</span>
+
+                }
+<span class="nc" id="L1846">                break;</span>
+            case TYPE_DASHED:
+            case TYPE_DOTTED:
+<span class="nc" id="L1849">                int segWidth = ac;</span>
+<span class="nc bnc" id="L1850" title="All 2 branches missed.">                if (type == TYPE_DASHED) {</span>
+<span class="nc" id="L1851">                    segWidth = ac * 3;</span>
+                }
+<span class="nc" id="L1853">                int ix = x;</span>
+<span class="nc bnc" id="L1854" title="All 2 branches missed.">                for (; ix &lt; x + width; ix += segWidth * 2) {</span>
+<span class="nc" id="L1855">                    g.fillRect(ix, y, segWidth, ac);</span>
+<span class="nc" id="L1856">                    g.fillRect(ix, y + height - ac, segWidth, ac);</span>
+                }
+<span class="nc bnc" id="L1858" title="All 2 branches missed.">                if (ix - segWidth &lt; x + width) { //fill in the gap if any</span>
+<span class="nc" id="L1859">                    g.fillRect(ix - segWidth, y, x + width - ix + segWidth, ac);</span>
+<span class="nc" id="L1860">                    g.fillRect(ix - segWidth, y + height - ac, x + width - ix + segWidth, ac);</span>
+                }
+
+<span class="nc" id="L1863">                int iy = y;</span>
+<span class="nc bnc" id="L1864" title="All 2 branches missed.">                for (; iy &lt; y + height; iy += segWidth * 2) {</span>
+<span class="nc" id="L1865">                    g.fillRect(x, iy, ac, segWidth);</span>
+<span class="nc" id="L1866">                    g.fillRect(x + width - ac, iy, ac, segWidth);</span>
+                }
+<span class="nc bnc" id="L1868" title="All 2 branches missed.">                if (iy - segWidth &lt; y + height) { //fill in the gap if any</span>
+<span class="nc" id="L1869">                    g.fillRect(x, iy - segWidth, ac, y + height - iy + segWidth);</span>
+<span class="nc" id="L1870">                    g.fillRect(x + width - ac, iy - segWidth, ac, y + height - iy + segWidth);</span>
+                }
+
+
+                break;
+            case TYPE_DOUBLE:
+<span class="nc" id="L1876">                width--;</span>
+<span class="nc" id="L1877">                height--;</span>
+<span class="nc bnc" id="L1878" title="All 2 branches missed.">                for (int iter = 0; iter &lt; ac; iter++) {</span>
+<span class="nc bnc" id="L1879" title="All 4 branches missed.">                    if ((iter * 100 / ac &lt;= 33) || (iter * 100 / ac &gt;= 66)) {</span>
+<span class="nc" id="L1880">                        g.drawRect(x + iter, y + iter, width, height);</span>
+                    }
+<span class="nc" id="L1882">                    width -= 2;</span>
+<span class="nc" id="L1883">                    height -= 2;</span>
+                }
+<span class="nc" id="L1885">                break;</span>
+            case TYPE_INSET:
+            case TYPE_OUTSET:
+<span class="nc bnc" id="L1888" title="All 2 branches missed.">                for (int i = 0; i &lt; ac; i++) {</span>
+<span class="nc" id="L1889">                    g.drawLine(x + i, y + i, x + i, y + height - i);</span>
+<span class="nc" id="L1890">                    g.drawLine(x + i, y + i, x + width - i, y + i);</span>
+                }
+
+<span class="nc bnc" id="L1893" title="All 2 branches missed.">                if (type == TYPE_INSET) {</span>
+<span class="nc" id="L1894">                    g.lighterColor(50);</span>
+                } else {
+<span class="nc" id="L1896">                    g.darkerColor(50);</span>
+                }
+<span class="nc bnc" id="L1898" title="All 2 branches missed.">                for (int i = 0; i &lt; ac; i++) {</span>
+<span class="nc" id="L1899">                    g.drawLine(x + i, y + height - i, x + width - i, y + height - i);</span>
+<span class="nc" id="L1900">                    g.drawLine(x + width - i, y + i, x + width - i, y + height - i);</span>
+                }
+<span class="nc" id="L1902">                break;</span>
+            case TYPE_GROOVE:
+            case TYPE_RIDGE:
+<span class="nc bnc" id="L1905" title="All 2 branches missed.">                for (int i = 0; i &lt; ac / 2; i++) {</span>
+<span class="nc" id="L1906">                    g.drawLine(x + i, y + i, x + i, y + height - i);</span>
+<span class="nc" id="L1907">                    g.drawLine(x + i, y + i, x + width - i, y + i);</span>
+                }
+<span class="nc bnc" id="L1909" title="All 2 branches missed.">                for (int i = ac / 2; i &lt; ac; i++) {</span>
+<span class="nc" id="L1910">                    g.drawLine(x + i, y + height - i, x + width - i, y + height - i);</span>
+<span class="nc" id="L1911">                    g.drawLine(x + width - i, y + i, x + width - i, y + height - i);</span>
+                }
+
+<span class="nc bnc" id="L1914" title="All 2 branches missed.">                if (type == TYPE_GROOVE) {</span>
+<span class="nc" id="L1915">                    g.lighterColor(50);</span>
+                } else {
+<span class="nc" id="L1917">                    g.darkerColor(50);</span>
+                }
+<span class="nc bnc" id="L1919" title="All 2 branches missed.">                for (int i = 0; i &lt; ac / 2; i++) {</span>
+<span class="nc" id="L1920">                    g.drawLine(x + i, y + height - i, x + width - i, y + height - i);</span>
+<span class="nc" id="L1921">                    g.drawLine(x + width - i, y + i, x + width - i, y + height - i);</span>
+                }
+<span class="nc bnc" id="L1923" title="All 2 branches missed.">                for (int i = ac / 2; i &lt; ac; i++) {</span>
+<span class="nc" id="L1924">                    g.drawLine(x + i, y + i, x + i, y + height - i);</span>
+<span class="nc" id="L1925">                    g.drawLine(x + i, y + i, x + width - i, y + i);</span>
+                }
+<span class="nc" id="L1927">                break;</span>
+            case TYPE_ROUNDED_PRESSED:
+<span class="nc" id="L1929">                borderTypeRounded(g, x + 1, y + 1, width - 2, height - 2);</span>
+<span class="nc" id="L1930">                break;</span>
+            case TYPE_ROUNDED:
+<span class="nc" id="L1932">                borderTypeRounded(g, x, y, width, height);</span>
+<span class="nc" id="L1933">                break;</span>
+            case TYPE_ETCHED_LOWERED:
+            case TYPE_ETCHED_RAISED:
+<span class="fc" id="L1936">                g.drawRect(x, y, width - 2, height - 2);</span>
+
+<span class="pc bpc" id="L1938" title="1 of 2 branches missed.">                if (themeColors) {</span>
+<span class="nc bnc" id="L1939" title="All 2 branches missed.">                    if (type == TYPE_ETCHED_LOWERED) {</span>
+<span class="nc" id="L1940">                        g.lighterColor(40);</span>
+                    } else {
+<span class="nc" id="L1942">                        g.darkerColor(40);</span>
+                    }
+                } else {
+<span class="fc" id="L1945">                    g.setColor(colorB);</span>
+                }
+<span class="fc" id="L1947">                g.drawLine(x + 1, y + height - 3, x + 1, y + 1);</span>
+<span class="fc" id="L1948">                g.drawLine(x + 1, y + 1, x + width - 3, y + 1);</span>
+
+<span class="fc" id="L1950">                g.drawLine(x, y + height - 1, x + width - 1, y + height - 1);</span>
+<span class="fc" id="L1951">                g.drawLine(x + width - 1, y + height - 1, x + width - 1, y);</span>
+<span class="fc" id="L1952">                break;</span>
+            case TYPE_BEVEL_RAISED:
+<span class="nc bnc" id="L1954" title="All 2 branches missed.">                if (themeColors) {</span>
+<span class="nc" id="L1955">                    g.setColor(getBackgroundColor(c));</span>
+<span class="nc" id="L1956">                    g.lighterColor(50);</span>
+                } else {
+<span class="nc" id="L1958">                    g.setColor(colorA);</span>
+                }
+<span class="nc" id="L1960">                g.drawLine(x, y, x, y + height - 2);</span>
+<span class="nc" id="L1961">                g.drawLine(x + 1, y, x + width - 2, y);</span>
+
+<span class="nc bnc" id="L1963" title="All 2 branches missed.">                if (themeColors) {</span>
+<span class="nc" id="L1964">                    g.darkerColor(25);</span>
+                } else {
+<span class="nc" id="L1966">                    g.setColor(colorB);</span>
+                }
+<span class="nc" id="L1968">                g.drawLine(x + 1, y + 1, x + 1, y + height - 3);</span>
+<span class="nc" id="L1969">                g.drawLine(x + 2, y + 1, x + width - 3, y + 1);</span>
+
+<span class="nc bnc" id="L1971" title="All 2 branches missed.">                if (themeColors) {</span>
+<span class="nc" id="L1972">                    g.darkerColor(50);</span>
+                } else {
+<span class="nc" id="L1974">                    g.setColor(colorC);</span>
+                }
+<span class="nc" id="L1976">                g.drawLine(x, y + height - 1, x + width - 1, y + height - 1);</span>
+<span class="nc" id="L1977">                g.drawLine(x + width - 1, y, x + width - 1, y + height - 2);</span>
+
+<span class="nc bnc" id="L1979" title="All 2 branches missed.">                if (themeColors) {</span>
+<span class="nc" id="L1980">                    g.darkerColor(25);</span>
+                } else {
+<span class="nc" id="L1982">                    g.setColor(colorD);</span>
+                }
+<span class="nc" id="L1984">                g.drawLine(x + 1, y + height - 2, x + width - 2, y + height - 2);</span>
+<span class="nc" id="L1985">                g.drawLine(x + width - 2, y + 1, x + width - 2, y + height - 3);</span>
+<span class="nc" id="L1986">                break;</span>
+            case TYPE_UNDERLINE:
+<span class="nc" id="L1988">                g.fillRect(x, y + height - ac - 1, width, ac);</span>
+<span class="nc" id="L1989">                break;</span>
+            case TYPE_BEVEL_LOWERED:
+<span class="nc bnc" id="L1991" title="All 2 branches missed.">                if (themeColors) {</span>
+<span class="nc" id="L1992">                    g.setColor(getBackgroundColor(c));</span>
+<span class="nc" id="L1993">                    g.darkerColor(50);</span>
+                } else {
+<span class="nc" id="L1995">                    g.setColor(colorD);</span>
+                }
+<span class="nc" id="L1997">                g.drawLine(x, y, x, y + height - 1);</span>
+<span class="nc" id="L1998">                g.drawLine(x + 1, y, x + width - 1, y);</span>
+
+<span class="nc bnc" id="L2000" title="All 2 branches missed.">                if (themeColors) {</span>
+<span class="nc" id="L2001">                    g.lighterColor(25);</span>
+                } else {
+<span class="nc" id="L2003">                    g.setColor(colorC);</span>
+                }
+<span class="nc" id="L2005">                g.drawLine(x + 1, y + 1, x + 1, y + height - 2);</span>
+<span class="nc" id="L2006">                g.drawLine(x + 2, y + 1, x + width - 2, y + 1);</span>
+
+<span class="nc bnc" id="L2008" title="All 2 branches missed.">                if (themeColors) {</span>
+<span class="nc" id="L2009">                    g.lighterColor(50);</span>
+                } else {
+<span class="nc" id="L2011">                    g.setColor(colorC);</span>
+                }
+<span class="nc" id="L2013">                g.drawLine(x + 1, y + height - 1, x + width - 1, y + height - 1);</span>
+<span class="nc" id="L2014">                g.drawLine(x + width - 1, y + 1, x + width - 1, y + height - 2);</span>
+
+<span class="nc bnc" id="L2016" title="All 2 branches missed.">                if (themeColors) {</span>
+<span class="nc" id="L2017">                    g.lighterColor(25);</span>
+                } else {
+<span class="nc" id="L2019">                    g.setColor(colorA);</span>
+                }
+<span class="nc" id="L2021">                g.drawLine(x + 2, y + height - 2, x + width - 2, y + height - 2);</span>
+<span class="nc" id="L2022">                g.drawLine(x + width - 2, y + 2, x + width - 2, y + height - 3);</span>
+<span class="nc" id="L2023">                break;</span>
+            case TYPE_COMPOUND:
+<span class="fc" id="L2025">                boolean drawLeft = true;</span>
+<span class="fc" id="L2026">                boolean drawRight = true;</span>
+
+<span class="pc bpc" id="L2028" title="1 of 2 branches missed.">                if (c.getUIManager().getLookAndFeel().isRTL()) {</span>
+<span class="nc" id="L2029">                    boolean temp = drawLeft;</span>
+<span class="nc" id="L2030">                    drawLeft = drawRight;</span>
+<span class="nc" id="L2031">                    drawRight = temp;</span>
+                }
+<span class="fc" id="L2033">                Border top = compoundBorders[Component.TOP];</span>
+<span class="fc" id="L2034">                Border bottom = compoundBorders[Component.BOTTOM];</span>
+<span class="fc" id="L2035">                Border left = compoundBorders[Component.LEFT];</span>
+<span class="fc" id="L2036">                Border right = compoundBorders[Component.RIGHT];</span>
+<span class="fc" id="L2037">                int topThickness = 0;</span>
+<span class="fc" id="L2038">                int bottomThickness = 0;</span>
+
+<span class="pc bpc" id="L2040" title="1 of 2 branches missed.">                if (top != null) {</span>
+<span class="fc" id="L2041">                    Rectangle clip = saveClip(g);</span>
+                    //g.pushClip();
+<span class="fc" id="L2043">                    topThickness = (int) top.thickness;</span>
+<span class="fc" id="L2044">                    g.clipRect(x, y, width, topThickness);</span>
+<span class="fc" id="L2045">                    top.paint(g, x, y, width, height, c); //top.paint(g, c);</span>
+<span class="fc" id="L2046">                    restoreClip(g, clip);</span>
+                    //g.popClip();
+                }
+
+<span class="pc bpc" id="L2050" title="1 of 2 branches missed.">                if (bottom != null) {</span>
+<span class="fc" id="L2051">                    Rectangle clip = saveClip(g);</span>
+                    //g.pushClip();
+<span class="fc" id="L2053">                    bottomThickness = (int) bottom.thickness;</span>
+<span class="fc" id="L2054">                    g.clipRect(x, y + height - bottomThickness, width, bottomThickness);</span>
+<span class="fc" id="L2055">                    bottom.paint(g, x, y, width, height, c); //bottom.paint(g, c);</span>
+<span class="fc" id="L2056">                    restoreClip(g, clip);</span>
+                    //g.popClip();
+                }
+
+<span class="pc bpc" id="L2060" title="2 of 4 branches missed.">                if ((drawLeft) &amp;&amp; (left != null)) {</span>
+<span class="fc" id="L2061">                    Rectangle clip = saveClip(g);</span>
+                    //g.pushClip();
+<span class="fc" id="L2063">                    g.clipRect(x, y + topThickness,</span>
+                            (int) left.thickness,
+                            height - topThickness - bottomThickness);
+<span class="fc" id="L2066">                    left.paint(g, x, y, width, height, c); //left.paint(g, c);</span>
+<span class="fc" id="L2067">                    restoreClip(g, clip);</span>
+                    //g.popClip();
+                }
+<span class="pc bpc" id="L2070" title="2 of 4 branches missed.">                if ((drawRight) &amp;&amp; (right != null)) {</span>
+<span class="fc" id="L2071">                    Rectangle clip = saveClip(g);</span>
+                    //g.pushClip();
+<span class="fc" id="L2073">                    g.clipRect(x + width - (int) right.thickness,</span>
+                            y + topThickness,
+                            (int) right.thickness,
+                            height - topThickness - bottomThickness);
+<span class="fc" id="L2077">                    right.paint(g, x, y, width, height, c); //right.paint(g, c);</span>
+<span class="fc" id="L2078">                    restoreClip(g, clip);</span>
+                    //g.popClip();
+<span class="fc" id="L2080">                }</span>
+                break;
+            default:
+                break;
+        }
+<span class="fc" id="L2085">        g.setColor(originalColor);</span>
+<span class="fc" id="L2086">    }</span>
+
+    private void borderTypeRounded(Graphics g, int x, int y, int width, int height) {
+<span class="nc" id="L2089">        width--;</span>
+<span class="nc" id="L2090">        height--;</span>
+
+<span class="nc bnc" id="L2092" title="All 2 branches missed.">        if (outline) {</span>
+<span class="nc" id="L2093">            g.drawRoundRect(x, y, width, height, arcWidth, arcHeight);</span>
+        }
+<span class="nc" id="L2095">    }</span>
+
+    /// Utility method used to save the current clip area
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: The graphics to obtain the clip area from
+    ///
+    /// #### Returns
+    ///
+    /// A Rectangle object representing the current clip area
+    private Rectangle saveClip(Graphics g) {
+<span class="fc" id="L2107">        return new Rectangle(g.getClipX(), g.getClipY(), g.getClipWidth(), g.getClipHeight());</span>
+    }
+
+    /// Utility method used to restore a previously saved clip area
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: The graphics to apply the clip area on
+    ///
+    /// - `rect`: A Rectangle representing the saved clip area
+    private void restoreClip(Graphics g, Rectangle rect) {
+<span class="fc" id="L2118">        g.setClip(rect.getX(), rect.getY(), rect.getSize().getWidth(), rect.getSize().getHeight());</span>
+<span class="fc" id="L2119">    }</span>
+
+    private int getBackgroundColor(Component c) {
+<span class="nc" id="L2122">        return c.getStyle().getBgColor();</span>
+    }
+
+    private void drawImageBorderLine(Graphics g, Image left, Image right, Image center, final int x, int y, int width, Image arrow, int imagePosition, boolean farEdge) {
+<span class="pc bpc" id="L2126" title="1 of 2 branches missed.">        if (width - right.getWidth() &gt; 0) {</span>
+<span class="fc" id="L2127">            g.tileImage(center, x + left.getWidth(), y, width - right.getWidth() - left.getWidth(), center.getHeight());</span>
+<span class="pc bpc" id="L2128" title="1 of 2 branches missed.">            if (arrow != null) {</span>
+<span class="nc" id="L2129">                imagePosition = Math.max(imagePosition, left.getWidth());</span>
+<span class="nc" id="L2130">                imagePosition = Math.min(imagePosition, width - arrow.getWidth() - right.getWidth());</span>
+<span class="nc bnc" id="L2131" title="All 2 branches missed.">                if (farEdge) {</span>
+<span class="nc" id="L2132">                    g.drawImage(arrow, x + imagePosition, y + center.getHeight() - arrow.getHeight());</span>
+                } else {
+<span class="nc" id="L2134">                    g.drawImage(arrow, x + imagePosition, y);</span>
+                }
+            }
+        }
+<span class="fc" id="L2138">    }</span>
+
+    private void drawImageBorderColumn(Graphics g, Image top, Image bottom, Image center, int x, final int y, int height, Image arrow, int imagePosition, boolean farEdge) {
+<span class="pc bpc" id="L2141" title="1 of 2 branches missed.">        if (height - bottom.getHeight() &gt; 0) {</span>
+<span class="fc" id="L2142">            g.tileImage(center, x, y + top.getHeight(), center.getWidth(), height - top.getHeight() - bottom.getHeight());</span>
+<span class="pc bpc" id="L2143" title="1 of 2 branches missed.">            if (arrow != null) {</span>
+<span class="nc" id="L2144">                imagePosition = Math.max(imagePosition, top.getHeight());</span>
+<span class="nc" id="L2145">                imagePosition = Math.min(imagePosition, height - arrow.getHeight() - bottom.getHeight());</span>
+<span class="nc bnc" id="L2146" title="All 2 branches missed.">                if (farEdge) {</span>
+<span class="nc" id="L2147">                    g.drawImage(arrow, x + center.getWidth() - arrow.getWidth(), y + imagePosition);</span>
+                } else {
+<span class="nc" id="L2149">                    g.drawImage(arrow, x, y + imagePosition);</span>
+                }
+            }
+        }
+<span class="fc" id="L2153">    }</span>
+
+    private void drawImageBorderLineScale(Graphics g, Image left, Image right, Image center, int x, int y, int width) {
+<span class="nc" id="L2156">        int currentWidth = width - right.getWidth() - left.getWidth();</span>
+<span class="nc bnc" id="L2157" title="All 2 branches missed.">        if (currentWidth &gt; 0) {</span>
+<span class="nc" id="L2158">            x += left.getWidth();</span>
+<span class="nc" id="L2159">            g.drawImage(center, x, y, currentWidth, center.getHeight());</span>
+        }
+<span class="nc" id="L2161">    }</span>
+
+    private void drawImageBorderColumnScale(Graphics g, Image top, Image bottom, Image center, int x, int y, int height) {
+<span class="nc" id="L2164">        int currentHeight = height - bottom.getHeight() - top.getHeight();</span>
+<span class="nc bnc" id="L2165" title="All 2 branches missed.">        if (currentHeight &gt; 0) {</span>
+<span class="nc" id="L2166">            y += top.getHeight();</span>
+<span class="nc" id="L2167">            g.drawImage(center, x, y, center.getWidth(), currentHeight);</span>
+        }
+<span class="nc" id="L2169">    }</span>
+
+    /// This method returns how thick is the border in pixels, notice this doesn't apply to most border types
+    ///
+    /// #### Returns
+    ///
+    /// the Border thickness
+    public int getThickness() {
+<span class="nc bnc" id="L2177" title="All 2 branches missed.">        if (millimeters) {</span>
+<span class="nc" id="L2178">            return Display.getInstance().convertToPixels(thickness);</span>
+        }
+<span class="nc" id="L2180">        return (int) thickness;</span>
+    }
+
+    /// This method returns sets the border thickness in pixels, notice this doesn't apply to most border types
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: the Border thickness
+    public void setThickness(int thickness) {
+<span class="nc" id="L2189">        this.thickness = thickness;</span>
+<span class="nc" id="L2190">    }</span>
+
+    /// Allows toggling the order in which the outer and inner borders are painted for the Outer border type
+    ///
+    /// #### Returns
+    ///
+    /// whether the outside border should be painter first
+    public boolean isPaintOuterBorderFirst() {
+<span class="nc" id="L2198">        return paintOuterBorderFirst;</span>
+    }
+
+    /// Allows toggling the order in which the outer and inner borders are painted for the Outer border type
+    ///
+    /// #### Parameters
+    ///
+    /// - `paintOuterBorderFirst`: whether the outside border should be painter first
+    public void setPaintOuterBorderFirst(boolean paintOuterBorderFirst) {
+<span class="nc" id="L2207">        this.paintOuterBorderFirst = paintOuterBorderFirst;</span>
+<span class="nc" id="L2208">    }</span>
+
+    /// This method returns the Compound Borders array.
+    /// The array size is 4 and the borders arranged as follows :
+    /// Border[] borders = getCompoundBorders();
+    /// `Border top = borders[Component.TOP];`
+    /// `Border bottom = borders[Component.BOTTOM];`
+    /// `Border left = borders[Component.LEFT];`
+    /// `Border right = borders[Component.RIGHT];`
+    ///
+    /// #### Returns
+    ///
+    /// the borders array or null if this is not a Compound Border
+    public Border[] getCompoundBorders() {
+<span class="nc" id="L2222">        return compoundBorders;</span>
+    }
+
+    /// This callback indicates that a component pointing at this border is initialized, this
+    /// method is useful for image borders whose lock methods are implicitly invoked.
+    /// This method may be invoked multiple times.
+    public void lock() {
+<span class="pc bpc" id="L2229" title="1 of 2 branches missed.">        if (images != null) {</span>
+<span class="nc" id="L2230">            int ilen = images.length;</span>
+<span class="nc bnc" id="L2231" title="All 2 branches missed.">            for (int iter = 0; iter &lt; ilen; iter++) {</span>
+<span class="nc bnc" id="L2232" title="All 2 branches missed.">                if (images[iter] != null) {</span>
+<span class="nc" id="L2233">                    images[iter].lock();</span>
+                }
+            }
+        }
+<span class="fc" id="L2237">    }</span>
+
+    /// This callback indicates that a component pointing at this border is now deinitilized
+    /// This method may be invoked multiple times.
+    public void unlock() {
+<span class="pc bpc" id="L2242" title="1 of 2 branches missed.">        if (images != null) {</span>
+<span class="nc" id="L2243">            int ilen = images.length;</span>
+<span class="nc bnc" id="L2244" title="All 2 branches missed.">            for (int iter = 0; iter &lt; ilen; iter++) {</span>
+<span class="nc bnc" id="L2245" title="All 2 branches missed.">                if (images[iter] != null) {</span>
+<span class="nc" id="L2246">                    images[iter].unlock();</span>
+                }
+            }
+        }
+<span class="fc" id="L2250">    }</span>
+
+    /// This method is for internal usage only!
+    public Object getProperty(String n) {
+<span class="nc bnc" id="L2254" title="All 2 branches missed.">        if (&quot;ThemeColors&quot;.equals(n)) {</span>
+<span class="nc bnc" id="L2255" title="All 2 branches missed.">            if (themeColors) {</span>
+<span class="nc" id="L2256">                return Boolean.TRUE;</span>
+            }
+<span class="nc" id="L2258">            return Boolean.FALSE;</span>
+        }
+<span class="nc bnc" id="L2260" title="All 2 branches missed.">        if (&quot;Type&quot;.equals(n)) {</span>
+<span class="nc" id="L2261">            return Integer.valueOf(type);</span>
+        }
+<span class="nc bnc" id="L2263" title="All 2 branches missed.">        if (&quot;ColorA&quot;.equals(n)) {</span>
+<span class="nc" id="L2264">            return Integer.valueOf(colorA);</span>
+        }
+<span class="nc bnc" id="L2266" title="All 2 branches missed.">        if (&quot;ColorB&quot;.equals(n)) {</span>
+<span class="nc" id="L2267">            return Integer.valueOf(colorB);</span>
+        }
+<span class="nc bnc" id="L2269" title="All 2 branches missed.">        if (&quot;ColorC&quot;.equals(n)) {</span>
+<span class="nc" id="L2270">            return Integer.valueOf(colorC);</span>
+        }
+<span class="nc bnc" id="L2272" title="All 2 branches missed.">        if (&quot;ColorD&quot;.equals(n)) {</span>
+<span class="nc" id="L2273">            return Integer.valueOf(colorD);</span>
+        }
+<span class="nc bnc" id="L2275" title="All 2 branches missed.">        if (&quot;ArcWidth&quot;.equals(n)) {</span>
+<span class="nc" id="L2276">            return Integer.valueOf(arcWidth);</span>
+        }
+<span class="nc bnc" id="L2278" title="All 2 branches missed.">        if (&quot;ArcHeight&quot;.equals(n)) {</span>
+<span class="nc" id="L2279">            return Integer.valueOf(arcHeight);</span>
+        }
+<span class="nc bnc" id="L2281" title="All 2 branches missed.">        if (&quot;Images&quot;.equals(n)) {</span>
+<span class="nc" id="L2282">            return images;</span>
+        }
+<span class="nc" id="L2284">        return null;</span>
+    }
+
+    private static class EmptyBorderHolder {
+<span class="fc" id="L2288">        private static final Border EMPTY = new Border();</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

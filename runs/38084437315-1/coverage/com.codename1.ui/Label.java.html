@@ -1,0 +1,1645 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Label.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">Label.java</span></div><h1>Label.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.accessibility.AccessibilityManager;
+import com.codename1.cloud.BindTarget;
+import com.codename1.io.Log;
+import com.codename1.ui.TextSelection.Char;
+import com.codename1.ui.TextSelection.Span;
+import com.codename1.ui.TextSelection.Spans;
+import com.codename1.ui.TextSelection.TextSelectionSupport;
+import com.codename1.ui.animations.AnimationTime;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.plaf.DefaultLookAndFeel;
+import com.codename1.ui.plaf.LookAndFeel;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.EventDispatcher;
+
+/// Allows displaying a single line of text and icon (both optional) with different alignment options. This class
+/// is a base class for several components allowing them to declare alignment/icon
+/// appearance universally.
+///
+/// Label text can be positioned in one of 4 locations as such:
+///
+/// ```java
+/// Form hi = new Form(&quot;Test Label&quot;, BoxLayout.y());
+///
+/// Image icon = FontImage.createMaterial(FontImage.MATERIAL_INFO, &quot;Label&quot;, 3.0f);
+///
+/// Label left = new Label(&quot;Left&quot;, icon);
+/// left.setTextPosition(Component.LEFT);
+/// Label right = new Label(&quot;Right&quot;, icon);
+/// right.setTextPosition(Component.RIGHT);
+/// Label bottom = new Label(&quot;Bottom&quot;, icon);
+/// bottom.setTextPosition(Component.BOTTOM);
+/// Label top = new Label(&quot;Top&quot;, icon);
+/// top.setTextPosition(Component.TOP);
+/// hi.add(left).add(right).add(bottom).add(top);
+/// hi.show();
+/// ```
+public class Label extends Component implements IconHolder, TextHolder {
+
+<span class="fc" id="L68">    private static int defaultGap = 2;</span>
+<span class="fc" id="L69">    private static boolean defaultTickerEnabled = true;</span>
+    private boolean iconChangeListenerInstalled;
+    /// Fallback to the old default look and feel renderer for cases where compatibility is essential
+    private boolean legacyRenderer;
+<span class="fc" id="L73">    private String text = &quot;&quot;;</span>
+    private TextSelectionSupport textSelectionSupport;
+    private boolean textSelectionEnabled;
+    /// True once `#setTextSelectionEnabled(boolean)` decided; until then the label follows
+    /// `TextSelection#setDefaultSelectable(boolean)`.
+    private boolean textSelectionExplicit;
+    private Image icon;
+<span class="fc" id="L80">    private final ActionListener iconChangeListener = new ActionListener() {</span>
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L83" title="All 4 branches missed.">            if (isInitialized() &amp;&amp; evt.getSource() == getIcon()) {</span>
+<span class="nc" id="L84">                repaint();</span>
+            }
+<span class="nc" id="L86">        }</span>
+
+    };
+    private Image maskedIcon;
+    private Component iconStyleComponent;
+<span class="fc" id="L91">    private int valign = BOTTOM;</span>
+<span class="fc" id="L92">    private int textPosition = RIGHT;</span>
+<span class="fc" id="L93">    private int gap = defaultGap;</span>
+<span class="fc" id="L94">    private int shiftText = 0;</span>
+<span class="fc" id="L95">    private boolean tickerRunning = false;</span>
+<span class="fc" id="L96">    private boolean tickerEnabled = defaultTickerEnabled;</span>
+
+    private long tickerStartTime;
+
+    private long tickerDelay;
+
+    private boolean rightToLeft;
+
+<span class="fc" id="L104">    private boolean endsWith3Points = true;</span>
+
+    private Object mask;
+
+    private String maskName;
+<span class="fc" id="L109">    private EventDispatcher textBindListeners = null;</span>
+<span class="fc" id="L110">    private boolean shouldLocalize = true;</span>
+<span class="fc" id="L111">    private boolean showEvenIfBlank = false;</span>
+<span class="fc" id="L112">    private float shiftMillimeters = 0.25f;</span>
+<span class="fc" id="L113">    private int stringWidthUnselected = -1;</span>
+
+    private boolean autoSizeMode;
+<span class="fc" id="L116">    private float maxAutoSize = -1;</span>
+<span class="fc" id="L117">    private float minAutoSize = -1;</span>
+    private Font originalFont;
+<span class="fc" id="L119">    private int widthAtLastCheck = -1;</span>
+    private char materialIcon;
+<span class="fc" id="L121">    private float materialIconSize = -1;</span>
+    private Font font;
+    private char fontIcon;
+<span class="fc" id="L124">    private float fontIconSize = -1;</span>
+    private String badgeText;
+    private Component badgeStyleComponent;
+    // workaround for potential infinite recursion situation https://github.com/codenameone/CodenameOne/commit/54a4092003b0ee5631c05250824a6466b84e757f#commitcomment-24244448
+    private boolean autoSizeLaidOutLock;
+    private Span span;
+
+    /// Constructs a new label with the specified string of text, left justified.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the string that the label presents.
+<span class="fc" id="L136">    public Label(String text) {</span>
+<span class="fc" id="L137">        endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();</span>
+<span class="fc" id="L138">        noBind = true;</span>
+
+        // This solves overridable method calls in constructor which are
+        // a source of some core problems in Java/CodenameOne
+<span class="fc" id="L142">        setUIIDFinal(&quot;Label&quot;);</span>
+<span class="fc" id="L143">        setLabelUIID(&quot;Label&quot;);</span>
+<span class="fc" id="L144">        this.text = text;</span>
+<span class="fc" id="L145">        localize();</span>
+<span class="fc" id="L146">        setFocusable(false);</span>
+<span class="fc" id="L147">    }</span>
+
+    /// Constructs a new label with the specified string of text and uiid
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the string that the label presents.
+    ///
+    /// - `uiid`: the uiid for the label
+<span class="fc" id="L156">    public Label(String text, String uiid) {</span>
+<span class="fc" id="L157">        endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();</span>
+<span class="fc" id="L158">        noBind = true;</span>
+<span class="fc" id="L159">        this.text = text;</span>
+<span class="fc" id="L160">        localize();</span>
+<span class="fc" id="L161">        setFocusable(false);</span>
+<span class="fc" id="L162">        setUIIDFinal(uiid);</span>
+<span class="fc" id="L163">    }</span>
+
+
+    /// Construct an empty label
+    public Label() {
+<span class="fc" id="L168">        this(&quot;&quot;);</span>
+<span class="fc" id="L169">        endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();</span>
+<span class="fc" id="L170">    }</span>
+
+    /// Constructs a new label with the specified icon
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: the image that the label presents.
+    public Label(Image icon) {
+<span class="fc" id="L178">        this(&quot;&quot;);</span>
+<span class="fc" id="L179">        this.icon = icon;</span>
+<span class="pc bpc" id="L180" title="1 of 4 branches missed.">        if (icon != null &amp;&amp; icon.requiresDrawImage()) {</span>
+<span class="fc" id="L181">            legacyRenderer = true;</span>
+        }
+<span class="fc" id="L183">        endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();</span>
+<span class="fc" id="L184">    }</span>
+
+
+    /// Constructs a new label with the specified icon and UIID
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: the image that the label presents.
+    ///
+    /// - `uiid`: the uiid for the label
+    public Label(Image icon, String uiid) {
+<span class="fc" id="L195">        this(&quot;&quot;, uiid);</span>
+<span class="fc" id="L196">        this.icon = icon;</span>
+<span class="pc bpc" id="L197" title="2 of 4 branches missed.">        if (icon != null &amp;&amp; icon.requiresDrawImage()) {</span>
+<span class="nc" id="L198">            legacyRenderer = true;</span>
+        }
+<span class="fc" id="L200">        endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();</span>
+<span class="fc" id="L201">    }</span>
+
+    /// Constructs a new label with the specified icon text and UIID
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text of the label
+    ///
+    /// - `icon`: the image that the label presents.
+    ///
+    /// - `uiid`: the uiid for the label
+    public Label(String text, Image icon, String uiid) {
+<span class="fc" id="L213">        this(text, uiid);</span>
+<span class="fc" id="L214">        this.icon = icon;</span>
+<span class="pc bpc" id="L215" title="2 of 4 branches missed.">        if (icon != null &amp;&amp; icon.requiresDrawImage()) {</span>
+<span class="nc" id="L216">            legacyRenderer = true;</span>
+        }
+<span class="fc" id="L218">        endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();</span>
+<span class="fc" id="L219">    }</span>
+
+    /// Constructs a new label with the specified icon and text
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text of the label
+    ///
+    /// - `icon`: the image that the label presents.
+    public Label(String text, Image icon) {
+<span class="fc" id="L229">        this(text);</span>
+<span class="fc" id="L230">        this.icon = icon;</span>
+<span class="pc bpc" id="L231" title="1 of 4 branches missed.">        if (icon != null &amp;&amp; icon.requiresDrawImage()) {</span>
+<span class="fc" id="L232">            legacyRenderer = true;</span>
+        }
+<span class="fc" id="L234">        endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();</span>
+<span class="fc" id="L235">    }</span>
+
+    /// Returns the default gap in pixels between the icon/text to the Label boundaries
+    ///
+    /// #### Returns
+    ///
+    /// the gap in pixels between the icon/text to the Label boundaries
+    public static int getDefaultGap() {
+<span class="fc" id="L243">        return defaultGap;</span>
+    }
+
+    /// Set the default gap in pixels between the icon/text to the Label boundaries
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: the gap in pixels
+    public static void setDefaultGap(int gap) {
+<span class="fc" id="L252">        defaultGap = gap;</span>
+<span class="fc" id="L253">    }</span>
+
+    /// Allows disabling/enabling tickers globally
+    ///
+    /// #### Returns
+    ///
+    /// the defaultTickerEnabled
+    public static boolean isDefaultTickerEnabled() {
+<span class="fc" id="L261">        return defaultTickerEnabled;</span>
+    }
+
+    /// Allows disabling/enabling tickers globally
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultTickerEnabled`: the defaultTickerEnabled to set
+    public static void setDefaultTickerEnabled(boolean aDefaultTickerEnabled) {
+<span class="fc" id="L270">        defaultTickerEnabled = aDefaultTickerEnabled;</span>
+<span class="fc" id="L271">    }</span>
+
+    /// {@inheritDoc}
+    /// This is overriden for auto size mode
+    @Override
+    protected void laidOut() {
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">        if (autoSizeLaidOutLock) {</span>
+<span class="nc" id="L278">            return;</span>
+        }
+<span class="fc" id="L280">        autoSizeLaidOutLock = true;</span>
+<span class="fc" id="L281">        super.laidOut();</span>
+<span class="fc bfc" id="L282" title="All 2 branches covered.">        if (autoSizeMode) {</span>
+<span class="fc" id="L283">            initAutoResize();</span>
+        }
+<span class="fc" id="L285">        autoSizeLaidOutLock = false;</span>
+<span class="fc" id="L286">    }</span>
+
+    /// Gets the text to be used in a badge on this label.
+    ///
+    /// #### Returns
+    ///
+    /// the badge text to be used on this label.  May return if no text is set.
+    ///
+    /// #### See also
+    ///
+    /// - #setBadgeText(java.lang.String)
+    ///
+    /// - #setBadgeUIID(java.lang.String)
+    ///
+    /// - #getBadgeStyleComponent()
+    public String getBadgeText() {
+<span class="fc" id="L302">        return badgeText;</span>
+    }
+
+    /// Sets the badge text to be used on this label.  Badges are rendered in the
+    /// upper right corner of the label inside round border.  The style of the badge can be
+    /// configured using `#setBadgeUIID(java.lang.String)`, but the default style uses
+    /// the &quot;Badge&quot; UIID, which, by default, uses white text on a red round border background.
+    ///
+    /// #### Parameters
+    ///
+    /// - `badgeText`: @param badgeText The text to include in the badge.   null or empty strings will result in the
+    /// badge not being rendered.
+    ///
+    /// #### See also
+    ///
+    /// - #getBadgeText()
+    ///
+    /// - #getBadgeStyleComponent()
+    ///
+    /// - #setBadgeUIID(java.lang.String)
+    public void setBadgeText(String badgeText) {
+<span class="fc" id="L323">        this.badgeText = badgeText;</span>
+<span class="fc" id="L324">    }</span>
+
+    /// Sets the style that should be used for rendering badges.  By default it will use
+    /// the &quot;Badge&quot; UIID, which rendered 1.5mm white text on a red round border.
+    ///
+    /// #### Parameters
+    ///
+    /// - `badgeUIID`: The UIID to use for the badge.
+    ///
+    /// #### See also
+    ///
+    /// - #setBadgeText(java.lang.String)
+    ///
+    /// - #getBadgeStyleComponent()
+    public void setBadgeUIID(String badgeUIID) {
+<span class="pc bpc" id="L339" title="1 of 2 branches missed.">        if (badgeStyleComponent == null) {</span>
+<span class="fc" id="L340">            badgeStyleComponent = new Label();</span>
+
+        }
+<span class="fc" id="L343">        badgeStyleComponent.setUIID(badgeUIID);</span>
+<span class="fc" id="L344">    }</span>
+
+    /// Gets a component that can be used for the style of the badge.
+    ///
+    /// #### Returns
+    ///
+    /// The component whose style can be used to style the badge.  May return null if none set.
+    ///
+    /// #### See also
+    ///
+    /// - #setBadgeText(java.lang.String)
+    ///
+    /// - #setBadgeUIID(java.lang.String)
+    ///
+    /// - #getBadgeText()
+    public Component getBadgeStyleComponent() {
+<span class="fc" id="L360">        return badgeStyleComponent;</span>
+    }
+
+    /// Gets the component that should be used for styling material the material icon.  If `#setIconUIID(java.lang.String)` has been used
+    /// to set a custom UIID for the icon, then this will return a component with that UIID.  Otherwise this will just return this component
+    /// itself.
+    ///
+    /// #### Returns
+    ///
+    /// The component to use for styling the material icon.
+    ///
+    @Override
+    public Component getIconStyleComponent() {
+<span class="fc bfc" id="L373" title="All 2 branches covered.">        if (iconStyleComponent != null) {</span>
+<span class="fc" id="L374">            return iconStyleComponent;</span>
+        }
+<span class="fc" id="L376">        return this;</span>
+    }
+
+    /// This method is shorthand for `Font, char, float)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: one of the constants from the font
+    public void setFontIcon(Font font, char c) {
+<span class="nc" id="L385">        FontImage.setFontIcon(this, font, c);</span>
+<span class="nc" id="L386">        fontIconSize = -1;</span>
+<span class="nc" id="L387">        this.font = font;</span>
+<span class="nc" id="L388">        fontIcon = c;</span>
+<span class="nc" id="L389">    }</span>
+
+    /// This method is shorthand for `char, float)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: one of the constants from `com.codename1.ui.FontImage`
+    ///
+    /// - `size`: the size of the icon in millimeters
+    @Override
+    public void setMaterialIcon(char c, float size) {
+<span class="fc" id="L400">        FontImage.setMaterialIcon(this, c, size);</span>
+<span class="fc" id="L401">        materialIconSize = size;</span>
+<span class="fc" id="L402">        materialIcon = c;</span>
+<span class="fc" id="L403">    }</span>
+
+    /// This method is shorthand for `com.codename1.ui.Font, char, float)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: one of the constants from the font
+    ///
+    /// - `size`: the size of the icon in millimeters
+    @Override
+    public void setFontIcon(Font font, char c, float size) {
+<span class="fc" id="L414">        FontImage.setFontIcon(this, font, c, size);</span>
+<span class="fc" id="L415">        fontIconSize = size;</span>
+<span class="fc" id="L416">        this.font = font;</span>
+<span class="fc" id="L417">        fontIcon = c;</span>
+<span class="fc" id="L418">    }</span>
+
+    /// Returns the material icon assigned to this component or 0 if not applicable
+    ///
+    /// #### Returns
+    ///
+    /// the material icon
+    public char getMaterialIcon() {
+<span class="fc" id="L426">        return materialIcon;</span>
+    }
+
+    /// This method is shorthand for `char)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: one of the constants from `com.codename1.ui.FontImage`
+    public void setMaterialIcon(char c) {
+<span class="fc" id="L435">        FontImage.setMaterialIcon(this, c);</span>
+<span class="fc" id="L436">        materialIconSize = -1;</span>
+<span class="fc" id="L437">        materialIcon = c;</span>
+<span class="fc" id="L438">    }</span>
+
+    /// Returns the font icon assigned to this component or 0 if not applicable
+    ///
+    /// #### Returns
+    ///
+    /// the material icon
+    public char getFontIcon() {
+<span class="fc" id="L446">        return fontIcon;</span>
+    }
+
+    /// Sets an icon font using either the same icon font that was used to set the icon font last, or using the font
+    /// from the icon UIID.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: The character to render in the font.
+    ///
+    public void setFontIcon(char c) {
+<span class="nc" id="L457">        Component iconStyle = getIconStyleComponent();</span>
+<span class="nc bnc" id="L458" title="All 2 branches missed.">        if (this.font == null) {</span>
+<span class="nc bnc" id="L459" title="All 2 branches missed.">            if (iconStyle == null) {</span>
+<span class="nc" id="L460">                throw new IllegalStateException(&quot;Cannot set FontIcon without an IconStyleComponent set first.&quot;);</span>
+            }
+<span class="nc" id="L462">            Font font = iconStyle.getStyle().getFont();</span>
+<span class="nc bnc" id="L463" title="All 2 branches missed.">            if (font == null) {</span>
+<span class="nc" id="L464">                throw new IllegalStateException(&quot;Cannot set FontIcon without an IconStyleComponent with a fond set first.&quot;);</span>
+            }
+<span class="nc" id="L466">            this.font = font;</span>
+        }
+<span class="nc" id="L468">        setFontIcon(this.font, c);</span>
+<span class="nc" id="L469">    }</span>
+
+    /// Returns the material icon size assigned to this component or 0/-1 if
+    /// not applicable
+    ///
+    /// #### Returns
+    ///
+    /// the material icon size
+    public float getMaterialIconSize() {
+<span class="fc" id="L478">        return materialIconSize;</span>
+    }
+
+    /// Returns the icon size assigned to this component or 0/-1 if
+    /// not applicable
+    ///
+    /// #### Returns
+    ///
+    /// the icon size
+    public float getFontIconSize() {
+<span class="fc" id="L488">        return fontIconSize;</span>
+    }
+
+    /// Returns the font for the icon font or null if not font set
+    ///
+    /// #### Returns
+    ///
+    /// the material icon size
+    public Font getIconFont() {
+<span class="fc" id="L497">        return font;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public int getBaselineResizeBehavior() {
+<span class="pc bpc" id="L503" title="3 of 4 branches missed.">        switch (valign) {</span>
+            case TOP:
+<span class="nc" id="L505">                return BRB_CONSTANT_ASCENT;</span>
+            case BOTTOM:
+<span class="fc" id="L507">                return BRB_CONSTANT_DESCENT;</span>
+            case CENTER:
+<span class="nc" id="L509">                return BRB_CENTER_OFFSET;</span>
+            default:
+<span class="nc" id="L511">                return BRB_OTHER;</span>
+        }
+    }
+
+    @Override
+    public int getBaseline(int width, int height) {
+<span class="fc" id="L517">        Style s = getStyle();</span>
+<span class="fc" id="L518">        Font f = s.getFont();</span>
+
+<span class="fc" id="L520">        int innerHeight = height - s.getVerticalPadding();</span>
+<span class="fc" id="L521">        return s.getPaddingTop() + (innerHeight - f.getHeight()) / 2 + f.getAscent();</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void setUIID(String id) {
+<span class="fc" id="L527">        super.setUIID(id);</span>
+<span class="fc" id="L528">        setLabelUIID(id);</span>
+<span class="fc" id="L529">    }</span>
+
+    private void setLabelUIID(String id) {
+<span class="pc bpc" id="L532" title="2 of 4 branches missed.">        if (id != null &amp;&amp; id.length() &gt; 0) {</span>
+<span class="fc" id="L533">            String iconUIID = getUIManager().getIconUIIDFor(id);</span>
+<span class="fc bfc" id="L534" title="All 2 branches covered.">            if (iconUIID != null) {</span>
+<span class="fc" id="L535">                setIconUIID(iconUIID);</span>
+            }
+        }
+
+<span class="fc bfc" id="L539" title="All 2 branches covered.">        if (materialIcon != 0) {</span>
+<span class="fc" id="L540">            FontImage.setMaterialIcon(this, materialIcon, materialIconSize);</span>
+<span class="fc bfc" id="L541" title="All 2 branches covered.">        } else if (fontIcon != 0) {</span>
+<span class="fc" id="L542">            FontImage.setFontIcon(this, font, fontIcon, fontIconSize);</span>
+        }
+<span class="fc" id="L544">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void refreshTheme(boolean merge) {
+<span class="fc" id="L549">        super.refreshTheme(merge);</span>
+<span class="fc bfc" id="L550" title="All 2 branches covered.">        if (materialIcon != 0) {</span>
+<span class="fc" id="L551">            FontImage.setMaterialIcon(this, materialIcon, materialIconSize);</span>
+<span class="pc bpc" id="L552" title="1 of 2 branches missed.">        } else if (fontIcon != 0) {</span>
+<span class="nc" id="L553">            FontImage.setFontIcon(this, font, fontIcon, fontIconSize);</span>
+        }
+<span class="fc" id="L555">    }</span>
+
+    private void localize() {
+<span class="fc bfc" id="L558" title="All 2 branches covered.">        if (shouldLocalize) {</span>
+<span class="fc" id="L559">            this.text = getUIManager().localize(text, text);</span>
+        }
+<span class="fc" id="L561">    }</span>
+
+    @Override
+    protected void initLaf(UIManager uim) {
+<span class="pc bpc" id="L565" title="1 of 4 branches missed.">        if (uim == getUIManager() &amp;&amp; isInitialized()) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L566">            return;</span>
+        }
+<span class="fc" id="L568">        super.initLaf(uim);</span>
+<span class="fc" id="L569">        String uiid = getUIID();</span>
+<span class="pc bpc" id="L570" title="1 of 4 branches missed.">        if (uiid != null &amp;&amp; uiid.length() &gt; 0) {</span>
+<span class="fc" id="L571">            String iconUiid = uim.getIconUIIDFor(uiid);</span>
+<span class="pc bpc" id="L572" title="1 of 2 branches missed.">            if (iconUiid != null) {</span>
+<span class="nc" id="L573">                setIconUIID(iconUiid);</span>
+<span class="nc bnc" id="L574" title="All 2 branches missed.">                if (materialIcon != 0) {</span>
+<span class="nc" id="L575">                    FontImage.setMaterialIcon(this, materialIcon, materialIconSize);</span>
+<span class="nc bnc" id="L576" title="All 2 branches missed.">                } else if (fontIcon != 0) {</span>
+<span class="nc" id="L577">                    FontImage.setFontIcon(this, font, fontIcon, fontIconSize);</span>
+                }
+            }
+        }
+<span class="fc" id="L581">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    void initComponentImpl() {
+<span class="fc" id="L586">        super.initComponentImpl();</span>
+<span class="fc" id="L587">        UIManager manager = getUIManager();</span>
+<span class="fc" id="L588">        LookAndFeel lf = manager.getLookAndFeel();</span>
+<span class="fc bfc" id="L589" title="All 2 branches covered.">        if (hasFocus()) {</span>
+<span class="pc bpc" id="L590" title="1 of 2 branches missed.">            if (lf instanceof DefaultLookAndFeel) {</span>
+<span class="fc" id="L591">                ((DefaultLookAndFeel) lf).focusGained(this);</span>
+            }
+        }
+        // solves the case of a user starting a ticker before adding the component
+        // into the container
+<span class="pc bpc" id="L596" title="1 of 6 branches missed.">        if (isTickerEnabled() &amp;&amp; isTickerRunning() &amp;&amp; !isCellRenderer()) {</span>
+<span class="fc" id="L597">            TopLevelSupport.registerAnimatedInternal(this, this);</span>
+        }
+<span class="fc" id="L599">        checkAnimation();</span>
+<span class="pc bpc" id="L600" title="3 of 4 branches missed.">        if (maskName != null &amp;&amp; mask == null) {</span>
+<span class="nc" id="L601">            setMask(UIManager.getInstance().getThemeMaskConstant(maskName));</span>
+        }
+<span class="fc bfc" id="L603" title="All 2 branches covered.">        if (getIcon() != null) {</span>
+<span class="fc bfc" id="L604" title="All 2 branches covered.">            if (!iconChangeListenerInstalled) {</span>
+<span class="fc" id="L605">                getIcon().addActionListener(iconChangeListener);</span>
+<span class="fc" id="L606">                iconChangeListenerInstalled = true;</span>
+            }
+<span class="fc" id="L608">            getIcon().lock();</span>
+        }
+<span class="fc" id="L610">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    void deinitializeImpl() {
+<span class="fc" id="L615">        super.deinitializeImpl();</span>
+<span class="fc" id="L616">        deregisterFromAnimation();</span>
+
+<span class="fc bfc" id="L618" title="All 2 branches covered.">        if (getIcon() != null) {</span>
+<span class="fc" id="L619">            getIcon().removeActionListener(iconChangeListener);</span>
+<span class="fc" id="L620">            getIcon().unlock();</span>
+        }
+<span class="fc" id="L622">    }</span>
+
+    /// Returns the label text
+    ///
+    /// #### Returns
+    ///
+    /// the label text
+    @Override
+    public String getText() {
+<span class="fc" id="L631">        return text;</span>
+    }
+
+    /// Sets the Label text
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the string that the label presents.
+    @Override
+    public void setText(String text) {
+<span class="fc" id="L641">        String oldText = this.text;</span>
+<span class="fc" id="L642">        widthAtLastCheck = -1;</span>
+<span class="fc" id="L643">        this.text = text;</span>
+<span class="fc" id="L644">        localize();</span>
+<span class="fc" id="L645">        stringWidthUnselected = -1;</span>
+<span class="fc" id="L646">        setShouldCalcPreferredSize(true);</span>
+<span class="pc bpc" id="L647" title="1 of 6 branches missed.">        if (oldText == null ? this.text != null : !oldText.equals(this.text)) {</span>
+<span class="fc" id="L648">            accessibilityChanged(AccessibilityManager.CHANGE_CONTENT);</span>
+        }
+<span class="fc" id="L650">        repaint();</span>
+<span class="fc" id="L651">    }</span>
+
+    @Override
+    void checkAnimation() {
+<span class="fc" id="L655">        super.checkAnimation();</span>
+<span class="fc bfc" id="L656" title="All 4 branches covered.">        if (icon != null &amp;&amp; icon.isAnimation()) {</span>
+<span class="fc" id="L657">            registerForAnimation();</span>
+        }
+<span class="fc" id="L659">    }</span>
+
+    /// Returns the labels icon
+    ///
+    /// #### Returns
+    ///
+    /// the labels icon
+    @Override
+    public Image getIcon() {
+<span class="fc" id="L668">        return icon;</span>
+    }
+
+    /// Sets the Label icon, if the icon is unmodified a repaint would not be triggered
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: the image that the label presents.
+    @Override
+    public void setIcon(Image icon) {
+<span class="fc bfc" id="L678" title="All 2 branches covered.">        if (this.icon == icon) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L679">            return;</span>
+        }
+<span class="fc bfc" id="L681" title="All 2 branches covered.">        if (this.icon != null) {</span>
+<span class="fc" id="L682">            this.icon.removeActionListener(iconChangeListener);</span>
+<span class="fc" id="L683">            iconChangeListenerInstalled = false;</span>
+        }
+<span class="fc" id="L685">        widthAtLastCheck = -1;</span>
+<span class="fc bfc" id="L686" title="All 2 branches covered.">        if (icon != null) {</span>
+<span class="fc bfc" id="L687" title="All 2 branches covered.">            if (icon.requiresDrawImage()) {</span>
+<span class="fc" id="L688">                legacyRenderer = true;</span>
+            }
+
+<span class="pc bpc" id="L691" title="1 of 2 branches missed.">            if (mask != null) {</span>
+<span class="nc" id="L692">                maskedIcon = icon.applyMaskAutoScale(mask);</span>
+            }
+        }
+<span class="fc" id="L695">        this.icon = icon;</span>
+<span class="fc bfc" id="L696" title="All 2 branches covered.">        if (this.icon != null) {</span>
+<span class="fc bfc" id="L697" title="All 2 branches covered.">            if (isInitialized()) {</span>
+<span class="fc" id="L698">                this.icon.addActionListener(iconChangeListener);</span>
+<span class="fc" id="L699">                iconChangeListenerInstalled = true;</span>
+            }
+        }
+<span class="fc" id="L702">        setShouldCalcPreferredSize(true);</span>
+<span class="fc" id="L703">        checkAnimation();</span>
+<span class="fc" id="L704">        repaint();</span>
+<span class="fc" id="L705">    }</span>
+
+    /// Returns the vertical alignment of the Label, this will only work when the icon
+    /// is in the side of the text and not above or below it.
+    /// **The valign property is only relevant relatively to the icon and not the entire label, this will
+    /// only work when there is an icon**
+    ///
+    /// #### Returns
+    ///
+    /// the vertical alignment of the Label one of: CENTER, TOP, BOTTOM, BASELINE
+    ///
+    /// #### See also
+    ///
+    /// - #CENTER
+    ///
+    /// - #TOP
+    ///
+    /// - #BOTTOM
+    ///
+    /// - #BASELINE
+    public int getVerticalAlignment() {
+<span class="fc" id="L726">        return valign;</span>
+    }
+
+    /// Sets the vertical alignment of the Label to one of: CENTER, TOP, BOTTOM, BASELINE
+    /// **The valign property is only relevant relatively to the icon and not the entire label, this will
+    /// only work when there is an icon**
+    ///
+    /// #### Parameters
+    ///
+    /// - `valign`: alignment value
+    ///
+    /// #### See also
+    ///
+    /// - #CENTER
+    ///
+    /// - #TOP
+    ///
+    /// - #BOTTOM
+    ///
+    /// - #BASELINE
+    public void setVerticalAlignment(int valign) {
+<span class="fc bfc" id="L747" title="All 8 branches covered.">        if (valign != CENTER &amp;&amp; valign != TOP &amp;&amp; valign != BOTTOM &amp;&amp; valign != BASELINE) {</span>
+<span class="fc" id="L748">            throw new IllegalArgumentException(&quot;Alignment can't be set to &quot; + valign);</span>
+        }
+<span class="fc" id="L750">        this.valign = valign;</span>
+<span class="fc" id="L751">    }</span>
+
+    /// Returns the alignment of the Label
+    ///
+    /// #### Returns
+    ///
+    /// the alignment of the Label one of: CENTER, LEFT, RIGHT
+    ///
+    /// #### Deprecated
+    ///
+    /// use Style.getAlignment instead
+    ///
+    /// #### See also
+    ///
+    /// - #CENTER
+    ///
+    /// - #LEFT
+    ///
+    /// - #RIGHT
+    public int getAlignment() {
+<span class="fc" id="L771">        return getStyle().getAlignment();</span>
+    }
+
+    /// Sets the Alignment of the Label to one of: CENTER, LEFT, RIGHT
+    ///
+    /// #### Parameters
+    ///
+    /// - `align`: alignment value
+    ///
+    /// #### Deprecated
+    ///
+    /// use Style.setAlignment instead
+    ///
+    /// #### See also
+    ///
+    /// - #CENTER
+    ///
+    /// - #LEFT
+    ///
+    /// - #RIGHT
+    public void setAlignment(int align) {
+<span class="fc" id="L792">        getSelectedStyle().setAlignment(align);</span>
+<span class="fc" id="L793">        getUnselectedStyle().setAlignment(align);</span>
+<span class="fc" id="L794">    }</span>
+
+    /// Returns The position of the text relative to the icon
+    ///
+    /// #### Returns
+    ///
+    /// The position of the text relative to the icon, one of: LEFT, RIGHT, BOTTOM, TOP
+    ///
+    /// #### See also
+    ///
+    /// - #LEFT
+    ///
+    /// - #RIGHT
+    ///
+    /// - #BOTTOM
+    ///
+    /// - #TOP
+    @Override
+    public int getTextPosition() {
+<span class="fc" id="L813">        return textPosition;</span>
+    }
+
+    /// Sets the position of the text relative to the icon if exists
+    ///
+    /// #### Parameters
+    ///
+    /// - `textPosition`: alignment value (LEFT, RIGHT, BOTTOM or TOP)
+    ///
+    /// #### See also
+    ///
+    /// - #LEFT
+    ///
+    /// - #RIGHT
+    ///
+    /// - #BOTTOM
+    ///
+    /// - #TOP
+    @Override
+    public void setTextPosition(int textPosition) {
+<span class="fc bfc" id="L833" title="All 8 branches covered.">        if (textPosition != LEFT &amp;&amp; textPosition != RIGHT &amp;&amp; textPosition != BOTTOM &amp;&amp; textPosition != TOP) {</span>
+<span class="fc" id="L834">            throw new IllegalArgumentException(&quot;Text position can't be set to &quot; + textPosition);</span>
+        }
+<span class="fc" id="L836">        this.textPosition = textPosition;</span>
+<span class="fc" id="L837">    }</span>
+
+    /// Returns the gap in pixels between the icon/text to the Label boundaries
+    ///
+    /// #### Returns
+    ///
+    /// the gap in pixels between the icon/text to the Label boundaries
+    @Override
+    public int getGap() {
+<span class="fc" id="L846">        return gap;</span>
+    }
+
+    /// Set the gap in pixels between the icon/text to the Label boundaries
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: the gap in pixels
+    @Override
+    public void setGap(int gap) {
+<span class="fc" id="L856">        this.gap = gap;</span>
+<span class="fc" id="L857">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected String paramString() {
+<span class="fc" id="L862">        return super.paramString() + &quot;, text = &quot; + getText() + &quot;, gap = &quot; + gap;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void paint(Graphics g) {
+<span class="pc bpc" id="L868" title="1 of 6 branches missed.">        if (legacyRenderer || (badgeText != null &amp;&amp; badgeText.length() &gt; 0)) {</span>
+<span class="fc" id="L869">            initAutoResize();</span>
+<span class="fc" id="L870">            getUIManager().getLookAndFeel().drawLabel(g, this);</span>
+<span class="fc" id="L871">            return;</span>
+        }
+<span class="fc" id="L873">        paintImpl(g);</span>
+<span class="fc" id="L874">    }</span>
+
+    void paintImpl(Graphics g) {
+<span class="fc" id="L877">        initAutoResize();</span>
+<span class="fc" id="L878">        Object icn = null;</span>
+<span class="fc" id="L879">        Image i = getIconFromState();</span>
+<span class="fc bfc" id="L880" title="All 2 branches covered.">        if (i != null) {</span>
+<span class="fc" id="L881">            icn = i.getImage();</span>
+        } else {
+            // optimize away a common usage pattern for drawing the background only
+<span class="pc bpc" id="L884" title="1 of 6 branches missed.">            if (text == null || &quot;&quot;.equals(text) || &quot; &quot;.equals(text)) {</span>
+<span class="fc" id="L885">                return;</span>
+            }
+        }
+        //getUIManager().getLookAndFeel().drawLabel(g, this);
+<span class="fc" id="L889">        int cmpX = getX() + g.getTranslateX();</span>
+<span class="fc" id="L890">        int cmpY = getY() + g.getTranslateY();</span>
+<span class="fc" id="L891">        int cmpHeight = getHeight();</span>
+<span class="fc" id="L892">        int cmpWidth = getWidth();</span>
+<span class="fc" id="L893">        Style s = getStyle();</span>
+<span class="fc" id="L894">        Font f = s.getFont();</span>
+<span class="fc" id="L895">        String t = text;</span>
+<span class="pc bpc" id="L896" title="1 of 2 branches missed.">        if (text == null) {</span>
+<span class="nc" id="L897">            t = &quot;&quot;;</span>
+        }
+<span class="fc" id="L899">        Display.impl.drawLabelComponent(g.getGraphics(), cmpX, cmpY, cmpHeight, cmpWidth, s, t,</span>
+<span class="fc" id="L900">                icn, null, 0, gap, isRTL(), false, textPosition, getStringWidth(f), tickerRunning, shiftText,</span>
+                endsWith3Points, valign);
+<span class="fc" id="L902">    }</span>
+
+    /// Allows us to limit the maximum size for the autosize mode
+    ///
+    /// #### Returns
+    ///
+    /// the maximum font size in millimeters
+    public float getMaxAutoSize() {
+<span class="fc" id="L910">        return maxAutoSize;</span>
+    }
+
+    /// Allows us to limit the maximum size for the autosize mode
+    ///
+    /// #### Parameters
+    ///
+    /// - `maxSize`: the maximum font size in millimeters
+    public void setMaxAutoSize(float maxSize) {
+<span class="fc" id="L919">        maxAutoSize = maxSize;</span>
+<span class="fc" id="L920">    }</span>
+
+    /// Allows us to limit the minimum size for the autosize mode
+    ///
+    /// #### Returns
+    ///
+    /// the minimum font size in millimeters
+    public float getMinAutoSize() {
+<span class="fc" id="L928">        return minAutoSize;</span>
+    }
+
+    /// Allows us to limit the minimum size for the autosize mode
+    ///
+    /// #### Parameters
+    ///
+    /// - `minSize`: the minimum font size in millimeters
+    public void setMinAutoSize(float minSize) {
+<span class="fc" id="L937">        minAutoSize = minSize;</span>
+<span class="fc" id="L938">    }</span>
+
+    void initAutoResize() {
+<span class="fc bfc" id="L941" title="All 2 branches covered.">        if (autoSizeMode) {</span>
+<span class="fc" id="L942">            Style s = getUnselectedStyle();</span>
+<span class="fc" id="L943">            int p = s.getHorizontalPadding();</span>
+<span class="fc" id="L944">            int w = getWidth();</span>
+<span class="pc bpc" id="L945" title="1 of 2 branches missed.">            if (w &gt; p + 10) {</span>
+<span class="fc bfc" id="L946" title="All 2 branches covered.">                if (originalFont == null) {</span>
+<span class="fc" id="L947">                    originalFont = s.getFont();</span>
+                } else {
+<span class="pc bpc" id="L949" title="1 of 2 branches missed.">                    if (w == widthAtLastCheck) {</span>
+<span class="fc" id="L950">                        return;</span>
+                    }
+                }
+
+<span class="fc" id="L954">                Font currentFont = getUnselectedStyle().getFont();</span>
+<span class="fc" id="L955">                float fontSize = currentFont.getPixelSize();</span>
+<span class="fc bfc" id="L956" title="All 2 branches covered.">                if (fontSize &lt; 1) {</span>
+<span class="fc" id="L957">                    Log.p(&quot;Autosize disabled probably because component wasn't using native fonts for UIID: &quot; + getUIID());</span>
+<span class="fc" id="L958">                    autoSizeMode = false;</span>
+<span class="fc" id="L959">                    return;</span>
+                }
+<span class="fc" id="L961">                widthAtLastCheck = w;</span>
+<span class="fc" id="L962">                autoSizeMode = false;</span>
+<span class="fc" id="L963">                int currentWidth = calcPreferredSize().getWidth();</span>
+<span class="fc" id="L964">                int maxSizePixel = Display.getInstance().convertToPixels(maxAutoSize);</span>
+<span class="pc bpc" id="L965" title="1 of 2 branches missed.">                while (currentWidth &lt; w) {</span>
+<span class="nc" id="L966">                    fontSize++;</span>
+<span class="nc bnc" id="L967" title="All 2 branches missed.">                    if (fontSize &gt;= maxSizePixel) {</span>
+<span class="nc" id="L968">                        fontSize = maxSizePixel;</span>
+<span class="nc" id="L969">                        currentFont = currentFont.derive(maxSizePixel, currentFont.getStyle());</span>
+<span class="nc" id="L970">                        getAllStyles().setFont(currentFont);</span>
+<span class="nc" id="L971">                        currentWidth = calcPreferredSize().getWidth();</span>
+<span class="nc" id="L972">                        break;</span>
+                    }
+<span class="nc" id="L974">                    currentFont = currentFont.derive(fontSize, currentFont.getStyle());</span>
+<span class="nc" id="L975">                    getAllStyles().setFont(currentFont);</span>
+<span class="nc" id="L976">                    currentWidth = calcPreferredSize().getWidth();</span>
+                }
+<span class="fc" id="L978">                int minSizePixel = Display.getInstance().convertToPixels(minAutoSize);</span>
+<span class="pc bpc" id="L979" title="1 of 2 branches missed.">                while (currentWidth &gt; w) {</span>
+<span class="fc" id="L980">                    fontSize--;</span>
+<span class="fc bfc" id="L981" title="All 2 branches covered.">                    if (fontSize &lt;= minSizePixel) {</span>
+<span class="fc" id="L982">                        currentFont = currentFont.derive(minSizePixel, currentFont.getStyle());</span>
+<span class="fc" id="L983">                        getAllStyles().setFont(currentFont);</span>
+<span class="fc" id="L984">                        break;</span>
+                    }
+<span class="fc" id="L986">                    currentFont = currentFont.derive(fontSize, currentFont.getStyle());</span>
+<span class="fc" id="L987">                    getAllStyles().setFont(currentFont);</span>
+<span class="fc" id="L988">                    currentWidth = calcPreferredSize().getWidth();</span>
+                }
+<span class="fc" id="L990">                autoSizeMode = true;</span>
+            }
+        }
+<span class="fc" id="L993">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="fc" id="L998">        return getUIManager().getLookAndFeel().getLabelPreferredSize(this);</span>
+    }
+
+    /// Simple getter to return how many pixels to shift the text inside the Label
+    ///
+    /// #### Returns
+    ///
+    /// number of pixels to shift
+    public int getShiftText() {
+<span class="fc" id="L1007">        return shiftText;</span>
+    }
+
+    /// This method shifts the text from it's position in pixels.
+    /// The value can be positive/negative to move the text to the right/left
+    ///
+    /// #### Parameters
+    ///
+    /// - `shiftText`: The number of pixels to move the text
+    public void setShiftText(int shiftText) {
+<span class="fc" id="L1017">        this.shiftText = shiftText;</span>
+<span class="fc" id="L1018">    }</span>
+
+    /// Returns true if a ticker should be started since there is no room to show
+    /// the text in the label.
+    ///
+    /// #### Returns
+    ///
+    /// true if a ticker should start running
+    public boolean shouldTickerStart() {
+<span class="pc bpc" id="L1027" title="1 of 2 branches missed.">        if (!tickerEnabled) {</span>
+<span class="nc" id="L1028">            return false;</span>
+        }
+<span class="fc" id="L1030">        Style style = getStyle();</span>
+<span class="fc" id="L1031">        int txtW = style.getFont().stringWidth(getText());</span>
+<span class="fc" id="L1032">        int textSpaceW = getAvaliableSpaceForText();</span>
+<span class="fc bfc" id="L1033" title="All 4 branches covered.">        return txtW &gt; textSpaceW &amp;&amp; textSpaceW &gt; 0;</span>
+    }
+
+    Image getIconFromState() {
+<span class="fc" id="L1037">        return getMaskedIcon();</span>
+    }
+
+    int getAvaliableSpaceForText() {
+<span class="fc" id="L1041">        Style style = getStyle();</span>
+<span class="fc" id="L1042">        int textSpaceW = getWidth() - style.getHorizontalPadding();</span>
+<span class="fc" id="L1043">        Image icon = getIconFromState();</span>
+
+<span class="pc bpc" id="L1045" title="3 of 6 branches missed.">        if (icon != null &amp;&amp; (getTextPosition() == Label.RIGHT || getTextPosition() == Label.LEFT)) {</span>
+<span class="fc" id="L1046">            textSpaceW = textSpaceW - icon.getWidth();</span>
+        }
+<span class="fc" id="L1048">        return textSpaceW;</span>
+    }
+
+    /// This method will start the text ticker
+    public void startTicker() {
+<span class="nc" id="L1053">        startTicker(getUIManager().getLookAndFeel().getTickerSpeed(), true);</span>
+<span class="nc" id="L1054">    }</span>
+
+    /// This method will start the text ticker
+    ///
+    /// #### Parameters
+    ///
+    /// - `delay`: the delay in millisecods between animation intervals
+    ///
+    /// - `rightToLeft`: if true move the text to the left
+    public void startTicker(long delay, boolean rightToLeft) {
+        //return if ticker is not enabled
+<span class="fc bfc" id="L1065" title="All 2 branches covered.">        if (!tickerEnabled) {</span>
+<span class="fc" id="L1066">            return;</span>
+        }
+<span class="pc bpc" id="L1068" title="1 of 2 branches missed.">        if (!isCellRenderer()) {</span>
+<span class="fc" id="L1069">            TopLevelContainer parent = getTopLevelContainer();</span>
+<span class="pc bpc" id="L1070" title="1 of 2 branches missed.">            if (parent != null) {</span>
+<span class="fc" id="L1071">                TopLevelSupport.registerAnimatedInternal(parent, this);</span>
+            }
+        }
+<span class="fc" id="L1074">        tickerStartTime = AnimationTime.now();</span>
+<span class="fc" id="L1075">        tickerDelay = delay;</span>
+<span class="fc" id="L1076">        tickerRunning = true;</span>
+<span class="fc" id="L1077">        this.rightToLeft = rightToLeft;</span>
+<span class="pc bpc" id="L1078" title="1 of 2 branches missed.">        if (isRTL()) {</span>
+<span class="nc bnc" id="L1079" title="All 2 branches missed.">            this.rightToLeft = !this.rightToLeft;</span>
+        }
+<span class="fc" id="L1081">    }</span>
+
+    /// Stops the text ticker
+    public void stopTicker() {
+<span class="fc" id="L1085">        tickerRunning = false;</span>
+<span class="fc" id="L1086">        setShiftText(0);</span>
+<span class="fc" id="L1087">        deregisterAnimatedInternal();</span>
+<span class="fc" id="L1088">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    void tryDeregisterAnimated() {
+<span class="pc bpc" id="L1093" title="3 of 4 branches missed.">        if (tickerEnabled || tickerRunning) {</span>
+<span class="fc" id="L1094">            return;</span>
+        }
+<span class="nc" id="L1096">        super.tryDeregisterAnimated();</span>
+<span class="nc" id="L1097">    }</span>
+
+    /// Returns true if the ticker is running
+    ///
+    /// #### Returns
+    ///
+    /// true if the ticker is running
+    public boolean isTickerRunning() {
+<span class="fc" id="L1105">        return tickerRunning;</span>
+    }
+
+    /// This method return true if the ticker is enabled on this Label
+    ///
+    /// #### Returns
+    ///
+    /// tickerEnabled
+    public boolean isTickerEnabled() {
+<span class="fc" id="L1114">        return tickerEnabled;</span>
+    }
+
+    /// Sets the Label to allow ticking of the text.
+    /// By default is true
+    ///
+    /// #### Parameters
+    ///
+    /// - `tickerEnabled`
+    public void setTickerEnabled(boolean tickerEnabled) {
+<span class="fc" id="L1124">        this.tickerEnabled = tickerEnabled;</span>
+<span class="fc" id="L1125">    }</span>
+
+    /// If the Label text is too long fit the text to the widget and adds &quot;`...`&quot;
+    /// points at the end. By default this is set to `false` for faster performance.
+    ///
+    /// #### Returns
+    ///
+    /// true if this Label adds &quot;...&quot; when the text is too long
+    public boolean isEndsWith3Points() {
+<span class="fc" id="L1134">        return endsWith3Points;</span>
+    }
+
+    /// If the Label text is too long fit the text to the widget and adds &quot;`...`&quot;
+    /// points at the end. By default this is set to `false` for faster performance.
+    ///
+    /// #### Parameters
+    ///
+    /// - `endsWith3Points`: true if text should add &quot;...&quot; at the end
+    public void setEndsWith3Points(boolean endsWith3Points) {
+<span class="fc" id="L1144">        this.endsWith3Points = endsWith3Points;</span>
+<span class="fc" id="L1145">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public boolean animate() {
+<span class="fc bfc" id="L1150" title="All 2 branches covered.">        if (!isVisibleOnForm()) {</span>
+<span class="fc" id="L1151">            return false;</span>
+        }
+<span class="fc" id="L1153">        boolean animateTicker = false;</span>
+<span class="pc bpc" id="L1154" title="1 of 4 branches missed.">        if (tickerRunning &amp;&amp; tickerStartTime + tickerDelay &lt; AnimationTime.now()) {</span>
+<span class="nc" id="L1155">            tickerStartTime = AnimationTime.now();</span>
+<span class="nc bnc" id="L1156" title="All 2 branches missed.">            if (rightToLeft) {</span>
+<span class="nc" id="L1157">                shiftText -= Display.getInstance().convertToPixels(shiftMillimeters);</span>
+<span class="nc bnc" id="L1158" title="All 2 branches missed.">                if (shiftText + getStringWidth(getStyle().getFont()) &lt; 0) {</span>
+<span class="nc" id="L1159">                    shiftText = getStringWidth(getStyle().getFont());</span>
+                }
+            } else {
+<span class="nc" id="L1162">                shiftText += Display.getInstance().convertToPixels(shiftMillimeters);</span>
+<span class="nc bnc" id="L1163" title="All 2 branches missed.">                if (getStringWidth(getStyle().getFont()) - shiftText &lt; 0) {</span>
+<span class="nc" id="L1164">                    shiftText = -getStringWidth(getStyle().getFont());</span>
+                }
+            }
+<span class="nc" id="L1167">            animateTicker = true;</span>
+        }
+        // if we have an animated icon then just let it do its thing...
+<span class="pc bpc" id="L1170" title="5 of 6 branches missed.">        boolean val = icon != null &amp;&amp; icon.isAnimation() &amp;&amp; icon.animate();</span>
+<span class="fc" id="L1171">        boolean parent = super.animate();</span>
+<span class="pc bpc" id="L1172" title="3 of 6 branches missed.">        return val || parent || animateTicker;</span>
+    }
+
+    /// Returns the mask matching the given image
+    ///
+    /// #### Returns
+    ///
+    /// the mask for the given label
+    public Object getMask() {
+<span class="fc" id="L1181">        return mask;</span>
+    }
+
+    /// A mask image can be applied to the label (see the image mask method for details)
+    /// which allows for things like rounded image appearance etc.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mask`: the mask returned from the image object
+    public void setMask(Object mask) {
+<span class="fc" id="L1191">        this.mask = mask;</span>
+<span class="fc" id="L1192">    }</span>
+
+    /// Determines the name of the mask from the image constants thus allowing the mask to be applied from the theme
+    ///
+    /// #### Returns
+    ///
+    /// the maskName
+    public String getMaskName() {
+<span class="fc" id="L1200">        return maskName;</span>
+    }
+
+    /// Determines the name of the mask from the image constants thus allowing the mask to be applied from the theme
+    ///
+    /// #### Parameters
+    ///
+    /// - `maskName`: the maskName to set
+    public void setMaskName(String maskName) {
+<span class="fc" id="L1209">        this.maskName = maskName;</span>
+<span class="fc" id="L1210">        setMask(UIManager.getInstance().getThemeMaskConstant(maskName));</span>
+<span class="fc" id="L1211">        repaint();</span>
+<span class="fc" id="L1212">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public String[] getPropertyNames() {
+<span class="nc" id="L1217">        return new String[]{&quot;maskName&quot;};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Class[] getPropertyTypes() {
+<span class="nc" id="L1223">        return new Class[]{String.class};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String[] getPropertyTypeNames() {
+<span class="nc" id="L1229">        return new String[]{&quot;String&quot;};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Object getPropertyValue(String name) {
+<span class="nc bnc" id="L1235" title="All 2 branches missed.">        if (&quot;maskName&quot;.equals(name)) {</span>
+<span class="nc" id="L1236">            return getMaskName();</span>
+        }
+<span class="nc" id="L1238">        return null;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String setPropertyValue(String name, Object value) {
+<span class="nc bnc" id="L1244" title="All 2 branches missed.">        if (&quot;maskName&quot;.equals(name)) {</span>
+<span class="nc" id="L1245">            setMaskName((String) value);</span>
+<span class="nc" id="L1246">            return null;</span>
+        }
+<span class="nc" id="L1248">        return super.setPropertyValue(name, value);</span>
+    }
+
+    /// If a mask is applied returns the icon with a mask, otherwise returns the icon
+    ///
+    /// #### Returns
+    ///
+    /// the icon masked or otherwise
+    public Image getMaskedIcon() {
+<span class="fc bfc" id="L1257" title="All 2 branches covered.">        if (maskedIcon != null) {</span>
+<span class="fc" id="L1258">            return maskedIcon;</span>
+        }
+<span class="fc bfc" id="L1260" title="All 2 branches covered.">        if (mask != null) {</span>
+<span class="pc bpc" id="L1261" title="1 of 2 branches missed.">            if (icon != null) {</span>
+<span class="fc" id="L1262">                maskedIcon = icon.applyMaskAutoScale(mask);</span>
+<span class="fc" id="L1263">                return maskedIcon;</span>
+            }
+        }
+<span class="fc" id="L1266">        return icon;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String[] getBindablePropertyNames() {
+<span class="fc" id="L1272">        return new String[]{&quot;text&quot;};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Class[] getBindablePropertyTypes() {
+<span class="fc" id="L1278">        return new Class[]{String.class};</span>
+    }
+
+    /// {@inheritDoc}
+    ///
+    /// #### Deprecated
+    ///
+    /// uses the deprecated BindTarget interface
+    @Override
+    public void bindProperty(String prop, BindTarget target) {
+<span class="pc bpc" id="L1288" title="1 of 2 branches missed.">        if (&quot;text&quot;.equals(prop)) {</span>
+<span class="pc bpc" id="L1289" title="1 of 2 branches missed.">            if (textBindListeners == null) {</span>
+<span class="fc" id="L1290">                textBindListeners = new EventDispatcher();</span>
+            }
+<span class="fc" id="L1292">            textBindListeners.addListener(target);</span>
+<span class="fc" id="L1293">            return;</span>
+        }
+<span class="nc" id="L1295">        super.bindProperty(prop, target);</span>
+<span class="nc" id="L1296">    }</span>
+
+    /// {@inheritDoc}
+    ///
+    /// #### Deprecated
+    ///
+    /// uses the deprecated BindTarget interface
+    @Override
+    public void unbindProperty(String prop, BindTarget target) {
+<span class="pc bpc" id="L1305" title="1 of 2 branches missed.">        if (&quot;text&quot;.equals(prop)) {</span>
+<span class="pc bpc" id="L1306" title="1 of 2 branches missed.">            if (textBindListeners == null) {</span>
+<span class="nc" id="L1307">                return;</span>
+            }
+<span class="fc" id="L1309">            textBindListeners.removeListener(target);</span>
+<span class="pc bpc" id="L1310" title="1 of 2 branches missed.">            if (!textBindListeners.hasListeners()) {</span>
+<span class="fc" id="L1311">                textBindListeners = null;</span>
+            }
+<span class="fc" id="L1313">            return;</span>
+        }
+<span class="nc" id="L1315">        super.unbindProperty(prop, target);</span>
+<span class="nc" id="L1316">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public Object getBoundPropertyValue(String prop) {
+<span class="pc bpc" id="L1321" title="1 of 2 branches missed.">        if (&quot;text&quot;.equals(prop)) {</span>
+<span class="fc" id="L1322">            return getText();</span>
+        }
+<span class="nc" id="L1324">        return super.getBoundPropertyValue(prop);</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void setBoundPropertyValue(String prop, Object value) {
+<span class="pc bpc" id="L1330" title="1 of 2 branches missed.">        if (&quot;text&quot;.equals(prop)) {</span>
+<span class="fc" id="L1331">            setText((String) value);</span>
+<span class="fc" id="L1332">            return;</span>
+        }
+<span class="nc" id="L1334">        super.setBoundPropertyValue(prop, value);</span>
+<span class="nc" id="L1335">    }</span>
+
+    /// Indicates if text should be localized when set to the label, by default
+    /// all text is localized so this allows disabling automatic localization for
+    /// a specific label.
+    ///
+    /// #### Returns
+    ///
+    /// the shouldLocalize value
+    public boolean isShouldLocalize() {
+<span class="fc" id="L1345">        return shouldLocalize;</span>
+    }
+
+    /// Indicates if text should be localized when set to the label, by default
+    /// all text is localized so this allows disabling automatic localization for
+    /// a specific label.
+    ///
+    /// #### Parameters
+    ///
+    /// - `shouldLocalize`: the shouldLocalize to set
+    public void setShouldLocalize(boolean shouldLocalize) {
+<span class="fc" id="L1356">        this.shouldLocalize = shouldLocalize;</span>
+<span class="fc" id="L1357">    }</span>
+
+    /// Returns the number of millimeters that should be shifted in tickering rounded to nearest int.
+    ///
+    /// #### Returns
+    ///
+    /// the shiftMillimeters
+    ///
+    /// #### Deprecated
+    ///
+    /// Use `#getShiftMillimetersF()`
+    public int getShiftMillimeters() {
+<span class="fc" id="L1369">        return Math.round(shiftMillimeters);</span>
+    }
+
+    /// Sets the millimeters that should be shifted in tickering
+    ///
+    /// #### Parameters
+    ///
+    /// - `shiftMillimeters`: the shiftMillimeters to set
+    public void setShiftMillimeters(int shiftMillimeters) {
+<span class="fc" id="L1378">        this.shiftMillimeters = shiftMillimeters;</span>
+<span class="fc" id="L1379">    }</span>
+
+    /// Sets the millimeters that should be shifted in tickering as a float.
+    ///
+    /// #### Parameters
+    ///
+    /// - `shiftMillimeters`: the shiftMillimeters to set
+    ///
+    public void setShiftMillimeters(float shiftMillimeters) {
+<span class="fc" id="L1388">        this.shiftMillimeters = shiftMillimeters;</span>
+<span class="fc" id="L1389">    }</span>
+
+    /// Returns the number of millimeters that should be shifted in tickering as a float.
+    ///
+    public float getShiftMillimetersF() {
+<span class="fc" id="L1394">        return shiftMillimeters;</span>
+    }
+
+    /// By default labels and subclasses become 0 sized when they are blank even ignoring their padding
+    /// setting this to true makes the padding take effect even in a blank field.
+    ///
+    /// #### Returns
+    ///
+    /// the showEvenIfBlank
+    public boolean isShowEvenIfBlank() {
+<span class="fc" id="L1404">        return showEvenIfBlank;</span>
+    }
+
+    /// By default labels and subclasses become 0 sized when they are blank even ignoring their padding
+    /// setting this to true makes the padding take effect even in a blank field.
+    ///
+    /// #### Parameters
+    ///
+    /// - `showEvenIfBlank`: the showEvenIfBlank to set
+    public final void setShowEvenIfBlank(boolean showEvenIfBlank) {
+<span class="fc" id="L1414">        this.showEvenIfBlank = showEvenIfBlank;</span>
+<span class="fc" id="L1415">    }</span>
+
+    /// This method is equivalent to label.getStyle().getFont().stringWidth(label.getText()) but its faster
+    ///
+    /// #### Parameters
+    ///
+    /// - `fnt`: the font is passed as an optimization to save a call to getStyle
+    ///
+    /// #### Returns
+    ///
+    /// the string width
+    public int getStringWidth(Font fnt) {
+<span class="fc bfc" id="L1427" title="All 2 branches covered.">        if (isUnselectedStyle) {</span>
+            // very optimized way to get the string width of a label for the common unselected case in larger lists
+<span class="fc bfc" id="L1429" title="All 2 branches covered.">            if (stringWidthUnselected &lt; 0) {</span>
+<span class="fc" id="L1430">                stringWidthUnselected = fnt.stringWidth(text);</span>
+            }
+<span class="fc" id="L1432">            return stringWidthUnselected;</span>
+        }
+<span class="fc" id="L1434">        return fnt.stringWidth(text);</span>
+    }
+
+    /// Fallback to the old default look and feel renderer for cases where compatibility is essential
+    ///
+    /// #### Returns
+    ///
+    /// the legacyRenderer
+    public boolean isLegacyRenderer() {
+<span class="fc" id="L1443">        return legacyRenderer;</span>
+    }
+
+    /// Fallback to the old default look and feel renderer for cases where compatibility is essential
+    ///
+    /// #### Parameters
+    ///
+    /// - `legacyRenderer`: the legacyRenderer to set
+    public void setLegacyRenderer(boolean legacyRenderer) {
+<span class="fc" id="L1452">        this.legacyRenderer = legacyRenderer;</span>
+<span class="fc" id="L1453">    }</span>
+
+    @Override
+    public void styleChanged(String propertyName, Style source) {
+<span class="fc" id="L1457">        super.styleChanged(propertyName, source);</span>
+        // If we're using a custom font, we need to use the legacy renderer.
+<span class="pc bpc" id="L1459" title="1 of 4 branches missed.">        if (Style.FONT.equals(propertyName) &amp;&amp; source.getFont() instanceof CustomFont) {</span>
+<span class="nc" id="L1460">            setLegacyRenderer(true);</span>
+        }
+<span class="pc bpc" id="L1462" title="3 of 4 branches missed.">        if (Style.ICON_GAP.equals(propertyName) &amp;&amp; source.getIconGap() &gt; 0) {</span>
+<span class="nc" id="L1463">            setGap(source.getIconGap());</span>
+        }
+<span class="fc" id="L1465">    }</span>
+
+    @Override
+    protected void initUnselectedStyle(Style unselectedStyle) {
+<span class="fc" id="L1469">        super.initUnselectedStyle(unselectedStyle);</span>
+<span class="pc bpc" id="L1470" title="1 of 2 branches missed.">        if (unselectedStyle.getIconGap() &gt; 0) {</span>
+<span class="nc" id="L1471">            setGap(unselectedStyle.getIconGap());</span>
+        }
+<span class="fc" id="L1473">    }</span>
+
+    /// Autosize mode automatically shrinks/grows the font of the label to fit in the available width, it carries
+    /// a noticeable performance penalty and we recommend you avoid using it unless absolutely necessary
+    ///
+    /// #### Returns
+    ///
+    /// the autoSizeMode
+    public boolean isAutoSizeMode() {
+<span class="fc" id="L1482">        return autoSizeMode;</span>
+    }
+
+    /// Autosize mode automatically shrinks/grows the font of the label to fit in the available width, it carries
+    /// a noticeable performance penalty and we recommend you avoid using it unless absolutely necessary
+    ///
+    /// #### Parameters
+    ///
+    /// - `autoSizeMode`: the autoSizeMode to set
+    public void setAutoSizeMode(boolean autoSizeMode) {
+<span class="fc" id="L1492">        this.autoSizeMode = autoSizeMode;</span>
+<span class="fc" id="L1493">    }</span>
+
+    /// Returns true if text selection is enabled on this label.  Default is false.  To enable text selection,
+    /// you must enable text selection on the Form with `Form#getTextSelection()` and `TextSelection#setEnabled(boolean)`,
+    /// and also ensure that the label's text selection is enabled via `#setTextSelectionEnabled(boolean)`.
+    ///
+    /// #### See also
+    ///
+    /// - #setTextSelectionEnabled(boolean)
+    public boolean isTextSelectionEnabled() {
+<span class="fc bfc" id="L1503" title="All 2 branches covered.">        if (textSelectionExplicit) {</span>
+<span class="fc" id="L1504">            return textSelectionEnabled;</span>
+        }
+        // A Button's press is its action, so it never takes the selectable default.
+<span class="fc bfc" id="L1507" title="All 4 branches covered.">        return !(this instanceof Button) &amp;&amp; TextSelection.isSelectableByDefault(this);</span>
+    }
+
+    /// Enables text selection on this label.  Text selection must also be enabled on the Form in order to
+    /// text selection to be activated.
+    ///
+    /// #### Parameters
+    ///
+    /// - `enabled`
+    ///
+    /// #### See also
+    ///
+    /// - #setTextSelectionEnabled(boolean)
+    ///
+    /// - Form#getTextSelection()
+    ///
+    /// - TextSelection#setEnabled(boolean)
+    public void setTextSelectionEnabled(boolean enabled) {
+<span class="fc" id="L1525">        this.textSelectionEnabled = enabled;</span>
+<span class="fc" id="L1526">        this.textSelectionExplicit = true;</span>
+<span class="fc bfc" id="L1527" title="All 2 branches covered.">        if (enabled) {</span>
+<span class="fc" id="L1528">            setCursor(Component.TEXT_CURSOR);</span>
+        }
+        // Refresh the containing paint tree so native text layers can update hit testing.
+<span class="fc" id="L1531">        TopLevelContainer top = getTopLevelContainer();</span>
+<span class="pc bpc" id="L1532" title="1 of 2 branches missed.">        if (top != null) {</span>
+<span class="nc" id="L1533">            top.asContainer().repaint();</span>
+        } else {
+<span class="fc" id="L1535">            repaint();</span>
+        }
+<span class="fc" id="L1537">    }</span>
+
+    @Override
+    public TextSelectionSupport getTextSelectionSupport() {
+<span class="pc bpc" id="L1541" title="1 of 2 branches missed.">        if (textSelectionSupport == null) {</span>
+<span class="fc" id="L1542">            textSelectionSupport = new TextSelectionSupport() {</span>
+                @Override
+                public TextSelection.Spans getTextSelectionForBounds(TextSelection sel, Rectangle bounds) {
+<span class="nc" id="L1545">                    span = getUIManager().getLookAndFeel().calculateLabelSpan(sel, Label.this);</span>
+<span class="nc bnc" id="L1546" title="All 2 branches missed.">                    if (span == null) {</span>
+<span class="nc" id="L1547">                        return sel.newSpans();</span>
+                    }
+
+<span class="nc" id="L1550">                    Span result = span.getIntersection(bounds, true);</span>
+<span class="nc" id="L1551">                    Spans out = sel.newSpans();</span>
+<span class="nc" id="L1552">                    out.add(result);</span>
+<span class="nc" id="L1553">                    return out;</span>
+
+                }
+
+                @Override
+                public boolean isTextSelectionEnabled(TextSelection sel) {
+<span class="fc" id="L1559">                    return Label.this.isTextSelectionEnabled();</span>
+                }
+
+                @Override
+                public boolean isTextSelectionTriggerEnabled(TextSelection sel) {
+<span class="nc" id="L1564">                    return Label.this.isTextSelectionEnabled();</span>
+                }
+
+                @Override
+                public Span triggerSelectionAt(TextSelection sel, int x, int y) {
+<span class="fc" id="L1569">                    span = getUIManager().getLookAndFeel().calculateLabelSpan(sel, Label.this);</span>
+<span class="pc bpc" id="L1570" title="1 of 2 branches missed.">                    if (span.isEmpty()) {</span>
+<span class="nc" id="L1571">                        return null;</span>
+                    }
+<span class="fc" id="L1573">                    Char charAtPoint = span.charAt(x, y);</span>
+<span class="pc bpc" id="L1574" title="1 of 2 branches missed.">                    if (charAtPoint == null) {</span>
+<span class="nc" id="L1575">                        return null;</span>
+                    }
+
+<span class="fc" id="L1578">                    int startPos = charAtPoint.getPosition();</span>
+<span class="fc" id="L1579">                    int endPos = charAtPoint.getPosition() + 1;</span>
+<span class="fc" id="L1580">                    String dividers = &quot; \t\r\n-.;&quot;;</span>
+
+<span class="pc bpc" id="L1582" title="1 of 2 branches missed.">                    while (startPos &gt; span.first().getPosition()) {</span>
+<span class="fc bfc" id="L1583" title="All 2 branches covered.">                        if (dividers.indexOf(Label.this.getText().substring(startPos, startPos + 1)) &lt; 0) {</span>
+<span class="fc" id="L1584">                            startPos--;</span>
+                        } else {
+<span class="pc bpc" id="L1586" title="1 of 2 branches missed.">                            if (startPos &lt; span.last().getPosition()) {</span>
+<span class="fc" id="L1587">                                startPos++;</span>
+                            }
+                            break;
+                        }
+                    }
+
+<span class="pc bpc" id="L1593" title="1 of 2 branches missed.">                    while (endPos &lt; span.last().getPosition() + 1) {</span>
+<span class="fc bfc" id="L1594" title="All 2 branches covered.">                        if (dividers.indexOf(Label.this.getText().substring(endPos - 1, endPos)) &lt; 0) {</span>
+<span class="fc" id="L1595">                            endPos++;</span>
+                        } else {
+<span class="pc bpc" id="L1597" title="1 of 2 branches missed.">                            if (endPos &gt; span.first().getPosition()) {</span>
+<span class="fc" id="L1598">                                endPos--;</span>
+                            }
+                            break;
+                        }
+                    }
+<span class="fc" id="L1603">                    return span.subspan(startPos, endPos);</span>
+                }
+
+                @Override
+                public String getTextForSpan(TextSelection sel, Span span) {
+<span class="fc" id="L1608">                    int offset = span.getStartPos();</span>
+<span class="fc" id="L1609">                    offset = Math.max(0, offset);</span>
+<span class="fc" id="L1610">                    offset = Math.min(getText().length() - 1, offset);</span>
+<span class="fc" id="L1611">                    int end = span.getEndPos();</span>
+<span class="fc" id="L1612">                    end = Math.min(getText().length(), end);</span>
+<span class="fc" id="L1613">                    return getText().substring(offset, end);</span>
+
+                }
+
+            };
+        }
+<span class="fc" id="L1619">        return textSelectionSupport;</span>
+    }
+
+    @Override
+    public String getIconUIID() {
+<span class="nc bnc" id="L1624" title="All 2 branches missed.">        if (iconStyleComponent != null) {</span>
+<span class="nc" id="L1625">            return iconStyleComponent.getUIID();</span>
+        }
+<span class="nc" id="L1627">        return getUIID();</span>
+    }
+
+    /// Sets a UIID to be used for the material icon style.
+    ///
+    /// #### Parameters
+    ///
+    /// - `uiid`: The uiid to use for the material icon style.
+    ///
+    @Override
+    public void setIconUIID(String uiid) {
+<span class="pc bpc" id="L1638" title="3 of 4 branches missed.">        if (iconStyleComponent == null || !uiid.equals(iconStyleComponent.getUIID())) {</span>
+<span class="fc" id="L1639">            iconStyleComponent = new Component();</span>
+<span class="fc" id="L1640">            iconStyleComponent.setUIID(uiid);</span>
+        }
+<span class="fc" id="L1642">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

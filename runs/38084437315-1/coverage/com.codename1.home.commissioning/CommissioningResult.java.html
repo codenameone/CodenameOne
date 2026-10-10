@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CommissioningResult.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.home.commissioning</a> &gt; <span class="el_source">CommissioningResult.java</span></div><h1>CommissioningResult.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.home.commissioning;
+
+/// What came of a commissioning attempt.
+///
+/// #### Success does not mean you got a device
+///
+/// This is the type that has to carry the least comfortable fact in the whole
+/// API. Commissioning adds an accessory to the **user's ecosystem**, and
+/// whether your app can then see or control it is a separate question with a
+/// different answer per backend:
+///
+/// - **iOS, MatterSupport** -- the accessory joins the user's HomeKit home and
+///   appears in your graph on the next refresh, where you can control it like
+///   any other. **This result carries no id**: Apple's sheet reports that the
+///   flow finished and does not say what was added or which home it went to,
+///   and the user is free to pick a different home than the one you asked
+///   for. Call `com.codename1.home.SmartHome#refresh()` and look at what is
+///   new. [#wasCommissionedToThisApp()] is `false` unless the build asked for
+///   a fabric of its own -- see
+///   [CommissioningRequest#setCommissionToThisApp(boolean)] -- in which case a
+///   successful flow means the accessory joined it, because the extension's
+///   commissioning step failing is what would have failed the flow.
+/// - **Android, Google Home APIs** -- the accessory joins the user's Google
+///   Home and, if the user granted your app access to that structure, appears
+///   in your graph. You get an id and it works.
+/// - **Android, Play services commissioning alone** -- the accessory joins the
+///   user's Google Home and **your app is told nothing more.** There is no id,
+///   and there is no graph to look it up in; see
+///   `com.codename1.home.HomeAvailability#COMMISSIONING_ONLY`.
+///
+/// [#wasCommissionedToThisApp()] is that distinction, made explicit so it
+/// cannot be missed. An app that assumes it got a device shows a &quot;your new
+/// device&quot; screen with nothing on it -- and on two of these three backends
+/// that is what it would get.
+public final class CommissioningResult {
+
+    private final String accessoryId;
+    private final String accessoryName;
+    private final String structureId;
+    private final boolean commissionedToThisApp;
+
+    /// Creates a result. Called by the ports.
+    ///
+    /// #### Parameters
+    ///
+    /// - `accessoryId`: the new accessory, or `null` when the backend did not
+    ///   say
+    ///
+    /// - `accessoryName`: the name the accessory ended up with, or `null`
+    ///
+    /// - `structureId`: the home it joined, or `null`
+    ///
+    /// - `commissionedToThisApp`: whether this app can address the accessory
+    public CommissioningResult(String accessoryId, String accessoryName,
+<span class="fc" id="L77">            String structureId, boolean commissionedToThisApp) {</span>
+<span class="fc" id="L78">        this.accessoryId = accessoryId;</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        this.accessoryName = accessoryName == null ? &quot;&quot; : accessoryName;</span>
+<span class="fc" id="L80">        this.structureId = structureId;</span>
+<span class="fc" id="L81">        this.commissionedToThisApp = commissionedToThisApp;</span>
+<span class="fc" id="L82">    }</span>
+
+    /// Whether this app can address the new accessory.
+    ///
+    /// When `false`, the accessory was added to the user's home successfully
+    /// and there is nothing more you can do with it from here -- tell the user
+    /// it worked and send them to their ecosystem app, rather than showing an
+    /// empty device screen. See the class note.
+    ///
+    /// #### Returns
+    ///
+    /// `true` when [#getAccessoryId()] is usable
+    public boolean wasCommissionedToThisApp() {
+<span class="fc" id="L95">        return commissionedToThisApp;</span>
+    }
+
+    /// The new accessory's identifier.
+    ///
+    /// #### Returns
+    ///
+    /// the identifier, or `null` when
+    /// [#wasCommissionedToThisApp()] is `false`
+    public String getAccessoryId() {
+<span class="fc" id="L105">        return accessoryId;</span>
+    }
+
+    /// The name the accessory ended up with, which is the user's choice rather
+    /// than the one suggested.
+    ///
+    /// #### Returns
+    ///
+    /// the name, never `null`; empty when the backend did not say
+    public String getAccessoryName() {
+<span class="fc" id="L115">        return accessoryName;</span>
+    }
+
+    /// The home the accessory joined.
+    ///
+    /// The user can pick a different home than the one requested, so this is
+    /// worth reading rather than assuming.
+    ///
+    /// #### Returns
+    ///
+    /// the structure identifier, or `null` when the backend did not say
+    public String getStructureId() {
+<span class="nc" id="L127">        return structureId;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        return &quot;CommissioningResult[&quot;</span>
+                + (commissionedToThisApp ? &quot;mine &quot; + accessoryId : &quot;external&quot;)
+<span class="nc bnc" id="L134" title="All 2 branches missed.">                + (accessoryName.length() &gt; 0 ? &quot; &quot; + accessoryName : &quot;&quot;)</span>
+                + &quot;]&quot;;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

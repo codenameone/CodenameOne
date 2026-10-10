@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CarNowPlayingTemplate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.car</a> &gt; <span class="el_source">CarNowPlayingTemplate.java</span></div><h1>CarNowPlayingTemplate.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.car;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// The system now-playing surface for audio apps. On both platforms the track metadata, artwork,
+/// transport controls and scrubber are driven by the platform media session -- on Android by the
+/// `MediaSession` behind Codename One's background audio service, on iOS by `MPNowPlayingInfoCenter`
+/// / the remote command center -- so this template carries no metadata of its own. It exists to (a)
+/// route the head unit to the now-playing screen and (b) add up-to-two app-specific buttons
+/// (shuffle, repeat, like, rate). Maps to `CPNowPlayingTemplate` and the Android Auto now-playing
+/// view.
+<span class="nc" id="L35">public class CarNowPlayingTemplate extends CarTemplate {</span>
+    private boolean upNextVisible;
+<span class="nc" id="L37">    private final List&lt;CarAction&gt; actions = new ArrayList&lt;CarAction&gt;();</span>
+
+    /// Adds an app-specific now-playing button (e.g. shuffle / repeat / like). The head unit shows a
+    /// small fixed number of these alongside the system transport controls.
+    ///
+    /// #### Parameters
+    ///
+    /// - `action`: the button to add
+    ///
+    /// #### Returns
+    ///
+    /// this template, for chaining
+    public CarNowPlayingTemplate addAction(CarAction action) {
+<span class="nc bnc" id="L50" title="All 2 branches missed.">        if (action != null) {</span>
+<span class="nc" id="L51">            actions.add(action);</span>
+        }
+<span class="nc" id="L53">        return this;</span>
+    }
+
+    /// Returns the app-specific now-playing buttons, in order.
+    public List&lt;CarAction&gt; getActions() {
+<span class="nc" id="L58">        return actions;</span>
+    }
+
+    /// Returns true when an &quot;Up next&quot; affordance should be offered.
+    public boolean isUpNextVisible() {
+<span class="nc" id="L63">        return upNextVisible;</span>
+    }
+
+    /// Sets whether the head unit offers an &quot;Up next&quot; button that lets the driver browse the queue.
+    ///
+    /// #### Parameters
+    ///
+    /// - `upNextVisible`: true to show the up-next affordance
+    ///
+    /// #### Returns
+    ///
+    /// this template, for chaining
+    public CarNowPlayingTemplate setUpNextVisible(boolean upNextVisible) {
+<span class="nc" id="L76">        this.upNextVisible = upNextVisible;</span>
+<span class="nc" id="L77">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

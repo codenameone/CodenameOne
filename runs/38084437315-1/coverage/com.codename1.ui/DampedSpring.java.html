@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DampedSpring.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">DampedSpring.java</span></div><h1>DampedSpring.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.util.MathUtil;
+
+/// The free response of a damped harmonic oscillator -- the curve a
+/// CASpringAnimation follows -- in closed form.
+///
+/// `x'' + 2 * zeta * omega * x' + omega^2 * x = 0`, starting at displacement `x0`
+/// with velocity `v0`; the spring rests at 0. `omega` is the natural angular
+/// frequency (rad/s, `sqrt(stiffness / mass)`) and `zeta` the damping ratio
+/// (`damping / (2 * sqrt(stiffness * mass))`): under 1 it oscillates, 1 is
+/// critical, over 1 it creeps back without crossing.
+///
+/// A spring animation from `a` to `b` is `b + displacement(omega, zeta, a - b, v0, t)`.
+final class DampedSpring {
+    private DampedSpring() {
+    }
+
+    /// Displacement from rest at time `t` (seconds).
+    static double displacement(double omega, double zeta, double x0, double v0, double t) {
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        if (t &lt;= 0) {</span>
+<span class="fc" id="L44">            return x0;</span>
+        }
+<span class="fc" id="L46">        double decay = MathUtil.exp(-zeta * omega * t);</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (zeta &lt; 1) {</span>
+<span class="fc" id="L48">            double wd = omega * Math.sqrt(1 - zeta * zeta);</span>
+<span class="fc" id="L49">            double b = (v0 + zeta * omega * x0) / wd;</span>
+<span class="fc" id="L50">            return decay * (x0 * Math.cos(wd * t) + b * Math.sin(wd * t));</span>
+        }
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (zeta == 1) {</span>
+<span class="fc" id="L53">            return decay * (x0 + (v0 + omega * x0) * t);</span>
+        }
+<span class="nc" id="L55">        double s = omega * Math.sqrt(zeta * zeta - 1);</span>
+<span class="nc" id="L56">        double r1 = -zeta * omega + s;</span>
+<span class="nc" id="L57">        double r2 = -zeta * omega - s;</span>
+<span class="nc" id="L58">        double c2 = (v0 - r1 * x0) / (r2 - r1);</span>
+<span class="nc" id="L59">        double c1 = x0 - c2;</span>
+<span class="nc" id="L60">        return c1 * MathUtil.exp(r1 * t) + c2 * MathUtil.exp(r2 * t);</span>
+    }
+
+    /// Velocity at time `t` (units per second).
+    static double velocity(double omega, double zeta, double x0, double v0, double t) {
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        if (t &lt;= 0) {</span>
+<span class="nc" id="L66">            return v0;</span>
+        }
+<span class="fc" id="L68">        double decay = MathUtil.exp(-zeta * omega * t);</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (zeta &lt; 1) {</span>
+<span class="nc" id="L70">            double wd = omega * Math.sqrt(1 - zeta * zeta);</span>
+<span class="nc" id="L71">            double b = (v0 + zeta * omega * x0) / wd;</span>
+<span class="nc" id="L72">            double c = Math.cos(wd * t);</span>
+<span class="nc" id="L73">            double s = Math.sin(wd * t);</span>
+<span class="nc" id="L74">            return decay * ((b * wd - zeta * omega * x0) * c - (x0 * wd + zeta * omega * b) * s);</span>
+        }
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (zeta == 1) {</span>
+<span class="fc" id="L77">            double k = v0 + omega * x0;</span>
+<span class="fc" id="L78">            return decay * (k - omega * (x0 + k * t));</span>
+        }
+<span class="nc" id="L80">        double s = omega * Math.sqrt(zeta * zeta - 1);</span>
+<span class="nc" id="L81">        double r1 = -zeta * omega + s;</span>
+<span class="nc" id="L82">        double r2 = -zeta * omega - s;</span>
+<span class="nc" id="L83">        double c2 = (v0 - r1 * x0) / (r2 - r1);</span>
+<span class="nc" id="L84">        double c1 = x0 - c2;</span>
+<span class="nc" id="L85">        return c1 * r1 * MathUtil.exp(r1 * t) + c2 * r2 * MathUtil.exp(r2 * t);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

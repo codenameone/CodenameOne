@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TerrainFeature.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.level</a> &gt; <span class="el_source">TerrainFeature.java</span></div><h1>TerrainFeature.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gaming.level;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/// A placed, variable-size terrain element such as a wall, ramp or platform. Unlike a per-cell
+/// height/wall value, a feature has a free world position (in tile units) and an arbitrary
+/// `width`x`height`x`depth` plus rotation, so dungeon walls, sloped roads and raised platforms
+/// of any size are first-class, dynamic objects. The `#getType()` names the shape family
+/// (`#TYPE_WALL`, `#TYPE_RAMP`, `#TYPE_PLATFORM`) and `#getMaterial()` its surface.
+public class TerrainFeature {
+    public static final String TYPE_WALL = &quot;wall&quot;;
+    public static final String TYPE_RAMP = &quot;ramp&quot;;
+    public static final String TYPE_PLATFORM = &quot;platform&quot;;
+
+    private String id;
+<span class="pc" id="L39">    private String type = TYPE_WALL;</span>
+    private double x;
+    private double y;
+    private double z;
+<span class="pc" id="L43">    private double width = 1;</span>
+<span class="pc" id="L44">    private double height = 1;</span>
+<span class="pc" id="L45">    private double depth = 1;</span>
+    private double rotation;
+<span class="pc" id="L47">    private String material = MaterialRegistry.STONE;</span>
+<span class="pc" id="L48">    private final Map&lt;String, Object&gt; props = new HashMap&lt;String, Object&gt;();</span>
+
+<span class="nc" id="L50">    public TerrainFeature() {</span>
+<span class="nc" id="L51">    }</span>
+
+<span class="fc" id="L53">    public TerrainFeature(String id, String type) {</span>
+<span class="fc" id="L54">        this.id = id;</span>
+<span class="fc" id="L55">        this.type = type;</span>
+<span class="fc" id="L56">    }</span>
+
+    public String getId() {
+<span class="nc" id="L59">        return id;</span>
+    }
+
+    public TerrainFeature setId(String id) {
+<span class="nc" id="L63">        this.id = id;</span>
+<span class="nc" id="L64">        return this;</span>
+    }
+
+    public String getType() {
+<span class="fc" id="L68">        return type;</span>
+    }
+
+    public TerrainFeature setType(String type) {
+<span class="nc" id="L72">        this.type = type;</span>
+<span class="nc" id="L73">        return this;</span>
+    }
+
+    public double getX() {
+<span class="fc" id="L77">        return x;</span>
+    }
+
+    public double getY() {
+<span class="nc" id="L81">        return y;</span>
+    }
+
+    public double getZ() {
+<span class="fc" id="L85">        return z;</span>
+    }
+
+    /// Sets the feature's world position in tile units (y = elevation).
+    public TerrainFeature setPosition(double x, double y, double z) {
+<span class="fc" id="L90">        this.x = x;</span>
+<span class="fc" id="L91">        this.y = y;</span>
+<span class="fc" id="L92">        this.z = z;</span>
+<span class="fc" id="L93">        return this;</span>
+    }
+
+    public double getWidth() {
+<span class="fc" id="L97">        return width;</span>
+    }
+
+    public double getHeight() {
+<span class="nc" id="L101">        return height;</span>
+    }
+
+    public double getDepth() {
+<span class="nc" id="L105">        return depth;</span>
+    }
+
+    /// Sets the feature size in tile units.
+    public TerrainFeature setSize(double width, double height, double depth) {
+<span class="fc" id="L110">        this.width = width;</span>
+<span class="fc" id="L111">        this.height = height;</span>
+<span class="fc" id="L112">        this.depth = depth;</span>
+<span class="fc" id="L113">        return this;</span>
+    }
+
+    public double getRotation() {
+<span class="nc" id="L117">        return rotation;</span>
+    }
+
+    public TerrainFeature setRotation(double rotation) {
+<span class="nc" id="L121">        this.rotation = rotation;</span>
+<span class="nc" id="L122">        return this;</span>
+    }
+
+    public String getMaterial() {
+<span class="nc" id="L126">        return material;</span>
+    }
+
+    public TerrainFeature setMaterial(String material) {
+<span class="fc" id="L130">        this.material = material;</span>
+<span class="fc" id="L131">        return this;</span>
+    }
+
+    public Map&lt;String, Object&gt; props() {
+<span class="nc" id="L135">        return props;</span>
+    }
+
+    void write(StringBuilder sb) {
+<span class="fc" id="L139">        sb.append(&quot;{\&quot;id\&quot;:&quot;);</span>
+<span class="fc" id="L140">        Json.writeString(sb, id);</span>
+<span class="fc" id="L141">        sb.append(&quot;,\&quot;type\&quot;:&quot;);</span>
+<span class="fc" id="L142">        Json.writeString(sb, type);</span>
+<span class="fc" id="L143">        sb.append(&quot;,\&quot;x\&quot;:&quot;);</span>
+<span class="fc" id="L144">        Json.writeNumber(sb, x);</span>
+<span class="fc" id="L145">        sb.append(&quot;,\&quot;y\&quot;:&quot;);</span>
+<span class="fc" id="L146">        Json.writeNumber(sb, y);</span>
+<span class="fc" id="L147">        sb.append(&quot;,\&quot;z\&quot;:&quot;);</span>
+<span class="fc" id="L148">        Json.writeNumber(sb, z);</span>
+<span class="fc" id="L149">        sb.append(&quot;,\&quot;w\&quot;:&quot;);</span>
+<span class="fc" id="L150">        Json.writeNumber(sb, width);</span>
+<span class="fc" id="L151">        sb.append(&quot;,\&quot;h\&quot;:&quot;);</span>
+<span class="fc" id="L152">        Json.writeNumber(sb, height);</span>
+<span class="fc" id="L153">        sb.append(&quot;,\&quot;d\&quot;:&quot;);</span>
+<span class="fc" id="L154">        Json.writeNumber(sb, depth);</span>
+<span class="fc" id="L155">        sb.append(&quot;,\&quot;rot\&quot;:&quot;);</span>
+<span class="fc" id="L156">        Json.writeNumber(sb, rotation);</span>
+<span class="fc" id="L157">        sb.append(&quot;,\&quot;mat\&quot;:&quot;);</span>
+<span class="fc" id="L158">        Json.writeString(sb, material);</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">        if (!props.isEmpty()) {</span>
+<span class="nc" id="L160">            sb.append(&quot;,\&quot;props\&quot;:&quot;);</span>
+<span class="nc" id="L161">            Json.writeValue(sb, props);</span>
+        }
+<span class="fc" id="L163">        sb.append('}');</span>
+<span class="fc" id="L164">    }</span>
+
+    static TerrainFeature read(Map&lt;String, Object&gt; m) {
+<span class="fc" id="L167">        TerrainFeature f = new TerrainFeature(Json.str(m.get(&quot;id&quot;), null), Json.str(m.get(&quot;type&quot;), TYPE_WALL));</span>
+<span class="fc" id="L168">        f.setPosition(Json.num(m.get(&quot;x&quot;), 0), Json.num(m.get(&quot;y&quot;), 0), Json.num(m.get(&quot;z&quot;), 0));</span>
+<span class="fc" id="L169">        f.setSize(Json.num(m.get(&quot;w&quot;), 1), Json.num(m.get(&quot;h&quot;), 1), Json.num(m.get(&quot;d&quot;), 1));</span>
+<span class="fc" id="L170">        f.rotation = Json.num(m.get(&quot;rot&quot;), 0);</span>
+<span class="fc" id="L171">        f.material = Json.str(m.get(&quot;mat&quot;), MaterialRegistry.STONE);</span>
+<span class="fc" id="L172">        Map&lt;String, Object&gt; p = Json.asMap(m.get(&quot;props&quot;));</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        if (p != null) {</span>
+<span class="nc" id="L174">            f.props.putAll(p);</span>
+        }
+<span class="fc" id="L176">        return f;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

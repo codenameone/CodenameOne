@@ -1,0 +1,616 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GeofenceManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.location</a> &gt; <span class="el_source">GeofenceManager.java</span></div><h1>GeofenceManager.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.location;
+
+import com.codename1.io.Log;
+import com.codename1.io.Storage;
+import com.codename1.ui.Display;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
+/// A utility class to simplify Geofencing in Codename One.  Using this class to manage
+/// an app's Geofences works around the 20-region limit on iOS and 100-region limit on Android, so that
+/// your app can monitor an unlimited number of Geofences simulataneously.
+///
+/// How it Works
+///
+/// GeofenceManager maintains a &quot;bubble&quot; region around the current device location.  You may register
+/// as many regions as you like to be monitored with GeofenceManager, but it will only register the regions
+/// that intersect the current &quot;bubble&quot; region.  When you exit the bubble region, the GeofenceManager will clear all of the
+/// previously registered regions, create a new bubble, and then register only those regions that intersect this
+/// new bubble.
+///
+/// GeofenceManager uses `Storage` to maintain its own active list of regions.
+///
+/// Limitations
+///
+/// GeofenceManager will only register 19 regions at a time, so if more than 19 regions intersect the current &quot;bubble&quot;
+/// region, some of them won't make the cut.  You can set the radius of the &quot;bubble&quot; region using `#setBubbleRadius(int)`
+/// to increase or decrease the &quot;bubble&quot; region area, so that no regions are left behind.
+///
+/// Although you can set any positive radius value you like, a typical Android or iOS device has a minimum effective
+/// radius of about 100m.
+///
+/// Note: If your app uses GeofenceManager, you shouldn't also add your own Geofences manually using `com.codename1.location.Geofence)`
+/// as your manual regions may conflict.
+///
+/// Usage
+///
+/// `GeofenceManager mgr = GeofenceManager.getInstance();
+/// mgr.setListenerClass(MyGeofenceListener.class);
+/// mgr.add(geofence1, geofence2, geofence3);
+/// mgr.update(10000);`
+///
+/// And the MyGeofenceListener class should be an instance of Geofence.
+///
+/// Reloading Geofences Upon Exiting Bubble
+///
+/// While there is no absolute limit on the number of regions that you can register in GeofenceManager
+/// simulataneously, since it is actually storing the list of Geofences in Storage, there is a practical limit.  E.g.
+/// It probably wouldn't perform well if you stored several thousand at a time.  If you want to monitor large quantifies
+/// of regions (thousands, or millions), you can simply respond to the `GeofenceListener#onExit(java.lang.String)` event
+/// for the &quot;bubble&quot; region, and &quot;reload&quot; the GeofenceManager with new regions related to the device's current location.
+/// You might load the new locations from a web-service, for example.  Use the `#isBubble(java.lang.String)` method
+/// to check if the id parameter is for the bubble region, and act accordintly.
+public final class GeofenceManager implements Iterable&lt;Geofence&gt; {
+    //private GeoStreamerAsyncDataSource dataSource;
+    private static final String STORAGE_KEY = &quot;$AsyncGeoStreamer.geofences$&quot;;
+    private static final String ACTIVE_FENCES_KEY = &quot;$AsyncGeoStreamer.activegeofences$&quot;;
+    private static final String CURRENT_ACTIVE_KEY = &quot;$AsyncGeoStreamer.currentActive&quot;;
+    private static final String EXPIRATIONS_KEY = &quot;$AsyncGeoStreamer.expirations&quot;;
+    private static final String LISTENER_CLASS_KEY = &quot;$AsyncGeoStreamer.listenerClass&quot;;
+    private static final String BUBBLE_GEOFENCE_ID = &quot;$AsyncGeoStreamer.bubble&quot;;
+    /// Default timeout for getting location.
+    private static final int defaultTimeout = 10000;
+<span class="fc" id="L91">    private static int MAX_ACTIVE_GEOFENCES = 19;</span>
+    private static GeofenceManager instance;
+    // Reference to the last bubble set.
+    Geofence lastBubble;
+    /// The radius of the bubble region (in metres)
+<span class="fc" id="L96">    private int bubbleRadius = 1000;</span>
+    /// The bubble region expiraton time (duration).  Default -1 means no expiration.
+<span class="fc" id="L98">    private long bubbleExpiration = -1L;</span>
+    /// The Class that should be instantiated to handle Geofence events.
+    private Class&lt;GeofenceListener&gt; listenerClass;
+    /// Maintains list of currently registered geofence IDs.  Only the ones
+    /// that are actually currently registered with the OS.
+    private List&lt;String&gt; activeKeys;
+    private Map&lt;String, Long&gt; expiryTimes;
+    /// Map of all currently registered fences.
+    private Map&lt;String, Geofence&gt; fences;
+    private Map&lt;String, Geofence&gt; activeFences;
+
+<span class="fc" id="L109">    private GeofenceManager() {</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        if (&quot;and&quot;.equals(Display.getInstance().getPlatformName())) {</span>
+<span class="nc" id="L111">            MAX_ACTIVE_GEOFENCES = 99;</span>
+        }
+        // On simulator we need to force refresh because the
+        // actual geofence timers aren't persisted
+<span class="fc" id="L115">        update(defaultTimeout, true);</span>
+<span class="fc" id="L116">    }</span>
+
+    /// Obtains reference to the singleton GeofenceManager
+    public static GeofenceManager getInstance() {
+<span class="fc" id="L120">        GeofenceManager result = instance;</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (result == null) {</span>
+<span class="fc" id="L122">            synchronized (GeofenceManager.class) {</span>
+<span class="fc" id="L123">                result = instance;</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">                if (result == null) {</span>
+<span class="fc" id="L125">                    result = new GeofenceManager();</span>
+<span class="fc" id="L126">                    instance = result;</span>
+                }
+<span class="fc" id="L128">            }</span>
+        }
+<span class="fc" id="L130">        return result;</span>
+    }
+
+    private synchronized Map&lt;String, Long&gt; getExpiryTimes(boolean reload) {
+<span class="pc bpc" id="L134" title="1 of 4 branches missed.">        if (reload || expiryTimes == null) {</span>
+            try {
+<span class="fc" id="L136">                expiryTimes = (Map) Storage.getInstance().readObject(EXPIRATIONS_KEY);</span>
+<span class="nc" id="L137">            } catch (Throwable t) {</span>
+<span class="nc" id="L138">                Log.e(t);</span>
+<span class="fc" id="L139">            }</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">            if (expiryTimes == null) {</span>
+<span class="fc" id="L141">                expiryTimes = new HashMap&lt;String, Long&gt;();</span>
+            }
+
+        }
+<span class="fc" id="L145">        return expiryTimes;</span>
+    }
+
+    private synchronized void updateExpiryTimes(Geofence... geofences) {
+<span class="fc" id="L149">        Map&lt;String, Long&gt; times = getExpiryTimes(false);</span>
+<span class="fc" id="L150">        long now = System.currentTimeMillis();</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        for (Geofence g : geofences) {</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">            if (g.getExpiration() &lt;= 0) {</span>
+<span class="fc" id="L153">                times.put(g.getId(), -1L);</span>
+            } else {
+<span class="nc" id="L155">                times.put(g.getId(), now + g.getExpiration());</span>
+            }
+        }
+<span class="fc" id="L158">        Storage.getInstance().writeObject(EXPIRATIONS_KEY, times);</span>
+
+<span class="fc" id="L160">    }</span>
+
+    private synchronized void purgeExpired() {
+<span class="fc" id="L163">        long now = System.currentTimeMillis();</span>
+<span class="fc" id="L164">        Map&lt;String, Long&gt; times = getExpiryTimes(false);</span>
+<span class="fc" id="L165">        Map&lt;String, Geofence&gt; fences = getFences(false);</span>
+<span class="fc" id="L166">        List&lt;String&gt; activeKeys = getActiveKeys(false);</span>
+<span class="fc" id="L167">        Map&lt;String, Geofence&gt; activeFences = getActiveFences(false);</span>
+<span class="fc" id="L168">        boolean saveFences = false;</span>
+<span class="fc" id="L169">        boolean saveActive = false;</span>
+<span class="fc" id="L170">        boolean saveActiveFences = false;</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        for (Iterator&lt;Map.Entry&lt;String, Long&gt;&gt; it = times.entrySet().iterator(); it.hasNext();) {</span>
+<span class="fc" id="L172">            Map.Entry&lt;String, Long&gt; time = it.next();</span>
+<span class="pc bpc" id="L173" title="1 of 4 branches missed.">            if (time.getValue() &gt; 0L &amp;&amp; time.getValue() &lt; now) {</span>
+<span class="fc" id="L174">                it.remove();</span>
+<span class="pc bpc" id="L175" title="1 of 4 branches missed.">                if (!saveFences &amp;&amp; fences.containsKey(time.getKey())) {</span>
+<span class="fc" id="L176">                    saveFences = true;</span>
+                }
+<span class="fc" id="L178">                fences.remove(time.getKey());</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">                while (activeKeys.remove(time.getKey())) {</span>
+<span class="fc" id="L180">                    saveActive = true;</span>
+                }
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">                if (activeFences.containsKey(time.getKey())) {</span>
+<span class="fc" id="L183">                    activeFences.remove(time.getKey());</span>
+<span class="fc" id="L184">                    saveActiveFences = true;</span>
+                }
+
+
+            }
+<span class="fc" id="L189">        }</span>
+
+<span class="fc" id="L191">        Storage.getInstance().writeObject(EXPIRATIONS_KEY, times);</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        if (saveFences) {</span>
+<span class="fc" id="L193">            saveFences();</span>
+        }
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        if (saveActive) {</span>
+<span class="fc" id="L196">            saveActiveKeys();</span>
+        }
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        if (saveActiveFences) {</span>
+<span class="fc" id="L199">            saveActiveFences();</span>
+        }
+<span class="fc" id="L201">    }</span>
+
+    /// Gets the radius of the &quot;bubble&quot; region, in metres.
+    ///
+    /// #### Returns
+    ///
+    /// the bubbleRadius
+    public int getBubbleRadius() {
+<span class="fc" id="L209">        return bubbleRadius;</span>
+    }
+
+    /// Sets the radius of the &quot;bubble&quot; regin, in metres.  Default value is 1000.
+    ///
+    /// #### Parameters
+    ///
+    /// - `bubbleRadius`: the bubbleRadius to set
+    public void setBubbleRadius(int bubbleRadius) {
+<span class="nc" id="L218">        this.bubbleRadius = bubbleRadius;</span>
+<span class="nc" id="L219">    }</span>
+
+    /// Gets the expiration duration (in milliseconds) of the bubble region.
+    ///
+    /// #### Returns
+    ///
+    /// the bubbleExpiration
+    public long getBubbleExpiration() {
+<span class="fc" id="L227">        return bubbleExpiration;</span>
+    }
+
+    /// Sets the expiration duration (in milliseconds) of the bubble region.  Default is -1
+    /// meaning &quot;No expiration&quot;.
+    ///
+    /// #### Parameters
+    ///
+    /// - `bubbleExpiration`: the bubbleExpiration to set
+    public void setBubbleExpiration(long bubbleExpiration) {
+<span class="nc" id="L237">        this.bubbleExpiration = bubbleExpiration;</span>
+<span class="nc" id="L238">    }</span>
+
+    /// Checks if the given ID is for the &quot;bubble&quot; region.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: An ID to check.
+    ///
+    /// #### Returns
+    ///
+    /// True if id is for the &quot;bubble&quot; region.
+    public boolean isBubble(String id) {
+<span class="fc" id="L250">        return BUBBLE_GEOFENCE_ID.equals(id);</span>
+    }
+
+    /// Gets the currently registered Listener class.
+    // The listener class name is persisted to Storage during registration; we
+    // have no Class literal here, so reflective resolution is unavoidable.
+    @SuppressWarnings(&quot;BanClassForName&quot;)
+    public synchronized Class&lt;? extends GeofenceListener&gt; getListenerClass() {
+<span class="fc bfc" id="L258" title="All 2 branches covered.">        if (listenerClass == null) {</span>
+<span class="fc" id="L259">            String className = (String) Storage.getInstance().readObject(LISTENER_CLASS_KEY);</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">            if (className != null) {</span>
+                try {
+<span class="nc" id="L262">                    listenerClass = (Class) Class.forName(className);</span>
+<span class="nc" id="L263">                } catch (Throwable t) {</span>
+<span class="nc" id="L264">                    Log.e(t);</span>
+<span class="nc" id="L265">                }</span>
+            }
+        }
+<span class="fc" id="L268">        return listenerClass;</span>
+    }
+
+    /// Sets the GeofenceListener class that should receive Geofence events.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`
+    public synchronized void setListenerClass(Class&lt;? extends GeofenceListener&gt; c) {
+<span class="fc" id="L277">        listenerClass = (Class) c;</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">        if (c == null) {</span>
+<span class="fc" id="L279">            Storage.getInstance().deleteStorageFile(LISTENER_CLASS_KEY);</span>
+        } else {
+<span class="fc" id="L281">            Storage.getInstance().writeObject(LISTENER_CLASS_KEY, c.getName());</span>
+        }
+<span class="fc" id="L283">    }</span>
+
+    ///
+    private GeofenceListener getListener() {
+<span class="fc" id="L287">        Class&lt;? extends GeofenceListener&gt; c = getListenerClass();</span>
+<span class="fc bfc" id="L288" title="All 2 branches covered.">        if (c != null) {</span>
+            try {
+<span class="fc" id="L290">                return (GeofenceListener) c.newInstance();</span>
+<span class="nc" id="L291">            } catch (Throwable t) {</span>
+<span class="nc" id="L292">                Log.e(t);</span>
+            }
+        }
+<span class="fc" id="L295">        return null;</span>
+    }
+
+    /// Adds a set of regions to be monitored by GeofenceManager.
+    ///
+    /// #### Parameters
+    ///
+    /// - `geofence`
+    public synchronized void add(Geofence... geofence) {
+<span class="fc" id="L304">        Map&lt;String, Geofence&gt; fences = getFences(false);</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">        for (Geofence f : geofence) {</span>
+<span class="fc" id="L306">            fences.put(f.getId(), f);</span>
+        }
+<span class="fc" id="L308">        saveFences();</span>
+<span class="fc" id="L309">        updateExpiryTimes(geofence);</span>
+<span class="fc" id="L310">    }</span>
+
+
+    /// Adds a set of regions to be monitored by GeofenceManager.
+    ///
+    /// #### Parameters
+    ///
+    /// - `geofences`
+    public synchronized void add(Collection&lt;Geofence&gt; geofences) {
+<span class="nc" id="L319">        add(geofences.toArray(new Geofence[geofences.size()]));</span>
+<span class="nc" id="L320">    }</span>
+
+    private synchronized List&lt;String&gt; getActiveKeys(boolean reload) {
+<span class="pc bpc" id="L323" title="1 of 4 branches missed.">        if (reload || activeKeys == null) {</span>
+<span class="fc" id="L324">            activeKeys = (List&lt;String&gt;) Storage.getInstance().readObject(CURRENT_ACTIVE_KEY);</span>
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">            if (activeKeys == null) {</span>
+<span class="fc" id="L326">                activeKeys = new ArrayList&lt;String&gt;();</span>
+            }
+        }
+<span class="fc" id="L329">        return activeKeys;</span>
+    }
+
+    public synchronized boolean isCurrentlyActive(String id) {
+<span class="fc" id="L333">        return getActiveKeys(false).contains(id);</span>
+    }
+
+    private synchronized void saveActiveKeys() {
+<span class="fc" id="L337">        Storage.getInstance().writeObject(CURRENT_ACTIVE_KEY, getActiveKeys(false));</span>
+<span class="fc" id="L338">    }</span>
+
+
+    /// Removes a set of regions (by ID) so that they will no longer be monitored.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ids`
+    public synchronized void remove(String... ids) {
+<span class="fc" id="L347">        Map&lt;String, Geofence&gt; fences = getFences(false);</span>
+<span class="fc bfc" id="L348" title="All 2 branches covered.">        for (String i : ids) {</span>
+<span class="fc" id="L349">            fences.remove(i);</span>
+        }
+<span class="fc" id="L351">        saveFences();</span>
+<span class="fc" id="L352">    }</span>
+
+    public synchronized void remove(Collection&lt;String&gt; ids) {
+<span class="nc" id="L355">        remove(ids.toArray(new String[ids.size()]));</span>
+<span class="nc" id="L356">    }</span>
+
+    /// Removes all current regions.
+    public synchronized void clear() {
+<span class="fc" id="L360">        Map&lt;String, Geofence&gt; fences = getFences(false);</span>
+<span class="fc" id="L361">        fences.clear();</span>
+<span class="fc" id="L362">        saveFences();</span>
+<span class="fc" id="L363">    }</span>
+
+    /// Checks the number of regions that are currently being monitored.
+    public synchronized int size() {
+<span class="fc" id="L367">        return getFences(false).size();</span>
+    }
+
+    /// Returns the Geofences as a Map.
+    public synchronized Map&lt;String, Geofence&gt; asMap() {
+<span class="fc" id="L372">        return getFences(false);</span>
+    }
+
+    /// Returns the Geofences as a list.
+    public synchronized List&lt;Geofence&gt; asList() {
+<span class="fc" id="L377">        return new ArrayList(getFences(false).values());</span>
+    }
+
+    /// Returns all Geofences sorted by distance from the current location.
+    public synchronized List&lt;Geofence&gt; asSortedList() {
+<span class="fc" id="L382">        List&lt;Geofence&gt; l = asList();</span>
+<span class="fc" id="L383">        Location curr = LocationManager.getLocationManager().getLastKnownLocation();</span>
+<span class="pc bpc" id="L384" title="1 of 2 branches missed.">        if (curr != null) {</span>
+<span class="fc" id="L385">            Collections.sort(l, Geofence.createDistanceComparator(curr));</span>
+        }
+<span class="fc" id="L387">        return l;</span>
+    }
+
+    /// Reloads geofences from storage.
+    public synchronized void refresh() {
+<span class="nc" id="L392">        getFences(true);</span>
+<span class="nc" id="L393">    }</span>
+
+    private Geofence fromMap(Map&lt;String, Object&gt; m) {
+<span class="nc" id="L396">        double lng = (Double) m.get(&quot;lng&quot;);</span>
+<span class="nc" id="L397">        double lat = (Double) m.get(&quot;lat&quot;);</span>
+<span class="nc" id="L398">        String id = (String) m.get(&quot;id&quot;);</span>
+<span class="nc" id="L399">        int radius = (Integer) m.get(&quot;radius&quot;);</span>
+<span class="nc" id="L400">        Long expiration = (Long) m.get(&quot;expiration&quot;);</span>
+<span class="nc bnc" id="L401" title="All 2 branches missed.">        if (expiration == null) {</span>
+<span class="nc" id="L402">            expiration = -1L;</span>
+        }
+<span class="nc" id="L404">        Location l = new Location();</span>
+<span class="nc" id="L405">        l.setLatitude(lat);</span>
+<span class="nc" id="L406">        l.setLongitude(lng);</span>
+<span class="nc" id="L407">        return new Geofence(id, l, radius, expiration);</span>
+    }
+
+    private Map&lt;String, Object&gt; toMap(Geofence g) {
+<span class="fc" id="L411">        double lng = g.getLoc().getLongitude();</span>
+<span class="fc" id="L412">        double lat = g.getLoc().getLatitude();</span>
+<span class="fc" id="L413">        int radius = g.getRadius();</span>
+<span class="fc" id="L414">        String id = g.getId();</span>
+<span class="fc" id="L415">        HashMap&lt;String, Object&gt; out = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L416">        out.put(&quot;lng&quot;, lng);</span>
+<span class="fc" id="L417">        out.put(&quot;lat&quot;, lat);</span>
+<span class="fc" id="L418">        out.put(&quot;radius&quot;, radius);</span>
+<span class="fc" id="L419">        out.put(&quot;id&quot;, id);</span>
+<span class="fc" id="L420">        out.put(&quot;expiration&quot;, g.getExpiration());</span>
+<span class="fc" id="L421">        return out;</span>
+    }
+
+    private synchronized Map&lt;String, Geofence&gt; getActiveFences(boolean reload) {
+<span class="pc bpc" id="L425" title="1 of 4 branches missed.">        if (reload || activeFences == null) {</span>
+<span class="fc" id="L426">            activeFences = new HashMap&lt;String, Geofence&gt;();</span>
+<span class="fc" id="L427">            Map&lt;String, Map&gt; tmp = (Map) Storage.getInstance().readObject(ACTIVE_FENCES_KEY);</span>
+<span class="pc bpc" id="L428" title="1 of 2 branches missed.">            if (tmp != null) {</span>
+<span class="nc bnc" id="L429" title="All 2 branches missed.">                for (Map.Entry&lt;String, Map&gt; e : tmp.entrySet()) {</span>
+<span class="nc" id="L430">                    activeFences.put(e.getKey(), fromMap(e.getValue()));</span>
+<span class="nc" id="L431">                }</span>
+            }
+        }
+<span class="fc" id="L434">        return activeFences;</span>
+    }
+
+    private synchronized void saveActiveFences() {
+<span class="pc bpc" id="L438" title="1 of 2 branches missed.">        if (activeFences != null) {</span>
+<span class="fc" id="L439">            Map&lt;String, Map&gt; out = new HashMap&lt;String, Map&gt;();</span>
+<span class="fc bfc" id="L440" title="All 2 branches covered.">            for (Map.Entry&lt;String, Geofence&gt; f : activeFences.entrySet()) {</span>
+<span class="fc" id="L441">                out.put(f.getValue().getId(), toMap(f.getValue()));</span>
+<span class="fc" id="L442">            }</span>
+<span class="fc" id="L443">            Storage.getInstance().writeObject(ACTIVE_FENCES_KEY, out);</span>
+        }
+<span class="fc" id="L445">    }</span>
+
+
+    private synchronized Map&lt;String, Geofence&gt; getFences(boolean reload) {
+<span class="pc bpc" id="L449" title="1 of 4 branches missed.">        if (reload || fences == null) {</span>
+<span class="fc" id="L450">            fences = new HashMap&lt;String, Geofence&gt;();</span>
+<span class="fc" id="L451">            Map&lt;String, Map&gt; tmp = (Map) Storage.getInstance().readObject(STORAGE_KEY);</span>
+<span class="pc bpc" id="L452" title="1 of 2 branches missed.">            if (tmp != null) {</span>
+<span class="nc bnc" id="L453" title="All 2 branches missed.">                for (Map.Entry&lt;String, Map&gt; e : tmp.entrySet()) {</span>
+<span class="nc" id="L454">                    fences.put(e.getKey(), fromMap(e.getValue()));</span>
+<span class="nc" id="L455">                }</span>
+            }
+        }
+<span class="fc" id="L458">        return fences;</span>
+    }
+
+    private synchronized void saveFences() {
+<span class="pc bpc" id="L462" title="1 of 2 branches missed.">        if (fences != null) {</span>
+<span class="fc" id="L463">            Map&lt;String, Map&gt; out = new HashMap&lt;String, Map&gt;();</span>
+<span class="fc bfc" id="L464" title="All 2 branches covered.">            for (Map.Entry&lt;String, Geofence&gt; f : fences.entrySet()) {</span>
+<span class="fc" id="L465">                out.put(f.getValue().getId(), toMap(f.getValue()));</span>
+<span class="fc" id="L466">            }</span>
+<span class="fc" id="L467">            Storage.getInstance().writeObject(STORAGE_KEY, out);</span>
+        }
+<span class="fc" id="L469">    }</span>
+
+    private boolean isWithinRadius(Location l1, Location l2, int radius) {
+<span class="fc bfc" id="L472" title="All 2 branches covered.">        return l1.getDistanceTo(l2) &lt;= radius;</span>
+    }
+
+    /// Updates the active Geofences that are being monitored on the OS.  This should be called
+    /// after making changes to the set of Geofences you wish to monitor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeout`: Timeout (in milliseconds)
+    public synchronized void update(int timeout) {
+<span class="fc" id="L482">        update(timeout, false);</span>
+<span class="fc" id="L483">    }</span>
+
+    /// Updates the active Geofences that are being monitored on the OS.  This should be called
+    /// after making changes to the set of Geofences you wish to monitor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeout`: Timeout (in milliseconds)
+    ///
+    /// - `forceRefresh`: If true, then this will force removal and re-addition of all geofences.
+    public synchronized void update(int timeout, boolean forceRefresh) {
+<span class="fc" id="L494">        Location here = LocationManager.getLocationManager().getCurrentLocationSync(timeout);</span>
+<span class="fc" id="L495">        update(forceRefresh, here);</span>
+<span class="fc" id="L496">    }</span>
+
+    private synchronized void update(boolean forceRefresh, Location here) {
+<span class="fc bfc" id="L499" title="All 2 branches covered.">        if (here == null) {</span>
+<span class="fc" id="L500">            LocationManager.getLocationManager().setBackgroundLocationListener(Listener.class);</span>
+<span class="fc" id="L501">            return;</span>
+        }
+<span class="fc" id="L503">        LocationManager.getLocationManager().setBackgroundLocationListener(null);</span>
+<span class="fc" id="L504">        List&lt;String&gt; activeIds = new ArrayList&lt;String&gt;(getActiveKeys(false));</span>
+<span class="fc" id="L505">        List&lt;String&gt; activeKeys = getActiveKeys(false);</span>
+<span class="fc" id="L506">        Map&lt;String, Geofence&gt; activeFences = getActiveFences(false);</span>
+<span class="fc bfc" id="L507" title="All 2 branches covered.">        for (String id : activeIds) {</span>
+<span class="fc" id="L508">            Geofence g = getFences(false).get(id);</span>
+<span class="pc bpc" id="L509" title="3 of 4 branches missed.">            if (!forceRefresh &amp;&amp; g != null) {</span>
+<span class="nc bnc" id="L510" title="All 2 branches missed.">                if (!isWithinRadius(g.getLoc(), here, getBubbleRadius() + g.getRadius())) {</span>
+<span class="nc" id="L511">                    LocationManager.getLocationManager().removeGeoFencing(id);</span>
+<span class="nc" id="L512">                    removeAll(activeKeys, id);</span>
+<span class="nc" id="L513">                    activeFences.remove(id);</span>
+                }
+            } else {
+<span class="fc" id="L516">                LocationManager.getLocationManager().removeGeoFencing(id);</span>
+<span class="fc" id="L517">                removeAll(activeKeys, id);</span>
+<span class="fc" id="L518">                activeFences.remove(id);</span>
+            }
+<span class="fc" id="L520">        }</span>
+
+<span class="fc bfc" id="L522" title="All 2 branches covered.">        for (Geofence g : asSortedList()) {</span>
+<span class="fc bfc" id="L523" title="All 2 branches covered.">            if (isWithinRadius(g.getLoc(), here, getBubbleRadius() + g.getRadius())) {</span>
+<span class="pc bpc" id="L524" title="1 of 2 branches missed.">                if (activeKeys.size() &gt;= MAX_ACTIVE_GEOFENCES) {</span>
+                    // only allowed 20 at a time
+<span class="nc" id="L526">                    break;</span>
+                }
+<span class="fc" id="L528">                Geofence ag = getActiveFences(false).get(g.getId());</span>
+<span class="pc bpc" id="L529" title="3 of 6 branches missed.">                if (forceRefresh || !activeKeys.contains(g.getId()) || !g.equals(ag)) {</span>
+<span class="pc bpc" id="L530" title="1 of 2 branches missed.">                    if (!activeKeys.contains(g.getId())) {</span>
+<span class="fc" id="L531">                        activeKeys.add(g.getId());</span>
+                    }
+<span class="fc" id="L533">                    activeFences.put(g.getId(), g);</span>
+<span class="fc" id="L534">                    LocationManager.getLocationManager().addGeoFencing(Listener.class, g);</span>
+                }
+            }
+<span class="fc" id="L537">        }</span>
+<span class="fc" id="L538">        saveActiveKeys();</span>
+<span class="fc" id="L539">        saveActiveFences();</span>
+<span class="fc" id="L540">        Location hereCopy = new Location();</span>
+<span class="fc" id="L541">        hereCopy.setLatitude(here.getLatitude());</span>
+<span class="fc" id="L542">        hereCopy.setLongitude(here.getLongitude());</span>
+<span class="fc" id="L543">        Geofence bubble = new Geofence(BUBBLE_GEOFENCE_ID, hereCopy, getBubbleRadius(), getBubbleExpiration());</span>
+<span class="pc bpc" id="L544" title="1 of 4 branches missed.">        if (lastBubble == null || lastBubble.getLoc().getDistanceTo(bubble.getLoc()) &gt; Math.min(100, bubbleRadius + 1)) {</span>
+<span class="fc" id="L545">            lastBubble = bubble;</span>
+<span class="fc" id="L546">            LocationManager.getLocationManager().addGeoFencing(Listener.class, bubble);</span>
+        }
+<span class="fc" id="L548">        purgeExpired();</span>
+<span class="fc" id="L549">    }</span>
+
+    private void onExit(String id) {
+<span class="fc" id="L552">        GeofenceListener l = getListener();</span>
+<span class="fc bfc" id="L553" title="All 2 branches covered.">        if (l != null) {</span>
+<span class="fc" id="L554">            l.onExit(id);</span>
+        }
+<span class="pc bpc" id="L556" title="1 of 2 branches missed.">        if (BUBBLE_GEOFENCE_ID.equals(id)) {</span>
+            // We are exiting our bubble
+<span class="nc" id="L558">            update(defaultTimeout);</span>
+        }
+<span class="fc" id="L560">    }</span>
+
+    private void removeAll(List l, Object o) {
+<span class="fc bfc" id="L563" title="All 2 branches covered.">        while (l.remove(o)) { // NOPMD EmptyControlStatement - intentional remove-all loop.</span>
+        }
+<span class="fc" id="L565">    }</span>
+
+    private void onEntered(String id) {
+<span class="fc" id="L568">        GeofenceListener l = getListener();</span>
+<span class="fc bfc" id="L569" title="All 2 branches covered.">        if (l != null) {</span>
+<span class="fc" id="L570">            l.onEntered(id);</span>
+        }
+<span class="fc" id="L572">    }</span>
+
+    /// Iterates over all geofences that are being monitored.
+    @Override
+    public Iterator&lt;Geofence&gt; iterator() {
+<span class="nc" id="L577">        return getFences(false).values().iterator();</span>
+    }
+
+    private void locationUpdated(Location location) {
+<span class="fc" id="L581">        update(false, location);</span>
+<span class="fc" id="L582">    }</span>
+
+    /// The Listener class that is registered to receive Geofence events.  This is
+    /// used internally by `GeofenceManager`.  It is only public because
+    /// `GeofenceListener` classes must be public.
+    ///
+    /// #### Deprecated
+    ///
+    /// For internal use only.
+<span class="fc" id="L591">    public static class Listener implements GeofenceListener, LocationListener {</span>
+
+        @Override
+        public void onExit(String id) {
+<span class="fc" id="L595">            GeofenceManager.getInstance().onExit(id);</span>
+<span class="fc" id="L596">        }</span>
+
+        @Override
+        public void onEntered(String id) {
+<span class="fc" id="L600">            GeofenceManager.getInstance().onEntered(id);</span>
+<span class="fc" id="L601">        }</span>
+
+        @Override
+        public void locationUpdated(Location location) {
+<span class="fc" id="L605">            GeofenceManager.getInstance().locationUpdated(location);</span>
+<span class="fc" id="L606">        }</span>
+
+        @Override
+        public void providerStateChanged(int newState) {
+            //GeofenceManager.getInstance().providerStateChanged(newState);
+<span class="fc" id="L611">        }</span>
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

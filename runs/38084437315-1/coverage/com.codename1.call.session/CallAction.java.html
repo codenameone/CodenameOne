@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CallAction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.call.session</a> &gt; <span class="el_source">CallAction.java</span></div><h1>CallAction.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.call.session;
+
+import com.codename1.call.spi.CallBridge;
+import com.codename1.impl.call.CallRequests;
+
+import java.util.Timer;
+import java.util.TimerTask;
+
+/// Something the **system** is asking the app to do to a call: the user
+/// pressed answer on the lock screen, hung up from the car, or tapped the
+/// keypad.
+///
+/// #### Why this is an object and not just a callback
+///
+/// Both platforms require the app to say whether it managed to do what was
+/// asked, and to say so within a few seconds. On iOS an unanswered
+/// `CXAction` times out and the system call UI and the app then disagree
+/// about the state of the call, permanently and with nothing in the log.
+///
+/// Most apps should ignore all of this: **doing nothing is correct**. If the
+/// listener returns without touching the action, it is fulfilled
+/// automatically. Only an app that has to do slow asynchronous work before it
+/// knows whether it can answer -- renegotiating a session, say -- needs to
+/// call [#defer()] and then [#fulfill()] or [#fail()] itself.
+///
+/// An action that is deferred and then forgotten is failed by a safety timer
+/// rather than left to time out, because a failed action puts the system UI
+/// back in a state the user can act on, and a timed-out one does not.
+public final class CallAction {
+    /// The token of an action that was never issued -- see [#answer].
+    static final long NONE = -1L;
+
+    private final long token;
+    private final String callId;
+    private boolean deferred;
+    private boolean answered;
+    private boolean fulfilled;
+    private Timer safety;
+    private TimerTask safetyTask;
+    private Runnable onFulfilled;
+
+    /// Runs on ANY answer, whatever the outcome; see [#whenAnswered].
+    private Runnable onAnswered;
+
+<span class="fc" id="L67">    CallAction(long token, String callId) {</span>
+<span class="fc" id="L68">        this.token = token;</span>
+<span class="fc" id="L69">        this.callId = callId;</span>
+<span class="fc" id="L70">    }</span>
+
+    /// The call this action is about.
+    public String getCallId() {
+<span class="nc" id="L74">        return callId;</span>
+    }
+
+    /// Takes responsibility for answering this action later.
+    ///
+    /// After calling this the listener **must** call [#fulfill()] or
+    /// [#fail()], and should do it within about three seconds. A deferred
+    /// action that is never answered is failed automatically, by the timer
+    /// this starts.
+    public void defer() {
+<span class="fc" id="L84">        deferred = true;</span>
+        // The timer is the whole reason defer() is worth calling rather than
+        // simply not answering. Both platforms time an unanswered action out
+        // on their own, and a timed-out action leaves the system UI and the
+        // app disagreeing about the call with nothing in the log; a FAILED
+        // one puts the UI back into a state the user can act on. Failing
+        // slightly early is the better of the two outcomes.
+        //
+        // java.util.Timer rather than Display.setTimeout, following the same
+        // reasoning as com.codename1.bluetooth's operation queue: this has to
+        // work before Display.init as well as after, and the device Timer has
+        // no daemon constructor -- so the timer is cancelled alongside the
+        // task in answer(), or its thread would keep a desktop JVM alive.
+<span class="fc" id="L97">        synchronized (this) {</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">            if (answered) {</span>
+<span class="nc" id="L99">                return;</span>
+            }
+<span class="fc bfc" id="L101" title="All 2 branches covered.">            if (safety != null) {</span>
+                // ALREADY deferred, and one timer is enough. A second defer
+                // -- two listeners registered on the same action, or one
+                // listener calling twice -- used to build another Timer and
+                // overwrite the field, so answer() could only ever cancel the
+                // newest. The first went on running: its task fires, answers
+                // an action that is already answered, and its NON-DAEMON
+                // thread keeps a desktop JVM alive. That is precisely what
+                // cancelSafetyNet cancels the timer as well as the task to
+                // avoid, undone by the field no longer naming it.
+<span class="fc" id="L111">                return;</span>
+            }
+<span class="fc" id="L113">            safety = new Timer();</span>
+<span class="fc" id="L114">            safetyTask = new SafetyNet(this);</span>
+            try {
+<span class="fc" id="L116">                safety.schedule(safetyTask, SAFETY_MILLIS);</span>
+<span class="nc" id="L117">            } catch (IllegalStateException alreadyGone) {</span>
+<span class="nc" id="L118">                safety = null;</span>
+<span class="nc" id="L119">                safetyTask = null;</span>
+<span class="fc" id="L120">            }</span>
+<span class="fc" id="L121">        }</span>
+<span class="fc" id="L122">    }</span>
+
+    /// Stops the safety net, whether or not it has run.
+    private void cancelSafetyNet() {
+        Timer t;
+        TimerTask task;
+<span class="fc" id="L128">        synchronized (this) {</span>
+<span class="fc" id="L129">            t = safety;</span>
+<span class="fc" id="L130">            task = safetyTask;</span>
+<span class="fc" id="L131">            safety = null;</span>
+<span class="fc" id="L132">            safetyTask = null;</span>
+<span class="fc" id="L133">        }</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (task != null) {</span>
+<span class="fc" id="L135">            task.cancel();</span>
+        }
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        if (t != null) {</span>
+            // Both, deliberately: cancelling only the task leaves the timer's
+            // non-daemon thread running.
+<span class="fc" id="L140">            t.cancel();</span>
+        }
+<span class="fc" id="L142">    }</span>
+
+    /// How long a deferred action has before it is failed for the app.
+    ///
+    /// Under CallKit's own timeout, so the app gets a definite answer rather
+    /// than the platform's silent one.
+    private static final int SAFETY_MILLIS = 3500;
+
+    /// Fails a deferred action nobody answered.
+    ///
+    /// A named static class rather than an anonymous one so it holds no
+    /// synthetic reference to an enclosing scope.
+    private static final class SafetyNet extends TimerTask {
+        private final CallAction action;
+
+<span class="fc" id="L157">        SafetyNet(CallAction action) {</span>
+<span class="fc" id="L158">            this.action = action;</span>
+<span class="fc" id="L159">        }</span>
+
+        @Override
+        public void run() {
+<span class="fc" id="L163">            action.answer(false);</span>
+<span class="fc" id="L164">        }</span>
+    }
+
+    /// Reports that the app did what was asked.
+    public void fulfill() {
+<span class="fc" id="L169">        answer(true);</span>
+<span class="fc" id="L170">    }</span>
+
+    /// Reports that the app could not do what was asked, putting the system
+    /// UI back into a state the user can act on.
+    public void fail() {
+<span class="fc" id="L175">        answer(false);</span>
+<span class="fc" id="L176">    }</span>
+
+    /// Whether the listener took responsibility for answering.
+    boolean isDeferred() {
+<span class="fc" id="L180">        return deferred;</span>
+    }
+
+    /// Runs `hook` if and when this action is fulfilled.
+    ///
+    /// The dispatch path uses it to forget an ended call. Checking
+    /// [#isAnswered()] straight after the listener returns is not enough: a
+    /// listener that defers and fulfils later was still unanswered at that
+    /// moment, so the call was never forgotten.
+    ///
+    /// Runs immediately when the action has already been fulfilled.
+    /// Runs `hook` once this action is answered, whatever the outcome and
+    /// whether or not the platform still held it.
+    ///
+    /// Separate from [#whenFulfilled], which is the local EFFECT of a
+    /// successful answer and is skipped when the platform has given up. This
+    /// is bookkeeping: whoever registered it has state keyed on an action
+    /// that is now over, and it has to go whether the answer was a fulfil, a
+    /// failure, or the safety net firing.
+    void whenAnswered(Runnable hook) {
+        boolean now;
+<span class="fc" id="L201">        synchronized (this) {</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">            if (!answered) {</span>
+<span class="fc" id="L203">                onAnswered = hook;</span>
+            }
+<span class="fc" id="L205">            now = answered;</span>
+<span class="fc" id="L206">        }</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        if (now) {</span>
+<span class="fc" id="L208">            hook.run();</span>
+        }
+<span class="fc" id="L210">    }</span>
+
+    void whenFulfilled(Runnable hook) {
+        boolean now;
+<span class="fc" id="L214">        synchronized (this) {</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">            if (!answered) {</span>
+<span class="fc" id="L216">                onFulfilled = hook;</span>
+<span class="fc" id="L217">                return;</span>
+            }
+<span class="nc" id="L219">            now = fulfilled;</span>
+<span class="nc" id="L220">        }</span>
+<span class="nc bnc" id="L221" title="All 2 branches missed.">        if (now) {</span>
+<span class="nc" id="L222">            hook.run();</span>
+        }
+<span class="nc" id="L224">    }</span>
+
+    /// Whether the answer, if one has been given, was a fulfilment.
+    ///
+    /// Meaningless until [#isAnswered()] is true.
+    synchronized boolean wasFulfilled() {
+<span class="nc" id="L230">        return fulfilled;</span>
+    }
+
+    /// Whether this has already been answered.
+    ///
+    /// Synchronized because the safety net and the application can answer
+    /// from different threads, and a read that saw a stale `false` would send
+    /// a second answer for the same token.
+    synchronized boolean isAnswered() {
+<span class="fc" id="L239">        return answered;</span>
+    }
+
+    /// Answers unless the application already has.
+    ///
+    /// The port ignores a second answer for the same token, so the race
+    /// between the safety net and a slow application is harmless; this flag
+    /// only keeps the common case off the bridge.
+    void answer(boolean fulfilled) {
+        Runnable hook;
+        Runnable cleanup;
+<span class="fc" id="L250">        synchronized (this) {</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">            if (answered) {</span>
+<span class="fc" id="L252">                return;</span>
+            }
+<span class="fc" id="L254">            answered = true;</span>
+<span class="fc" id="L255">            this.fulfilled = fulfilled;</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">            hook = fulfilled ? onFulfilled : null;</span>
+<span class="fc" id="L257">            onFulfilled = null;</span>
+<span class="fc" id="L258">            cleanup = onAnswered;</span>
+<span class="fc" id="L259">            onAnswered = null;</span>
+<span class="fc" id="L260">        }</span>
+<span class="fc" id="L261">        cancelSafetyNet();</span>
+        // The PLATFORM IS ASKED FIRST, and its answer decides whether the
+        // local effect happens at all.
+        //
+        // Running the hook first and telling the platform afterwards made the
+        // two disagree whenever the platform had already given up: with the
+        // EDT blocked past CallKit's ~5s deadline the action is timed out
+        // natively, yet the queued event still ran, so a delayed end removed
+        // the session and a delayed answer or hold moved it -- to a state the
+        // system call UI was never in. `token == NONE` is the case where
+        // nothing was ever pending (the platform reported what it had already
+        // done rather than asking), so there is nothing to be refused by.
+<span class="fc" id="L273">        boolean stillHeld = true;</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">        if (token != NONE) {</span>
+<span class="fc" id="L275">            CallBridge b = CallRequests.bridge();</span>
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">            if (b != null) {</span>
+<span class="fc" id="L277">                stillHeld = b.completeAction(token, fulfilled);</span>
+            }
+        }
+<span class="fc bfc" id="L280" title="All 4 branches covered.">        if (hook != null &amp;&amp; stillHeld) {</span>
+            // Outside the lock: the hook ends up in Calls, which takes its own.
+<span class="fc" id="L282">            hook.run();</span>
+        }
+<span class="fc bfc" id="L284" title="All 2 branches covered.">        if (cleanup != null) {</span>
+            // UNCONDITIONAL, unlike the hook above. This one exists to drop
+            // state keyed on an action that is now over, and the action is
+            // over whether the platform still held it or not.
+<span class="fc" id="L288">            cleanup.run();</span>
+        }
+<span class="fc" id="L290">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

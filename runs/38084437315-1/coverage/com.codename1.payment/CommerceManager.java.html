@@ -1,0 +1,320 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CommerceManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.payment</a> &gt; <span class="el_source">CommerceManager.java</span></div><h1>CommerceManager.java</h1><pre class="source lang-java linenums">/*
+ * Codename One - cross-platform commerce (subscription/IAP validation) SDK.
+ *
+ * Optional client facade over the existing Purchase API that adds cloud-side
+ * receipt validation and store-agnostic entitlement checks backed by the
+ * Codename One Commerce service. The framework itself is free; this talks to
+ * the paid cloud service when the app is built with it enabled.
+ */
+package com.codename1.payment;
+
+import com.codename1.io.Log;
+import com.codename1.io.Preferences;
+import com.codename1.io.rest.Response;
+import com.codename1.io.rest.Rest;
+import com.codename1.ui.Display;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Client facade for the Codename One Commerce service. It does not replace
+/// the {@link Purchase} API -- it wraps it: purchases still go through the
+/// platform store, and this class adds server-side validation and a
+/// store-agnostic &lt;em&gt;entitlement&lt;/em&gt; check (&quot;does this user have pro?&quot;)
+/// instead of per-SKU receipt juggling.
+///
+/// &lt;p&gt;Typical use:
+/// &lt;pre&gt;
+///   CommerceManager cm = CommerceManager.getInstance();
+///   cm.setAppUserId(myAccountId);          // optional; stable per user
+///   cm.subscribe(&quot;pro_monthly&quot;);           // delegates to Purchase
+///   // later, off the EDT:
+///   cm.refresh();                          // validate receipts with the cloud
+///   if (cm.isEntitled(&quot;pro&quot;)) { ... }      // entitlement, not SKU
+/// &lt;/pre&gt;
+///
+/// &lt;p&gt;&lt;b&gt;Graceful degradation.&lt;/b&gt; When the cloud is unreachable, or the
+/// developer's account is over its monthly validated-volume cap, the cloud
+/// stops validating and {@link #isDegraded()} becomes true. Entitlement checks
+/// then fall back to the store-direct signal (the platform's own receipt), so
+/// a paying user is never locked out -- exactly the server-side behaviour,
+/// mirrored on the device.
+///
+/// &lt;p&gt;The cloud endpoint, build key and package are stamped into the build by
+/// the Codename One build server when commerce is enabled
+/// ({@code codename1.arg.commerce.cloud.enabled=true}); when they are absent
+/// this class is inert and every call is a safe no-op that defers to
+/// {@link Purchase}.
+public final class CommerceManager {
+
+    private static final String PROP_ENABLED = &quot;commerce.cloud.enabled&quot;;
+    private static final String PROP_ENDPOINT = &quot;commerce.cloud.endpoint&quot;;
+    private static final String DEFAULT_ENDPOINT = &quot;https://cloud.codenameone.com/api/v2/commerce&quot;;
+
+    // Standard build-stamped properties, shared with crash/analytics: every
+    // cloud build bakes these, so commerce needs no build-daemon wiring of its
+    // own (it works off the same build_key the analytics provider sends).
+    private static final String PROP_BUILD_KEY = &quot;build_key&quot;;
+    private static final String PROP_PACKAGE = &quot;package_name&quot;;
+
+    private static final String PREF_APP_USER_ID = &quot;cn1$commerce$appUserId&quot;;
+
+    private static CommerceManager instance;
+
+<span class="nc" id="L65">    private final Map entitlementCache = new HashMap();</span>
+    private boolean degraded;
+    private String appUserId;
+
+<span class="nc" id="L69">    private CommerceManager() {</span>
+<span class="nc" id="L70">        appUserId = Preferences.get(PREF_APP_USER_ID, null);</span>
+<span class="nc" id="L71">    }</span>
+
+    /// The shared instance.
+    public static synchronized CommerceManager getInstance() {
+<span class="nc bnc" id="L75" title="All 2 branches missed.">        if (instance == null) {</span>
+<span class="nc" id="L76">            instance = new CommerceManager();</span>
+        }
+<span class="nc" id="L78">        return instance;</span>
+    }
+
+    /// Whether cloud commerce is active in this build. True for any cloud build
+    /// (one that carries a {@code build_key}) unless the developer explicitly
+    /// disabled it with {@code codename1.commerce.cloud.enabled=false}. In the
+    /// simulator / a local build there is no build key, so this is false and
+    /// every call safely defers to {@link Purchase}.
+    public boolean isCloudEnabled() {
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        if (&quot;false&quot;.equalsIgnoreCase(Display.getInstance().getProperty(PROP_ENABLED, &quot;true&quot;))) {</span>
+<span class="nc" id="L88">            return false;</span>
+        }
+<span class="nc" id="L90">        String key = Display.getInstance().getProperty(PROP_BUILD_KEY, &quot;&quot;);</span>
+<span class="nc bnc" id="L91" title="All 6 branches missed.">        return key != null &amp;&amp; key.length() &gt; 0 &amp;&amp; endpoint() != null;</span>
+    }
+
+    /// True after a {@link #refresh()} that could not get a server-validated
+    /// answer -- the cloud was unreachable or the account is over its monthly
+    /// cap. Entitlement checks fall back to the store-direct signal while this
+    /// is true.
+    public boolean isDegraded() {
+<span class="nc" id="L99">        return degraded;</span>
+    }
+
+    /// Sets the stable per-user id the cloud keys entitlements on. Pass your
+    /// own account id once the user signs in; if never set, an anonymous id is
+    /// generated and persisted so entitlements survive restarts on the device.
+    public void setAppUserId(String id) {
+<span class="nc" id="L106">        appUserId = id;</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        if (id != null) {</span>
+<span class="nc" id="L108">            Preferences.set(PREF_APP_USER_ID, id);</span>
+        }
+<span class="nc" id="L110">    }</span>
+
+    /// The current (explicit or generated-anonymous) app user id.
+    public String getAppUserId() {
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        if (appUserId == null) {</span>
+<span class="nc" id="L115">            appUserId = &quot;anon-&quot; + Long.toString(System.currentTimeMillis(), 36)</span>
+<span class="nc" id="L116">                    + &quot;-&quot; + Integer.toString(hashCode() &amp; 0x7fffffff, 36);</span>
+<span class="nc" id="L117">            Preferences.set(PREF_APP_USER_ID, appUserId);</span>
+        }
+<span class="nc" id="L119">        return appUserId;</span>
+    }
+
+    // ---- purchase delegation (thin pass-through to Purchase) ----------------
+
+    public void purchase(String sku) {
+<span class="nc" id="L125">        Purchase.getInAppPurchase().purchase(sku);</span>
+<span class="nc" id="L126">    }</span>
+
+    public void subscribe(String sku) {
+<span class="nc" id="L129">        Purchase.getInAppPurchase().subscribe(sku);</span>
+<span class="nc" id="L130">    }</span>
+
+    public void unsubscribe(String sku) {
+<span class="nc" id="L133">        Purchase.getInAppPurchase().unsubscribe(sku);</span>
+<span class="nc" id="L134">    }</span>
+
+    // ---- entitlement checks --------------------------------------------------
+
+    /// Whether the user currently holds {@code entitlementId}. Uses the last
+    /// cloud-validated answer when available; otherwise (cloud disabled or
+    /// degraded) falls back to the store-direct signal, treating the
+    /// entitlement id as a subscription SKU so a paying user keeps access.
+    public boolean isEntitled(String entitlementId) {
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        if (entitlementId == null) {</span>
+<span class="nc" id="L144">            return false;</span>
+        }
+<span class="nc" id="L146">        Object cached = entitlementCache.get(entitlementId);</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">        if (cached instanceof Boolean) {</span>
+<span class="nc" id="L148">            return ((Boolean) cached).booleanValue();</span>
+        }
+        // Store-direct fallback: the platform's own receipt is authoritative
+        // enough to keep a paying user unlocked when we have no cloud answer.
+        try {
+<span class="nc" id="L153">            return Purchase.getInAppPurchase().isSubscribed(entitlementId);</span>
+<span class="nc" id="L154">        } catch (Throwable t) {</span>
+<span class="nc" id="L155">            return false;</span>
+        }
+    }
+
+    /// Snapshot of the entitlement ids currently considered active.
+    public List getActiveEntitlements() {
+<span class="nc" id="L161">        List out = new ArrayList();</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">        for (Object o : entitlementCache.entrySet()) {</span>
+<span class="nc" id="L163">            Map.Entry e = (Map.Entry) o;</span>
+<span class="nc" id="L164">            Object v = e.getValue();</span>
+<span class="nc bnc" id="L165" title="All 4 branches missed.">            if (v instanceof Boolean &amp;&amp; ((Boolean) v).booleanValue()) {</span>
+<span class="nc" id="L166">                out.add(e.getKey());</span>
+            }
+<span class="nc" id="L168">        }</span>
+<span class="nc" id="L169">        return out;</span>
+    }
+
+    // ---- cloud refresh -------------------------------------------------------
+
+    /// Validates the device's current receipts with the cloud and updates the
+    /// entitlement cache. Blocking network call -- invoke off the EDT. Safe
+    /// no-op when the cloud is not enabled in this build. On any failure the
+    /// manager flips to {@link #isDegraded() degraded} and leaves the previous
+    /// (or store-direct) answers in place.
+    public void refresh() {
+<span class="nc bnc" id="L180" title="All 2 branches missed.">        if (!isCloudEnabled()) {</span>
+<span class="nc" id="L181">            return;</span>
+        }
+        List receipts;
+        try {
+<span class="nc" id="L185">            receipts = Purchase.getInAppPurchase().getReceipts();</span>
+<span class="nc" id="L186">        } catch (Throwable t) {</span>
+<span class="nc" id="L187">            degraded = true;</span>
+<span class="nc" id="L188">            return;</span>
+<span class="nc" id="L189">        }</span>
+<span class="nc bnc" id="L190" title="All 4 branches missed.">        if (receipts == null || receipts.isEmpty()) {</span>
+<span class="nc" id="L191">            return;</span>
+        }
+<span class="nc" id="L193">        boolean anySuccess = false;</span>
+<span class="nc" id="L194">        boolean anyDegraded = false;</span>
+<span class="nc bnc" id="L195" title="All 2 branches missed.">        for (Object o : receipts) {</span>
+<span class="nc" id="L196">            Receipt r = (Receipt) o;</span>
+<span class="nc" id="L197">            Boolean[] flags = validateReceipt(r);</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">            if (flags != null) {</span>
+<span class="nc" id="L199">                anySuccess = true;</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">                if (flags[0].booleanValue()) {</span>
+<span class="nc" id="L201">                    anyDegraded = true;</span>
+                }
+            }
+<span class="nc" id="L204">        }</span>
+<span class="nc bnc" id="L205" title="All 4 branches missed.">        degraded = anyDegraded || !anySuccess;</span>
+<span class="nc" id="L206">    }</span>
+
+    /// Posts one receipt to the cloud /validate endpoint, folds the returned
+    /// entitlements into the cache, and returns {degraded} (or null on
+    /// failure).
+    private Boolean[] validateReceipt(Receipt r) {
+<span class="nc" id="L212">        String url = endpoint();</span>
+<span class="nc bnc" id="L213" title="All 4 branches missed.">        if (url == null || r == null) {</span>
+<span class="nc" id="L214">            return null;</span>
+        }
+<span class="nc" id="L216">        String body = buildRequest(r);</span>
+        try {
+<span class="nc" id="L218">            Response resp = Rest.post(url + &quot;/validate&quot;).jsonContent().body(body).getAsJsonMap();</span>
+<span class="nc bnc" id="L219" title="All 4 branches missed.">            if (resp.getResponseCode() &lt; 200 || resp.getResponseCode() &gt;= 300) {</span>
+<span class="nc" id="L220">                return null;</span>
+            }
+<span class="nc" id="L222">            Object data = resp.getResponseData();</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">            if (!(data instanceof Map)) {</span>
+<span class="nc" id="L224">                return null;</span>
+            }
+<span class="nc" id="L226">            Map result = (Map) data;</span>
+<span class="nc" id="L227">            applyEntitlements(result.get(&quot;entitlements&quot;));</span>
+<span class="nc" id="L228">            boolean deg = asBoolean(result.get(&quot;degraded&quot;));</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">            return new Boolean[] { deg ? Boolean.TRUE : Boolean.FALSE };</span>
+<span class="nc" id="L230">        } catch (Throwable t) {</span>
+<span class="nc" id="L231">            Log.p(&quot;CommerceManager.validateReceipt failed: &quot; + t);</span>
+<span class="nc" id="L232">            return null;</span>
+        }
+    }
+
+    private void applyEntitlements(Object entitlements) {
+<span class="nc bnc" id="L237" title="All 2 branches missed.">        if (!(entitlements instanceof Map)) {</span>
+<span class="nc" id="L238">            return;</span>
+        }
+<span class="nc" id="L240">        Map ents = (Map) entitlements;</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">        for (Object o : ents.entrySet()) {</span>
+<span class="nc" id="L242">            Map.Entry e = (Map.Entry) o;</span>
+<span class="nc" id="L243">            Object view = e.getValue();</span>
+<span class="nc" id="L244">            boolean active = false;</span>
+<span class="nc bnc" id="L245" title="All 2 branches missed.">            if (view instanceof Map) {</span>
+<span class="nc" id="L246">                active = asBoolean(((Map) view).get(&quot;active&quot;));</span>
+            }
+<span class="nc bnc" id="L248" title="All 2 branches missed.">            entitlementCache.put(String.valueOf(e.getKey()), active ? Boolean.TRUE : Boolean.FALSE);</span>
+<span class="nc" id="L249">        }</span>
+<span class="nc" id="L250">    }</span>
+
+    private String buildRequest(Receipt r) {
+<span class="nc" id="L253">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L254">        sb.append('{');</span>
+<span class="nc" id="L255">        appendField(sb, &quot;buildKey&quot;, Display.getInstance().getProperty(PROP_BUILD_KEY, &quot;&quot;));</span>
+<span class="nc" id="L256">        sb.append(',');</span>
+<span class="nc" id="L257">        appendField(sb, &quot;packageName&quot;, packageName());</span>
+<span class="nc" id="L258">        sb.append(',');</span>
+<span class="nc" id="L259">        appendField(sb, &quot;appUserId&quot;, getAppUserId());</span>
+<span class="nc" id="L260">        sb.append(',');</span>
+<span class="nc" id="L261">        appendField(sb, &quot;store&quot;, storeOf(r));</span>
+<span class="nc" id="L262">        sb.append(',');</span>
+        // On StoreKit 2 the order data carries the signed transaction JWS; the
+        // server decodes/normalizes it. Other stores send their own receipt.
+<span class="nc" id="L265">        appendField(sb, &quot;signedTransaction&quot;, r.getOrderData());</span>
+<span class="nc" id="L266">        sb.append(',');</span>
+<span class="nc" id="L267">        appendField(sb, &quot;productId&quot;, r.getSku());</span>
+<span class="nc" id="L268">        sb.append('}');</span>
+<span class="nc" id="L269">        return sb.toString();</span>
+    }
+
+    private static String storeOf(Receipt r) {
+<span class="nc" id="L273">        String code = r.getStoreCode();</span>
+<span class="nc bnc" id="L274" title="All 2 branches missed.">        if (Receipt.STORE_CODE_ITUNES.equals(code)) {</span>
+<span class="nc" id="L275">            return &quot;apple&quot;;</span>
+        }
+<span class="nc bnc" id="L277" title="All 2 branches missed.">        if (Receipt.STORE_CODE_PLAY.equals(code)) {</span>
+<span class="nc" id="L278">            return &quot;google&quot;;</span>
+        }
+<span class="nc bnc" id="L280" title="All 2 branches missed.">        return code == null ? &quot;&quot; : code;</span>
+    }
+
+    private String packageName() {
+<span class="nc" id="L284">        return Display.getInstance().getProperty(PROP_PACKAGE, &quot;&quot;);</span>
+    }
+
+    private String endpoint() {
+<span class="nc" id="L288">        String e = Display.getInstance().getProperty(PROP_ENDPOINT, DEFAULT_ENDPOINT);</span>
+<span class="nc bnc" id="L289" title="All 4 branches missed.">        return e == null || e.length() == 0 ? null : e;</span>
+    }
+
+    private static boolean asBoolean(Object o) {
+<span class="nc bnc" id="L293" title="All 2 branches missed.">        if (o instanceof Boolean) {</span>
+<span class="nc" id="L294">            return ((Boolean) o).booleanValue();</span>
+        }
+<span class="nc bnc" id="L296" title="All 4 branches missed.">        return o != null &amp;&amp; &quot;true&quot;.equalsIgnoreCase(o.toString());</span>
+    }
+
+    private static void appendField(StringBuilder sb, String key, String value) {
+<span class="nc" id="L300">        sb.append('&quot;').append(key).append('&quot;').append(':');</span>
+<span class="nc bnc" id="L301" title="All 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L302">            sb.append(&quot;null&quot;);</span>
+<span class="nc" id="L303">            return;</span>
+        }
+<span class="nc" id="L305">        sb.append('&quot;');</span>
+<span class="nc bnc" id="L306" title="All 2 branches missed.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="nc" id="L307">            char c = value.charAt(i);</span>
+<span class="nc bnc" id="L308" title="All 6 branches missed.">            switch (c) {</span>
+<span class="nc" id="L309">                case '&quot;': sb.append(&quot;\\\&quot;&quot;); break;</span>
+<span class="nc" id="L310">                case '\\': sb.append(&quot;\\\\&quot;); break;</span>
+<span class="nc" id="L311">                case '\n': sb.append(&quot;\\n&quot;); break;</span>
+<span class="nc" id="L312">                case '\r': sb.append(&quot;\\r&quot;); break;</span>
+<span class="nc" id="L313">                case '\t': sb.append(&quot;\\t&quot;); break;</span>
+<span class="nc" id="L314">                default: sb.append(c);</span>
+            }
+        }
+<span class="nc" id="L317">        sb.append('&quot;');</span>
+<span class="nc" id="L318">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

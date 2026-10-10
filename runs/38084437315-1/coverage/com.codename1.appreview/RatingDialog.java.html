@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RatingDialog.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.appreview</a> &gt; <span class="el_source">RatingDialog.java</span></div><h1>RatingDialog.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.appreview;
+
+import com.codename1.components.SpanLabel;
+import com.codename1.messaging.Message;
+import com.codename1.ui.Button;
+import com.codename1.ui.CN;
+import com.codename1.ui.Container;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.Sheet;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BoxLayout;
+
+/// The Codename One drawn rating widget shown by [AppReview] when no native
+/// review prompt is available. It is presented as a bottom [Sheet] so the user
+/// can dismiss it with a swipe rather than a blocking modal: a row of stars,
+/// then a high rating routes to the store while a low rating opens a private
+/// feedback step.
+///
+/// This class is intentionally package private -- apps interact with it
+/// exclusively through [AppReview].
+final class RatingDialog {
+    private static final int MAX_STARS = 5;
+
+    private RatingDialog() {
+    }
+
+    static void show(final AppReview config) {
+<span class="nc" id="L53">        String appName = CN.getProperty(&quot;AppName&quot;, &quot;this app&quot;);</span>
+<span class="nc" id="L54">        final Sheet sheet = new Sheet(null, &quot;Enjoying &quot; + appName + &quot;?&quot;);</span>
+<span class="nc" id="L55">        Container content = sheet.getContentPane();</span>
+<span class="nc" id="L56">        content.setLayout(BoxLayout.y());</span>
+
+<span class="nc" id="L58">        SpanLabel prompt = new SpanLabel(&quot;Tap a star to rate your experience.&quot;);</span>
+<span class="nc" id="L59">        prompt.setUIID(&quot;DialogBody&quot;);</span>
+<span class="nc" id="L60">        content.add(prompt);</span>
+
+        // A horizontal box keeps the stars together at the leading edge
+        // (left, or right under RTL) on a single row -- a grid would space
+        // them across the full width and a flow layout would wrap them.
+<span class="nc" id="L65">        Container stars = new Container(BoxLayout.x());</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        for (int i = 1; i &lt;= MAX_STARS; i++) {</span>
+<span class="nc" id="L67">            final int value = i;</span>
+<span class="nc" id="L68">            Button star = new Button();</span>
+<span class="nc" id="L69">            star.setUIID(&quot;Label&quot;);</span>
+<span class="nc" id="L70">            FontImage.setMaterialIcon(star, FontImage.MATERIAL_STAR_BORDER, 5);</span>
+<span class="nc" id="L71">            star.addActionListener(new ActionListener() {</span>
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L74">                    sheet.back();</span>
+<span class="nc" id="L75">                    onRating(config, value);</span>
+<span class="nc" id="L76">                }</span>
+            });
+<span class="nc" id="L78">            stars.add(star);</span>
+        }
+<span class="nc" id="L80">        content.add(stars);</span>
+
+<span class="nc" id="L82">        Button never = new Button(&quot;Don't ask again&quot;);</span>
+<span class="nc" id="L83">        never.setUIID(&quot;DialogCommandText&quot;);</span>
+<span class="nc" id="L84">        never.addActionListener(new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L87">                config.markCompleted();</span>
+<span class="nc" id="L88">                sheet.back();</span>
+<span class="nc" id="L89">            }</span>
+        });
+<span class="nc" id="L91">        content.add(never);</span>
+
+<span class="nc" id="L93">        sheet.show();</span>
+<span class="nc" id="L94">    }</span>
+
+    private static void onRating(AppReview config, int rating) {
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        if (rating &gt;= config.getHighRatingThreshold()) {</span>
+<span class="nc" id="L98">            config.markCompleted();</span>
+<span class="nc" id="L99">            openStore(config);</span>
+        } else {
+<span class="nc" id="L101">            collectFeedback(config, rating);</span>
+        }
+<span class="nc" id="L103">    }</span>
+
+    private static void openStore(AppReview config) {
+        // Even within the fallback widget the native prompt may have become
+        // available (e.g. a positive rating on an older flow); prefer it.
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        if (CN.isNativeInAppReviewSupported()) {</span>
+<span class="nc" id="L109">            CN.requestNativeInAppReview(null);</span>
+<span class="nc" id="L110">            return;</span>
+        }
+<span class="nc" id="L112">        String storeUrl = config.getStoreUrl();</span>
+<span class="nc bnc" id="L113" title="All 4 branches missed.">        if (storeUrl != null &amp;&amp; storeUrl.length() &gt; 0) {</span>
+<span class="nc" id="L114">            CN.execute(storeUrl);</span>
+        }
+<span class="nc" id="L116">    }</span>
+
+    private static void collectFeedback(final AppReview config, final int rating) {
+<span class="nc" id="L119">        FeedbackListener listener = config.getFeedbackListener();</span>
+<span class="nc bnc" id="L120" title="All 4 branches missed.">        if (listener != null &amp;&amp; listener.lowRating(rating)) {</span>
+            // The listener is presenting its own feedback experience.
+<span class="nc" id="L122">            config.markCompleted();</span>
+<span class="nc" id="L123">            return;</span>
+        }
+
+<span class="nc" id="L126">        String supportEmail = config.getSupportEmail();</span>
+<span class="nc bnc" id="L127" title="All 6 branches missed.">        if ((listener == null &amp;&amp; (supportEmail == null || supportEmail.length() == 0))) {</span>
+            // Nowhere to route the feedback -- nothing more to do.
+<span class="nc" id="L129">            config.markCompleted();</span>
+<span class="nc" id="L130">            return;</span>
+        }
+
+<span class="nc" id="L133">        final Sheet sheet = new Sheet(null, &quot;Help us improve&quot;);</span>
+<span class="nc" id="L134">        Container content = sheet.getContentPane();</span>
+<span class="nc" id="L135">        content.setLayout(BoxLayout.y());</span>
+<span class="nc" id="L136">        SpanLabel prompt = new SpanLabel(&quot;Sorry to hear it wasn't great. What can we do better?&quot;);</span>
+<span class="nc" id="L137">        prompt.setUIID(&quot;DialogBody&quot;);</span>
+<span class="nc" id="L138">        content.add(prompt);</span>
+
+<span class="nc" id="L140">        final TextArea feedback = new TextArea(&quot;&quot;, 4, 20);</span>
+<span class="nc" id="L141">        feedback.setHint(&quot;Your feedback&quot;);</span>
+<span class="nc" id="L142">        content.add(feedback);</span>
+
+<span class="nc" id="L144">        Button send = new Button(&quot;Send&quot;);</span>
+<span class="nc" id="L145">        send.addActionListener(new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L148">                String text = feedback.getText();</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">                if (text == null) {</span>
+<span class="nc" id="L150">                    text = &quot;&quot;;</span>
+                }
+<span class="nc" id="L152">                config.markCompleted();</span>
+<span class="nc" id="L153">                sheet.back();</span>
+<span class="nc" id="L154">                deliverFeedback(config, rating, text);</span>
+<span class="nc" id="L155">            }</span>
+        });
+<span class="nc" id="L157">        content.add(send);</span>
+
+<span class="nc" id="L159">        sheet.show();</span>
+<span class="nc" id="L160">    }</span>
+
+    private static void deliverFeedback(AppReview config, int rating, String text) {
+<span class="nc" id="L163">        FeedbackListener listener = config.getFeedbackListener();</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">        if (listener != null) {</span>
+<span class="nc" id="L165">            listener.feedback(rating, text);</span>
+<span class="nc" id="L166">            return;</span>
+        }
+<span class="nc" id="L168">        String supportEmail = config.getSupportEmail();</span>
+<span class="nc bnc" id="L169" title="All 4 branches missed.">        if (supportEmail != null &amp;&amp; supportEmail.length() &gt; 0) {</span>
+<span class="nc" id="L170">            String appName = CN.getProperty(&quot;AppName&quot;, &quot;the app&quot;);</span>
+<span class="nc" id="L171">            Message msg = new Message(text);</span>
+<span class="nc" id="L172">            Message.sendMessage(new String[]{supportEmail}, &quot;Feedback for &quot; + appName, msg);</span>
+        }
+<span class="nc" id="L174">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,2144 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NetworkManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">NetworkManager.java</span></div><h1>NetworkManager.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+
+package com.codename1.io;
+
+import com.codename1.annotations.Async;
+import com.codename1.ui.CN;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.util.EventDispatcher;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Enumeration;
+import java.util.Hashtable;
+import java.util.Vector;
+
+/// Main entry point for managing the connection requests, this is essentially a
+/// threaded queue that makes sure to route all connections via the network thread
+/// while sending the callbacks through the Codename One EDT.
+///
+/// The sample
+/// code below fetches a page of data from the nestoria housing listing API.
+///
+/// You can see instructions on how to display the data in the `com.codename1.components.InfiniteScrollAdapter`
+/// class. You can read more about networking in Codename One `here`
+///
+/// ```java
+/// int pageNumber = 1;
+/// java.util.List&lt;Map&lt;String, Object&gt;&gt; fetchPropertyData(String text) {
+///     try {
+///         ConnectionRequest r = new ConnectionRequest();
+///         r.setPost(false);
+///         r.setUrl(&quot;http://api.nestoria.co.uk/api&quot;);
+///         r.addArgument(&quot;pretty&quot;, &quot;0&quot;);
+///         r.addArgument(&quot;action&quot;, &quot;search_listings&quot;);
+///         r.addArgument(&quot;encoding&quot;, &quot;json&quot;);
+///         r.addArgument(&quot;listing_type&quot;, &quot;buy&quot;);
+///         r.addArgument(&quot;page&quot;, &quot;&quot; + pageNumber);
+///         pageNumber++;
+///         r.addArgument(&quot;country&quot;, &quot;uk&quot;);
+///         r.addArgument(&quot;place_name&quot;, text);
+///         NetworkManager.getInstance().addToQueueAndWait(r);
+///         Map result = new JSONParser().parseJSON(new InputStreamReader(new ByteArrayInputStream(r.getResponseData()), &quot;UTF-8&quot;));
+///         Map response = (Map)result.get(&quot;response&quot;);
+///         return (java.util.List&lt;Map&lt;String, Object&gt;&gt;)response.get(&quot;listings&quot;);
+///     } catch(Exception err) {
+///         Log.e(err);
+///         return null;
+///     }
+/// }
+/// ```
+public final class NetworkManager {
+    /// Indicates an unknown access point type
+    public static final int ACCESS_POINT_TYPE_UNKNOWN = 1;
+
+    /// Indicates a wlan (802.11b/c/g/n) access point type
+    public static final int ACCESS_POINT_TYPE_WLAN = 2;
+
+    /// Indicates an access point based on a cable
+    public static final int ACCESS_POINT_TYPE_CABLE = 3;
+
+    /// Indicates a 3g network access point type
+    public static final int ACCESS_POINT_TYPE_NETWORK3G = 4;
+
+    /// Indicates a 2g network access point type
+    public static final int ACCESS_POINT_TYPE_NETWORK2G = 5;
+
+
+    /// Indicates a corporate routing server access point type (e.g. BIS etc.)
+    public static final int ACCESS_POINT_TYPE_CORPORATE = 6;
+
+    /// Active network type reported by `getCurrentNetworkType()` /
+    /// `NetworkTypeListener`: no usable connectivity.
+    public static final int NETWORK_TYPE_NONE = 0;
+    /// Active network type: WiFi / 802.11 / WLAN.
+    public static final int NETWORK_TYPE_WIFI = 1;
+    /// Active network type: cellular data (2G/3G/4G/5G).
+    public static final int NETWORK_TYPE_CELLULAR = 2;
+    /// Active network type: wired Ethernet.
+    public static final int NETWORK_TYPE_ETHERNET = 3;
+    /// Active network type: short-range Bluetooth PAN.
+    public static final int NETWORK_TYPE_BLUETOOTH = 4;
+    /// Active network type reported by the platform but not classified into
+    /// one of the named buckets above.
+    public static final int NETWORK_TYPE_OTHER = 5;
+
+<span class="fc" id="L115">    private static final Object LOCK = new Object();</span>
+<span class="fc" id="L116">    private static final NetworkManager INSTANCE = new NetworkManager();</span>
+    private EventDispatcher networkTypeListeners;
+<span class="fc" id="L118">    private int lastNetworkType = -1;</span>
+    private boolean lastVpnActive;
+<span class="fc" id="L120">    private static String autoDetectURL = &quot;https://www.google.com/&quot;;</span>
+<span class="fc" id="L121">    private final Vector pending = new Vector();</span>
+<span class="fc" id="L122">    private final Hashtable threadAssignements = new Hashtable();</span>
+    private boolean running;
+<span class="fc" id="L124">    private int threadCount = 1;</span>
+    private NetworkThread[] networkThreads;
+    private EventDispatcher errorListeners;
+    private EventDispatcher progressListeners;
+<span class="fc" id="L128">    private int timeout = 300000;</span>
+    private Hashtable userHeaders;
+    private boolean autoDetected;
+<span class="fc" id="L131">    private int nextConnectionId = 1;</span>
+
+<span class="fc" id="L133">    private NetworkManager() {</span>
+<span class="fc" id="L134">    }</span>
+
+    /// This URL is used to check whether an Internet connection is available
+    ///
+    /// #### Returns
+    ///
+    /// the autoDetectURL
+    public static String getAutoDetectURL() {
+<span class="fc" id="L142">        return autoDetectURL;</span>
+    }
+
+    /// This URL is used to check whether an Internet connection is available
+    ///
+    /// #### Parameters
+    ///
+    /// - `aAutoDetectURL`: the autoDetectURL to set
+    public static void setAutoDetectURL(String aAutoDetectURL) {
+<span class="fc" id="L151">        autoDetectURL = aAutoDetectURL;</span>
+<span class="fc" id="L152">    }</span>
+
+    /// Callback for native layer to check the certificates of a connection request.
+    ///
+    /// #### Parameters
+    ///
+    /// - `connectionId`: THe connection ID of the connection request to check.
+    ///
+    /// #### Returns
+    ///
+    /// @return True if the certificates check out, or if the ConnectionRequest is not set
+    /// to check certificates.
+    ///
+    /// Currently this is only used by iOS.
+    /// To use this method in other ports, you need to implement the `CodenameOneImplementation#checkSSLCertificatesRequiresCallbackFromNative()` to return true.
+    ///
+    /// #### Deprecated
+    ///
+    /// For internal use only
+    ///
+    /// #### See also
+    ///
+    /// - CodenameOneImplementation#checkSSLCertificatesRequiresCallbackFromNative()
+    static boolean checkCertificatesNativeCallback(int connectionId) {
+<span class="nc" id="L176">        ArrayList&lt;NetworkThread&gt; threads = new ArrayList&lt;NetworkThread&gt;();</span>
+<span class="nc" id="L177">        synchronized (LOCK) {</span>
+<span class="nc bnc" id="L178" title="All 4 branches missed.">            if (INSTANCE == null || INSTANCE.networkThreads == null) {</span>
+<span class="nc" id="L179">                return true;</span>
+            }
+
+<span class="nc bnc" id="L182" title="All 2 branches missed.">            for (NetworkThread nt : INSTANCE.networkThreads) {</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">                if (nt != null) {</span>
+<span class="nc" id="L184">                    threads.add(nt);</span>
+                }
+            }
+<span class="nc" id="L187">        }</span>
+<span class="nc bnc" id="L188" title="All 2 branches missed.">        for (NetworkThread nt : threads) {</span>
+<span class="nc bnc" id="L189" title="All 2 branches missed.">            if (nt.currentRequest == null) {</span>
+<span class="nc" id="L190">                continue;</span>
+            }
+<span class="nc bnc" id="L192" title="All 2 branches missed.">            if (nt.currentRequest.getId() == connectionId) {</span>
+
+<span class="nc" id="L194">                return nt.currentRequest.checkCertificatesNativeCallback();</span>
+            }
+<span class="nc" id="L196">        }</span>
+<span class="nc" id="L197">        return true;</span>
+    }
+
+    /// Returns the singleton instance of this class
+    ///
+    /// #### Returns
+    ///
+    /// instance of this class
+    public static NetworkManager getInstance() {
+<span class="fc" id="L206">        return INSTANCE;</span>
+    }
+
+    /// Read through [#getNetworkGuard()], which synchronizes on the same monitor the two
+    /// writers below take. Not `volatile`: the core is built for Java 5 semantics and the
+    /// repo's PMD gate forbids the modifier outright, so the lock is what publishes the
+    /// write to the network thread.
+    private static NetworkGuard networkGuard;
+    private static boolean networkGuardSealed;
+
+    /// Installs the app-wide [NetworkGuard].
+    ///
+    /// The first call wins and the slot then seals. A guard can veto requests and enforce
+    /// certificate pins, so allowing it to be replaced at runtime would let any code that runs
+    /// later -- including code an attacker injected -- swap in a permissive one.
+    ///
+    /// @throws IllegalStateException if a guard is already installed
+    public static void setNetworkGuard(NetworkGuard guard) {
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        if (guard == null) {</span>
+<span class="nc" id="L225">            throw new IllegalArgumentException(&quot;guard is null&quot;);</span>
+        }
+<span class="fc" id="L227">        synchronized (NetworkManager.class) {</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">            if (networkGuardSealed) {</span>
+<span class="nc" id="L229">                throw new IllegalStateException(&quot;A network guard is already installed&quot;);</span>
+            }
+<span class="fc" id="L231">            networkGuard = guard;</span>
+<span class="fc" id="L232">            networkGuardSealed = true;</span>
+<span class="fc" id="L233">        }</span>
+<span class="fc" id="L234">    }</span>
+
+    /// The installed guard, or null when none was installed.
+    public static synchronized NetworkGuard getNetworkGuard() {
+<span class="fc" id="L238">        return networkGuard;</span>
+    }
+
+    /// Read through [#getNetworkTracer()], for the same publication reason as the guard.
+    private static NetworkTracer networkTracer;
+
+    /// Installs the app-wide [NetworkTracer], replacing any earlier one; null removes it.
+    ///
+    /// Unlike the guard this slot does not seal: a tracer only observes, so replacing
+    /// one cannot weaken anything, and telemetry that is switched off at run time has
+    /// to be able to take itself out.
+    public static synchronized void setNetworkTracer(NetworkTracer tracer) {
+<span class="fc" id="L250">        networkTracer = tracer;</span>
+<span class="fc" id="L251">    }</span>
+
+    /// The installed tracer, or null.
+    public static synchronized NetworkTracer getNetworkTracer() {
+<span class="fc" id="L255">        return networkTracer;</span>
+    }
+
+    /// Test hook: drops the installed guard and unseals the slot.
+    static void resetNetworkGuardForTesting() {
+<span class="fc" id="L260">        synchronized (NetworkManager.class) {</span>
+<span class="fc" id="L261">            networkGuard = null;</span>
+<span class="fc" id="L262">            networkGuardSealed = false;</span>
+<span class="fc" id="L263">        }</span>
+<span class="fc" id="L264">    }</span>
+
+    void resetAPN() {
+<span class="nc" id="L267">        autoDetected = false;</span>
+<span class="nc" id="L268">    }</span>
+
+    boolean handleErrorCode(ConnectionRequest r, int code, String message) {
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">        if (errorListeners != null) {</span>
+<span class="fc" id="L272">            ActionEvent ev = new NetworkEvent(r, code, message);</span>
+<span class="fc" id="L273">            errorListeners.fireActionEvent(ev);</span>
+<span class="fc" id="L274">            return ev.isConsumed();</span>
+        }
+<span class="nc" id="L276">        return false;</span>
+    }
+
+    private boolean handleException(ConnectionRequest r, Exception o) {
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">        if (errorListeners != null) {</span>
+<span class="nc" id="L281">            ActionEvent ev = new NetworkEvent(r, o);</span>
+<span class="nc" id="L282">            errorListeners.fireActionEvent(ev);</span>
+<span class="nc" id="L283">            return ev.isConsumed();</span>
+        }
+<span class="fc" id="L285">        return false;</span>
+    }
+
+    /// The number of threads
+    ///
+    /// #### Returns
+    ///
+    /// the threadCount
+    public int getThreadCount() {
+<span class="fc" id="L294">        return threadCount;</span>
+    }
+
+    /// Thread count should never be changed when the network is running since it will have no effect.
+    /// Increasing the thread count can bring many race conditions and problems to the surface,
+    /// furthermore some platforms don't support more than one network thread hence increasing
+    /// the thread count might fail.
+    ///
+    /// #### Parameters
+    ///
+    /// - `threadCount`: the threadCount to set
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated since the network is always running in Codename One this method is quite confusing
+    /// unfortunately fixing it will probably break working code. You should migrate the code to use
+    /// `#updateThreadCount(int)`
+    public void setThreadCount(int threadCount) {
+        // in auto detect mode multiple threads can break the detections
+<span class="nc bnc" id="L313" title="All 2 branches missed.">        if (!Util.getImplementation().shouldAutoDetectAccessPoint()) {</span>
+<span class="nc" id="L314">            this.threadCount = threadCount;</span>
+        }
+<span class="nc" id="L316">    }</span>
+
+    /// Sets the number of network threads and restarts the network threads
+    ///
+    /// #### Parameters
+    ///
+    /// - `threadCount`: the new number of threads
+    public void updateThreadCount(int threadCount) {
+<span class="fc" id="L324">        this.threadCount = threadCount;</span>
+<span class="fc" id="L325">        shutdown();</span>
+<span class="fc" id="L326">        start();</span>
+<span class="fc" id="L327">    }</span>
+
+    boolean hasProgressListeners() {
+<span class="fc bfc" id="L330" title="All 2 branches covered.">        return progressListeners != null;</span>
+    }
+
+    void fireProgressEvent(ConnectionRequest c, int type, int length, int sentReceived) {
+        // progressListeners might be made null by a separate thread
+<span class="fc" id="L335">        EventDispatcher d = progressListeners;</span>
+<span class="pc bpc" id="L336" title="1 of 2 branches missed.">        if (d != null) {</span>
+<span class="fc" id="L337">            NetworkEvent n = new NetworkEvent(c, type);</span>
+<span class="fc" id="L338">            n.setLength(length);</span>
+<span class="fc" id="L339">            n.setSentReceived(sentReceived);</span>
+<span class="fc" id="L340">            d.fireActionEvent(n);</span>
+        }
+<span class="fc" id="L342">    }</span>
+
+    private NetworkThread createNetworkThread() {
+<span class="fc" id="L345">        return new NetworkThread();</span>
+    }
+
+    /// There is no need to invoke this method since the network manager is started
+    /// implicitly. It is useful only if you explicitly stop the network manager.
+    /// Invoking this method otherwise will just do nothing.
+    public void start() {
+<span class="fc bfc" id="L352" title="All 2 branches covered.">        if (networkThreads != null) {</span>
+            //throw new IllegalStateException(&quot;Network manager already initialized&quot;);
+<span class="fc" id="L354">            return;</span>
+        }
+<span class="fc" id="L356">        running = true;</span>
+<span class="fc" id="L357">        networkThreads = new NetworkThread[getThreadCount()];</span>
+<span class="fc bfc" id="L358" title="All 2 branches covered.">        for (int iter = 0; iter &lt; getThreadCount(); iter++) {</span>
+<span class="fc" id="L359">            networkThreads[iter] = createNetworkThread();</span>
+<span class="fc" id="L360">            networkThreads[iter].start();</span>
+        }
+        // we need to implement a timeout thread of our own for this case...
+<span class="pc bpc" id="L363" title="1 of 2 branches missed.">        if (!Util.getImplementation().isTimeoutSupported()) {</span>
+<span class="nc" id="L364">            Util.getImplementation().startThread(&quot;Timeout Thread&quot;, new Runnable() {</span>
+                @Override
+                public void run() {
+                    // detect timeout violations by polling
+<span class="nc bnc" id="L368" title="All 2 branches missed.">                    while (running) {</span>
+                        try {
+<span class="nc" id="L370">                            Thread.sleep(timeout / 10);</span>
+<span class="nc" id="L371">                        } catch (InterruptedException ex) {</span>
+<span class="nc" id="L372">                            ex.printStackTrace();</span>
+<span class="nc" id="L373">                        }</span>
+<span class="nc" id="L374">                        NetworkThread[] networkThreads = NetworkManager.this.networkThreads;</span>
+<span class="nc bnc" id="L375" title="All 2 branches missed.">                        if (networkThreads == null) {</span>
+<span class="nc" id="L376">                            return;</span>
+                        }
+                        // check for timeout violations on the currently executing threads
+<span class="nc" id="L379">                        int ntlen = networkThreads.length;</span>
+<span class="nc bnc" id="L380" title="All 2 branches missed.">                        for (int iter = 0; iter &lt; ntlen; iter++) {</span>
+<span class="nc" id="L381">                            ConnectionRequest c = networkThreads[iter].getCurrentRequest();</span>
+<span class="nc bnc" id="L382" title="All 2 branches missed.">                            if (c != null) {</span>
+<span class="nc" id="L383">                                int cTimeout = Math.min(timeout, c.getTimeout());</span>
+<span class="nc bnc" id="L384" title="All 2 branches missed.">                                if (c.getTimeout() &lt; 0) {</span>
+<span class="nc" id="L385">                                    cTimeout = timeout;</span>
+                                }
+<span class="nc bnc" id="L387" title="All 2 branches missed.">                                if (c.getTimeSinceLastActivity() &gt; cTimeout) {</span>
+                                    // we have a timeout problem on our hands! We need to try and kill!
+<span class="nc" id="L389">                                    c.kill();</span>
+<span class="nc" id="L390">                                    networkThreads[iter].interrupt();</span>
+                                    try {
+<span class="nc" id="L392">                                        Thread.sleep(500);</span>
+<span class="nc" id="L393">                                    } catch (InterruptedException ex) {</span>
+<span class="nc" id="L394">                                        ex.printStackTrace();</span>
+<span class="nc" id="L395">                                    }</span>
+
+                                    // did the attempt work?
+<span class="nc bnc" id="L398" title="All 2 branches missed.">                                    if (networkThreads[iter].getCurrentRequest() == c) {</span>
+<span class="nc bnc" id="L399" title="All 2 branches missed.">                                        if (c.getTimeSinceLastActivity() &gt; cTimeout) {</span>
+                                            // we need to create a whole new network thread and abandon this one!
+<span class="nc bnc" id="L401" title="All 2 branches missed.">                                            if (running) {</span>
+<span class="nc" id="L402">                                                networkThreads[iter] = createNetworkThread();</span>
+<span class="nc" id="L403">                                                networkThreads[iter].start();</span>
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+<span class="nc" id="L410">                    }</span>
+<span class="nc" id="L411">                }</span>
+            });
+        }
+<span class="fc" id="L414">    }</span>
+
+    /// Shuts down the network thread, this will trigger failures if you have network requests
+    ///
+    /// #### Deprecated
+    ///
+    /// This method is for internal use only
+    public void shutdown() {
+<span class="fc" id="L422">        running = false;</span>
+<span class="pc bpc" id="L423" title="1 of 2 branches missed.">        if (networkThreads != null) {</span>
+<span class="fc bfc" id="L424" title="All 2 branches covered.">            for (NetworkThread n : networkThreads) {</span>
+<span class="pc bpc" id="L425" title="1 of 2 branches missed.">                if (n != null) {</span>
+<span class="fc" id="L426">                    n.stopped = true;</span>
+                }
+            }
+        }
+<span class="fc" id="L430">        synchronized (LOCK) {</span>
+<span class="fc" id="L431">            networkThreads = null;</span>
+<span class="fc" id="L432">            LOCK.notifyAll();</span>
+<span class="fc" id="L433">        }</span>
+
+<span class="fc" id="L435">    }</span>
+
+    /// Shuts down the network thread and waits for shutdown to complete
+    public void shutdownSync() {
+<span class="fc" id="L439">        NetworkThread[] n = this.networkThreads;</span>
+<span class="fc bfc" id="L440" title="All 2 branches covered.">        if (n != null) {</span>
+<span class="fc" id="L441">            NetworkThread t = n[0];</span>
+<span class="pc bpc" id="L442" title="1 of 2 branches missed.">            if (t != null) {</span>
+<span class="fc" id="L443">                shutdown();</span>
+<span class="fc" id="L444">                t.join();</span>
+            }
+        }
+<span class="fc" id="L447">    }</span>
+
+    private void addSortedToQueue(ConnectionRequest request, int priority) {
+<span class="fc bfc" id="L450" title="All 2 branches covered.">        for (int iter = 0; iter &lt; pending.size(); iter++) {</span>
+<span class="fc" id="L451">            ConnectionRequest r = (ConnectionRequest) pending.elementAt(iter);</span>
+<span class="fc bfc" id="L452" title="All 2 branches covered.">            if (r.getPriority() &lt; priority) {</span>
+<span class="fc" id="L453">                pending.insertElementAt(request, iter);</span>
+<span class="fc" id="L454">                return;</span>
+            }
+        }
+<span class="fc" id="L457">        pending.addElement(request);</span>
+<span class="fc" id="L458">    }</span>
+
+    /// Adds a header to the global default headers, this header will be implicitly added
+    /// to all requests going out from this point onwards. The main use case for this is
+    /// for authentication information communication via the header.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key of the header
+    ///
+    /// - `value`: the value of the header
+    public void addDefaultHeader(String key, String value) {
+<span class="fc bfc" id="L470" title="All 2 branches covered.">        if (userHeaders == null) {</span>
+<span class="fc" id="L471">            userHeaders = new Hashtable();</span>
+        }
+<span class="fc" id="L473">        userHeaders.put(key, value);</span>
+<span class="fc" id="L474">    }</span>
+
+    /// What [#setAuthorizer(String, RequestAuthorizer)] registered. Owned by the event
+    /// dispatch thread: read and replaced there and nowhere else. A network thread never
+    /// comes here -- it is handed the header with the request, see
+    /// [ConnectionRequest#captureAuthorization(boolean)].
+<span class="fc" id="L480">    private AuthorizerEntry[] authorizers = new AuthorizerEntry[0];</span>
+    /// Whether a default authorizer is registered. Cleared when the last one is removed, and
+    /// the one thing about authorizers a thread other than the EDT looks at: it decides
+    /// only whether a request queued from that thread has to pass through the EDT first.
+    /// It is not what protects anything -- the registrations themselves are never read
+    /// off the EDT.
+    @SuppressWarnings(&quot;PMD.AvoidUsingVolatile&quot;) // Publishes the EDT's hint to background queuers.
+    private volatile boolean authorizerRegistered;
+
+    /// Runs `work` on the event dispatch thread and returns when it has run: at once on
+    /// the EDT itself, and before there is one. This is how the methods that touch
+    /// authorizer state take a call from another thread.
+    private static void onEdt(Runnable work) {
+<span class="pc bpc" id="L493" title="2 of 4 branches missed.">        if (!Display.isInitialized() || Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L494">            work.run();</span>
+        } else {
+<span class="fc" id="L496">            Display.getInstance().callSeriallyAndWait(work);</span>
+        }
+<span class="fc" id="L498">    }</span>
+
+    private static final class AuthorizerEntry {
+        /// The base URL's origin, as [#originOf(String)] writes it.
+        final String origin;
+        /// The base URL's path, without a trailing slash; empty for the whole origin.
+        final String path;
+        final RequestAuthorizer authorizer;
+
+<span class="fc" id="L507">        AuthorizerEntry(String origin, String path, RequestAuthorizer authorizer) {</span>
+<span class="fc" id="L508">            this.origin = origin;</span>
+<span class="fc" id="L509">            this.path = path;</span>
+<span class="fc" id="L510">            this.authorizer = authorizer;</span>
+<span class="fc" id="L511">        }</span>
+    }
+
+    /// Makes `authorizer` the default for every request to `baseUrl` and below, so the
+    /// application's own service gets its `Authorization` header -- and a renewed one after a
+    /// `401` -- without each request being told. See [RequestAuthorizer].
+    ///
+    /// ```java
+    /// NetworkManager.getInstance().setAuthorizer(&quot;https://api.example.com/v1&quot;, authorizer);
+    /// ```
+    ///
+    /// A request is covered when its URL has the same origin as `baseUrl` and a path that is
+    /// `baseUrl`'s path or below it.
+    ///
+    /// The origin is the scheme, the host and the port. Scheme and host compare without
+    /// regard to case, and a port left out is the scheme's own, so `https://host`,
+    /// `HTTPS://Host` and `https://host:443` are one base URL, and so are `http://host` and
+    /// `http://host:80`. Anything else is another origin and never gets the header:
+    /// `https://api.example.com` covers neither `https://api.example.com.evil.test/` nor
+    /// `https://api.example.com@evil.test/`, nor the same host over `http` or on port 8443.
+    ///
+    /// The path compares exactly and stops at whole segments: `/api` covers `/api`,
+    /// `/api/pets` and `/api?x=1`, and does not cover `/apiary` or `/API`. When several
+    /// registrations cover a request the one with the longest path is used.
+    ///
+    /// The header is decided when the request is queued and follows a redirect only as far
+    /// as `baseUrl` reaches: a request redirected to another origin, or to a path outside
+    /// `baseUrl`, is sent there without it.
+    ///
+    /// A request with an authorizer of its own, or with an `Authorization` header already on
+    /// it, is left alone.
+    ///
+    /// #### Parameters
+    ///
+    /// - `baseUrl`: an absolute URL; a trailing slash is ignored
+    ///
+    /// - `authorizer`: the authorizer, or null to remove the one registered for `baseUrl`
+    ///
+    /// The registrations belong to the event dispatch thread. Called from another thread
+    /// this waits for the EDT to make the change.
+    public void setAuthorizer(String baseUrl, final RequestAuthorizer authorizer) {
+<span class="pc bpc" id="L552" title="1 of 4 branches missed.">        if (baseUrl == null || baseUrl.indexOf(&quot;://&quot;) &lt; 0) {</span>
+<span class="fc" id="L553">            throw new IllegalArgumentException(&quot;baseUrl must be an absolute URL&quot;);</span>
+        }
+<span class="fc" id="L555">        final String origin = originOf(baseUrl);</span>
+<span class="fc" id="L556">        String path = pathOf(baseUrl);</span>
+<span class="pc bpc" id="L557" title="1 of 2 branches missed.">        if (path == null) {</span>
+<span class="nc" id="L558">            throw new IllegalArgumentException(&quot;baseUrl has an ambiguous path&quot;);</span>
+        }
+<span class="fc" id="L560">        int end = path.length();</span>
+<span class="fc bfc" id="L561" title="All 2 branches covered.">        for (int i = 0; i &lt; path.length(); i++) {</span>
+<span class="fc" id="L562">            char c = path.charAt(i);</span>
+<span class="pc bpc" id="L563" title="2 of 4 branches missed.">            if (c == '?' || c == '#') {</span>
+<span class="nc" id="L564">                end = i;</span>
+<span class="nc" id="L565">                break;</span>
+            }
+        }
+<span class="fc bfc" id="L568" title="All 4 branches covered.">        while (end &gt; 0 &amp;&amp; path.charAt(end - 1) == '/') {</span>
+<span class="fc" id="L569">            end--;</span>
+        }
+<span class="fc" id="L571">        final String basePath = path.substring(0, end);</span>
+<span class="fc bfc" id="L572" title="All 2 branches covered.">        if (authorizer != null) {</span>
+            // Before the registration, so the thread that registers one sees the hint in
+            // what it queues next.
+<span class="fc" id="L575">            authorizerRegistered = true;</span>
+        }
+<span class="fc" id="L577">        onEdt(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc bfc" id="L580" title="All 2 branches covered.">                if (authorizer != null) {</span>
+<span class="fc" id="L581">                    authorizerRegistered = true;</span>
+                }
+<span class="fc" id="L583">                ArrayList&lt;AuthorizerEntry&gt; next = new ArrayList&lt;AuthorizerEntry&gt;();</span>
+<span class="fc bfc" id="L584" title="All 2 branches covered.">                for (AuthorizerEntry e : authorizers) {</span>
+                    // The same base URL however it was spelled: https://host:443/ replaces,
+                    // and removes, what https://HOST registered.
+<span class="fc bfc" id="L587" title="All 4 branches covered.">                    if (!(e.origin.equals(origin) &amp;&amp; e.path.equals(basePath))) {</span>
+<span class="fc" id="L588">                        next.add(e);</span>
+                    }
+                }
+<span class="fc bfc" id="L591" title="All 2 branches covered.">                if (authorizer != null) {</span>
+<span class="fc" id="L592">                    next.add(new AuthorizerEntry(origin, basePath, authorizer));</span>
+                }
+<span class="fc" id="L594">                authorizers = next.toArray(new AuthorizerEntry[next.size()]);</span>
+<span class="fc bfc" id="L595" title="All 2 branches covered.">                authorizerRegistered = authorizers.length != 0;</span>
+<span class="fc" id="L596">            }</span>
+        });
+<span class="fc" id="L598">    }</span>
+
+    /// The default authorizer of a URL.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the URL of a request
+    ///
+    /// #### Returns
+    ///
+    /// the authorizer registered for the longest base URL that covers `url`, or null
+    ///
+    /// Called from a thread other than the event dispatch thread this waits for the EDT to
+    /// answer.
+    public RequestAuthorizer getAuthorizer(final String url) {
+<span class="fc" id="L613">        final RequestAuthorizer[] out = new RequestAuthorizer[1];</span>
+<span class="fc" id="L614">        onEdt(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L617">                AuthorizerEntry e = authorizerEntry(url);</span>
+<span class="fc bfc" id="L618" title="All 2 branches covered.">                out[0] = e == null ? null : e.authorizer;</span>
+<span class="fc" id="L619">            }</span>
+        });
+<span class="fc" id="L621">        return out[0];</span>
+    }
+
+    /// The default authorizer of a URL and the base URL it was registered for, with no
+    /// header value yet. Null when no registration covers `url`. Called on the EDT.
+    ConnectionRequest.CapturedAuthorization defaultAuthorization(String url) {
+<span class="fc" id="L627">        AuthorizerEntry e = authorizerEntry(url);</span>
+<span class="fc bfc" id="L628" title="All 2 branches covered.">        return e == null ? null</span>
+                : new ConnectionRequest.CapturedAuthorization(e.authorizer, null, e.origin, e.path);
+    }
+
+    /// Whether [#addDefaultHeader(String, String)] set an `Authorization` header, which
+    /// then goes on every request and wins over any authorizer.
+    boolean hasDefaultAuthorizationHeader() {
+<span class="fc bfc" id="L635" title="All 2 branches covered.">        if (userHeaders != null) {</span>
+<span class="fc" id="L636">            Enumeration keys = userHeaders.keys();</span>
+<span class="fc bfc" id="L637" title="All 2 branches covered.">            while (keys.hasMoreElements()) {</span>
+<span class="fc bfc" id="L638" title="All 2 branches covered.">                if (&quot;Authorization&quot;.equalsIgnoreCase((String) keys.nextElement())) {</span>
+<span class="fc" id="L639">                    return true;</span>
+                }
+            }
+        }
+<span class="fc" id="L643">        return false;</span>
+    }
+
+    /// The registration with the longest base URL that covers `url`. Called on the EDT.
+    private AuthorizerEntry authorizerEntry(String url) {
+<span class="fc" id="L648">        AuthorizerEntry[] current = authorizers;</span>
+<span class="fc bfc" id="L649" title="All 4 branches covered.">        if (url == null || current.length == 0) {</span>
+<span class="fc" id="L650">            return null;</span>
+        }
+<span class="fc" id="L652">        String origin = null;</span>
+<span class="fc" id="L653">        String path = null;</span>
+<span class="fc" id="L654">        AuthorizerEntry best = null;</span>
+<span class="fc bfc" id="L655" title="All 2 branches covered.">        for (AuthorizerEntry e : current) {</span>
+<span class="fc bfc" id="L656" title="All 4 branches covered.">            if (best != null &amp;&amp; e.path.length() &lt;= best.path.length()) {</span>
+<span class="fc" id="L657">                continue;</span>
+            }
+<span class="fc bfc" id="L659" title="All 2 branches covered.">            if (origin == null) {</span>
+<span class="fc" id="L660">                origin = originOf(url);</span>
+<span class="fc" id="L661">                path = pathOf(url);</span>
+            }
+<span class="fc bfc" id="L663" title="All 4 branches covered.">            if (e.origin.equals(origin) &amp;&amp; pathCovers(e.path, path)) {</span>
+<span class="fc" id="L664">                best = e;</span>
+            }
+        }
+<span class="fc" id="L667">        return best;</span>
+    }
+
+    /// Whether `url` is `base` or below it: the same origin, and a path at or under the
+    /// base's on a segment boundary. See [#setAuthorizer(String, RequestAuthorizer)].
+    static boolean covers(String base, String url) {
+<span class="pc bpc" id="L673" title="3 of 6 branches missed.">        if (base == null || url == null || !originOf(base).equals(originOf(url))) {</span>
+<span class="nc" id="L674">            return false;</span>
+        }
+<span class="fc" id="L676">        String path = pathOf(base);</span>
+<span class="pc bpc" id="L677" title="1 of 2 branches missed.">        if (path == null) {</span>
+<span class="nc" id="L678">            return false;</span>
+        }
+<span class="pc bpc" id="L680" title="1 of 2 branches missed.">        while (path.endsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L681">            path = path.substring(0, path.length() - 1);</span>
+        }
+<span class="fc" id="L683">        return pathCovers(path, pathOf(url));</span>
+    }
+
+    /// Whether `rest` -- what follows the authority of a URL -- is the path `base` or below
+    /// it. `base` has no trailing slash. The comparison is exact, and `base` must end where
+    /// a segment of `rest` ends: `/api` is not a prefix of `/apiary`.
+    static boolean pathCovers(String base, String rest) {
+<span class="fc bfc" id="L690" title="All 4 branches covered.">        if (rest == null || !rest.startsWith(base)) {</span>
+<span class="fc" id="L691">            return false;</span>
+        }
+<span class="fc bfc" id="L693" title="All 2 branches covered.">        if (rest.length() == base.length()) {</span>
+<span class="fc" id="L694">            return true;</span>
+        }
+<span class="fc" id="L696">        char next = rest.charAt(base.length());</span>
+<span class="fc bfc" id="L697" title="All 6 branches covered.">        return next == '/' || next == '?' || next == '#';</span>
+    }
+
+    /// Where the authority of `url` ends: the first `/`, `?` or `#` after `://`, or the end.
+    private static int authorityEnd(String url, int from) {
+<span class="fc bfc" id="L702" title="All 2 branches covered.">        for (int i = from; i &lt; url.length(); i++) {</span>
+<span class="fc" id="L703">            char c = url.charAt(i);</span>
+<span class="fc bfc" id="L704" title="All 6 branches covered.">            if (c == '/' || c == '?' || c == '#') {</span>
+<span class="fc" id="L705">                return i;</span>
+            }
+        }
+<span class="fc" id="L708">        return url.length();</span>
+    }
+
+    /// The normalized path, followed by the query and fragment. Literal and encoded dot
+    /// segments are removed before authorization scope is compared. Ambiguous separators,
+    /// nested encoding and control characters fail closed across differing HTTP transports.
+    /// Empty when the URL has no path; null when the path is ambiguous.
+    static String pathOf(String url) {
+<span class="pc bpc" id="L716" title="1 of 2 branches missed.">        int scheme = url == null ? -1 : url.indexOf(&quot;://&quot;);</span>
+<span class="pc bpc" id="L717" title="1 of 2 branches missed.">        if (scheme &lt; 0) {</span>
+<span class="nc" id="L718">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L720">        String rest = url.substring(authorityEnd(url, scheme + 3));</span>
+<span class="fc" id="L721">        int end = rest.length();</span>
+<span class="fc bfc" id="L722" title="All 2 branches covered.">        for (int i = 0; i &lt; rest.length(); i++) {</span>
+<span class="fc bfc" id="L723" title="All 4 branches covered.">            if (rest.charAt(i) == '?' || rest.charAt(i) == '#') {</span>
+<span class="fc" id="L724">                end = i;</span>
+<span class="fc" id="L725">                break;</span>
+            }
+        }
+<span class="fc" id="L728">        StringBuilder decoded = new StringBuilder(end);</span>
+<span class="fc bfc" id="L729" title="All 2 branches covered.">        for (int i = 0; i &lt; end; i++) {</span>
+<span class="fc" id="L730">            char c = rest.charAt(i);</span>
+<span class="pc bpc" id="L731" title="2 of 6 branches missed.">            if (c == '\\' || c &lt;= ' ' || c == 127) {</span>
+<span class="fc" id="L732">                return null;</span>
+            }
+<span class="fc bfc" id="L734" title="All 2 branches covered.">            if (c == '%') {</span>
+<span class="pc bpc" id="L735" title="1 of 2 branches missed.">                if (i + 2 &gt;= end) {</span>
+<span class="nc" id="L736">                    return null;</span>
+                }
+<span class="fc" id="L738">                int high = Character.digit(rest.charAt(i + 1), 16);</span>
+<span class="fc" id="L739">                int low = Character.digit(rest.charAt(i + 2), 16);</span>
+<span class="pc bpc" id="L740" title="2 of 4 branches missed.">                if (high &lt; 0 || low &lt; 0) {</span>
+<span class="nc" id="L741">                    return null;</span>
+                }
+<span class="fc" id="L743">                int value = high * 16 + low;</span>
+<span class="fc bfc" id="L744" title="All 2 branches covered.">                if (value == 46) {</span>
+<span class="fc" id="L745">                    c = '.';</span>
+<span class="fc" id="L746">                    i += 2;</span>
+<span class="pc bpc" id="L747" title="8 of 12 branches missed.">                } else if (value == 47 || value == 92 || value == 37 || value &gt;= 0 &amp;&amp; value &lt;= 32</span>
+                        || value == 127) {
+<span class="fc" id="L749">                    return null;</span>
+                }
+            }
+<span class="fc" id="L752">            decoded.append(c);</span>
+        }
+<span class="fc" id="L754">        String rawPath = decoded.toString();</span>
+<span class="fc bfc" id="L755" title="All 2 branches covered.">        if (rawPath.indexOf(&quot;//&quot;) &gt;= 0) {</span>
+<span class="fc" id="L756">            return null;</span>
+        }
+<span class="fc" id="L758">        ArrayList&lt;String&gt; segments = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L759" title="All 2 branches covered.">        for (String segment : Util.split(rawPath, &quot;/&quot;)) {</span>
+<span class="fc bfc" id="L760" title="All 2 branches covered.">            if (&quot;..&quot;.equals(segment)) {</span>
+<span class="pc bpc" id="L761" title="1 of 2 branches missed.">                if (!segments.isEmpty()) {</span>
+<span class="fc" id="L762">                    segments.remove(segments.size() - 1);</span>
+                }
+<span class="fc bfc" id="L764" title="All 4 branches covered.">            } else if (segment.length() &gt; 0 &amp;&amp; !&quot;.&quot;.equals(segment)) {</span>
+<span class="fc" id="L765">                segments.add(segment);</span>
+            }
+        }
+<span class="fc" id="L768">        StringBuilder normalized = new StringBuilder(rest.length());</span>
+<span class="fc bfc" id="L769" title="All 2 branches covered.">        for (String segment : segments) {</span>
+<span class="fc" id="L770">            normalized.append('/').append(segment);</span>
+<span class="fc" id="L771">        }</span>
+<span class="fc bfc" id="L772" title="All 6 branches covered.">        if (rawPath.length() &gt; 0 &amp;&amp; (normalized.length() == 0 || rawPath.endsWith(&quot;/&quot;)</span>
+<span class="pc bpc" id="L773" title="2 of 4 branches missed.">                || rawPath.endsWith(&quot;/.&quot;) || rawPath.endsWith(&quot;/..&quot;))) {</span>
+<span class="fc" id="L774">            normalized.append('/');</span>
+        }
+<span class="fc" id="L776">        return normalized.append(rest.substring(end)).toString();</span>
+    }
+
+    /// The origin of a URL in one spelling, so that two URLs of one origin compare equal as
+    /// text: the scheme and the host in lower case, and the port always written --
+    /// `https://Api.Example.com` and `https://api.example.com:443` are both
+    /// `https://api.example.com:443`. The port left out of an `http` or `ws` URL is 80, of an
+    /// `https` or `wss` one 443, and of any other scheme stays empty.
+    ///
+    /// User information is kept, as it was written, so that `https://host@evil.test` is not
+    /// the origin `https://evil.test` either: a URL that carries credentials is nobody's
+    /// base URL but its own. A URL with no `://` is returned as it is.
+    ///
+    /// Only `A` to `Z` are folded, by hand: a scheme and a host name are ASCII, and
+    /// `toLowerCase()` follows the device's locale.
+    static String originOf(String url) {
+<span class="fc bfc" id="L792" title="All 2 branches covered.">        if (url == null) {</span>
+<span class="fc" id="L793">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L795">        int scheme = url.indexOf(&quot;://&quot;);</span>
+<span class="fc bfc" id="L796" title="All 2 branches covered.">        if (scheme &lt; 0) {</span>
+<span class="fc" id="L797">            return url;</span>
+        }
+<span class="fc" id="L799">        int end = authorityEnd(url, scheme + 3);</span>
+<span class="fc" id="L800">        int at = url.lastIndexOf('@', end - 1);</span>
+<span class="fc bfc" id="L801" title="All 2 branches covered.">        int host = at &gt;= scheme + 3 ? at + 1 : scheme + 3;</span>
+        // The port follows the last colon outside an IPv6 literal's brackets.
+<span class="fc" id="L803">        int bracket = url.lastIndexOf(']', end - 1);</span>
+<span class="fc" id="L804">        int colon = -1;</span>
+<span class="fc bfc" id="L805" title="All 4 branches covered.">        for (int i = end - 1; i &gt;= host &amp;&amp; i &gt; bracket; i--) {</span>
+<span class="fc bfc" id="L806" title="All 2 branches covered.">            if (url.charAt(i) == ':') {</span>
+<span class="fc" id="L807">                colon = i;</span>
+<span class="fc" id="L808">                break;</span>
+            }
+        }
+<span class="fc bfc" id="L811" title="All 2 branches covered.">        int hostEnd = colon &lt; 0 ? end : colon;</span>
+<span class="fc bfc" id="L812" title="All 2 branches covered.">        String port = colon &lt; 0 ? &quot;&quot; : url.substring(colon + 1, end);</span>
+<span class="fc" id="L813">        StringBuilder b = new StringBuilder(end + 6);</span>
+<span class="fc" id="L814">        appendAsciiLower(b, url, 0, scheme);</span>
+<span class="fc" id="L815">        String schemeName = b.toString();</span>
+<span class="fc bfc" id="L816" title="All 2 branches covered.">        if (port.length() == 0) {</span>
+<span class="fc bfc" id="L817" title="All 4 branches covered.">            if (&quot;https&quot;.equals(schemeName) || &quot;wss&quot;.equals(schemeName)) {</span>
+<span class="fc" id="L818">                port = &quot;443&quot;;</span>
+<span class="pc bpc" id="L819" title="1 of 4 branches missed.">            } else if (&quot;http&quot;.equals(schemeName) || &quot;ws&quot;.equals(schemeName)) {</span>
+<span class="fc" id="L820">                port = &quot;80&quot;;</span>
+            }
+        } else {
+            // 0443 is 443: leading zeros are the same port.
+<span class="fc" id="L824">            int digits = 0;</span>
+<span class="pc bpc" id="L825" title="1 of 4 branches missed.">            while (digits &lt; port.length() - 1 &amp;&amp; port.charAt(digits) == '0') {</span>
+<span class="fc" id="L826">                digits++;</span>
+            }
+<span class="fc" id="L828">            port = port.substring(digits);</span>
+        }
+<span class="fc" id="L830">        b.append(&quot;://&quot;);</span>
+<span class="fc" id="L831">        b.append(url.substring(scheme + 3, host));</span>
+<span class="fc" id="L832">        appendAsciiLower(b, url, host, hostEnd);</span>
+        // A trailing dot names the same host.
+<span class="pc bpc" id="L834" title="2 of 6 branches missed.">        if (b.length() &gt; 0 &amp;&amp; b.charAt(b.length() - 1) == '.' &amp;&amp; hostEnd - host &gt; 1) {</span>
+<span class="fc" id="L835">            b.setLength(b.length() - 1);</span>
+        }
+<span class="fc" id="L837">        b.append(':').append(port);</span>
+<span class="fc" id="L838">        return b.toString();</span>
+    }
+
+    private static void appendAsciiLower(StringBuilder b, String text, int from, int to) {
+<span class="fc bfc" id="L842" title="All 2 branches covered.">        for (int i = from; i &lt; to; i++) {</span>
+<span class="fc" id="L843">            char c = text.charAt(i);</span>
+<span class="fc bfc" id="L844" title="All 4 branches covered.">            if (c &gt;= 'A' &amp;&amp; c &lt;= 'Z') {</span>
+<span class="fc" id="L845">                c = (char) (c + ('a' - 'A'));</span>
+            }
+<span class="fc" id="L847">            b.append(c);</span>
+        }
+<span class="fc" id="L849">    }</span>
+
+    /// Tells whoever waits for a request that it will not be sent again: it was killed while
+    /// its authorizer was renewing, after the attempt that would have completed it was held.
+    void authorizationAbandoned(ConnectionRequest request) {
+<span class="fc" id="L854">        scheduleTracerClear(request, request.tracerRequeues);</span>
+<span class="fc" id="L855">        EventDispatcher listeners = progressListeners;</span>
+<span class="fc bfc" id="L856" title="All 2 branches covered.">        if (listeners != null) {</span>
+<span class="fc" id="L857">            listeners.fireActionEvent(new NetworkEvent(request, NetworkEvent.PROGRESS_TYPE_COMPLETED));</span>
+        }
+<span class="fc" id="L859">    }</span>
+
+    /// Identical to add to queue but returns an AsyncResource object that will resolve to
+    /// the ConnectionRequest.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the request object to add.
+    ///
+    /// #### Returns
+    ///
+    /// AsyncResource resolving to the connection request on complete.
+    ///
+    public AsyncResource&lt;ConnectionRequest&gt; addToQueueAsync(final ConnectionRequest request) {
+<span class="fc" id="L873">        final AsyncResource&lt;ConnectionRequest&gt; out = new AsyncResource&lt;ConnectionRequest&gt;();</span>
+<span class="fc" id="L874">        class WaitingClass implements ActionListener&lt;NetworkEvent&gt; {</span>
+
+
+            @Override
+            public void actionPerformed(NetworkEvent e) {
+<span class="pc bpc" id="L879" title="1 of 2 branches missed.">                if (e.getError() != null) {</span>
+
+<span class="nc" id="L881">                    removeProgressListener(this);</span>
+<span class="nc" id="L882">                    removeErrorListener(this);</span>
+<span class="nc bnc" id="L883" title="All 2 branches missed.">                    if (!out.isDone()) {</span>
+<span class="nc" id="L884">                        out.error(e.getError());</span>
+                    }
+<span class="nc" id="L886">                    return;</span>
+                }
+<span class="pc bpc" id="L888" title="1 of 2 branches missed.">                if (e.getConnectionRequest() == request) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc bfc" id="L889" title="All 2 branches covered.">                    if (e.getProgressType() == NetworkEvent.PROGRESS_TYPE_COMPLETED) {</span>
+<span class="fc bfc" id="L890" title="All 2 branches covered.">                        if (request.retrying) {</span>
+<span class="fc" id="L891">                            request.retrying = false;</span>
+<span class="fc" id="L892">                            return;</span>
+                        }
+
+<span class="fc" id="L895">                        removeProgressListener(this);</span>
+<span class="fc" id="L896">                        removeErrorListener(this);</span>
+<span class="pc bpc" id="L897" title="1 of 2 branches missed.">                        if (!out.isDone()) {</span>
+<span class="fc" id="L898">                            out.complete(request);</span>
+                        }
+                    }
+                }
+<span class="fc" id="L902">            }</span>
+        }
+<span class="fc" id="L904">        WaitingClass w = new WaitingClass();</span>
+<span class="fc" id="L905">        addProgressListener(w);</span>
+<span class="fc" id="L906">        addErrorListener(w);</span>
+<span class="fc" id="L907">        addToQueue(request);</span>
+<span class="fc" id="L908">        return out;</span>
+    }
+
+    /// Identical to add to queue but waits until the request is processed in the queue,
+    /// this is useful for completely synchronous operations.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the request object to add
+    public void addToQueueAndWait(final ConnectionRequest request) {
+<span class="fc" id="L918">        class WaitingClass implements Runnable, ActionListener&lt;NetworkEvent&gt; {</span>
+<span class="fc" id="L919">            private final boolean edt = CN.isEdt();</span>
+            private boolean finishedWaiting;
+
+            @Override
+            public void run() {
+<span class="fc bfc" id="L924" title="All 2 branches covered.">                if (edt) {</span>
+<span class="fc bfc" id="L925" title="All 2 branches covered.">                    while (!finishedWaiting) {</span>
+                        try {
+<span class="fc" id="L927">                            Thread.sleep(30);</span>
+<span class="nc" id="L928">                        } catch (InterruptedException ex) {</span>
+<span class="nc" id="L929">                            ex.printStackTrace();</span>
+<span class="pc" id="L930">                        }</span>
+                    }
+                } else {
+<span class="fc bfc" id="L933" title="All 2 branches covered.">                    while (!request.complete) {</span>
+                        try {
+<span class="fc" id="L935">                            Thread.sleep(30);</span>
+<span class="nc" id="L936">                        } catch (InterruptedException ex) {</span>
+<span class="nc" id="L937">                            ex.printStackTrace();</span>
+<span class="pc" id="L938">                        }</span>
+                    }
+                }
+<span class="fc" id="L941">            }</span>
+
+            @Override
+            public void actionPerformed(NetworkEvent e) {
+<span class="pc bpc" id="L945" title="1 of 2 branches missed.">                if (e.getError() != null) {</span>
+<span class="nc" id="L946">                    finishedWaiting = true;</span>
+<span class="nc" id="L947">                    removeProgressListener(this);</span>
+<span class="nc" id="L948">                    removeErrorListener(this);</span>
+<span class="nc" id="L949">                    return;</span>
+                }
+<span class="fc bfc" id="L951" title="All 2 branches covered.">                if (e.getConnectionRequest() == request) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc bfc" id="L952" title="All 2 branches covered.">                    if (e.getProgressType() == NetworkEvent.PROGRESS_TYPE_COMPLETED) {</span>
+<span class="fc bfc" id="L953" title="All 2 branches covered.">                        if (request.retrying) {</span>
+<span class="fc" id="L954">                            request.retrying = false;</span>
+<span class="fc" id="L955">                            return;</span>
+                        }
+<span class="fc" id="L957">                        finishedWaiting = true;</span>
+<span class="fc" id="L958">                        removeProgressListener(this);</span>
+<span class="fc" id="L959">                        removeErrorListener(this);</span>
+                    }
+                }
+<span class="fc" id="L962">            }</span>
+        }
+<span class="fc" id="L964">        WaitingClass w = new WaitingClass();</span>
+<span class="fc bfc" id="L965" title="All 2 branches covered.">        if (Display.getInstance().isEdt()) {</span>
+<span class="fc" id="L966">            addProgressListener(w);</span>
+<span class="fc" id="L967">            addErrorListener(w);</span>
+<span class="fc" id="L968">            addToQueue(request);</span>
+<span class="fc" id="L969">            Display.getInstance().invokeAndBlock(w);</span>
+        } else {
+            // The flag this thread is about to poll still says &quot;complete&quot; for a request that
+            // has run before, and stays so until a network thread picks the request up
+            // again -- long enough for the loop to return before anything was sent.
+<span class="fc" id="L974">            request.complete = false;</span>
+<span class="fc" id="L975">            addToQueue(request);</span>
+<span class="fc" id="L976">            w.run();</span>
+        }
+<span class="fc" id="L978">    }</span>
+
+    /// Adds the given network connection to the queue of execution
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: network request for execution
+    public void addToQueue(final ConnectionRequest request) {
+<span class="pc bpc" id="L986" title="1 of 4 branches missed.">        if (Display.isInitialized() &amp;&amp; !Display.getInstance().isEdt()) {</span>
+<span class="fc bfc" id="L987" title="All 4 branches covered.">            if ((!authorizerRegistered &amp;&amp; request.getAuthorizer() == null)</span>
+<span class="fc bfc" id="L988" title="All 2 branches covered.">                    || request.getAuthorizer() == RequestAuthorizer.NONE //NOPMD CompareObjectsWithEquals - opt-out singleton</span>
+<span class="fc bfc" id="L989" title="All 2 branches covered.">                    || request.getRequestHeader(&quot;Authorization&quot;) != null) {</span>
+                // No authorizer can have a header for it: queued from here as it always
+                // was, without a look at anything the EDT owns.
+<span class="fc" id="L992">                addToQueue(request, false);</span>
+<span class="fc" id="L993">                return;</span>
+            }
+            // An authorizer may have a header for this request, and authorizers are only
+            // ever called on the event dispatch thread. The request is handed over to it
+            // here and queued from there; nothing waits on this thread.
+<span class="fc" id="L998">            captureHeldTracer(request);</span>
+<span class="fc" id="L999">            Display.getInstance().callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="fc" id="L1002">                    queueOnEdt(request);</span>
+<span class="fc" id="L1003">                }</span>
+            });
+<span class="fc" id="L1005">            return;</span>
+        }
+<span class="fc" id="L1007">        queueOnEdt(request);</span>
+<span class="fc" id="L1008">    }</span>
+
+    /// Queues a request the application asked for: on the event dispatch thread, or on the
+    /// one thread there is before a display exists.
+    private void queueOnEdt(ConnectionRequest request) {
+<span class="fc bfc" id="L1013" title="All 2 branches covered.">        if (holdForAuthorizer(request)) {</span>
+<span class="fc" id="L1014">            return;</span>
+        }
+<span class="fc" id="L1016">        addToQueue(request, false, request.captureAuthorization(true), true);</span>
+<span class="fc" id="L1017">    }</span>
+
+    /// Asks the network tracer, on the thread that asked for a request, what that thread
+    /// was doing, and keeps the answer for when the request is really queued: the thread
+    /// that queues it then is not the one that asked.
+    private void captureHeldTracer(ConnectionRequest request) {
+<span class="pc bpc" id="L1023" title="1 of 2 branches missed.">        if (request.heldTracerCaptured) {</span>
+            // Already asked, by the thread that handed the request to the EDT.
+<span class="nc" id="L1025">            return;</span>
+        }
+<span class="fc" id="L1027">        request.heldTracerParent = null;</span>
+<span class="fc" id="L1028">        request.heldTracerOwner = null;</span>
+<span class="fc" id="L1029">        NetworkTracer tracer = getNetworkTracer();</span>
+<span class="pc bpc" id="L1030" title="1 of 2 branches missed.">        if (tracer != null) {</span>
+            try {
+<span class="nc" id="L1032">                request.heldTracerParent = tracer.requestQueued(request);</span>
+<span class="nc" id="L1033">                request.heldTracerOwner = tracer;</span>
+<span class="nc" id="L1034">                request.heldTracerCaptured = true;</span>
+<span class="nc" id="L1035">            } catch (Throwable t) {</span>
+<span class="nc" id="L1036">                Log.e(t);</span>
+<span class="nc" id="L1037">            }</span>
+        }
+<span class="fc" id="L1039">    }</span>
+
+    /// Gives up a held request that was killed while it waited: nobody will send it, so
+    /// whoever waits for it has to be told here.
+    ///
+    /// #### Returns
+    ///
+    /// true when the request was killed and has been given up
+    private boolean abandonIfKilled(ConnectionRequest request) {
+<span class="fc bfc" id="L1048" title="All 2 branches covered.">        if (!request.isKilled()) {</span>
+<span class="fc" id="L1049">            return false;</span>
+        }
+<span class="fc" id="L1051">        request.heldTracerCaptured = false;</span>
+<span class="fc" id="L1052">        request.heldTracerParent = null;</span>
+<span class="fc" id="L1053">        request.heldTracerOwner = null;</span>
+<span class="fc" id="L1054">        request.complete = true;</span>
+<span class="fc" id="L1055">        authorizationAbandoned(request);</span>
+<span class="fc" id="L1056">        return true;</span>
+    }
+
+    /// Asks the request's authorizer, if it is a [RequestAuthorizer.Proactive], whether its
+    /// credential has to be renewed before this request is sent, and keeps the request out
+    /// of the queue until it has been.
+    ///
+    /// Nothing blocks here. The request is not handed to a network thread yet, so the
+    /// renewal -- a request of its own -- has the queue to itself even with one network
+    /// thread, and the held request is queued exactly once, from the renewal's completion.
+    /// Whoever waits for the request waits on its completion, which has not happened.
+    ///
+    /// #### Returns
+    ///
+    /// true when the request was taken and will be queued later
+    private boolean holdForAuthorizer(final ConnectionRequest request) {
+<span class="pc bpc" id="L1072" title="1 of 2 branches missed.">        if (request == null) {</span>
+<span class="nc" id="L1073">            return false;</span>
+        }
+<span class="fc bfc" id="L1075" title="All 2 branches covered.">        if (request.heldBeforeSending) {</span>
+            // Queued again while it waits: it will be queued, once, when the wait ends.
+<span class="fc" id="L1077">            return true;</span>
+        }
+<span class="fc" id="L1079">        RequestAuthorizer.Proactive proactive = request.proactiveAuthorizer();</span>
+<span class="fc bfc" id="L1080" title="All 2 branches covered.">        if (proactive == null) {</span>
+<span class="fc" id="L1081">            return false;</span>
+        }
+        AsyncResource&lt;Boolean&gt; preparing;
+        try {
+<span class="fc" id="L1085">            preparing = proactive.prepareAuthorization(request);</span>
+<span class="nc" id="L1086">        } catch (RuntimeException err) {</span>
+            // An authorizer that throws must not take the request down with it.
+<span class="nc" id="L1088">            Log.e(err);</span>
+<span class="nc" id="L1089">            preparing = null;</span>
+<span class="fc" id="L1090">        }</span>
+<span class="pc bpc" id="L1091" title="1 of 4 branches missed.">        if (preparing == null || preparing.isDone()) {</span>
+<span class="fc" id="L1092">            return false;</span>
+        }
+<span class="fc" id="L1094">        request.heldBeforeSending = true;</span>
+<span class="fc" id="L1095">        final HeldAuthorization held = new HeldAuthorization(request);</span>
+<span class="fc" id="L1096">        request.heldAuthorization = held;</span>
+        // The context of whoever asked, captured now: by the time the request is queued
+        // this thread has moved on.
+<span class="fc" id="L1099">        captureHeldTracer(request);</span>
+<span class="fc" id="L1100">        preparing.ready(new SuccessCallback&lt;Boolean&gt;() {</span>
+            @Override
+            public void onSucess(Boolean ready) {
+<span class="fc" id="L1103">                releaseHeld(held);</span>
+<span class="fc" id="L1104">            }</span>
+<span class="fc" id="L1105">        }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+            @Override
+            public void onSucess(Throwable err) {
+<span class="nc" id="L1108">                releaseHeld(held);</span>
+<span class="nc" id="L1109">            }</span>
+        });
+<span class="pc bpc" id="L1111" title="1 of 2 branches missed.">        if (request.isKilled()) {</span>
+<span class="nc" id="L1112">            releaseHeld(held);</span>
+        }
+<span class="fc" id="L1114">        return true;</span>
+    }
+
+    /// The renewal callbacks hold this detachable reference, so a renewal that
+    /// never finishes cannot retain a cancelled request and its listeners.
+    static final class HeldAuthorization {
+        private ConnectionRequest request;
+
+<span class="fc" id="L1122">        HeldAuthorization(ConnectionRequest request) {</span>
+<span class="fc" id="L1123">            this.request = request;</span>
+<span class="fc" id="L1124">        }</span>
+    }
+
+    /// Queues a request [#holdForAuthorizer(ConnectionRequest)] took, once.
+    private void releaseHeld(HeldAuthorization held) {
+<span class="fc" id="L1129">        ConnectionRequest request = held.request;</span>
+<span class="fc bfc" id="L1130" title="All 2 branches covered.">        if (request == null) {</span>
+            // Answered twice: a resource can complete and then fail in a listener of its own.
+<span class="fc" id="L1132">            return;</span>
+        }
+<span class="fc" id="L1134">        held.request = null;</span>
+<span class="fc" id="L1135">        request.heldAuthorization = null;</span>
+<span class="fc" id="L1136">        request.heldBeforeSending = false;</span>
+<span class="fc bfc" id="L1137" title="All 2 branches covered.">        if (abandonIfKilled(request)) {</span>
+<span class="fc" id="L1138">            return;</span>
+        }
+        // The renewal is done, so this is the header it produced.
+<span class="fc" id="L1141">        addToQueue(request, false, request.captureAuthorization(true), true);</span>
+<span class="fc" id="L1142">    }</span>
+
+    /// Kills the given request and waits until the request is killed if it is
+    /// being processed by one of the threads. This method must not be invoked from
+    /// a network thread!
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`
+    public void killAndWait(final ConnectionRequest request) {
+<span class="fc" id="L1152">        request.kill();</span>
+<span class="fc" id="L1153">        class KillWaitingClass implements Runnable {</span>
+            @Override
+            public void run() {
+<span class="fc bfc" id="L1156" title="All 2 branches covered.">                for (int iter = 0; iter &lt; threadCount; iter++) {</span>
+<span class="pc bpc" id="L1157" title="1 of 2 branches missed.">                    if (networkThreads[iter].currentRequest == request) {</span>
+<span class="nc" id="L1158">                        synchronized (LOCK) {</span>
+<span class="nc bnc" id="L1159" title="All 2 branches missed.">                            while (networkThreads[iter].currentRequest == request) {</span>
+                                try {
+<span class="nc" id="L1161">                                    LOCK.wait(20);</span>
+<span class="nc" id="L1162">                                } catch (InterruptedException ex) {</span>
+<span class="nc" id="L1163">                                    ex.printStackTrace();</span>
+<span class="nc" id="L1164">                                }</span>
+                            }
+<span class="nc" id="L1166">                        }</span>
+                    }
+                }
+<span class="fc" id="L1169">            }</span>
+        }
+<span class="fc" id="L1171">        Display.getInstance().invokeAndBlock(new KillWaitingClass());</span>
+<span class="fc" id="L1172">    }</span>
+
+    void kill9(final ConnectionRequest request) {
+<span class="pc bpc" id="L1175" title="1 of 2 branches missed.">        if (request.isKilled()) {</span>
+<span class="fc" id="L1176">            Runnable abandonHeld = new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="pc bpc" id="L1179" title="1 of 4 branches missed.">                    if (request.isKilled() &amp;&amp; request.heldAuthorization != null) {</span>
+<span class="fc" id="L1180">                        releaseHeld(request.heldAuthorization);</span>
+                    }
+<span class="fc" id="L1182">                }</span>
+            };
+<span class="pc bpc" id="L1184" title="1 of 4 branches missed.">            if (!Display.isInitialized() || Display.getInstance().isEdt()) {</span>
+<span class="fc" id="L1185">                abandonHeld.run();</span>
+            } else {
+<span class="fc" id="L1187">                Display.getInstance().callSerially(abandonHeld);</span>
+            }
+<span class="pc bpc" id="L1189" title="1 of 4 branches missed.">            for (int iter = 0; networkThreads != null &amp;&amp; iter &lt; threadCount; iter++) {</span>
+<span class="pc bpc" id="L1190" title="1 of 4 branches missed.">                if (networkThreads[iter] != null &amp;&amp; networkThreads[iter].currentRequest == request) {</span>
+<span class="fc" id="L1191">                    synchronized (LOCK) {</span>
+<span class="fc bfc" id="L1192" title="All 2 branches covered.">                        if (networkThreads[iter].currentRequest == request) {</span>
+<span class="fc" id="L1193">                            networkThreads[iter].interrupt();</span>
+<span class="fc" id="L1194">                            networkThreads[iter].stopped = true;</span>
+<span class="fc" id="L1195">                            networkThreads[iter] = createNetworkThread();</span>
+<span class="fc" id="L1196">                            networkThreads[iter].start();</span>
+                        }
+<span class="fc" id="L1198">                    }</span>
+                }
+            }
+        }
+<span class="fc" id="L1202">    }</span>
+
+    /// Ends the tracer attempt in flight on `req`, if any, with the tracer that
+    /// started it. Cleared first, so an attempt is ended exactly once however the
+    /// tracer behaves.
+    ///
+    /// Only the thread that started the attempt ends it. Once a retry has
+    /// re-queued the request, another worker may already have begun the NEXT
+    /// attempt by the time this one reaches its finally, and that attempt is
+    /// not this thread's to end.
+    static void endTracerAttempt(ConnectionRequest req, Throwable failure) {
+<span class="fc" id="L1213">        Object attempt = req.tracerAttempt;</span>
+<span class="fc" id="L1214">        NetworkTracer owner = req.tracerOwner;</span>
+<span class="pc bpc" id="L1215" title="1 of 4 branches missed.">        if (attempt == null || owner == null</span>
+<span class="fc bfc" id="L1216" title="All 2 branches covered.">                || req.tracerThread != Thread.currentThread()) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L1217">            return;</span>
+        }
+<span class="fc" id="L1219">        req.tracerAttempt = null;</span>
+<span class="fc" id="L1220">        req.tracerOwner = null;</span>
+<span class="fc" id="L1221">        req.tracerThread = null;</span>
+        // Kept for a retry of a request queued with no parent: see addToQueue.
+<span class="fc" id="L1223">        req.tracerLastAttempt = attempt;</span>
+<span class="fc" id="L1224">        req.tracerLastOwner = owner;</span>
+        try {
+            // Only a status THIS attempt received: a reused request still holds
+            // the last one's.
+<span class="fc bfc" id="L1228" title="All 2 branches covered.">            owner.afterRequest(req, attempt,</span>
+<span class="fc" id="L1229">                    req.tracerResponded ? req.getResponseCode() : -1, failure);</span>
+<span class="nc" id="L1230">        } catch (Throwable t) {</span>
+            // Observation must never change a request's outcome.
+<span class="nc" id="L1232">            Log.e(t);</span>
+<span class="fc" id="L1233">        }</span>
+<span class="fc" id="L1234">    }</span>
+
+    /// Clears `req`'s tracer state on the EDT, after whatever this attempt already
+    /// queued there, unless the request was queued again in the meantime.
+    private static void scheduleTracerClear(final ConnectionRequest req, final int requeues) {
+<span class="pc bpc" id="L1239" title="1 of 2 branches missed.">        if (!Display.isInitialized()) {</span>
+<span class="nc" id="L1240">            clearTracerState(req);</span>
+<span class="nc" id="L1241">            return;</span>
+        }
+<span class="fc" id="L1243">        Display.getInstance().callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="pc bpc" id="L1246" title="1 of 2 branches missed.">                if (req.tracerRequeues == requeues) {</span>
+<span class="fc" id="L1247">                    clearTracerState(req);</span>
+                }
+<span class="fc" id="L1249">            }</span>
+        });
+<span class="fc" id="L1251">    }</span>
+
+    /// Forgets every tracer object a finished request holds.
+    static void clearTracerState(ConnectionRequest req) {
+<span class="fc" id="L1255">        req.tracerParent = null;</span>
+<span class="fc" id="L1256">        req.tracerParentOwner = null;</span>
+<span class="fc" id="L1257">        req.tracerParentChained = false;</span>
+<span class="fc" id="L1258">        req.tracerLastAttempt = null;</span>
+<span class="fc" id="L1259">        req.tracerLastOwner = null;</span>
+<span class="fc" id="L1260">    }</span>
+
+    /// Adds the given network connection to the queue of execution
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: network request for execution
+    void addToQueue(@Async.Schedule ConnectionRequest request, boolean retry) {
+<span class="fc" id="L1268">        addToQueue(request, retry, null, false);</span>
+<span class="fc" id="L1269">    }</span>
+
+    /// Queues a request. `captured` is the header the event dispatch thread decided on for
+    /// a request the application queued, taken by the request only once the enqueue is
+    /// accepted; `withAuthorization` is false for a retry, which keeps what it has.
+    private void addToQueue(@Async.Schedule ConnectionRequest request, boolean retry,
+            ConnectionRequest.CapturedAuthorization captured, boolean withAuthorization) {
+<span class="fc bfc" id="L1276" title="All 2 branches covered.">        if (retry) {</span>
+            // A redirect or retry re-queues THIS request object while its current
+            // attempt is still open on the worker that ran it. With more than one
+            // network thread another worker can pick it up before that worker
+            // reaches its finally and overwrite the attempt's state -- losing the
+            // span and leaving its traceparent on the request. So the attempt ends
+            // here, on the thread that ran it, before the request is visible to
+            // anyone else.
+<span class="fc" id="L1284">            endTracerAttempt(request, null);</span>
+<span class="fc" id="L1285">            request.tracerRequeues++;</span>
+            // A request queued with no context -- the usual case for a generated
+            // client used outside Telemetry.run -- would start a NEW trace on every
+            // attempt: a 302 and the 200 it led to, or a failure and the retry that
+            // succeeded, came out as unrelated traces with separate sampling
+            // decisions, and the logical request could not be followed. So the
+            // attempt that just ended becomes the next one's parent: one trace,
+            // one decision, each attempt still its own span. A request that WAS
+            // queued inside an action keeps that action as every attempt's parent.
+            // A parent some OTHER tracer captured is as good as none: the tracer
+            // that ran this attempt will not use it (it only takes its own), and
+            // keeping it blocked the chain, so every retry started a new root.
+            // The attempt to continue from is the last one that ENDED -- or, when a
+            // listener retries from the EDT before the network thread has finished
+            // the attempt it is reacting to, that attempt, still in flight. Waiting
+            // for &quot;ended&quot; alone lost the race on a fast EDT, and the retry started
+            // an unrelated trace.
+<span class="fc bfc" id="L1302" title="All 2 branches covered.">            Object previous = request.tracerAttempt != null</span>
+                    ? request.tracerAttempt : request.tracerLastAttempt;
+<span class="fc bfc" id="L1304" title="All 2 branches covered.">            NetworkTracer previousOwner = request.tracerAttempt != null</span>
+                    ? request.tracerOwner : request.tracerLastOwner;
+<span class="pc bpc" id="L1306" title="2 of 8 branches missed.">            if ((request.tracerParent == null || request.tracerParentChained</span>
+                    || request.tracerParentOwner != previousOwner) //NOPMD CompareObjectsWithEquals
+                    &amp;&amp; previous != null) {
+<span class="fc" id="L1309">                request.tracerParent = previous;</span>
+<span class="fc" id="L1310">                request.tracerParentOwner = previousOwner;</span>
+<span class="fc" id="L1311">                request.tracerParentChained = true;</span>
+            }
+        }
+        // Captured HERE, on the thread that asked for the request, so the span it
+        // becomes is a child of what the app was doing at the time. A retry keeps
+        // the context of the request it retries. Held in locals and stored only once
+        // the enqueue is accepted below: re-adding a request that is already pending
+        // is rejected as a duplicate, and storing first would re-parent the queued
+        // one under whatever the rejected call was doing.
+<span class="fc" id="L1320">        NetworkTracer queuedBy = null;</span>
+<span class="fc" id="L1321">        Object queuedParent = null;</span>
+<span class="fc bfc" id="L1322" title="All 2 branches covered.">        if (!retry) {</span>
+<span class="pc bpc" id="L1323" title="1 of 2 branches missed.">            if (request.heldTracerCaptured) {</span>
+                // Asked for when it was held for its authorizer, on the thread that asked.
+<span class="nc" id="L1325">                queuedParent = request.heldTracerParent;</span>
+<span class="nc" id="L1326">                queuedBy = request.heldTracerOwner;</span>
+<span class="nc" id="L1327">                request.heldTracerCaptured = false;</span>
+<span class="nc" id="L1328">                request.heldTracerParent = null;</span>
+<span class="nc" id="L1329">                request.heldTracerOwner = null;</span>
+            } else {
+<span class="fc" id="L1331">                NetworkTracer tracer = getNetworkTracer();</span>
+<span class="fc bfc" id="L1332" title="All 2 branches covered.">                if (tracer != null) {</span>
+                    try {
+<span class="fc" id="L1334">                        queuedParent = tracer.requestQueued(request);</span>
+<span class="fc" id="L1335">                        queuedBy = tracer;</span>
+<span class="nc" id="L1336">                    } catch (Throwable t) {</span>
+<span class="nc" id="L1337">                        Log.e(t);</span>
+<span class="fc" id="L1338">                    }</span>
+                }
+            }
+        }
+<span class="fc" id="L1342">        Util.getImplementation().addConnectionToQueue(request);</span>
+<span class="fc bfc" id="L1343" title="All 2 branches covered.">        if (!running) {</span>
+<span class="fc" id="L1344">            start();</span>
+        }
+<span class="fc bfc" id="L1346" title="All 2 branches covered.">        if (!autoDetected) {</span>
+<span class="fc" id="L1347">            autoDetected = true;</span>
+<span class="pc bpc" id="L1348" title="1 of 2 branches missed.">            if (Util.getImplementation().shouldAutoDetectAccessPoint()) {</span>
+<span class="nc" id="L1349">                AutoDetectAPN r = new AutoDetectAPN();</span>
+<span class="nc" id="L1350">                r.setPost(false);</span>
+<span class="nc" id="L1351">                r.setUrl(autoDetectURL);</span>
+<span class="nc" id="L1352">                r.setPriority(ConnectionRequest.PRIORITY_CRITICAL);</span>
+<span class="nc" id="L1353">                addToQueue(r, false);</span>
+            }
+        }
+<span class="fc" id="L1356">        request.validateImpl();</span>
+<span class="fc" id="L1357">        synchronized (LOCK) {</span>
+<span class="fc" id="L1358">            int i = request.getPriority();</span>
+<span class="fc bfc" id="L1359" title="All 2 branches covered.">            if (!retry) {</span>
+<span class="fc bfc" id="L1360" title="All 2 branches covered.">                if (!request.isDuplicateSupported()) {</span>
+<span class="fc bfc" id="L1361" title="All 2 branches covered.">                    if (pending.contains(request)) {</span>
+<span class="fc" id="L1362">                        Log.p(&quot;Duplicate entry in the queue: &quot; + request.getClass().getName() + &quot;: &quot; + request);</span>
+<span class="fc" id="L1363">                        return;</span>
+                    }
+<span class="fc" id="L1365">                    ConnectionRequest currentRequest = networkThreads[0].getCurrentRequest();</span>
+<span class="pc bpc" id="L1366" title="5 of 6 branches missed.">                    if (currentRequest != null &amp;&amp; !currentRequest.retrying &amp;&amp; currentRequest.equals(request)) {</span>
+<span class="nc" id="L1367">                        System.out.println(&quot;Duplicate entry detected&quot;);</span>
+<span class="nc" id="L1368">                        return;</span>
+                    }
+                }
+<span class="fc" id="L1371">                request.tracerParent = queuedParent;</span>
+<span class="fc" id="L1372">                request.tracerParentOwner = queuedBy;</span>
+                // A fresh enqueue is a new logical request, not a retry of the last.
+                // It advances the generation too: a cleanup the previous run queued
+                // on the EDT would otherwise still match, and clear the parent this
+                // enqueue just captured -- a listener can reuse a finished request
+                // with addToQueue before that cleanup runs.
+<span class="fc" id="L1378">                request.tracerRequeues++;</span>
+<span class="fc" id="L1379">                request.tracerParentChained = false;</span>
+<span class="fc" id="L1380">                request.tracerLastAttempt = null;</span>
+<span class="fc" id="L1381">                request.tracerLastOwner = null;</span>
+                // And nothing of the last run's dealings with its authorizer: a request the
+                // application queues again gets its one renewal again. A retry mark the last
+                // run left unread goes too -- with nobody waiting on that run it was never
+                // consumed, and the first waiter of this one would take a completed request
+                // for one still being retried and wait for good.
+<span class="fc" id="L1387">                request.resetAuthorization();</span>
+                // The header the EDT captured, handed over with the request. Internal
+                // requests queued without one -- the access point probe -- carry none.
+<span class="fc bfc" id="L1390" title="All 2 branches covered.">                request.setCapturedAuthorization(withAuthorization ? captured : null);</span>
+<span class="fc" id="L1391">                request.retrying = false;</span>
+            } else {
+<span class="fc" id="L1393">                i = ConnectionRequest.PRIORITY_HIGH;</span>
+            }
+<span class="pc bpc" id="L1395" title="2 of 3 branches missed.">            switch (i) {</span>
+                case ConnectionRequest.PRIORITY_CRITICAL:
+<span class="nc" id="L1397">                    pending.insertElementAt(request, 0);</span>
+<span class="nc" id="L1398">                    ConnectionRequest currentRequest = networkThreads[0].getCurrentRequest();</span>
+<span class="nc bnc" id="L1399" title="All 4 branches missed.">                    if (currentRequest != null &amp;&amp; currentRequest.getPriority() &lt; ConnectionRequest.PRIORITY_CRITICAL) {</span>
+<span class="nc bnc" id="L1400" title="All 2 branches missed.">                        if (currentRequest.isPausable()) {</span>
+<span class="nc" id="L1401">                            currentRequest.pause();</span>
+<span class="nc" id="L1402">                            pending.insertElementAt(currentRequest, 1);</span>
+                        } else {
+<span class="nc" id="L1404">                            currentRequest.kill();</span>
+                        }
+                    }
+                    break;
+                case ConnectionRequest.PRIORITY_HIGH:
+                case ConnectionRequest.PRIORITY_NORMAL:
+                case ConnectionRequest.PRIORITY_LOW:
+                case ConnectionRequest.PRIORITY_REDUNDANT:
+<span class="fc" id="L1412">                    addSortedToQueue(request, i);</span>
+<span class="fc" id="L1413">                    break;</span>
+                default:
+<span class="nc" id="L1415">                    addSortedToQueue(request, i);</span>
+                    break;
+            }
+<span class="fc" id="L1418">            LOCK.notifyAll();</span>
+<span class="fc" id="L1419">        }</span>
+<span class="fc" id="L1420">    }</span>
+
+    /// Returns the timeout duration
+    ///
+    /// #### Returns
+    ///
+    /// timeout in milliseconds
+    public int getTimeout() {
+<span class="nc" id="L1428">        return timeout;</span>
+    }
+
+    /// Sets the timeout in milliseconds for network connections, a timeout may be &quot;faked&quot;
+    /// for platforms that don't support the notion of a timeout
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: the timeout duration
+    public void setTimeout(int t) {
+<span class="fc bfc" id="L1438" title="All 2 branches covered.">        if (Util.getImplementation().isTimeoutSupported()) {</span>
+<span class="fc" id="L1439">            Util.getImplementation().setTimeout(t);</span>
+        } else {
+<span class="fc" id="L1441">            timeout = t;</span>
+        }
+<span class="fc" id="L1443">    }</span>
+
+    /// Adds a generic listener to a network error that is invoked before the exception is propagated.
+    /// Note that this handles also server error codes by default! You can change this default behavior setting to false
+    /// ConnectionRequest.setHandleErrorCodesInGlobalErrorHandler(boolean).
+    /// Consume the event in order to prevent it from propagating further.
+    ///
+    /// #### Parameters
+    ///
+    /// - `e`: callback will be invoked with the Exception as the source object
+    public void addErrorListener(ActionListener&lt;NetworkEvent&gt; e) {
+<span class="fc bfc" id="L1454" title="All 2 branches covered.">        if (errorListeners == null) {</span>
+<span class="fc" id="L1455">            errorListeners = new EventDispatcher();</span>
+<span class="fc" id="L1456">            errorListeners.setBlocking(true);</span>
+        }
+<span class="fc" id="L1458">        errorListeners.addListener(e);</span>
+<span class="fc" id="L1459">    }</span>
+
+    /// Removes the given error listener
+    ///
+    /// #### Parameters
+    ///
+    /// - `e`: callback to remove
+    public void removeErrorListener(ActionListener&lt;NetworkEvent&gt; e) {
+<span class="pc bpc" id="L1467" title="1 of 2 branches missed.">        if (errorListeners == null) {</span>
+<span class="nc" id="L1468">            return;</span>
+        }
+
+<span class="fc" id="L1471">        errorListeners.removeListener(e);</span>
+<span class="fc" id="L1472">    }</span>
+
+    /// Adds a listener to be notified when progress updates
+    ///
+    /// #### Parameters
+    ///
+    /// - `al`: action listener
+    public void addProgressListener(ActionListener&lt;NetworkEvent&gt; al) {
+<span class="fc bfc" id="L1480" title="All 2 branches covered.">        if (progressListeners == null) {</span>
+<span class="fc" id="L1481">            progressListeners = new EventDispatcher();</span>
+<span class="fc" id="L1482">            progressListeners.setBlocking(false);</span>
+        }
+<span class="fc" id="L1484">        progressListeners.addListener(al);</span>
+<span class="fc" id="L1485">    }</span>
+
+    /// Adds a listener to be notified when progress updates
+    ///
+    /// #### Parameters
+    ///
+    /// - `al`: action listener
+    public void removeProgressListener(ActionListener&lt;NetworkEvent&gt; al) {
+<span class="pc bpc" id="L1493" title="1 of 2 branches missed.">        if (progressListeners == null) {</span>
+<span class="nc" id="L1494">            return;</span>
+        }
+<span class="fc" id="L1496">        progressListeners.removeListener(al);</span>
+<span class="fc" id="L1497">        Collection v = progressListeners.getListenerCollection();</span>
+<span class="pc bpc" id="L1498" title="1 of 4 branches missed.">        if (v == null || v.isEmpty()) {</span>
+<span class="fc" id="L1499">            progressListeners = null;</span>
+        }
+<span class="fc" id="L1501">    }</span>
+
+    /// Makes sure the given class (subclass of ConnectionRequest) is always assigned
+    /// to the given thread number. This is useful for a case of an application that wants
+    /// all background downloads to occur on one thread so it doesn't tie up the main
+    /// network thread (but doesn't stop like a low priority request would).
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestType`: the class of the specific connection request
+    ///
+    /// - `offset`: the offset of the thread starting from 0 and smaller than thread count
+    public void assignToThread(Class requestType, int offset) {
+<span class="fc" id="L1514">        threadAssignements.put(requestType.getName(), Integer.valueOf(offset));</span>
+<span class="fc" id="L1515">    }</span>
+
+    /// This method returns all pending ConnectioRequest connections.
+    ///
+    /// #### Returns
+    ///
+    /// the queue elements
+    public Enumeration enumurateQueue() {
+<span class="fc" id="L1523">        Vector elements = new Vector();</span>
+<span class="fc" id="L1524">        synchronized (LOCK) {</span>
+<span class="fc" id="L1525">            Enumeration e = pending.elements();</span>
+<span class="fc bfc" id="L1526" title="All 2 branches covered.">            while (e.hasMoreElements()) {</span>
+<span class="fc" id="L1527">                elements.addElement(e.nextElement());</span>
+            }
+<span class="fc" id="L1529">        }</span>
+<span class="fc" id="L1530">        return elements.elements();</span>
+    }
+
+    /// Indicates that the network queue is idle
+    ///
+    /// #### Returns
+    ///
+    /// true if no network activity is in progress or pending
+    public boolean isQueueIdle() {
+<span class="pc bpc" id="L1539" title="2 of 6 branches missed.">        return pending == null ||</span>
+                networkThreads == null ||
+                networkThreads[0] == null ||
+<span class="fc bfc" id="L1542" title="All 4 branches covered.">                (pending.isEmpty() &amp;&amp; networkThreads[0].getCurrentRequest() == null);</span>
+    }
+
+    /// Indicates whether looking up an access point is supported by this device
+    ///
+    /// #### Returns
+    ///
+    /// true if access point lookup is supported
+    public boolean isAPSupported() {
+<span class="fc" id="L1551">        return Util.getImplementation().isAPSupported();</span>
+    }
+
+    /// Returns the ids of the access points available if supported
+    ///
+    /// #### Returns
+    ///
+    /// ids of access points
+    public String[] getAPIds() {
+<span class="fc" id="L1560">        return Util.getImplementation().getAPIds();</span>
+    }
+
+    /// Returns the type of the access point
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: access point id
+    ///
+    /// #### Returns
+    ///
+    /// one of the supported access point types from network manager
+    public int getAPType(String id) {
+<span class="fc" id="L1573">        return Util.getImplementation().getAPType(id);</span>
+    }
+
+    /// Returns the user displayable name for the given access point
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the id of the access point
+    ///
+    /// #### Returns
+    ///
+    /// the name of the access point
+    public String getAPName(String id) {
+<span class="fc" id="L1586">        return Util.getImplementation().getAPName(id);</span>
+    }
+
+    /// Returns the id of the current access point
+    ///
+    /// #### Returns
+    ///
+    /// id of the current access point
+    public String getCurrentAccessPoint() {
+<span class="nc" id="L1595">        return Util.getImplementation().getCurrentAccessPoint();</span>
+    }
+
+    /// Returns the id of the current access point
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: id of the current access point
+    public void setCurrentAccessPoint(String id) {
+<span class="fc" id="L1604">        Util.getImplementation().setCurrentAccessPoint(id);</span>
+<span class="fc" id="L1605">    }</span>
+
+    /// Indicates whether the current platform supports best-effort VPN detection.
+    ///
+    /// #### Returns
+    ///
+    /// `true` if `#isVPNActive()` is implemented on this platform.
+    public boolean isVPNDetectionSupported() {
+<span class="fc" id="L1613">        return Util.getImplementation().isVPNDetectionSupported();</span>
+    }
+
+    /// Best-effort check for whether a VPN appears to be active.
+    ///
+    /// This value should be treated as advisory only. Platform APIs and
+    /// interface-name heuristics can miss some VPN configurations and may also
+    /// report non-VPN tunnels as VPNs.
+    ///
+    /// #### Returns
+    ///
+    /// `true` if a VPN appears to be active on the current connection.
+    public boolean isVPNActive() {
+<span class="fc" id="L1626">        return Util.getImplementation().isVPNActive();</span>
+    }
+
+    /// Returns the device's currently active network type, one of the
+    /// `NETWORK_TYPE_*` constants. Returns `NETWORK_TYPE_NONE` when there is
+    /// no connectivity. Distinct from `getAPType` which describes a configured
+    /// access point rather than the active data path.
+    public int getCurrentNetworkType() {
+<span class="fc" id="L1634">        return Display.getInstance()</span>
+<span class="fc" id="L1635">                .getNetworkTypePlatform().getCurrentNetworkType();</span>
+    }
+
+    /// Fast best-effort connectivity check. Returns `false` only when the
+    /// platform reports `NETWORK_TYPE_NONE`; all other states (WiFi,
+    /// cellular, ethernet, VPN-only, or &quot;other&quot;) return `true`. Avoids the
+    /// HTTP probe that `getInstance().assignToThread(...)` performs against
+    /// `autoDetectURL` so the check is suitable to call from the EDT.
+    ///
+    /// Apps that need a stronger &quot;can I reach my server&quot; guarantee should
+    /// still fire a real `ConnectionRequest`; this method only reports
+    /// whether the device has *any* usable network interface up.
+    public boolean isConnected() {
+<span class="nc bnc" id="L1648" title="All 2 branches missed.">        return getCurrentNetworkType() != NETWORK_TYPE_NONE;</span>
+    }
+
+    /// Issues a blocking HTTP HEAD request to `url` and returns whether the
+    /// server responded within `timeoutMillis`. Any response - including 4xx
+    /// or 5xx - is treated as a successful ping (the network round-trip
+    /// completed). Only socket errors, DNS failures, and timeouts return
+    /// false.
+    ///
+    /// Use this for reachability probes against a known endpoint when
+    /// [#isConnected] (a fast device-side network-type check) isn't strong
+    /// enough. Must not be invoked from the EDT.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the URL to probe; typically a small static endpoint
+    ///
+    /// - `timeoutMillis`: maximum time to wait for the request to complete; pass
+    /// 0 to use the connection's default timeout
+    ///
+    /// #### Returns
+    ///
+    /// true if the server responded, false on timeout, DNS, or socket error
+    public boolean ping(String url, int timeoutMillis) {
+<span class="fc bfc" id="L1672" title="All 2 branches covered.">        if (url == null) {</span>
+<span class="fc" id="L1673">            throw new IllegalArgumentException(&quot;url is null&quot;);</span>
+        }
+<span class="fc" id="L1675">        ConnectionRequest cr = new ConnectionRequest();</span>
+<span class="fc" id="L1676">        cr.setUrl(url);</span>
+<span class="fc" id="L1677">        cr.setPost(false);</span>
+<span class="fc" id="L1678">        cr.setHttpMethod(&quot;HEAD&quot;);</span>
+<span class="fc" id="L1679">        cr.setFailSilently(true);</span>
+<span class="fc" id="L1680">        cr.setReadResponseForErrors(false);</span>
+<span class="pc bpc" id="L1681" title="1 of 2 branches missed.">        if (timeoutMillis &gt; 0) {</span>
+<span class="fc" id="L1682">            cr.setTimeout(timeoutMillis);</span>
+<span class="fc" id="L1683">            cr.setReadTimeout(timeoutMillis);</span>
+        }
+<span class="fc" id="L1685">        addToQueueAndWait(cr);</span>
+<span class="pc bpc" id="L1686" title="1 of 2 branches missed.">        return cr.getResponseCode() &gt; 0;</span>
+    }
+
+    /// Registers `l` to be notified when the device's active network type
+    /// changes (WiFi &lt;-&gt; Cellular &lt;-&gt; None &lt;-&gt; ...). The listener is invoked
+    /// on the EDT. Safe to call multiple times with the same listener; only
+    /// the first registration takes effect.
+    ///
+    /// On platforms where network change events are unavailable the listener
+    /// is still installed but never fires; `getCurrentNetworkType()` should
+    /// be polled instead.
+    public void addNetworkTypeListener(NetworkTypeListener l) {
+<span class="nc" id="L1698">        synchronized (LOCK) {</span>
+<span class="nc bnc" id="L1699" title="All 2 branches missed.">            if (networkTypeListeners == null) {</span>
+<span class="nc" id="L1700">                networkTypeListeners = new EventDispatcher();</span>
+<span class="nc" id="L1701">                networkTypeListeners.setBlocking(false);</span>
+<span class="nc" id="L1702">                Display.getInstance()</span>
+<span class="nc" id="L1703">                        .getNetworkTypePlatform().install(this);</span>
+<span class="nc" id="L1704">                lastNetworkType = getCurrentNetworkType();</span>
+<span class="nc" id="L1705">                lastVpnActive = isVPNActive();</span>
+            }
+<span class="nc bnc" id="L1707" title="All 2 branches missed.">            if (!containsListener(networkTypeListeners, l)) {</span>
+<span class="nc" id="L1708">                networkTypeListeners.addListener(l);</span>
+            }
+<span class="nc" id="L1710">        }</span>
+<span class="nc" id="L1711">    }</span>
+
+    /// Removes a listener previously registered with
+    /// `addNetworkTypeListener(NetworkTypeListener)`. If the last listener is
+    /// removed the platform watcher is torn down too.
+    public void removeNetworkTypeListener(NetworkTypeListener l) {
+<span class="nc" id="L1717">        synchronized (LOCK) {</span>
+<span class="nc bnc" id="L1718" title="All 2 branches missed.">            if (networkTypeListeners == null) {</span>
+<span class="nc" id="L1719">                return;</span>
+            }
+<span class="nc" id="L1721">            networkTypeListeners.removeListener(l);</span>
+<span class="nc" id="L1722">            Collection v = networkTypeListeners.getListenerCollection();</span>
+<span class="nc bnc" id="L1723" title="All 4 branches missed.">            if (v == null || v.isEmpty()) {</span>
+<span class="nc" id="L1724">                Display.getInstance()</span>
+<span class="nc" id="L1725">                        .getNetworkTypePlatform().uninstall(this);</span>
+<span class="nc" id="L1726">                networkTypeListeners = null;</span>
+            }
+<span class="nc" id="L1728">        }</span>
+<span class="nc" id="L1729">    }</span>
+
+    private boolean containsListener(EventDispatcher d, Object l) {
+<span class="nc" id="L1732">        Collection v = d.getListenerCollection();</span>
+<span class="nc bnc" id="L1733" title="All 4 branches missed.">        return v != null &amp;&amp; v.contains(l);</span>
+    }
+
+    /// Internal: invoked by platform implementations to deliver a network
+    /// type change event. Public so platform code in other packages can call
+    /// it; not intended for application use.
+    public void fireNetworkTypeChange(int newType, boolean vpnActive) {
+        EventDispatcher d;
+        int oldType;
+        boolean fire;
+<span class="nc" id="L1743">        synchronized (LOCK) {</span>
+<span class="nc" id="L1744">            d = networkTypeListeners;</span>
+<span class="nc" id="L1745">            oldType = lastNetworkType;</span>
+<span class="nc bnc" id="L1746" title="All 6 branches missed.">            fire = d != null &amp;&amp; (oldType != newType || lastVpnActive != vpnActive);</span>
+<span class="nc" id="L1747">            lastNetworkType = newType;</span>
+<span class="nc" id="L1748">            lastVpnActive = vpnActive;</span>
+<span class="nc" id="L1749">        }</span>
+<span class="nc bnc" id="L1750" title="All 2 branches missed.">        if (fire) {</span>
+<span class="nc" id="L1751">            Collection listeners = d.getListenerCollection();</span>
+<span class="nc bnc" id="L1752" title="All 2 branches missed.">            if (listeners == null) {</span>
+<span class="nc" id="L1753">                return;</span>
+            }
+<span class="nc" id="L1755">            Object[] arr = listeners.toArray();</span>
+<span class="nc bnc" id="L1756" title="All 2 branches missed.">            for (Object o : arr) {</span>
+<span class="nc bnc" id="L1757" title="All 2 branches missed.">                if (o instanceof NetworkTypeListener) {</span>
+<span class="nc" id="L1758">                    ((NetworkTypeListener) o)</span>
+<span class="nc" id="L1759">                            .onNetworkTypeChanged(oldType, newType, vpnActive);</span>
+                }
+            }
+        }
+<span class="nc" id="L1763">    }</span>
+
+    class NetworkThread implements Runnable {
+<span class="fc" id="L1766">        boolean stopped = false;</span>
+        private ConnectionRequest currentRequest;
+        private Thread threadInstance;
+
+<span class="fc" id="L1770">        public NetworkThread() {</span>
+<span class="fc" id="L1771">        }</span>
+
+        public ConnectionRequest getCurrentRequest() {
+<span class="fc" id="L1774">            return currentRequest;</span>
+        }
+
+        public void join() {
+            try {
+<span class="fc" id="L1779">                Thread t = threadInstance;</span>
+<span class="pc bpc" id="L1780" title="1 of 2 branches missed.">                if (t != null) {</span>
+<span class="fc" id="L1781">                    t.join();</span>
+                }
+<span class="nc" id="L1783">            } catch (InterruptedException ex) {</span>
+<span class="nc" id="L1784">                ex.printStackTrace();</span>
+<span class="fc" id="L1785">            }</span>
+<span class="fc" id="L1786">        }</span>
+
+        public void start() {
+<span class="fc" id="L1789">            Util.getImplementation().startThread(&quot;Network Thread&quot;, this);</span>
+<span class="fc" id="L1790">        }</span>
+
+        public void interrupt() {
+<span class="pc bpc" id="L1793" title="1 of 2 branches missed.">            if (threadInstance != null) {</span>
+<span class="fc" id="L1794">                threadInstance.interrupt();</span>
+            }
+<span class="fc" id="L1796">        }</span>
+
+        public Thread getThreadInstance() {
+<span class="nc" id="L1799">            return threadInstance;</span>
+        }
+
+        private boolean runCurrentRequest(@Async.Execute ConnectionRequest req) {
+<span class="pc bpc" id="L1803" title="1 of 2 branches missed.">            if (!threadAssignements.isEmpty()) {</span>
+<span class="nc" id="L1804">                String n = req.getClass().getName();</span>
+<span class="nc" id="L1805">                Integer threadOffset = (Integer) threadAssignements.get(n);</span>
+<span class="nc" id="L1806">                NetworkThread[] networkThreads = NetworkManager.this.networkThreads;</span>
+<span class="nc bnc" id="L1807" title="All 2 branches missed.">                if (networkThreads == null) {</span>
+<span class="nc" id="L1808">                    return false;</span>
+                }
+<span class="nc bnc" id="L1810" title="All 4 branches missed.">                if (threadOffset != null &amp;&amp; networkThreads[threadOffset.intValue()] != this) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L1811">                    synchronized (LOCK) {</span>
+<span class="nc bnc" id="L1812" title="All 2 branches missed.">                        if (!pending.isEmpty()) {</span>
+<span class="nc" id="L1813">                            pending.insertElementAt(req, 1);</span>
+<span class="nc" id="L1814">                            return false;</span>
+                        }
+<span class="nc" id="L1816">                        pending.addElement(req);</span>
+<span class="nc" id="L1817">                        LOCK.notifyAll();</span>
+<span class="nc" id="L1818">                        long end = System.currentTimeMillis() + 30;</span>
+                        while (true) {
+<span class="nc" id="L1820">                            long remaining = end - System.currentTimeMillis();</span>
+<span class="nc bnc" id="L1821" title="All 2 branches missed.">                            if (remaining &lt;= 0) {</span>
+<span class="nc" id="L1822">                                break;</span>
+                            }
+                            try {
+<span class="nc" id="L1825">                                LOCK.wait(remaining);</span>
+<span class="nc" id="L1826">                                break;</span>
+<span class="nc" id="L1827">                            } catch (InterruptedException ex) {</span>
+<span class="nc" id="L1828">                                ex.printStackTrace();</span>
+                            }
+<span class="nc" id="L1830">                        }</span>
+<span class="nc" id="L1831">                    }</span>
+                }
+            }
+
+<span class="fc" id="L1835">            int frameRate = -1;</span>
+<span class="fc" id="L1836">            boolean requestWasCompleted = true;</span>
+            // What failed the attempt, for the tracer. Both catches below handle the
+            // failure and do not rethrow, so the finally is the one place that sees
+            // every ending.
+<span class="fc" id="L1840">            Throwable failure = null;</span>
+            // How many times the request had been re-queued when this attempt
+            // began; compared in the finally to learn whether it was the last.
+<span class="fc" id="L1843">            int requeuesBefore = req.tracerRequeues;</span>
+            // Default this to true because if, for some reason an exception is thrown
+            // before calling performOperationComplete(), then the request
+            // won't be retried.
+            try {
+                // for higher priority tasks increase the thread priority, for lower
+                // prioirty tasks decrease it. In critical priority reduce the Codename One
+                // rendering thread speed for even faster download
+<span class="pc bpc" id="L1851" title="3 of 6 branches missed.">                switch (req.getPriority()) {</span>
+                    case ConnectionRequest.PRIORITY_CRITICAL:
+<span class="nc" id="L1853">                        frameRate = Display.getInstance().getFrameRate();</span>
+<span class="nc" id="L1854">                        Display.getInstance().setFramerate(4);</span>
+<span class="nc" id="L1855">                        Thread.currentThread().setPriority(Thread.MAX_PRIORITY - 1);</span>
+<span class="nc" id="L1856">                        break;</span>
+                    case ConnectionRequest.PRIORITY_HIGH:
+<span class="fc" id="L1858">                        Thread.currentThread().setPriority(Thread.NORM_PRIORITY + 2);</span>
+<span class="fc" id="L1859">                        break;</span>
+                    case ConnectionRequest.PRIORITY_NORMAL:
+<span class="fc" id="L1861">                        break;</span>
+                    case ConnectionRequest.PRIORITY_LOW:
+<span class="fc" id="L1863">                        Thread.currentThread().setPriority(Thread.MIN_PRIORITY + 2);</span>
+<span class="fc" id="L1864">                        break;</span>
+                    case ConnectionRequest.PRIORITY_REDUNDANT:
+<span class="nc" id="L1866">                        Thread.currentThread().setPriority(Thread.MIN_PRIORITY);</span>
+<span class="nc" id="L1867">                        break;</span>
+                    default:
+                        break;
+                }
+
+                // progressListeners might be made null by a separate thread
+<span class="fc" id="L1873">                EventDispatcher initListeners = progressListeners;</span>
+<span class="fc bfc" id="L1874" title="All 2 branches covered.">                if (initListeners != null) {</span>
+<span class="fc" id="L1875">                    initListeners.fireActionEvent(new NetworkEvent(req, NetworkEvent.PROGRESS_TYPE_INITIALIZING));</span>
+                }
+<span class="pc bpc" id="L1877" title="1 of 2 branches missed.">                if (req.getShowOnInit() != null) {</span>
+<span class="nc" id="L1878">                    req.getShowOnInit().showModeless();</span>
+                }
+
+<span class="fc" id="L1881">                requestWasCompleted = req.performOperationComplete();</span>
+<span class="fc" id="L1882">            } catch (IOException e) {</span>
+<span class="fc" id="L1883">                failure = e;</span>
+                // Ended HERE, with the failure, before any handler runs: a handler
+                // that retries re-queues the request, and ending the attempt at
+                // that point has no failure to report, so the span came out with
+                // neither a response nor an error.
+<span class="fc" id="L1888">                endTracerAttempt(req, e);</span>
+<span class="pc bpc" id="L1889" title="1 of 2 branches missed.">                if (!req.isFailSilently()) {</span>
+<span class="pc bpc" id="L1890" title="1 of 2 branches missed.">                    if (!handleException(req, e)) {</span>
+<span class="fc" id="L1891">                        req.handleIOException(e);</span>
+                    }
+                } else {
+                    // for the record
+<span class="nc" id="L1895">                    Log.e(e);</span>
+                }
+<span class="fc" id="L1897">            } catch (RuntimeException er) {</span>
+<span class="fc" id="L1898">                failure = er;</span>
+<span class="fc" id="L1899">                endTracerAttempt(req, er);</span>
+<span class="fc bfc" id="L1900" title="All 2 branches covered.">                if (!req.isFailSilently()) {</span>
+<span class="pc bpc" id="L1901" title="1 of 2 branches missed.">                    if (!handleException(req, er)) {</span>
+<span class="fc" id="L1902">                        req.handleRuntimeException(er);</span>
+                    }
+                } else {
+                    // for the record
+<span class="fc" id="L1906">                    Log.e(er);</span>
+                }
+            } finally {
+<span class="fc" id="L1909">                Thread.currentThread().setPriority(Thread.NORM_PRIORITY);</span>
+<span class="pc bpc" id="L1910" title="1 of 2 branches missed.">                if (frameRate &gt; -1) {</span>
+<span class="nc" id="L1911">                    Display.getInstance().setFramerate(frameRate);</span>
+                }
+<span class="fc bfc" id="L1913" title="All 2 branches covered.">                if (requestWasCompleted) {</span>
+<span class="fc" id="L1914">                    req.complete = true;</span>
+                }
+<span class="fc" id="L1916">                endTracerAttempt(req, failure);</span>
+                // Any tracer field, the owners included: a request queued outside an
+                // action holds only tracerParentOwner, and that alone pins the whole
+                // telemetry installation.
+<span class="pc bpc" id="L1920" title="1 of 12 branches missed.">                if (req.tracerRequeues == requeuesBefore &amp;&amp; !req.authorizationPending</span>
+                        &amp;&amp; (req.tracerParent != null || req.tracerLastAttempt != null
+                        || req.tracerParentOwner != null || req.tracerLastOwner != null)) {
+                    // Nothing queued this request again YET. Its tracer state has
+                    // to go once it is done -- the parent and the last attempt are
+                    // the tracer's own objects, a span and through it the whole
+                    // installation, and a request an app keeps for reuse held them
+                    // for as long as it lived. But not from here: an exception or
+                    // response-code listener runs LATER, on the EDT, and may still
+                    // call retry(), which needs the last attempt to continue its
+                    // trace. So the clear is queued on the EDT behind those
+                    // listener callbacks, and skipped if one of them retried.
+<span class="fc" id="L1932">                    scheduleTracerClear(req, req.tracerRequeues);</span>
+                }
+<span class="fc" id="L1934">                NetworkGuard guard = getNetworkGuard();</span>
+<span class="pc bpc" id="L1935" title="3 of 4 branches missed.">                if (guard != null &amp;&amp; req.hasGuardResponse()) {</span>
+                    try {
+<span class="nc" id="L1937">                        guard.afterResponse(req, req.getResponseCode(), req.getGuardHeaders());</span>
+<span class="nc" id="L1938">                    } catch (Throwable t) {</span>
+                        // A guard's bookkeeping must never turn a completed
+                        // request into a failed one.
+<span class="nc" id="L1941">                        Log.e(t);</span>
+<span class="nc" id="L1942">                    }</span>
+                }
+                // Read once into a local. A listener removed from the EDT --
+                // which is where postResponse() runs, queued while this thread
+                // was still finishing the request -- can null the field between
+                // the check and the dispatch, and the NullPointerException that
+                // followed would escape NetworkThread.run() and kill the only
+                // network worker. Same reasoning as fireProgressEvent.
+<span class="fc" id="L1950">                EventDispatcher completionListeners = progressListeners;</span>
+<span class="fc bfc" id="L1951" title="All 2 branches covered.">                if (completionListeners != null) {</span>
+<span class="fc" id="L1952">                    completionListeners.fireActionEvent(new NetworkEvent(req, NetworkEvent.PROGRESS_TYPE_COMPLETED));</span>
+                }
+                // Read once: a renewal that answers at once clears it again below.
+<span class="fc" id="L1955">                boolean heldForAuthorizer = req.authorizationPending;</span>
+<span class="fc bfc" id="L1956" title="All 2 branches covered.">                if (heldForAuthorizer) {</span>
+                    // A 401 is being held for the request's authorizer. Queued here, behind
+                    // the completion event just fired, and not from the request itself: the
+                    // renewal may finish at once and queue the request again, and whoever
+                    // waits must have read this attempt's completion as &quot;retrying&quot; before
+                    // the next attempt can end.
+<span class="fc" id="L1962">                    final ConnectionRequest held = req;</span>
+<span class="pc bpc" id="L1963" title="1 of 2 branches missed.">                    if (Display.isInitialized()) {</span>
+<span class="fc" id="L1964">                        Display.getInstance().callSerially(new Runnable() {</span>
+                            @Override
+                            public void run() {
+<span class="fc" id="L1967">                                held.renewAuthorization();</span>
+<span class="fc" id="L1968">                            }</span>
+                        });
+                    } else {
+<span class="nc" id="L1971">                        held.renewAuthorization();</span>
+                    }
+                }
+<span class="pc bpc" id="L1974" title="5 of 6 branches missed.">                if (req.getDisposeOnCompletion() != null &amp;&amp; !req.isRedirecting()</span>
+                        &amp;&amp; !heldForAuthorizer) {
+                    // there may be a race condition where the dialog hasn't yet appeared but the
+                    // network request completed
+<span class="nc" id="L1978">                    final ConnectionRequest finalReq = req;</span>
+<span class="nc" id="L1979">                    Display.getInstance().callSerially(new Runnable() {</span>
+                        @Override
+                        public void run() {
+<span class="nc" id="L1982">                            Dialog dlg = finalReq.getDisposeOnCompletion();</span>
+<span class="nc bnc" id="L1983" title="All 2 branches missed.">                            if (dlg != null) {</span>
+<span class="nc" id="L1984">                                dlg.dispose();</span>
+                            }
+<span class="nc" id="L1986">                        }</span>
+                    });
+                }
+            }
+<span class="fc" id="L1990">            return true;</span>
+        }
+
+        @Override
+        public void run() {
+<span class="fc" id="L1995">            threadInstance = Thread.currentThread();</span>
+<span class="fc bfc" id="L1996" title="All 4 branches covered.">            while (running &amp;&amp; !stopped) {</span>
+<span class="fc bfc" id="L1997" title="All 2 branches covered.">                if (!pending.isEmpty()) {</span>
+                    // the synchronization here isn't essential, only for good measure
+<span class="fc" id="L1999">                    synchronized (LOCK) {</span>
+                        //double lock to prevent a potential exception
+<span class="fc bfc" id="L2001" title="All 2 branches covered.">                        if (pending.isEmpty()) {</span>
+<span class="fc" id="L2002">                            continue;</span>
+                        }
+<span class="fc" id="L2004">                        currentRequest = (ConnectionRequest) pending.elementAt(0);</span>
+<span class="fc" id="L2005">                        pending.removeElementAt(0);</span>
+<span class="fc" id="L2006">                        currentRequest.prepare();</span>
+<span class="fc bfc" id="L2007" title="All 2 branches covered.">                        if (currentRequest.isKilled()) {</span>
+                            // Killed while it waited: runCurrentRequest, whose
+                            // finally forgets the tracer state addToQueue
+                            // captured, never runs -- so forget it here, or a
+                            // request the app keeps holds the parent span and
+                            // through it the whole telemetry installation. And
+                            // let go of the request itself: the worker would
+                            // otherwise hold it as currentRequest until the
+                            // next one arrives.
+<span class="fc" id="L2016">                            scheduleTracerClear(currentRequest, currentRequest.tracerRequeues);</span>
+<span class="fc" id="L2017">                            currentRequest = null;</span>
+<span class="fc" id="L2018">                            LOCK.notifyAll();</span>
+<span class="fc" id="L2019">                            continue;</span>
+                        }
+<span class="fc" id="L2021">                        currentRequest.setId(nextConnectionId++);</span>
+<span class="pc bpc" id="L2022" title="1 of 2 branches missed.">                        if (nextConnectionId &gt; 2000000000) {</span>
+<span class="nc" id="L2023">                            nextConnectionId = 1;</span>
+                        }
+<span class="fc" id="L2025">                    }</span>
+<span class="fc bfc" id="L2026" title="All 4 branches covered.">                    if (userHeaders != null &amp;&amp; currentRequest.shouldApplyDefaultHeaders()) {</span>
+<span class="fc" id="L2027">                        Enumeration e = userHeaders.keys();</span>
+<span class="fc bfc" id="L2028" title="All 2 branches covered.">                        while (e.hasMoreElements()) {</span>
+<span class="fc" id="L2029">                            String key = (String) e.nextElement();</span>
+<span class="fc" id="L2030">                            String value = (String) userHeaders.get(key);</span>
+<span class="fc" id="L2031">                            currentRequest.addRequestHeaderDontRepleace(key, value);</span>
+<span class="fc" id="L2032">                        }</span>
+                    }
+<span class="pc bpc" id="L2034" title="1 of 2 branches missed.">                    if (!runCurrentRequest(currentRequest)) {</span>
+<span class="nc" id="L2035">                        continue;</span>
+                    }
+
+                    // wakeup threads waiting for the completion of this network operation
+<span class="fc" id="L2039">                    synchronized (LOCK) {</span>
+<span class="fc" id="L2040">                        currentRequest = null;</span>
+<span class="fc" id="L2041">                        LOCK.notifyAll();</span>
+<span class="fc" id="L2042">                    }</span>
+                } else {
+<span class="fc" id="L2044">                    synchronized (LOCK) {</span>
+                        try {
+                            // prevent waiting when there is still a pending request
+                            // this can occur with a race condition since the synchronize
+                            // scope is limited to prevent blocking on add...
+<span class="fc bfc" id="L2049" title="All 6 branches covered.">                            while (pending.isEmpty() &amp;&amp; running &amp;&amp; !stopped) {</span>
+<span class="fc" id="L2050">                                LOCK.wait();</span>
+                            }
+<span class="nc" id="L2052">                        } catch (InterruptedException ex) {</span>
+<span class="nc" id="L2053">                            ex.printStackTrace();</span>
+<span class="fc" id="L2054">                        }</span>
+<span class="fc" id="L2055">                    }</span>
+                }
+            }
+<span class="fc" id="L2058">        }</span>
+    }
+
+<span class="fc" id="L2061">    class AutoDetectAPN extends ConnectionRequest {</span>
+<span class="fc" id="L2062">        private Vector aps = null;</span>
+        private int currentAP;
+
+        @Override
+        protected void handleErrorResponseCode(int code, String message) {
+<span class="fc" id="L2067">            retryWithDifferentAPN();</span>
+<span class="fc" id="L2068">        }</span>
+
+        @Override
+        protected void handleException(Exception err) {
+<span class="fc" id="L2072">            retryWithDifferentAPN();</span>
+<span class="fc" id="L2073">        }</span>
+
+        @Override
+        protected void readResponse(InputStream input) throws IOException {
+<span class="fc" id="L2077">            String s = Util.readToString(input);</span>
+<span class="fc bfc" id="L2078" title="All 2 branches covered.">            if (!&quot;hi&quot;.equals(s)) {</span>
+<span class="fc" id="L2079">                retryWithDifferentAPN();</span>
+            }
+<span class="fc" id="L2081">        }</span>
+
+        private String nextAP() {
+<span class="fc bfc" id="L2084" title="All 2 branches covered.">            if (aps == null) {</span>
+<span class="fc" id="L2085">                aps = new Vector();</span>
+<span class="fc" id="L2086">                String[] ids = getAPIds();</span>
+<span class="fc" id="L2087">                int idlen = ids.length;</span>
+<span class="pc bpc" id="L2088" title="1 of 2 branches missed.">                for (int iter = 0; iter &lt; idlen; iter++) {</span>
+<span class="nc" id="L2089">                    int t = getAPType(ids[iter]);</span>
+<span class="nc bnc" id="L2090" title="All 2 branches missed.">                    if (t == ACCESS_POINT_TYPE_WLAN) {</span>
+<span class="nc" id="L2091">                        aps.insertElementAt(ids[iter], 0);</span>
+                    } else {
+<span class="nc bnc" id="L2093" title="All 4 branches missed.">                        if (t == ACCESS_POINT_TYPE_CORPORATE || t == ACCESS_POINT_TYPE_NETWORK3G) {</span>
+<span class="nc" id="L2094">                            aps.addElement(ids[iter]);</span>
+                        }
+                    }
+                }
+
+                // add all the 2G networks at the end
+<span class="pc bpc" id="L2100" title="1 of 2 branches missed.">                for (int iter = 0; iter &lt; idlen; iter++) {</span>
+<span class="nc" id="L2101">                    int t = getAPType(ids[iter]);</span>
+<span class="nc bnc" id="L2102" title="All 2 branches missed.">                    if (t == ACCESS_POINT_TYPE_NETWORK2G) {</span>
+<span class="nc" id="L2103">                        aps.addElement(ids[iter]);</span>
+                    }
+                }
+            }
+<span class="pc bpc" id="L2107" title="1 of 2 branches missed.">            if (currentAP &gt;= aps.size()) {</span>
+<span class="fc" id="L2108">                return null;</span>
+            }
+<span class="nc" id="L2110">            String s = (String) aps.elementAt(currentAP);</span>
+<span class="nc" id="L2111">            currentAP++;</span>
+<span class="nc" id="L2112">            return s;</span>
+        }
+
+        private void retryWithDifferentAPN() {
+<span class="fc" id="L2116">            String n = nextAP();</span>
+<span class="pc bpc" id="L2117" title="1 of 2 branches missed.">            if (n == null) {</span>
+<span class="fc" id="L2118">                return;</span>
+            }
+<span class="nc" id="L2120">            setCurrentAccessPoint(n);</span>
+<span class="nc" id="L2121">            AutoDetectAPN r = new AutoDetectAPN();</span>
+<span class="nc" id="L2122">            r.setPost(false);</span>
+<span class="nc" id="L2123">            r.currentAP = currentAP;</span>
+<span class="nc" id="L2124">            r.aps = aps;</span>
+<span class="nc" id="L2125">            r.setUrl(autoDetectURL);</span>
+<span class="nc" id="L2126">            r.setPriority(ConnectionRequest.PRIORITY_CRITICAL);</span>
+<span class="nc" id="L2127">            addToQueue(r);</span>
+<span class="nc" id="L2128">        }</span>
+
+        @Override
+        public boolean equals(Object o) {
+<span class="nc bnc" id="L2132" title="All 2 branches missed.">            return this == o;</span>
+        }
+
+        @Override
+        public int hashCode() {
+<span class="nc" id="L2137">            int result = super.hashCode();</span>
+<span class="nc bnc" id="L2138" title="All 2 branches missed.">            result = 31 * result + (aps != null ? aps.hashCode() : 0);</span>
+<span class="nc" id="L2139">            result = 31 * result + currentAP;</span>
+<span class="nc" id="L2140">            return result;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

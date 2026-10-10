@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Tensor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai.inference</a> &gt; <span class="el_source">Tensor.java</span></div><h1>Tensor.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai.inference;
+
+/// Immutable named tensor passed to or returned from an inference session.
+/// The primitive data array and shape are copied on construction and by their
+/// public getters, so callers can safely reuse or mutate their source arrays.
+public final class Tensor {
+    private final String name;
+    private final TensorType type;
+    private final int[] shape;
+    private final Object data;
+
+    /// Creates a tensor and validates that its type, shape, and primitive array
+    /// agree. Dynamic dimensions may be negative and skip the element-count
+    /// check; fixed shapes are overflow-checked.
+    ///
+    /// @param name model tensor name, or {@code null} for positional matching
+    /// @param type element type
+    /// @param shape tensor dimensions; an empty shape represents a scalar
+    /// @param data matching primitive array
+<span class="fc" id="L42">    public Tensor(String name, TensorType type, int[] shape, Object data) {</span>
+<span class="pc bpc" id="L43" title="2 of 4 branches missed.">        if (type == null || data == null) {</span>
+<span class="nc" id="L44">            throw new NullPointerException(&quot;type and data are required&quot;);</span>
+        }
+<span class="fc" id="L46">        validateData(type, data);</span>
+<span class="fc" id="L47">        int count = elementCount(shape);</span>
+<span class="pc bpc" id="L48" title="1 of 4 branches missed.">        if (count &gt;= 0 &amp;&amp; count != dataLength(data)) {</span>
+<span class="fc" id="L49">            throw new IllegalArgumentException(&quot;Tensor shape does not match data length&quot;);</span>
+        }
+<span class="fc" id="L51">        this.name = name;</span>
+<span class="fc" id="L52">        this.type = type;</span>
+<span class="fc" id="L53">        this.shape = copy(shape);</span>
+<span class="fc" id="L54">        this.data = copyData(data);</span>
+<span class="fc" id="L55">    }</span>
+
+    /// @return a FLOAT32 tensor with defensively copied data
+    public static Tensor floats(String name, int[] shape, float[] data) {
+<span class="fc" id="L59">        return new Tensor(name, TensorType.FLOAT32, shape, data);</span>
+    }
+
+    /// @return an INT32 tensor with defensively copied data
+    public static Tensor ints(String name, int[] shape, int[] data) {
+<span class="nc" id="L64">        return new Tensor(name, TensorType.INT32, shape, data);</span>
+    }
+
+    /// Creates a byte-array tensor for UINT8, INT8, or BOOL data.
+    /// @return a tensor with defensively copied data
+    public static Tensor bytes(String name, TensorType type, int[] shape, byte[] data) {
+<span class="nc" id="L70">        return new Tensor(name, type, shape, data);</span>
+    }
+
+    /// @return the model tensor name, or {@code null} for an unnamed tensor
+    public String getName() {
+<span class="fc" id="L75">        return name;</span>
+    }
+
+    /// @return the element type
+    public TensorType getType() {
+<span class="nc" id="L80">        return type;</span>
+    }
+
+    /// @return a defensive copy of tensor dimensions
+    public int[] getShape() {
+<span class="fc" id="L85">        return copy(shape);</span>
+    }
+
+    /// @return a defensive copy of the matching primitive data array
+    public Object getData() {
+<span class="fc" id="L90">        return copyData(data);</span>
+    }
+
+    /// Returns the tensor's immutable backing primitive array to a port
+    /// implementation, avoiding an additional full-tensor copy at the native
+    /// boundary. Application code must use {@link #getData()}.
+    ///
+    /// @return the backing {@code float[]}, {@code int[]}, {@code long[]}, or
+    ///         {@code byte[]} matching {@link #getType()}
+    /// @hidden
+    public Object getDataUnsafe() {
+<span class="nc" id="L101">        return data;</span>
+    }
+
+    private static void validateData(TensorType type, Object data) {
+        boolean valid;
+<span class="pc bpc" id="L106" title="3 of 5 branches missed.">        switch (type) {</span>
+            case FLOAT32:
+<span class="fc" id="L108">                valid = data instanceof float[];</span>
+<span class="fc" id="L109">                break;</span>
+            case INT32:
+<span class="nc" id="L111">                valid = data instanceof int[];</span>
+<span class="nc" id="L112">                break;</span>
+            case INT64:
+<span class="nc" id="L114">                valid = data instanceof long[];</span>
+<span class="nc" id="L115">                break;</span>
+            case UINT8:
+            case INT8:
+            case BOOL:
+<span class="fc" id="L119">                valid = data instanceof byte[];</span>
+<span class="fc" id="L120">                break;</span>
+            default:
+<span class="nc" id="L122">                valid = false;</span>
+        }
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        if (!valid) {</span>
+<span class="nc" id="L125">            throw new IllegalArgumentException(&quot;Data array does not match &quot; + type);</span>
+        }
+<span class="fc" id="L127">    }</span>
+
+    private static int elementCount(int[] shape) {
+<span class="pc bpc" id="L130" title="2 of 4 branches missed.">        if (shape == null || shape.length == 0) {</span>
+<span class="nc" id="L131">            return 1;</span>
+        }
+<span class="fc" id="L133">        long out = 1;</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        for (int dimension : shape) {</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">            if (dimension &lt; 0) {</span>
+<span class="nc" id="L136">                return -1;</span>
+            }
+<span class="fc" id="L138">            out *= dimension;</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">            if (out &gt; Integer.MAX_VALUE) {</span>
+<span class="fc" id="L140">                throw new IllegalArgumentException(</span>
+                        &quot;Tensor shape contains more than 2147483647 elements&quot;);
+            }
+        }
+<span class="fc" id="L144">        return (int) out;</span>
+    }
+
+    private static int dataLength(Object value) {
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">        if (value instanceof float[]) {</span>
+<span class="fc" id="L149">            return ((float[]) value).length;</span>
+        }
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        if (value instanceof int[]) {</span>
+<span class="nc" id="L152">            return ((int[]) value).length;</span>
+        }
+<span class="nc bnc" id="L154" title="All 2 branches missed.">        if (value instanceof long[]) {</span>
+<span class="nc" id="L155">            return ((long[]) value).length;</span>
+        }
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        if (value instanceof byte[]) {</span>
+<span class="nc" id="L158">            return ((byte[]) value).length;</span>
+        }
+<span class="nc" id="L160">        throw new IllegalArgumentException(&quot;Unsupported tensor data array&quot;);</span>
+    }
+
+    private static int[] copy(int[] value) {
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L165">            return new int[0];</span>
+        }
+<span class="fc" id="L167">        int[] out = new int[value.length];</span>
+<span class="fc" id="L168">        System.arraycopy(value, 0, out, 0, value.length);</span>
+<span class="fc" id="L169">        return out;</span>
+    }
+
+    private static Object copyData(Object value) {
+<span class="fc" id="L173">        int length = dataLength(value);</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        if (value instanceof float[]) {</span>
+<span class="fc" id="L175">            float[] out = new float[length];</span>
+<span class="fc" id="L176">            System.arraycopy(value, 0, out, 0, length);</span>
+<span class="fc" id="L177">            return out;</span>
+        }
+<span class="nc bnc" id="L179" title="All 2 branches missed.">        if (value instanceof int[]) {</span>
+<span class="nc" id="L180">            int[] out = new int[length];</span>
+<span class="nc" id="L181">            System.arraycopy(value, 0, out, 0, length);</span>
+<span class="nc" id="L182">            return out;</span>
+        }
+<span class="nc bnc" id="L184" title="All 2 branches missed.">        if (value instanceof long[]) {</span>
+<span class="nc" id="L185">            long[] out = new long[length];</span>
+<span class="nc" id="L186">            System.arraycopy(value, 0, out, 0, length);</span>
+<span class="nc" id="L187">            return out;</span>
+        }
+<span class="nc bnc" id="L189" title="All 2 branches missed.">        if (value instanceof byte[]) {</span>
+<span class="nc" id="L190">            byte[] out = new byte[length];</span>
+<span class="nc" id="L191">            System.arraycopy(value, 0, out, 0, length);</span>
+<span class="nc" id="L192">            return out;</span>
+        }
+<span class="nc" id="L194">        throw new IllegalArgumentException(&quot;Unsupported tensor data array&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

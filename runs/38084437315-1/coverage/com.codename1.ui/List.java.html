@@ -1,0 +1,2561 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>List.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">List.java</span></div><h1>List.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.accessibility.AccessibilityManager;
+import com.codename1.compat.java.util.Objects;
+import com.codename1.ui.animations.Motion;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.events.SelectionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.list.DefaultListCellRenderer;
+import com.codename1.ui.list.DefaultListModel;
+import com.codename1.ui.list.ListCellRenderer;
+import com.codename1.ui.list.ListModel;
+import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.EventDispatcher;
+
+import java.util.Collection;
+import java.util.Vector;
+
+/// A set of elements that is rendered using a `com.codename1.ui.list.ListCellRenderer`
+/// and are extracted via the `com.codename1.ui.list.ListModel`, **notice** that
+/// [we strongly discourage usage of lists](https://www.codenameone.com/blog/avoiding-lists.html).
+///
+/// A list can represent many UI concepts ranging from a carousel to a &quot;todo&quot; checklist, this
+/// is made possible thanks to extensive use of Swing's style of MVC. Specifically a list
+/// component is relatively simple, it invokes the model in order to extract the displayed/selected
+/// information and shows it to the user by invoking the cell renderer.
+///
+/// The list class itself is completely decoupled from everything, thus it allows us to extract its
+/// content from any source (e.g. network, storage etc.) and display the information in any form
+/// (e.g. checkboxed elemenents, icons etc.).
+///
+/// Important
+///
+/// `List` is a pretty complex class to use so we generally recommend developers use
+/// `com.codename1.ui.Container`,
+/// `com.codename1.components.InfiniteScrollAdapter` or `com.codename1.ui.InfiniteContainer`
+/// coupled with widgets such as `com.codename1.components.MultiButton`. Arranging those in a
+/// `com.codename1.ui.layouts.BoxLayout` on the `com.codename1.ui.layouts.BoxLayout#Y_AXIS`
+/// can produce the functionality of the `List` with better performance and far simpler code!
+///
+/// Another simpler alternative although not as attractive is the `com.codename1.ui.list.MultiList` class
+/// that removes a lot of the `com.codename1.ui.list.ListCellRenderer` related complexities inherent
+/// in building a list.
+///
+/// Sample Usage
+///
+/// The sample below uses the `com.codename1.ui.list.GenericListCellRenderer` class instead of the
+/// `com.codename1.ui.list.DefaultListCellRenderer`. We generally recommend using the builtin classes
+/// as the renderer is probably the greatest source of pitfalls in `Lists`.
+///
+/// ```java
+/// public void showForm() {
+///     com.codename1.ui.List list = new com.codename1.ui.List(createGenericListCellRendererModelData());
+///     list.setRenderer(new GenericListCellRenderer(createGenericRendererContainer(), createGenericRendererContainer()));
+///     Form hi = new Form(&quot;GenericListCellRenderer&quot;, new BorderLayout());
+///     hi.add(BorderLayout.CENTER, list);
+///     hi.show();
+/// }
+///
+/// private Container createGenericRendererContainer() {
+///     Label name = new Label();
+///     name.setFocusable(true);
+///     name.setName(&quot;Name&quot;);
+///     Label surname = new Label();
+///     surname.setFocusable(true);
+///     surname.setName(&quot;Surname&quot;);
+///     CheckBox selected = new CheckBox();
+///     selected.setName(&quot;Selected&quot;);
+///     selected.setFocusable(true);
+///     Container c = BorderLayout.center(name).
+///             add(BorderLayout.SOUTH, surname).
+///             add(BorderLayout.WEST, selected);
+///     c.setUIID(&quot;ListRenderer&quot;);
+///     return c;
+/// }
+///
+/// private Object[] createGenericListCellRendererModelData() {
+///     Map[] data = new HashMap[5];
+///     data[0] = new HashMap&lt;&gt;();
+///     data[0].put(&quot;Name&quot;, &quot;Shai&quot;);
+///     data[0].put(&quot;Surname&quot;, &quot;Almog&quot;);
+///     data[0].put(&quot;Selected&quot;, Boolean.TRUE);
+///     data[1] = new HashMap&lt;&gt;();
+///     data[1].put(&quot;Name&quot;, &quot;Chen&quot;);
+///     data[1].put(&quot;Surname&quot;, &quot;Fishbein&quot;);
+///     data[1].put(&quot;Selected&quot;, Boolean.TRUE);
+///     data[2] = new HashMap&lt;&gt;();
+///     data[2].put(&quot;Name&quot;, &quot;Ofir&quot;);
+///     data[2].put(&quot;Surname&quot;, &quot;Leitner&quot;);
+///     data[3] = new HashMap&lt;&gt;();
+///     data[3].put(&quot;Name&quot;, &quot;Yaniv&quot;);
+///     data[3].put(&quot;Surname&quot;, &quot;Vakarat&quot;);
+///     data[4] = new HashMap&lt;&gt;();
+///     data[4].put(&quot;Name&quot;, &quot;Meirav&quot;);
+///     data[4].put(&quot;Surname&quot;, &quot;Nachmanovitch&quot;);
+///     return data;
+/// }
+/// ```
+///
+/// #### See also
+///
+/// - com.codename1.ui.Container
+///
+/// - com.codename1.ui.InfiniteContainer
+///
+/// - com.codename1.components.InfiniteScrollAdapter
+///
+/// - com.codename1.components.MultiButton
+///
+/// - com.codename1.ui.list
+///
+/// - com.codename1.ui.list.MultiList
+public class List&lt;T&gt; extends Component implements ActionSource {
+    /// Indicates the list isn't fixed and that selection is movable
+    public static final int FIXED_NONE = 0;
+    /// Indicates that the list is not fixed in place but cycles its elements
+    public static final int FIXED_NONE_CYCLIC = 1;
+    /// Indicates the list selection will only reach the edge when there are no more
+    /// elements in the list.
+    public static final int FIXED_NONE_ONE_ELEMENT_MARGIN_FROM_EDGE = 2;
+    /// Indicates the list selection is fixed into place at the top of the list
+    /// or at the left of the list
+    public static final int FIXED_LEAD = 10;
+    /// Indicates the list selection is fixed into place at the bottom of the list
+    /// or at the right of the list
+    public static final int FIXED_TRAIL = 11;
+    /// Indicates the list selection is fixed into place at the center of the list
+    public static final int FIXED_CENTER = 12;
+    /// Indicates the list orientation is VERTICAL
+    public static final int VERTICAL = 0;
+    /// Indicates the list orientation is HORIZONTAL
+    public static final int HORIZONTAL = 1;
+    static final int COMBO = 2;
+    /// Allows to test for fixed none
+    private static final int FIXED_NONE_BOUNDRY = 9;
+<span class="fc" id="L165">    private static boolean defaultFireOnClick = true;</span>
+    /// Indicates whether the list should not paint the focus component if the list
+    /// itself has no focus.
+<span class="fc" id="L168">    private static boolean defaultIgnoreFocusComponentWhenUnfocused = true;</span>
+    Style spinnerOverlay;
+<span class="fc" id="L170">    EventDispatcher dispatcher = new EventDispatcher();</span>
+<span class="fc" id="L171">    Object eventSource = this;</span>
+    /// Used internally by the combo box
+    boolean disposeDialogOnSelection;
+    /// Set once this list, as the popup of a `ComboBox`, has reported a choice. The combo
+    /// reads it to tell a popup that closed on a choice from one that just went away.
+    boolean popupSelectionFired;
+    /// Set on the popup list of a `ComboBox` on a desktop: the list owns the keyboard for
+    /// as long as the popup is up and cannot be talked out of it. See `#setHandlesInput(boolean)`.
+    boolean popupKeepsInput;
+    /// #### See also
+    ///
+    /// - #setRenderingPrototype
+    private T renderingPrototype;
+    /// Indicates whether selection is fixable to place in which case all the
+    /// elements in the list move and selection stays in place. Fixed selection
+    /// can be one of: FIXED_NONE, FIXED_TRAIL, FIXED_LEAD, FIXED_CENTER
+    private int fixedSelection;
+    private ListModel&lt;T&gt; model;
+<span class="fc" id="L189">    private ListCellRenderer&lt;T&gt; renderer = new DefaultListCellRenderer&lt;T&gt;();</span>
+<span class="fc" id="L190">    private int orientation = VERTICAL;</span>
+    private Dimension elemSize;
+    private Dimension selectedElemSize;
+<span class="fc" id="L193">    private boolean inputOnFocus = true;</span>
+<span class="fc" id="L194">    private boolean numericKeyActions = true;</span>
+<span class="fc" id="L195">    private boolean paintFocusBehindList = true;</span>
+    /// Indicates the number of elements the list should check to determine the element
+    /// sizes. This is ignored when a rendering prototype is present.
+<span class="fc" id="L198">    private int listSizeCalculationSampleCount = 5;</span>
+    /// Minimum number of elements shown in a list, this member is used to calculate
+    /// the list preferred size. If the number of elements in the model is smaller than
+    /// this then this value is used in the calculations.
+<span class="fc" id="L202">    private int minElementHeight = 0;</span>
+    /// Maximum number of elements shown in a list, this member is used to calculate
+    /// the list preferred size. If the number of elements in the model is larger than
+    /// this then this value is used in the calculations.
+<span class="fc" id="L206">    private int maxElementHeight = Integer.MAX_VALUE;</span>
+    /// Indicates the gap between each item in the list
+<span class="fc" id="L208">    private int itemGap = 2;</span>
+    private Listeners listener;
+    /// Indicates the position within the current animation, 0 means no animation
+    /// is in progress
+    private int animationPosition;
+    private int fixedDraggedAnimationPosition;
+    private int fixedDraggedPosition;
+    private Motion fixedDraggedMotion;
+    private int destination;
+    private Motion listMotion;
+<span class="fc" id="L218">    private boolean fireOnClick = defaultFireOnClick;</span>
+    private boolean fireOnRelease;
+    /// Initial x/y positions for the fixed mode drag
+<span class="fc" id="L221">    private int fixedDraggedSelection = 0;</span>
+    private boolean commandList;
+    /// Indicates whether the list should not paint the focus component if the list
+    /// itself has no focus.
+<span class="fc" id="L225">    private boolean ignoreFocusComponentWhenUnfocused = defaultIgnoreFocusComponentWhenUnfocused;</span>
+    /// Indicates that the background of a cell renderer might mutate between one entry and the next,
+    /// it is recommended that this flag remains false for performance reasons.
+    private boolean mutableRendererBackgrounds;
+    /// This flag indicates if the List should automatically scroll to the
+    /// selected element when it's been initialized.
+<span class="fc" id="L231">    private boolean scrollToSelected = true;</span>
+    private Label hintLabel;
+    private boolean longPointerPressAction;
+
+    /// Creates a new instance of List
+    ///
+    /// #### Parameters
+    ///
+    /// - `items`: set of items placed into the list model
+    public List(Vector items) {
+<span class="nc" id="L241">        this(new DefaultListModel(items));</span>
+<span class="nc" id="L242">    }</span>
+
+    /// Creates a new instance of List
+    ///
+    /// #### Parameters
+    ///
+    /// - `items`: set of items placed into the list model
+    public List(T... items) {
+<span class="fc" id="L250">        this(new DefaultListModel(items));</span>
+<span class="fc" id="L251">    }</span>
+
+    /// Creates a new instance of List with an empty default model
+    public List() {
+<span class="fc" id="L255">        this(new DefaultListModel());</span>
+<span class="fc" id="L256">    }</span>
+
+    /// Creates a new instance of List with the given model
+    ///
+    /// #### Parameters
+    ///
+    /// - `model`: the model instance
+<span class="fc" id="L263">    public List(ListModel model) {</span>
+<span class="fc" id="L264">        setUIIDFinal(&quot;List&quot;);</span>
+<span class="fc" id="L265">        setModel(model);</span>
+<span class="fc" id="L266">    }</span>
+
+    /// Indicates whether the list should not paint the focus component if the list
+    /// itself has no focus.
+    ///
+    /// #### Returns
+    ///
+    /// the defaultIgnoreFocusComponentWhenUnfocused
+    public static boolean isDefaultIgnoreFocusComponentWhenUnfocused() {
+<span class="fc" id="L275">        return defaultIgnoreFocusComponentWhenUnfocused;</span>
+    }
+
+    /// Indicates whether the list should not paint the focus component if the list
+    /// itself has no focus.
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultIgnoreFocusComponentWhenUnfocused`: the defaultIgnoreFocusComponentWhenUnfocused to set
+    public static void setDefaultIgnoreFocusComponentWhenUnfocused(boolean aDefaultIgnoreFocusComponentWhenUnfocused) {
+<span class="fc" id="L285">        defaultIgnoreFocusComponentWhenUnfocused = aDefaultIgnoreFocusComponentWhenUnfocused;</span>
+<span class="fc" id="L286">    }</span>
+
+    /// Default value for the fire on click behavior
+    ///
+    /// #### Returns
+    ///
+    /// the defaultFireOnClick
+    public static boolean isDefaultFireOnClick() {
+<span class="nc" id="L294">        return defaultFireOnClick;</span>
+    }
+
+    /// Default value for the fire on click behavior
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultFireOnClick`: the defaultFireOnClick to set
+    public static void setDefaultFireOnClick(boolean aDefaultFireOnClick) {
+<span class="nc" id="L303">        defaultFireOnClick = aDefaultFireOnClick;</span>
+<span class="nc" id="L304">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void initLaf(UIManager uim) {
+<span class="fc" id="L309">        super.initLaf(uim);</span>
+<span class="fc" id="L310">        setSmoothScrolling(uim.getLookAndFeel().isDefaultSmoothScrolling());</span>
+<span class="fc" id="L311">        fixedSelection = uim.getThemeConstant(&quot;fixedSelectionInt&quot;, fixedSelection);</span>
+<span class="fc" id="L312">        itemGap = uim.getThemeConstant(&quot;listItemGapInt&quot;, itemGap);</span>
+<span class="fc" id="L313">        longPointerPressAction = uim.isThemeConstant(&quot;listLongPressBool&quot;, true);</span>
+<span class="fc" id="L314">    }</span>
+
+
+    /// {@inheritDoc}
+    @Override
+    void initComponentImpl() {
+<span class="fc" id="L320">        dataChanged(0, 0);</span>
+        // lazily bind listeners to prevent a memory leak in cases where models
+        // are stored separately from view
+<span class="fc" id="L323">        bindListeners();</span>
+<span class="fc" id="L324">        super.initComponentImpl();</span>
+<span class="fc" id="L325">        int index = model.getSelectedIndex();</span>
+<span class="fc bfc" id="L326" title="All 2 branches covered.">        if (index &gt;= 0) {</span>
+<span class="fc" id="L327">            model.setSelectedIndex(index);</span>
+        }
+<span class="fc" id="L329">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void laidOut() {
+<span class="fc" id="L334">        super.laidOut();</span>
+<span class="fc bfc" id="L335" title="All 6 branches covered.">        if (isScrollable() &amp;&amp; isInitialized() &amp;&amp; scrollToSelected) {</span>
+<span class="fc" id="L336">            int index = model.getSelectedIndex();</span>
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">            if (index &gt;= 0) {</span>
+<span class="pc bpc" id="L338" title="2 of 6 branches missed.">                if (disposeDialogOnSelection &amp;&amp; isSmoothScrolling() &amp;&amp; Display.getInstance().isDesktop()) {</span>
+                    // A capped combo popup opens AT its current value. Smooth scrolling
+                    // would open it on the first rows and then run the list down to the
+                    // value while the user is already reaching for it. Desktop only,
+                    // like the cap that makes it matter: a touch popup keeps its motion.
+<span class="fc" id="L343">                    setSmoothScrolling(false);</span>
+<span class="fc" id="L344">                    selectElement(index);</span>
+<span class="fc" id="L345">                    setSmoothScrolling(true);</span>
+                } else {
+<span class="fc" id="L347">                    selectElement(index);</span>
+                }
+            }
+        }
+<span class="fc" id="L351">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    void deinitializeImpl() {
+<span class="fc" id="L356">        super.deinitializeImpl();</span>
+
+        // cleanup to allow garbage collection even if the user keeps the model in
+        // memory which is a valid use case
+<span class="fc bfc" id="L360" title="All 2 branches covered.">        if (listener != null) {</span>
+<span class="fc" id="L361">            model.removeDataChangedListener(listener);</span>
+<span class="fc" id="L362">            model.removeSelectionListener(listener);</span>
+<span class="fc" id="L363">            listener = null;</span>
+        }
+<span class="fc" id="L365">    }</span>
+
+    /// Callback to allow subclasses to react to a change in the model
+    ///
+    /// #### Parameters
+    ///
+    /// - `status`: the type data change; REMOVED, ADDED or CHANGED
+    ///
+    /// - `index`: item index in a list model
+    protected void modelChanged(int status, int index) {
+<span class="fc" id="L375">    }</span>
+
+    /// Callback to allow subclasses to react to a selection change in the model
+    ///
+    /// #### Parameters
+    ///
+    /// - `oldSelected`: the old selection value
+    ///
+    /// - `newSelected`: the new selection value
+    protected void listSelectionChanged(int oldSelected, int newSelected) {
+<span class="fc" id="L385">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public int getSideGap() {
+        // isScrollableY() in the base method is very expensive since it triggers getScrollDimension before the layout is complete!
+<span class="pc bpc" id="L391" title="1 of 4 branches missed.">        if (isScrollVisible() &amp;&amp; orientation != HORIZONTAL) {</span>
+<span class="fc" id="L392">            return getUIManager().getLookAndFeel().getVerticalScrollWidth();</span>
+        }
+<span class="fc" id="L394">        return 0;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public boolean isScrollableY() {
+<span class="pc bpc" id="L400" title="2 of 10 branches missed.">        return (getScrollDimension().getHeight() &gt; getHeight() || isAlwaysTensile()) &amp;&amp; getHeight() &gt; 0 &amp;&amp; (fixedSelection &lt; FIXED_NONE_BOUNDRY) &amp;&amp;</span>
+                orientation != HORIZONTAL;
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public boolean isScrollableX() {
+<span class="pc bpc" id="L407" title="1 of 6 branches missed.">        return (getScrollDimension().getWidth() &gt; getWidth()) &amp;&amp; (fixedSelection &lt; FIXED_NONE_BOUNDRY) &amp;&amp;</span>
+                orientation == HORIZONTAL;
+    }
+
+    /// Maximum number of elements shown in a list, this member is used to calculate
+    /// the list preferred size. If the number of elements in the model is larger than
+    /// this then this value is used in the calculations.
+    ///
+    /// #### Returns
+    ///
+    /// the maximum number of elements
+    public int getMaxElementHeight() {
+<span class="fc" id="L419">        return maxElementHeight;</span>
+    }
+
+    /// Maximum number of elements shown in a list, this member is used to calculate
+    /// the list preferred size. If the number of elements in the model is larger than
+    /// this then this value is used in the calculations.
+    ///
+    /// #### Parameters
+    ///
+    /// - `maxElementHeight`: the maximum number of elements
+    public void setMaxElementHeight(int maxElementHeight) {
+<span class="fc" id="L430">        this.maxElementHeight = maxElementHeight;</span>
+<span class="fc" id="L431">    }</span>
+
+    /// Minimum number of elements shown in a list, this member is used to calculate
+    /// the list preferred size. If the number of elements in the model is smaller than
+    /// this then this value is used in the calculations.
+    ///
+    /// #### Returns
+    ///
+    /// the minimum number of elements
+    public int getMinElementHeight() {
+<span class="fc" id="L441">        return minElementHeight;</span>
+    }
+
+    /// Minimum number of elements shown in a list, this member is used to calculate
+    /// the list preferred size. If the number of elements in the model is smaller than
+    /// this then this value is used in the calculations.
+    ///
+    /// #### Parameters
+    ///
+    /// - `minElementHeight`: the minimum number of elements
+    public void setMinElementHeight(int minElementHeight) {
+<span class="fc" id="L452">        this.minElementHeight = minElementHeight;</span>
+<span class="fc" id="L453">    }</span>
+
+    /// Returns the number of elements in the list, shorthand for
+    /// getModel().getSize()
+    ///
+    /// #### Returns
+    ///
+    /// the number of elements in the list
+    public int size() {
+<span class="fc" id="L462">        return model.getSize();</span>
+    }
+
+    /// Returns the bounds of a renderer-backed row for the portable virtual
+    /// accessibility tree. Bounds are relative to this list.
+    public Rectangle getAccessibilityItemBounds(int index, Rectangle out) {
+<span class="pc bpc" id="L468" title="1 of 2 branches missed.">        if (out == null) {</span>
+<span class="nc" id="L469">            throw new NullPointerException(&quot;out&quot;);</span>
+        }
+<span class="pc bpc" id="L471" title="2 of 4 branches missed.">        if (index &lt; 0 || index &gt;= size()) {</span>
+<span class="nc" id="L472">            out.setBounds(0, 0, 0, 0);</span>
+<span class="nc" id="L473">            return out;</span>
+        }
+<span class="fc" id="L475">        int width = getWidth() - getStyle().getHorizontalPadding() - getSideGap();</span>
+<span class="fc" id="L476">        calculateComponentPosition(index, width, out, getElementSize(false, true),</span>
+<span class="fc bfc" id="L477" title="All 2 branches covered.">                getElementSize(true, true), index &lt;= getCurrentSelected());</span>
+<span class="fc" id="L478">        return out;</span>
+    }
+
+    /// Returns the accessible name produced by the list renderer for an item.
+    public String getAccessibilityItemText(int index) {
+<span class="pc bpc" id="L483" title="2 of 4 branches missed.">        if (index &lt; 0 || index &gt;= size()) {</span>
+<span class="nc" id="L484">            return null;</span>
+        }
+<span class="fc" id="L486">        T value = model.getItemAt(index);</span>
+<span class="fc" id="L487">        Component rendererComponent = renderer.getListCellRendererComponent(this, value, index,</span>
+<span class="fc bfc" id="L488" title="All 2 branches covered.">                index == getSelectedIndex());</span>
+<span class="pc bpc" id="L489" title="1 of 2 branches missed.">        String text = rendererComponent == null ? null : rendererComponent.getAccessibilityText();</span>
+<span class="pc bpc" id="L490" title="2 of 4 branches missed.">        if (text == null || text.length() == 0) {</span>
+<span class="nc bnc" id="L491" title="All 2 branches missed.">            text = value == null ? null : String.valueOf(value);</span>
+        }
+<span class="fc" id="L493">        return text;</span>
+    }
+
+    /// Returns the model indices that should currently be materialized as
+    /// virtual accessibility children. The result contains the visible window,
+    /// a small one-item navigation buffer on each side, and the selected item.
+    /// It is intentionally bounded by the viewport so building a semantic tree
+    /// for a large renderer-backed list doesn't instantiate every row renderer.
+    public int[] getAccessibilityVisibleItemIndices() {
+<span class="fc" id="L502">        int modelSize = size();</span>
+<span class="pc bpc" id="L503" title="1 of 2 branches missed.">        if (modelSize == 0) {</span>
+<span class="nc" id="L504">            return new int[0];</span>
+        }
+
+<span class="fc" id="L507">        Dimension rendererSize = getElementSize(false, true);</span>
+<span class="fc" id="L508">        Style style = getStyle();</span>
+<span class="pc bpc" id="L509" title="1 of 2 branches missed.">        int itemExtent = orientation == HORIZONTAL ? rendererSize.getWidth() : rendererSize.getHeight();</span>
+<span class="pc bpc" id="L510" title="1 of 2 branches missed.">        int viewportExtent = orientation == HORIZONTAL</span>
+<span class="pc" id="L511">                ? getWidth() - style.getHorizontalPadding()</span>
+<span class="fc" id="L512">                : getHeight() - style.getVerticalPadding();</span>
+<span class="fc" id="L513">        int stride = Math.max(1, itemExtent + itemGap);</span>
+<span class="fc" id="L514">        int windowSize = Math.min(modelSize, Math.max(1, viewportExtent / stride + 3));</span>
+<span class="fc" id="L515">        int selected = getSelectedIndex();</span>
+<span class="fc" id="L516">        int[] result = new int[Math.min(modelSize, windowSize + 1)];</span>
+<span class="fc" id="L517">        int count = 0;</span>
+
+<span class="pc bpc" id="L519" title="1 of 2 branches missed.">        if (fixedSelection &gt; FIXED_NONE_BOUNDRY) {</span>
+<span class="nc bnc" id="L520" title="All 4 branches missed.">            int center = selected &gt;= 0 &amp;&amp; selected &lt; modelSize ? selected : 0;</span>
+<span class="nc" id="L521">            int start = center - windowSize / 2;</span>
+<span class="nc bnc" id="L522" title="All 2 branches missed.">            for (int offset = 0; offset &lt; windowSize; offset++) {</span>
+<span class="nc" id="L523">                int index = (start + offset) % modelSize;</span>
+<span class="nc bnc" id="L524" title="All 2 branches missed.">                if (index &lt; 0) {</span>
+<span class="nc" id="L525">                    index += modelSize;</span>
+                }
+<span class="nc" id="L527">                result[count++] = index;</span>
+            }
+<span class="nc" id="L529">        } else {</span>
+<span class="pc bpc" id="L530" title="1 of 2 branches missed.">            int scroll = orientation == HORIZONTAL ? getScrollX() : getScrollY();</span>
+<span class="pc bpc" id="L531" title="1 of 2 branches missed.">            int padding = orientation == HORIZONTAL ? style.getPaddingLeftNoRTL() : style.getPaddingTop();</span>
+<span class="fc" id="L532">            int first = Math.max(0, (scroll - padding) / stride - 1);</span>
+<span class="pc bpc" id="L533" title="1 of 2 branches missed.">            if (first + windowSize &gt; modelSize) {</span>
+<span class="nc" id="L534">                first = Math.max(0, modelSize - windowSize);</span>
+            }
+<span class="fc bfc" id="L536" title="All 2 branches covered.">            for (int index = first; index &lt; first + windowSize; index++) {</span>
+<span class="fc" id="L537">                result[count++] = index;</span>
+            }
+        }
+
+<span class="pc bpc" id="L541" title="3 of 6 branches missed.">        if (selected &gt;= 0 &amp;&amp; selected &lt; modelSize &amp;&amp; !containsIndex(result, count, selected)) {</span>
+<span class="nc" id="L542">            result[count++] = selected;</span>
+        }
+<span class="fc bfc" id="L544" title="All 2 branches covered.">        if (count == result.length) {</span>
+<span class="fc" id="L545">            return result;</span>
+        }
+<span class="fc" id="L547">        int[] trimmed = new int[count];</span>
+<span class="fc" id="L548">        System.arraycopy(result, 0, trimmed, 0, count);</span>
+<span class="fc" id="L549">        return trimmed;</span>
+    }
+
+    private boolean containsIndex(int[] indices, int length, int wanted) {
+<span class="pc bpc" id="L553" title="1 of 2 branches missed.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc bfc" id="L554" title="All 2 branches covered.">            if (indices[i] == wanted) {</span>
+<span class="fc" id="L555">                return true;</span>
+            }
+        }
+<span class="nc" id="L558">        return false;</span>
+    }
+
+    /// Returns the visual selection during a drag operation, otherwise equivalent to model.getSelectedIndex
+    ///
+    /// #### Returns
+    ///
+    /// visual selection
+    public int getCurrentSelected() {
+<span class="pc bpc" id="L567" title="1 of 4 branches missed.">        if (fixedSelection &gt; FIXED_NONE_BOUNDRY &amp;&amp; isDragActivated()) {</span>
+<span class="nc" id="L568">            return fixedDraggedSelection;</span>
+        }
+<span class="fc" id="L570">        return model.getSelectedIndex();</span>
+    }
+
+    /// Returns the current selected offset in the list
+    ///
+    /// #### Returns
+    ///
+    /// the current selected offset in the list
+    public int getSelectedIndex() {
+<span class="fc" id="L579">        return model.getSelectedIndex();</span>
+    }
+
+    /// Sets the current selected offset in the list, by default this implementation
+    /// will scroll the list to the selection if the selection is outside of the screen
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the current selected offset in the list
+    public void setSelectedIndex(int index) {
+<span class="fc" id="L589">        setSelectedIndex(index, true);</span>
+<span class="fc" id="L590">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected Rectangle getVisibleBounds() {
+<span class="nc" id="L595">        Rectangle pos = new Rectangle();</span>
+<span class="nc" id="L596">        Dimension rendererSize = getElementSize(false, true);</span>
+<span class="nc" id="L597">        Style style = getStyle();</span>
+<span class="nc" id="L598">        int width = getWidth() - style.getHorizontalPadding() - getSideGap();</span>
+<span class="nc" id="L599">        calculateComponentPosition(getCurrentSelected(), width, pos, rendererSize, getElementSize(true, true), true);</span>
+<span class="nc" id="L600">        pos.setX(pos.getX() + getX());</span>
+<span class="nc" id="L601">        pos.setY(pos.getY() + getY());</span>
+<span class="nc" id="L602">        return pos;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    protected int getDragRegionStatus(int x, int y) {
+<span class="nc bnc" id="L608" title="All 2 branches missed.">        if (!isScrollable()) {</span>
+<span class="nc" id="L609">            return DRAG_REGION_NOT_DRAGGABLE;</span>
+        }
+<span class="nc bnc" id="L611" title="All 2 branches missed.">        if (getOrientation() == HORIZONTAL) {</span>
+<span class="nc" id="L612">            return DRAG_REGION_POSSIBLE_DRAG_X;</span>
+        }
+<span class="nc" id="L614">        return DRAG_REGION_POSSIBLE_DRAG_Y;</span>
+    }
+
+    /// Sets the current selected offset in the list
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the current selected offset in the list
+    ///
+    /// - `scrollToSelection`: @param scrollToSelection indicates whether scrolling to selection should
+    /// occur if the selection is outside of view
+    public void setSelectedIndex(int index, boolean scrollToSelection) {
+<span class="pc bpc" id="L626" title="1 of 2 branches missed.">        if (index &lt; 0) {</span>
+<span class="nc" id="L627">            throw new IllegalArgumentException(&quot;Selection index is negative:&quot; + index);</span>
+        }
+<span class="fc" id="L629">        int oldIndex = model.getSelectedIndex();</span>
+<span class="fc" id="L630">        model.setSelectedIndex(index);</span>
+<span class="fc bfc" id="L631" title="All 2 branches covered.">        if (oldIndex != index) {</span>
+<span class="fc" id="L632">            accessibilityChanged(AccessibilityManager.CHANGE_STATE | AccessibilityManager.CHANGE_VALUE);</span>
+        }
+<span class="fc bfc" id="L634" title="All 2 branches covered.">        if (!isInitialized()) {</span>
+<span class="fc" id="L635">            TopLevelContainer f = getTopLevelContainer();</span>
+<span class="fc bfc" id="L636" title="All 2 branches covered.">            if (f == null) {</span>
+<span class="fc" id="L637">                return;</span>
+            }
+<span class="fc" id="L639">            f.asContainer().revalidate();</span>
+        }
+<span class="fc bfc" id="L641" title="All 2 branches covered.">        if (scrollToSelection/* &amp;&amp; isInitialized() */) {</span>
+<span class="fc" id="L642">            selectElement(index);</span>
+        }
+<span class="fc" id="L644">    }</span>
+
+    /// Returns the current selected item in the list or null for no selection
+    ///
+    /// #### Returns
+    ///
+    /// the current selected item in the list
+    public T getSelectedItem() {
+<span class="fc" id="L652">        int idx = model.getSelectedIndex();</span>
+<span class="pc bpc" id="L653" title="2 of 4 branches missed.">        if (idx &lt; model.getSize() &amp;&amp; idx &gt; -1) {</span>
+<span class="fc" id="L654">            return model.getItemAt(idx);</span>
+        }
+<span class="nc" id="L656">        return null;</span>
+    }
+
+    /// Sets the current selected item in the list
+    ///
+    /// #### Parameters
+    ///
+    /// - `item`: the current selected item in the list
+    public void setSelectedItem(T item) {
+<span class="fc" id="L665">        int size = model.getSize();</span>
+<span class="pc bpc" id="L666" title="1 of 2 branches missed.">        for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="fc" id="L667">            Object current = model.getItemAt(iter);</span>
+<span class="fc bfc" id="L668" title="All 2 branches covered.">            if (Objects.equals(current, item)) {</span>
+<span class="fc" id="L669">                model.setSelectedIndex(iter);</span>
+<span class="fc" id="L670">                break;</span>
+            }
+        }
+<span class="fc" id="L673">    }</span>
+
+    /// Returns the model underlying the list
+    ///
+    /// #### Returns
+    ///
+    /// the model underlying the list
+    public ListModel&lt;T&gt; getModel() {
+<span class="fc" id="L681">        return model;</span>
+    }
+
+    /// Replaces/sets the model underlying the list
+    ///
+    /// #### Parameters
+    ///
+    /// - `model`: the new model underlying the list
+    public void setModel(ListModel model) {
+<span class="fc bfc" id="L690" title="All 2 branches covered.">        if (this.model != null) {</span>
+<span class="fc" id="L691">            setShouldCalcPreferredSize(true);</span>
+<span class="fc" id="L692">            this.model.removeDataChangedListener(listener);</span>
+<span class="fc" id="L693">            this.model.removeSelectionListener(listener);</span>
+<span class="fc" id="L694">            this.model = model;</span>
+<span class="fc" id="L695">            listener = null;</span>
+
+            // when replacing a model on a scrolled list reset the scrolling if necessary
+<span class="pc bpc" id="L698" title="1 of 2 branches missed.">            if (getScrollDimension().getHeight() &lt; getScrollY() + getHeight()) {</span>
+<span class="nc" id="L699">                setScrollY(0);</span>
+            }
+<span class="pc bpc" id="L701" title="1 of 2 branches missed.">            if (getScrollDimension().getWidth() &lt; getScrollX() + getWidth()) {</span>
+<span class="nc" id="L702">                setScrollX(0);</span>
+            }
+        }
+<span class="fc" id="L705">        this.model = model;</span>
+<span class="pc bpc" id="L706" title="1 of 2 branches missed.">        if (isInitialized()) {</span>
+<span class="nc" id="L707">            bindListeners();</span>
+        }
+<span class="fc" id="L709">        repaint();</span>
+<span class="fc" id="L710">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void setShouldCalcPreferredSize(boolean shouldCalcPreferredSize) {
+<span class="fc" id="L715">        super.setShouldCalcPreferredSize(shouldCalcPreferredSize);</span>
+<span class="fc" id="L716">        elemSize = null;</span>
+<span class="fc" id="L717">        selectedElemSize = null;</span>
+
+        // we should try passing the should calcPreferredSize to the renderer so it can revalidate too
+<span class="pc bpc" id="L720" title="1 of 2 branches missed.">        if (shouldCalcPreferredSize) {</span>
+<span class="fc" id="L721">            ListCellRenderer r = getRenderer();</span>
+            Object val;
+<span class="fc bfc" id="L723" title="All 2 branches covered.">            if (renderingPrototype != null) {</span>
+<span class="fc" id="L724">                val = renderingPrototype;</span>
+            } else {
+<span class="fc bfc" id="L726" title="All 2 branches covered.">                if (getModel().getSize() &gt; 0) {</span>
+<span class="fc" id="L727">                    val = getModel().getItemAt(0);</span>
+                } else {
+<span class="fc" id="L729">                    return;</span>
+                }
+            }
+<span class="fc" id="L732">            Component c = r.getListCellRendererComponent(this, val, 0, false);</span>
+<span class="fc" id="L733">            c.setShouldCalcPreferredSize(shouldCalcPreferredSize);</span>
+<span class="fc" id="L734">            c = r.getListCellRendererComponent(this, val, 0, true);</span>
+<span class="fc" id="L735">            c.setShouldCalcPreferredSize(shouldCalcPreferredSize);</span>
+        }
+<span class="fc" id="L737">    }</span>
+
+    void dataChanged(int status, int index) {
+<span class="fc" id="L740">        setShouldCalcPreferredSize(true);</span>
+<span class="fc bfc" id="L741" title="All 2 branches covered.">        if (getSelectedIndex() &gt;= model.getSize()) {</span>
+<span class="fc" id="L742">            setSelectedIndex(Math.max(model.getSize() - 1, 0));</span>
+        }
+
+<span class="fc" id="L745">        modelChanged(status, index);</span>
+<span class="fc" id="L746">        repaint();</span>
+<span class="fc" id="L747">    }</span>
+
+    private void bindListeners() {
+<span class="pc bpc" id="L750" title="1 of 2 branches missed.">        if (listener == null) {</span>
+<span class="fc" id="L751">            listener = new Listeners();</span>
+<span class="fc" id="L752">            model.addDataChangedListener(listener);</span>
+<span class="fc" id="L753">            model.addSelectionListener(listener);</span>
+        }
+<span class="fc" id="L755">    }</span>
+
+    /// Indicate whether pressing the number keys should trigger an action
+    ///
+    /// #### Returns
+    ///
+    /// true if pressing the number keys should trigger an action
+    public boolean isNumericKeyActions() {
+<span class="nc" id="L763">        return numericKeyActions;</span>
+    }
+
+    /// Indicate whether pressing the number keys should trigger an action
+    ///
+    /// #### Parameters
+    ///
+    /// - `numericKeyActions`: true to trigger an action on number keys
+    public void setNumericKeyActions(boolean numericKeyActions) {
+<span class="nc" id="L772">        this.numericKeyActions = numericKeyActions;</span>
+<span class="nc" id="L773">    }</span>
+
+    /// Indicates that the list should be treated as a list of commands, if the
+    /// user &quot;clicks&quot; a command from the list its action performed method is invoked.
+    ///
+    /// #### Returns
+    ///
+    /// true if the list is treated as a command list
+    public boolean isCommandList() {
+<span class="fc" id="L782">        return commandList;</span>
+    }
+
+    /// Indicates that the list should be treated as a list of commands, if the
+    /// user &quot;clicks&quot; a command from the list its action performed method is invoked.
+    ///
+    /// #### Parameters
+    ///
+    /// - `commandList`: true for the list to be treated as a command list
+    public void setCommandList(boolean commandList) {
+<span class="fc" id="L792">        this.commandList = commandList;</span>
+<span class="fc" id="L793">    }</span>
+
+    /// Indicates whether the list should not paint the focus component if the list
+    /// itself has no focus.
+    ///
+    /// #### Returns
+    ///
+    /// the ignoreFocusComponentWhenUnfocused
+    public boolean isIgnoreFocusComponentWhenUnfocused() {
+<span class="fc" id="L802">        return ignoreFocusComponentWhenUnfocused;</span>
+    }
+
+    /// Indicates whether the list should not paint the focus component if the list
+    /// itself has no focus.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ignoreFocusComponentWhenUnfocused`: true to ignore the focus component false otherwise
+    public void setIgnoreFocusComponentWhenUnfocused(boolean ignoreFocusComponentWhenUnfocused) {
+<span class="fc" id="L812">        this.ignoreFocusComponentWhenUnfocused = ignoreFocusComponentWhenUnfocused;</span>
+<span class="fc" id="L813">    }</span>
+
+    /// Indicates that the background of a cell renderer might mutate between one entry and the next,
+    /// it is recommended that this flag remains false for performance reasons.
+    ///
+    /// #### Returns
+    ///
+    /// the value of the flag
+    public boolean isMutableRendererBackgrounds() {
+<span class="nc" id="L822">        return mutableRendererBackgrounds;</span>
+    }
+
+    /// Indicates that the background of a cell renderer might mutate between one entry and the next,
+    /// it is recommended that this flag remains false for performance reasons.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mutableRendererBackgrounds`: the new value for the flag
+    public void setMutableRendererBackgrounds(boolean mutableRendererBackgrounds) {
+<span class="nc" id="L832">        this.mutableRendererBackgrounds = mutableRendererBackgrounds;</span>
+<span class="nc" id="L833">    }</span>
+
+    /// Indicates the number of elements the list should check to determine the element
+    /// sizes. This is ignored when a rendering prototype is present.
+    ///
+    /// #### Returns
+    ///
+    /// the listSizeCalculationSampleCount
+    public int getListSizeCalculationSampleCount() {
+<span class="fc" id="L842">        return listSizeCalculationSampleCount;</span>
+    }
+
+    /// Indicates the number of elements the list should check to determine the element
+    /// sizes. This is ignored when a rendering prototype is present.
+    ///
+    /// #### Parameters
+    ///
+    /// - `listSizeCalculationSampleCount`: the listSizeCalculationSampleCount to set
+    public void setListSizeCalculationSampleCount(int listSizeCalculationSampleCount) {
+<span class="fc" id="L852">        this.listSizeCalculationSampleCount = listSizeCalculationSampleCount;</span>
+<span class="fc" id="L853">    }</span>
+
+    /// Enable/disable list action on long pointer press event
+    ///
+    /// #### Returns
+    ///
+    /// the longPointerPressAction
+    public boolean isLongPointerPressActionEnabled() {
+<span class="nc" id="L861">        return longPointerPressAction;</span>
+    }
+
+    /// Enable/disable list action on long pointer press event
+    ///
+    /// #### Parameters
+    ///
+    /// - `longPointerPressAction`: the longPointerPressAction to set
+    public void setLongPointerPressActionEnabled(boolean longPointerPressAction) {
+<span class="nc" id="L870">        this.longPointerPressAction = longPointerPressAction;</span>
+<span class="nc" id="L871">    }</span>
+
+    /// Sets the renderer which is used to draw list elements
+    ///
+    /// #### Parameters
+    ///
+    /// - `renderer`: cell renderer instance
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated use setRenderer instead, this method was deprecated to confirm
+    /// better to JavaBean convention of having the getter/setter with the same name
+    public void setListCellRenderer(ListCellRenderer renderer) {
+<span class="pc bpc" id="L884" title="1 of 2 branches missed.">        if (this.renderer != null) {</span>
+            //calculate the item list size and the list size.
+<span class="fc" id="L886">            elemSize = null;</span>
+<span class="fc" id="L887">            selectedElemSize = null;</span>
+<span class="fc" id="L888">            setShouldCalcPreferredSize(true);</span>
+        }
+<span class="fc" id="L890">        this.renderer = renderer;</span>
+<span class="fc" id="L891">    }</span>
+
+    /// Returns the renderer which is used to draw list elements
+    ///
+    /// #### Returns
+    ///
+    /// the renderer which is used to draw list elements
+    public final ListCellRenderer getRenderer() {
+<span class="fc" id="L899">        return renderer;</span>
+    }
+
+    /// Sets the renderer which is used to draw list elements
+    ///
+    /// #### Parameters
+    ///
+    /// - `renderer`: cell renderer instance
+    public final void setRenderer(ListCellRenderer renderer) {
+<span class="fc" id="L908">        setListCellRenderer(renderer);</span>
+<span class="fc" id="L909">    }</span>
+
+    /// Returns the list orientation
+    ///
+    /// #### Returns
+    ///
+    /// the list orientation HORIZONTAL or VERTICAL
+    ///
+    /// #### See also
+    ///
+    /// - #HORIZONTAL
+    ///
+    /// - #VERTICAL
+    public int getOrientation() {
+<span class="fc" id="L923">        return orientation;</span>
+    }
+
+    /// Sets the list orientation HORIZONTAL or VERTICAL
+    ///
+    /// #### Parameters
+    ///
+    /// - `orientation`: the list orientation HORIZONTAL or VERTICAL
+    ///
+    /// #### See also
+    ///
+    /// - #HORIZONTAL
+    ///
+    /// - #VERTICAL
+    public void setOrientation(int orientation) {
+<span class="fc" id="L938">        this.orientation = orientation;</span>
+<span class="fc" id="L939">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void refreshTheme(boolean merge) {
+<span class="fc" id="L944">        ListCellRenderer r = getRenderer();</span>
+<span class="pc bpc" id="L945" title="1 of 2 branches missed.">        if (renderingPrototype != null) {</span>
+<span class="nc" id="L946">            r.getListCellRendererComponent(this, renderingPrototype, 0, false).refreshTheme(merge);</span>
+        } else {
+<span class="pc bpc" id="L948" title="1 of 2 branches missed.">            if (getModel().getSize() &gt; 0) {</span>
+<span class="fc" id="L949">                r.getListCellRendererComponent(this, getModel().getItemAt(0), 0, false).refreshTheme(merge);</span>
+            } else {
+<span class="nc" id="L951">                r.getListCellRendererComponent(this, &quot;&quot;, 0, false).refreshTheme(merge);</span>
+            }
+        }
+<span class="fc" id="L954">        Component focus = r.getListFocusComponent(this);</span>
+<span class="pc bpc" id="L955" title="1 of 2 branches missed.">        if (focus != null) {</span>
+<span class="fc" id="L956">            focus.refreshTheme(merge);</span>
+        }
+<span class="fc" id="L958">        super.refreshTheme(merge);</span>
+<span class="fc" id="L959">    }</span>
+
+    /// Makes sure the selected index is visible if it is not in the current view
+    /// rect the list will scroll so it fits within
+    ///
+    /// #### Parameters
+    ///
+    /// - `rect`: the rectangle area to scroll to
+    public void scrollRectToVisible(Rectangle rect) {
+<span class="fc bfc" id="L968" title="All 2 branches covered.">        if (fixedSelection &lt; FIXED_NONE_BOUNDRY) {</span>
+            //Dimension elemSize = getElementSize();
+            Rectangle toScroll;
+<span class="pc bpc" id="L971" title="1 of 2 branches missed.">            if (orientation != HORIZONTAL) {</span>
+<span class="fc" id="L972">                toScroll = new Rectangle(getScrollX(), rect.getY(), rect.getSize().getWidth(), rect.getSize().getHeight() + itemGap);</span>
+            } else {
+<span class="nc" id="L974">                toScroll = new Rectangle(rect.getX(), getScrollY(), rect.getSize().getWidth() + itemGap, rect.getSize().getHeight());</span>
+            }
+<span class="fc" id="L976">            super.scrollRectToVisible(toScroll, this);</span>
+        }
+<span class="fc" id="L978">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void setHandlesInput(boolean b) {
+<span class="fc bfc" id="L983" title="All 2 branches covered.">        if (popupKeepsInput) {</span>
+            // Input mode is how a list on a form shares the arrow keys with focus
+            // traversal: Fire takes them, Fire or a sideways arrow or running off either
+            // end gives them back. In a combo popup on a desktop there is nothing to
+            // share them with. Every one of those hand-backs left the popup deaf to the
+            // arrows, and the next Enter then only switched input mode back on instead
+            // of choosing the row.
+<span class="fc" id="L990">            super.setHandlesInput(true);</span>
+<span class="fc" id="L991">            return;</span>
+        }
+<span class="fc" id="L993">        TopLevelContainer f = getTopLevelContainer();</span>
+<span class="pc bpc" id="L994" title="1 of 2 branches missed.">        if (f != null) {</span>
+            // prevent the list from losing focus if its the only element
+            // or when the user presses fire and there is no other component
+<span class="pc bpc" id="L997" title="1 of 4 branches missed.">            super.setHandlesInput(b || f.isSingleFocusMode());</span>
+        } else {
+<span class="nc" id="L999">            super.setHandlesInput(b);</span>
+        }
+<span class="fc" id="L1001">    }</span>
+
+    void setHandlesInputParent(boolean b) {
+<span class="fc" id="L1004">        super.setHandlesInput(b);</span>
+<span class="fc" id="L1005">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void fireClicked() {
+<span class="nc" id="L1010">        boolean h = handlesInput();</span>
+<span class="nc bnc" id="L1011" title="All 2 branches missed.">        setHandlesInput(!h);</span>
+<span class="nc bnc" id="L1012" title="All 2 branches missed.">        if (h) {</span>
+<span class="nc" id="L1013">            fireActionEvent();</span>
+        }
+<span class="nc" id="L1015">        repaint();</span>
+<span class="nc" id="L1016">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected boolean isSelectableInteraction() {
+<span class="fc" id="L1021">        return true;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void keyReleased(int keyCode) {
+        // other events are in keyReleased to prevent the next event from reaching the next form
+<span class="fc" id="L1028">        int gameAction = Display.getInstance().getGameAction(keyCode);</span>
+<span class="fc bfc" id="L1029" title="All 2 branches covered.">        if (gameAction == Display.GAME_FIRE) {</span>
+<span class="fc" id="L1030">            boolean h = handlesInput();</span>
+<span class="fc bfc" id="L1031" title="All 2 branches covered.">            setHandlesInput(!h);</span>
+<span class="fc bfc" id="L1032" title="All 2 branches covered.">            if (h) {</span>
+<span class="fc" id="L1033">                fireActionEvent();</span>
+            }
+<span class="fc" id="L1035">            repaint();</span>
+<span class="fc" id="L1036">            return;</span>
+        }
+
+<span class="pc bpc" id="L1039" title="3 of 10 branches missed.">        if (numericKeyActions &amp;&amp; gameAction != Display.GAME_LEFT &amp;&amp;</span>
+                gameAction != Display.GAME_RIGHT &amp;&amp; gameAction != Display.GAME_UP &amp;&amp;
+                gameAction != Display.GAME_DOWN) {
+<span class="pc bpc" id="L1042" title="2 of 4 branches missed.">            if (keyCode &gt;= '1' &amp;&amp; keyCode &lt;= '9') {</span>
+<span class="fc" id="L1043">                int offset = keyCode - '1';</span>
+<span class="pc bpc" id="L1044" title="1 of 2 branches missed.">                if (offset &lt; getModel().getSize()) {</span>
+<span class="fc" id="L1045">                    setSelectedIndex(offset);</span>
+<span class="fc" id="L1046">                    fireActionEvent();</span>
+                }
+            }
+        }
+<span class="fc" id="L1050">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void keyPressed(int keyCode) {
+        // scrolling events are in keyPressed to provide immediate feedback
+<span class="fc bfc" id="L1056" title="All 2 branches covered.">        if (!handlesInput()) {</span>
+<span class="fc" id="L1057">            return;</span>
+        }
+
+<span class="fc" id="L1060">        int gameAction = Display.getInstance().getGameAction(keyCode);</span>
+        int keyFwd;
+        int keyBck;
+<span class="pc bpc" id="L1063" title="1 of 2 branches missed.">        if (getOrientation() != HORIZONTAL) {</span>
+<span class="fc" id="L1064">            keyFwd = Display.GAME_DOWN;</span>
+<span class="fc" id="L1065">            keyBck = Display.GAME_UP;</span>
+<span class="pc bpc" id="L1066" title="1 of 4 branches missed.">            if (gameAction == Display.GAME_LEFT || gameAction == Display.GAME_RIGHT) {</span>
+<span class="fc" id="L1067">                setHandlesInput(false);</span>
+            }
+        } else {
+<span class="nc bnc" id="L1070" title="All 2 branches missed.">            if (isRTL()) {</span>
+<span class="nc" id="L1071">                keyFwd = Display.GAME_LEFT;</span>
+<span class="nc" id="L1072">                keyBck = Display.GAME_RIGHT;</span>
+            } else {
+<span class="nc" id="L1074">                keyFwd = Display.GAME_RIGHT;</span>
+<span class="nc" id="L1075">                keyBck = Display.GAME_LEFT;</span>
+            }
+<span class="nc bnc" id="L1077" title="All 4 branches missed.">            if (gameAction == Display.GAME_DOWN || gameAction == Display.GAME_UP) {</span>
+<span class="nc" id="L1078">                setHandlesInput(false);</span>
+            }
+        }
+
+<span class="fc" id="L1082">        int selectedIndex = model.getSelectedIndex();</span>
+<span class="pc bpc" id="L1083" title="1 of 2 branches missed.">        if (gameAction == keyBck) {</span>
+<span class="nc" id="L1084">            selectedIndex--;</span>
+<span class="nc bnc" id="L1085" title="All 2 branches missed.">            if (selectedIndex &lt; 0) {</span>
+<span class="nc bnc" id="L1086" title="All 4 branches missed.">                if (fixedSelection != FIXED_NONE &amp;&amp; fixedSelection != FIXED_NONE_ONE_ELEMENT_MARGIN_FROM_EDGE) {</span>
+<span class="nc" id="L1087">                    selectedIndex = size() - 1;</span>
+                } else {
+<span class="nc" id="L1089">                    selectedIndex = 0;</span>
+<span class="nc" id="L1090">                    setHandlesInput(false);</span>
+                }
+            }
+<span class="fc bfc" id="L1093" title="All 2 branches covered.">        } else if (gameAction == keyFwd) {</span>
+<span class="fc" id="L1094">            selectedIndex++;</span>
+<span class="pc bpc" id="L1095" title="1 of 2 branches missed.">            if (selectedIndex &gt;= size()) {</span>
+<span class="nc bnc" id="L1096" title="All 4 branches missed.">                if (fixedSelection != FIXED_NONE &amp;&amp; fixedSelection != FIXED_NONE_ONE_ELEMENT_MARGIN_FROM_EDGE) {</span>
+<span class="nc" id="L1097">                    selectedIndex = 0;</span>
+                } else {
+<span class="nc" id="L1099">                    selectedIndex = size() - 1;</span>
+<span class="nc" id="L1100">                    setHandlesInput(false);</span>
+                }
+            }
+        }
+
+<span class="fc bfc" id="L1105" title="All 2 branches covered.">        if (selectedIndex != model.getSelectedIndex()) {</span>
+<span class="fc" id="L1106">            model.setSelectedIndex(selectedIndex);</span>
+<span class="pc bpc" id="L1107" title="1 of 2 branches missed.">            int direction = (gameAction == keyFwd ? 1 : -1);</span>
+<span class="pc bpc" id="L1108" title="3 of 4 branches missed.">            if ((isRTL()) &amp;&amp; (getOrientation() == HORIZONTAL)) {</span>
+<span class="nc" id="L1109">                direction = -direction;</span>
+            }
+<span class="fc" id="L1111">            updateAnimationPosition(direction);</span>
+<span class="pc bpc" id="L1112" title="2 of 4 branches missed.">            if (fixedSelection == FIXED_NONE || fixedSelection == FIXED_NONE_CYCLIC) {</span>
+<span class="fc" id="L1113">                selectElement(selectedIndex);</span>
+            }
+<span class="pc bpc" id="L1115" title="1 of 2 branches missed.">            if (fixedSelection == FIXED_NONE_ONE_ELEMENT_MARGIN_FROM_EDGE) {</span>
+                // are we going down?
+<span class="nc bnc" id="L1117" title="All 2 branches missed.">                if (keyFwd == gameAction) {</span>
+<span class="nc" id="L1118">                    selectElement(Math.min(selectedIndex + 1, getModel().getSize() - 1));</span>
+                } else {
+<span class="nc" id="L1120">                    selectElement(Math.max(selectedIndex - 1, 0));</span>
+                }
+            }
+        }
+<span class="fc" id="L1124">        repaint();</span>
+<span class="fc" id="L1125">    }</span>
+
+    void selectElement(int selectedIndex) {
+<span class="fc" id="L1128">        Dimension size = getElementSize(false, true);</span>
+        Rectangle rect;
+<span class="pc bpc" id="L1130" title="1 of 2 branches missed.">        if (getOrientation() != HORIZONTAL) {</span>
+<span class="fc" id="L1131">            rect = new Rectangle(getX(), (size.getHeight() + itemGap) * selectedIndex, getElementSize(true, true));</span>
+        } else {
+<span class="nc" id="L1133">            int x = (size.getWidth() + itemGap) * selectedIndex;</span>
+<span class="nc bnc" id="L1134" title="All 4 branches missed.">            if (isRTL() &amp;&amp; isScrollableX()) {</span>
+<span class="nc" id="L1135">                x = getScrollDimension().getWidth() - x - (size.getWidth() + itemGap);</span>
+            }
+<span class="nc" id="L1137">            rect = new Rectangle(x, getY(), getElementSize(true, true));</span>
+        }
+<span class="pc bpc" id="L1139" title="1 of 2 branches missed.">        if (hasScrollableParent(getParent())) {</span>
+<span class="nc bnc" id="L1140" title="All 2 branches missed.">            if (hasFocus()) {</span>
+<span class="nc" id="L1141">                scrollRectToVisible(rect);</span>
+            }
+        } else {
+<span class="fc" id="L1144">            scrollRectToVisible(rect);</span>
+        }
+<span class="fc" id="L1146">    }</span>
+
+    private boolean hasScrollableParent(Container c) {
+<span class="fc bfc" id="L1149" title="All 2 branches covered.">        if (c == null) {</span>
+<span class="fc" id="L1150">            return false;</span>
+        }
+<span class="pc bpc" id="L1152" title="1 of 2 branches missed.">        if (c.isScrollable()) {</span>
+<span class="nc" id="L1153">            return true;</span>
+        }
+<span class="fc" id="L1155">        return hasScrollableParent(c.getParent());</span>
+    }
+
+    /// Updates the animation constant to a new value based on a keypress
+    ///
+    /// #### Parameters
+    ///
+    /// - `direction`: direction of the animation 1 or -1
+    private void updateAnimationPosition(int direction) {
+<span class="fc bfc" id="L1164" title="All 2 branches covered.">        if (animationPosition != 0) {</span>
+<span class="fc" id="L1165">            animationPosition = 0;</span>
+<span class="fc" id="L1166">            animate();</span>
+        }
+
+<span class="pc bpc" id="L1169" title="1 of 2 branches missed.">        if (isSmoothScrolling()) {</span>
+<span class="pc bpc" id="L1170" title="1 of 2 branches missed.">            if (orientation != HORIZONTAL) {</span>
+<span class="fc" id="L1171">                animationPosition += (direction * getElementSize(false, true).getHeight());</span>
+            } else {
+<span class="nc" id="L1173">                animationPosition += (direction * getElementSize(false, true).getWidth());</span>
+            }
+<span class="fc" id="L1175">            destination = Math.abs(animationPosition);</span>
+<span class="fc" id="L1176">            initListMotion();</span>
+        }
+<span class="fc" id="L1178">    }</span>
+
+    private void initListMotion() {
+<span class="fc" id="L1181">        TopLevelContainer p = getTopLevelContainer();</span>
+<span class="pc bpc" id="L1182" title="1 of 2 branches missed.">        if (p != null) {</span>
+<span class="fc" id="L1183">            TopLevelSupport.registerAnimatedInternal(p, this);</span>
+        }
+<span class="fc" id="L1185">        listMotion = Motion.createSplineMotion(0, destination, getScrollAnimationSpeed());</span>
+<span class="fc" id="L1186">        listMotion.start();</span>
+<span class="fc" id="L1187">    }</span>
+
+    /// Calculates the desired bounds for the component and returns them within the
+    /// given rectangle.
+    private void calculateComponentPosition(int index, int defaultWidth, Rectangle rect, Dimension rendererSize, Dimension selectedSize, boolean beforeSelected) {
+<span class="fc" id="L1192">        Style style = getStyle();</span>
+<span class="fc" id="L1193">        int initialY = style.getPaddingTop();</span>
+<span class="fc" id="L1194">        int initialX = style.getPaddingLeftNoRTL();</span>
+
+<span class="fc" id="L1196">        boolean rtl = isRTL();</span>
+<span class="pc bpc" id="L1197" title="1 of 2 branches missed.">        if (rtl) {</span>
+<span class="nc" id="L1198">            initialX += getSideGap();</span>
+        }
+
+<span class="fc" id="L1201">        int selection = getCurrentSelected();</span>
+
+<span class="fc" id="L1203">        Dimension d = rect.getSize();</span>
+        int selectedDiff;
+
+        // the algorithm illustrated here is very simple despite the &quot;mess&quot; of code...
+        // The idea is that if we have a &quot;fixed&quot; element we just add up the amount of pixels
+        // to get it into its place in the screen (nothing for top obviously).
+        // In order to cause the list to be cyclic we just subtract the list size
+        // which will cause the bottom elements to &quot;return&quot; from the top.
+<span class="pc bpc" id="L1211" title="1 of 2 branches missed.">        if (orientation != HORIZONTAL) {</span>
+<span class="fc" id="L1212">            int height = rendererSize.getHeight();</span>
+<span class="fc" id="L1213">            selectedDiff = selectedSize.getHeight() - height;</span>
+<span class="fc" id="L1214">            rect.setX(initialX);</span>
+<span class="fc" id="L1215">            d.setHeight(height);</span>
+<span class="fc" id="L1216">            d.setWidth(defaultWidth);</span>
+<span class="fc" id="L1217">            int y = 0;</span>
+<span class="fc" id="L1218">            int listHeight = getHeight() - style.getVerticalPadding();</span>
+<span class="fc" id="L1219">            int totalHeight = (height + itemGap) * getModel().getSize() + selectedDiff;</span>
+<span class="pc bpc" id="L1220" title="2 of 4 branches missed.">            switch (fixedSelection) {</span>
+                case FIXED_CENTER:
+<span class="fc" id="L1222">                    y = listHeight / 2 - (height + itemGap + selectedDiff) / 2 +</span>
+                            (index - selection) * (height + itemGap);
+<span class="fc bfc" id="L1224" title="All 2 branches covered.">                    if (!beforeSelected) {</span>
+<span class="fc" id="L1225">                        y += selectedDiff;</span>
+                    }
+<span class="fc" id="L1227">                    y = recalcOffset(y, totalHeight, listHeight, height + itemGap);</span>
+<span class="fc" id="L1228">                    break;</span>
+                case FIXED_TRAIL:
+<span class="nc" id="L1230">                    y = fixedLead(index, listHeight - (height + itemGap + selectedDiff), selection, height, selectedDiff, totalHeight, listHeight);</span>
+<span class="nc" id="L1231">                    break;</span>
+                case FIXED_LEAD:
+<span class="nc" id="L1233">                    y = fixedLead(index, y, selection, height, selectedDiff, totalHeight, listHeight);</span>
+<span class="nc" id="L1234">                    break;</span>
+                default:
+<span class="fc" id="L1236">                    y = index * (height + itemGap);</span>
+<span class="fc bfc" id="L1237" title="All 2 branches covered.">                    if (!beforeSelected) {</span>
+<span class="fc" id="L1238">                        y += selectedDiff;</span>
+                    }
+                    break;
+            }
+<span class="fc" id="L1242">            rect.setY(y + initialY);</span>
+<span class="fc bfc" id="L1243" title="All 2 branches covered.">            if (index == selection) {</span>
+<span class="fc" id="L1244">                d.setHeight(d.getHeight() + selectedDiff);</span>
+            }
+
+<span class="fc" id="L1247">        } else {</span>
+<span class="nc" id="L1248">            int width = rendererSize.getWidth();</span>
+<span class="nc" id="L1249">            selectedDiff = selectedSize.getWidth() - width;</span>
+<span class="nc" id="L1250">            rect.setY(initialY);</span>
+<span class="nc" id="L1251">            d.setHeight(getHeight() - style.getVerticalPadding());</span>
+<span class="nc" id="L1252">            d.setWidth(width);</span>
+<span class="nc" id="L1253">            int x = 0;</span>
+<span class="nc" id="L1254">            int listWidth = getWidth() - style.getHorizontalPadding();</span>
+<span class="nc" id="L1255">            int totalWidth = (width + itemGap) * getModel().getSize() + selectedDiff;</span>
+<span class="nc bnc" id="L1256" title="All 4 branches missed.">            switch (fixedSelection) {</span>
+                case FIXED_CENTER:
+<span class="nc" id="L1258">                    x = listWidth / 2 - (width + itemGap + selectedDiff) / 2 +</span>
+                            (index - selection) * (width + itemGap);
+<span class="nc bnc" id="L1260" title="All 2 branches missed.">                    if (!beforeSelected) {</span>
+<span class="nc" id="L1261">                        x += selectedDiff;</span>
+                    }
+<span class="nc bnc" id="L1263" title="All 2 branches missed.">                    if (rtl) {</span>
+<span class="nc" id="L1264">                        x = listWidth - x - width;</span>
+                    }
+
+<span class="nc" id="L1267">                    x = recalcOffset(x, totalWidth, listWidth, width + itemGap);</span>
+<span class="nc" id="L1268">                    break;</span>
+                case FIXED_TRAIL:
+<span class="nc" id="L1270">                    x = fixedLead(index, listWidth - (width + itemGap + selectedDiff),</span>
+                            selection, width, selectedDiff, rtl, listWidth, totalWidth);
+<span class="nc" id="L1272">                    break;</span>
+                case FIXED_LEAD:
+<span class="nc" id="L1274">                    x = fixedLead(index, x, selection, width, selectedDiff, rtl, listWidth, totalWidth);</span>
+<span class="nc" id="L1275">                    break;</span>
+                default:
+<span class="nc" id="L1277">                    x = index * (width + itemGap);</span>
+<span class="nc bnc" id="L1278" title="All 2 branches missed.">                    if (!beforeSelected) {</span>
+<span class="nc" id="L1279">                        x += selectedDiff;</span>
+                    }
+                    break;
+            }
+<span class="nc" id="L1283">            int rectX = initialX + x;</span>
+<span class="nc bnc" id="L1284" title="All 4 branches missed.">            if ((rtl) &amp;&amp; (fixedSelection &lt; FIXED_NONE_BOUNDRY)) {</span>
+<span class="nc" id="L1285">                rectX = initialX + totalWidth - (x - initialX) - (width + itemGap);</span>
+<span class="nc bnc" id="L1286" title="All 2 branches missed.">                if (index == getCurrentSelected()) {</span>
+<span class="nc" id="L1287">                    rectX -= selectedDiff;</span>
+                }
+<span class="nc bnc" id="L1289" title="All 2 branches missed.">                if (totalWidth &lt; listWidth) {</span>
+<span class="nc" id="L1290">                    rectX += (listWidth - totalWidth);</span>
+                }
+            }
+<span class="nc" id="L1293">            rect.setX(rectX);</span>
+<span class="nc bnc" id="L1294" title="All 2 branches missed.">            if (index == selection) {</span>
+<span class="nc" id="L1295">                d.setWidth(d.getWidth() + selectedDiff);</span>
+            }
+        }
+<span class="fc" id="L1298">    }</span>
+
+    private int fixedLead(int index, int x, int selection, int width, int selectedDiff, boolean rtl, int listWidth, int totalWidth) {
+<span class="nc" id="L1301">        x += (index - selection) * (width + itemGap);</span>
+<span class="nc bnc" id="L1302" title="All 2 branches missed.">        if (index - selection &gt; 0) {</span>
+<span class="nc" id="L1303">            x += selectedDiff;</span>
+        }
+<span class="nc bnc" id="L1305" title="All 2 branches missed.">        if (rtl) {</span>
+<span class="nc" id="L1306">            x = listWidth - x - width;</span>
+        }
+<span class="nc" id="L1308">        x = recalcOffset(x, totalWidth, listWidth, width + itemGap);</span>
+<span class="nc" id="L1309">        return x;</span>
+    }
+
+    private int fixedLead(int index, int y, int selection, int height, int selectedDiff, int totalHeight, int listHeight) {
+<span class="nc" id="L1313">        y += (index - selection) * (height + itemGap);</span>
+<span class="nc bnc" id="L1314" title="All 2 branches missed.">        if (index - selection &gt; 0) {</span>
+<span class="nc" id="L1315">            y += selectedDiff;</span>
+        }
+<span class="nc" id="L1317">        y = recalcOffset(y, totalHeight, listHeight, height + itemGap);</span>
+<span class="nc" id="L1318">        return y;</span>
+    }
+
+    /// Allows us to recalculate the bounds of a coordinate to make it &quot;loop&quot; back
+    /// into view
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: either x or y coordinate
+    ///
+    /// - `totalSize`: the total width or height of the list with all the elements (including scroll)
+    ///
+    /// - `viewSize`: the size visible to the user
+    ///
+    /// - `componentSize`: the size of the component
+    ///
+    /// #### Returns
+    ///
+    /// offset after manipulation if such manipulation was performed
+    private int recalcOffset(int offset, int totalSize, int viewSize, int componentSize) {
+<span class="fc bfc" id="L1338" title="All 2 branches covered.">        if (offset + (animationPosition % componentSize) +</span>
+                (fixedDraggedAnimationPosition % componentSize) &gt;= viewSize) {
+<span class="fc" id="L1340">            offset -= totalSize;</span>
+        } else {
+<span class="fc bfc" id="L1342" title="All 2 branches covered.">            if (offset + (animationPosition % componentSize) +</span>
+                    (fixedDraggedAnimationPosition % componentSize) &lt; 1 - componentSize) {
+<span class="fc" id="L1344">                offset += totalSize;</span>
+            }
+        }
+<span class="fc" id="L1347">        return offset;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void paint(Graphics g) {
+<span class="fc" id="L1353">        getUIManager().getLookAndFeel().drawList(g, this);</span>
+
+<span class="fc" id="L1355">        Style style = getStyle();</span>
+<span class="fc" id="L1356">        int width = getWidth() - style.getHorizontalPadding() - getSideGap();</span>
+<span class="pc bpc" id="L1357" title="1 of 2 branches missed.">        if (isScrollableX()) {</span>
+<span class="nc" id="L1358">            width = Math.max(width, getScrollDimension().getWidth() - style.getHorizontalPadding() - getSideGap());</span>
+        }
+<span class="fc" id="L1360">        int numOfcomponents = model.getSize();</span>
+<span class="fc bfc" id="L1361" title="All 2 branches covered.">        if (numOfcomponents == 0) {</span>
+<span class="fc" id="L1362">            paintHint(g);</span>
+<span class="fc" id="L1363">            return;</span>
+        }
+<span class="fc" id="L1365">        int xTranslate = getX();</span>
+<span class="fc" id="L1366">        int yTranslate = getY();</span>
+<span class="fc" id="L1367">        g.translate(xTranslate, yTranslate);</span>
+<span class="fc" id="L1368">        Rectangle pos = new Rectangle();</span>
+<span class="fc" id="L1369">        Dimension rendererSize = getElementSize(false, true);</span>
+
+<span class="fc bfc" id="L1371" title="All 2 branches covered.">        if (fixedSelection &gt; FIXED_NONE_BOUNDRY) {</span>
+<span class="pc bpc" id="L1372" title="2 of 4 branches missed.">            if (animationPosition != 0 || isDragActivated()) {</span>
+<span class="nc bnc" id="L1373" title="All 2 branches missed.">                if (orientation != HORIZONTAL) {</span>
+<span class="nc" id="L1374">                    yTranslate += (animationPosition + fixedDraggedAnimationPosition);</span>
+<span class="nc" id="L1375">                    g.translate(0, animationPosition + fixedDraggedAnimationPosition);</span>
+                } else {
+<span class="nc" id="L1377">                    xTranslate += (animationPosition + fixedDraggedAnimationPosition);</span>
+<span class="nc" id="L1378">                    g.translate(animationPosition + fixedDraggedAnimationPosition, 0);</span>
+                }
+            }
+        }
+<span class="fc" id="L1382">        int clipX = g.getClipX();</span>
+<span class="fc" id="L1383">        int clipY = g.getClipY();</span>
+<span class="fc" id="L1384">        int clipWidth = g.getClipWidth();</span>
+<span class="fc" id="L1385">        int clipHeight = g.getClipHeight();</span>
+
+        // this flag is for preformance improvements
+        // if we figured out that the list items are not visible anymore
+        // we should break from the List loop
+<span class="fc" id="L1390">        boolean shouldBreak = false;</span>
+
+        // improve performance for browsing the end of a very large list
+<span class="fc" id="L1393">        int startingPoint = 0;</span>
+<span class="fc bfc" id="L1394" title="All 2 branches covered.">        if (fixedSelection &lt; FIXED_NONE_BOUNDRY) {</span>
+<span class="fc" id="L1395">            int startX = clipX + getAbsoluteX();</span>
+<span class="pc bpc" id="L1396" title="1 of 2 branches missed.">            if (isRTL()) {</span>
+                //In RTL the start of the list is not in the left side of the viewport, but rather the right side
+<span class="nc" id="L1398">                startX += getWidth();</span>
+            }
+<span class="fc" id="L1400">            startingPoint = Math.max(0, pointerSelect(startX, clipY + getAbsoluteY()) - 1);</span>
+        }
+
+<span class="fc" id="L1403">        int startOffset = 0;</span>
+<span class="fc" id="L1404">        int endOffset = numOfcomponents;</span>
+
+<span class="pc bpc" id="L1406" title="1 of 2 branches missed.">        if (mutableRendererBackgrounds) {</span>
+<span class="nc bnc" id="L1407" title="All 2 branches missed.">            for (int i = startingPoint; i &lt; numOfcomponents; i++) {</span>
+                // skip on the selected
+<span class="nc bnc" id="L1409" title="All 6 branches missed.">                if (i == getCurrentSelected() &amp;&amp; animationPosition == 0 &amp;&amp; fixedDraggedAnimationPosition == 0) {</span>
+<span class="nc bnc" id="L1410" title="All 2 branches missed.">                    if (!shouldBreak) {</span>
+<span class="nc" id="L1411">                        startOffset = i;</span>
+                    }
+<span class="nc" id="L1413">                    endOffset = i;</span>
+<span class="nc" id="L1414">                    shouldBreak = true;</span>
+<span class="nc" id="L1415">                    continue;</span>
+                }
+<span class="nc bnc" id="L1417" title="All 2 branches missed.">                calculateComponentPosition(i, width, pos, rendererSize, getElementSize(true, true), i &lt;= getCurrentSelected());</span>
+
+                // if the renderer is in the clipping region
+<span class="nc bnc" id="L1420" title="All 2 branches missed.">                if (pos.intersects(clipX, clipY, clipWidth, clipHeight)) {</span>
+<span class="nc bnc" id="L1421" title="All 2 branches missed.">                    if (!shouldBreak) {</span>
+<span class="nc" id="L1422">                        startOffset = i;</span>
+                    }
+<span class="nc" id="L1424">                    endOffset = i;</span>
+<span class="nc" id="L1425">                    Dimension size = pos.getSize();</span>
+<span class="nc bnc" id="L1426" title="All 2 branches missed.">                    Component selectionCmp = renderer.getListCellRendererComponent(this, getModel().getItemAt(i), i, i == getCurrentSelected());</span>
+<span class="nc" id="L1427">                    renderComponentBackground(g, selectionCmp, pos.getX(), pos.getY(), size.getWidth(), size.getHeight());</span>
+<span class="nc" id="L1428">                    shouldBreak = true;</span>
+<span class="nc" id="L1429">                } else {</span>
+                    //this is relevant only if the List is not fixed.
+<span class="nc bnc" id="L1431" title="All 4 branches missed.">                    if (shouldBreak &amp;&amp; (fixedSelection &lt; FIXED_NONE_BOUNDRY)) {</span>
+<span class="nc" id="L1432">                        break;</span>
+                    }
+                }
+            }
+        } else {
+<span class="fc" id="L1437">            T valueAt0 = getModel().getItemAt(0);</span>
+            Component selectionCmp;
+<span class="fc" id="L1439">            int selectedIndex = getSelectedIndex();</span>
+<span class="pc bpc" id="L1440" title="2 of 4 branches missed.">            if (selectedIndex &gt; -1 &amp;&amp; selectedIndex &lt; numOfcomponents) {</span>
+                // this is essential otherwise we constantly ticker based on the value of the first entry
+<span class="fc" id="L1442">                selectionCmp = renderer.getListCellRendererComponent(this, getModel().getItemAt(selectedIndex), 0, true);</span>
+            } else {
+<span class="nc" id="L1444">                selectionCmp = renderer.getListCellRendererComponent(this, valueAt0, 0, true);</span>
+            }
+<span class="fc" id="L1446">            Component unselectedCmp = renderer.getListCellRendererComponent(this, valueAt0, 0, false);</span>
+<span class="fc bfc" id="L1447" title="All 2 branches covered.">            for (int i = startingPoint; i &lt; numOfcomponents; i++) {</span>
+                // skip on the selected
+<span class="pc bpc" id="L1449" title="1 of 4 branches missed.">                if (i == getCurrentSelected() &amp;&amp; animationPosition == 0) {</span>
+<span class="fc bfc" id="L1450" title="All 2 branches covered.">                    if (!shouldBreak) {</span>
+<span class="fc" id="L1451">                        startOffset = i;</span>
+                    }
+<span class="fc" id="L1453">                    endOffset = i;</span>
+<span class="fc" id="L1454">                    shouldBreak = true;</span>
+<span class="fc" id="L1455">                    continue;</span>
+                }
+<span class="fc bfc" id="L1457" title="All 2 branches covered.">                calculateComponentPosition(i, width, pos, rendererSize, getElementSize(true, true), i &lt;= getCurrentSelected());</span>
+
+                // if the renderer is in the clipping region
+<span class="fc bfc" id="L1460" title="All 2 branches covered.">                if (pos.intersects(clipX, clipY, clipWidth, clipHeight)) {</span>
+<span class="fc bfc" id="L1461" title="All 2 branches covered.">                    if (!shouldBreak) {</span>
+<span class="fc" id="L1462">                        startOffset = i;</span>
+                    }
+<span class="fc" id="L1464">                    endOffset = i;</span>
+<span class="pc bpc" id="L1465" title="1 of 2 branches missed.">                    if (i == getCurrentSelected()) {</span>
+<span class="nc" id="L1466">                        Dimension size = pos.getSize();</span>
+<span class="nc" id="L1467">                        renderComponentBackground(g, selectionCmp, pos.getX(), pos.getY(), size.getWidth(), size.getHeight());</span>
+<span class="nc" id="L1468">                    } else {</span>
+<span class="fc" id="L1469">                        Dimension size = pos.getSize();</span>
+<span class="fc" id="L1470">                        renderComponentBackground(g, unselectedCmp, pos.getX(), pos.getY(), size.getWidth(), size.getHeight());</span>
+                    }
+<span class="fc" id="L1472">                    shouldBreak = true;</span>
+                } else {
+                    //this is relevant only if the List is not fixed.
+<span class="fc bfc" id="L1475" title="All 4 branches covered.">                    if (shouldBreak &amp;&amp; (fixedSelection &lt; FIXED_NONE_BOUNDRY)) {</span>
+<span class="fc" id="L1476">                        break;</span>
+                    }
+                }
+            }
+        }
+
+<span class="pc bpc" id="L1482" title="5 of 8 branches missed.">        boolean shouldRendererSelectedEntry = (renderer.getListFocusComponent(this) == null &amp;&amp; (fixedSelection &lt; FIXED_NONE_BOUNDRY)) || animationPosition == 0 &amp;&amp; model.getSize() &gt; 0;</span>
+<span class="fc" id="L1483">        Rectangle selectedPos = new Rectangle();</span>
+<span class="fc" id="L1484">        calculateComponentPosition(getCurrentSelected(), width, selectedPos, rendererSize, getElementSize(true, true), true);</span>
+<span class="fc" id="L1485">        Dimension size = selectedPos.getSize();</span>
+<span class="fc" id="L1486">        int curSel = getCurrentSelected();</span>
+<span class="pc bpc" id="L1487" title="3 of 6 branches missed.">        if (shouldRendererSelectedEntry &amp;&amp; curSel &gt; -1 &amp;&amp; curSel &lt; model.getSize()) {</span>
+<span class="fc" id="L1488">            Component selected = renderer.getListCellRendererComponent(this, model.getItemAt(getCurrentSelected()), getCurrentSelected(), true);</span>
+<span class="fc" id="L1489">            renderComponentBackground(g, selected, selectedPos.getX(), selectedPos.getY(), size.getWidth(), size.getHeight());</span>
+        }
+
+<span class="pc bpc" id="L1492" title="1 of 2 branches missed.">        if (paintFocusBehindList) {</span>
+<span class="fc" id="L1493">            paintFocus(g, width, pos, rendererSize);</span>
+        }
+<span class="fc bfc" id="L1495" title="All 2 branches covered.">        for (int i = startOffset; i &lt;= endOffset; i++) {</span>
+            // skip on the selected
+<span class="pc bpc" id="L1497" title="1 of 4 branches missed.">            if (i == getCurrentSelected() &amp;&amp; animationPosition == 0) {</span>
+<span class="fc" id="L1498">                continue;</span>
+            }
+<span class="fc bfc" id="L1500" title="All 2 branches covered.">            calculateComponentPosition(i, width, pos, rendererSize, getElementSize(true, true), i &lt;= getCurrentSelected());</span>
+
+<span class="pc bpc" id="L1502" title="1 of 2 branches missed.">            if (pos.intersects(clipX, clipY, clipWidth, clipHeight)) {</span>
+<span class="fc" id="L1503">                T value = model.getItemAt(i);</span>
+<span class="fc" id="L1504">                Component cmp = renderer.getListCellRendererComponent(this, value, i, false);</span>
+<span class="fc" id="L1505">                cmp.setCellRenderer(true);</span>
+<span class="fc" id="L1506">                Dimension sizeC = pos.getSize();</span>
+<span class="fc" id="L1507">                renderComponent(g, cmp, pos.getX(), pos.getY(), sizeC.getWidth(), sizeC.getHeight());</span>
+            }
+        }
+        //if the animation has finished draw the selected element
+<span class="pc bpc" id="L1511" title="1 of 2 branches missed.">        if (shouldRendererSelectedEntry) {</span>
+<span class="fc" id="L1512">            Component selected = renderer.getListCellRendererComponent(this, model.getItemAt(getCurrentSelected()), getCurrentSelected(), true);</span>
+<span class="fc" id="L1513">            renderComponent(g, selected, selectedPos.getX(), selectedPos.getY(), size.getWidth(), size.getHeight());</span>
+        }
+
+<span class="pc bpc" id="L1516" title="1 of 2 branches missed.">        if (!paintFocusBehindList) {</span>
+<span class="nc" id="L1517">            paintFocus(g, width, pos, rendererSize);</span>
+        }
+
+<span class="fc" id="L1520">        g.translate(-xTranslate, -yTranslate);</span>
+<span class="pc bpc" id="L1521" title="1 of 2 branches missed.">        if (spinnerOverlay != null) {</span>
+<span class="nc bnc" id="L1522" title="All 2 branches missed.">            if (spinnerOverlay.getBorder() != null) {</span>
+<span class="nc" id="L1523">                spinnerOverlay.getBorder().paintBorderBackground(g, this);</span>
+<span class="nc" id="L1524">                spinnerOverlay.getBorder().paint(g, this);</span>
+            } else {
+<span class="nc" id="L1526">                spinnerOverlay.getBgPainter().paint(g, getBounds());</span>
+            }
+        }
+<span class="fc" id="L1529">    }</span>
+
+    /// Allows subclasses to override the selection rendering for the component, specifically the spinner
+    /// in some themes
+    ///
+    /// #### Returns
+    ///
+    /// true to render the selection, false otherwise.
+    protected boolean shouldRenderSelection() {
+<span class="fc" id="L1538">        return Display.getInstance().shouldRenderSelection(this);</span>
+    }
+
+    private void paintFocus(Graphics g, int width, Rectangle pos, Dimension rendererSize) {
+<span class="pc bpc" id="L1542" title="1 of 4 branches missed.">        if (ignoreFocusComponentWhenUnfocused &amp;&amp; !hasFocus()) {</span>
+<span class="fc" id="L1543">            return;</span>
+        }
+<span class="pc bpc" id="L1545" title="1 of 2 branches missed.">        if (!shouldRenderSelection()) {</span>
+<span class="nc" id="L1546">            return;</span>
+        }
+<span class="fc" id="L1548">        calculateComponentPosition(getCurrentSelected(), width, pos, rendererSize, getElementSize(true, true), true);</span>
+<span class="fc" id="L1549">        Dimension size = pos.getSize();</span>
+
+<span class="fc" id="L1551">        Component cmp = renderer.getListFocusComponent(this);</span>
+<span class="pc bpc" id="L1552" title="1 of 2 branches missed.">        if (cmp != null) {</span>
+<span class="fc" id="L1553">            cmp.setCellRenderer(true);</span>
+<span class="fc" id="L1554">            int x = pos.getX();</span>
+<span class="fc" id="L1555">            int y = pos.getY();</span>
+
+            // prevent focus animation from working during a drag operation
+<span class="pc bpc" id="L1558" title="1 of 2 branches missed.">            if (orientation != HORIZONTAL) {</span>
+<span class="fc" id="L1559">                y -= (animationPosition + fixedDraggedAnimationPosition);</span>
+            } else {
+<span class="nc" id="L1561">                x -= (animationPosition + fixedDraggedAnimationPosition);</span>
+            }
+<span class="fc" id="L1563">            renderComponentBackground(g, cmp, x, y, size.getWidth(), size.getHeight());</span>
+<span class="fc" id="L1564">            renderComponent(g, cmp, x, y, size.getWidth(), size.getHeight());</span>
+        }
+
+<span class="fc" id="L1567">    }</span>
+
+    /// Renders the current component on the screen
+    private void renderComponent(Graphics g, Component cmp, int x, int y, int width, int height) {
+<span class="fc" id="L1571">        Style s = cmp.getStyle();</span>
+<span class="fc" id="L1572">        int left = s.getMarginLeft(isRTL());</span>
+<span class="fc" id="L1573">        int top = s.getMarginTop();</span>
+<span class="fc" id="L1574">        cmp.setWidth(width - left - s.getMarginRight(isRTL()));</span>
+<span class="fc" id="L1575">        cmp.setHeight(height - top - s.getMarginBottom());</span>
+<span class="fc" id="L1576">        cmp.setX(x + left);</span>
+<span class="fc" id="L1577">        cmp.setY(y + top);</span>
+
+<span class="fc" id="L1579">        int oX = g.getClipX();</span>
+<span class="fc" id="L1580">        int oY = g.getClipY();</span>
+<span class="fc" id="L1581">        int oWidth = g.getClipWidth();</span>
+<span class="fc" id="L1582">        int oHeight = g.getClipHeight();</span>
+        //g.pushClip();
+<span class="fc" id="L1584">        g.clipRect(cmp.getX(), cmp.getY(), cmp.getWidth(), cmp.getHeight());</span>
+<span class="fc bfc" id="L1585" title="All 2 branches covered.">        if (cmp instanceof Container) {</span>
+<span class="fc" id="L1586">            ((Container) cmp).layoutContainer();</span>
+        }
+<span class="fc" id="L1588">        cmp.paint(g);</span>
+<span class="fc" id="L1589">        Border b = s.getBorder();</span>
+<span class="pc bpc" id="L1590" title="3 of 4 branches missed.">        if (b != null &amp;&amp; !b.isBackgroundPainter()) {</span>
+<span class="nc" id="L1591">            cmp.paintBorder(g);</span>
+        }
+<span class="fc" id="L1593">        g.setClip(oX, oY, oWidth, oHeight);</span>
+        //g.popClip();
+<span class="fc" id="L1595">    }</span>
+
+    private void renderComponentBackground(Graphics g, Component cmp, int x, int y, int width, int height) {
+<span class="fc" id="L1598">        Style s = cmp.getStyle();</span>
+<span class="fc" id="L1599">        int left = s.getMarginLeft(isRTL());</span>
+<span class="fc" id="L1600">        int top = s.getMarginTop();</span>
+<span class="fc" id="L1601">        cmp.setWidth(width - left - s.getMarginRight(isRTL()));</span>
+<span class="fc" id="L1602">        cmp.setHeight(height - top - s.getMarginBottom());</span>
+<span class="fc" id="L1603">        cmp.setX(x + left);</span>
+<span class="fc" id="L1604">        cmp.setY(y + top);</span>
+<span class="fc" id="L1605">        int cX = g.getClipX();</span>
+<span class="fc" id="L1606">        int cY = g.getClipY();</span>
+<span class="fc" id="L1607">        int cW = g.getClipWidth();</span>
+<span class="fc" id="L1608">        int cH = g.getClipHeight();</span>
+        //g.pushClip();
+<span class="fc" id="L1610">        g.clipRect(cmp.getX(), cmp.getY(), cmp.getWidth(), cmp.getHeight());</span>
+<span class="fc bfc" id="L1611" title="All 2 branches covered.">        if (cmp instanceof Container) {</span>
+<span class="fc" id="L1612">            ((Container) cmp).layoutContainer();</span>
+        }
+<span class="fc" id="L1614">        cmp.paintComponentBackground(g);</span>
+<span class="fc" id="L1615">        g.setClip(cX, cY, cW, cH);</span>
+        //g.popClip();
+<span class="fc" id="L1617">    }</span>
+
+    /// Invoked to indicate interest in future selection events
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the selection listener to be added
+    public void addSelectionListener(SelectionListener l) {
+<span class="fc" id="L1625">        model.addSelectionListener(l);</span>
+<span class="fc" id="L1626">    }</span>
+
+    /// Invoked to indicate no further interest in future selection events
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the selection listener to be removed
+    public void removeSelectionListener(SelectionListener l) {
+<span class="fc" id="L1634">        model.removeSelectionListener(l);</span>
+<span class="fc" id="L1635">    }</span>
+
+    /// Allows binding a listener to user selection actions
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the action listener to be added
+    @Override
+    public void addActionListener(ActionListener l) {
+<span class="fc" id="L1644">        dispatcher.addListener(l);</span>
+<span class="fc" id="L1645">    }</span>
+
+    /// This method allows extracting the action listeners from the current list
+    ///
+    /// #### Returns
+    ///
+    /// vector containing the action listeners on the list
+    ///
+    /// #### Deprecated
+    ///
+    /// use getListeners instead
+    public Vector getActionListeners() {
+<span class="nc" id="L1657">        return dispatcher.getListenerVector();</span>
+    }
+
+    /// This method allows extracting the action listeners from the current list
+    ///
+    /// #### Returns
+    ///
+    /// Collection containing the action listeners on the list
+    public Collection getListeners() {
+<span class="nc" id="L1666">        return dispatcher.getListenerCollection();</span>
+    }
+
+    /// Allows binding a listener to user selection actions
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the action listener to be removed
+    @Override
+    public void removeActionListener(ActionListener l) {
+<span class="fc" id="L1676">        dispatcher.removeListener(l);</span>
+<span class="fc" id="L1677">    }</span>
+
+    /// Fires an action event for the current event source.
+    @Override
+    protected void fireActionEvent() {
+<span class="fc" id="L1682">        fireActionEvent(new ActionEvent(eventSource, ActionEvent.Type.Other));</span>
+<span class="fc" id="L1683">    }</span>
+
+    /// Triggers the event to the listeners
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: the event to fire
+    protected void fireActionEvent(ActionEvent a) {
+<span class="pc bpc" id="L1691" title="2 of 4 branches missed.">        if (isEnabled() &amp;&amp; !Display.getInstance().hasDragOccured()) {</span>
+<span class="fc bfc" id="L1692" title="All 2 branches covered.">            if (disposeDialogOnSelection) {</span>
+<span class="fc" id="L1693">                popupSelectionFired = true;</span>
+                // The enclosing Dialog, found the same way an activated command finds
+                // who owns it. getComponentForm() used to be enough because a Dialog
+                // always was the current form; a Dialog hosted in a Window is a
+                // parented Form, so that lookup returns null there and selecting an
+                // item left the popup open with its caller still blocked. A list that
+                // is not in a dialog resolves to its top level and disposes nothing,
+                // which is what Form.dispose() did for it before.
+<span class="fc" id="L1701">                Container disposing = TopLevelSupport.commandHostOf(this);</span>
+<span class="pc bpc" id="L1702" title="1 of 2 branches missed.">                if (disposing instanceof Dialog) {</span>
+<span class="fc" id="L1703">                    ((Dialog) disposing).dispose();</span>
+                }
+            }
+<span class="fc" id="L1706">            super.fireActionEvent();</span>
+<span class="fc" id="L1707">            dispatcher.fireActionEvent(a);</span>
+<span class="pc bpc" id="L1708" title="1 of 4 branches missed.">            if (isCommandList() &amp;&amp; !a.isConsumed()) {</span>
+<span class="fc" id="L1709">                T i = getSelectedItem();</span>
+<span class="pc bpc" id="L1710" title="3 of 6 branches missed.">                if (i != null &amp;&amp; i instanceof Command &amp;&amp; ((Command) i).isEnabled()) {</span>
+<span class="fc" id="L1711">                    ((Command) i).actionPerformed(a);</span>
+<span class="pc bpc" id="L1712" title="1 of 2 branches missed.">                    if (!a.isConsumed()) {</span>
+                        // The command host rather than the form: getComponentForm() is
+                        // null by design inside a Window, so a command list there invoked
+                        // the command and then told nobody -- the window's command
+                        // listeners never saw the activation. It is also not simply the
+                        // top level: a Dialog hosted in a window's layered pane is a
+                        // parented Form, which that walk goes straight past. Neither
+                        // branch re-invokes the command, which has just run above.
+<span class="fc" id="L1720">                        Container host = TopLevelSupport.commandHostOf(this);</span>
+<span class="pc bpc" id="L1721" title="1 of 2 branches missed.">                        if (host != null) {</span>
+<span class="fc" id="L1722">                            host.commandActivatedFromList((Command) i, a);</span>
+                        }
+                    }
+                }
+            }
+<span class="fc" id="L1727">            Display d = Display.getInstance();</span>
+<span class="fc bfc" id="L1728" title="All 2 branches covered.">            if (d.isBuiltinSoundsEnabled()) {</span>
+<span class="fc" id="L1729">                d.playBuiltinSound(Display.SOUND_TYPE_BUTTON_PRESS);</span>
+            }
+        }
+<span class="fc" id="L1732">    }</span>
+
+    /// A list can start handling input implicitly upon gaining focus, this can
+    /// make for a more intuitive UI when no other focus elements exist or when
+    /// their use case is infrequent. However, it might be odd in some cases
+    /// where the list &quot;steals&quot; focus.
+    ///
+    /// #### Parameters
+    ///
+    /// - `inputOnFocus`: @param inputOnFocus true is a list can start handling input
+    /// implicitly upon gaining focus
+    public void setInputOnFocus(boolean inputOnFocus) {
+<span class="fc" id="L1744">        this.inputOnFocus = inputOnFocus;</span>
+<span class="fc" id="L1745">    }</span>
+
+    /// This method determines if the animated focus is drawn on top of the List
+    /// or behind the List when moving.
+    ///
+    /// #### Parameters
+    ///
+    /// - `paintFocusBehindList`
+    public void setPaintFocusBehindList(boolean paintFocusBehindList) {
+<span class="nc" id="L1754">        this.paintFocusBehindList = paintFocusBehindList;</span>
+<span class="nc" id="L1755">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    void focusGainedInternal() {
+<span class="fc" id="L1760">        super.focusGainedInternal();</span>
+<span class="fc bfc" id="L1761" title="All 2 branches covered.">        if (inputOnFocus) {</span>
+<span class="fc" id="L1762">            setHandlesInput(true);</span>
+        }
+<span class="fc" id="L1764">    }</span>
+
+    /// Returns the gap between items
+    ///
+    /// #### Returns
+    ///
+    /// the gap between items
+    public int getItemGap() {
+<span class="fc" id="L1772">        return itemGap;</span>
+    }
+
+    /// Set the gap between items
+    ///
+    /// #### Parameters
+    ///
+    /// - `itemGap`: the gap between items
+    public void setItemGap(int itemGap) {
+<span class="fc" id="L1781">        this.itemGap = itemGap;</span>
+<span class="fc" id="L1782">    }</span>
+
+    /// See set rendering prototype
+    ///
+    /// #### Returns
+    ///
+    /// the value of the rendering prototype
+    ///
+    /// #### See also
+    ///
+    /// - #setRenderingPrototype(java.lang.Object)
+    public T getRenderingPrototype() {
+<span class="fc" id="L1794">        return renderingPrototype;</span>
+    }
+
+    /// The rendering prototype is optionally used in calculating the size of the
+    /// List and is recommended for performance reasons. You should invoke it with an object
+    /// representing a theoretical value in the list which will be used to calculate
+    /// the size required for each element in the list.
+    ///
+    /// This allows list size calculations to work across look and feels and allows
+    /// developers to predetermine size for list elements.
+    ///
+    /// e.g. For a list of Strings which you would like to always be 5 characters wide
+    /// you can use a prototype &quot;XXXXX&quot; which would use the preferred size of the XXXXX
+    /// String to determine the size of the list element. E.g. for a list of dates you can use
+    /// new Date(30, 12, 00) etc..
+    ///
+    /// The example below was designed for `com.codename1.ui.list.MultiList` but
+    /// should work for any list. Its goal is to render 2 lines of text with 20 characters and a
+    /// 5mm square icon:
+    ///
+    /// ```java
+    /// Map proto = new HashMap&lt;&gt;();
+    /// map.put(&quot;Line1&quot;, &quot;WWWWWWWWWWWWWWWWWWWW&quot;);
+    /// map.put(&quot;Line2&quot;, &quot;WWWWWWWWWWWWWWWWWWWW&quot;);
+    /// int mm5 = Display.getInstance().convertToPixels(5, true);
+    /// map.put(&quot;icon&quot;, Image.create(mm5, mm5));
+    /// myMultiList.setRenderingPrototype(map);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `renderingPrototype`: @param renderingPrototype a value that can be passed to the renderer to indicate the preferred
+    /// size of a list component.
+    public void setRenderingPrototype(T renderingPrototype) {
+<span class="fc" id="L1828">        this.renderingPrototype = renderingPrototype;</span>
+<span class="fc" id="L1829">    }</span>
+
+    /// Calculates the default size for elements on the list
+    ///
+    /// #### Returns
+    ///
+    /// the default dimension for elements in a list
+    Dimension getElementSize(boolean selected, boolean addMargin) {
+<span class="fc bfc" id="L1837" title="All 2 branches covered.">        if (selected) {</span>
+<span class="fc bfc" id="L1838" title="All 2 branches covered.">            if (selectedElemSize == null) {</span>
+                // don't keep element size if there are no elements and no prototype...
+<span class="fc bfc" id="L1840" title="All 2 branches covered.">                if (renderingPrototype == null) {</span>
+<span class="fc bfc" id="L1841" title="All 2 branches covered.">                    if (model.getSize() == 0) {</span>
+                        // put a sensible value as default when there are no elements or rendering prototype
+<span class="pc bpc" id="L1843" title="1 of 2 branches missed.">                        if (addMargin) {</span>
+<span class="fc" id="L1844">                            return new Label(&quot;XXXXXX&quot;).getPreferredSizeWithMargin();</span>
+                        }
+<span class="nc" id="L1846">                        return new Label(&quot;XXXXXX&quot;).getPreferredSize();</span>
+                    }
+                }
+<span class="fc" id="L1849">                selectedElemSize = calculateElementSize(true, addMargin);</span>
+            }
+<span class="fc" id="L1851">            return selectedElemSize;</span>
+        } else {
+<span class="fc bfc" id="L1853" title="All 2 branches covered.">            if (elemSize == null) {</span>
+                // don't keep element size if there are no elements and no prototype...
+<span class="fc bfc" id="L1855" title="All 2 branches covered.">                if (renderingPrototype == null) {</span>
+<span class="fc bfc" id="L1856" title="All 2 branches covered.">                    if (model.getSize() == 0) {</span>
+                        // put a sensible value as default when there are no elements or rendering prototype
+<span class="fc" id="L1858">                        Label l = new Label(&quot;XXXXXX&quot;);</span>
+<span class="pc bpc" id="L1859" title="1 of 2 branches missed.">                        if (addMargin) {</span>
+<span class="fc" id="L1860">                            return l.getPreferredSizeWithMargin();</span>
+                        } else {
+<span class="nc" id="L1862">                            return l.getPreferredSize();</span>
+                        }
+                    }
+                }
+<span class="fc" id="L1866">                elemSize = calculateElementSize(false, addMargin);</span>
+            }
+<span class="fc" id="L1868">            return elemSize;</span>
+        }
+    }
+
+    /// Calculates the size of an element based on a forumla or on rendering prototype
+    private Dimension calculateElementSize(boolean selected, boolean addMargin) {
+<span class="fc bfc" id="L1874" title="All 2 branches covered.">        if (renderingPrototype != null) {</span>
+<span class="fc" id="L1875">            Component unselected = renderer.getListCellRendererComponent(this, renderingPrototype, 0, selected);</span>
+<span class="pc bpc" id="L1876" title="1 of 2 branches missed.">            if (addMargin) {</span>
+<span class="fc" id="L1877">                return unselected.getPreferredSizeWithMargin();</span>
+            } else {
+<span class="nc" id="L1879">                return unselected.getPreferredSize();</span>
+            }
+        }
+<span class="fc" id="L1882">        int width = 0;</span>
+<span class="fc" id="L1883">        int height = 0;</span>
+<span class="fc" id="L1884">        int elements = Math.min(listSizeCalculationSampleCount, model.getSize());</span>
+<span class="fc" id="L1885">        int marginY = 0;</span>
+<span class="fc" id="L1886">        int marginX = 0;</span>
+<span class="fc bfc" id="L1887" title="All 2 branches covered.">        for (int iter = 0; iter &lt; elements; iter++) {</span>
+<span class="fc" id="L1888">            Component cmp = renderer.getListCellRendererComponent(this, model.getItemAt(iter), iter, selected);</span>
+<span class="fc bfc" id="L1889" title="All 2 branches covered.">            if (cmp instanceof Container) {</span>
+<span class="fc" id="L1890">                cmp.setShouldCalcPreferredSize(true);</span>
+            }
+<span class="fc" id="L1892">            Dimension d = cmp.getPreferredSize();</span>
+<span class="fc" id="L1893">            width = Math.max(width, d.getWidth());</span>
+<span class="fc" id="L1894">            height = Math.max(height, d.getHeight());</span>
+<span class="fc bfc" id="L1895" title="All 2 branches covered.">            if (iter == 0) {</span>
+<span class="fc" id="L1896">                Style s = cmp.getStyle();</span>
+<span class="fc" id="L1897">                marginY = s.getVerticalMargins();</span>
+<span class="fc" id="L1898">                marginX = s.getHorizontalMargins();</span>
+            }
+        }
+<span class="fc" id="L1901">        return new Dimension(width + marginX, height + marginY);</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void longPointerPress(int x, int y) {
+<span class="nc bnc" id="L1907" title="All 2 branches missed.">        if (!isEnabled()) {</span>
+<span class="nc" id="L1908">            return;</span>
+        }
+<span class="nc bnc" id="L1910" title="All 2 branches missed.">        if (longPointerPressAction) {</span>
+<span class="nc" id="L1911">            int s = pointerSelect(x, y);</span>
+<span class="nc bnc" id="L1912" title="All 2 branches missed.">            if (s &gt; -1) {</span>
+<span class="nc" id="L1913">                model.setSelectedIndex(s);</span>
+            }
+<span class="nc" id="L1915">            pointerReleasedImpl(x, y, false, true);</span>
+        }
+<span class="nc" id="L1917">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerPressed(int x, int y) {
+<span class="pc bpc" id="L1922" title="1 of 2 branches missed.">        if (!isEnabled()) {</span>
+<span class="nc" id="L1923">            return;</span>
+        }
+<span class="pc bpc" id="L1925" title="1 of 2 branches missed.">        if (fixedSelection &gt; FIXED_NONE_BOUNDRY) {</span>
+            // for a fixed list we need to store the initial drag position
+<span class="nc bnc" id="L1927" title="All 2 branches missed.">            if (isSmoothScrolling()) {</span>
+<span class="nc bnc" id="L1928" title="All 2 branches missed.">                if (orientation != HORIZONTAL) {</span>
+<span class="nc" id="L1929">                    fixedDraggedPosition = y;</span>
+                } else {
+<span class="nc" id="L1931">                    fixedDraggedPosition = x;</span>
+                }
+<span class="nc bnc" id="L1933" title="All 2 branches missed.">                if (isDragActivated()) {</span>
+<span class="nc" id="L1934">                    int selected = getCurrentSelected();</span>
+<span class="nc" id="L1935">                    model.setSelectedIndex(selected);</span>
+<span class="nc" id="L1936">                    fixedDraggedMotion = null;</span>
+<span class="nc" id="L1937">                    fixedDraggedAnimationPosition = 0;</span>
+                }
+<span class="nc" id="L1939">                fixedDraggedSelection = getModel().getSelectedIndex();</span>
+            }
+        }
+        // prevent a hover event from activating the drag in case of a click screen,
+        // this is essential for the Storm device
+<span class="fc" id="L1944">        setDragActivated(false);</span>
+<span class="fc" id="L1945">        int current = model.getSelectedIndex();</span>
+<span class="fc" id="L1946">        int selection = pointerSelect(x, y);</span>
+
+<span class="pc bpc" id="L1948" title="2 of 4 branches missed.">        if (selection &gt; -1 &amp;&amp; fixedSelection &lt; FIXED_NONE_BOUNDRY) {</span>
+<span class="fc" id="L1949">            model.setSelectedIndex(selection);</span>
+        }
+<span class="pc bpc" id="L1951" title="1 of 2 branches missed.">        fireOnRelease = current == selection;</span>
+
+<span class="fc" id="L1953">        super.pointerPressed(x, y);</span>
+<span class="fc" id="L1954">    }</span>
+
+    /// Highlights the row under the pointer, in the popup of a `ComboBox` and nowhere else.
+    ///
+    /// The highlight is the model's selection, because that is the only thing a list
+    /// paints as highlighted and the thing Enter and a click then act on. In a combo popup
+    /// that is safe: the selection there is provisional until a row is chosen, and
+    /// `ComboBox#fireClicked()` puts the original one back whenever the popup goes away
+    /// without a choice. It is what every desktop toolkit does with a drop down.
+    ///
+    /// A list sitting on a form is deliberately left alone. Its selection is state: the
+    /// application reads it, listens to it and often loads a detail view from it, and
+    /// nothing would restore it afterwards. Moving it because the mouse crossed the list
+    /// on its way somewhere else would be a change the user never asked for.
+    ///
+    /// A list with a fixed selection (the spinner arrangement) is skipped as well: there
+    /// the selected row is a position on screen that the rows move through, so it cannot
+    /// follow the pointer. No scrolling goes with the highlight -- a half visible row at
+    /// the edge would otherwise pull the list along under a pointer that is standing still.
+    @Override
+    public void pointerHover(int[] x, int[] y) {
+<span class="pc bpc" id="L1975" title="5 of 12 branches missed.">        if (!disposeDialogOnSelection || !isEnabled() || x == null || y == null</span>
+                || x.length == 0 || y.length == 0) {
+<span class="fc" id="L1977">            return;</span>
+        }
+<span class="pc bpc" id="L1979" title="3 of 6 branches missed.">        if (fixedSelection &gt; FIXED_NONE_BOUNDRY || isDragActivated() || Display.impl.isScrollWheeling()) {</span>
+<span class="nc" id="L1980">            return;</span>
+        }
+<span class="pc bpc" id="L1982" title="1 of 2 branches missed.">        if (!contains(x[0], y[0])) {</span>
+<span class="nc" id="L1983">            return;</span>
+        }
+<span class="fc" id="L1985">        int row = pointerSelect(x[0], y[0]);</span>
+<span class="pc bpc" id="L1986" title="2 of 4 branches missed.">        if (row &gt; -1 &amp;&amp; row != model.getSelectedIndex()) {</span>
+<span class="fc" id="L1987">            model.setSelectedIndex(row);</span>
+        }
+<span class="fc" id="L1989">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerDragged(int x, int y) {
+<span class="nc" id="L1994">        pointerDraggedImpl(x, y);</span>
+<span class="nc" id="L1995">    }</span>
+
+    private void pointerDraggedImpl(int x, int y) {
+<span class="nc bnc" id="L1998" title="All 2 branches missed.">        if (!isEnabled()) {</span>
+<span class="nc" id="L1999">            return;</span>
+        }
+<span class="nc bnc" id="L2001" title="All 2 branches missed.">        if (isSmoothScrolling()) {</span>
+<span class="nc bnc" id="L2002" title="All 2 branches missed.">            if (fixedSelection &lt; FIXED_NONE_BOUNDRY) {</span>
+<span class="nc" id="L2003">                super.pointerDragged(x, y);</span>
+            } else {
+<span class="nc bnc" id="L2005" title="All 2 branches missed.">                if (!isDragActivated()) {</span>
+<span class="nc" id="L2006">                    setDragActivated(true);</span>
+                }
+<span class="nc" id="L2008">                Dimension size = getElementSize(false, true);</span>
+<span class="nc bnc" id="L2009" title="All 2 branches missed.">                boolean vertical = orientation == List.VERTICAL;</span>
+                int pos;
+                int s;
+<span class="nc bnc" id="L2012" title="All 2 branches missed.">                if (vertical) {</span>
+<span class="nc" id="L2013">                    pos = y;</span>
+<span class="nc" id="L2014">                    s = size.getHeight();</span>
+                } else {
+<span class="nc" id="L2016">                    pos = x;</span>
+<span class="nc" id="L2017">                    s = size.getWidth();</span>
+                }
+<span class="nc" id="L2019">                fixedDraggedAnimationPosition = fixedDraggedAnimationPosition - (fixedDraggedPosition - pos);</span>
+<span class="nc" id="L2020">                fixedDraggedPosition = pos;</span>
+<span class="nc bnc" id="L2021" title="All 2 branches missed.">                if (fixedDraggedAnimationPosition &lt;= -s) {</span>
+<span class="nc" id="L2022">                    fixedDraggedSelection++;</span>
+<span class="nc bnc" id="L2023" title="All 2 branches missed.">                    if (fixedDraggedSelection &gt;= model.getSize()) {</span>
+<span class="nc" id="L2024">                        fixedDraggedSelection = 0;</span>
+                    }
+<span class="nc bnc" id="L2026" title="All 2 branches missed.">                } else if (fixedDraggedAnimationPosition &gt;= s) {</span>
+<span class="nc" id="L2027">                    fixedDraggedSelection--;</span>
+<span class="nc bnc" id="L2028" title="All 2 branches missed.">                    if (fixedDraggedSelection &lt; 0) {</span>
+<span class="nc" id="L2029">                        fixedDraggedSelection = model.getSize() - 1;</span>
+                    }
+                }
+<span class="nc" id="L2032">                fixedDraggedAnimationPosition = fixedDraggedAnimationPosition % s;</span>
+<span class="nc" id="L2033">            }</span>
+        } else {
+<span class="nc" id="L2035">            int sel = pointerSelect(x, y);</span>
+<span class="nc bnc" id="L2036" title="All 2 branches missed.">            if (sel &gt; -1) {</span>
+<span class="nc" id="L2037">                model.setSelectedIndex(sel);</span>
+            }
+        }
+<span class="nc" id="L2040">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public Rectangle getSelectedRect() {
+<span class="nc" id="L2045">        Style style = getStyle();</span>
+<span class="nc" id="L2046">        Rectangle pos = new Rectangle();</span>
+<span class="nc" id="L2047">        int width = getWidth() - style.getHorizontalPadding() - getSideGap();</span>
+<span class="nc" id="L2048">        Dimension rendererSize = getElementSize(false, true);</span>
+<span class="nc" id="L2049">        calculateComponentPosition(getSelectedIndex(), width, pos, rendererSize, getElementSize(true, true), true);</span>
+<span class="nc" id="L2050">        pos.setX(pos.getX() + getParent().getAbsoluteX());</span>
+<span class="nc" id="L2051">        pos.setY(pos.getY() + getParent().getAbsoluteY());</span>
+<span class="nc" id="L2052">        return pos;</span>
+    }
+
+    private int pointerSelect(int x, int y) {
+<span class="fc" id="L2056">        int selectedIndex = -1;</span>
+<span class="fc" id="L2057">        int numOfcomponents = getModel().getSize();</span>
+<span class="fc" id="L2058">        Style style = getStyle();</span>
+
+<span class="fc" id="L2060">        Dimension rendererSize = getElementSize(false, true);</span>
+<span class="fc" id="L2061">        Dimension selectedSize = getElementSize(true, true);</span>
+
+<span class="fc" id="L2063">        Rectangle pos = new Rectangle();</span>
+<span class="fc" id="L2064">        int width = getWidth() - style.getHorizontalPadding() - getSideGap();</span>
+<span class="pc bpc" id="L2065" title="1 of 2 branches missed.">        if (isScrollableX()) {</span>
+<span class="nc" id="L2066">            width = Math.max(width, getScrollDimension().getWidth() - style.getHorizontalPadding() - getSideGap());</span>
+        }
+<span class="fc" id="L2068">        y = y - getAbsoluteY();</span>
+<span class="fc" id="L2069">        x = x - getAbsoluteX();</span>
+
+<span class="pc bpc" id="L2071" title="1 of 2 branches missed.">        if (fixedSelection &lt; FIXED_NONE_BOUNDRY) {</span>
+<span class="fc" id="L2072">            calculateComponentPosition(getSelectedIndex(), width, pos, rendererSize, getElementSize(true, true), true);</span>
+
+<span class="pc bpc" id="L2074" title="1 of 2 branches missed.">            if (orientation != HORIZONTAL) {</span>
+<span class="fc bfc" id="L2075" title="All 2 branches covered.">                if (y &lt; pos.getY()) {</span>
+<span class="fc" id="L2076">                    selectedIndex = (y - style.getPaddingTop()) / (rendererSize.getHeight() + itemGap);</span>
+                } else {
+<span class="fc" id="L2078">                    int current = getSelectedIndex();</span>
+<span class="fc bfc" id="L2079" title="All 2 branches covered.">                    if (y &lt; pos.getY() + selectedSize.getHeight()) {</span>
+<span class="fc" id="L2080">                        selectedIndex = current;</span>
+                    } else {
+<span class="fc" id="L2082">                        selectedIndex = (current + 1) + (y - (pos.getY() + selectedSize.getHeight())) / (rendererSize.getHeight() + itemGap);</span>
+                    }
+<span class="fc" id="L2084">                }</span>
+            } else {
+<span class="nc bnc" id="L2086" title="All 2 branches missed.">                if (isRTL()) {</span>
+<span class="nc bnc" id="L2087" title="All 2 branches missed.">                    if (x &gt; pos.getX() + selectedSize.getWidth()) {</span>
+<span class="nc" id="L2088">                        int delta = x - (pos.getX() + selectedSize.getWidth());</span>
+<span class="nc" id="L2089">                        delta /= (rendererSize.getWidth() + itemGap);</span>
+
+                        // should have been -1-delta, but works better like this.
+<span class="nc" id="L2092">                        selectedIndex = getSelectedIndex() - 1 - delta;</span>
+<span class="nc" id="L2093">                    } else {</span>
+<span class="nc bnc" id="L2094" title="All 2 branches missed.">                        if (x &gt;= pos.getX()) {</span>
+<span class="nc" id="L2095">                            selectedIndex = getSelectedIndex();</span>
+                        } else {
+<span class="nc" id="L2097">                            int delta = pos.getX() - x;</span>
+<span class="nc" id="L2098">                            delta /= (rendererSize.getWidth() + itemGap);</span>
+<span class="nc" id="L2099">                            selectedIndex = getSelectedIndex() + 1 + delta;</span>
+<span class="nc" id="L2100">                        }</span>
+                    }
+                } else {
+<span class="nc bnc" id="L2103" title="All 2 branches missed.">                    if (x &lt; pos.getX()) {</span>
+<span class="nc" id="L2104">                        selectedIndex = (x - style.getPaddingLeftNoRTL()) / (rendererSize.getWidth() + itemGap);</span>
+                    } else {
+<span class="nc" id="L2106">                        int current = getSelectedIndex();</span>
+<span class="nc bnc" id="L2107" title="All 2 branches missed.">                        if (x &lt; pos.getX() + selectedSize.getWidth()) {</span>
+<span class="nc" id="L2108">                            selectedIndex = current;</span>
+                        } else {
+<span class="nc" id="L2110">                            selectedIndex = (current + 1) + (x - (pos.getX() + selectedSize.getWidth())) / (rendererSize.getWidth() + itemGap);</span>
+                        }
+<span class="nc" id="L2112">                    }</span>
+                }
+            }
+        } else {
+<span class="nc bnc" id="L2116" title="All 2 branches missed.">            for (int i = 0; i &lt; numOfcomponents; i++) {</span>
+<span class="nc" id="L2117">                calculateComponentPosition(i, width, pos, rendererSize, selectedSize, true);</span>
+<span class="nc bnc" id="L2118" title="All 2 branches missed.">                if (pos.contains(x, y)) {</span>
+<span class="nc" id="L2119">                    selectedIndex = i;</span>
+<span class="nc" id="L2120">                    break;</span>
+                }
+            }
+        }
+
+<span class="pc bpc" id="L2125" title="2 of 4 branches missed.">        if (selectedIndex &lt; 0 || selectedIndex &gt;= size()) {</span>
+<span class="nc" id="L2126">            return -1;</span>
+        }
+<span class="fc" id="L2128">        return selectedIndex;</span>
+    }
+
+    /// This method determines if the List fires the action event when the pointer
+    /// was clicked on one of the items, or only if the item was the selected item
+    /// By default the value is true, this setting is only relevant for none fixed
+    /// Lists
+    ///
+    /// #### Parameters
+    ///
+    /// - `fireOnClick`
+    public void setFireOnClick(boolean fireOnClick) {
+<span class="nc" id="L2140">        this.fireOnClick = fireOnClick;</span>
+<span class="nc" id="L2141">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerHoverReleased(int[] x, int[] y) {
+<span class="nc" id="L2146">    }</span>
+
+    private void pointerReleasedImpl(int x, int y, boolean isHover, boolean longPress) {
+<span class="pc bpc" id="L2149" title="1 of 2 branches missed.">        if (!isEnabled()) {</span>
+<span class="nc" id="L2150">            return;</span>
+        }
+<span class="pc bpc" id="L2152" title="1 of 2 branches missed.">        if (isDragActivated()) {</span>
+<span class="nc bnc" id="L2153" title="All 2 branches missed.">            if (fixedSelection &lt; FIXED_NONE_BOUNDRY) {</span>
+<span class="nc" id="L2154">                super.pointerReleased(x, y);</span>
+            } else {
+<span class="nc bnc" id="L2156" title="All 2 branches missed.">                boolean vertical = getOrientation() == VERTICAL;</span>
+<span class="nc" id="L2157">                float speed = getDragSpeed(vertical);</span>
+<span class="nc" id="L2158">                fixedDraggedMotion = Motion.createFrictionMotion(-fixedDraggedAnimationPosition,</span>
+                        Integer.MAX_VALUE, speed, 0.0007f);
+<span class="nc" id="L2160">                fixedDraggedPosition = fixedDraggedAnimationPosition;</span>
+<span class="nc" id="L2161">                TopLevelContainer p = getTopLevelContainer();</span>
+<span class="nc bnc" id="L2162" title="All 2 branches missed.">                if (p != null) {</span>
+<span class="nc" id="L2163">                    TopLevelSupport.registerAnimatedInternal(p, this);</span>
+                }
+<span class="nc" id="L2165">                fixedDraggedMotion.start();</span>
+            }
+<span class="nc" id="L2167">            return;</span>
+        }
+
+<span class="pc bpc" id="L2170" title="2 of 4 branches missed.">        if (!isHover &amp;&amp; pointerSelect(x, y) &gt; -1) {</span>
+<span class="pc bpc" id="L2171" title="1 of 2 branches missed.">            if (fixedSelection &gt; FIXED_NONE_BOUNDRY) {</span>
+<span class="nc" id="L2172">                int index = pointerSelect(x, y);</span>
+<span class="nc" id="L2173">                updateAnimationPosition(index - getSelectedIndex());</span>
+<span class="nc" id="L2174">                setSelectedIndex(index);</span>
+<span class="nc" id="L2175">                fireActionEvent(new ActionEvent(eventSource, ActionEvent.Type.Other));</span>
+<span class="nc" id="L2176">                return;</span>
+            }
+
+<span class="pc bpc" id="L2179" title="4 of 6 branches missed.">            if ((fireOnClick &amp;&amp; fixedSelection &lt; FIXED_NONE_BOUNDRY) || fireOnRelease) {</span>
+                // fire the action event into the selected component
+<span class="fc" id="L2181">                Component selectionCmp = renderer.getListCellRendererComponent(this, getSelectedItem(), getSelectedIndex(), true);</span>
+
+<span class="fc" id="L2183">                Style style = getStyle();</span>
+<span class="fc" id="L2184">                int width = getWidth() - style.getHorizontalPadding() - getSideGap();</span>
+<span class="fc" id="L2185">                Rectangle pos = new Rectangle();</span>
+<span class="fc" id="L2186">                Dimension rendererSize = getElementSize(false, true);</span>
+<span class="fc" id="L2187">                calculateComponentPosition(getSelectedIndex(), width, pos, rendererSize, getElementSize(true, true), true);</span>
+<span class="fc" id="L2188">                int absX = getAbsoluteX();</span>
+<span class="fc" id="L2189">                int posX = pos.getX();</span>
+<span class="fc" id="L2190">                int absY = getAbsoluteY();</span>
+<span class="fc" id="L2191">                int posY = pos.getY();</span>
+<span class="fc" id="L2192">                int newX = x - absX - posX;</span>
+<span class="fc" id="L2193">                int newY = y - absY - posY;</span>
+<span class="fc" id="L2194">                selectionCmp.setX(0);</span>
+<span class="fc" id="L2195">                selectionCmp.setY(0);</span>
+<span class="pc bpc" id="L2196" title="1 of 2 branches missed.">                if (selectionCmp instanceof Container) {</span>
+<span class="nc" id="L2197">                    Component tmp = ((Container) selectionCmp).getComponentAt(newX, newY);</span>
+<span class="nc bnc" id="L2198" title="All 2 branches missed.">                    if (tmp != null) {</span>
+<span class="nc" id="L2199">                        selectionCmp = tmp;</span>
+                    }
+                }
+<span class="pc bpc" id="L2202" title="1 of 2 branches missed.">                if (longPress) {</span>
+<span class="nc" id="L2203">                    selectionCmp.longPointerPress(newX, newY);</span>
+<span class="nc" id="L2204">                    fireActionEvent(new ActionEvent(eventSource, newX, newY, true));</span>
+                } else {
+<span class="fc" id="L2206">                    selectionCmp.pointerPressed(newX, newY);</span>
+<span class="fc" id="L2207">                    selectionCmp.pointerReleased(newX, newY);</span>
+<span class="fc" id="L2208">                    fireActionEvent(new ActionEvent(eventSource, newX, newY, false));</span>
+                }
+            }
+        }
+<span class="fc" id="L2212">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerReleased(int x, int y) {
+<span class="fc" id="L2217">        pointerReleasedImpl(x, y, false, false);</span>
+<span class="fc" id="L2218">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="fc bfc" id="L2223" title="All 2 branches covered.">        if (shouldShowHint()) {</span>
+<span class="fc" id="L2224">            Label l = getHintLabelImpl();</span>
+<span class="pc bpc" id="L2225" title="1 of 2 branches missed.">            if (l != null) {</span>
+<span class="nc" id="L2226">                Dimension d1 = getUIManager().getLookAndFeel().getListPreferredSize(this);</span>
+<span class="nc" id="L2227">                Dimension d2 = l.getPreferredSize();</span>
+<span class="nc" id="L2228">                return new Dimension(d1.getWidth() + d2.getWidth(), d1.getHeight() + d2.getHeight());</span>
+            }
+        }
+<span class="fc" id="L2231">        Dimension d = getUIManager().getLookAndFeel().getListPreferredSize(this);</span>
+<span class="pc bpc" id="L2232" title="1 of 2 branches missed.">        if (spinnerOverlay != null) {</span>
+<span class="nc bnc" id="L2233" title="All 2 branches missed.">            if (spinnerOverlay.getBorder() != null) {</span>
+<span class="nc" id="L2234">                d.setWidth(Math.max(spinnerOverlay.getBorder().getMinimumWidth(), d.getWidth()));</span>
+<span class="nc" id="L2235">                d.setHeight(Math.max(spinnerOverlay.getBorder().getMinimumHeight(), d.getHeight()));</span>
+            }
+
+        }
+<span class="fc" id="L2239">        return d;</span>
+    }
+
+    /// The scrollable extent is what the model holds, not what the list asks its parent for.
+    ///
+    /// The inherited implementation answers `calcPreferredSize()`, and for a list those two
+    /// are different questions: the preferred size is how much room the list would like on
+    /// screen, and it is routinely capped -- by `setMaxElementHeight(int)`, or by a subclass
+    /// that limits its preferred height so a long list does not swallow the form. A capped
+    /// preferred size used to cap the scroll size with it, the list was then laid out at
+    /// exactly its &quot;scroll&quot; height, `isScrollableY()` answered false, and neither the wheel
+    /// nor a drag could reach the rows below the cap. Nothing reported it.
+    ///
+    /// So the scrolling axis is measured from the rows themselves, with the same arithmetic
+    /// the look and feel uses for an uncapped list. The preferred size still wins when it is
+    /// the larger of the two, which keeps the minimum element count, the hint label and the
+    /// spinner overlay minimums exactly as they were. A combo box face is not a scrolling
+    /// list at all and keeps the inherited answer.
+    @Override
+    protected Dimension calcScrollSize() {
+<span class="fc" id="L2259">        Dimension pref = calcPreferredSize();</span>
+<span class="fc" id="L2260">        int count = model.getSize();</span>
+<span class="fc" id="L2261">        int o = getOrientation();</span>
+<span class="pc bpc" id="L2262" title="1 of 6 branches missed.">        if (count == 0 || (o != VERTICAL &amp;&amp; o != HORIZONTAL)) {</span>
+<span class="fc" id="L2263">            return pref;</span>
+        }
+<span class="fc" id="L2265">        Dimension unselected = getElementSize(false, true);</span>
+<span class="fc" id="L2266">        Dimension selected = getElementSize(true, true);</span>
+<span class="fc" id="L2267">        Style style = getStyle();</span>
+<span class="pc bpc" id="L2268" title="1 of 2 branches missed.">        if (o == VERTICAL) {</span>
+<span class="fc" id="L2269">            int content = selected.getHeight() + (unselected.getHeight() + itemGap) * (count - 1)</span>
+<span class="fc" id="L2270">                    + style.getVerticalPadding();</span>
+<span class="fc" id="L2271">            return new Dimension(pref.getWidth(), Math.max(pref.getHeight(), content));</span>
+        }
+<span class="nc" id="L2273">        int content = selected.getWidth() + (unselected.getWidth() + itemGap) * (count - 1)</span>
+<span class="nc" id="L2274">                + style.getHorizontalPadding();</span>
+<span class="nc" id="L2275">        return new Dimension(Math.max(pref.getWidth(), content), pref.getHeight());</span>
+    }
+
+    /// Allows adding an element to a list if the underlying model supports this, notice that
+    /// it is an optional operation and if the model does not support it (default list model does)
+    /// then this operation may failed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `item`: the item to be added to a list model
+    public void addItem(T item) {
+<span class="fc" id="L2286">        model.addItem(item);</span>
+<span class="fc" id="L2287">    }</span>
+
+    /// Indicates whether selection is fixable to place in which case all the
+    /// elements in the list move and selection stays in place.
+    ///
+    /// #### Returns
+    ///
+    /// one of: FIXED_NONE, FIXED_TRAIL, FIXED_LEAD, FIXED_CENTER, FIXED_NONE_CYCLIC
+    public int getFixedSelection() {
+<span class="fc" id="L2296">        return fixedSelection;</span>
+    }
+
+    /// Indicates whether selection is fixable to place in which case all the
+    /// elements in the list move and selection stays in place.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fixedSelection`: @param fixedSelection one of: FIXED_NONE, FIXED_TRAIL, FIXED_LEAD,
+    /// FIXED_CENTER, FIXED_NONE_CYCLIC
+    public void setFixedSelection(int fixedSelection) {
+<span class="fc" id="L2307">        this.fixedSelection = fixedSelection;</span>
+<span class="fc" id="L2308">    }</span>
+
+    @Override
+    void deregisterAnimatedInternal() {
+<span class="fc bfc" id="L2312" title="All 2 branches covered.">        if (animationPosition == 0) {</span>
+<span class="fc" id="L2313">            super.deregisterAnimatedInternal();</span>
+        }
+<span class="fc" id="L2315">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public boolean animate() {
+        // parent is performing the animation we shouldn't do anything in this case
+        // this is the scrolling animation which we don't want to interfear with
+<span class="fc" id="L2322">        boolean parentFinished = super.animate();</span>
+<span class="pc bpc" id="L2323" title="5 of 6 branches missed.">        if ((animationPosition != 0) &amp;&amp; listMotion != null &amp;&amp; !isDragActivated()) {</span>
+<span class="nc bnc" id="L2324" title="All 2 branches missed.">            if (animationPosition &lt; 0) {</span>
+<span class="nc" id="L2325">                animationPosition = Math.min(listMotion.getValue() - destination, 0);</span>
+            } else {
+<span class="nc" id="L2327">                animationPosition = Math.max(destination - listMotion.getValue(), 0);</span>
+            }
+<span class="nc bnc" id="L2329" title="All 2 branches missed.">            if (animationPosition == 0) {</span>
+<span class="nc" id="L2330">                listMotion = null;</span>
+<span class="nc" id="L2331">                deregisterAnimatedInternal();</span>
+            }
+<span class="nc" id="L2333">            return true;</span>
+        }
+<span class="pc bpc" id="L2335" title="1 of 2 branches missed.">        if (fixedDraggedMotion != null) {</span>
+<span class="nc" id="L2336">            int val = -fixedDraggedMotion.getValue();</span>
+<span class="nc" id="L2337">            fixedDraggedAnimationPosition = fixedDraggedAnimationPosition - (fixedDraggedPosition - val);</span>
+<span class="nc" id="L2338">            fixedDraggedPosition = val;</span>
+<span class="nc" id="L2339">            Dimension size = getElementSize(false, true);</span>
+            int s;
+<span class="nc bnc" id="L2341" title="All 2 branches missed.">            if (orientation == VERTICAL) {</span>
+<span class="nc" id="L2342">                s = size.getHeight();</span>
+            } else {
+<span class="nc" id="L2344">                s = size.getWidth();</span>
+            }
+
+<span class="nc bnc" id="L2347" title="All 2 branches missed.">            if (fixedDraggedMotion.isFinished()) {</span>
+<span class="nc" id="L2348">                deregisterAnimatedInternal();</span>
+                //if after dragging the list is in the middle check which item
+                //is the closest and animate to it.
+<span class="nc bnc" id="L2351" title="All 2 branches missed.">                if (fixedDraggedAnimationPosition &lt;= -s / 2) {</span>
+<span class="nc" id="L2352">                    fixedDraggedSelection++;</span>
+<span class="nc bnc" id="L2353" title="All 2 branches missed.">                    if (fixedDraggedSelection &gt;= model.getSize()) {</span>
+<span class="nc" id="L2354">                        fixedDraggedSelection = 0;</span>
+                    }
+<span class="nc bnc" id="L2356" title="All 2 branches missed.">                } else if (fixedDraggedAnimationPosition &gt;= s / 2) {</span>
+<span class="nc" id="L2357">                    fixedDraggedSelection--;</span>
+<span class="nc bnc" id="L2358" title="All 2 branches missed.">                    if (fixedDraggedSelection &lt; 0) {</span>
+<span class="nc" id="L2359">                        fixedDraggedSelection = model.getSize() - 1;</span>
+                    }
+                }
+
+<span class="nc bnc" id="L2363" title="All 2 branches missed.">                if (fixedDraggedAnimationPosition != 0) {</span>
+<span class="nc bnc" id="L2364" title="All 2 branches missed.">                    if (fixedDraggedAnimationPosition &lt; 0) {</span>
+<span class="nc bnc" id="L2365" title="All 2 branches missed.">                        if (fixedDraggedAnimationPosition &lt; -s / 2) {</span>
+<span class="nc" id="L2366">                            destination = s + fixedDraggedAnimationPosition;</span>
+<span class="nc" id="L2367">                            animationPosition = destination;</span>
+                        } else {
+<span class="nc" id="L2369">                            destination = -fixedDraggedAnimationPosition;</span>
+<span class="nc" id="L2370">                            animationPosition = fixedDraggedAnimationPosition;</span>
+                        }
+
+                    } else {
+<span class="nc bnc" id="L2374" title="All 2 branches missed.">                        if (fixedDraggedAnimationPosition &gt; s / 2) {</span>
+<span class="nc" id="L2375">                            destination = (s - fixedDraggedAnimationPosition);</span>
+<span class="nc" id="L2376">                            animationPosition = -destination;</span>
+                        } else {
+<span class="nc" id="L2378">                            destination = fixedDraggedAnimationPosition;</span>
+<span class="nc" id="L2379">                            animationPosition = fixedDraggedAnimationPosition;</span>
+                        }
+                    }
+<span class="nc" id="L2382">                    initListMotion();</span>
+<span class="nc" id="L2383">                    fixedDraggedAnimationPosition = 0;</span>
+                }
+                // this happens when dragging an empty list causing an exception on a negative selection
+<span class="nc bnc" id="L2386" title="All 4 branches missed.">                if (fixedDraggedSelection &gt;= 0 &amp;&amp; fixedDraggedSelection &lt; getModel().getSize()) {</span>
+<span class="nc" id="L2387">                    setSelectedIndex(fixedDraggedSelection, false);</span>
+                }
+<span class="nc" id="L2389">                setDragActivated(false);</span>
+<span class="nc" id="L2390">                fixedDraggedMotion = null;</span>
+<span class="nc" id="L2391">                return false;</span>
+            } else {
+<span class="nc bnc" id="L2393" title="All 2 branches missed.">                if (fixedDraggedAnimationPosition &lt;= -s) {</span>
+<span class="nc" id="L2394">                    fixedDraggedSelection++;</span>
+<span class="nc bnc" id="L2395" title="All 2 branches missed.">                    if (fixedDraggedSelection &gt;= model.getSize()) {</span>
+<span class="nc" id="L2396">                        fixedDraggedSelection = 0;</span>
+                    }
+<span class="nc" id="L2398">                    fixedDraggedPosition = val;</span>
+<span class="nc bnc" id="L2399" title="All 2 branches missed.">                } else if (fixedDraggedAnimationPosition &gt;= s) {</span>
+<span class="nc" id="L2400">                    fixedDraggedSelection--;</span>
+<span class="nc bnc" id="L2401" title="All 2 branches missed.">                    if (fixedDraggedSelection &lt; 0) {</span>
+<span class="nc" id="L2402">                        fixedDraggedSelection = model.getSize() - 1;</span>
+                    }
+<span class="nc" id="L2404">                    fixedDraggedPosition = val;</span>
+                }
+<span class="nc" id="L2406">                fixedDraggedAnimationPosition = fixedDraggedAnimationPosition % s;</span>
+
+
+            }
+<span class="nc" id="L2410">            return true;</span>
+        }
+<span class="fc" id="L2412">        return parentFinished;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    protected boolean isTactileTouch(int x, int y) {
+        // provide touch feedback only when pressing an entry in the list and not for the entire list
+<span class="nc bnc" id="L2419" title="All 2 branches missed.">        if (isTactileTouch()) {</span>
+<span class="nc" id="L2420">            int selection = pointerSelect(x, y);</span>
+<span class="nc bnc" id="L2421" title="All 2 branches missed.">            return selection &gt; -1;</span>
+        }
+<span class="nc" id="L2423">        return false;</span>
+    }
+
+    /// This flag indicates to the List if the List should scroll to the selected
+    /// element when it's been initialized.
+    ///
+    /// #### Parameters
+    ///
+    /// - `scrollToSelected`: @param scrollToSelected if true the List scrolls to the selected element
+    /// when It's been initialized.
+    public void setScrollToSelected(boolean scrollToSelected) {
+<span class="fc" id="L2434">        this.scrollToSelected = scrollToSelected;</span>
+<span class="fc" id="L2435">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected int getGridPosY() {
+<span class="nc" id="L2440">        int gridSize = getElementSize(false, true).getHeight() + itemGap;</span>
+<span class="nc" id="L2441">        int scroll = getScrollY();</span>
+<span class="nc" id="L2442">        return calcGrid(scroll, gridSize);</span>
+    }
+
+    private int calcGrid(int scroll, int gridSize) {
+<span class="nc" id="L2446">        int fraction = scroll % gridSize;</span>
+<span class="nc bnc" id="L2447" title="All 2 branches missed.">        if (Math.abs(fraction - gridSize) &gt; 2) {</span>
+<span class="nc bnc" id="L2448" title="All 2 branches missed.">            if (fraction &gt; gridSize / 2) {</span>
+<span class="nc" id="L2449">                return scroll + gridSize - fraction;</span>
+            } else {
+<span class="nc" id="L2451">                return scroll - fraction;</span>
+            }
+        }
+<span class="nc" id="L2454">        return scroll;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    protected int getGridPosX() {
+<span class="nc" id="L2460">        int gridSize = getElementSize(false, true).getWidth() + itemGap;</span>
+<span class="nc" id="L2461">        int scroll = getScrollX();</span>
+<span class="nc" id="L2462">        return calcGrid(scroll, gridSize);</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    protected String paramString() {
+<span class="fc" id="L2468">        String elemSizeStr = &quot;element size = &quot;;</span>
+<span class="pc bpc" id="L2469" title="1 of 2 branches missed.">        if (elemSize != null) {</span>
+<span class="fc" id="L2470">            elemSizeStr += elemSize.toString();</span>
+        }
+<span class="fc" id="L2472">        return super.paramString() + &quot;, &quot; + elemSizeStr +</span>
+                &quot;, itemGap = &quot; + itemGap +
+                &quot;, orientation = &quot; + orientation +
+<span class="fc" id="L2475">                &quot;, selected index = &quot; + getSelectedIndex() +</span>
+<span class="fc" id="L2476">                &quot;, size = &quot; + size();</span>
+    }
+
+    /// Returns the hint text
+    ///
+    /// #### Returns
+    ///
+    /// the hint text or null
+    @Override
+    public String getHint() {
+<span class="nc" id="L2486">        return super.getHint();</span>
+    }
+
+    /// Sets the TextArea hint text, the hint text  is displayed on the TextArea
+    /// When there is no text in the TextArea
+    ///
+    /// #### Parameters
+    ///
+    /// - `hint`: the hint text to display
+    public void setHint(String hint) {
+<span class="fc" id="L2496">        super.setHint(hint, getHintIcon());</span>
+<span class="fc" id="L2497">    }</span>
+
+    /// Returns the hint icon
+    ///
+    /// #### Returns
+    ///
+    /// the hint icon
+    @Override
+    public Image getHintIcon() {
+<span class="fc" id="L2506">        return super.getHintIcon();</span>
+    }
+
+    /// Sets the TextArea hint icon, the hint is displayed on the TextArea
+    /// When there is no text in the TextArea
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: the icon
+    public void setHintIcon(Image icon) {
+<span class="nc" id="L2516">        setHint(getHint(), icon);</span>
+<span class="nc" id="L2517">    }</span>
+
+    /// Sets the TextArea hint text and Icon, the hint text and icon are
+    /// displayed on the TextArea when there is no text in the TextArea
+    ///
+    /// #### Parameters
+    ///
+    /// - `hint`: the hint text to display
+    ///
+    /// - `icon`: the hint icon to display
+    @Override
+    public void setHint(String hint, Image icon) {
+<span class="nc" id="L2529">        super.setHint(hint, icon);</span>
+<span class="nc" id="L2530">    }</span>
+
+    @Override
+    Label getHintLabelImpl() {
+<span class="fc" id="L2534">        return hintLabel;</span>
+    }
+
+    @Override
+    void setHintLabelImpl(Label hintLabel) {
+<span class="fc" id="L2539">        this.hintLabel = hintLabel;</span>
+<span class="fc" id="L2540">    }</span>
+
+    @Override
+    boolean shouldShowHint() {
+<span class="fc bfc" id="L2544" title="All 2 branches covered.">        return getModel().getSize() == 0;</span>
+    }
+
+<span class="fc" id="L2547">    private class Listeners implements DataChangedListener, SelectionListener {</span>
+
+        @Override
+        public void dataChanged(int status, int index) {
+<span class="fc" id="L2551">            List.this.dataChanged(status, index);</span>
+<span class="fc" id="L2552">        }</span>
+
+        @Override
+        public void selectionChanged(int oldSelected, int newSelected) {
+<span class="fc" id="L2556">            repaint();</span>
+<span class="fc" id="L2557">            List.this.listSelectionChanged(oldSelected, newSelected);</span>
+<span class="fc" id="L2558">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

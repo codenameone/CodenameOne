@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DeviceFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.nearby.companion</a> &gt; <span class="el_source">DeviceFilter.java</span></div><h1>DeviceFilter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.nearby.companion;
+
+/// Narrows what the system device chooser offers the user.
+///
+/// A request with no filter shows everything the radios can see, which is a
+/// long and confusing list; a request with one good filter usually shows
+/// exactly the accessory the user is holding. Filters within one
+/// [AssociationRequest] are OR-combined -- a device matching any of them is
+/// offered.
+///
+/// ```java
+/// AssociationRequest req = new AssociationRequest.Builder()
+///         .addFilter(DeviceFilter.bleService(&quot;180D&quot;))     // heart rate
+///         .addFilter(DeviceFilter.namePattern(&quot;Acme.*&quot;))
+///         .build();
+/// ```
+public final class DeviceFilter {
+
+    /// Filter kind: match a BLE service UUID being advertised.
+    public static final int KIND_BLE_SERVICE = 0;
+
+    /// Filter kind: match the advertised device name against a regular
+    /// expression.
+    public static final int KIND_NAME_PATTERN = 1;
+
+    /// Filter kind: match one exact device address.
+    public static final int KIND_ADDRESS = 2;
+
+    /// Filter kind: match a Wi-Fi SSID.
+    public static final int KIND_WIFI_SSID = 3;
+
+    private final int kind;
+    private final String value;
+
+<span class="fc" id="L57">    private DeviceFilter(int kind, String value) {</span>
+<span class="fc" id="L58">        this.kind = kind;</span>
+<span class="fc" id="L59">        this.value = value;</span>
+<span class="fc" id="L60">    }</span>
+
+    /// Offers only devices advertising the given BLE service.
+    ///
+    /// #### Parameters
+    ///
+    /// - `serviceUuid`: the service UUID, in either the 16-bit short form
+    ///   (`&quot;180D&quot;`) or the full 128-bit form
+    ///
+    /// #### Returns
+    ///
+    /// the filter
+    public static DeviceFilter bleService(String serviceUuid) {
+<span class="fc" id="L73">        return new DeviceFilter(KIND_BLE_SERVICE, require(serviceUuid));</span>
+    }
+
+    /// Offers only devices whose advertised name matches a regular
+    /// expression.
+    ///
+    /// The pattern is passed through to the platform, which on Android is
+    /// `java.util.regex` and on iOS is a substring match on the accessory
+    /// name -- so keep patterns simple if the app runs on both.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pattern`: the pattern to match the name against
+    ///
+    /// #### Returns
+    ///
+    /// the filter
+    public static DeviceFilter namePattern(String pattern) {
+<span class="nc" id="L91">        return new DeviceFilter(KIND_NAME_PATTERN, require(pattern));</span>
+    }
+
+    /// Offers only the device at one exact address -- the reconnect case,
+    /// where the app already knows which device it wants.
+    ///
+    /// #### Parameters
+    ///
+    /// - `address`: the device address, as
+    ///   `com.codename1.bluetooth.BluetoothDevice#getAddress()` reports it
+    ///
+    /// #### Returns
+    ///
+    /// the filter
+    public static DeviceFilter address(String address) {
+<span class="nc" id="L106">        return new DeviceFilter(KIND_ADDRESS, require(address));</span>
+    }
+
+    /// Offers only the Wi-Fi network with the given SSID. Android only;
+    /// ignored on platforms that associate Bluetooth accessories alone.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ssid`: the network name
+    ///
+    /// #### Returns
+    ///
+    /// the filter
+    public static DeviceFilter wifiSsid(String ssid) {
+<span class="nc" id="L120">        return new DeviceFilter(KIND_WIFI_SSID, require(ssid));</span>
+    }
+
+    /// Which of the `KIND_` constants this filter is.
+    public int getKind() {
+<span class="fc" id="L125">        return kind;</span>
+    }
+
+    /// The UUID, pattern, address or SSID, depending on [#getKind()].
+    public String getValue() {
+<span class="fc" id="L130">        return value;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L135">        return &quot;DeviceFilter[kind=&quot; + kind + &quot;, value=&quot; + value + &quot;]&quot;;</span>
+    }
+
+    private static String require(String v) {
+<span class="pc bpc" id="L139" title="2 of 4 branches missed.">        if (v == null || v.length() == 0) {</span>
+<span class="nc" id="L140">            throw new IllegalArgumentException(</span>
+                    &quot;a device filter needs a non-empty value&quot;);
+        }
+<span class="fc" id="L143">        return v;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

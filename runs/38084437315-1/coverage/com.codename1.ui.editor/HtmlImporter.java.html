@@ -1,0 +1,602 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HtmlImporter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.editor</a> &gt; <span class="el_source">HtmlImporter.java</span></div><h1>HtmlImporter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui.editor;
+
+import com.codename1.ui.html.HTMLParser;
+import com.codename1.xml.Element;
+
+import java.io.StringReader;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Parses an HTML string into the pure rich text editor model (plain text plus per character
+/// `TextStyle` and per paragraph `RichBlocks.BlockAttr`). Parsing and entity decoding are delegated to
+/// the framework's tolerant `HTMLParser`/`XMLParser` implementation; this class only maps the resulting
+/// DOM onto the editor model. It handles the HTML that `HtmlSerializer` emits plus common external
+/// markup (headings, paragraphs, lists, bold / italic / underline / strike, colored spans and links).
+public final class HtmlImporter {
+    /// The imported content.
+    public static final class Result {
+        private final String text;
+        private final List&lt;TextStyle&gt; styles;
+        private final List&lt;RichBlocks.BlockAttr&gt; blocks;
+        private final List&lt;String&gt; links;
+        private final List&lt;String&gt; imageSources;
+        private final boolean blockContent;
+
+        Result(String text, List&lt;TextStyle&gt; styles, List&lt;RichBlocks.BlockAttr&gt; blocks,
+<span class="fc" id="L51">                List&lt;String&gt; links, List&lt;String&gt; imageSources, boolean blockContent) {</span>
+<span class="fc" id="L52">            this.text = text;</span>
+<span class="fc" id="L53">            this.styles = styles;</span>
+<span class="fc" id="L54">            this.blocks = blocks;</span>
+<span class="fc" id="L55">            this.links = links;</span>
+<span class="fc" id="L56">            this.imageSources = imageSources;</span>
+<span class="fc" id="L57">            this.blockContent = blockContent;</span>
+<span class="fc" id="L58">        }</span>
+
+        /// The plain text.
+        public String getText() {
+<span class="fc" id="L62">            return text;</span>
+        }
+
+        /// One style per character.
+        public List&lt;TextStyle&gt; getStyles() {
+<span class="fc" id="L67">            return styles;</span>
+        }
+
+        /// One block attribute per paragraph.
+        public List&lt;RichBlocks.BlockAttr&gt; getBlocks() {
+<span class="fc" id="L72">            return blocks;</span>
+        }
+
+        /// One hyperlink target per character, null outside links.
+        public List&lt;String&gt; getLinks() {
+<span class="fc" id="L77">            return links;</span>
+        }
+
+        /// One image source per character, non-null only for object-replacement characters.
+        public List&lt;String&gt; getImageSources() {
+<span class="fc" id="L82">            return imageSources;</span>
+        }
+
+        /// True when the fragment explicitly contained block-level markup.
+        public boolean hasBlockContent() {
+<span class="fc" id="L87">            return blockContent;</span>
+        }
+    }
+
+<span class="fc" id="L91">    private final StringBuilder text = new StringBuilder(); // NOPMD - intentional owned buffer</span>
+<span class="fc" id="L92">    private final List&lt;TextStyle&gt; styles = new ArrayList&lt;TextStyle&gt;();</span>
+<span class="fc" id="L93">    private final List&lt;String&gt; links = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L94">    private final List&lt;String&gt; imageSources = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L95">    private final List&lt;RichBlocks.BlockAttr&gt; paras = new ArrayList&lt;RichBlocks.BlockAttr&gt;();</span>
+<span class="fc" id="L96">    private boolean freshParagraph = true;</span>
+<span class="fc" id="L97">    private boolean lastWasSpace = true;</span>
+
+<span class="fc" id="L99">    private TextStyle current = TextStyle.DEFAULT;</span>
+<span class="fc" id="L100">    private final List&lt;TextStyle&gt; styleStack = new ArrayList&lt;TextStyle&gt;();</span>
+<span class="fc" id="L101">    private final List&lt;String&gt; linkStack = new ArrayList&lt;String&gt;();</span>
+    private String currentHref;
+    private boolean blockContent;
+    // nesting depth of &lt;pre&gt; elements; whitespace is preserved verbatim while &gt; 0
+    private int preDepth;
+    // list context stack: each entry is {listType, indent}
+<span class="fc" id="L107">    private final List&lt;int[]&gt; listStack = new ArrayList&lt;int[]&gt;();</span>
+
+<span class="fc" id="L109">    private HtmlImporter() {</span>
+<span class="fc" id="L110">    }</span>
+
+    /// Parses HTML into an editor model result.
+    public static Result parse(String html) {
+<span class="fc" id="L114">        HtmlImporter imp = new HtmlImporter();</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        imp.parseFragment(html == null ? &quot;&quot; : html);</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (imp.paras.isEmpty()) {</span>
+<span class="nc" id="L117">            imp.paras.add(new RichBlocks.BlockAttr());</span>
+        }
+<span class="fc" id="L119">        return new Result(imp.text.toString(), imp.styles, imp.paras, imp.links, imp.imageSources,</span>
+                imp.blockContent);
+    }
+
+    // ---- framework HTML parser bridge ----
+
+    private void parseFragment(String html) {
+<span class="fc" id="L126">        HTMLParser parser = new HTMLParser(true);</span>
+<span class="fc" id="L127">        Element root = parser.parse(new StringReader(&quot;&lt;div&gt;&quot; + html + &quot;&lt;/div&gt;&quot;));</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        if (root == null) {</span>
+<span class="nc" id="L129">            return;</span>
+        }
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        for (int i = 0; i &lt; root.getNumChildren(); i++) {</span>
+<span class="fc" id="L132">            walk(root.getChildAt(i));</span>
+        }
+<span class="fc" id="L134">    }</span>
+
+    private void walk(Element element) {
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        if (element.isTextElement()) {</span>
+<span class="fc" id="L138">            appendText(element.getText());</span>
+<span class="fc" id="L139">            return;</span>
+        }
+<span class="fc" id="L141">        String name = element.getTagName().toLowerCase();</span>
+<span class="pc bpc" id="L142" title="3 of 6 branches missed.">        if (&quot;head&quot;.equals(name) || &quot;style&quot;.equals(name) || &quot;script&quot;.equals(name)) {</span>
+<span class="nc" id="L143">            return;</span>
+        }
+<span class="fc" id="L145">        startTag(name, attributes(element));</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        for (int i = 0; i &lt; element.getNumChildren(); i++) {</span>
+<span class="fc" id="L147">            walk(element.getChildAt(i));</span>
+        }
+<span class="fc" id="L149">        endTag(name);</span>
+<span class="fc" id="L150">    }</span>
+
+    private static Map&lt;String, String&gt; attributes(Element element) {
+<span class="fc" id="L153">        Map&lt;String, String&gt; attrs = new HashMap&lt;String, String&gt;();</span>
+<span class="fc" id="L154">        String[] names = {&quot;style&quot;, &quot;align&quot;, &quot;href&quot;, &quot;src&quot;, &quot;color&quot;, &quot;size&quot;, &quot;data-indent&quot;};</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        for (String name : names) {</span>
+<span class="fc" id="L156">            String value = element.getAttribute(name);</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            if (value != null) {</span>
+<span class="fc" id="L158">                attrs.put(name, value);</span>
+            }
+        }
+<span class="fc" id="L161">        return attrs;</span>
+    }
+
+    // ---- tag handling ----
+
+    private void startTag(String name, Map&lt;String, String&gt; attrs) {
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        if (&quot;br&quot;.equals(name)) {</span>
+<span class="nc" id="L168">            blockContent = true;</span>
+<span class="nc" id="L169">            newParagraph(currentBlockCtx());</span>
+<span class="nc" id="L170">            return;</span>
+        }
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        if (&quot;img&quot;.equals(name)) {</span>
+<span class="nc" id="L173">            appendImage(attrs.get(&quot;src&quot;));</span>
+<span class="nc" id="L174">            return;</span>
+        }
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">        if (&quot;hr&quot;.equals(name)) {</span>
+<span class="nc" id="L177">            return;</span>
+        }
+<span class="pc bpc" id="L179" title="2 of 4 branches missed.">        if (&quot;ol&quot;.equals(name) || &quot;ul&quot;.equals(name)) {</span>
+<span class="nc" id="L180">            blockContent = true;</span>
+<span class="nc bnc" id="L181" title="All 2 branches missed.">            listStack.add(new int[]{&quot;ol&quot;.equals(name) ? RichBlocks.LIST_ORDERED : RichBlocks.LIST_UNORDERED, 0});</span>
+<span class="nc" id="L182">            return;</span>
+        }
+<span class="pc bpc" id="L184" title="1 of 4 branches missed.">        if (isBlockTag(name) || &quot;li&quot;.equals(name)) {</span>
+<span class="fc" id="L185">            blockContent = true;</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">            if (&quot;pre&quot;.equals(name)) {</span>
+<span class="fc" id="L187">                preDepth++;</span>
+            }
+<span class="fc" id="L189">            startBlock(blockAttrFor(name, attrs));</span>
+<span class="fc" id="L190">            return;</span>
+        }
+        // inline tag
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">        if (isInlineTag(name)) {</span>
+<span class="fc" id="L194">            styleStack.add(current);</span>
+<span class="fc" id="L195">            linkStack.add(currentHref);</span>
+<span class="fc" id="L196">            current = applyInlineTag(name, current, attrs);</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">            if (&quot;a&quot;.equals(name)) {</span>
+<span class="fc" id="L198">                currentHref = attrs.get(&quot;href&quot;);</span>
+            }
+        }
+<span class="fc" id="L201">    }</span>
+
+    private void endTag(String name) {
+<span class="pc bpc" id="L204" title="1 of 4 branches missed.">        if (&quot;pre&quot;.equals(name) &amp;&amp; preDepth &gt; 0) {</span>
+<span class="fc" id="L205">            preDepth--;</span>
+<span class="fc" id="L206">            return;</span>
+        }
+<span class="pc bpc" id="L208" title="2 of 4 branches missed.">        if (&quot;ol&quot;.equals(name) || &quot;ul&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L209" title="All 2 branches missed.">            if (!listStack.isEmpty()) {</span>
+<span class="nc" id="L210">                listStack.remove(listStack.size() - 1);</span>
+            }
+<span class="nc" id="L212">            return;</span>
+        }
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        if (isInlineTag(name)) {</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">            if (!styleStack.isEmpty()) {</span>
+<span class="fc" id="L216">                current = styleStack.remove(styleStack.size() - 1);</span>
+            }
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">            if (!linkStack.isEmpty()) {</span>
+<span class="fc" id="L219">                currentHref = linkStack.remove(linkStack.size() - 1);</span>
+            }
+        }
+<span class="fc" id="L222">    }</span>
+
+    private static boolean isBlockTag(String tag) {
+<span class="pc bpc" id="L225" title="1 of 8 branches missed.">        return &quot;p&quot;.equals(tag) || &quot;div&quot;.equals(tag) || &quot;pre&quot;.equals(tag) || &quot;blockquote&quot;.equals(tag)</span>
+<span class="pc bpc" id="L226" title="3 of 8 branches missed.">                || (tag.length() == 2 &amp;&amp; tag.charAt(0) == 'h' &amp;&amp; tag.charAt(1) &gt;= '1' &amp;&amp; tag.charAt(1) &lt;= '6');</span>
+    }
+
+    private static boolean isInlineTag(String tag) {
+<span class="pc bpc" id="L230" title="2 of 8 branches missed.">        return &quot;b&quot;.equals(tag) || &quot;strong&quot;.equals(tag) || &quot;i&quot;.equals(tag) || &quot;em&quot;.equals(tag)</span>
+<span class="pc bpc" id="L231" title="4 of 8 branches missed.">                || &quot;u&quot;.equals(tag) || &quot;s&quot;.equals(tag) || &quot;strike&quot;.equals(tag) || &quot;del&quot;.equals(tag)</span>
+<span class="pc bpc" id="L232" title="3 of 8 branches missed.">                || &quot;a&quot;.equals(tag) || &quot;span&quot;.equals(tag) || &quot;font&quot;.equals(tag) || &quot;code&quot;.equals(tag);</span>
+    }
+
+    private RichBlocks.BlockAttr currentBlockCtx() {
+<span class="fc" id="L236">        RichBlocks.BlockAttr a = new RichBlocks.BlockAttr();</span>
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">        if (!listStack.isEmpty()) {</span>
+<span class="nc" id="L238">            int[] top = listStack.get(listStack.size() - 1);</span>
+<span class="nc" id="L239">            a.listType = top[0];</span>
+<span class="nc" id="L240">            a.indent = listStack.size() - 1;</span>
+        }
+<span class="fc" id="L242">        return a;</span>
+    }
+
+    private RichBlocks.BlockAttr blockAttrFor(String tag, Map&lt;String, String&gt; attrs) {
+<span class="fc" id="L246">        RichBlocks.BlockAttr attr = currentBlockCtx();</span>
+<span class="pc bpc" id="L247" title="1 of 4 branches missed.">        if (tag.length() == 2 &amp;&amp; tag.charAt(0) == 'h') {</span>
+<span class="fc" id="L248">            attr.type = RichBlocks.H1 + (tag.charAt(1) - '1');</span>
+<span class="fc" id="L249">            attr.listType = RichBlocks.LIST_NONE;</span>
+<span class="fc bfc" id="L250" title="All 2 branches covered.">        } else if (&quot;pre&quot;.equals(tag)) {</span>
+<span class="fc" id="L251">            attr.type = RichBlocks.PRE;</span>
+<span class="fc" id="L252">            attr.listType = RichBlocks.LIST_NONE;</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">        } else if (&quot;blockquote&quot;.equals(tag)) {</span>
+<span class="fc" id="L254">            attr.type = RichBlocks.BLOCKQUOTE;</span>
+<span class="fc" id="L255">            attr.listType = RichBlocks.LIST_NONE;</span>
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">        } else if (&quot;li&quot;.equals(tag)) {</span>
+<span class="nc" id="L257">            attr.type = RichBlocks.PARAGRAPH;</span>
+        } else {
+<span class="fc" id="L259">            attr.type = RichBlocks.PARAGRAPH;</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">            if (!&quot;li&quot;.equals(tag)) {</span>
+<span class="fc" id="L261">                attr.listType = RichBlocks.LIST_NONE;</span>
+            }
+        }
+<span class="fc" id="L264">        String styleAttr = attrs.get(&quot;style&quot;);</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        if (styleAttr != null) {</span>
+<span class="fc" id="L266">            String align = cssValue(styleAttr, &quot;text-align&quot;);</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">            if (&quot;center&quot;.equals(align)) {</span>
+<span class="fc" id="L268">                attr.align = RichBlocks.ALIGN_CENTER;</span>
+<span class="nc bnc" id="L269" title="All 2 branches missed.">            } else if (&quot;right&quot;.equals(align)) {</span>
+<span class="nc" id="L270">                attr.align = RichBlocks.ALIGN_RIGHT;</span>
+<span class="nc bnc" id="L271" title="All 2 branches missed.">            } else if (&quot;left&quot;.equals(align)) {</span>
+<span class="nc" id="L272">                attr.align = RichBlocks.ALIGN_LEFT;</span>
+            }
+        }
+<span class="fc" id="L275">        String dataIndent = attrs.get(&quot;data-indent&quot;);</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        if (dataIndent != null) {</span>
+            try {
+<span class="fc" id="L278">                attr.indent = Integer.parseInt(dataIndent.trim());</span>
+<span class="nc" id="L279">            } catch (NumberFormatException err) { // NOPMD - malformed input, intentionally ignored</span>
+                // ignore
+<span class="fc" id="L281">            }</span>
+        }
+<span class="fc" id="L283">        return attr;</span>
+    }
+
+    private TextStyle applyInlineTag(String tag, TextStyle style, Map&lt;String, String&gt; attrs) {
+<span class="pc bpc" id="L287" title="1 of 4 branches missed.">        if (&quot;b&quot;.equals(tag) || &quot;strong&quot;.equals(tag)) {</span>
+<span class="fc" id="L288">            return style.withBold(true);</span>
+        }
+<span class="pc bpc" id="L290" title="1 of 4 branches missed.">        if (&quot;i&quot;.equals(tag) || &quot;em&quot;.equals(tag)) {</span>
+<span class="fc" id="L291">            return style.withItalic(true);</span>
+        }
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">        if (&quot;u&quot;.equals(tag)) {</span>
+<span class="nc" id="L294">            return style.withUnderline(true);</span>
+        }
+<span class="pc bpc" id="L296" title="3 of 6 branches missed.">        if (&quot;s&quot;.equals(tag) || &quot;strike&quot;.equals(tag) || &quot;del&quot;.equals(tag)) {</span>
+<span class="nc" id="L297">            return style.withStrike(true);</span>
+        }
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">        if (&quot;code&quot;.equals(tag)) {</span>
+<span class="nc" id="L300">            return style.withMonospace(true);</span>
+        }
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">        if (&quot;a&quot;.equals(tag)) {</span>
+<span class="fc" id="L303">            return style.withUnderline(true).withForeColor(0x1a73e8);</span>
+        }
+<span class="nc bnc" id="L305" title="All 4 branches missed.">        if (&quot;span&quot;.equals(tag) || &quot;font&quot;.equals(tag)) {</span>
+<span class="nc" id="L306">            TextStyle s = style;</span>
+<span class="nc" id="L307">            String styleAttr = attrs.get(&quot;style&quot;);</span>
+<span class="nc bnc" id="L308" title="All 2 branches missed.">            if (styleAttr != null) {</span>
+<span class="nc" id="L309">                int color = parseColor(cssValue(styleAttr, &quot;color&quot;));</span>
+<span class="nc bnc" id="L310" title="All 2 branches missed.">                if (color &gt;= 0) {</span>
+<span class="nc" id="L311">                    s = s.withForeColor(color);</span>
+                }
+<span class="nc" id="L313">                int bg = parseColor(cssValue(styleAttr, &quot;background-color&quot;));</span>
+<span class="nc bnc" id="L314" title="All 2 branches missed.">                if (bg &lt; 0) {</span>
+<span class="nc" id="L315">                    bg = parseColor(cssValue(styleAttr, &quot;background&quot;));</span>
+                }
+<span class="nc bnc" id="L317" title="All 2 branches missed.">                if (bg &gt;= 0) {</span>
+<span class="nc" id="L318">                    s = s.withHighlight(bg);</span>
+                }
+<span class="nc" id="L320">                String fw = cssValue(styleAttr, &quot;font-weight&quot;);</span>
+<span class="nc bnc" id="L321" title="All 4 branches missed.">                if (&quot;bold&quot;.equals(fw) || &quot;700&quot;.equals(fw)) {</span>
+<span class="nc" id="L322">                    s = s.withBold(true);</span>
+                }
+<span class="nc" id="L324">                String fs = cssValue(styleAttr, &quot;font-style&quot;);</span>
+<span class="nc bnc" id="L325" title="All 2 branches missed.">                if (&quot;italic&quot;.equals(fs)) {</span>
+<span class="nc" id="L326">                    s = s.withItalic(true);</span>
+                }
+<span class="nc" id="L328">                String fontSizeCss = cssValue(styleAttr, &quot;font-size&quot;);</span>
+<span class="nc" id="L329">                int px = fontSizePx(fontSizeCss);</span>
+<span class="nc bnc" id="L330" title="All 2 branches missed.">                if (px &gt; 0) {</span>
+<span class="nc" id="L331">                    s = s.withFontSizePx(px);</span>
+                } else {
+<span class="nc" id="L333">                    int level = fontSizeLevel(fontSizeCss);</span>
+<span class="nc bnc" id="L334" title="All 2 branches missed.">                    if (level &gt; 0) {</span>
+<span class="nc" id="L335">                        s = s.withFontSizeLevel(level);</span>
+                    }
+                }
+            }
+<span class="nc" id="L339">            String colorAttr = attrs.get(&quot;color&quot;);</span>
+<span class="nc bnc" id="L340" title="All 2 branches missed.">            if (colorAttr != null) {</span>
+<span class="nc" id="L341">                int color = parseColor(colorAttr);</span>
+<span class="nc bnc" id="L342" title="All 2 branches missed.">                if (color &gt;= 0) {</span>
+<span class="nc" id="L343">                    s = s.withForeColor(color);</span>
+                }
+            }
+<span class="nc" id="L346">            return s;</span>
+        }
+<span class="nc" id="L348">        return style;</span>
+    }
+
+    // ---- model builders ----
+
+    private void startBlock(RichBlocks.BlockAttr attr) {
+<span class="fc bfc" id="L354" title="All 2 branches covered.">        if (!freshParagraph) {</span>
+<span class="fc" id="L355">            text.append('\n');</span>
+<span class="fc" id="L356">            styles.add(TextStyle.DEFAULT);</span>
+<span class="fc" id="L357">            links.add(null);</span>
+<span class="fc" id="L358">            imageSources.add(null);</span>
+<span class="fc" id="L359">            paras.add(attr);</span>
+<span class="fc" id="L360">            freshParagraph = true;</span>
+<span class="fc" id="L361">            lastWasSpace = true;</span>
+<span class="pc bpc" id="L362" title="1 of 2 branches missed.">        } else if (paras.isEmpty()) {</span>
+<span class="fc" id="L363">            paras.add(attr);</span>
+        } else {
+<span class="nc" id="L365">            paras.set(paras.size() - 1, attr);</span>
+        }
+<span class="fc" id="L367">    }</span>
+
+    private void newParagraph(RichBlocks.BlockAttr attr) {
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">        if (paras.isEmpty()) {</span>
+<span class="nc" id="L371">            paras.add(new RichBlocks.BlockAttr());</span>
+        }
+<span class="fc" id="L373">        text.append('\n');</span>
+<span class="fc" id="L374">        styles.add(TextStyle.DEFAULT);</span>
+<span class="fc" id="L375">        links.add(null);</span>
+<span class="fc" id="L376">        imageSources.add(null);</span>
+<span class="fc" id="L377">        paras.add(attr);</span>
+<span class="fc" id="L378">        freshParagraph = true;</span>
+<span class="fc" id="L379">        lastWasSpace = true;</span>
+<span class="fc" id="L380">    }</span>
+
+    private void appendText(String t) {
+<span class="pc bpc" id="L383" title="2 of 4 branches missed.">        if (t == null || t.length() == 0) {</span>
+<span class="nc" id="L384">            return;</span>
+        }
+<span class="fc bfc" id="L386" title="All 2 branches covered.">        if (paras.isEmpty()) {</span>
+<span class="fc" id="L387">            paras.add(new RichBlocks.BlockAttr());</span>
+        }
+<span class="fc bfc" id="L389" title="All 2 branches covered.">        if (preDepth &gt; 0) {</span>
+<span class="fc" id="L390">            appendPreformattedText(t);</span>
+<span class="fc" id="L391">            return;</span>
+        }
+<span class="fc bfc" id="L393" title="All 2 branches covered.">        for (int i = 0; i &lt; t.length(); i++) {</span>
+<span class="fc" id="L394">            char c = t.charAt(i);</span>
+<span class="pc bpc" id="L395" title="2 of 8 branches missed.">            if (c == ' ' || c == '\n' || c == '\r' || c == '\t') {</span>
+<span class="fc bfc" id="L396" title="All 2 branches covered.">                if (lastWasSpace) {</span>
+<span class="fc" id="L397">                    continue;</span>
+                }
+<span class="fc" id="L399">                text.append(' ');</span>
+<span class="fc" id="L400">                styles.add(current);</span>
+<span class="fc" id="L401">                links.add(currentHref);</span>
+<span class="fc" id="L402">                imageSources.add(null);</span>
+<span class="fc" id="L403">                lastWasSpace = true;</span>
+<span class="fc" id="L404">                freshParagraph = false;</span>
+            } else {
+<span class="fc" id="L406">                text.append(c);</span>
+<span class="fc" id="L407">                styles.add(current);</span>
+<span class="fc" id="L408">                links.add(currentHref);</span>
+<span class="fc" id="L409">                imageSources.add(null);</span>
+<span class="fc" id="L410">                lastWasSpace = false;</span>
+<span class="fc" id="L411">                freshParagraph = false;</span>
+            }
+        }
+<span class="fc" id="L414">    }</span>
+
+    /// Inside `pre` whitespace is content: spaces and tabs are preserved verbatim and newlines
+    /// start a fresh preformatted line, so indentation survives `setHtml` and getHtml round trips.
+    private void appendPreformattedText(String t) {
+<span class="fc bfc" id="L419" title="All 2 branches covered.">        for (int i = 0; i &lt; t.length(); i++) {</span>
+<span class="fc" id="L420">            char c = t.charAt(i);</span>
+<span class="pc bpc" id="L421" title="1 of 2 branches missed.">            if (c == '\r') {</span>
+<span class="nc" id="L422">                continue;</span>
+            }
+<span class="fc bfc" id="L424" title="All 2 branches covered.">            if (c == '\n') {</span>
+                // the parser hands the pre body as text; a leading newline right after &lt;pre&gt;
+                // would otherwise open an empty first line
+<span class="pc bpc" id="L427" title="1 of 2 branches missed.">                if (freshParagraph) {</span>
+<span class="nc" id="L428">                    continue;</span>
+                }
+<span class="fc" id="L430">                RichBlocks.BlockAttr attr = currentBlockCtx();</span>
+<span class="fc" id="L431">                attr.type = RichBlocks.PRE;</span>
+<span class="fc" id="L432">                attr.listType = RichBlocks.LIST_NONE;</span>
+<span class="fc" id="L433">                newParagraph(attr);</span>
+<span class="fc" id="L434">                continue;</span>
+            }
+<span class="pc bpc" id="L436" title="1 of 2 branches missed.">            text.append(c == '\t' ? ' ' : c);</span>
+<span class="pc bpc" id="L437" title="1 of 2 branches missed.">            if (c == '\t') {</span>
+                // expand the tab to spaces; the renderer has no tab stops
+<span class="nc bnc" id="L439" title="All 2 branches missed.">                for (int s = 0; s &lt; 3; s++) {</span>
+<span class="nc" id="L440">                    text.append(' ');</span>
+<span class="nc" id="L441">                    styles.add(current);</span>
+<span class="nc" id="L442">                    links.add(currentHref);</span>
+<span class="nc" id="L443">                    imageSources.add(null);</span>
+                }
+            }
+<span class="fc" id="L446">            styles.add(current);</span>
+<span class="fc" id="L447">            links.add(currentHref);</span>
+<span class="fc" id="L448">            imageSources.add(null);</span>
+<span class="fc" id="L449">            lastWasSpace = false;</span>
+<span class="fc" id="L450">            freshParagraph = false;</span>
+        }
+<span class="fc" id="L452">    }</span>
+
+    private void appendImage(String source) {
+<span class="nc bnc" id="L455" title="All 2 branches missed.">        if (paras.isEmpty()) {</span>
+<span class="nc" id="L456">            paras.add(new RichBlocks.BlockAttr());</span>
+        }
+<span class="nc" id="L458">        text.append('\uFFFC');</span>
+<span class="nc" id="L459">        styles.add(current);</span>
+<span class="nc" id="L460">        links.add(currentHref);</span>
+<span class="nc bnc" id="L461" title="All 2 branches missed.">        imageSources.add(source == null ? &quot;&quot; : source);</span>
+<span class="nc" id="L462">        lastWasSpace = false;</span>
+<span class="nc" id="L463">        freshParagraph = false;</span>
+<span class="nc" id="L464">    }</span>
+
+    // ---- css helpers ----
+
+    private static String cssValue(String styleAttr, String prop) {
+<span class="fc" id="L469">        String lower = styleAttr.toLowerCase();</span>
+<span class="fc" id="L470">        int idx = lower.indexOf(prop);</span>
+<span class="pc bpc" id="L471" title="1 of 2 branches missed.">        while (idx &gt;= 0) {</span>
+<span class="pc bpc" id="L472" title="5 of 6 branches missed.">            boolean boundary = idx == 0 || lower.charAt(idx - 1) == ';' || lower.charAt(idx - 1) == ' ';</span>
+<span class="fc" id="L473">            int colon = lower.indexOf(':', idx);</span>
+<span class="pc bpc" id="L474" title="2 of 4 branches missed.">            if (boundary &amp;&amp; colon == idx + prop.length()) {</span>
+<span class="fc" id="L475">                int end = lower.indexOf(';', colon);</span>
+<span class="pc bpc" id="L476" title="1 of 2 branches missed.">                if (end &lt; 0) {</span>
+<span class="fc" id="L477">                    end = styleAttr.length();</span>
+                }
+<span class="fc" id="L479">                return styleAttr.substring(colon + 1, end).trim();</span>
+            }
+<span class="nc" id="L481">            idx = lower.indexOf(prop, idx + 1);</span>
+<span class="nc" id="L482">        }</span>
+<span class="nc" id="L483">        return null;</span>
+    }
+
+    private static int parseColor(String v) {
+<span class="nc bnc" id="L487" title="All 2 branches missed.">        if (v == null) {</span>
+<span class="nc" id="L488">            return -1;</span>
+        }
+<span class="nc" id="L490">        v = v.trim();</span>
+<span class="nc bnc" id="L491" title="All 2 branches missed.">        if (v.startsWith(&quot;#&quot;)) {</span>
+<span class="nc" id="L492">            String hex = v.substring(1);</span>
+<span class="nc bnc" id="L493" title="All 2 branches missed.">            if (hex.length() == 3) {</span>
+<span class="nc" id="L494">                char r = hex.charAt(0);</span>
+<span class="nc" id="L495">                char g = hex.charAt(1);</span>
+<span class="nc" id="L496">                char b = hex.charAt(2);</span>
+<span class="nc" id="L497">                hex = &quot;&quot; + r + r + g + g + b + b;</span>
+            }
+<span class="nc bnc" id="L499" title="All 2 branches missed.">            if (hex.length() &gt;= 6) {</span>
+                try {
+<span class="nc" id="L501">                    return Integer.parseInt(hex.substring(0, 6), 16);</span>
+<span class="nc" id="L502">                } catch (NumberFormatException err) {</span>
+<span class="nc" id="L503">                    return -1;</span>
+                }
+            }
+<span class="nc" id="L506">            return -1;</span>
+        }
+<span class="nc bnc" id="L508" title="All 2 branches missed.">        if (v.startsWith(&quot;rgb&quot;)) {</span>
+<span class="nc" id="L509">            int open = v.indexOf('(');</span>
+<span class="nc" id="L510">            int close = v.indexOf(')');</span>
+<span class="nc bnc" id="L511" title="All 4 branches missed.">            if (open &gt;= 0 &amp;&amp; close &gt; open) {</span>
+<span class="nc" id="L512">                String[] parts = split(v.substring(open + 1, close), ',');</span>
+<span class="nc bnc" id="L513" title="All 2 branches missed.">                if (parts.length &gt;= 3) {</span>
+                    try {
+<span class="nc" id="L515">                        int r = Integer.parseInt(parts[0].trim());</span>
+<span class="nc" id="L516">                        int g = Integer.parseInt(parts[1].trim());</span>
+<span class="nc" id="L517">                        int b = Integer.parseInt(parts[2].trim());</span>
+<span class="nc" id="L518">                        return ((r &amp; 0xff) &lt;&lt; 16) | ((g &amp; 0xff) &lt;&lt; 8) | (b &amp; 0xff);</span>
+<span class="nc" id="L519">                    } catch (NumberFormatException err) {</span>
+<span class="nc" id="L520">                        return -1;</span>
+                    }
+                }
+            }
+        }
+<span class="nc" id="L525">        return -1;</span>
+    }
+
+    /// Parses an absolute CSS font-size (px, pt, em/rem) into pixels, or -1 when the value is
+    /// relative (%, keyword) or absent. pt is converted at 96dpi (1pt = 1.333px); em/rem use a
+    /// 16px reference so imported content matches typical browser defaults.
+    private static int fontSizePx(String v) {
+<span class="nc bnc" id="L532" title="All 2 branches missed.">        if (v == null) {</span>
+<span class="nc" id="L533">            return -1;</span>
+        }
+<span class="nc" id="L535">        v = v.trim().toLowerCase();</span>
+        try {
+<span class="nc bnc" id="L537" title="All 2 branches missed.">            if (v.endsWith(&quot;px&quot;)) {</span>
+<span class="nc" id="L538">                return Math.round(Float.parseFloat(v.substring(0, v.length() - 2).trim()));</span>
+            }
+<span class="nc bnc" id="L540" title="All 2 branches missed.">            if (v.endsWith(&quot;pt&quot;)) {</span>
+<span class="nc" id="L541">                return Math.round(Float.parseFloat(v.substring(0, v.length() - 2).trim()) * 96f / 72f);</span>
+            }
+<span class="nc bnc" id="L543" title="All 2 branches missed.">            if (v.endsWith(&quot;rem&quot;)) {</span>
+<span class="nc" id="L544">                return Math.round(Float.parseFloat(v.substring(0, v.length() - 3).trim()) * 16f);</span>
+            }
+<span class="nc bnc" id="L546" title="All 2 branches missed.">            if (v.endsWith(&quot;em&quot;)) {</span>
+<span class="nc" id="L547">                return Math.round(Float.parseFloat(v.substring(0, v.length() - 2).trim()) * 16f);</span>
+            }
+<span class="nc" id="L549">        } catch (NumberFormatException err) {</span>
+<span class="nc" id="L550">            return -1;</span>
+<span class="nc" id="L551">        }</span>
+<span class="nc" id="L552">        return -1;</span>
+    }
+
+    private static int fontSizeLevel(String v) {
+<span class="nc bnc" id="L556" title="All 2 branches missed.">        if (v == null) {</span>
+<span class="nc" id="L557">            return 0;</span>
+        }
+<span class="nc" id="L559">        v = v.trim();</span>
+<span class="nc bnc" id="L560" title="All 2 branches missed.">        if (v.endsWith(&quot;%&quot;)) {</span>
+            try {
+<span class="nc" id="L562">                int pct = Integer.parseInt(v.substring(0, v.length() - 1).trim());</span>
+<span class="nc bnc" id="L563" title="All 2 branches missed.">                if (pct &lt;= 70) {</span>
+<span class="nc" id="L564">                    return 1;</span>
+                }
+<span class="nc bnc" id="L566" title="All 2 branches missed.">                if (pct &lt;= 85) {</span>
+<span class="nc" id="L567">                    return 2;</span>
+                }
+<span class="nc bnc" id="L569" title="All 2 branches missed.">                if (pct &lt;= 100) {</span>
+<span class="nc" id="L570">                    return 3;</span>
+                }
+<span class="nc bnc" id="L572" title="All 2 branches missed.">                if (pct &lt;= 115) {</span>
+<span class="nc" id="L573">                    return 4;</span>
+                }
+<span class="nc bnc" id="L575" title="All 2 branches missed.">                if (pct &lt;= 150) {</span>
+<span class="nc" id="L576">                    return 5;</span>
+                }
+<span class="nc bnc" id="L578" title="All 2 branches missed.">                if (pct &lt;= 200) {</span>
+<span class="nc" id="L579">                    return 6;</span>
+                }
+<span class="nc" id="L581">                return 7;</span>
+<span class="nc" id="L582">            } catch (NumberFormatException err) {</span>
+<span class="nc" id="L583">                return 0;</span>
+            }
+        }
+<span class="nc" id="L586">        return 0;</span>
+    }
+
+    private static String[] split(String s, char c) {
+<span class="nc" id="L590">        List&lt;String&gt; out = new ArrayList&lt;String&gt;();</span>
+<span class="nc" id="L591">        int start = 0;</span>
+<span class="nc bnc" id="L592" title="All 2 branches missed.">        for (int i = 0; i &lt; s.length(); i++) {</span>
+<span class="nc bnc" id="L593" title="All 2 branches missed.">            if (s.charAt(i) == c) {</span>
+<span class="nc" id="L594">                out.add(s.substring(start, i));</span>
+<span class="nc" id="L595">                start = i + 1;</span>
+            }
+        }
+<span class="nc" id="L598">        out.add(s.substring(start));</span>
+<span class="nc" id="L599">        return out.toArray(new String[out.size()]);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

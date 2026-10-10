@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TunnelSetup.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.vpn.tunnel</a> &gt; <span class="el_source">TunnelSetup.java</span></div><h1>TunnelSetup.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.vpn.tunnel;
+
+/// What an application asks the platform to set up before its tunnel runs.
+///
+/// The mirror of [TunnelConfiguration]: this is what goes DOWN to the
+/// platform, that is what comes back up to [VpnTunnel#onStart]. They are
+/// separate types because they are not the same thing -- a setup is a
+/// request, a configuration is what the platform actually established, and
+/// a host that runs the tunnel in its own process decides the two apart.
+///
+/// Every field has a usable default, so the smallest tunnel is
+/// `new TunnelSetup().address(&quot;10.0.0.2/32&quot;).route(&quot;0.0.0.0/0&quot;)`.
+<span class="fc" id="L35">public final class TunnelSetup {</span>
+
+    /// The MTU a link gets when the application does not choose one.
+    ///
+    /// 1400 rather than 1500: a tunnel adds its own encapsulation, and a
+    /// link sized for the physical MTU fragments every full-size packet.
+    public static final int DEFAULT_MTU = 1400;
+
+<span class="fc" id="L43">    private String address = &quot;&quot;;</span>
+<span class="fc" id="L44">    private String server = &quot;&quot;;</span>
+<span class="fc" id="L45">    private String[] routes = new String[0];</span>
+<span class="fc" id="L46">    private String[] dnsServers = new String[0];</span>
+<span class="fc" id="L47">    private String[] searchDomains = new String[0];</span>
+<span class="fc" id="L48">    private int mtu = DEFAULT_MTU;</span>
+<span class="fc" id="L49">    private String data = &quot;&quot;;</span>
+<span class="fc" id="L50">    private String sessionName = &quot;&quot;;</span>
+
+    /// The address this device takes on the tunnel, in CIDR form.
+    ///
+    /// REQUIRED. A setup without one fails the start with
+    /// `INVALID_CONFIGURATION`, because a link with no address is not one a
+    /// platform can establish -- Android's `VpnService.Builder` documents
+    /// that at least one address must be set before `establish()`.
+    ///
+    /// The prefix may be left off -- `/32` for IPv4, `/128` for IPv6 -- but
+    /// one that is written and unreadable FAILS the start the same way; see
+    /// [#route].
+    public TunnelSetup address(String cidr) {
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        this.address = cidr == null ? &quot;&quot; : cidr;</span>
+<span class="fc" id="L64">        return this;</span>
+    }
+
+    /// The far end, which the platform excludes from the tunnel's own routes
+    /// so the tunnel's own traffic does not loop back into it.
+    public TunnelSetup server(String host) {
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        this.server = host == null ? &quot;&quot; : host;</span>
+<span class="fc" id="L71">        return this;</span>
+    }
+
+    /// A route directed into the tunnel, in CIDR form. Repeatable.
+    ///
+    /// `0.0.0.0/0` and `::/0` are the full tunnel. An unreadable prefix
+    /// fails the start with `INVALID_CONFIGURATION` rather than being
+    /// narrowed to a host route: `&quot;0.0.0.0/o&quot;` is a typo for the default
+    /// route, and a tunnel that started and carried one address would let
+    /// every packet the app believed it was protecting out in the clear.
+    /// Checked in the simulation as well, so the refusal is not something
+    /// found first on a device.
+    public TunnelSetup route(String cidr) {
+<span class="fc" id="L84">        routes = append(routes, cidr);</span>
+<span class="fc" id="L85">        return this;</span>
+    }
+
+    /// A DNS server the tunnel provides. Repeatable.
+    public TunnelSetup dnsServer(String address) {
+<span class="fc" id="L90">        dnsServers = append(dnsServers, address);</span>
+<span class="fc" id="L91">        return this;</span>
+    }
+
+    /// A DNS search domain. Repeatable.
+    ///
+    /// Android applies these. A platform that cannot express one ignores it
+    /// rather than
+    /// refusing the tunnel, because a search domain is a convenience and
+    /// losing the tunnel over one is not a trade an app would choose.
+    public TunnelSetup searchDomain(String domain) {
+<span class="fc" id="L101">        searchDomains = append(searchDomains, domain);</span>
+<span class="fc" id="L102">        return this;</span>
+    }
+
+    /// The link MTU. See [#DEFAULT_MTU].
+    public TunnelSetup mtu(int bytes) {
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        this.mtu = bytes &gt; 0 ? bytes : DEFAULT_MTU;</span>
+<span class="fc" id="L108">        return this;</span>
+    }
+
+    /// The name the system shows for this VPN session.
+    public TunnelSetup sessionName(String name) {
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        this.sessionName = name == null ? &quot;&quot; : name;</span>
+<span class="fc" id="L114">        return this;</span>
+    }
+
+    /// Application data handed to [VpnTunnel#onStart] as
+    /// [TunnelConfiguration#getData].
+    ///
+    /// The one thing that reaches the tunnel from the app WITHOUT relying
+    /// on the two sharing a process. Android's does, so a static works
+    /// there; a host that constructed the tunnel elsewhere shares no
+    /// statics, no singletons and no open connections with the app. A
+    /// tunnel that takes its token, server list or key from here is the one
+    /// that does not have to be rewritten.
+    public TunnelSetup data(String value) {
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        this.data = value == null ? &quot;&quot; : value;</span>
+<span class="fc" id="L128">        return this;</span>
+    }
+
+    /// @return the device's tunnel address in CIDR form
+    public String getAddress() {
+<span class="fc" id="L133">        return address;</span>
+    }
+
+    /// @return the far end
+    public String getServer() {
+<span class="fc" id="L138">        return server;</span>
+    }
+
+    /// @return the routes directed into the tunnel
+    public String[] getRoutes() {
+<span class="fc" id="L143">        return copy(routes);</span>
+    }
+
+    /// @return the DNS servers the tunnel provides
+    public String[] getDnsServers() {
+<span class="fc" id="L148">        return copy(dnsServers);</span>
+    }
+
+    /// @return the DNS search domains
+    public String[] getSearchDomains() {
+<span class="fc" id="L153">        return copy(searchDomains);</span>
+    }
+
+    /// @return the link MTU
+    public int getMtu() {
+<span class="fc" id="L158">        return mtu;</span>
+    }
+
+    /// @return the session name the system shows
+    public String getSessionName() {
+<span class="fc" id="L163">        return sessionName;</span>
+    }
+
+    /// @return the application data, never null
+    public String getData() {
+<span class="fc" id="L168">        return data;</span>
+    }
+
+    private static String[] append(String[] existing, String value) {
+<span class="pc bpc" id="L172" title="2 of 4 branches missed.">        if (value == null || value.length() == 0) {</span>
+<span class="nc" id="L173">            return existing;</span>
+        }
+<span class="fc" id="L175">        String[] out = new String[existing.length + 1];</span>
+<span class="fc" id="L176">        System.arraycopy(existing, 0, out, 0, existing.length);</span>
+<span class="fc" id="L177">        out[existing.length] = value;</span>
+<span class="fc" id="L178">        return out;</span>
+    }
+
+    private static String[] copy(String[] source) {
+<span class="fc" id="L182">        String[] out = new String[source.length];</span>
+<span class="fc" id="L183">        System.arraycopy(source, 0, out, 0, source.length);</span>
+<span class="fc" id="L184">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

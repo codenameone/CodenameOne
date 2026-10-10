@@ -1,0 +1,784 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ICalendarCodec.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.calendar</a> &gt; <span class="el_source">ICalendarCodec.java</span></div><h1>ICalendarCodec.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.calendar;
+
+import com.codename1.util.StringUtil;
+import java.time.DateTimeException;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Reads and writes the interoperable portion of RFC 5545 used by events,
+/// tasks, CalDAV, and file import/export. Unknown X-properties are preserved
+/// in provider data so a read/write cycle doesn't silently discard extensions.
+public final class ICalendarCodec {
+
+    private static final String CRLF = &quot;\r\n&quot;;
+
+    private ICalendarCodec() {
+    }
+
+    public static String writeEvent(CalendarEvent event) {
+<span class="fc" id="L49">        StringBuilder out = beginCalendar();</span>
+<span class="fc" id="L50">        append(out, &quot;BEGIN:VEVENT&quot;);</span>
+<span class="fc" id="L51">        writeCommon(out, event.getId(), event.getTitle(), event.getDescription(), event.getLocation(), event.getStart(), event.getEnd(), event.getRecurrence(), event.getProviderData(), false);</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (event.getUrl() != null) {</span>
+<span class="nc" id="L53">            append(out, &quot;URL:&quot; + escape(event.getUrl()));</span>
+        }
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        append(out, &quot;STATUS:&quot; + (event.getStatus() == CalendarEvent.Status.CANCELED</span>
+<span class="fc" id="L56">                ? &quot;CANCELLED&quot; : event.getStatus().name()));</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        append(out, &quot;TRANSP:&quot; + (event.getAvailability() == CalendarEvent.Availability.FREE ? &quot;TRANSPARENT&quot; : &quot;OPAQUE&quot;));</span>
+<span class="fc" id="L58">        append(out, &quot;CLASS:&quot; + event.getPrivacy().name());</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        for (CalendarAttendee attendee : event.getAttendees()) {</span>
+<span class="fc" id="L60">            writeAttendee(out, attendee);</span>
+<span class="fc" id="L61">        }</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        for (CalendarAttachment attachment : event.getAttachments()) {</span>
+<span class="fc" id="L63">            writeAttachment(out, attachment);</span>
+<span class="fc" id="L64">        }</span>
+<span class="pc bpc" id="L65" title="1 of 4 branches missed.">        if (event.getConference() != null &amp;&amp; event.getConference().getJoinUrl() != null) {</span>
+<span class="fc" id="L66">            append(out, &quot;CONFERENCE;VALUE=URI:&quot; + escape(event.getConference().getJoinUrl()));</span>
+        }
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        for (CalendarAlarm alarm : event.getAlarms()) {</span>
+<span class="fc" id="L69">            writeAlarm(out, alarm);</span>
+<span class="fc" id="L70">        }</span>
+<span class="fc" id="L71">        append(out, &quot;END:VEVENT&quot;);</span>
+<span class="fc" id="L72">        return endCalendar(out);</span>
+    }
+
+    public static String writeTask(CalendarTask task) {
+<span class="fc" id="L76">        StringBuilder out = beginCalendar();</span>
+<span class="fc" id="L77">        append(out, &quot;BEGIN:VTODO&quot;);</span>
+<span class="fc" id="L78">        writeCommon(out, task.getId(), task.getTitle(), task.getDescription(), task.getLocation(), task.getStart(), task.getDue(), task.getRecurrence(), task.getProviderData(), true);</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        append(out, &quot;STATUS:&quot; + (task.isCompleted() ? &quot;COMPLETED&quot; : &quot;NEEDS-ACTION&quot;));</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        if (task.getCompletionTime() != null) {</span>
+<span class="nc" id="L81">            append(out, &quot;COMPLETED:&quot; + utc(task.getCompletionTime()));</span>
+        }
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        if (task.getPriority() &gt; 0) {</span>
+<span class="fc" id="L84">            append(out, &quot;PRIORITY:&quot; + task.getPriority());</span>
+        }
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        for (CalendarAttachment attachment : task.getAttachments()) {</span>
+<span class="nc" id="L87">            writeAttachment(out, attachment);</span>
+<span class="nc" id="L88">        }</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        for (CalendarAlarm alarm : task.getAlarms()) {</span>
+<span class="nc" id="L90">            writeAlarm(out, alarm);</span>
+<span class="nc" id="L91">        }</span>
+<span class="fc" id="L92">        append(out, &quot;END:VTODO&quot;);</span>
+<span class="fc" id="L93">        return endCalendar(out);</span>
+    }
+
+    public static CalendarEvent readEvent(String text) throws CalendarException {
+<span class="fc" id="L97">        Component component = component(text, &quot;VEVENT&quot;);</span>
+<span class="fc" id="L98">        CalendarEvent out = new CalendarEvent();</span>
+<span class="fc" id="L99">        readCommon(component, out, null);</span>
+<span class="fc" id="L100">        out.setUrl(value(component, &quot;URL&quot;));</span>
+<span class="fc" id="L101">        String status = value(component, &quot;STATUS&quot;);</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        out.setStatus(&quot;CANCELLED&quot;.equalsIgnoreCase(status) ? CalendarEvent.Status.CANCELED</span>
+<span class="fc" id="L103">                : enumValue(CalendarEvent.Status.class, status, CalendarEvent.Status.CONFIRMED));</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        if (&quot;TRANSPARENT&quot;.equalsIgnoreCase(value(component, &quot;TRANSP&quot;))) {</span>
+<span class="nc" id="L105">            out.setAvailability(CalendarEvent.Availability.FREE);</span>
+        }
+<span class="fc" id="L107">        out.setPrivacy(enumValue(CalendarEvent.Privacy.class, value(component, &quot;CLASS&quot;), CalendarEvent.Privacy.DEFAULT));</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        for (Property property : component.all(&quot;ATTENDEE&quot;)) {</span>
+<span class="fc" id="L109">            out.addAttendee(readAttendee(property));</span>
+<span class="fc" id="L110">        }</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        for (Property property : component.all(&quot;ATTACH&quot;)) {</span>
+<span class="fc" id="L112">            out.addAttachment(readAttachment(property));</span>
+<span class="fc" id="L113">        }</span>
+<span class="fc" id="L114">        Property conference = component.first(&quot;CONFERENCE&quot;);</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        if (conference != null) {</span>
+<span class="fc" id="L116">            out.setConference(new CalendarConference().setJoinUrl(unescape(conference.value)));</span>
+        }
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        for (Component alarm : component.children) {</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">            if (&quot;VALARM&quot;.equals(alarm.name)) {</span>
+<span class="fc" id="L120">                out.addAlarm(readAlarm(alarm));</span>
+            }
+<span class="fc" id="L122">        }</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        for (Property property : component.properties) {</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            if (property.name.startsWith(&quot;X-&quot;)) {</span>
+<span class="fc" id="L125">                out.putProviderData(property.name, unescape(property.value));</span>
+            }
+<span class="fc" id="L127">        }</span>
+<span class="fc" id="L128">        return out;</span>
+    }
+
+    public static CalendarTask readTask(String text) throws CalendarException {
+<span class="fc" id="L132">        Component component = component(text, &quot;VTODO&quot;);</span>
+<span class="fc" id="L133">        CalendarTask out = new CalendarTask();</span>
+<span class="fc" id="L134">        readCommon(component, null, out);</span>
+<span class="fc" id="L135">        out.setCompleted(&quot;COMPLETED&quot;.equalsIgnoreCase(value(component, &quot;STATUS&quot;)));</span>
+<span class="fc" id="L136">        String completed = value(component, &quot;COMPLETED&quot;);</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        if (completed != null) {</span>
+<span class="nc" id="L138">            out.setCompletionTime(parseDateTime(completed, null).getDateTime().toInstant());</span>
+        }
+<span class="fc" id="L140">        String priority = value(component, &quot;PRIORITY&quot;);</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (priority != null) {</span>
+            try {
+<span class="fc" id="L143">                out.setPriority(Integer.parseInt(priority));</span>
+<span class="nc" id="L144">            } catch (NumberFormatException ignored) {</span>
+<span class="fc" id="L145">            }</span>
+        }
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        for (Property property : component.all(&quot;ATTACH&quot;)) {</span>
+<span class="nc" id="L148">            out.addAttachment(readAttachment(property));</span>
+<span class="nc" id="L149">        }</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        for (Component alarm : component.children) {</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">            if (&quot;VALARM&quot;.equals(alarm.name)) {</span>
+<span class="nc" id="L152">                out.addAlarm(readAlarm(alarm));</span>
+            }
+<span class="nc" id="L154">        }</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        for (Property property : component.properties) {</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">            if (property.name.startsWith(&quot;X-&quot;)) {</span>
+<span class="nc" id="L157">                out.putProviderData(property.name, unescape(property.value));</span>
+            }
+<span class="fc" id="L159">        }</span>
+<span class="fc" id="L160">        return out;</span>
+    }
+
+    /// Serializes a recurrence rule without the {@code RRULE:} prefix.
+    public static String writeRecurrenceRule(CalendarRecurrenceRule rule) {
+<span class="nc bnc" id="L165" title="All 4 branches missed.">        if (rule == null || rule.getFrequency() == null) {</span>
+<span class="nc" id="L166">            throw new IllegalArgumentException(&quot;frequency required&quot;);</span>
+        }
+<span class="nc" id="L168">        return recurrence(rule);</span>
+    }
+
+    /// Parses a recurrence rule with or without an {@code RRULE:} prefix.
+    public static CalendarRecurrenceRule readRecurrenceRule(String value) throws CalendarException {
+<span class="nc bnc" id="L173" title="All 2 branches missed.">        if (startsWithIgnoreCase(value, &quot;RRULE:&quot;)) {</span>
+<span class="nc" id="L174">            value = value.substring(6);</span>
+        }
+<span class="nc" id="L176">        return parseRecurrence(value);</span>
+    }
+
+    private static void readCommon(Component component, CalendarEvent event, CalendarTask task) throws CalendarException {
+<span class="fc" id="L180">        String id = value(component, &quot;UID&quot;);</span>
+<span class="fc" id="L181">        String title = value(component, &quot;SUMMARY&quot;);</span>
+<span class="fc" id="L182">        String description = value(component, &quot;DESCRIPTION&quot;);</span>
+<span class="fc" id="L183">        String location = value(component, &quot;LOCATION&quot;);</span>
+<span class="fc" id="L184">        Property start = component.first(&quot;DTSTART&quot;);</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        Property end = component.first(event == null ? &quot;DUE&quot; : &quot;DTEND&quot;);</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        CalendarDateTime startValue = start == null ? null : parseDateTime(start.value, start.params.get(&quot;TZID&quot;));</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        CalendarDateTime endValue = end == null ? null : parseDateTime(end.value, end.params.get(&quot;TZID&quot;));</span>
+<span class="fc" id="L188">        CalendarRecurrenceRule recurrence = parseRecurrence(value(component, &quot;RRULE&quot;));</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        if (event != null) {</span>
+<span class="fc" id="L190">            event.setId(id).setTitle(title).setDescription(description).setLocation(location).setStart(startValue).setEnd(endValue).setRecurrence(recurrence);</span>
+        } else {
+<span class="fc" id="L192">            task.setId(id).setTitle(title).setDescription(description).setLocation(location).setStart(startValue).setDue(endValue).setRecurrence(recurrence);</span>
+        }
+<span class="fc" id="L194">    }</span>
+
+    private static void writeCommon(StringBuilder out, String id, String title, String description, String location, CalendarDateTime start, CalendarDateTime end, CalendarRecurrenceRule recurrence, Map&lt;String, String&gt; extensions, boolean task) {
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        append(out, &quot;UID:&quot; + escape(id == null ? String.valueOf(System.currentTimeMillis()) + &quot;@codenameone&quot; : id));</span>
+<span class="fc" id="L198">        append(out, &quot;DTSTAMP:&quot; + utc(Instant.now()));</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        if (title != null) {</span>
+<span class="fc" id="L200">            append(out, &quot;SUMMARY:&quot; + escape(title));</span>
+        }
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        if (description != null) {</span>
+<span class="fc" id="L203">            append(out, &quot;DESCRIPTION:&quot; + escape(description));</span>
+        }
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        if (location != null) {</span>
+<span class="fc" id="L206">            append(out, &quot;LOCATION:&quot; + escape(location));</span>
+        }
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        if (start != null) {</span>
+<span class="fc" id="L209">            writeDateTime(out, &quot;DTSTART&quot;, start);</span>
+        }
+<span class="fc bfc" id="L211" title="All 2 branches covered.">        if (end != null) {</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">            writeDateTime(out, task ? &quot;DUE&quot; : &quot;DTEND&quot;, end);</span>
+        }
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        if (recurrence != null) {</span>
+<span class="fc" id="L215">            append(out, &quot;RRULE:&quot; + recurrence(recurrence));</span>
+        }
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; entry : extensions.entrySet()) {</span>
+<span class="fc" id="L218">            String key = asciiUpper(entry.getKey());</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">            if (key.startsWith(&quot;X-&quot;)) {</span>
+<span class="fc" id="L220">                append(out, key + &quot;:&quot; + escape(entry.getValue()));</span>
+            }
+<span class="fc" id="L222">        }</span>
+<span class="fc" id="L223">    }</span>
+
+    private static void writeDateTime(StringBuilder out, String name, CalendarDateTime value) {
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        if (value.isAllDay()) {</span>
+<span class="fc" id="L227">            LocalDate date = value.getDate();</span>
+<span class="fc" id="L228">            append(out, name + &quot;;VALUE=DATE:&quot; + digits(date));</span>
+<span class="fc" id="L229">        } else {</span>
+<span class="fc" id="L230">            ZonedDateTime dateTime = value.getDateTime();</span>
+<span class="fc" id="L231">            String zone = dateTime.getZone().getId();</span>
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">            if (isUtc(dateTime.getZone())) {</span>
+<span class="nc" id="L233">                append(out, name + &quot;:&quot; + utc(dateTime.toInstant()));</span>
+            } else {
+<span class="fc" id="L235">                append(out, name + &quot;;TZID=&quot; + zone + &quot;:&quot; + local(dateTime.toInstant(), dateTime.getZone()));</span>
+            }
+        }
+<span class="fc" id="L238">    }</span>
+
+    private static String recurrence(CalendarRecurrenceRule rule) {
+<span class="fc" id="L241">        StringBuilder out = new StringBuilder(&quot;FREQ=&quot;).append(rule.getFrequency().name());</span>
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">        if (rule.getInterval() != 1) {</span>
+<span class="fc" id="L243">            out.append(&quot;;INTERVAL=&quot;).append(rule.getInterval());</span>
+        }
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">        if (rule.getCount() != null) {</span>
+<span class="fc" id="L246">            out.append(&quot;;COUNT=&quot;).append(rule.getCount());</span>
+        }
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">        if (rule.getUntil() != null) {</span>
+<span class="nc" id="L249">            out.append(&quot;;UNTIL=&quot;).append(formatRecurrenceUntil(rule.getUntil()));</span>
+        }
+<span class="fc" id="L251">        appendNumbers(out, &quot;BYDAY&quot;, rule.getDaysOfWeek(), true);</span>
+<span class="fc" id="L252">        appendNumbers(out, &quot;BYMONTHDAY&quot;, rule.getDaysOfMonth(), false);</span>
+<span class="fc" id="L253">        appendNumbers(out, &quot;BYMONTH&quot;, rule.getMonths(), false);</span>
+<span class="fc" id="L254">        return out.toString();</span>
+    }
+
+    private static CalendarRecurrenceRule parseRecurrence(String value) throws CalendarException {
+<span class="fc bfc" id="L258" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L259">            return null;</span>
+        }
+<span class="fc" id="L261">        CalendarRecurrenceRule out = new CalendarRecurrenceRule();</span>
+<span class="fc" id="L262">        String[] parts = CalendarDateUtil.split(value, ';');</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">        for (String part : parts) {</span>
+<span class="fc" id="L264">            int equals = part.indexOf('=');</span>
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">            if (equals &lt; 1) {</span>
+<span class="nc" id="L266">                continue;</span>
+            }
+<span class="fc" id="L268">            String key = asciiUpper(part.substring(0, equals));</span>
+<span class="fc" id="L269">            String data = part.substring(equals + 1);</span>
+            try {
+<span class="fc bfc" id="L271" title="All 2 branches covered.">                if (&quot;FREQ&quot;.equals(key)) {</span>
+<span class="fc" id="L272">                    out.setFrequency(CalendarRecurrenceRule.Frequency.valueOf(asciiUpper(data)));</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">                } else if (&quot;INTERVAL&quot;.equals(key)) {</span>
+<span class="fc" id="L274">                    out.setInterval(Integer.parseInt(data));</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">                } else if (&quot;COUNT&quot;.equals(key)) {</span>
+<span class="fc" id="L276">                    out.setCount(Integer.valueOf(data));</span>
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">                } else if (&quot;UNTIL&quot;.equals(key)) {</span>
+<span class="nc" id="L278">                    out.setUntil(parseDateTime(data, null));</span>
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">                } else if (&quot;BYDAY&quot;.equals(key)) {</span>
+<span class="fc bfc" id="L280" title="All 2 branches covered.">                    for (String item : CalendarDateUtil.split(data, ',')) {</span>
+<span class="fc" id="L281">                        out.addDayOfWeek(day(item));</span>
+                    }
+<span class="nc bnc" id="L283" title="All 2 branches missed.">                } else if (&quot;BYMONTHDAY&quot;.equals(key)) {</span>
+<span class="nc bnc" id="L284" title="All 2 branches missed.">                    for (String item : CalendarDateUtil.split(data, ',')) {</span>
+<span class="nc" id="L285">                        out.addDayOfMonth(Integer.parseInt(item));</span>
+                    }
+<span class="nc bnc" id="L287" title="All 2 branches missed.">                } else if (&quot;BYMONTH&quot;.equals(key)) {</span>
+<span class="nc bnc" id="L288" title="All 2 branches missed.">                    for (String item : CalendarDateUtil.split(data, ',')) {</span>
+<span class="nc" id="L289">                        out.addMonth(Integer.parseInt(item));</span>
+                    }
+                }
+<span class="nc" id="L292">            } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L293">                throw new CalendarException(CalendarError.MALFORMED_RESPONSE, &quot;Invalid recurrence rule: &quot; + value, ex);</span>
+<span class="fc" id="L294">            }</span>
+        }
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">        if (out.getFrequency() == null) {</span>
+<span class="nc" id="L297">            throw new CalendarException(CalendarError.MALFORMED_RESPONSE, &quot;RRULE has no frequency&quot;);</span>
+        }
+<span class="fc" id="L299">        return out;</span>
+    }
+
+    private static void writeAttendee(StringBuilder out, CalendarAttendee attendee) {
+<span class="fc" id="L303">        StringBuilder line = new StringBuilder(&quot;ATTENDEE&quot;);</span>
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">        if (attendee.getName() != null) {</span>
+<span class="fc" id="L305">            line.append(&quot;;CN=&quot;).append(quote(attendee.getName()));</span>
+        }
+<span class="pc bpc" id="L307" title="1 of 4 branches missed.">        line.append(&quot;;ROLE=&quot;).append(attendee.getRole() == CalendarAttendee.Role.OPTIONAL ? &quot;OPT-PARTICIPANT&quot; : attendee.getRole() == CalendarAttendee.Role.RESOURCE ? &quot;NON-PARTICIPANT&quot; : &quot;REQ-PARTICIPANT&quot;);</span>
+<span class="pc bpc" id="L308" title="1 of 2 branches missed.">        line.append(&quot;;PARTSTAT=&quot;).append(attendee.getResponse() == CalendarAttendee.Response.NONE</span>
+<span class="fc" id="L309">                ? &quot;NEEDS-ACTION&quot; : attendee.getResponse().name().replace('_', '-'));</span>
+<span class="fc" id="L310">        line.append(':');</span>
+<span class="fc bfc" id="L311" title="All 2 branches covered.">        String uri = attendee.getUri() != null ? attendee.getUri() : attendee.getEmail();</span>
+<span class="pc bpc" id="L312" title="1 of 4 branches missed.">        if (uri != null &amp;&amp; uri.indexOf(':') &lt; 0) {</span>
+<span class="fc" id="L313">            uri = &quot;mailto:&quot; + uri;</span>
+        }
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">        line.append(uri == null ? &quot;&quot; : uri);</span>
+<span class="fc" id="L316">        append(out, line.toString());</span>
+<span class="fc" id="L317">    }</span>
+
+    private static CalendarAttendee readAttendee(Property property) {
+<span class="fc" id="L320">        String uri = unescape(property.value);</span>
+<span class="fc" id="L321">        String email = uri;</span>
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">        if (startsWithIgnoreCase(email, &quot;mailto:&quot;)) {</span>
+<span class="fc" id="L323">            email = email.substring(7);</span>
+        }
+<span class="fc" id="L325">        CalendarAttendee out = new CalendarAttendee().setUri(uri).setEmail(email).setName(property.params.get(&quot;CN&quot;));</span>
+<span class="fc" id="L326">        String role = property.params.get(&quot;ROLE&quot;);</span>
+<span class="fc bfc" id="L327" title="All 2 branches covered.">        if (&quot;OPT-PARTICIPANT&quot;.equals(role)) {</span>
+<span class="fc" id="L328">            out.setRole(CalendarAttendee.Role.OPTIONAL);</span>
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">        } else if (&quot;NON-PARTICIPANT&quot;.equals(role)) {</span>
+<span class="nc" id="L330">            out.setRole(CalendarAttendee.Role.RESOURCE);</span>
+        }
+<span class="fc" id="L332">        String response = property.params.get(&quot;PARTSTAT&quot;);</span>
+<span class="pc bpc" id="L333" title="1 of 2 branches missed.">        if (response != null) {</span>
+            try {
+<span class="fc" id="L335">                out.setResponse(CalendarAttendee.Response.valueOf(response.replace('-', '_')));</span>
+<span class="nc" id="L336">            } catch (IllegalArgumentException ignored) {</span>
+<span class="fc" id="L337">            }</span>
+        }
+<span class="fc" id="L339">        return out;</span>
+    }
+
+    private static void writeAlarm(StringBuilder out, CalendarAlarm alarm) {
+<span class="fc" id="L343">        append(out, &quot;BEGIN:VALARM&quot;);</span>
+<span class="pc bpc" id="L344" title="2 of 4 branches missed.">        append(out, &quot;ACTION:&quot; + (alarm.getMethod() == CalendarAlarm.Method.EMAIL ? &quot;EMAIL&quot; : alarm.getMethod() == CalendarAlarm.Method.AUDIO ? &quot;AUDIO&quot; : &quot;DISPLAY&quot;));</span>
+<span class="pc bpc" id="L345" title="1 of 2 branches missed.">        if (alarm.getTimeBefore() != null) {</span>
+<span class="fc" id="L346">            long seconds = alarm.getTimeBefore().getSeconds();</span>
+<span class="pc bpc" id="L347" title="1 of 2 branches missed.">            if (seconds &lt; 0) {</span>
+<span class="nc" id="L348">                throw new IllegalArgumentException(&quot;timeBefore must be a non-negative duration&quot;);</span>
+            }
+            // iCalendar triggers are whole seconds; round sub-second values
+            // instead of failing an export queued long after the value was set.
+<span class="pc bpc" id="L352" title="1 of 2 branches missed.">            if (alarm.getTimeBefore().getNano() &gt;= 500000000) {</span>
+<span class="nc" id="L353">                seconds++;</span>
+            }
+<span class="fc" id="L355">            append(out, &quot;TRIGGER:-&quot; + Duration.ofSeconds(seconds));</span>
+<span class="pc bnc" id="L356" title="All 2 branches missed.">        } else if (alarm.getAbsoluteTime() != null) {</span>
+<span class="nc" id="L357">            append(out, &quot;TRIGGER;VALUE=DATE-TIME:&quot; + utc(alarm.getAbsoluteTime()));</span>
+        }
+<span class="fc" id="L359">        append(out, &quot;END:VALARM&quot;);</span>
+<span class="fc" id="L360">    }</span>
+
+    private static CalendarAlarm readAlarm(Component component) throws CalendarException {
+<span class="fc" id="L363">        String action = value(component, &quot;ACTION&quot;);</span>
+<span class="fc" id="L364">        String trigger = value(component, &quot;TRIGGER&quot;);</span>
+<span class="fc" id="L365">        CalendarAlarm out = new CalendarAlarm();</span>
+<span class="pc bpc" id="L366" title="1 of 2 branches missed.">        if (&quot;EMAIL&quot;.equals(action)) {</span>
+<span class="nc" id="L367">            out.setMethod(CalendarAlarm.Method.EMAIL);</span>
+<span class="pc bpc" id="L368" title="1 of 2 branches missed.">        } else if (&quot;AUDIO&quot;.equals(action)) {</span>
+<span class="nc" id="L369">            out.setMethod(CalendarAlarm.Method.AUDIO);</span>
+        }
+<span class="pc bpc" id="L371" title="1 of 4 branches missed.">        if (trigger != null &amp;&amp; trigger.startsWith(&quot;-P&quot;)) {</span>
+            try {
+<span class="fc" id="L373">                out.setTimeBefore(Duration.parse(trigger.substring(1)));</span>
+<span class="nc" id="L374">            } catch (DateTimeException ignored) {</span>
+<span class="pc" id="L375">            }</span>
+<span class="pc bpc" id="L376" title="4 of 6 branches missed.">        } else if (trigger != null &amp;&amp; (trigger.startsWith(&quot;P&quot;) || trigger.startsWith(&quot;+P&quot;))) {</span>
+            try {
+<span class="pc bpc" id="L378" title="1 of 2 branches missed.">                Duration offset = Duration.parse(trigger.charAt(0) == '+' ? trigger.substring(1) : trigger);</span>
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">                if (offset.compareTo(Duration.ofSeconds(0)) == 0) {</span>
+<span class="fc" id="L380">                    out.setTimeBefore(offset);</span>
+                }
+<span class="nc" id="L382">            } catch (DateTimeException ignored) {</span>
+<span class="pc" id="L383">            }</span>
+<span class="nc bnc" id="L384" title="All 2 branches missed.">        } else if (trigger != null) {</span>
+<span class="nc" id="L385">            out.setAbsoluteTime(parseDateTime(trigger, null).getDateTime().toInstant());</span>
+        }
+<span class="pc bpc" id="L387" title="3 of 4 branches missed.">        if (out.getTimeBefore() == null &amp;&amp; out.getAbsoluteTime() == null) {</span>
+            // An alarm without a mappable trigger would re-serialize as a
+            // VALARM missing its required TRIGGER property; drop it instead.
+<span class="nc" id="L390">            return null;</span>
+        }
+<span class="fc" id="L392">        return out;</span>
+    }
+
+    private static void writeAttachment(StringBuilder out, CalendarAttachment attachment) {
+<span class="pc bpc" id="L396" title="1 of 2 branches missed.">        if (attachment.getUri() == null) {</span>
+<span class="nc" id="L397">            return;</span>
+        }
+<span class="fc" id="L399">        StringBuilder line = new StringBuilder(&quot;ATTACH&quot;);</span>
+<span class="pc bpc" id="L400" title="1 of 2 branches missed.">        if (attachment.getMimeType() != null) {</span>
+<span class="fc" id="L401">            line.append(&quot;;FMTTYPE=&quot;).append(attachment.getMimeType());</span>
+        }
+<span class="fc" id="L403">        line.append(':').append(escape(attachment.getUri()));</span>
+<span class="fc" id="L404">        append(out, line.toString());</span>
+<span class="fc" id="L405">    }</span>
+
+    private static CalendarAttachment readAttachment(Property property) {
+<span class="fc" id="L408">        return new CalendarAttachment().setUri(unescape(property.value)).setMimeType(property.params.get(&quot;FMTTYPE&quot;));</span>
+    }
+
+    private static Component component(String input, String wanted) throws CalendarException {
+<span class="pc bpc" id="L412" title="1 of 2 branches missed.">        if (input == null) {</span>
+<span class="nc" id="L413">            throw new CalendarException(CalendarError.MALFORMED_RESPONSE, &quot;Calendar data is null&quot;);</span>
+        }
+<span class="fc" id="L415">        List&lt;String&gt; lines = unfold(input);</span>
+<span class="fc" id="L416">        Component root = new Component(&quot;ROOT&quot;);</span>
+<span class="fc" id="L417">        Component current = root;</span>
+<span class="fc" id="L418">        List&lt;Component&gt; stack = new ArrayList&lt;Component&gt;();</span>
+<span class="fc bfc" id="L419" title="All 2 branches covered.">        for (String line : lines) {</span>
+<span class="fc bfc" id="L420" title="All 2 branches covered.">            if (line.startsWith(&quot;BEGIN:&quot;)) {</span>
+<span class="fc" id="L421">                Component child = new Component(asciiUpper(line.substring(6)));</span>
+<span class="fc" id="L422">                current.children.add(child);</span>
+<span class="fc" id="L423">                stack.add(current);</span>
+<span class="fc" id="L424">                current = child;</span>
+<span class="fc bfc" id="L425" title="All 2 branches covered.">            } else if (line.startsWith(&quot;END:&quot;)) {</span>
+<span class="pc bpc" id="L426" title="1 of 2 branches missed.">                if (!stack.isEmpty()) {</span>
+<span class="fc" id="L427">                    current = stack.remove(stack.size() - 1);</span>
+                }
+            } else {
+<span class="fc" id="L430">                int colon = colon(line);</span>
+<span class="pc bpc" id="L431" title="1 of 2 branches missed.">                if (colon &lt; 0) {</span>
+<span class="nc" id="L432">                    continue;</span>
+                }
+<span class="fc" id="L434">                String left = line.substring(0, colon);</span>
+<span class="fc" id="L435">                String data = line.substring(colon + 1);</span>
+<span class="fc" id="L436">                List&lt;String&gt; fields = splitParameters(left);</span>
+<span class="fc" id="L437">                Property property = new Property(asciiUpper(fields.get(0)), data);</span>
+<span class="fc bfc" id="L438" title="All 2 branches covered.">                for (int i = 1; i &lt; fields.size(); i++) {</span>
+<span class="fc" id="L439">                    int equals = fields.get(i).indexOf('=');</span>
+<span class="pc bpc" id="L440" title="1 of 2 branches missed.">                    if (equals &gt; 0) {</span>
+<span class="fc" id="L441">                        property.params.put(asciiUpper(fields.get(i).substring(0, equals)), unquote(fields.get(i).substring(equals + 1)));</span>
+                    }
+                }
+<span class="fc" id="L444">                current.properties.add(property);</span>
+            }
+<span class="fc" id="L446">        }</span>
+<span class="fc" id="L447">        Component found = find(root, wanted);</span>
+<span class="pc bpc" id="L448" title="1 of 2 branches missed.">        if (found == null) {</span>
+<span class="nc" id="L449">            throw new CalendarException(CalendarError.MALFORMED_RESPONSE, &quot;No &quot; + wanted + &quot; component found&quot;);</span>
+        }
+<span class="fc" id="L451">        return found;</span>
+    }
+
+    private static Component find(Component component, String name) {
+<span class="fc bfc" id="L455" title="All 2 branches covered.">        if (name.equals(component.name)) {</span>
+<span class="fc" id="L456">            return component;</span>
+        }
+<span class="pc bpc" id="L458" title="1 of 2 branches missed.">        for (Component child : component.children) {</span>
+<span class="fc" id="L459">            Component result = find(child, name);</span>
+<span class="pc bpc" id="L460" title="1 of 2 branches missed.">            if (result != null) {</span>
+<span class="fc" id="L461">                return result;</span>
+            }
+<span class="nc" id="L463">        }</span>
+<span class="nc" id="L464">        return null;</span>
+    }
+
+    private static CalendarDateTime parseDateTime(String value, String zone) throws CalendarException {
+        try {
+<span class="fc bfc" id="L469" title="All 2 branches covered.">            if (value.length() == 8) {</span>
+<span class="fc" id="L470">                return CalendarDateTime.allDay(CalendarDateUtil.parseDate(</span>
+<span class="fc" id="L471">                        value.substring(0, 4) + &quot;-&quot; + value.substring(4, 6)</span>
+<span class="fc" id="L472">                        + &quot;-&quot; + value.substring(6, 8)));</span>
+            }
+<span class="fc" id="L474">            boolean zulu = value.endsWith(&quot;Z&quot;);</span>
+<span class="pc bpc" id="L475" title="1 of 4 branches missed.">            String timeZone = zulu || zone == null ? &quot;UTC&quot; : zone;</span>
+<span class="fc" id="L476">            ZoneId zoneId = CalendarDateUtil.zoneId(timeZone);</span>
+<span class="fc" id="L477">            return CalendarDateTime.instant(CalendarDateUtil.parseDateTime(value, zoneId), zoneId);</span>
+<span class="fc" id="L478">        } catch (IllegalArgumentException ex) {</span>
+<span class="fc" id="L479">            throw new CalendarException(CalendarError.MALFORMED_RESPONSE, &quot;Invalid calendar date: &quot; + value, ex);</span>
+        }
+    }
+
+    private static List&lt;String&gt; unfold(String input) {
+<span class="fc" id="L484">        String normalized = input.replace(&quot;\r\n&quot;, &quot;\n&quot;).replace('\r', '\n');</span>
+<span class="fc" id="L485">        String[] raw = CalendarDateUtil.split(normalized, '\n');</span>
+<span class="fc" id="L486">        List&lt;String&gt; out = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L487" title="All 2 branches covered.">        for (String line : raw) {</span>
+<span class="pc bpc" id="L488" title="2 of 6 branches missed.">            if ((line.startsWith(&quot; &quot;) || line.startsWith(&quot;\t&quot;)) &amp;&amp; !out.isEmpty()) {</span>
+<span class="fc" id="L489">                int last = out.size() - 1;</span>
+<span class="fc" id="L490">                out.set(last, out.get(last) + line.substring(1));</span>
+<span class="fc bfc" id="L491" title="All 2 branches covered.">            } else if (line.length() &gt; 0) {</span>
+<span class="fc" id="L492">                out.add(line);</span>
+            }
+        }
+<span class="fc" id="L495">        return out;</span>
+    }
+
+    private static void append(StringBuilder out, String line) {
+<span class="fc" id="L499">        byte[] bytes = StringUtil.getBytes(line);</span>
+<span class="fc bfc" id="L500" title="All 2 branches covered.">        if (bytes.length &lt;= 75) {</span>
+<span class="fc" id="L501">            out.append(line).append(CRLF);</span>
+<span class="fc" id="L502">            return;</span>
+        }
+<span class="fc" id="L504">        int start = 0;</span>
+<span class="fc" id="L505">        int chars = line.length();</span>
+<span class="fc bfc" id="L506" title="All 2 branches covered.">        while (start &lt; chars) {</span>
+<span class="fc" id="L507">            int end = Math.min(chars, start + 72);</span>
+<span class="pc bpc" id="L508" title="2 of 4 branches missed.">            while (end &gt; start &amp;&amp; utf8Length(line.substring(start, end)) &gt; 74) {</span>
+<span class="nc" id="L509">                end--;</span>
+            }
+            // Never fold between a surrogate pair: each half would encode as
+            // a replacement character and permanently corrupt the text.
+<span class="pc bpc" id="L513" title="2 of 6 branches missed.">            while (end &gt; start + 1 &amp;&amp; end &lt; chars &amp;&amp; Character.isLowSurrogate(line.charAt(end))) {</span>
+<span class="nc" id="L514">                end--;</span>
+            }
+<span class="fc bfc" id="L516" title="All 2 branches covered.">            if (start &gt; 0) {</span>
+<span class="fc" id="L517">                out.append(' ');</span>
+            }
+<span class="fc" id="L519">            out.append(line.substring(start, end)).append(CRLF);</span>
+<span class="fc" id="L520">            start = end;</span>
+<span class="fc" id="L521">        }</span>
+<span class="fc" id="L522">    }</span>
+
+    private static int utf8Length(String value) {
+        try {
+<span class="fc" id="L526">            return value.getBytes(&quot;UTF-8&quot;).length;</span>
+<span class="nc" id="L527">        } catch (java.io.UnsupportedEncodingException ex) {</span>
+<span class="nc" id="L528">            return value.length();</span>
+        }
+    }
+
+    private static String escape(String value) {
+<span class="pc bpc" id="L533" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L534">            return null;</span>
+        }
+<span class="fc" id="L536">        return value.replace(&quot;\\&quot;, &quot;\\\\&quot;).replace(&quot;;&quot;, &quot;\\;&quot;).replace(&quot;,&quot;, &quot;\\,&quot;).replace(&quot;\r\n&quot;, &quot;\\n&quot;).replace(&quot;\n&quot;, &quot;\\n&quot;).replace(&quot;\r&quot;, &quot;\\n&quot;);</span>
+    }
+
+    private static String unescape(String value) {
+<span class="pc bpc" id="L540" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L541">            return null;</span>
+        }
+<span class="fc" id="L543">        StringBuilder out = new StringBuilder();</span>
+<span class="fc" id="L544">        boolean slash = false;</span>
+<span class="fc bfc" id="L545" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L546">            char c = value.charAt(i);</span>
+<span class="fc bfc" id="L547" title="All 2 branches covered.">            if (slash) {</span>
+<span class="pc bpc" id="L548" title="1 of 4 branches missed.">                out.append(c == 'n' || c == 'N' ? '\n' : c);</span>
+<span class="fc" id="L549">                slash = false;</span>
+<span class="fc bfc" id="L550" title="All 2 branches covered.">            } else if (c == '\\') {</span>
+<span class="fc" id="L551">                slash = true;</span>
+            } else {
+<span class="fc" id="L553">                out.append(c);</span>
+            }
+        }
+<span class="pc bpc" id="L556" title="1 of 2 branches missed.">        if (slash) {</span>
+<span class="nc" id="L557">            out.append('\\');</span>
+        }
+<span class="fc" id="L559">        return out.toString();</span>
+    }
+
+    private static String quote(String value) {
+        // RFC 5545 forbids a raw double quote inside a quoted parameter value;
+        // RFC 6868 caret encoding represents it (and caret/newline) portably
+        // and keeps the emitted line parseable by colon()/splitParameters().
+<span class="fc" id="L566">        return '&quot;' + value.replace(&quot;^&quot;, &quot;^^&quot;).replace(&quot;\&quot;&quot;, &quot;^'&quot;).replace(&quot;\n&quot;, &quot;^n&quot;) + '&quot;';</span>
+    }
+
+    private static String unquote(String value) {
+<span class="pc bpc" id="L570" title="2 of 6 branches missed.">        if (value.length() &gt; 1 &amp;&amp; value.charAt(0) == '&quot;' &amp;&amp; value.charAt(value.length() - 1) == '&quot;') {</span>
+<span class="fc" id="L571">            return caretDecode(value.substring(1, value.length() - 1));</span>
+        }
+<span class="fc" id="L573">        return caretDecode(value);</span>
+    }
+
+    private static String caretDecode(String value) {
+<span class="pc bpc" id="L577" title="1 of 2 branches missed.">        if (value.indexOf('^') &lt; 0) {</span>
+<span class="fc" id="L578">            return value;</span>
+        }
+<span class="nc" id="L580">        StringBuilder out = new StringBuilder(value.length());</span>
+<span class="nc bnc" id="L581" title="All 2 branches missed.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="nc" id="L582">            char c = value.charAt(i);</span>
+<span class="nc bnc" id="L583" title="All 4 branches missed.">            if (c == '^' &amp;&amp; i + 1 &lt; value.length()) {</span>
+<span class="nc" id="L584">                char next = value.charAt(i + 1);</span>
+<span class="nc bnc" id="L585" title="All 2 branches missed.">                if (next == '^') {</span>
+<span class="nc" id="L586">                    out.append('^');</span>
+<span class="nc" id="L587">                    i++;</span>
+<span class="nc" id="L588">                    continue;</span>
+                }
+<span class="nc bnc" id="L590" title="All 2 branches missed.">                if (next == '\'') {</span>
+<span class="nc" id="L591">                    out.append('&quot;');</span>
+<span class="nc" id="L592">                    i++;</span>
+<span class="nc" id="L593">                    continue;</span>
+                }
+<span class="nc bnc" id="L595" title="All 4 branches missed.">                if (next == 'n' || next == 'N') {</span>
+<span class="nc" id="L596">                    out.append('\n');</span>
+<span class="nc" id="L597">                    i++;</span>
+<span class="nc" id="L598">                    continue;</span>
+                }
+            }
+<span class="nc" id="L601">            out.append(c);</span>
+        }
+<span class="nc" id="L603">        return out.toString();</span>
+    }
+
+    private static int colon(String value) {
+<span class="fc" id="L607">        boolean quoted = false;</span>
+<span class="pc bpc" id="L608" title="1 of 2 branches missed.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L609">            char c = value.charAt(i);</span>
+<span class="fc bfc" id="L610" title="All 2 branches covered.">            if (c == '&quot;') {</span>
+<span class="fc bfc" id="L611" title="All 2 branches covered.">                quoted = !quoted;</span>
+<span class="pc bpc" id="L612" title="1 of 4 branches missed.">            } else if (c == ':' &amp;&amp; !quoted) {</span>
+<span class="fc" id="L613">                return i;</span>
+            }
+        }
+<span class="nc" id="L616">        return -1;</span>
+    }
+
+    private static List&lt;String&gt; splitParameters(String value) {
+<span class="fc" id="L620">        List&lt;String&gt; out = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L621">        int start = 0;</span>
+<span class="fc" id="L622">        boolean quoted = false;</span>
+<span class="fc" id="L623">        boolean escaped = false;</span>
+<span class="fc bfc" id="L624" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L625">            char c = value.charAt(i);</span>
+<span class="pc bpc" id="L626" title="1 of 2 branches missed.">            if (escaped) {</span>
+<span class="nc" id="L627">                escaped = false;</span>
+<span class="pc bpc" id="L628" title="1 of 2 branches missed.">            } else if (c == '\\') {</span>
+<span class="nc" id="L629">                escaped = true;</span>
+<span class="fc bfc" id="L630" title="All 2 branches covered.">            } else if (c == '&quot;') {</span>
+<span class="fc bfc" id="L631" title="All 2 branches covered.">                quoted = !quoted;</span>
+<span class="fc bfc" id="L632" title="All 4 branches covered.">            } else if (c == ';' &amp;&amp; !quoted) {</span>
+<span class="fc" id="L633">                out.add(value.substring(start, i));</span>
+<span class="fc" id="L634">                start = i + 1;</span>
+            }
+        }
+<span class="fc" id="L637">        out.add(value.substring(start));</span>
+<span class="fc" id="L638">        return out;</span>
+    }
+
+    private static String value(Component component, String name) {
+<span class="fc" id="L642">        Property property = component.first(name);</span>
+<span class="fc bfc" id="L643" title="All 2 branches covered.">        return property == null ? null : unescape(property.value);</span>
+    }
+
+    private static String digits(LocalDate date) {
+<span class="fc" id="L647">        return pad(date.getYear(), 4) + pad(date.getMonthValue(), 2) + pad(date.getDayOfMonth(), 2);</span>
+    }
+
+    private static String pad(int value, int count) {
+<span class="fc" id="L651">        String s = String.valueOf(value);</span>
+<span class="fc bfc" id="L652" title="All 2 branches covered.">        while (s.length() &lt; count) {</span>
+<span class="fc" id="L653">            s = &quot;0&quot; + s;</span>
+        }
+<span class="fc" id="L655">        return s;</span>
+    }
+
+    private static String utc(Instant value) {
+<span class="fc" id="L659">        return format(value, ZoneOffset.UTC) + &quot;Z&quot;;</span>
+    }
+
+    private static String local(Instant value, ZoneId zone) {
+<span class="fc" id="L663">        return format(value, zone);</span>
+    }
+
+    private static boolean isUtc(ZoneId zone) {
+<span class="fc" id="L667">        String id = zone.getId();</span>
+<span class="pc bpc" id="L668" title="3 of 6 branches missed.">        return ZoneOffset.UTC.equals(zone) || &quot;UTC&quot;.equals(id) || &quot;GMT&quot;.equals(id)</span>
+<span class="pc bpc" id="L669" title="2 of 4 branches missed.">                || &quot;Etc/UTC&quot;.equals(id) || &quot;Etc/GMT&quot;.equals(id);</span>
+    }
+
+    private static String format(Instant value, ZoneId zone) {
+<span class="fc" id="L673">        return CalendarDateUtil.formatBasic(value, zone);</span>
+    }
+
+    private static String formatRecurrenceUntil(CalendarDateTime value) {
+<span class="nc bnc" id="L677" title="All 2 branches missed.">        return value.isAllDay() ? digits(value.getDate()) : utc(value.getDateTime().toInstant());</span>
+    }
+
+    private static int day(String value) {
+<span class="pc bpc" id="L681" title="1 of 2 branches missed.">        String v = value.length() &gt; 2 ? value.substring(value.length() - 2) : value;</span>
+<span class="fc" id="L682">        String[] days = { &quot;MO&quot;, &quot;TU&quot;, &quot;WE&quot;, &quot;TH&quot;, &quot;FR&quot;, &quot;SA&quot;, &quot;SU&quot; };</span>
+<span class="pc bpc" id="L683" title="1 of 2 branches missed.">        for (int i = 0; i &lt; days.length; i++) {</span>
+<span class="fc bfc" id="L684" title="All 2 branches covered.">            if (days[i].equals(v)) {</span>
+<span class="fc" id="L685">                return i + 1;</span>
+            }
+        }
+<span class="nc" id="L688">        throw new IllegalArgumentException(value);</span>
+    }
+
+    private static void appendNumbers(StringBuilder out, String name, List&lt;Integer&gt; values, boolean weekdays) {
+<span class="fc bfc" id="L692" title="All 2 branches covered.">        if (values.isEmpty()) {</span>
+<span class="fc" id="L693">            return;</span>
+        }
+<span class="fc" id="L695">        out.append(';').append(name).append('=');</span>
+<span class="fc bfc" id="L696" title="All 2 branches covered.">        for (int i = 0; i &lt; values.size(); i++) {</span>
+<span class="fc bfc" id="L697" title="All 2 branches covered.">            if (i &gt; 0) {</span>
+<span class="fc" id="L698">                out.append(',');</span>
+            }
+<span class="fc" id="L700">            int v = values.get(i).intValue();</span>
+<span class="pc bpc" id="L701" title="1 of 2 branches missed.">            out.append(weekdays ? new String[] { &quot;MO&quot;, &quot;TU&quot;, &quot;WE&quot;, &quot;TH&quot;, &quot;FR&quot;, &quot;SA&quot;, &quot;SU&quot; }[v - 1] : String.valueOf(v));</span>
+        }
+<span class="fc" id="L703">    }</span>
+
+    private static StringBuilder beginCalendar() {
+<span class="fc" id="L706">        return new StringBuilder(&quot;BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Codename One//Calendar API//EN\r\nCALSCALE:GREGORIAN\r\n&quot;);</span>
+    }
+
+    private static String endCalendar(StringBuilder out) {
+<span class="fc" id="L710">        return out.append(&quot;END:VCALENDAR\r\n&quot;).toString();</span>
+    }
+
+    private static boolean startsWithIgnoreCase(String value, String prefix) {
+<span class="pc bpc" id="L714" title="2 of 4 branches missed.">        return value != null &amp;&amp; value.length() &gt;= prefix.length()</span>
+<span class="pc bpc" id="L715" title="1 of 2 branches missed.">                &amp;&amp; value.regionMatches(true, 0, prefix, 0, prefix.length());</span>
+    }
+
+    private static String asciiUpper(String value) {
+<span class="fc" id="L719">        StringBuilder out = new StringBuilder(value.length());</span>
+<span class="fc bfc" id="L720" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L721">            char c = value.charAt(i);</span>
+<span class="pc bpc" id="L722" title="3 of 4 branches missed.">            out.append(c &gt;= 'a' &amp;&amp; c &lt;= 'z' ? (char) (c - ('a' - 'A')) : c);</span>
+        }
+<span class="fc" id="L724">        return out.toString();</span>
+    }
+
+    private static &lt;E extends Enum&lt;E&gt;&gt; E enumValue(Class&lt;E&gt; type, String value, E fallback) {
+<span class="fc bfc" id="L728" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L729">            return fallback;</span>
+        }
+        try {
+<span class="fc" id="L732">            return Enum.valueOf(type, asciiUpper(value).replace('-', '_'));</span>
+<span class="nc" id="L733">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L734">            return fallback;</span>
+        }
+    }
+
+    private static final class Component {
+
+        final String name;
+
+<span class="fc" id="L742">        final List&lt;Property&gt; properties = new ArrayList&lt;Property&gt;();</span>
+
+<span class="fc" id="L744">        final List&lt;Component&gt; children = new ArrayList&lt;Component&gt;();</span>
+
+<span class="fc" id="L746">        Component(String name) {</span>
+<span class="fc" id="L747">            this.name = name;</span>
+<span class="fc" id="L748">        }</span>
+
+        Property first(String propertyName) {
+<span class="fc bfc" id="L751" title="All 2 branches covered.">            for (Property p : properties) {</span>
+<span class="fc bfc" id="L752" title="All 2 branches covered.">                if (propertyName.equals(p.name)) {</span>
+<span class="fc" id="L753">                    return p;</span>
+                }
+<span class="fc" id="L755">            }</span>
+<span class="fc" id="L756">            return null;</span>
+        }
+
+        List&lt;Property&gt; all(String propertyName) {
+<span class="fc" id="L760">            List&lt;Property&gt; out = new ArrayList&lt;Property&gt;();</span>
+<span class="fc bfc" id="L761" title="All 2 branches covered.">            for (Property p : properties) {</span>
+<span class="fc bfc" id="L762" title="All 2 branches covered.">                if (propertyName.equals(p.name)) {</span>
+<span class="fc" id="L763">                    out.add(p);</span>
+                }
+<span class="fc" id="L765">            }</span>
+<span class="fc" id="L766">            return out;</span>
+        }
+    }
+
+    private static final class Property {
+
+        final String name;
+
+        final String value;
+
+<span class="fc" id="L776">        final Map&lt;String, String&gt; params = new HashMap&lt;String, String&gt;();</span>
+
+<span class="fc" id="L778">        Property(String name, String value) {</span>
+<span class="fc" id="L779">            this.name = name;</span>
+<span class="fc" id="L780">            this.value = value;</span>
+<span class="fc" id="L781">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

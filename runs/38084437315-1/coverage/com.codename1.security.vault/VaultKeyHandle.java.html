@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VaultKeyHandle.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security.vault</a> &gt; <span class="el_source">VaultKeyHandle.java</span></div><h1>VaultKeyHandle.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security.vault;
+
+import com.codename1.security.Hash;
+import com.codename1.security.Hmac;
+import com.codename1.util.AsyncResource;
+
+/// The [KeyHandle] a vault hands out for [Vault#operationalKey(String)].
+///
+/// The material is a subkey derived from the vault's data key and lives in this object while the
+/// vault is unlocked, which is why [#isExportable()] answers `true`: the bytes exist in the
+/// process, and claiming otherwise would be the kind of overstatement this package is built to
+/// avoid. What the handle guarantees is narrower and still worth having -- there is no accessor
+/// that returns them, the usages are fixed, and the handle stops working the moment the vault
+/// locks.
+///
+/// A port whose platform can hold a key the process genuinely cannot read supplies its own
+/// subclass and answers `false`.
+final class VaultKeyHandle extends KeyHandle {
+
+    private final Vault owner;
+    private final int generation;
+    private final int keyGeneration;
+    private final String purpose;
+    private final int version;
+    private final ProtectionReport protection;
+    private byte[] material;
+
+<span class="fc" id="L50">    private static final KeyUsage[] USAGES = {</span>
+        KeyUsage.SEAL, KeyUsage.OPEN, KeyUsage.MAC, KeyUsage.VERIFY_MAC
+    };
+
+    VaultKeyHandle(Vault owner, int generation, int keyGeneration, byte[] material, String purpose,
+<span class="fc" id="L55">                   int version, ProtectionReport protection) {</span>
+<span class="fc" id="L56">        this.owner = owner;</span>
+<span class="fc" id="L57">        this.generation = generation;</span>
+<span class="fc" id="L58">        this.keyGeneration = keyGeneration;</span>
+<span class="fc" id="L59">        this.material = material;</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        this.purpose = purpose == null ? &quot;&quot; : purpose;</span>
+<span class="fc" id="L61">        this.version = version;</span>
+<span class="fc" id="L62">        this.protection = protection;</span>
+<span class="fc" id="L63">    }</span>
+
+    @Override
+    public String getAlgorithm() {
+<span class="nc" id="L67">        return &quot;AES-GCM&quot;;</span>
+    }
+
+    @Override
+    public String getKeyId() {
+<span class="nc" id="L72">        return purpose;</span>
+    }
+
+    @Override
+    public int getVersion() {
+<span class="fc" id="L77">        return version;</span>
+    }
+
+    @Override
+    public boolean isExportable() {
+<span class="fc" id="L82">        return true;</span>
+    }
+
+    @Override
+    public KeyUsage[] getUsages() {
+<span class="nc" id="L87">        KeyUsage[] copy = new KeyUsage[USAGES.length];</span>
+<span class="nc" id="L88">        System.arraycopy(USAGES, 0, copy, 0, USAGES.length);</span>
+<span class="nc" id="L89">        return copy;</span>
+    }
+
+    @Override
+    public ProtectionReport getProtection() {
+<span class="fc" id="L94">        return protection;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;byte[]&gt; seal(byte[] plaintext, AssociatedData aad) {
+<span class="fc" id="L99">        AsyncResource&lt;byte[]&gt; out = new AsyncResource&lt;byte[]&gt;();</span>
+<span class="fc" id="L100">        byte[] key = null;</span>
+        try {
+<span class="fc" id="L102">            key = live();</span>
+<span class="fc" id="L103">            int at = owner.generation();</span>
+<span class="fc" id="L104">            completeBytes(out, at, SecureEnvelope.seal(key, purpose, version, aad, plaintext));</span>
+<span class="fc" id="L105">        } catch (VaultException failed) {</span>
+<span class="fc" id="L106">            out.error(failed);</span>
+        } finally {
+<span class="fc" id="L108">            Bytes.zero(key);</span>
+        }
+<span class="fc" id="L110">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;byte[]&gt; open(byte[] sealed, AssociatedData aad) {
+<span class="fc" id="L115">        AsyncResource&lt;byte[]&gt; out = new AsyncResource&lt;byte[]&gt;();</span>
+<span class="fc" id="L116">        byte[] current = null;</span>
+        try {
+<span class="fc" id="L118">            SecureEnvelope envelope = SecureEnvelope.parse(sealed);</span>
+            // live() first either way: it is the liveness check, and a destroyed or locked
+            // handle must answer LOCKED rather than reach into the vault for an older key.
+<span class="fc" id="L121">            current = live();</span>
+<span class="fc" id="L122">            int at = owner.generation();</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            if (envelope.getKeyVersion() == version) {</span>
+<span class="fc" id="L124">                completeBytes(out, at, envelope.open(current, aad));</span>
+            } else {
+                // Every subkey is derived from the data key, so a rotation changes this handle's
+                // material and a record sealed before it no longer opens under the live one --
+                // even though the envelope records the version that sealed it and the vault
+                // still holds the retired chain reaching back to it. getVersion() documents that
+                // such a record stays readable, and opening only with the live key is what broke
+                // that promise: an application that cached ciphertext from operationalKey lost
+                // it at the first rotation.
+<span class="fc" id="L133">                byte[] older = owner.subkeyAtVersion(purpose, envelope.getKeyVersion());</span>
+                try {
+<span class="fc" id="L135">                    completeBytes(out, at, envelope.open(older, aad));</span>
+                } finally {
+<span class="fc" id="L137">                    Bytes.zero(older);</span>
+                }
+            }
+<span class="fc" id="L140">        } catch (VaultException failed) {</span>
+<span class="fc" id="L141">            out.error(failed);</span>
+        } finally {
+<span class="fc" id="L143">            Bytes.zero(current);</span>
+        }
+<span class="fc" id="L145">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;byte[]&gt; mac(byte[] data) {
+<span class="fc" id="L150">        AsyncResource&lt;byte[]&gt; out = new AsyncResource&lt;byte[]&gt;();</span>
+<span class="fc" id="L151">        byte[] key = null;</span>
+        try {
+<span class="fc" id="L153">            key = live();</span>
+<span class="fc" id="L154">            Hmac hmac = Hmac.create(Hash.SHA256, key);</span>
+<span class="fc" id="L155">            int at = owner.generation();</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">            completeBytes(out, at, hmac.doFinal(data == null ? new byte[0] : data));</span>
+<span class="fc" id="L157">        } catch (VaultException failed) {</span>
+<span class="fc" id="L158">            out.error(failed);</span>
+        } finally {
+<span class="fc" id="L160">            Bytes.zero(key);</span>
+        }
+<span class="fc" id="L162">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;Boolean&gt; verifyMac(byte[] data, byte[] tag) {
+<span class="fc" id="L167">        AsyncResource&lt;Boolean&gt; out = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="fc" id="L168">        byte[] key = null;</span>
+        try {
+<span class="fc" id="L170">            key = live();</span>
+<span class="fc" id="L171">            Hmac hmac = Hmac.create(Hash.SHA256, key);</span>
+<span class="fc" id="L172">            int at = owner.generation();</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">            byte[] computed = hmac.doFinal(data == null ? new byte[0] : data);</span>
+<span class="fc" id="L174">            boolean same = Bytes.constantTimeEquals(computed, tag);</span>
+<span class="fc" id="L175">            Bytes.zero(computed);</span>
+<span class="fc" id="L176">            completeVerification(out, at, same);</span>
+<span class="fc" id="L177">        } catch (VaultException failed) {</span>
+<span class="fc" id="L178">            out.error(failed);</span>
+        } finally {
+<span class="fc" id="L180">            Bytes.zero(key);</span>
+        }
+<span class="fc" id="L182">        return out;</span>
+    }
+
+    @Override
+    public void destroy() {
+<span class="fc" id="L187">        synchronized (owner) {</span>
+<span class="fc" id="L188">            Bytes.zero(material);</span>
+<span class="fc" id="L189">            material = null;</span>
+<span class="fc" id="L190">        }</span>
+<span class="fc" id="L191">    }</span>
+
+    @Override
+    public boolean isDestroyed() {
+<span class="fc" id="L195">        synchronized (owner) {</span>
+<span class="fc bfc" id="L196" title="All 4 branches covered.">            return material == null || generation != owner.generation()</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">                    || keyGeneration != owner.keyGeneration();</span>
+        }
+    }
+
+    /// One monitor covers handle destruction, vault locking, key replacement and publication.
+    /// Crypto, storage and application callbacks run outside this monitor.
+    private void completeBytes(AsyncResource&lt;byte[]&gt; out, final int at, final byte[] produced) {
+<span class="fc" id="L204">        out.complete(produced, owner, new Runnable() {</span>
+            @Override
+            public void run() {
+                try {
+<span class="fc" id="L208">                    requireStillOurs(at);</span>
+<span class="fc" id="L209">                } catch (VaultException locked) {</span>
+<span class="fc" id="L210">                    Bytes.zero(produced);</span>
+<span class="fc" id="L211">                    throw locked;</span>
+<span class="fc" id="L212">                }</span>
+<span class="fc" id="L213">            }</span>
+        });
+<span class="fc" id="L215">    }</span>
+
+    private void completeVerification(AsyncResource&lt;Boolean&gt; out, final int at, boolean same) {
+<span class="fc" id="L218">        out.complete(Boolean.valueOf(same), owner, new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L221">                requireStillOurs(at);</span>
+<span class="fc" id="L222">            }</span>
+        });
+<span class="fc" id="L224">    }</span>
+
+    private void requireStillOurs(int at) {
+<span class="fc bfc" id="L227" title="All 4 branches covered.">        if (at != owner.generation() || isDestroyed()) {</span>
+<span class="fc" id="L228">            throw new VaultException(VaultError.LOCKED,</span>
+                    &quot;the vault was locked while this key handle was being used, so the result &quot;
+                    + &quot;was discarded&quot;);
+        }
+<span class="fc" id="L232">    }</span>
+
+    /// The material, or a refusal. Checked on every operation rather than only at creation,
+    /// because the vault can lock between the two and a handle that kept working afterwards would
+    /// make [Vault#lock()] a suggestion.
+    ///
+    /// A rotation counts as well, and that is the less obvious half. Rotation leaves the vault
+    /// open, so the lock generation does not move -- and this handle went on using the subkey
+    /// derived from the superseded data key. Sealing stayed readable, because the envelope
+    /// carries the version this handle was made at and [#open] walks the retired chain back to
+    /// it. [#mac] has nothing to carry: its tag records no version, so one produced here after a
+    /// rotation cannot be verified by any handle obtained afterwards, and nothing says so. A
+    /// refusal the caller can see is the smaller failure.
+    private byte[] live() {
+<span class="fc bfc" id="L246" title="All 2 branches covered.">        if (isDestroyed()) {</span>
+<span class="fc" id="L247">            throw new VaultException(VaultError.LOCKED,</span>
+                    &quot;this key handle is no longer valid: destroy() was called, or its vault was &quot;
+                    + &quot;locked, or the data key it derives from was rotated or replaced by a sync &quot;
+                    + &quot;import. Ask the vault for a new handle&quot;);
+        }
+<span class="fc" id="L252">        owner.noteHandleUse();</span>
+<span class="fc" id="L253">        return copyMaterial();</span>
+    }
+
+    /// Copies under the destruction monitor. An alias would let destroy() wipe a key while
+    /// crypto was still consuming it. Every caller wipes its private copy in a finally block.
+    private byte[] copyMaterial() {
+<span class="fc" id="L259">        synchronized (owner) {</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">            if (material == null) {</span>
+<span class="nc" id="L261">                throw new VaultException(VaultError.LOCKED,</span>
+                        &quot;this key handle was destroyed while it was being used&quot;);
+            }
+<span class="fc" id="L264">            byte[] copy = new byte[material.length];</span>
+<span class="fc" id="L265">            System.arraycopy(material, 0, copy, 0, material.length);</span>
+<span class="fc" id="L266">            return copy;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>
