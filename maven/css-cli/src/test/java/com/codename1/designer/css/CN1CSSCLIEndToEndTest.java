@@ -382,6 +382,29 @@ class CN1CSSCLIEndToEndTest {
 
         assertEquals(CN1CSSCLI.EXIT_COMPILE_FAILED, CN1CSSCLI.run(args),
                 "the image is gone and the stylesheet still names it: " + stdout());
+        String said = stdout() + stderr();
+        assertTrue(said.contains("a.png"), "the failure names the image: " + said);
+        assertTrue(!said.contains("NullPointerException"), said);
+        assertTrue(!new File(common, "target/css/cn1-merged-files").exists()
+                || !containsFile(new File(common, "target/css/cn1-merged-files"), "a.png"),
+                "and the copy of it is gone from the mirror");
+
+        // Put back, the build recovers.
+        png(image, 8, 6, 0xff336699);
+        assertEquals(0, CN1CSSCLI.run(args), stderr());
+    }
+
+    private static boolean containsFile(File dir, String name) {
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return false;
+        }
+        for (File child : children) {
+            if (child.isDirectory() ? containsFile(child, name) : child.getName().equals(name)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Test

@@ -31,6 +31,12 @@ public final class BackgroundImage {
     /// The `background-repeat` modes.
     public enum Repeat { REPEAT, REPEAT_X, REPEAT_Y, NO_REPEAT }
 
+    /// How the tiles of a repeating axis are fitted to the positioning
+    /// area: as they come, spread out so that a whole number fits with gaps
+    /// between them (`space`), or resized so that a whole number fits
+    /// exactly (`round`).
+    public enum Fit { NONE, SPACE, ROUND }
+
     /// The `background-size` modes.
     public enum Size { AUTO, COVER, CONTAIN, EXPLICIT }
 
@@ -54,6 +60,10 @@ public final class BackgroundImage {
     public final double sizeW;
     /// The height for [Size#EXPLICIT]; a negative value means `auto`.
     public final double sizeH;
+    /// How the tiles are fitted across, when the image repeats across.
+    public final Fit fitX;
+    /// How the tiles are fitted down, when the image repeats down.
+    public final Fit fitY;
 
     /// Creates a layer with the CSS initial values: `repeat`, position
     /// `0% 0%`, size `auto`.
@@ -63,6 +73,13 @@ public final class BackgroundImage {
 
     public BackgroundImage(BufferedImage image, Repeat repeat, double posX, boolean posXPercent,
             double posY, boolean posYPercent, Size size, double sizeW, double sizeH) {
+        this(image, repeat, posX, posXPercent, posY, posYPercent, size, sizeW, sizeH, Fit.NONE, Fit.NONE);
+    }
+
+    private BackgroundImage(BufferedImage image, Repeat repeat, double posX, boolean posXPercent,
+            double posY, boolean posYPercent, Size size, double sizeW, double sizeH, Fit fitX, Fit fitY) {
+        this.fitX = fitX == null ? Fit.NONE : fitX;
+        this.fitY = fitY == null ? Fit.NONE : fitY;
         this.image = image;
         this.repeat = repeat;
         this.posX = posX;
@@ -76,23 +93,28 @@ public final class BackgroundImage {
 
     /// Returns a copy with a different repeat mode.
     public BackgroundImage withRepeat(Repeat r) {
-        return new BackgroundImage(image, r, posX, posXPercent, posY, posYPercent, size, sizeW, sizeH);
+        return new BackgroundImage(image, r, posX, posXPercent, posY, posYPercent, size, sizeW, sizeH, fitX, fitY);
+    }
+
+    /// Returns a copy whose tiles are fitted differently.
+    public BackgroundImage withFit(Fit x, Fit y) {
+        return new BackgroundImage(image, repeat, posX, posXPercent, posY, posYPercent, size, sizeW, sizeH, x, y);
     }
 
     /// Returns a copy with a different position.
     public BackgroundImage withPosition(double x, boolean xPercent, double y, boolean yPercent) {
-        return new BackgroundImage(image, repeat, x, xPercent, y, yPercent, size, sizeW, sizeH);
+        return new BackgroundImage(image, repeat, x, xPercent, y, yPercent, size, sizeW, sizeH, fitX, fitY);
     }
 
     /// Returns a copy sized by keyword (`AUTO`, `COVER` or `CONTAIN`).
     public BackgroundImage withSize(Size s) {
-        return new BackgroundImage(image, repeat, posX, posXPercent, posY, posYPercent, s, -1, -1);
+        return new BackgroundImage(image, repeat, posX, posXPercent, posY, posYPercent, s, -1, -1, fitX, fitY);
     }
 
     /// Returns a copy with an explicit size; a negative value is `auto`
     /// for that axis.
     public BackgroundImage withSize(double w, double h) {
-        return new BackgroundImage(image, repeat, posX, posXPercent, posY, posYPercent, Size.EXPLICIT, w, h);
+        return new BackgroundImage(image, repeat, posX, posXPercent, posY, posYPercent, Size.EXPLICIT, w, h, fitX, fitY);
     }
 
     public BufferedImage getImage() {

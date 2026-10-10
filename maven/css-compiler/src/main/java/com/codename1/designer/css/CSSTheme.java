@@ -4953,13 +4953,30 @@ public class CSSTheme {
                     // that size, laid out by `background-repeat` like any
                     // other. An `auto` axis is the whole box, a gradient
                     // having no size of its own.
-                    int tileW = (int) Math.max(1, Math.round(tile[0] < 0 ? paintWidth : tile[0]));
-                    int tileH = (int) Math.max(1, Math.round(tile[1] < 0 ? paintHeight : tile[1]));
-                    GradientSpec spec = CN1Gradient.describeForRaster((ScaledUnit) gradient, tileW, tileH);
+                    double fullW = Math.min(1e9, Math.max(1, Math.round(tile[0] < 0 ? paintWidth : tile[0])));
+                    double fullH = Math.min(1e9, Math.max(1, Math.round(tile[1] < 0 ? paintHeight : tile[1])));
+                    // A tile can be asked for at any size, and only the part
+                    // of it inside the box is ever seen. Past the largest
+                    // image the compiler paints, the gradient is still laid
+                    // out over the whole tile and its top left corner alone
+                    // is painted, which is all a tile that large shows; it
+                    // does not come round again on that axis.
+                    int tileW = (int) Math.min(MAX_VECTOR_SIDE, fullW);
+                    int tileH = (int) Math.min(MAX_VECTOR_SIDE, fullH);
+                    GradientSpec spec = CN1Gradient.describeForRaster((ScaledUnit) gradient, (int) fullW, (int) fullH);
                     BufferedImage image = new BufferedImage(tileW, tileH, BufferedImage.TYPE_INT_ARGB);
                     image.setRGB(0, 0, tileW, tileH,
-                            new GradientPainter(spec, 0, 0, tileW, tileH).paint(tileW, tileH), 0, tileW);
-                    box.backgroundImage(new BackgroundImage(image).withRepeat(rasterRepeat(styles))
+                            new GradientPainter(spec, 0, 0, fullW, fullH).paint(tileW, tileH), 0, tileW);
+                    BackgroundImage.Repeat repeat = rasterRepeat(styles);
+                    boolean across = tileW == fullW && (repeat == BackgroundImage.Repeat.REPEAT
+                            || repeat == BackgroundImage.Repeat.REPEAT_X);
+                    boolean down = tileH == fullH && (repeat == BackgroundImage.Repeat.REPEAT
+                            || repeat == BackgroundImage.Repeat.REPEAT_Y);
+                    repeat = across && down ? BackgroundImage.Repeat.REPEAT
+                            : across ? BackgroundImage.Repeat.REPEAT_X
+                            : down ? BackgroundImage.Repeat.REPEAT_Y : BackgroundImage.Repeat.NO_REPEAT;
+                    BackgroundImage.Fit[] fit = rasterFit(styles);
+                    box.backgroundImage(new BackgroundImage(image).withRepeat(repeat).withFit(fit[0], fit[1])
                             .withPosition(0, true, 0, true).withSize(tileW, tileH));
                 }
             }
@@ -5058,7 +5075,9 @@ public class CSSTheme {
             // and the shorthand's position keywords are skipped. The page
             // these images used to be captured from was built from the same
             // stored properties, so it painted at the top left as well.
-            BackgroundImage layer = new BackgroundImage(image).withRepeat(repeat).withPosition(0, true, 0, true);
+            BackgroundImage.Fit[] fit = rasterFit(styles);
+            BackgroundImage layer = new BackgroundImage(image).withRepeat(repeat).withFit(fit[0], fit[1])
+                    .withPosition(0, true, 0, true);
             layer = explicit != null ? layer.withSize(explicit[0], explicit[1]) : layer.withSize(size);
             if (vector != null) {
                 // A vector image has no pixels of its own to stretch. It is
@@ -5071,9 +5090,28 @@ public class CSSTheme {
                     tile = new double[] {vector.getWidth(), vector.getHeight()};
                 }
                 layer = new BackgroundImage(vector.paint(tile[0], tile[1], MAX_VECTOR_SIDE)).withRepeat(repeat)
-                        .withPosition(0, true, 0, true).withSize(tile[0], tile[1]);
+                        .withFit(fit[0], fit[1]).withPosition(0, true, 0, true).withSize(tile[0], tile[1]);
             }
             return layer;
+        }
+
+        /// How the tiles of a rule's background are fitted across and down:
+        /// the `space` and `round` of its `background-repeat`.
+        private BackgroundImage.Fit[] rasterFit(Map<String, LexicalUnit> styles) {
+            BackgroundImage.Fit[] fit = {BackgroundImage.Fit.NONE, BackgroundImage.Fit.NONE};
+            LexicalUnit repeatUnit = styles.get("background-repeat");
+            if (repeatUnit != null && repeatUnit.getStringValue() != null) {
+                LexicalUnit vertical = repeatUnit.getNextLexicalUnit();
+                fit[0] = fitOf(repeatUnit.getStringValue());
+                fit[1] = vertical == null || vertical.getStringValue() == null ? fit[0]
+                        : fitOf(vertical.getStringValue());
+            }
+            return fit;
+        }
+
+        private BackgroundImage.Fit fitOf(String keyword) {
+            return "space".equals(keyword) ? BackgroundImage.Fit.SPACE
+                    : "round".equals(keyword) ? BackgroundImage.Fit.ROUND : BackgroundImage.Fit.NONE;
         }
 
         /// The `background-repeat` of a rule, as the painter names it.
@@ -5084,10 +5122,8 @@ public class CSSTheme {
                 String keyword = repeatUnit.getStringValue();
                 LexicalUnit vertical = repeatUnit.getNextLexicalUnit();
                 String second = vertical == null ? null : vertical.getStringValue();
-                // `space` and `round` are painted as `repeat`. They are not
-                // values a theme can hold either -- the native background
-                // types are tile, scale and align -- so a rule using one
-                // looks the same with a generated image as without.
+                // `space` and `round` repeat; how their tiles are fitted
+                // is rasterFit()'s to say.
                 if (second != null) {
                     // Two keywords: horizontal, then vertical.
                     boolean x = !"no-repeat".equals(keyword);

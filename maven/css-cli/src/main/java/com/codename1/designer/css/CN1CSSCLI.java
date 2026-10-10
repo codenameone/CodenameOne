@@ -439,7 +439,10 @@ public class CN1CSSCLI {
     private static boolean assetsNewerThan(File css, long time) {
         try {
             for (File asset : CssImports.assets(css)) {
-                if (asset.lastModified() > time) {
+                // One that has gone is a change too: the rule that names
+                // it must be compiled again to say so, not answered from
+                // what it compiled to while the file was there.
+                if (!asset.exists() || asset.lastModified() > time) {
                     return true;
                 }
             }
@@ -545,14 +548,15 @@ public class CN1CSSCLI {
         });
     }
 
+    /// Deletes a file, or a directory and everything in it.
     private static void delTree(File dir) {
-        for(File f : dir.listFiles()) {
-            if(f.isDirectory()) {
+        File[] children = dir.listFiles();
+        if (children != null) {
+            for (File f : children) {
                 delTree(f);
-            } else {
-                f.delete();
             }
         }
+        dir.delete();
     }
     private static void syncDirectories(File srcDir, File destDir) throws IOException {
         File canonicalSrc = srcDir.getCanonicalFile();

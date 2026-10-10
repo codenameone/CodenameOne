@@ -367,6 +367,51 @@ class CSSGeneratedImageTest {
     }
 
     @Test
+    void spaceSpreadsWholeTilesAndRoundResizesThemToFit(@TempDir Path dir) throws Exception {
+        // The box is 320 by 100 and starts at (2, 2). Three 100px tiles fit
+        // across with 10px between them; one fits down.
+        png(new File(dir.toFile(), "img/tile.png"), 100, 100, 0xff0000ff);
+        Compiled spaced = compile(dir, "Banner { width: 50%; height: 10%; background-color: #ffffff;"
+                + " background-image: url(img/tile.png); background-repeat: space;"
+                + " box-shadow: 0 0 4px black; }");
+        BufferedImage img = stored(spaced.res, "Banner_1.png", Display.DENSITY_HD);
+        assertEquals(0xff0000ff, img.getRGB(2 + 50, 50), "the first tile");
+        assertEquals(0xffffffff, img.getRGB(2 + 105, 50), "the gap after it");
+        assertEquals(0xff0000ff, img.getRGB(2 + 160, 50), "the second tile");
+        assertEquals(0xff0000ff, img.getRGB(2 + 315, 50), "the last tile ends at the edge");
+
+        // 90px tiles: three and a half fit, so four are made 80px wide.
+        Path other = Files.createDirectory(dir.resolve("other"));
+        BufferedImage halves = new BufferedImage(90, 100, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < 100; y++) {
+            for (int x = 0; x < 90; x++) {
+                halves.setRGB(x, y, x < 45 ? 0xffff0000 : 0xff00ff00);
+            }
+        }
+        new File(other.toFile(), "img").mkdirs();
+        assertTrue(ImageIO.write(halves, "png", new File(other.toFile(), "img/tile.png")));
+        Compiled rounded = compile(other, "Banner { width: 50%; height: 10%; background-color: #ffffff;"
+                + " background-image: url(img/tile.png); background-repeat: round no-repeat;"
+                + " box-shadow: 0 0 4px black; }");
+        img = stored(rounded.res, "Banner_1.png", Display.DENSITY_HD);
+        assertEquals(0xffff0000, img.getRGB(2 + 20, 30), "the left half of the first 80px tile");
+        assertEquals(0xff00ff00, img.getRGB(2 + 60, 30), "its right half");
+        assertEquals(0xffff0000, img.getRGB(2 + 250, 30), "the left half of the fourth, which starts at 240");
+        assertEquals(0xff00ff00, img.getRGB(2 + 310, 30), "and the box ends on a whole tile");
+    }
+
+    @Test
+    void aGradientTileOfAnEnormousSizeIsPaintedOnlyWhereItShows(@TempDir Path dir) throws Exception {
+        Compiled c = org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(java.time.Duration.ofSeconds(60),
+                () -> compile(dir, "Banner { width: 50%; height: 10%;"
+                        + " background: linear-gradient(to right, #ffffff 100px, #000000 100px);"
+                        + " background-size: 100000px 100000px; box-shadow: 0 0 4px black; }"));
+        BufferedImage img = stored(c.res, "Banner_1.png", Display.DENSITY_HD);
+        assertTrue((img.getRGB(2 + 50, 50) & 0xff) > 0xe0, "white up to 100px of the tile");
+        assertTrue((img.getRGB(2 + 150, 50) & 0xff) < 0x20, "black after it");
+    }
+
+    @Test
     void aGradientWrittenAsABackgroundImageIsPainted(@TempDir Path dir) throws Exception {
         Compiled c = compile(dir, "Banner { width: 50%; height: 10%;"
                 + " background-image: linear-gradient(to right, #ffffff 50%, #000000 50%);"

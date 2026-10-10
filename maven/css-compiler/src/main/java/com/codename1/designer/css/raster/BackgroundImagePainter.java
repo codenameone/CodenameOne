@@ -114,20 +114,64 @@ public final class BackgroundImagePainter {
         if (!(tw > 0) || !(th > 0) || Double.isInfinite(tw) || Double.isInfinite(th)) {
             return null;
         }
-        double px = area.getX() + (bg.posXPercent ? (area.getWidth() - tw) * bg.posX / 100 : bg.posX);
-        double py = area.getY() + (bg.posYPercent ? (area.getHeight() - th) * bg.posY / 100 : bg.posY);
         boolean repeatX = bg.repeat == BackgroundImage.Repeat.REPEAT || bg.repeat == BackgroundImage.Repeat.REPEAT_X;
         boolean repeatY = bg.repeat == BackgroundImage.Repeat.REPEAT || bg.repeat == BackgroundImage.Repeat.REPEAT_Y;
+        boolean roundX = repeatX && bg.fitX == BackgroundImage.Fit.ROUND;
+        boolean roundY = repeatY && bg.fitY == BackgroundImage.Fit.ROUND;
+        // `round` resizes the tile so that a whole number of them fills the
+        // area. Rounded on one axis only, an image whose other side is
+        // `auto` keeps its shape.
+        if (roundX) {
+            double fitted = area.getWidth() / Math.max(1, Math.round(area.getWidth() / tw));
+            if (!roundY && autoSide(bg, false)) {
+                th = th * fitted / tw;
+            }
+            tw = fitted;
+        }
+        if (roundY) {
+            double fitted = area.getHeight() / Math.max(1, Math.round(area.getHeight() / th));
+            if (!roundX && autoSide(bg, true)) {
+                tw = tw * fitted / th;
+            }
+            th = fitted;
+        }
+        if (!(tw > 0) || !(th > 0)) {
+            return null;
+        }
+        double px = roundX ? area.getX()
+                : area.getX() + (bg.posXPercent ? (area.getWidth() - tw) * bg.posX / 100 : bg.posX);
+        double py = roundY ? area.getY()
+                : area.getY() + (bg.posYPercent ? (area.getHeight() - th) * bg.posY / 100 : bg.posY);
 
+        // `space` keeps the tiles whole: as many as fit in the area, the
+        // first and last against its edges and the room left over shared out
+        // between them. With room for one only, it is placed like an image
+        // that does not repeat.
+        double stepX = tw;
+        double stepY = th;
         double x0 = px;
         long nx = 1;
-        if (repeatX) {
+        if (repeatX && bg.fitX == BackgroundImage.Fit.SPACE) {
+            long fit = (long) Math.floor(area.getWidth() / tw);
+            if (fit >= 2) {
+                nx = fit;
+                x0 = area.getX();
+                stepX = tw + (area.getWidth() - fit * tw) / (fit - 1);
+            }
+        } else if (repeatX) {
             x0 = px - Math.ceil((px - clip.getMinX()) / tw) * tw;
             nx = (long) Math.ceil((clip.getMaxX() - x0) / tw);
         }
         double y0 = py;
         long ny = 1;
-        if (repeatY) {
+        if (repeatY && bg.fitY == BackgroundImage.Fit.SPACE) {
+            long fit = (long) Math.floor(area.getHeight() / th);
+            if (fit >= 2) {
+                ny = fit;
+                y0 = area.getY();
+                stepY = th + (area.getHeight() - fit * th) / (fit - 1);
+            }
+        } else if (repeatY) {
             y0 = py - Math.ceil((py - clip.getMinY()) / th) * th;
             ny = (long) Math.ceil((clip.getMaxY() - y0) / th);
         }
@@ -145,15 +189,18 @@ public final class BackgroundImagePainter {
             // Divided, not multiplied: two counts large enough wrap around
             // to a small product, and the loops below would then never end.
             if (nx > MAX_DRAWN_TILES / ny) {
+                // Too many to draw one by one. The gaps of `space` between
+                // tiles this small are fractions of a pixel and are not
+                // kept.
                 g.setPaint(new TexturePaint(src, new Rectangle2D.Double(x0, y0, tw, th)));
-                g.fill(new Rectangle2D.Double(x0, y0, nx * tw, ny * th));
+                g.fill(new Rectangle2D.Double(x0, y0, nx * stepX, ny * stepY));
             } else {
                 double sx = tw / src.getWidth();
                 double sy = th / src.getHeight();
                 for (long j = 0; j < ny; j++) {
                     for (long i = 0; i < nx; i++) {
                         AffineTransform at = new AffineTransform();
-                        at.translate(x0 + i * tw, y0 + j * th);
+                        at.translate(x0 + i * stepX, y0 + j * stepY);
                         at.scale(sx, sy);
                         g.drawImage(src, at, null);
                     }
@@ -163,6 +210,14 @@ public final class BackgroundImagePainter {
             g.dispose();
         }
         return layer.getRGB(0, 0, w, h, null, 0, w);
+    }
+
+    /// Whether the image's width (or height) is left to follow its shape.
+    private static boolean autoSide(BackgroundImage bg, boolean width) {
+        if (bg.size == BackgroundImage.Size.AUTO) {
+            return true;
+        }
+        return bg.size == BackgroundImage.Size.EXPLICIT && (width ? bg.sizeW < 0 : bg.sizeH < 0);
     }
 
     /// Halves an image until it is less than twice the target size.
