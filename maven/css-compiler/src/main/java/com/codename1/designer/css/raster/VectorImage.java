@@ -118,7 +118,7 @@ public final class VectorImage {
             g.scale(w / vw, h / vh);
             g.translate(-doc.getViewBoxX(), -doc.getViewBoxY());
             for (SVGNode child : doc.getChildren()) {
-                paintNode(g, child, doc.getStyle());
+                paintNode(g, child, doc.getStyle(), w, h);
             }
         } finally {
             g.dispose();
@@ -126,7 +126,7 @@ public final class VectorImage {
         return out;
     }
 
-    private void paintNode(Graphics2D g, SVGNode node, SVGStyle parentStyle) {
+    private void paintNode(Graphics2D g, SVGNode node, SVGStyle parentStyle, int w, int h) {
         SVGStyle style = node.getStyle() == null ? new SVGStyle() : node.getStyle();
         style.inherit(parentStyle);
         float opacity = style.getOpacity() == null ? 1f : clamp(style.getOpacity().floatValue());
@@ -138,15 +138,16 @@ public final class VectorImage {
             // its own, and the layer is laid down once at that opacity.
             // Fading its parts one by one would let them show through each
             // other where they overlap.
-            java.awt.Rectangle device = g.getDeviceConfiguration().getBounds();
-            BufferedImage layer = new BufferedImage(Math.max(1, device.width), Math.max(1, device.height),
-                    BufferedImage.TYPE_INT_ARGB);
+            // The layer is the size of the image being painted, which is
+            // handed down: what a Graphics2D reports as its device is not
+            // the image behind it on every JDK.
+            BufferedImage layer = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
             Graphics2D lg = layer.createGraphics();
             try {
                 Pixels.hints(lg);
                 lg.setTransform(g.getTransform());
                 lg.setClip(g.getClip());
-                paintOpaque(lg, node, style);
+                paintOpaque(lg, node, style, w, h);
             } finally {
                 lg.dispose();
             }
@@ -162,11 +163,11 @@ public final class VectorImage {
             }
             return;
         }
-        paintOpaque(g, node, style);
+        paintOpaque(g, node, style, w, h);
     }
 
     /// Paints `node` with everything but its own opacity.
-    private void paintOpaque(Graphics2D g, SVGNode node, SVGStyle style) {
+    private void paintOpaque(Graphics2D g, SVGNode node, SVGStyle style, int w, int h) {
         AffineTransform savedTransform = g.getTransform();
         Shape savedClip = g.getClip();
         try {
@@ -186,7 +187,7 @@ public final class VectorImage {
             }
             if (node instanceof SVGGroup) {
                 for (SVGNode child : ((SVGGroup) node).getChildren()) {
-                    paintNode(g, child, style);
+                    paintNode(g, child, style, w, h);
                 }
             } else if (node instanceof SVGText) {
                 paintText(g, (SVGText) node, style);
