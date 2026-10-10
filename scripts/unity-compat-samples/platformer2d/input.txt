@@ -1,0 +1,6 @@
+# Run to the right, jump once clear of the platform, land, run through the
+# thorn and on into the wall the script built.
+20 right down
+100 space down
+102 space up
+270 right up

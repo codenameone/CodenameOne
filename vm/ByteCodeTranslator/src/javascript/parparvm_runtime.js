@@ -2309,6 +2309,8 @@ const jvm = {
       case "int":
         return value | 0;
       case "float":
+        // A host number is a double; a Java float holds the nearest float.
+        return Math.fround(Number(value));
       case "double":
       case "long":
         return Number(value);
@@ -4020,6 +4022,21 @@ function _LfromNumber(v) {
   return _LL((v % _TWO_PWR_32) | 0, (v / _TWO_PWR_32) | 0);
 }
 function _LtoNumber(a) { return a.h * _TWO_PWR_32 + (a.l >>> 0); }
+// long -> float, rounded once. Rounding the long to a double and that double to
+// a float rounds twice, and the first rounding can land exactly on the midpoint
+// of two floats that the long itself was above or below. Up to 2^53 a long is a
+// double exactly, so there is one rounding. Beyond it floats are at least 2^30
+// apart, so bits 0..28 can only say "something is set below the rounding bit":
+// they are replaced by bit 28 alone, which leaves 36 significant bits - exact
+// as a double - on the same side of every float and float midpoint.
+function _Ll2f(x) {
+  x = _Lc(x);
+  const h = x.h;
+  if (h >= -0x200000 && h < 0x200000) return Math.fround(h * _TWO_PWR_32 + (x.l >>> 0));
+  let l = x.l >>> 0;
+  if ((l & 0x1FFFFFFF) !== 0) l = ((l & 0xE0000000) >>> 0) + 0x10000000;
+  return Math.fround(h * _TWO_PWR_32 + l);
+}
 function _Lc(x) {
   if (x && x.__l === 1) return x;
   if (x == null) return _L0;
@@ -4181,8 +4198,13 @@ global._Lushr = _Lushr;
 global._Lcmp = _Lcmp;
 global._Li2l = (x) => _LfromInt(x | 0);      // int -> long
 global._Ll2i = _Ll2i;                        // long -> int
-global._Ll2d = (x) => _LtoNumber(_Lc(x));    // long -> float/double
+global._Ll2d = (x) => _LtoNumber(_Lc(x));    // long -> double
+global._Ll2f = _Ll2f;                        // long -> float
 global._Ld2l = (x) => _LfromNumber(x);       // float/double -> long
+// float/double -> int. Java saturates at both ends and answers 0 for NaN;
+// "x | 0" alone wraps modulo 2^32 and answers 0 for the infinities. NaN fails
+// both comparisons and falls through to the truncation, which makes it 0.
+global._d2i = (x) => x >= 2147483647 ? 2147483647 : x <= -2147483648 ? -2147483648 : x | 0;
 // Class-registration aliases: ``_Z`` for defineClass (1592 calls, 15-char
 // prefix savings each) and ``_M`` for the methods-map registration
 // (1590 calls, 3-char savings).
@@ -5684,7 +5706,9 @@ bindNative(["cn1_java_lang_Float_intBitsToFloat_int_R_float"], function(bits) { 
 function formatJavaFloating(value, scientificNotation) {
   value = Number(value);
   if (!scientificNotation) {
-    return String(value);
+    // Java always prints a fraction: 9999999.0, where String() answers "9999999".
+    const plain = String(value);
+    return isFinite(value) && plain.indexOf(".") < 0 && plain.indexOf("e") < 0 ? plain + ".0" : plain;
   }
   const parts = value.toExponential().split("e");
   let mantissa = parts[0];
@@ -5698,8 +5722,27 @@ function formatJavaFloating(value, scientificNotation) {
   exponent = exponent.replace(/^(-?)0+(\d)/, "$1$2");
   return mantissa + "E" + exponent;
 }
+// A float is carried as the double it equals, and the shortest text that
+// identifies that DOUBLE is not the shortest that identifies the float:
+// 3.4028235E38f printed as 3.4028234663852886E38 and (float) Integer.MIN_VALUE
+// as -2.147483648E9, where the JVM and the native targets print 3.4028235E38
+// and -2.14748365E9. Nine significant digits always identify a float, so the
+// first precision whose text reads back as the same float is the answer.
+function shortestFloatValue(value) {
+  value = Math.fround(Number(value));
+  if (!isFinite(value) || value === 0) {
+    return value;
+  }
+  for (let precision = 1; precision <= 9; precision++) {
+    const candidate = Number(value.toPrecision(precision));
+    if (Math.fround(candidate) === value) {
+      return candidate;
+    }
+  }
+  return value;
+}
 bindNative(["cn1_java_lang_Float_toStringImpl_float_boolean_R_java_lang_String"], function(v, scientificNotation) {
-  return createJavaString(formatJavaFloating(v, !!scientificNotation));
+  return createJavaString(formatJavaFloating(shortestFloatValue(v), !!scientificNotation));
 });
 bindNative(["cn1_java_lang_Double_doubleToLongBits_double_R_long"], function(v) { return longBitsFromDouble(v); });
 bindNative(["cn1_java_lang_Double_longBitsToDouble_long_R_double"], function(bits) { return doubleFromLongBits(bits); });

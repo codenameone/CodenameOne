@@ -1,0 +1,41 @@
+fileFormatVersion: 2
+guid: 9c1d2e3f4a5b4c6d8e7f0a1b2c3d4e5f
+TextureImporter:
+  internalIDToNameTable: []
+  serializedVersion: 12
+  textureType: 8
+  spriteMode: 2
+  spritePixelsToUnits: 32
+  spritePivot: {x: 0.5, y: 0.5}
+  alignment: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: sheet_arrow
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 0
+        width: 32
+        height: 32
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      internalID: 4567001
+    - serializedVersion: 2
+      name: sheet_ell
+      rect:
+        serializedVersion: 2
+        x: 32
+        y: 0
+        width: 32
+        height: 32
+      alignment: 9
+      pivot: {x: 0.25, y: 0.25}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      internalID: -4567002
+    outline: []
+  userData:
+  assetBundleName:
+  assetBundleVariant:

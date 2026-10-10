@@ -25,6 +25,7 @@ package com.codename1.gaming;
 import com.codename1.gpu.GraphicsDevice;
 import com.codename1.gpu.Light;
 import com.codename1.gpu.RenderView;
+import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Rectangle;
@@ -82,6 +83,9 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
     private ActionListener dragListener;
     private ActionListener releaseListener;
     private boolean formListenersAdded;
+    /// Set once the form has delivered a pointer event to this view directly,
+    /// with every finger in it. See `#addFormPointerListeners()`.
+    private boolean touchesArrive;
 
     public GameView() {
         super(new SpriteRenderer());
@@ -136,6 +140,26 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
     /// Removes a previously added 3D `Model`.
     public void removeModel(Model model) {
         ((SpriteRenderer) getRenderer()).removeModel(model);
+    }
+
+    /// Releases the texture the view keeps for an image that is no longer
+    /// drawn. The view uploads each image a sprite shows once and keeps the
+    /// texture for as long as it lives, so an image that is made at run time
+    /// and then replaced -- a text painted into an image, for one -- has to be
+    /// released, or its texture stays. Safe to call from `update`; an image
+    /// that is drawn again later is uploaded again, and one the view has no
+    /// texture for is ignored. See `SpriteRenderer#releaseTexture(Image)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `image`: the image whose texture is no longer needed
+    public void releaseTexture(Image image) {
+        ((SpriteRenderer) getRenderer()).releaseTexture(image);
+    }
+
+    /// The number of images the view holds a texture for at the moment.
+    public int getTextureCount() {
+        return ((SpriteRenderer) getRenderer()).getTextureCount();
     }
 
     /// Override to allocate GPU resources (meshes, textures, `Model`s) once the GPU
@@ -225,6 +249,14 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
     @Override
     protected void initComponent() {
         super.initComponent();
+        // What the view hosts -- the GPU surface, or the placeholder that stands
+        // in for it -- is the view as far as a touch goes. A form hands a pointer
+        // event to the deepest component under it, which would be that child, and
+        // it does nothing with one; marked this way the form passes it on to its
+        // parent, and the multi-touch callbacks of this class see every finger.
+        for (int i = 0; i < getComponentCount(); i++) {
+            getComponentAt(i).setIgnorePointerEvents(true);
+        }
         addFormPointerListeners();
         if (running) {
             setContinuous(true);
@@ -239,12 +271,14 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
         super.deinitialize();
     }
 
-    /// The GPU surface is hosted in a native peer that swallows the platform's
-    /// pointer events before they reach this component, so the usual
-    /// `#pointerPressed(int[], int[])` callbacks never fire over the surface. Instead
-    /// we listen at the form level (those listeners fire for every pointer event,
-    /// regardless of which component is hit) and route the touches to the on-screen
-    /// controls ourselves.
+    /// Form-level listeners fire for every pointer event, whichever component is
+    /// hit, but they carry the first finger only. They are what feeds the view
+    /// until `#pointerPressed(int[], int[])` and its siblings have been seen to
+    /// arrive -- those carry every finger, and once they do, a press or a drag
+    /// heard here as well would take the on-screen controls back to one finger
+    /// between two reports of all of them. A release is always routed: it means
+    /// the last finger lifted, saying so twice changes nothing, and it must not be
+    /// lost when the form delivers it to another component.
     private void addFormPointerListeners() {
         if (formListenersAdded) {
             return;
@@ -257,13 +291,17 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
             pressListener = new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    routeFormTouch(e.getX(), e.getY(), true, true, false);
+                    if (!touchesArrive) {
+                        routeFormTouch(e.getX(), e.getY(), true, true, false);
+                    }
                 }
             };
             dragListener = new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    routeFormTouch(e.getX(), e.getY(), true, false, false);
+                    if (!touchesArrive) {
+                        routeFormTouch(e.getX(), e.getY(), true, false, false);
+                    }
                 }
             };
             releaseListener = new ActionListener() {
@@ -379,18 +417,51 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
         input.keyUp(keyCode);
     }
 
+    /// A key that is held is held, and nothing more. The display reports a key
+    /// that stays down as repeating -- 800 ms after the press and then every few
+    /// milliseconds, by the wall clock -- and a component turns each repeat into a
+    /// press and a release unless it says otherwise. For a text field that is a
+    /// character typed again; here it would let go of a key the player still holds:
+    /// `GameInput#isKeyDown(int)` went false one repeat interval into every held
+    /// direction on a port that does not re-send the press itself, and a subclass
+    /// that forwards `#keyReleased(int)` saw the key come up.
+    @Override
+    public void keyRepeated(int keyCode) {
+        // Deliberately empty: see above.
+    }
+
+    /// A form hands a press to the component under it through this overload and
+    /// never through the one that takes arrays, which only a drag arrives by.
+    /// Unless it is passed on, the first drag marks the view as hearing its
+    /// touches directly, the form's own listeners stop feeding it presses, and
+    /// from then on no press reaches the game at all: a click after the pointer
+    /// had once been dragged did nothing.
+    @Override
+    public void pointerPressed(int x, int y) {
+        pointerPressed(new int[] {x}, new int[] {y});
+    }
+
+    /// The release of `#pointerPressed(int, int)`, for the same reason.
+    @Override
+    public void pointerReleased(int x, int y) {
+        pointerReleased(new int[] {x}, new int[] {y});
+    }
+
     @Override
     public void pointerPressed(int[] x, int[] y) {
+        touchesArrive = true;
         routeTouches(x, y, true, true, false);
     }
 
     @Override
     public void pointerDragged(int[] x, int[] y) {
+        touchesArrive = true;
         routeTouches(x, y, true, false, false);
     }
 
     @Override
     public void pointerReleased(int[] x, int[] y) {
+        touchesArrive = true;
         routeTouches(x, y, false, false, true);
     }
 

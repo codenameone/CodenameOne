@@ -234,15 +234,55 @@ JAVA_INT com_codename1_impl_linux_LinuxNative_fontHeight___long_R_int(CODENAME_O
     return cn1FontOrDefault(font)->height;
 }
 
+/*
+ * The Font.STYLE_* bits a "native:" scheme name asks for: native:MainBold and
+ * native:MainBlack are bold, every native:Italic* name is italic, and
+ * native:ItalicBold is both. Any other name asks for nothing.
+ *
+ * The style of such a font is in its NAME. The portable way to ask for one is
+ * Font.createTrueTypeFont("native:MainBold", "native:MainBold").derive(px,
+ * Font.STYLE_PLAIN) -- Font.createTrueTypeFont(name, sizeMm) is exactly that --
+ * so the weight passed to derive is PLAIN and only the load can honour the
+ * name. This port used to map every native: name to regular "Sans", and bold
+ * and italic text came out in the regular face wherever the caller did not
+ * repeat the style in derive's weight (which iOS ignores, so portable code
+ * does not).
+ *
+ * Kept free of Pango and of the VM's types on purpose:
+ * NativeFontStyleContractTest (vm/tests) compiles this function alone and
+ * runs it, since nothing else in CI builds this file off Linux.
+ */
+static int cn1LinuxNativeFontStyle(const char* name) {
+    int style = 0;
+    if (name == 0 || strncmp(name, "native:", 7) != 0) {
+        return 0;
+    }
+    if (strstr(name + 7, "Bold") != 0 || strstr(name + 7, "Black") != 0) {
+        style |= CN1_STYLE_BOLD;
+    }
+    if (strstr(name + 7, "Italic") != 0) {
+        style |= CN1_STYLE_ITALIC;
+    }
+    return style;
+}
+
+/* The system UI family in the weight and slant a "native:" name asks for.
+ * deriveTrueTypeFont copies the description, so the style survives a derive
+ * to another size. */
+static CN1Font* cn1LinuxNativeSchemeFont(const char* name) {
+    int style = cn1LinuxNativeFontStyle(name);
+    return cn1MakeFont("Sans", (style & CN1_STYLE_BOLD) != 0 ? PANGO_WEIGHT_BOLD : PANGO_WEIGHT_NORMAL,
+            (style & CN1_STYLE_ITALIC) != 0, 18);
+}
+
 JAVA_LONG com_codename1_impl_linux_LinuxNative_loadTrueTypeFont___java_lang_String_java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT fontName, JAVA_OBJECT fileName) {
     const char* name = fontName == JAVA_NULL ? "Sans" : stringToUTF8(threadStateData, fontName);
-    const char* family = name;
     (void) fileName;
-    /* "native:" scheme maps to the system UI family. */
+    /* "native:" scheme maps to the system UI family, styled by its name. */
     if (strncmp(name, "native:", 7) == 0) {
-        family = "Sans";
+        return (JAVA_LONG) (intptr_t) cn1LinuxNativeSchemeFont(name);
     }
-    return (JAVA_LONG) (intptr_t) cn1MakeFont(family, PANGO_WEIGHT_NORMAL, 0, 18);
+    return (JAVA_LONG) (intptr_t) cn1MakeFont(name, PANGO_WEIGHT_NORMAL, 0, 18);
 }
 
 JAVA_LONG com_codename1_impl_linux_LinuxNative_loadTrueTypeFontFromMemory___java_lang_String_byte_1ARRAY_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT fontName, JAVA_OBJECT data) {
@@ -261,7 +301,7 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_loadTrueTypeFontFromMemory___java
     family[0] = 0;
     if (data == JAVA_NULL || (len = (int) (*(JAVA_ARRAY) data).length) <= 0) {
         if (strncmp(name, "native:", 7) == 0) {
-            name = "Sans";
+            return (JAVA_LONG) (intptr_t) cn1LinuxNativeSchemeFont(name);
         }
         return (JAVA_LONG) (intptr_t) cn1MakeFont(name, PANGO_WEIGHT_NORMAL, 0, 18);
     }

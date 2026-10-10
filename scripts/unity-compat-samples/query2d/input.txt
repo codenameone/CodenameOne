@@ -1,0 +1,27 @@
+# One finger lands, drags and is joined by a second; the first lifts while the
+# second stays, then the second lifts.
+10 touch 100,200
+11 touch 110,200
+12 touch 110,200;300,100
+13 touch 120,210;300,100
+14 touch 120,210;310,90
+16 touch 310,90
+18 touch none
+# A tap that lands and lifts between two frames, then a double tap.
+30 touch 50,50
+30 touch none
+40 touch 200,150
+42 touch none
+45 touch 202,151
+47 touch none
+# A mouse, which is not a finger: buttons and the Mouse X and Mouse Y axes.
+60 pointer:100,100 down
+61 pointer:120,90 move
+62 pointer:120,90 up
+# With mouse emulation off a finger presses no button.
+105 touch 100,100
+107 touch none
+# With multi touch off the second finger is not reported.
+135 touch 100,100;200,200
+136 touch 105,100;200,210
+138 touch none

@@ -243,6 +243,29 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_drawString___long_java_lang_S
  * family.
  */
 /*
+ * The Font.STYLE_* bits a "native:" scheme name asks for: native:MainBold and
+ * native:MainBlack are bold, every native:Italic* name is italic, and
+ * native:ItalicBold is both. Any other name asks for nothing.
+ *
+ * Kept free of Windows and of the VM's types on purpose:
+ * NativeFontStyleContractTest (vm/tests) compiles this function alone and
+ * runs it, since nothing else in CI builds this file off Windows.
+ */
+static int cn1WinNativeFontStyle(const wchar_t* name) {
+    int style = 0;
+    if (name == 0 || wcsncmp(name, L"native:", 7) != 0) {
+        return 0;
+    }
+    if (wcsstr(name + 7, L"Bold") != 0 || wcsstr(name + 7, L"Black") != 0) {
+        style |= CN1_STYLE_BOLD;
+    }
+    if (wcsstr(name + 7, L"Italic") != 0) {
+        style |= CN1_STYLE_ITALIC;
+    }
+    return style;
+}
+
+/*
  * Fallback when no bundled TTF was registered: resolve a system family. The
  * "native:" scheme names (native:MainLight, native:ItalicBold, ...) map to the
  * platform UI family (Segoe UI) with weight/slant from the suffix; any other
@@ -252,13 +275,7 @@ static CN1Font* cn1WinSystemFontForName(const WCHAR* name, float dpi) {
     const wchar_t* family = L"Segoe UI";
     int style = 0;
     if (name != NULL && wcsncmp(name, L"native:", 7) == 0) {
-        const wchar_t* suffix = name + 7;
-        if (wcsstr(suffix, L"Bold") != NULL || wcsstr(suffix, L"Black") != NULL) {
-            style |= CN1_STYLE_BOLD;
-        }
-        if (wcsstr(suffix, L"Italic") != NULL) {
-            style |= CN1_STYLE_ITALIC;
-        }
+        style = cn1WinNativeFontStyle(name);
     } else if (name != NULL && name[0] != L'\0') {
         family = name;
     }
@@ -324,13 +341,25 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_loadTrueTypeFontFromMemory___
 /*
  * deriveTrueTypeFont produces a new peer at the requested pixel size and weight,
  * reusing the base font's family. weight carries the CN1 STYLE_* bits.
+ *
+ * The base font's own style is kept and the requested bits are added to it. A
+ * "native:" scheme font has its weight and slant in its NAME, which the load
+ * above turned into base->style; the portable request is
+ * Font.createTrueTypeFont("native:MainBold", "native:MainBold").derive(px,
+ * Font.STYLE_PLAIN) -- Font.createTrueTypeFont(name, sizeMm) is exactly that --
+ * so the weight arriving here is PLAIN. Building the derived format from the
+ * weight alone threw the name's style away, and every native:*Bold and
+ * native:Italic* font was drawn in the regular face at any size but the
+ * loaded one. The Linux port's derive copies the base description for the
+ * same reason. A bundled TrueType file loads with style 0, so it is unchanged.
  */
 JAVA_LONG com_codename1_impl_windows_WindowsNative_deriveTrueTypeFont___long_float_int_R_long(
         CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_FLOAT __cn1Arg2, JAVA_INT __cn1Arg3) {
     CN1Font* base = (CN1Font*) (intptr_t) __cn1Arg1;
     const wchar_t* family = (base != NULL && base->family != NULL) ? base->family : L"Segoe UI";
     float px = __cn1Arg2 > 0.0f ? __cn1Arg2 : 15.0f;
-    CN1Font* font = cn1WinMakeFont(family, px, 0, __cn1Arg3);
+    int style = (base != NULL ? base->style : 0) | __cn1Arg3;
+    CN1Font* font = cn1WinMakeFont(family, px, 0, style);
     return (JAVA_LONG) (intptr_t) font;
 }
 

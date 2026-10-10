@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: d1000000000000000000000000000003
+TextureImporter:
+  internalIDToNameTable: []
+  serializedVersion: 11
+  textureType: 8
+  spriteMode: 1
+  spritePixelsToUnits: 4
+  spritePivot: {x: 0.5, y: 0.5}
+  alignment: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites: []
+    outline: []
+    physicsShape: []
+  userData:
+  assetBundleName:
+  assetBundleVariant:

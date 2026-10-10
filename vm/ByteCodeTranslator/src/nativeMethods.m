@@ -1103,8 +1103,10 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
     // The bracket spans the memmove below, not just the logging: the registration is what
     // mark startup and mark termination wait on, so releasing it before the copy would let
     // a scan interleave with the publication. See cn1SatbBulkBegin.
+    // An array of primitive arrays (int[][]) holds references too, though its class says
+    // primitiveType; see byteSizeForArray.
     JAVA_BOOLEAN cn1__satbReg = JAVA_FALSE;
-    if(!cls->primitiveType) {
+    if(!cls->primitiveType || cls->dimensions > 1) {
         cn1__satbReg = JAVA_TRUE;
         if(cn1SatbBulkBegin()) {
             // One acquisition of the SATB mutex per 256 references rather than per

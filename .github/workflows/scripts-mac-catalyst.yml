@@ -22,6 +22,11 @@ on:
       port_prepared:
         type: boolean
         default: false
+      # True when the caller already ran unity-gallery-prebuilt.yml in this run:
+      # its artifact has a fixed name and cannot be uploaded twice.
+      unity_prepared:
+        type: boolean
+        default: false
 
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;
@@ -30,6 +35,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The application has a Unity project in it. One Linux job compiles it and
+  # hands the result to the job below as an artifact, unless the caller did.
+  unity-gallery:
+    if: ${{ !inputs.unity_prepared }}
+    uses: ./.github/workflows/unity-gallery-prebuilt.yml
+
   build-port:
     if: ${{ !inputs.port_prepared }}
     # Shared with scripts-ios.yml / scripts-ios-native.yml / ios-packaging.yml
@@ -38,8 +49,8 @@ jobs:
     uses: ./.github/workflows/_build-ios-port.yml
 
   build-mac-catalyst:
-    if: ${{ !cancelled() && (inputs.port_prepared || needs.build-port.result == 'success') }}
-    needs: build-port
+    if: ${{ !cancelled() && (inputs.port_prepared || needs.build-port.result == 'success') && (inputs.unity_prepared || needs.unity-gallery.result == 'success') }}
+    needs: [build-port, unity-gallery]
     permissions:
       contents: read
       pull-requests: write
@@ -150,6 +161,11 @@ jobs:
           cn1_select_xcode || exit 1
           "$XCODEBUILD" -downloadComponent MetalToolchain
         timeout-minutes: 10
+
+      # After everything that fills the local Maven repository and before the
+      # application is built; this job has no .NET SDK (see the action).
+      - name: Unpack the Unity gallery prebuilt
+        uses: ./.github/actions/unity-gallery-prebuilt
 
       - name: Build sample Mac Catalyst app and compile workspace
         id: build-mac-catalyst-app

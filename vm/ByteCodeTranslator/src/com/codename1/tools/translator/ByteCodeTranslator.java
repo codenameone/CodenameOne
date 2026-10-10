@@ -1433,11 +1433,19 @@ public class ByteCodeTranslator {
             //   (measured 1.7x slowdown on a transcendental loop). Dropping just
             //   fmod's builtin status keeps the guard a branch; sqrt/sin/cos keep
             //   their intrinsics.
+            // -ffp-contract=off: Java rounds a * b and then rounds the sum with c.
+            //   Clang's default (on) fuses the two into one multiply-add wherever
+            //   the CPU has the instruction -- every arm64 device -- which rounds
+            //   once. The result differs in the last bit from the JVM, from x86 and
+            //   from the same source on Android, and a physics step or a timer
+            //   accumulates that into a different frame (measured: a 200-body
+            //   float integrator ended on a different checksum than HotSpot until
+            //   this flag was set). The Xcode templates set the same.
             // clang-cl (the Windows toolchain) takes the GNU spellings via /clang:.
             writer.append("if(MSVC)\n");
-            writer.append("    target_compile_options(${PROJECT_NAME} PRIVATE /clang:-fwrapv /clang:-fno-strict-aliasing /clang:-fno-builtin-fmod /clang:-fno-builtin-fmodf)\n");
+            writer.append("    target_compile_options(${PROJECT_NAME} PRIVATE /clang:-fwrapv /clang:-fno-strict-aliasing /clang:-fno-builtin-fmod /clang:-fno-builtin-fmodf /clang:-ffp-contract=off)\n");
             writer.append("else()\n");
-            writer.append("    target_compile_options(${PROJECT_NAME} PRIVATE -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf)\n");
+            writer.append("    target_compile_options(${PROJECT_NAME} PRIVATE -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf -ffp-contract=off)\n");
             writer.append("endif()\n");
             if (executable && !windows) {
                 // ThinLTO for the Release Linux executable: the translator emits one

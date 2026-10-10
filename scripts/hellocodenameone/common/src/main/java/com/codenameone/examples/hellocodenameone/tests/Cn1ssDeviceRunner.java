@@ -45,6 +45,14 @@ import com.codenameone.examples.hellocodenameone.tests.androidcompat.AndroidComp
 import com.codenameone.examples.hellocodenameone.tests.androidcompat.AndroidCompatRecyclerScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.androidcompat.AndroidCompatMaterialScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.androidcompat.AndroidCompatKotlinScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.unitycompat.UnityCompatAnimatorScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.unitycompat.UnityCompatCanvasScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.unitycompat.UnityCompatCinemachineScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.unitycompat.UnityCompatParticlesScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.unitycompat.UnityCompatPhysicsScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.unitycompat.UnityCompatSpritesScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.unitycompat.UnityCompatTextMeshProScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.unitycompat.UnityCompatTilemapScreenshotTest;
 import com.codename1.testing.TestReporting;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
@@ -645,6 +653,21 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new AndroidCompatRecyclerScreenshotTest(),
             new AndroidCompatMaterialScreenshotTest(),
             new AndroidCompatKotlinScreenshotTest(),
+            // The Unity compatibility gallery (scripts/unity-compat-samples/gallery),
+            // compiled into this app from its unmodified Unity project: one capture per
+            // scene, each loaded by itself, stepped a fixed number of fixed frames with
+            // the view's clock held, and taken down again. Here for the reason the Android
+            // gallery is: the runtime it installs cannot shift an existing baseline, and
+            // DesktopMode stays the last ordinary capture. They draw through the GPU and
+            // pass without a capture where there is none.
+            new UnityCompatSpritesScreenshotTest(),
+            new UnityCompatPhysicsScreenshotTest(),
+            new UnityCompatCanvasScreenshotTest(),
+            new UnityCompatTilemapScreenshotTest(),
+            new UnityCompatAnimatorScreenshotTest(),
+            new UnityCompatParticlesScreenshotTest(),
+            new UnityCompatTextMeshProScreenshotTest(),
+            new UnityCompatCinemachineScreenshotTest(),
             // Desktop integration demo. Placed LAST on purpose: it shows a Toolbar with text
             // and a populated list, which warms the font cache / shifts suite timing, and the
             // earlier graphics screenshot tests (DrawString, DrawStringDecorated, inscribed

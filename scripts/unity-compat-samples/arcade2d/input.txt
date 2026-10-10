@@ -1,0 +1,10 @@
+# Two shots straight up at the target, which takes two; then a turn to the
+# right with the alternative key, and a third shot that flies off and expires.
+5 space down
+8 space up
+60 space down
+63 space up
+120 d down
+150 d up
+160 space down
+163 space up

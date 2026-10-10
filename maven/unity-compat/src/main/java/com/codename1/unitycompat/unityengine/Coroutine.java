@@ -1,0 +1,50 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.unitycompat.unityengine;
+
+import com.codename1.unitycompat.system.collections.IEnumerator;
+
+/// `UnityEngine.Coroutine`: a running iterator and what it is waiting for.
+public final class Coroutine extends YieldInstruction {
+    MonoBehaviour owner;
+    /// The enumerator being stepped: the one given to `StartCoroutine`, or
+    /// the innermost of those it yielded.
+    IEnumerator routine;
+    /// The enumerators waiting for [#routine] to end, outermost first, when
+    /// a routine has yielded another: `yield return Child()`. The shared
+    /// empty array until the first time one does.
+    IEnumerator[] outer = NONE;
+    private static final IEnumerator[] NONE = new IEnumerator[0];
+    int depth;
+    /// Whether the log was told that this coroutine was made to wait a
+    /// frame, having run nested routines without end in one.
+    boolean spun;
+    float resumeAt;
+    /// The first frame, by `Time.frameCount`, whose pass after `Update` may
+    /// resume it: the one after the frame it last yielded in.
+    int notBefore;
+    Coroutine waitingFor;
+    /// 0 the next frame, 1 after the next physics step, 2 the end of a frame.
+    int phase;
+    boolean done;
+}

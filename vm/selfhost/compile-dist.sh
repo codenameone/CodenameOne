@@ -55,11 +55,11 @@ PYEOF
     asms=$(ls "$srcdir"/*.S 2>/dev/null || true)
     # -flto=thin for -O3 arrives through CN1_SELFHOST_CFLAGS, which the caller sets.
     local flags="$opt"
-    $CC $flags -w -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf \
+    $CC $flags -w -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf -ffp-contract=off \
         $CN1_SELFHOST_CFLAGS -I"$srcdir" "$srcdir"/*.c $asms -lm -lpthread -o "$bin" \
         2> "$log" || { echo "COMPILE FAILED"; tail -40 "$log"; return 1; }
     if [ -n "${CN1_BUILD_SOURCE_SNAPSHOT:-}" ]; then
-        CN1_BUILD_FLAGS="$flags -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf $CN1_SELFHOST_CFLAGS" \
+        CN1_BUILD_FLAGS="$flags -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf -ffp-contract=off $CN1_SELFHOST_CFLAGS" \
             "$PYTHON" "$REPO/vm/selfhost/bench-selfhost.py" --record-build "$bin"
     fi
     echo "built $bin"

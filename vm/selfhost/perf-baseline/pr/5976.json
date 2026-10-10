@@ -1,0 +1,87 @@
+{
+ "pr": 5976,
+ "rebaseline": {
+  "linux-arm64@neoverse-n2": {
+   "objectAllocation": {
+    "all": {
+     "from": {
+      "memory": 0.378,
+      "time": 1.768,
+      "tolerance": {
+       "time": 0.45
+      }
+     },
+     "memory": 0.37,
+     "reason": "Recalibrate objectAllocation RAM on Neoverse-N2 from four complete five-round runs: this pull request's run 37950022133 (run median 0.298x) and three master controls, 37927504399 at d65703afaa (0.378x), 37902400038 at 438399d5f1 (0.380x) and 37889241211 at 8e6f2cf05 (0.363x). ParparVM's peak is bimodal on this runner, about 156-167 MB or about 123-129 MB against a steady 430 MB for JDK 25: the low mode is one round of fifteen on master (37889241211 round 5, 125.1 MB, 0.291x) and three rounds of five here (124.0, 128.6, 123.3 MB), so this run's median landed in it and failed as IMPROVED against a two-run 0.378x row that carried only the global 15% RAM tolerance. Whether this pull request makes the low mode more frequent (it adds -ffp-contract=off to the benchmark's native build and changes arraycopy/clone sizing for arrays of primitive arrays) or one run of five rounds simply drew it was NOT established: there is a single run of this branch. So this records no improvement. It keeps the baseline at the pooled run median (0.370x) and widens the RAM tolerance to the 30% the tool derives from the observed spread, which is what the objectAllocation rows of the other runners already carry; taking this run alone would have set 0.298x at 15% and failed the next high-mode run as a regression. Time is unchanged.",
+     "runs": 4,
+     "time": 1.768,
+     "tolerance": {
+      "memory": 0.3,
+      "time": 0.45
+     }
+    }
+   }
+  },
+  "linux-x64@amd-epyc-7763-64-core-processor": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.519,
+      "time": 0.515,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.481,
+     "reason": "Recalibrate translator RAM on EPYC 7763 from four complete five-round runs: this pull request's runs 37997610022 at 8a51fcb4b1 (run median 0.428x, which failed as IMPROVED at -17.5% against the 0.519x row's 15% tolerance) and 37962653289 at e453c39d61 (0.478x, which passed), and two master controls, 37790360588 at ebe0e64be3 (0.484x) and 37746994710 at 6478b2f347 (0.484x). Both master controls predate d65703afaa, the commit this branch is based on: no run of master at or after that commit landed on this CPU model, so there is no same-model control at the base commit. On Xeon Platinum 8573C, master at d65703afaa measured 0.414x (run 37927504399), lower than the run that failed here. Per round, the two master runs on this model range 0.44-0.51x and this pull request's failing run 0.41-0.50x, three of its five rounds at 0.41-0.43x. Whether this pull request makes the lower rounds more frequent on this model or one run of five rounds simply drew them was NOT established. So this records no improvement: it sets the baseline to the pooled run median (0.481x) and widens the RAM tolerance to the 20% the tool derives from the observed spread. Time is unchanged.",
+     "runs": 4,
+     "time": 0.515,
+     "tolerance": {
+      "memory": 0.2,
+      "time": 0.2
+     }
+    }
+   }
+  },
+  "linux-x64@intel-xeon-platinum-8573c": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.732,
+      "time": 0.942,
+      "tolerance": {
+       "memory": 0.2,
+       "time": 0.5
+      }
+     },
+     "memory": 0.905,
+     "reason": "Recalibrate hello RAM on Xeon Platinum 8573C from three complete five-round runs: this pull request's run 37974545389 at bb185e0f13 (run median 0.905x) and two master controls, 37927504399 at d65703afaa, the commit this branch is based on (0.926x), and 37889241211 at 8e6f2cf05d (0.880x). All three fail the 0.732x row, which came from a single run, by +20.2% to +26.5% against its 20% tolerance, and this pull request's figure lies between the two master figures. The shift is therefore present on master at the base commit and is not attributed to this pull request; what moved it on master was not investigated. No improvement or regression is claimed. The baseline moves to the pooled run median, the RAM tolerance stays at 20% and time is unchanged.",
+     "runs": 3,
+     "time": 0.942,
+     "tolerance": {
+      "memory": 0.2,
+      "time": 0.5
+     }
+    }
+   },
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.517,
+      "time": 0.505,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.43,
+     "reason": "Recalibrate translator time and RAM on Xeon Platinum 8573C from three complete five-round runs. Run medians, time / RAM: this pull request's run 37974545389 at bb185e0f13, 0.638x / 0.430x; master 37927504399 at d65703afaa, the commit this branch is based on, 0.664x / 0.414x; master 37889241211 at 8e6f2cf05d, 0.521x / 0.465x. Master at the base commit fails the 0.505x / 0.517x row (which came from a single run) the same way this pull request does: time +31.5% there and +26.2% here against a 20% tolerance, RAM -19.9% there and -16.8% here against 15%. This pull request's medians lie between the two master runs on both metrics, and the two master runs differ from each other by more than this pull request differs from either. The shift is therefore present on master at the base commit and is not attributed to this pull request; why two runs of master differ this much was not investigated. No improvement or regression is claimed. The baseline moves to the pooled run medians and the time tolerance widens to the 30% the tool derives from the observed spread; RAM keeps the global tolerance.",
+     "runs": 3,
+     "time": 0.638,
+     "tolerance": {
+      "time": 0.3
+     }
+    }
+   }
+  }
+ }
+}

@@ -1073,7 +1073,11 @@ public final class GradleConversion {
     static final java.util.Set<String> PLUGIN_SUPPLIED = new java.util.HashSet<String>(java.util.Arrays.asList(
             "codenameone-core", "codenameone-javase", "java-runtime", "codenameone-backend", "cn1-binaries-javase",
             "codenameone-css-cli", "codenameone-android", "codenameone-ios", "codenameone-javascript",
-            "codenameone-maven-plugin"));
+            "codenameone-maven-plugin",
+            // Added by the plugin for a project with src/main/unity, at its own
+            // version, together with the translator of that version: a
+            // declaration carried over from the pom could name another one.
+            "codenameone-unity-compat"));
 
     /// `build.gradle.kts` lines for the dependencies a module's pom declares
     /// itself, leaving out the framework, which the plugin adds. A dependency of

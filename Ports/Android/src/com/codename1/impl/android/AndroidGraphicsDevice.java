@@ -6,6 +6,19 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 package com.codename1.impl.android;
 
@@ -330,10 +343,17 @@ class AndroidGraphicsDevice extends GraphicsDevice {
             GLES20.glDisable(GLES20.GL_BLEND);
         } else {
             GLES20.glEnable(GLES20.GL_BLEND);
+            // The alpha channel accumulates coverage rather than being
+            // weighted by itself, so an opaque frame stays opaque
+            // (RenderState.BlendMode's contract). The default surface has no
+            // alpha channel and showed nothing of this; one that does -- a
+            // translucent surface, a frame read back -- would have.
             if (blend == RenderState.BlendMode.ADDITIVE) {
-                GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE);
+                GLES20.glBlendFuncSeparate(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE,
+                        GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_ALPHA);
             } else {
-                GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
+                GLES20.glBlendFuncSeparate(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA,
+                        GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_ALPHA);
             }
         }
 

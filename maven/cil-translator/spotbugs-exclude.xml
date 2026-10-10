@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    The translator is held at zero SpotBugs findings. Everything SpotBugs
+    reported that was a defect was fixed in the code; each exception below is a
+    finding that describes the design, scoped to the member it applies to.
+-->
+<FindBugsFilter>
+    <!--
+        An assembly is built in three steps because signatures name types of
+        other assemblies: the constructor reads the tables, load() registers
+        the types and link() resolves them. Universe.load() is the only caller
+        and runs all three before it hands an assembly to anybody, so these
+        fields are set before any method that reads them can be reached.
+    -->
+    <Match>
+        <Class name="com.codename1.cil.metadata.CilAssembly"/>
+        <Or>
+            <Field name="universe"/>
+            <Field name="fieldsByRow"/>
+            <Field name="methodsByRow"/>
+        </Or>
+        <Bug pattern="UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR"/>
+    </Match>
+
+    <!--
+        The reader is a view over the bytes of one assembly file, which its
+        only caller has just read and keeps no other reference to. A defensive
+        copy would hold every assembly in memory twice (the netstandard
+        reference alone is a megabyte and a half) to guard against nobody.
+    -->
+    <Match>
+        <Class name="com.codename1.cil.metadata.MetadataReader"/>
+        <Method name="&lt;init&gt;"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!--
+        null here is an answer of its own, not an empty list: "this type is not
+        a generic instantiation" (CilType.substitute() takes null to mean
+        "substitute nothing"), "no physics material", "the header could not be
+        read". An empty array would say something else in each case.
+    -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.cil.metadata.CilAssembly$MethodRef"/>
+                <Method name="typeArgs"/>
+            </And>
+            <And>
+                <Class name="com.codename1.cil.translate.MethodTranslator"/>
+                <Method name="typeArgsOf"/>
+            </And>
+            <And>
+                <Class name="com.codename1.unity.scenecompiler.SceneCompiler"/>
+                <Or>
+                    <Method name="material"/>
+                    <Method name="audioInfo"/>
+                    <Method name="imageSize"/>
+                </Or>
+            </And>
+        </Or>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
+</FindBugsFilter>

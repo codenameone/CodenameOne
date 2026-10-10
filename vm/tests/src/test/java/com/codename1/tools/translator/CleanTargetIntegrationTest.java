@@ -1077,6 +1077,37 @@ class CleanTargetIntegrationTest {
     }
 
     /**
+     * The classes of every library the hellocodenameone application depends on and
+     * ships -- the mock ad provider, the Unity compatibility runtime -- as its common
+     * module unpacks them ({@code stage-translation-libs} in its pom). None of them is
+     * compiled into {@code common/target/classes}, so the directory is a translator
+     * source root of its own: without it the translator cannot emit a class the
+     * application names and the C build fails on that class's missing header.
+     *
+     * <p>One directory, filled from the application's own dependency list, so a
+     * library added to the application reaches every translation that assembles its
+     * inputs by hand. These used to name one library's build directory each, and the
+     * next library was simply absent.</p>
+     */
+    static Path helloSuiteLibraryClasses() {
+        Path libraryClasses = Paths.get("..", "..", "scripts", "hellocodenameone", "common", "target",
+                "translation-libs").normalize().toAbsolutePath();
+        org.junit.jupiter.api.Assumptions.assumeTrue(Files.isDirectory(libraryClasses),
+                "hellocodenameone-common must be built to process-classes or later"
+                        + " (scripts/hellocodenameone/common/target/translation-libs)");
+        // Built is not enough: an archive of the application's classes that left this
+        // directory out unpacks to the same failure this method exists to prevent, far
+        // from its cause. Both are libraries the suite cannot run without.
+        for (String required : new String[] {
+                "com/codename1/ads/mock/MockAdProvider.class",
+                "com/codename1/unitycompat/unityengine/UnityRuntime.class" }) {
+            assertTrue(Files.exists(libraryClasses.resolve(required)),
+                    "the application's libraries are incomplete: " + libraryClasses + " has no " + required);
+        }
+        return libraryClasses;
+    }
+
+    /**
      * Translates the real hellocodenameone screenshot suite (the Kotlin/Java app +
      * every *ScreenshotTest, the Kotlin stdlib, core, the Windows port, JavaAPI and
      * the port's nativeSources) into a CMake dist with the "windows" app type, and
@@ -1090,12 +1121,7 @@ class CleanTargetIntegrationTest {
         Path portClasses = Paths.get("..", "..", "maven", "windows", "target", "classes").normalize().toAbsolutePath();
         Path commonClasses = Paths.get("..", "..", "scripts", "hellocodenameone", "common", "target", "classes")
                 .normalize().toAbsolutePath();
-        // cn1-ads-mock is a Maven dependency of the app (used by AdsScreenshotTest),
-        // not compiled into common/target/classes, so add its classes as a source
-        // root or the translator can't emit MockAdProvider and the C build fails on
-        // its missing header. Built by the CI install step alongside core + plugin.
-        Path adsMockClasses = Paths.get("..", "..", "maven", "cn1-ads-mock", "target", "classes")
-                .normalize().toAbsolutePath();
+        Path libraryClasses = helloSuiteLibraryClasses();
         org.junit.jupiter.api.Assumptions.assumeTrue(Files.exists(coreClasses.resolve("com/codename1/ui/Form.class")),
                 "codenameone-core must be built (maven/core/target/classes)");
         org.junit.jupiter.api.Assumptions.assumeTrue(Files.exists(portClasses.resolve("com/codename1/impl/windows/WindowsImplementation.class")),
@@ -1132,7 +1158,7 @@ class CleanTargetIntegrationTest {
         CompilerHelper.compileJavaAPI(javaApiDir, config);
         String cp = coreClasses + java.io.File.pathSeparator + portClasses
                 + java.io.File.pathSeparator + commonClasses + java.io.File.pathSeparator + kotlinDir
-                + java.io.File.pathSeparator + adsMockClasses;
+                + java.io.File.pathSeparator + libraryClasses;
         List<String> appCompile = new java.util.ArrayList<>(Arrays.asList(
                 "-source", config.targetVersion, "-target", config.targetVersion,
                 "-classpath", cp, "-d", classesDir.toString(),
@@ -1152,7 +1178,7 @@ class CleanTargetIntegrationTest {
 
         Path outputDir = Files.createTempDirectory("winhello-out");
         String sources = classesDir + ";" + commonClasses + ";" + kotlinDir + ";" + coreClasses + ";"
-                + portClasses + ";" + javaApiDir + ";" + nativeStage + ";" + adsMockClasses;
+                + portClasses + ";" + javaApiDir + ";" + nativeStage + ";" + libraryClasses;
         // The "windows" app type binds CodenameOneImplementation to its @Concrete
         // win() target (WindowsImplementation) during translation -- no override.
         runTranslatorMultiSource(sources, outputDir, "WinHelloMain", "windows");

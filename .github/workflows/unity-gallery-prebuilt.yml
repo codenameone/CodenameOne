@@ -1,0 +1,161 @@
+name: _Unity gallery prebuilt (reusable)
+
+# scripts/hellocodenameone, the application every screenshot workflow builds,
+# contains a Unity project (scripts/unity-compat-samples/gallery). Compiling
+# it takes the .NET SDK and the two Maven modules behind -Dunity-compat. This
+# workflow is the ONE place that happens: it compiles the gallery on Linux,
+# packs the result with scripts/unity-gallery-prebuilt.sh and uploads it as the
+# artifact `unity-gallery-prebuilt`. Every job that builds the application
+# `needs:` the job that calls this workflow and runs
+# ./.github/actions/unity-gallery-prebuilt, which downloads and unpacks it.
+# No macOS, Windows, Android or iOS job installs .NET or builds those modules.
+#
+# What the consumer gets, and why it is safe on another machine and another
+# operating system, is described in scripts/unity-gallery-prebuilt.sh.
+#
+# Calling it:
+#
+#   unity-gallery:
+#     uses: ./.github/workflows/unity-gallery-prebuilt.yml
+#
+# ONCE per workflow run. The artifact has a fixed name, and a second upload of
+# it in the same run is refused, so a workflow that is itself called by one
+# that already made the archive takes an input saying so and skips its own
+# call (`unity_prepared`, beside `port_prepared`, in scripts-ios-native.yml,
+# ios-packaging.yml and scripts-mac-catalyst.yml).
+#
+# The cache. A cold build is the framework up to the Maven plugin plus both
+# Unity modules, several minutes; the archive that comes out of it depends only
+# on the files hashed into the key below, so it is cached under that hash and a
+# run that finds it does nothing but upload it again. Two things about that:
+#
+#   - The key has to name everything that can change a byte of the archive. The
+#     consumer's check is by content, but of the archive's OWN jars: a stale
+#     archive is not refused downstream, it is used. So the key takes the whole
+#     core (the runtime is compiled against it, and javac copies constants and
+#     binds overloads at compile time), both Unity modules, the builder and the
+#     goal that drive the compile, the gallery, the application's poms and the
+#     scripts and workflow that make the archive. The .NET SDK is not in it:
+#     another SDK would write other bytes for the same sources, and either
+#     archive is right.
+#   - GitHub scopes a cache to the ref that saved it. A pull request's runs all
+#     have the same ref (refs/pull/N/merge), so the screenshot workflows of one
+#     pull request share one entry, and a run can also read what master saved.
+#     Workflows that start together on a push all miss together and each
+#     builds; the later ones find the entry. Another pull request never sees it.
+#
+# The artifact, not the cache, is the handoff within a run: a cache entry can
+# be evicted between this job and a consumer that waited for a runner.
+
+on:
+  workflow_call:
+
+jobs:
+  build:
+    name: Unity gallery prebuilt
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+      PACK: ${{ github.workspace }}/artifacts/unity-gallery-prebuilt/unity-gallery-prebuilt.tgz
+    steps:
+      - uses: actions/checkout@v6
+
+      # Everything below this step but the upload is skipped on a hit.
+      - name: Cache the Unity gallery prebuilt
+        id: pack
+        uses: actions/cache@v5
+        with:
+          path: artifacts/unity-gallery-prebuilt/unity-gallery-prebuilt.tgz
+          key: unity-gallery-prebuilt-v1-${{ hashFiles('maven/pom.xml', 'maven/cil-translator/**', 'maven/unity-compat/**', 'maven/build-engine/src/main/java/com/codename1/maven/Unity*', 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*', 'CodenameOne/src/**', 'Ports/CLDC11/src/**', 'scripts/unity-compat-samples/gallery/**', 'scripts/hellocodenameone/pom.xml', 'scripts/hellocodenameone/common/pom.xml', 'scripts/unity-gallery-prebuilt.sh', '.github/workflows/unity-gallery-prebuilt.yml') }}
+
+      # Installed FIRST so the JDK 8 below is the one JAVA_HOME names.
+      - name: Set up JDK 17 for the application build
+        if: steps.pack.outputs.cache-hit != 'true'
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - if: steps.pack.outputs.cache-hit != 'true'
+        run: echo "JDK_17_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up JDK 8
+        if: steps.pack.outputs.cache-hit != 'true'
+        uses: actions/setup-java@v5
+        with:
+          java-version: '8'
+          distribution: 'temurin'
+          cache: 'maven'
+      - name: Set up .NET
+        if: steps.pack.outputs.cache-hit != 'true'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      # xvfb as in the other Maven builds of the framework.
+      - name: Install xvfb
+        if: steps.pack.outputs.cache-hit != 'true'
+        run: bash scripts/ci/apt-get-install.sh xvfb
+
+      # The least of the framework that compiles the gallery: the Maven plugin
+      # (the compile-unity goal) and what the application's common module
+      # depends on, plus the two Unity modules. These steps only build, so a
+      # blanket retry cannot turn a flaky test into a pass.
+      - name: Build the plugin, the Unity modules and the application's dependencies
+        if: steps.pack.outputs.cache-hit != 'true'
+        run: |
+          cd maven
+          bash ../scripts/ci/retry.sh xvfb-run -a mvn -B install -Plocal-dev-javase -Dunity-compat -DskipTests -Darchetype.test.skip=true -Dmaven.javadoc.skip=true -pl codenameone-maven-plugin,cn1-ads-mock,android-compat,cil-translator,unity-compat -am
+
+      # generate-sources is as far as the application has to go: compile-unity
+      # is bound to it, and nothing after it writes what the archive carries.
+      - name: Compile the gallery
+        if: steps.pack.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          export JAVA_HOME="$JDK_17_HOME"
+          export PATH="$JAVA_HOME/bin:$PATH"
+          mkdir -p "$HOME/.codenameone"
+          [ -f "$HOME/.codenameone/guibuilder.jar" ] || : > "$HOME/.codenameone/guibuilder.jar"
+          bash scripts/ci/retry.sh xvfb-run -a mvn -B -f scripts/hellocodenameone/pom.xml -pl common -am generate-sources -DskipTests
+          test -s scripts/hellocodenameone/common/target/unity/state.txt
+
+      - name: Pack
+        if: steps.pack.outputs.cache-hit != 'true'
+        run: bash scripts/unity-gallery-prebuilt.sh pack "$PACK"
+
+      # On a hit as well: an entry that was cut short is caught here, in the
+      # job that can say so, and not in a dozen consumers.
+      - name: Check the archive
+        run: |
+          set -euo pipefail
+          ls -la "$PACK"
+          version="$(sed -n 's:.*<cn1.version>\(.*\)</cn1.version>.*:\1:p' scripts/hellocodenameone/pom.xml | head -n 1)"
+          info="$(tar -xzOf - pack-info.txt <"$PACK")"
+          echo "$info"
+          echo "$info" | grep -qx "cn1.version=$version"
+          tar -tzf - <"$PACK" | grep -q '^target/unity/state.txt$'
+          if [ "${{ steps.pack.outputs.cache-hit }}" = "true" ]; then
+            echo "Unity gallery prebuilt: cache HIT; nothing was built."
+          else
+            echo "Unity gallery prebuilt: cache MISS; built fresh."
+          fi
+
+      - name: Upload the Unity gallery prebuilt
+        uses: actions/upload-artifact@v7
+        with:
+          name: unity-gallery-prebuilt
+          path: ${{ env.PACK }}
+          retention-days: 1
+          if-no-files-found: error
+          # A re-run of a failed attempt uploads under the same name.
+          overwrite: true
+
+      - name: Upload the build logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unity-gallery-prebuilt-logs
+          path: scripts/hellocodenameone/common/target/unity/*.log
+          if-no-files-found: ignore

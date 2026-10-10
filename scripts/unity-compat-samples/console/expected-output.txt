@@ -1,0 +1,155 @@
+== value types
+a=(100,200) b=(500,200)
+inside (9900,200)
+after call a=(100,200)
+field=(100,200) local=(100,800)
+field=(100,200) copy=(200,400)
+scaled in place=(300,600)
+prop source=(300,600) prop copy=(-100,600)
+returned=(300,700) source=(300,600)
+default element=(0,0)
+arr0=(4200,800) a=(100,800) elem=(4200,4300)
+trail2=(4200,800) arr0=(4200,0)
+s.to=(300,1000) t.to=(100000,1000)
+default=(0,0) sqr=65
+== ref and out
+x=2 y=1
+p=(1200,200) q=(100,100)
+ok=True half=5
+ok=False half=-1
+ball!
+== generics
+count=4 sum=29 [2]=9 has9=True
+p0=(100,100) p1=(700,100) first=(100,5000)
+3=three has4=True try5=False n=2
+a=11
+bi=13/2 bs=boxed bv=(300,400)
+largest=9 pear
+== delegates
+total=6 captured=103
+twice=42 shifted=31
+seen=16
+later 0
+later 1
+later 2
+== enums and properties
+moved ended other raw=7
+ground=True player=False bits=5 eq=True
+g2=10 count=2
+== strings
+Codename One len=12 idx=9 sub=name tail=One
+eq=True neq=True starts=True ends=False empty=True
+n=7 twice=14 name=Codename One
+a-3-a
+vowels=6 first=C code=111
+UD?
+null concat=[] True
+char math=c bool=True long=12345678901
+== exceptions
+unwind 0
+unwind 1
+unwind 2
+caught bottom code=17
+inner finally
+outer finally v=3
+returned 2
+div 3 -3 rem -1
+divide by zero
+invalid cast
+null reference
+index out of range
+rethrowing first
+outer first
+base catch bad arg is arg=True
+== iterators
+routine start
+tick 1 current=0
+tick 2 current=1
+routine mid
+tick 3 current=null
+routine end
+evens=20
+== boxing and types
+back=6 isInt=True isString=False f=25
+boxed=(100,200) v=(900,200) str=(100,200)
+unbox mismatch
+rect:6
+square/rect:16
+area=22 iface=square/rect as=True asNull=True isRect=True
+== arithmetic
+fnv=2797852379 div=399693197 rem=379 shr=10 big=True
+as int=-1497114917 sar=-6 byte=255 sbyte=-1
+wrapped=-2147483648 wide=8589934588 narrow=-1 short=4464 ushort=4464
+ulong=18446744073709551615 half=9223372036854775807 cmp=True
+trunc=7 -7 round=2 floor=-8 sqrt=1414 abs=4 max=8
+float bits=33333334 double bits=33333333333333
+and=15 or=65295 xor=61680 not=-3856 shl=-252706816 shift mask=2
+jagged=10 longs=1099511627771 flags=FalseTrue chars=ok
+== integer edges
+int div overflow 2147483647 -2147483648 -1073741824 7 0 zero zero
+int rem overflow 0 0 0 0 -1 zero
+long div overflow 9223372036854775807 -9223372036854775808 2147483648 7 zero zero
+long rem overflow 0 -8 0 zero
+unsigned 0 2147483648 0 9223372036854775808 4294967295 zero zero
+abs overflow 2147483647 4 overflow 9223372036854775807 2147483648
+smallest -2147483648 True/-2147483648 False/0
+== multi-dimensional arrays
+grid[2,3]=23 [0,3]=3 [1,0]=10 sum=138 length=12 rank=2 dims=3x4 upper=2,3 lower=0
+range: range range range range 23 range
+literal 2x3 [1,0]=4 foreach=21 order=123456
+compound=118 ref=-7
+cube[1,2,3]=23 [1,0,0]=12 [0,2,1]=9 length=24 rank=3 dim2=4 range: range range range ok
+hyper=42 sum=49 length=24 rank=4 dim3=3 range
+float=3 double=4 long=1099511627776 bool=TrueFalse char=cb byte=455 short=-300
+strings=north/south/True length=4
+structs=(0,0)(200,400)(500,0)(100,700) taken=(900,200)
+struct foreach=(800,1100)
+clone=50/1 3 struct clone=(-100,400)(200,400)
+clear=5000056 (0,0)(100,700)
+field=13 6 replaced=5 0
+array of grids=6 23
+empty=0 5 range
+negative size
+== splitting and parsing
+lines 3:[1,2,-3][4,,6][7,x,9] kept 5:[1,2,-3][][4,,6][][7,x,9]
+cells 3:[4][][6] 3:[4][][6] 2:[4][6]
+count 2:[a][b,c,d] 2:[a][b,,c] 1:[,a,b] 0:
+white 6:[][a][][b][c][] 3:[a][b][c] empty 1:[] 0: 2:[][]
+strings 3:[a][b][c] 2:[a][b] 2:[one][two and three]
+parse True/42 True/-7 True/19 False/0 False/0 False/0 True/2147483647 False/0 True/-2147483648 False/0 False/0 False/0 True/7
+int.Parse 12 format overflow
+grid -3 -1 -1 9
+== dictionaries
+out struct True(100,0) False(0,0)
+pairs (200,0)(100,0)(5000,0) match=True count=3
+out int True1 False0
+order zed=13 cat=4 bob=2 dan=5 zedcatbobdan total=24 TrueFalse4
+slots 100x 7n1 200y 21n3 28n4 35n5 300z Truen3FalseTrue
+changed while walked
+cleared 1 5five
+== enum methods
+signed None=0 One=1 All=-1 None One All 
+big Small=1 Huge=5000000000 Neg=-2 tiny B=3 A=200 wide B A=60000 unsigned Low Top=4000000000
+walked 17 unboxed 60000 200 5000000000 undefined 3000000000 250 65535 -7 All
+defined TrueTrueTrueFalseTrueTrueFalse
+other enum Argument Argument InvalidOperation True Moved Ended null Argument
+has flag Argument True ArgumentNull True False Argument
+compare Argument Argument 1 -1 1 Argument 1 -1 equals FalseFalseTrueTrueFalseFalse
+parse Ground, Enemy|Ground, Player|Ground, Enemy|Argument|7|Ground|5000000000|Ended
+parse bad Argument Argument Argument Argument Argument Argument Argument Argument ArgumentNull
+parse number Player, Enemy|Ground, Player|-1|Overflow|Overflow|Overflow|A|Top|Overflow|-9223372036854775808|Overflow|Argument
+try parse True Ground, Enemy True Player FalseTrue FalseTrue FalseTrue
+== base library
+linq True/1 0/2 True/3 3/4 True/5 False/6 3/7 0/8 4/9 12/10 5/11 4/12 4/13 3/14 thrown/15 empty/16
+types FalseFalseFalseFalseFalseTrueTrueTrue System.UInt32 System.UInt64 System.Int32 System.SByte System.UInt16 Spike.HolderFalse
+zeros True pos 1 2 neg True True 1 same 1 True True True0TrueTrueTrue
+format Format a}b1{ 1} Format Format Format
+trim 61 33 a axy xya 11130[]
+digits 11000111110000101100 370 4915445 False0 Format Argument
+copies 43 32 3/17 (100,200)(100,200)(700,200) 0 ArgumentNull
+dictionary copy a1d4e5f6 4TrueTrue16 ArgumentNull
+== static init
+before
+Order.cctor
+n=42 again=43 first=41
+done

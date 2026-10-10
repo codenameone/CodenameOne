@@ -283,7 +283,7 @@ if [ "$(uname -s)" = "Darwin" ]; then GC_LDFLAGS="-Wl,-dead_strip"; else GC_LDFL
 if [ "${CN1_BACKEND_DEAD_STRIP:-1}" = "0" ]; then GC_CFLAGS=""; GC_LDFLAGS=""; fi
 # -fwrapv -fno-strict-aliasing -fno-builtin-fmod(f) are MANDATORY for generated C
 # (Java wrapping arithmetic; clang -O3 provably miscompiles without them).
-$CC -O3 -w -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf $GC_CFLAGS \
+$CC -O3 -w -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf -ffp-contract=off $GC_CFLAGS \
     $CN1_BACKEND_CFLAGS $EXTRA $SSL_FLAGS -I"$SRCDIR" "$SRCDIR"/*.c "$SRCDIR"/*.S \
     -lm -lpthread $CURL_LIB $GC_LDFLAGS -o "$OUTBIN" \
     2> "$WORK/cc.log" || { echo "COMPILE FAILED"; tail -40 "$WORK/cc.log"; exit 1; }

@@ -11,6 +11,12 @@ permissions:
   contents: write
 
 jobs:
+  # The application has a Unity project in it. One Linux job compiles it and
+  # hands the result to the jobs below as an artifact; none of them installs
+  # the .NET SDK or builds the Unity modules.
+  unity-gallery:
+    uses: ./.github/workflows/unity-gallery-prebuilt.yml
+
   # port-status-publish.yml only publishes a report when a workflow_run event
   # reaches it, and those events never arrive for some producers -- the Linux
   # and Windows suites had not landed a single report, so the public table
@@ -30,6 +36,7 @@ jobs:
         run: scripts/hellocodenameone/conformance/backfill_port_status.sh
 
   build-javascript-app:
+    needs: unity-gallery
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
@@ -53,6 +60,11 @@ jobs:
         run: bash scripts/ci/apt-get-install.sh xvfb
       - name: Set up workspace
         run: xvfb-run ./scripts/setup-workspace.sh -q -DskipTests
+      # After everything that fills the local Maven repository and before the
+      # application is built; this job has no .NET SDK (see the action).
+      - name: Unpack the Unity gallery prebuilt
+        uses: ./.github/actions/unity-gallery-prebuilt
+
       - name: Build compliance application for JavaScript
         run: SKIP_PARPARVM_BUILD=1 xvfb-run ./scripts/build-javascript-port-hellocodenameone.sh "${GITHUB_WORKSPACE}/hellocodenameone-javascript-port.zip"
       - uses: actions/upload-artifact@v4

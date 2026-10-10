@@ -1,0 +1,383 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <parent>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone</artifactId>
+        <version>8.0-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>codenameone-unity-compat</artifactId>
+    <version>8.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    <name>codenameone-unity-compat</name>
+    <description>
+        The runtime translated Unity 2D scripts run against: a small .NET base
+        library written in Java, the UnityEngine value types (C# in
+        src/main/csharp/UnityEngine.Values, translated to class files by
+        codenameone-cil-translator during this build) and the engine classes
+        behind the UnityEngine names, written over Codename One's game and
+        physics packages.
+
+        Building it needs the .NET SDK, to compile the C#. That is why this
+        module is only in the reactor under the unity-compat profile
+        (-Dunity-compat): the framework build itself never needs .NET. A
+        release turns the profile on and publishes it.
+    </description>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <!--
+            The javadoc tool compiles the sources it documents, and half of what
+            these name (UnityEngine.Vector2 and the other value types) exists
+            only as translated class files it is not shown.
+        -->
+        <maven.javadoc.skip>true</maven.javadoc.skip>
+        <!-- The .NET CLI. Override with -Ddotnet.executable=/path/to/dotnet. -->
+        <dotnet.executable>dotnet</dotnet.executable>
+        <unity.csharp.dir>${project.basedir}/src/main/csharp</unity.csharp.dir>
+        <unity.values.out>${unity.csharp.dir}/UnityEngine.Values/bin/Release/netstandard2.1</unity.values.out>
+    </properties>
+
+    <!--
+        The build is ordered by a cycle in the sources: the engine classes are
+        written against the value types (Vector2, Color, ...), the value types
+        are translated C#, and the translator checks every reference the C#
+        makes into the base library against that library's compiled classes.
+        So:
+
+          generate-sources    dotnet builds UnityEngine.csproj, and through its
+                              project reference UnityEngine.Values.csproj
+          process-sources     javac, the base library alone (unitycompat/system)
+          generate-resources  the translator turns the value assembly into
+                              class files, straight into target/classes
+          compile             javac, everything, with those classes in view
+    -->
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.0.0</version>
+                <executions>
+                    <execution>
+                        <id>dotnet-build</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>${dotnet.executable}</executable>
+                            <workingDirectory>${unity.csharp.dir}</workingDirectory>
+                            <environmentVariables>
+                                <DOTNET_CLI_TELEMETRY_OPTOUT>1</DOTNET_CLI_TELEMETRY_OPTOUT>
+                                <DOTNET_NOLOGO>1</DOTNET_NOLOGO>
+                            </environmentVariables>
+                            <arguments>
+                                <argument>build</argument>
+                                <argument>-c</argument>
+                                <argument>Release</argument>
+                                <argument>--nologo</argument>
+                                <argument>UnityEngine/UnityEngine.csproj</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>translate-values</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>com.codename1.cil.translate.Translator</mainClass>
+                            <includeProjectDependencies>false</includeProjectDependencies>
+                            <includePluginDependencies>true</includePluginDependencies>
+                            <arguments combine.self="override">
+                                <argument>--out</argument>
+                                <argument>${project.build.outputDirectory}</argument>
+                                <argument>--runtime</argument>
+                                <argument>${project.build.outputDirectory}</argument>
+                                <argument>--ref</argument>
+                                <argument>${unity.values.out}/netstandard-ref/netstandard.dll</argument>
+                                <argument>${unity.values.out}/Codename1.UnityValues.dll</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.codenameone</groupId>
+                        <artifactId>codenameone-cil-translator</artifactId>
+                        <version>${project.version}</version>
+                    </dependency>
+                </dependencies>
+            </plugin>
+            <!--
+                The assemblies an application's C# compiles against, as the
+                "references" classifier: the reference-only UnityEngine, the
+                value types, and the netstandard reference assembly the SDK
+                resolved for them. An application build has no checkout to
+                find them in, and resolves this artifact instead
+                (UnityProjectBuilder in build-engine).
+
+                A classifier and not resources of the main jar: the main jar
+                is merged into every application, and these are a megabyte
+                and a half that only a build reads.
+            -->
+            <plugin>
+                <artifactId>maven-resources-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>stage-reference-assemblies</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/unity-references</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${unity.csharp.dir}/UnityEngine/bin/Release/netstandard2.1</directory>
+                                    <includes>
+                                        <include>UnityEngine.dll</include>
+                                    </includes>
+                                    <filtering>false</filtering>
+                                </resource>
+                                <resource>
+                                    <directory>${unity.values.out}</directory>
+                                    <includes>
+                                        <include>Codename1.UnityValues.dll</include>
+                                    </includes>
+                                    <filtering>false</filtering>
+                                </resource>
+                                <resource>
+                                    <directory>${unity.values.out}/netstandard-ref</directory>
+                                    <includes>
+                                        <include>netstandard.dll</include>
+                                    </includes>
+                                    <filtering>false</filtering>
+                                </resource>
+                                <!--
+                                    netstandard.dll is Microsoft's, from the NuGet
+                                    package NETStandard.Library.Ref, under the MIT
+                                    license: a copy may be passed on as long as the
+                                    copyright and permission notice goes with it.
+                                    These are the package's own two files, verbatim.
+                                -->
+                                <resource>
+                                    <directory>${project.basedir}/third-party</directory>
+                                    <targetPath>META-INF/licenses</targetPath>
+                                    <includes>
+                                        <include>NETStandard.Library.Ref/LICENSE.TXT</include>
+                                        <include>NETStandard.Library.Ref/THIRD-PARTY-NOTICES.TXT</include>
+                                    </includes>
+                                    <filtering>false</filtering>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!--
+                The javadoc jar every published module has beside its jar and
+                its sources. This one cannot be generated (maven.javadoc.skip
+                above says why), so it holds a note saying so: a consumer or a
+                repository manager that asks for the classifier gets an answer
+                instead of a 404, and the module is staged with the same set
+                of files as its siblings.
+            -->
+            <plugin>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>javadoc-placeholder</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <mkdir dir="${project.build.directory}/javadoc-placeholder"/>
+                                <echo file="${project.build.directory}/javadoc-placeholder/README.txt">${project.artifactId} publishes no generated API documentation.
+
+Half of the types its sources name are translated from C# during the build and
+exist only as class files, which the javadoc tool cannot document. The sources
+jar beside this one carries the documentation comments of the classes written
+in Java.
+</echo>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>reference-assemblies</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                        <configuration>
+                            <classifier>references</classifier>
+                            <classesDirectory>${project.build.directory}/unity-references</classesDirectory>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>javadoc-placeholder</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                        <configuration>
+                            <classifier>javadoc</classifier>
+                            <classesDirectory>${project.build.directory}/javadoc-placeholder</classesDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>compile-base-library</id>
+                        <phase>process-sources</phase>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
+                        <configuration>
+                            <includes>
+                                <include>com/codename1/unitycompat/system/**</include>
+                            </includes>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!--
+                The static analysis gates the rest of the tree is held to, wired
+                the way maven/backend wires them, because this is a runtime
+                ParparVM translates too. SpotBugs has to come out empty; PMD
+                and Checkstyle use the core's own rulesets. SpotBugs and
+                Checkstyle fail `verify` themselves, PMD only writes
+                target/pmd.xml for .github/scripts/generate-quality-report.py,
+                which .github/workflows/unity-compat.yml runs over this module.
+
+                SpotBugs reads target/classes, which also holds the classes
+                translated from C# (the UnityEngine packages). They have no
+                Java source to fix, so spotbugs-exclude.xml leaves them out by
+                class name; PMD and Checkstyle read sources and never see them.
+            -->
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>4.7.3.4</version>
+                <configuration>
+                    <effort>Max</effort>
+                    <threshold>Low</threshold>
+                    <failOnError>true</failOnError>
+                    <xmlOutput>true</xmlOutput>
+                    <xmlOutputDirectory>${project.build.directory}</xmlOutputDirectory>
+                    <excludeFilterFile>${project.basedir}/spotbugs-exclude.xml</excludeFilterFile>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>spotbugs</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>spotbugs</goal>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-pmd-plugin</artifactId>
+                <version>3.21.0</version>
+                <configuration>
+                    <failOnViolation>false</failOnViolation>
+                    <printFailingErrors>false</printFailingErrors>
+                    <targetJdk>1.8</targetJdk>
+                    <rulesets>
+                        <ruleset>${project.basedir}/../core-unittests/pmd.xml</ruleset>
+                    </rulesets>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>pmd</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>pmd</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>3.3.0</version>
+                <configuration>
+                    <configLocation>${project.basedir}/../core-unittests/checkstyle.xml</configLocation>
+                    <encoding>${project.build.sourceEncoding}</encoding>
+                    <consoleOutput>false</consoleOutput>
+                    <failsOnError>false</failsOnError>
+                    <linkXRef>false</linkXRef>
+                    <includeTestSourceDirectory>false</includeTestSourceDirectory>
+                    <outputFile>${project.build.directory}/checkstyle-result.xml</outputFile>
+                    <outputFileFormat>xml</outputFileFormat>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>validate</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>checkstyle</goal>
+                        </goals>
+                    </execution>
+                    <!-- The goal above only writes the report; this one fails
+                         verify on any error, as maven/backend's does. -->
+                    <execution>
+                        <id>checkstyle-zero-errors</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <failOnViolation>true</failOnViolation>
+                            <violationSeverity>error</violationSeverity>
+                            <maxAllowedViolations>0</maxAllowedViolations>
+                            <logViolationsToConsole>true</logViolationsToConsole>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <!-- Reactor ordering only: the exec plugin above needs the translator
+             built first, and a plugin dependency does not order the reactor. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-cil-translator</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+            <optional>true</optional>
+        </dependency>
+    </dependencies>
+</project>

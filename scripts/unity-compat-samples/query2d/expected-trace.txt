@@ -1,0 +1,162 @@
+headless seed=3 frames=150 view=400x300 rate=60 scenes=1
+ray box Box d=300 p=300,275 n=-100,0 f=30
+ray disc Disc d=350 p=350,100 n=-100,0 f=0
+ray disc oblique Disc d=360 p=360,130 n=-80,60 f=0
+ray pill side Pill d=350 p=350,-100 n=-100,0 f=0
+ray pill cap Pill d=210 p=430,-10 n=60,80 f=21
+ray log Log d=192 p=-400,-42 n=-50,87 f=19
+ray ramp flat Ramp d=200 p=-200,-300 n=0,100 f=0
+ray ramp slope Ramp d=150 p=0,-250 n=-45,89 f=0
+ray ramp below Ramp d=200 p=0,-250 n=45,-89 f=0
+ray ell notch Ell d=200 p=-250,300 n=0,100 f=0
+ray ell arm Ell d=300 p=-300,350 n=100,0 f=0
+ray short none
+ray diagonal Disc d=354 p=350,100 n=-100,0 f=0
+ray empty misses, as bool false
+line Disc d=350 p=350,100 n=-100,0 f=50
+line short none
+line all 2 Zone@150 Box@300
+layers Walls=8 Props=10 Missing=-1 9=Sensors mask=768 walls=256
+mask int=256 sensors=512 default=-5
+trigger on Zone d=150 p=150,300 n=-100,0 f=0
+trigger masked Box d=300 p=300,300 n=-100,0 f=30
+trigger only Zone d=150 p=150,300 n=-100,0 f=15
+trigger off Box d=300 p=300,300 n=-100,0 f=0
+trigger off masked none
+all 2 Zone@150 Box@300
+all row 2 Log@113 Pill@950
+all row depth 1 Log@113
+nonalloc 2 Log@113 Pill@950
+filter 1 Box@300 filtering=True
+filter list 2 2 first=Zone
+inside Box d=0 p=400,300 n=-100,0 f=0
+inside off none
+inside off down Disc d=150 p=400,150 n=0,100 f=0
+circle box Box d=275 p=300,275 n=-100,0 f=28
+circle disc Disc d=320 p=360,130 n=-80,60 f=0
+circle corner Box d=260 p=300,350 n=-80,60 f=26
+circle ramp Ramp d=94 p=22,-239 n=-45,89 f=0
+circle miss none
+circle all 2 Zone@125 Box@275
+box box Box d=250 p=300,288 n=-100,0 f=25
+box turned Box d=229 p=300,275 n=-100,0 f=23
+box disc Disc d=300 p=350,100 n=-100,0 f=0
+box disc corner Disc d=310 p=360,130 n=-80,60 f=0
+box slope Ramp d=75 p=50,-225 n=-45,89 f=0
+box pill Pill d=282 p=350,-118 n=-100,0 f=0
+box inside Box d=0 p=350,300 n=-100,0 f=0
+box all 2 Zone@100 Box@250
+box nonalloc 2 Log@57 Pill@900
+capsule box Box d=250 p=300,288 n=-100,0 f=25
+capsule disc Disc d=250 p=350,100 n=-100,0 f=0
+point box Box
+point empty none
+point notch none
+point ell Ell
+point pill cap Pill
+point pill corner none
+point log Log
+point edge none
+circle Disc
+circle short none
+circle edge Ramp
+circle all 5 Pill Zone Ramp Disc Box
+circle all depth 4 Zone Ramp Disc Box
+circle all masked 2 Pill Zone
+circle nonalloc 5 Pill Zone Ramp Disc Box
+box Disc
+box short none
+box turned none
+box all 3 Pill Crate Ramp
+area Zone
+area all 3 Floor Ramp Box
+capsule Disc
+filter 1 Pill
+own point True False
+bounds pill 350,-200..450,0 ramp -300,-300..300,-200 log -493,-175..-307,-25 floor -600,-450..-200,-350
+find Menu/Panel/Button Menu/Panel/Button 12 Menu Menu/Panel none none none none TrueTrue
+children 3 Panel Button
+inactive 1 Panel 1 Button 1 none none Panel/Button
+inactive root none 0 Button
+outer starts frame=1
+inner a starts frame=1
+touch supported=True multi=True simulate=True count=0
+inner a waited frame=3
+deep a step=3 frame=4
+falling touching=False layers=False y=-294
+inner a ends frame=7
+outer after a frame=7
+empty frame=7
+outer after empty frame=7
+inner b starts frame=7
+inner b waited frame=8
+deep b step=7 frame=9
+input frame=10 touch=100,200
+stopping ticks=9
+frame 10 touches=1 [0 began 100,100 d=0,0 taps=1] array=1 mouse=down at 100,100 axis=0,0
+input frame=11 touch=110,200
+frame 11 touches=1 [0 moved 110,100 d=10,0 taps=1] array=1 mouse=held at 110,100 axis=500,0
+inner b ends frame=11
+outer ends frame=11
+input frame=12 touch=110,200;300,100
+frame 12 touches=2 [0 stationary 110,100 d=0,0 taps=1] [1 began 300,200 d=0,0 taps=1] array=2 mouse=held at 110,100 axis=0,0
+input frame=13 touch=120,210;300,100
+frame 13 touches=2 [0 moved 120,90 d=10,-10 taps=1] [1 stationary 300,200 d=0,0 taps=1] array=2 mouse=held at 120,90 axis=500,-500
+input frame=14 touch=120,210;310,90
+frame 14 touches=2 [0 stationary 120,90 d=0,0 taps=1] [1 moved 310,210 d=10,10 taps=1] array=2 mouse=held at 120,90 axis=0,0
+frame 15 touches=2 [0 stationary 120,90 d=0,0 taps=1] [1 stationary 310,210 d=0,0 taps=1] array=2 mouse=held at 120,90 axis=0,0
+input frame=16 touch=310,90
+frame 16 touches=2 [0 ended 120,90 d=0,0 taps=1] [1 stationary 310,210 d=0,0 taps=1] array=2 mouse=held at 310,210 axis=9500,6000
+frame 17 touches=1 [1 stationary 310,210 d=0,0 taps=1] array=1 mouse=held at 310,210 axis=0,0
+input frame=18 touch=none
+frame 18 touches=1 [1 ended 310,210 d=0,0 taps=1] array=1 mouse=up at 310,210 axis=0,0
+A coroutine of Probe ran 1000000 nested enumerators in one frame and none of them yielded; it goes on in the next frame.
+spin given up spins=1000000
+spin stopped spins=1000000
+input frame=30 touch=50,50
+input frame=30 touch=none
+frame 30 touches=1 [0 began 50,250 d=0,0 taps=1] array=1 mouse=down at 50,250 axis=0,0
+frame 31 touches=1 [0 ended 50,250 d=0,0 taps=1] array=1 mouse=none at 50,250 axis=0,0
+input frame=40 touch=200,150
+frame 40 touches=1 [0 began 200,150 d=0,0 taps=1] array=1 mouse=down at 200,150 axis=0,0
+frame 41 touches=1 [0 stationary 200,150 d=0,0 taps=1] array=1 mouse=held at 200,150 axis=0,0
+input frame=42 touch=none
+frame 42 touches=1 [0 ended 200,150 d=0,0 taps=1] array=1 mouse=up at 200,150 axis=0,0
+input frame=45 touch=202,151
+frame 45 touches=1 [0 began 202,149 d=0,0 taps=2] array=1 mouse=down at 202,149 axis=0,0
+frame 46 touches=1 [0 stationary 202,149 d=0,0 taps=2] array=1 mouse=held at 202,149 axis=0,0
+input frame=47 touch=none
+frame 47 touches=1 [0 ended 202,149 d=0,0 taps=2] array=1 mouse=up at 202,149 axis=0,0
+input frame=60 pointer=100,100 down
+frame 60 touches=0 array=0 mouse=down at 100,200 axis=0,0
+frame 60 objects=11 drawn=0
+input frame=61 pointer=120,90 move
+frame 61 touches=0 array=0 mouse=held at 120,210 axis=1000,500
+input frame=62 pointer=120,90 up
+frame 62 touches=0 array=0 mouse=up at 120,210 axis=0,0
+resting touching=True True layers=True props=False body=True True y=-298
+body cast up 2 Log@73 Ell@448
+body cast right 1 Ramp@50
+collider cast short 0
+body point True False
+moved stale Disc d=351 p=351,90 n=-98,-20 f=35
+moved synced Disc d=370 p=370,90 n=-60,80 f=37
+stopped ticks=9 fixed clock dt=200 unscaled=200 fixedUnscaled=200 ahead=TrueTrue
+fixed clock half dt=200 unscaled=400 fixedUnscaled=400
+update clock dt=83 unscaled=167 fixed=200 fixedUnscaled=400
+mouse emulation off
+input frame=105 touch=100,100
+frame 105 touches=1 [0 began 100,200 d=0,0 taps=1] array=1 mouse=none at 120,210 axis=0,0
+frame 106 touches=1 [0 stationary 100,200 d=0,0 taps=1] array=1 mouse=none at 120,210 axis=0,0
+input frame=107 touch=none
+frame 107 touches=1 [0 ended 100,200 d=0,0 taps=1] array=1 mouse=none at 120,210 axis=0,0
+multi touch off
+frame 120 objects=11 drawn=0
+input frame=135 touch=100,100;200,200
+frame 135 touches=1 [0 began 100,200 d=0,0 taps=1] array=1 mouse=none at 120,210 axis=0,0
+input frame=136 touch=105,100;200,210
+frame 136 touches=1 [0 moved 105,200 d=5,0 taps=1] array=1 mouse=none at 120,210 axis=0,0
+frame 137 touches=1 [0 stationary 105,200 d=0,0 taps=1] array=1 mouse=none at 120,210 axis=0,0
+input frame=138 touch=none
+frame 138 touches=1 [0 ended 105,200 d=0,0 taps=1] array=1 mouse=none at 120,210 axis=0,0
+frame 150 objects=11 drawn=0

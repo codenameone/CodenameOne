@@ -274,14 +274,28 @@ public class ChartComponent extends Component {
         boolean oldAntialias = g.isAntiAliased();
         g.setAntiAliased(true);
 
-        boolean transformed = false;
-        if (getTransform() != null) {
-            transformed = true;
+        // The transform the caller painted with is put back exactly as it was
+        // found, whether or not this component has one of its own. A chart
+        // turns the canvas for a rotated label and turns it back, and turning
+        // back is not exact: the angle is a float, so the round trip leaves a
+        // matrix that is the identity to fifteen digits and not to the
+        // sixteenth. Whatever is painted after the chart then runs under a
+        // transform that is no longer the identity, which a port may draw
+        // differently -- the JavaScript port draws text as DOM nodes only
+        // under the identity -- so a chart changed how the rest of its form
+        // was drawn. Asked for only where the platform has transforms: one
+        // that has none cannot be left with a residue either.
+        boolean transformed = getTransform() != null;
+        boolean restore = transformed || g.isTransformSupported();
+        if (restore) {
+            // One object for every paint. It is written here and read back at
+            // the end of this same call, and nothing in between is handed it.
             if (tmpTransform == null) {
                 tmpTransform = Transform.makeIdentity();
             }
             g.getTransform(tmpTransform);
-
+        }
+        if (transformed) {
             if (currentTransform == null) {
                 currentTransform = Transform.makeIdentity();
             } else {
@@ -301,13 +315,14 @@ public class ChartComponent extends Component {
         }
 
 
-        util.paintChart(g, chart, getBounds(), getAbsoluteX(), getAbsoluteY());
-
-        if (transformed) {
-            g.setTransform(tmpTransform);
+        try {
+            util.paintChart(g, chart, getBounds(), getAbsoluteX(), getAbsoluteY());
+        } finally {
+            if (restore) {
+                g.setTransform(tmpTransform);
+            }
+            g.setAntiAliased(oldAntialias);
         }
-
-        g.setAntiAliased(oldAntialias);
     }
 
     /// Converts screen coordinates to chart coordinates.

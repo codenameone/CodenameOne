@@ -1,0 +1,53 @@
+name: Unpack the Unity gallery prebuilt
+description: >-
+  Downloads the compiled Unity gallery that unity-gallery-prebuilt.yml uploaded
+  in this run and puts it where a build of scripts/hellocodenameone reads it,
+  so the job needs neither the .NET SDK nor the Unity modules.
+
+# scripts/hellocodenameone compiles a Unity project
+# (scripts/unity-compat-samples/gallery). Compiling it takes the .NET SDK and
+# the two Maven modules behind -Dunity-compat; one Linux job per workflow run
+# does that (.github/workflows/unity-gallery-prebuilt.yml) and every job that
+# builds the application uses this action instead.
+#
+# Where it goes in a job:
+#   - AFTER the checkout (the action is read from the workspace) and after
+#     anything that restores or installs the framework into the local Maven
+#     repository: a cache or a bundle restored later could put another
+#     codenameone-unity-compat jar back over the one unpacked here, and the
+#     compiled output is good only with the exact jars of the archive.
+#   - BEFORE the first Maven command that builds the application.
+#   - The job must `needs:` the job that calls unity-gallery-prebuilt.yml.
+#
+# A job that builds the application without it fails in compile-unity, asking
+# for the .NET SDK.
+
+inputs:
+  maven-repo-local:
+    description: The local Maven repository the job builds against. Empty for ~/.m2/repository.
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Download the Unity gallery prebuilt
+      uses: ./.github/actions/download-artifact-with-retry
+      with:
+        name: unity-gallery-prebuilt
+        path: ${{ runner.temp }}/unity-gallery-prebuilt
+
+    # bash on every runner, Git Bash on Windows: the script is bash. The
+    # archive is named through RUNNER_TEMP rather than the expression above so
+    # that a Windows path is never pasted into the script text, where its
+    # backslashes would be escapes.
+    - name: Unpack the Unity gallery prebuilt
+      shell: bash
+      env:
+        UNITY_GALLERY_MAVEN_REPO_LOCAL: ${{ inputs.maven-repo-local }}
+      run: |
+        set -euo pipefail
+        if [ -n "$UNITY_GALLERY_MAVEN_REPO_LOCAL" ]; then
+          export MAVEN_REPO_LOCAL="$UNITY_GALLERY_MAVEN_REPO_LOCAL"
+        fi
+        bash scripts/unity-gallery-prebuilt.sh unpack "$RUNNER_TEMP/unity-gallery-prebuilt/unity-gallery-prebuilt.tgz"

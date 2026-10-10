@@ -1,0 +1,59 @@
+host installed, keeper=false
+keeper awake host=True gauge=False
+keeper platform=IPhonePlayer mobile=True iphone=True editor=False best=41
+host told: awake
+headless seed=3 frames=130 view=400x300 rate=60 scenes=2
+marker start in First keeper=True total=5 keepers=1 frame 1
+marker coroutine from update end of frame began 1 resumed 1 again 2
+marker coroutine from start began 1 resumed 2 again 3
+marker coroutine from update began 1 resumed 2 again 3
+input frame=5 host=10
+keeper add 10 total=15 frame 5 in First
+host told: total 15
+host store best=42
+input frame=10 pointer=200,150 down
+Pad mouse down frame 10
+input frame=14 pointer=20,20 up
+Pad mouse up frame 14
+input frame=20 pointer=20,20 down
+input frame=22 pointer=20,20 up
+keeper tick 1 frame 30 in First since load 500 of 500
+keeper focus=False frame 39
+keeper pause=True frame 39
+input frame=40 app=pause
+keeper pause=False frame 43
+keeper focus=True frame 43
+input frame=44 app=resume
+input frame=50 key=110 down
+marker start in Second keeper=True total=15 keepers=1 frame 51
+input frame=52 key=110 up
+marker coroutine from update end of frame began 51 resumed 51 again 52
+marker coroutine from start began 51 resumed 52 again 53
+marker coroutine from update began 51 resumed 52 again 53
+frame 60 objects=3 Keeper=1 drawn=0
+keeper tick 2 frame 61 in Second since load 183 of 1017
+input frame=70 host=7
+keeper add 7 total=22 frame 70 in Second
+host told: total 22
+host store best=42
+input frame=80 pointer=200,150 down
+input frame=82 pointer=200,150 up
+input frame=90 key=110 down
+keeper: a second one in First removes itself
+marker start in First keeper=True total=22 keepers=2 frame 91
+input frame=92 key=110 up
+keeper tick 3 frame 92 in First since load 33 of 1533
+marker coroutine from update end of frame began 91 resumed 91 again 92
+marker coroutine from start began 91 resumed 92 again 93
+marker coroutine from update began 91 resumed 92 again 93
+input frame=100 pointer=200,150 down
+input frame=100 host=1
+keeper add 1 total=23 frame 100 in First
+host told: total 23
+host store best=42
+Pad mouse down frame 100
+input frame=103 pointer=200,150 up
+Pad mouse up frame 103
+frame 120 objects=5 Keeper=1 drawn=0
+keeper tick 4 frame 123 in First since load 550 of 2050
+frame 130 objects=5 Keeper=1 drawn=0

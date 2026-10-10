@@ -1,0 +1,53 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.unitycompat.system;
+
+/// An enum value held as an `object`: the number and the enum it is a
+/// value of. An enum that is stored or passed as itself is a bare integer;
+/// this exists only once C# boxes one -- into an `object`, a `params
+/// object[]`, a format argument -- so that the box prints as the member's
+/// name and equals only a box of the same enum, as on .NET.
+public final class EnumBox {
+    public final Type type;
+    public final long value;
+
+    EnumBox(Type type, long value) {
+        this.type = type;
+        this.value = value;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        return o instanceof EnumBox && ((EnumBox) o).type == type && ((EnumBox) o).value == value; // NOPMD CompareObjectsWithEquals
+    }
+
+    @Override
+    public int hashCode() {
+        return (int) (value ^ (value >>> 32));
+    }
+
+    @Override
+    public String toString() {
+        return type.nameOf(value);
+    }
+}

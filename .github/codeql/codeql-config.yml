@@ -16,3 +16,8 @@ paths-ignore:
   # casts -- so every program there must compile and behave exactly as javac's
   # output does; "fixing" what CodeQL flags would remove the case under test.
   - 'vm/JavaCompiler/tests/**'
+  # The JavaScript target's numeric differential fixture, for the same reason:
+  # it compares narrowing compound assignments, saturating casts and overflow
+  # against the JVM, and writing the casts out would change the bytecode shape
+  # (the DUP2 of a compound array store) that the comparison is there to cover.
+  - 'vm/tests/src/test/resources/com/codename1/tools/translator/JsNumericDifferentialApp.java'

@@ -1,0 +1,41 @@
+fileFormatVersion: 2
+guid: d1000000000000000000000000000001
+TextureImporter:
+  internalIDToNameTable: []
+  serializedVersion: 12
+  textureType: 8
+  spriteMode: 2
+  spritePixelsToUnits: 16
+  spritePivot: {x: 0.5, y: 0.5}
+  alignment: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: tiles_ground
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 0
+        width: 16
+        height: 16
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      internalID: 1001
+    - serializedVersion: 2
+      name: tiles_ledge
+      rect:
+        serializedVersion: 2
+        x: 16
+        y: 0
+        width: 16
+        height: 16
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      internalID: 1002
+    outline: []
+  userData:
+  assetBundleName:
+  assetBundleVariant:

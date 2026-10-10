@@ -15,7 +15,8 @@
 #
 # Jobs:
 #   prepare-suite (x64)            -> builds the plugin + hellocodenameone-common,
-#                                     uploads the suite + ads-mock classes
+#                                     uploads the suite classes and those of
+#                                     the libraries it ships (translation-libs)
 #   build-run (matrix x64 + arm64) -> core + Linux port, translate + build + run,
 #                                     uploads PNGs/arch
 #   compare-comment (ubuntu)       -> diffs each arch vs its in-repo baseline,
@@ -31,6 +32,16 @@ on:
     - cron: '45 1 * * *'
   pull_request:
     paths:
+      # The application these jobs build compiles a Unity project, from an
+      # archive that unity-gallery-prebuilt.yml makes out of these.
+      - 'scripts/unity-compat-samples/gallery/**'
+      - 'maven/cil-translator/**'
+      - 'maven/unity-compat/**'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
+      - 'scripts/unity-gallery-prebuilt.sh'
+      - '.github/workflows/unity-gallery-prebuilt.yml'
+      - '.github/actions/unity-gallery-prebuilt/**'
       - '.github/workflows/linux-build-run.yml'
       # The package install goes through these, and they run from this workflow
       # too -- a change to either must be exercised by the job that depends on
@@ -60,6 +71,16 @@ on:
   push:
     branches: [ master, main ]
     paths:
+      # The application these jobs build compiles a Unity project, from an
+      # archive that unity-gallery-prebuilt.yml makes out of these.
+      - 'scripts/unity-compat-samples/gallery/**'
+      - 'maven/cil-translator/**'
+      - 'maven/unity-compat/**'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
+      - 'scripts/unity-gallery-prebuilt.sh'
+      - '.github/workflows/unity-gallery-prebuilt.yml'
+      - '.github/actions/unity-gallery-prebuilt/**'
       - '.github/workflows/linux-build-run.yml'
       - 'scripts/ci/apt-get-install.sh'
       - 'scripts/ci/apt-get-update.sh'
@@ -88,11 +109,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The application has a Unity project in it. One Linux job compiles it and
+  # hands the result to the jobs below as an artifact; none of them installs
+  # the .NET SDK or builds the Unity modules.
+  unity-gallery:
+    uses: ./.github/workflows/unity-gallery-prebuilt.yml
+
   # Build the codenameone maven plugin (it needs CEF, which is x64-only on Linux)
-  # and the hellocodenameone screenshot suite, then publish the suite + ads-mock
-  # *.class. These are architecture-independent (they are translated to C later),
+  # and the hellocodenameone screenshot suite, then publish the suite *.class
+  # and the *.class of the libraries it ships (common/target/translation-libs:
+  # the mock ad provider, the Unity runtime). These are architecture-independent (they are translated to C later),
   # so both arch legs translate from these same classes.
   prepare-suite:
+    needs: unity-gallery
     name: build suite classes (x64)
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -130,6 +159,11 @@ jobs:
             mvn -B -pl codenameone-maven-plugin,cn1-ads-mock,backend,backend-test -am \
             -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
 
+      # After everything that fills the local Maven repository and before the
+      # application is built; this job has no .NET SDK (see the action).
+      - name: Unpack the Unity gallery prebuilt
+        uses: ./.github/actions/unity-gallery-prebuilt
+
       - name: Build hellocodenameone-common (JDK 17)
         run: |
           set -e
@@ -160,7 +194,7 @@ jobs:
           set -e
           tar czf suite-classes.tgz \
             scripts/hellocodenameone/common/target/classes \
-            maven/cn1-ads-mock/target/classes \
+            scripts/hellocodenameone/common/target/translation-libs \
             artifacts/cn1ss-server
       - name: Upload suite classes
         uses: actions/upload-artifact@v4

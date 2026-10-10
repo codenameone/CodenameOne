@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The UnityEngine value types: plain arithmetic with no engine behind it.
+    These are real implementations, written from the public scripting
+    documentation, and are translated to Java like any game script. That is
+    what gives them the struct protocol the translator expects without anyone
+    writing it out by hand.
+  -->
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>Codename1.UnityValues</AssemblyName>
+    <RootNamespace>UnityEngine</RootNamespace>
+    <Deterministic>true</Deterministic>
+    <DebugType>portable</DebugType>
+    <Optimize>true</Optimize>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+  </PropertyGroup>
+  <!--
+    The translator resolves the base library through netstandard.dll, which
+    lives wherever this machine's NuGet cache or SDK keeps it. Copying it next
+    to the output gives every consumer one path that does not depend on that.
+  -->
+  <Target Name="CopyNetStandardReference" AfterTargets="Build">
+    <Copy SourceFiles="@(ReferencePath)" Condition="'%(Filename)%(Extension)' == 'netstandard.dll'"
+          DestinationFolder="$(OutDir)netstandard-ref" SkipUnchangedFiles="true" />
+  </Target>
+</Project>
