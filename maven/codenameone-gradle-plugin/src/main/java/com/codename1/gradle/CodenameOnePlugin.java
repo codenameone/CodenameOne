@@ -23,10 +23,14 @@
 package com.codename1.gradle;
 
 import org.gradle.api.GradleException;
+import org.gradle.api.flow.FlowProviders;
+import org.gradle.api.flow.FlowScope;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
 import org.gradle.api.initialization.Settings;
 import org.gradle.util.GradleVersion;
+
+import javax.inject.Inject;
 
 /// The `com.codenameone` Gradle plugin.
 ///
@@ -44,7 +48,7 @@ import org.gradle.util.GradleVersion;
 ///
 /// The work itself is the build engine the Maven plugin also runs, so the same
 /// application builds the same way under either tool.
-public class CodenameOnePlugin implements Plugin<Object> {
+public abstract class CodenameOnePlugin implements Plugin<Object> {
     /// The oldest Gradle the plugin supports.
     static final String MINIMUM_GRADLE = "8.5";
 
@@ -57,6 +61,7 @@ public class CodenameOnePlugin implements Plugin<Object> {
         }
         if (target instanceof Settings) {
             SettingsSupport.apply((Settings) target);
+            FirstBuildTelemetryAction.register((Settings) target, getFlowScope(), getFlowProviders());
         } else if (target instanceof Project) {
             ProjectSupport.apply((Project) target);
         } else {
@@ -64,4 +69,12 @@ public class CodenameOnePlugin implements Plugin<Object> {
                     + "project's build.gradle.kts, not to " + target);
         }
     }
+
+    /// Injected by Gradle: how the settings plugin learns that the build ended, for
+    /// [FirstBuildTelemetryAction]. Only used when applied to settings.
+    @Inject
+    protected abstract FlowScope getFlowScope();
+
+    @Inject
+    protected abstract FlowProviders getFlowProviders();
 }

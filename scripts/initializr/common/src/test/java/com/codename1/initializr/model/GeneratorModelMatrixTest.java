@@ -186,6 +186,20 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 label + "settings.gradle.kts should name the project like the Maven artifactId");
         assertContains(getText(entries, "gradle.properties"), "org.gradle.configuration-cache=true",
                 label + "gradle.properties should come from the shared template");
+        // Gradle builds -- from the IDE or ./gradlew -- report through the plugin's
+        // settings half; a backend-only project has no client build to report.
+        String gradleProperties = getText(entries, "gradle.properties");
+        if (type == ProjectOptions.ProjectType.BACKEND_ONLY) {
+            assertFalse(gradleProperties.indexOf("cn1.telemetry.") >= 0,
+                    label + "a backend-only project does not report builds");
+        } else {
+            assertContains(gradleProperties, "cn1.telemetry.project=" + Sha256.hex(packageName) + "\n",
+                    label + "gradle.properties should opt in with the hashed package");
+            assertContains(gradleProperties, "cn1.telemetry.events=" + GeneratorModel.LAUNCHER_EVENTS_URL + "\n",
+                    label + "gradle.properties should name the events URL");
+            assertContains(getText(entries, "README.md"), "## Build progress reporting",
+                    label + "README should explain the reporting");
+        }
         String gitIgnore = getText(entries, ".gitignore");
         assertContains(gitIgnore, ".gradle/", label + ".gitignore should ignore the Gradle cache");
         assertContains(gitIgnore, "build/", label + ".gitignore should ignore build outputs");
@@ -1084,8 +1098,26 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 assertFalse(text.indexOf(packageName) >= 0, label + "a launcher must never carry the package name");
                 assertFalse(text.indexOf("__CN1_") >= 0, label + "a launcher still has a template token");
             }
+            assertContains(sh, "export CN1_LAUNCHER=1", label + "build.sh should tell Maven it reports the build");
+            assertContains(bat, "set \"CN1_LAUNCHER=1\"", label + "build.bat should tell Maven it reports the build");
+
+            // Builds the launchers never see -- the IDE's run configurations, mvn by
+            // hand -- report through the Codename One Maven plugin, which needs the
+            // opt-in properties and to be loaded as a build extension.
+            String pom = getText(entries, "pom.xml");
+            assertContains(pom, "<cn1.telemetry.project>" + id + "</cn1.telemetry.project>",
+                    label + "pom.xml should opt IDE builds in with the hashed package");
+            assertContains(pom, "<cn1.telemetry.events>" + GeneratorModel.LAUNCHER_EVENTS_URL + "</cn1.telemetry.events>",
+                    label + "pom.xml should name the events URL");
+            assertContains(pom, "<version>${cn1.plugin.version}</version>\n        <extensions>true</extensions>",
+                    label + "pom.xml should load the plugin as a build extension");
+            assertFalse(pom.indexOf("<cn1.telemetry.project>" + packageName) >= 0,
+                    label + "pom.xml must report the hash, never the package");
+
             String readme = getText(entries, "README.md");
             assertContains(readme, "## Build progress reporting", label + "README should explain the reporting");
+            assertContains(readme, "when your IDE runs the build", label + "README should say IDE builds report");
+            assertContains(readme, "cn1.telemetry.project", label + "README should say how to remove the opt-in");
             assertContains(readme, "CN1_TELEMETRY=0", label + "README should give the opt-out");
             // `set` in PowerShell does not reach build.bat's environment.
             assertContains(readme, "$Env:CN1_TELEMETRY = \"0\"", label + "README should give the PowerShell opt-out");
@@ -1095,6 +1127,9 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         // The injection is anchored on the archetype's launcher lines; a launcher of
         // another shape is shipped untouched, never half-patched.
         GeneratorModel model = GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, "A", "com.acme.a");
+        assertEqual("<project/>", model.withIdeBuildReporting("<project/>"), "An unknown pom.xml is left alone");
+        assertContains(model.withIdeBuildReportingGradle("org.gradle.caching=true\n"),
+                "\ncn1.telemetry.project=" + Sha256.hex("com.acme.a") + "\n", "gradle.properties opts in");
         assertEqual("#!/bin/bash\necho hi\n", model.withShellTelemetry("#!/bin/bash\necho hi\n"),
                 "An unknown build.sh is left alone");
         assertEqual("@echo off\r\ngoto %CMD%\r\n", model.withBatchTelemetry("@echo off\r\ngoto %CMD%\r\n"),
