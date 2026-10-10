@@ -175,17 +175,41 @@ public class ParentPeer extends Container implements FxPeer {
         childClipY = g.getClipY() - getY();
         childClipW = g.getClipWidth();
         childClipH = g.getClipHeight();
+        int bx = g.getClipX();
+        int by = g.getClipY();
+        int bw = g.getClipWidth();
+        int bh = g.getClipHeight();
         Transform saved = PeerPaint.push(g, node, m, getX(), getY());
+        // Codename One paints a child only where its bounds meet the clip,
+        // and compares the two as numbers. Under a matrix, on a port whose
+        // clip stays in the coordinates of the screen, those numbers are in
+        // two different spaces: a child drawn well inside the window was
+        // found outside the clip and never painted. The clip handed down
+        // is therefore widened to hold every child, here and in each
+        // parent below while the matrix is in force, and put back after.
+        // Each child is still clipped to its own bounds when it paints.
+        boolean screen = PeerPaint.underScreenClip()
+                || (saved != null && PeerPaint.clipStaysOnScreen(g, saved, bx, by, bw, bh));
+        if (screen) {
+            PeerPaint.includeChildren(g, this);
+            PeerPaint.screenClip(1);
+        }
         painting++;
-        super.paint(g);
-        painting--;
+        try {
+            super.paint(g);
+        } finally {
+            painting--;
+            if (screen) {
+                PeerPaint.screenClip(-1);
+            }
+        }
         if (saved != null) {
             PeerPaint.setDeviceTransform(g, saved);
         }
         if (clipped) {
             g.popClip();
         }
-        if (widened) {
+        if (widened || screen) {
             g.setClip(cx, cy, cw, ch);
         }
         g.setAlpha(old);

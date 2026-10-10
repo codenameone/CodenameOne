@@ -661,8 +661,191 @@ public class HeadlessImplementation extends CodenameOneImplementation {
     public void clipRect(java.lang.Object a0, int a1, int a2, int a3, int a4) {
         int x2 = Math.min(clipX + clipW, a1 + a3);
         int y2 = Math.min(clipY + clipH, a2 + a4);
+    /// When set, the implementation is a port with affine transforms whose
+    /// clip stays in the coordinates of the screen, which is how the native
+    /// Linux port behaves: `setClip` and the clip getters carry the same
+    /// numbers whatever matrix is installed, and `clipRect` under a matrix
+    /// REPLACES the clip with the bounds of the transformed rectangle. Wants
+    /// [#trackClip]. What is drawn is clipped but not moved by the matrix:
+    /// the mode is for testing what gets painted, not where it lands.
+    public static boolean screenSpaceClip;
+    private static double[] matrix = {1, 0, 0, 1, 0, 0};
+
+    /// Where a point handed to the port lands on the screen under the
+    /// matrix installed now, in [#screenSpaceClip] mode.
+    public static double[] onScreen(double x, double y) {
+        double[] m = matrix;
+        return new double[] {m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]};
+    }
+
+    private static double[] affine(Object nativeTransform) {
+        return (double[]) nativeTransform;
+    }
+
+    private static boolean plain(double[] m) {
+        return m[0] == 1 && m[1] == 0 && m[2] == 0 && m[3] == 1 && m[4] == 0 && m[5] == 0;
+    }
+
+    @Override
+    public boolean isTransformSupported() {
+        return screenSpaceClip;
+    }
+
+    @Override
+    public boolean isTransformSupported(Object graphics) {
+        return screenSpaceClip;
+    }
+
+    @Override
+    public Object makeTransformIdentity() {
+        return new double[] {1, 0, 0, 1, 0, 0};
+    }
+
+    @Override
+    public void setTransformIdentity(Object t) {
+        setTransformAffine(t, 1, 0, 0, 1, 0, 0);
+    }
+
+    @Override
+    public Object makeTransformAffine(double m00, double m10, double m01, double m11, double m02, double m12) {
+        return new double[] {m00, m10, m01, m11, m02, m12};
+    }
+
+    @Override
+    public void setTransformAffine(Object t, double m00, double m10, double m01, double m11, double m02,
+                                   double m12) {
+        double[] m = affine(t);
+        m[0] = m00;
+        m[1] = m10;
+        m[2] = m01;
+        m[3] = m11;
+        m[4] = m02;
+        m[5] = m12;
+    }
+
+    @Override
+    public Object makeTransformTranslation(float x, float y, float z) {
+        return new double[] {1, 0, 0, 1, x, y};
+    }
+
+    @Override
+    public void setTransformTranslation(Object t, float x, float y, float z) {
+        setTransformAffine(t, 1, 0, 0, 1, x, y);
+    }
+
+    @Override
+    public Object makeTransformScale(float x, float y, float z) {
+        return new double[] {x, 0, 0, y, 0, 0};
+    }
+
+    @Override
+    public void setTransformScale(Object t, float x, float y, float z) {
+        setTransformAffine(t, x, 0, 0, y, 0, 0);
+    }
+
+    @Override
+    public void transformTranslate(Object t, float x, float y, float z) {
+        concatenateTransform(t, new double[] {1, 0, 0, 1, x, y});
+    }
+
+    @Override
+    public void transformScale(Object t, float x, float y, float z) {
+        concatenateTransform(t, new double[] {x, 0, 0, y, 0, 0});
+    }
+
+    @Override
+    public Object makeTransformInverse(Object t) {
+        double[] m = affine(t);
+        double det = m[0] * m[3] - m[1] * m[2];
+        if (det == 0) {
+            return null;
+        }
+        return new double[] {m[3] / det, -m[1] / det, -m[2] / det, m[0] / det,
+            (m[2] * m[5] - m[3] * m[4]) / det, (m[1] * m[4] - m[0] * m[5]) / det};
+    }
+
+    @Override
+    public void setTransformInverse(Object t) throws com.codename1.ui.Transform.NotInvertibleException {
+        Object inverse = makeTransformInverse(t);
+        if (inverse == null) {
+            throw new com.codename1.ui.Transform.NotInvertibleException();
+        }
+        copyTransform(inverse, t);
+    }
+
+    @Override
+    public void copyTransform(Object src, Object dest) {
+        System.arraycopy(affine(src), 0, affine(dest), 0, 6);
+    }
+
+    @Override
+    public void concatenateTransform(Object t1, Object t2) {
+        double[] a = affine(t1);
+        double[] b = affine(t2);
+        setTransformAffine(t1, a[0] * b[0] + a[2] * b[1], a[1] * b[0] + a[3] * b[1],
+                a[0] * b[2] + a[2] * b[3], a[1] * b[2] + a[3] * b[3],
+                a[0] * b[4] + a[2] * b[5] + a[4], a[1] * b[4] + a[3] * b[5] + a[5]);
+    }
+
+    @Override
+    public boolean transformNativeEqualsImpl(Object t1, Object t2) {
+        return t1 != null && t2 != null && java.util.Arrays.equals(affine(t1), affine(t2));
+    }
+
+    @Override
+    public void transformPoint(Object t, float[] in, float[] out) {
+        double[] m = affine(t);
+        float x = in[0];
+        float y = in[1];
+        out[0] = (float) (m[0] * x + m[2] * y + m[4]);
+        out[1] = (float) (m[1] * x + m[3] * y + m[5]);
+    }
+
+    @Override
+    public void setTransform(Object graphics, com.codename1.ui.Transform transform) {
+        if (transform == null) {
+            matrix = new double[] {1, 0, 0, 1, 0, 0};
+        } else {
+            matrix = affine(transform.getNativeTransform()).clone();
+        }
+    }
+
+    @Override
+    public com.codename1.ui.Transform getTransform(Object graphics) {
+        double[] m = screenSpaceClip ? matrix : new double[] {1, 0, 0, 1, 0, 0};
+        return com.codename1.ui.Transform.makeAffine(m[0], m[1], m[2], m[3], m[4], m[5]);
+    }
+
+    @Override
+    public void getTransform(Object graphics, com.codename1.ui.Transform t) {
+        t.setTransform(getTransform(graphics));
+    }
+
         clipX = Math.max(clipX, a1);
         clipY = Math.max(clipY, a2);
+        if (screenSpaceClip && !plain(matrix)) {
+            double[] m = matrix;
+            double minX = Double.MAX_VALUE;
+            double minY = Double.MAX_VALUE;
+            double maxX = -Double.MAX_VALUE;
+            double maxY = -Double.MAX_VALUE;
+            for (int i = 0; i < 4; i++) {
+                double x = a1 + ((i & 1) == 0 ? 0 : a3);
+                double y = a2 + ((i & 2) == 0 ? 0 : a4);
+                double sx = m[0] * x + m[2] * y + m[4];
+                double sy = m[1] * x + m[3] * y + m[5];
+                minX = Math.min(minX, sx);
+                minY = Math.min(minY, sy);
+                maxX = Math.max(maxX, sx);
+                maxY = Math.max(maxY, sy);
+            }
+            clipX = (int) Math.floor(minX);
+            clipY = (int) Math.floor(minY);
+            clipW = (int) Math.ceil(maxX) - clipX;
+            clipH = (int) Math.ceil(maxY) - clipY;
+            shapeClip = null;
+            return;
+        }
         clipW = Math.max(0, x2 - clipX);
         clipH = Math.max(0, y2 - clipY);
         shapeClip = null;
@@ -677,7 +860,13 @@ public class HeadlessImplementation extends CodenameOneImplementation {
     public void setClip(java.lang.Object graphics, com.codename1.ui.geom.Shape shape) {
         if (trackClip) {
             com.codename1.ui.geom.Rectangle b = shape.getBounds();
-            setClip(graphics, b.getX(), b.getY(), b.getWidth(), b.getHeight());
+            if (screenSpaceClip && !plain(matrix)) {
+                // The native Linux port: the shape goes through the matrix
+                // and its bounds on the screen become the clip.
+                clipRect(graphics, b.getX(), b.getY(), b.getWidth(), b.getHeight());
+            } else {
+                setClip(graphics, b.getX(), b.getY(), b.getWidth(), b.getHeight());
+            }
             shapeClip = shape;
         }
     }

@@ -134,6 +134,89 @@ public final class PeerPaint {
         }
     }
 
+    /// Whether the port keeps its clip in the coordinates of the screen
+    /// while a matrix is installed, asked right after one was: `before` is
+    /// the transform that was replaced and the rectangle is the clip read
+    /// under it.
+    ///
+    /// A port either answers the clip in the coordinates drawing is given
+    /// in, so that the numbers change with the matrix, or in those of the
+    /// screen, so that they do not. Only the second kind needs
+    /// [#includeChildren]; widening on the first would let what is inside a
+    /// viewport paint outside it. Unchanged numbers under a matrix that
+    /// moves the rectangle are what tells the two apart, and a matrix that
+    /// leaves the rectangle where it was needs nothing on either.
+    static boolean clipStaysOnScreen(Graphics g, Transform before, int x, int y, int w, int h) {
+        if (w <= 0 || h <= 0 || g.getClipX() != x || g.getClipY() != y || g.getClipWidth() != w
+                || g.getClipHeight() != h) {
+            return false;
+        }
+        Transform now = g.getTransform();
+        int ox = g.getTranslateX() + x;
+        int oy = g.getTranslateY() + y;
+        float[] in = new float[2];
+        float[] a = new float[2];
+        float[] b = new float[2];
+        for (int i = 0; i < 4; i++) {
+            in[0] = ox + ((i & 1) == 0 ? 0 : w);
+            in[1] = oy + ((i & 2) == 0 ? 0 : h);
+            before.transformPoint(in, a);
+            now.transformPoint(in, b);
+            if (Math.abs(a[0] - b[0]) > 1 || Math.abs(a[1] - b[1]) > 1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// How many parents are painting their children under a matrix on a
+    /// port that keeps its clip in the coordinates of the screen. Painting
+    /// is on one thread.
+    private static int screenClipDepth;
+
+    /// Whether a parent further up is painting under such a matrix: the
+    /// parents below it widen their clip as well, since theirs is in the
+    /// same two spaces.
+    static boolean underScreenClip() {
+        return screenClipDepth > 0;
+    }
+
+    /// Whether this graphics is one that such a parent is painting on, with
+    /// a matrix installed: a clip read from it is not in the coordinates
+    /// drawing is given in. An image painted on in the meantime, with no
+    /// matrix of its own, is not.
+    static boolean screenClipUnderMatrix(Graphics g) {
+        return screenClipDepth > 0 && g.isTransformSupported() && !g.getTransform().isIdentity();
+    }
+
+    /// Enters (1) or leaves (-1) a parent that widened its clip.
+    static void screenClip(int by) {
+        screenClipDepth += by;
+    }
+
+    /// Widens the clip to hold every child of a peer about to paint them;
+    /// the caller restores the clip afterwards. See [#clipStaysOnScreen].
+    static void includeChildren(Graphics g, com.codename1.ui.Container peer) {
+        int x1 = g.getClipX();
+        int y1 = g.getClipY();
+        int x2 = x1 + g.getClipWidth();
+        int y2 = y1 + g.getClipHeight();
+        if (x2 <= x1 || y2 <= y1) {
+            return;
+        }
+        int ox = peer.getX() - peer.getScrollX();
+        int oy = peer.getY() - peer.getScrollY();
+        int n = peer.getComponentCount();
+        for (int i = 0; i < n; i++) {
+            Component c = peer.getComponentAt(i);
+            x1 = Math.min(x1, ox + c.getX());
+            y1 = Math.min(y1, oy + c.getY());
+            x2 = Math.max(x2, ox + c.getX() + c.getWidth());
+            y2 = Math.max(y2, oy + c.getY() + c.getHeight());
+        }
+        g.setClip(x1, y1, x2 - x1, y2 - y1);
+    }
+
     /// Installs a node's matrix on the graphics for a peer at a position;
     /// answers the transform to restore, or `null` when nothing was done.
     static Transform push(Graphics g, Node node, double[] m, int x, int y) {
