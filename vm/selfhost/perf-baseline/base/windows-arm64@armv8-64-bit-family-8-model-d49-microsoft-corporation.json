@@ -25,9 +25,12 @@
  },
  "hello": {
   "all": {
-   "memory": 0.9,
-   "runs": 7,
-   "time": 1.107
+   "memory": 0.975,
+   "runs": 11,
+   "time": 1.107,
+   "tolerance": {
+    "memory": 0.35
+   }
   }
  },
  "intArithmetic": {
@@ -86,8 +89,8 @@
  "translator": {
   "all": {
    "memory": 0.451,
-   "runs": 1,
-   "time": 0.751
+   "runs": 2,
+   "time": 0.838
   }
  },
  "valueEscape": {

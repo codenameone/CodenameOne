@@ -99,7 +99,7 @@ public class NativePickerStrings extends NativePicker {
                                 lock.notify();
                             }
                         }
-                    });
+                    }).start();
                 }
             }
             
@@ -310,6 +310,16 @@ public class NativePickerStrings extends NativePicker {
         }
         source.getParent().revalidate();
         el.focus();
+        // Focusing alone leaves the list closed, and the user who has just clicked the picker
+        // would have to click again. The click that brought us here is still a live user
+        // gesture on the page, which is what showPicker() asks for. A browser without the
+        // method, or one that judges the gesture spent, throws; the focused select is then
+        // what it always was, one more click away from opening.
+        try {
+            selectEl.showPicker();
+        } catch (Throwable t) {
+            // Left focused; see above.
+        }
         
         
         invokeAndBlock(new Runnable() {
@@ -328,7 +338,8 @@ public class NativePickerStrings extends NativePicker {
         uninstallListeners(form);
         
         int selectedIndex = selectEl.getSelectedIndex();
-        String value = cancelled && selectedIndex >= 0 ? null : selectEl.getOptions().item(selectedIndex).getText();
+        // No selection is a cancel too: an empty list has nothing at index -1 to read.
+        String value = cancelled || selectedIndex < 0 ? null : selectEl.getOptions().item(selectedIndex).getText();
         document.getBody().removeChild(el);
         if (source instanceof Picker) {
             SpinnerAccessor.setSuppressPaint((Picker)source, false);

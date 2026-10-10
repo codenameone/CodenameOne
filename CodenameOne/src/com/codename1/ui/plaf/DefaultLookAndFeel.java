@@ -724,7 +724,10 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             comboImageWidth = style.getFont().getHeight();
         }
 
-        int cellX = cb.getX() + style.getPaddingTop();
+        // The side padding, which leftPadding already holds mirrored. This read the TOP
+        // padding, so the value sat at the right inset only in a theme whose combo is
+        // padded the same all round.
+        int cellX = cb.getX() + leftPadding;
         if (cb.isRTL()) {
             cellX += comboImageWidth;
         }

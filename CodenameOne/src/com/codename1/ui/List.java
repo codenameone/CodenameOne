@@ -171,6 +171,12 @@ public class List<T> extends Component implements ActionSource {
     Object eventSource = this;
     /// Used internally by the combo box
     boolean disposeDialogOnSelection;
+    /// Set once this list, as the popup of a `ComboBox`, has reported a choice. The combo
+    /// reads it to tell a popup that closed on a choice from one that just went away.
+    boolean popupSelectionFired;
+    /// Set on the popup list of a `ComboBox` on a desktop: the list owns the keyboard for
+    /// as long as the popup is up and cannot be talked out of it. See `#setHandlesInput(boolean)`.
+    boolean popupKeepsInput;
     /// #### See also
     ///
     /// - #setRenderingPrototype
@@ -329,7 +335,17 @@ public class List<T> extends Component implements ActionSource {
         if (isScrollable() && isInitialized() && scrollToSelected) {
             int index = model.getSelectedIndex();
             if (index >= 0) {
-                selectElement(index);
+                if (disposeDialogOnSelection && isSmoothScrolling() && Display.getInstance().isDesktop()) {
+                    // A capped combo popup opens AT its current value. Smooth scrolling
+                    // would open it on the first rows and then run the list down to the
+                    // value while the user is already reaching for it. Desktop only,
+                    // like the cap that makes it matter: a touch popup keeps its motion.
+                    setSmoothScrolling(false);
+                    selectElement(index);
+                    setSmoothScrolling(true);
+                } else {
+                    selectElement(index);
+                }
             }
         }
     }
@@ -964,6 +980,16 @@ public class List<T> extends Component implements ActionSource {
     /// {@inheritDoc}
     @Override
     public void setHandlesInput(boolean b) {
+        if (popupKeepsInput) {
+            // Input mode is how a list on a form shares the arrow keys with focus
+            // traversal: Fire takes them, Fire or a sideways arrow or running off either
+            // end gives them back. In a combo popup on a desktop there is nothing to
+            // share them with. Every one of those hand-backs left the popup deaf to the
+            // arrows, and the next Enter then only switched input mode back on instead
+            // of choosing the row.
+            super.setHandlesInput(true);
+            return;
+        }
         TopLevelContainer f = getTopLevelContainer();
         if (f != null) {
             // prevent the list from losing focus if its the only element
@@ -1664,6 +1690,7 @@ public class List<T> extends Component implements ActionSource {
     protected void fireActionEvent(ActionEvent a) {
         if (isEnabled() && !Display.getInstance().hasDragOccured()) {
             if (disposeDialogOnSelection) {
+                popupSelectionFired = true;
                 // The enclosing Dialog, found the same way an activated command finds
                 // who owns it. getComponentForm() used to be enough because a Dialog
                 // always was the current form; a Dialog hosted in a Window is a
@@ -1926,9 +1953,39 @@ public class List<T> extends Component implements ActionSource {
         super.pointerPressed(x, y);
     }
 
-    /// {@inheritDoc}
+    /// Highlights the row under the pointer, in the popup of a `ComboBox` and nowhere else.
+    ///
+    /// The highlight is the model's selection, because that is the only thing a list
+    /// paints as highlighted and the thing Enter and a click then act on. In a combo popup
+    /// that is safe: the selection there is provisional until a row is chosen, and
+    /// `ComboBox#fireClicked()` puts the original one back whenever the popup goes away
+    /// without a choice. It is what every desktop toolkit does with a drop down.
+    ///
+    /// A list sitting on a form is deliberately left alone. Its selection is state: the
+    /// application reads it, listens to it and often loads a detail view from it, and
+    /// nothing would restore it afterwards. Moving it because the mouse crossed the list
+    /// on its way somewhere else would be a change the user never asked for.
+    ///
+    /// A list with a fixed selection (the spinner arrangement) is skipped as well: there
+    /// the selected row is a position on screen that the rows move through, so it cannot
+    /// follow the pointer. No scrolling goes with the highlight -- a half visible row at
+    /// the edge would otherwise pull the list along under a pointer that is standing still.
     @Override
     public void pointerHover(int[] x, int[] y) {
+        if (!disposeDialogOnSelection || !isEnabled() || x == null || y == null
+                || x.length == 0 || y.length == 0) {
+            return;
+        }
+        if (fixedSelection > FIXED_NONE_BOUNDRY || isDragActivated() || Display.impl.isScrollWheeling()) {
+            return;
+        }
+        if (!contains(x[0], y[0])) {
+            return;
+        }
+        int row = pointerSelect(x[0], y[0]);
+        if (row > -1 && row != model.getSelectedIndex()) {
+            model.setSelectedIndex(row);
+        }
     }
 
     /// {@inheritDoc}
@@ -2180,6 +2237,42 @@ public class List<T> extends Component implements ActionSource {
 
         }
         return d;
+    }
+
+    /// The scrollable extent is what the model holds, not what the list asks its parent for.
+    ///
+    /// The inherited implementation answers `calcPreferredSize()`, and for a list those two
+    /// are different questions: the preferred size is how much room the list would like on
+    /// screen, and it is routinely capped -- by `setMaxElementHeight(int)`, or by a subclass
+    /// that limits its preferred height so a long list does not swallow the form. A capped
+    /// preferred size used to cap the scroll size with it, the list was then laid out at
+    /// exactly its "scroll" height, `isScrollableY()` answered false, and neither the wheel
+    /// nor a drag could reach the rows below the cap. Nothing reported it.
+    ///
+    /// So the scrolling axis is measured from the rows themselves, with the same arithmetic
+    /// the look and feel uses for an uncapped list. The preferred size still wins when it is
+    /// the larger of the two, which keeps the minimum element count, the hint label and the
+    /// spinner overlay minimums exactly as they were. A combo box face is not a scrolling
+    /// list at all and keeps the inherited answer.
+    @Override
+    protected Dimension calcScrollSize() {
+        Dimension pref = calcPreferredSize();
+        int count = model.getSize();
+        int o = getOrientation();
+        if (count == 0 || (o != VERTICAL && o != HORIZONTAL)) {
+            return pref;
+        }
+        Dimension unselected = getElementSize(false, true);
+        Dimension selected = getElementSize(true, true);
+        Style style = getStyle();
+        if (o == VERTICAL) {
+            int content = selected.getHeight() + (unselected.getHeight() + itemGap) * (count - 1)
+                    + style.getVerticalPadding();
+            return new Dimension(pref.getWidth(), Math.max(pref.getHeight(), content));
+        }
+        int content = selected.getWidth() + (unselected.getWidth() + itemGap) * (count - 1)
+                + style.getHorizontalPadding();
+        return new Dimension(Math.max(pref.getWidth(), content), pref.getHeight());
     }
 
     /// Allows adding an element to a list if the underlying model supports this, notice that

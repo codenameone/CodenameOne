@@ -128,6 +128,12 @@ It must also have been defined as a background image in some selector in this CS
 
 The `Default` selector is special in that it will set properties on the theme's "default" element. The default element is a special UIID in Codename One from which all other UIIDs in the same theme are derived. This is a good place to set things like default fonts or background-colors.
 
+A UIID takes a property from `Default` only when no rule sets that property for the UIID itself. That includes the rules of the native theme the app builds on, so `Default` doesn't override a native `Button` or `TextField`. It fills in the UIIDs that nothing else styles, which are mostly the ones you create.
+
+Backgrounds follow the same rule, and the native theme decides what an unstyled UIID looks like. `Container` is always transparent with no padding or margin, but a UIID of your own that sets no background can paint an opaque one under some themes. If such a UIID shows a band of color over its parent, give it `background-color: transparent`, or set that on `Default` to cover every UIID you leave unstyled.
+
+The universal selector `*` isn't supported. The compiler ignores its declarations and prints a warning. Use `Default` instead.
+
 === Standard CSS properties
 
 * `padding` (and variants)

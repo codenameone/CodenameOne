@@ -88,13 +88,15 @@ public final class MigrationEngine {
         List<MigrationEntry> chosen = new ArrayList<MigrationEntry>();
         boolean[] seen = new boolean[all.length];
         for (int i = 0; i < all.length; i++) {
-            if (seen[i] || (all[i].version() == null) != repeatable) {
+            boolean entryRepeatable = all[i].version() == null;
+            if (seen[i] || entryRepeatable != repeatable) {
                 continue;
             }
             MigrationEntry common = null;
             MigrationEntry specific = null;
             for (int j = i; j < all.length; j++) {
-                if (seen[j] || (all[j].version() == null) != repeatable || !same(all[i], all[j])) {
+                boolean candidateRepeatable = all[j].version() == null;
+                if (seen[j] || candidateRepeatable != repeatable || !same(all[i], all[j])) {
                     continue;
                 }
                 seen[j] = true;
