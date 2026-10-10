@@ -34,6 +34,13 @@ public final class Application {
     private Application() {
     }
 
+    /// Forgets what a script asked for; the platform is the host's to say
+    /// and stays.
+    static void reset() {
+        targetFrameRate = -1;
+        quit = false;
+    }
+
     public static int get_targetFrameRate() {
         return targetFrameRate;
     }

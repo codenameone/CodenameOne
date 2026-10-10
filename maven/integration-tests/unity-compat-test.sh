@@ -53,6 +53,16 @@
 #             and a script declares a message nothing sends: the build
 #             succeeds and says so, and the four warnings are held to their
 #             text.
+#   gallery   the project the screenshot tests of scripts/hellocodenameone
+#             capture (its UnityCompat* tests), one scene for each area of
+#             the runtime: sprites, physics, a canvas, a tilemap, animators,
+#             particle systems, TextMesh Pro, a Cinemachine camera. It has
+#             no trace and no script that is played. What is held here is
+#             what a screenshot relies on: every scene, loaded by itself in
+#             one JVM after the others, stepped by hand with the view's
+#             clock held, draws something, stands still afterwards, gives
+#             the same pixels when run again, and leaves nothing behind.
+#             It is not run through ParparVM here; the application is.
 #
 # Each is compiled by the C# compiler, translated to class files by
 # maven/cil-translator and run on the JVM against the runtime jar's classes
@@ -313,6 +323,26 @@ java -Xverify:all -Djava.awt.headless=true -cp "$PF/classes:$PF/resources:$RUNTI
   || { cat "$PF/hotspot.err"; fail "platformer2d: the project failed on the JVM"; }
 compare "platformer2d on the JVM" "$SAMPLES/platformer2d/expected-trace.txt" "$PF/hotspot.txt"
 offscreen platformer2d "$PF" "${PLATFORMER_ARGS[@]}" --trace "$SAMPLES/platformer2d/expected-trace.txt"
+
+# The gallery: see the head of this file. `--scenes` is SceneShots, beside
+# OffscreenCheck; the size is a phone's shape, as the captures have.
+echo "== gallery"
+GA="$WORKDIR/gallery"
+rm -rf "$GA"
+run_logged "$WORKDIR/gallery-build.log" "gallery: build-unity-project.sh" \
+  "$SAMPLES/build-unity-project.sh" "$SAMPLES/gallery" "$GA"
+if grep '^warning:' "$WORKDIR/gallery-build.log"; then
+  fail "gallery: the scene compiler warned"
+fi
+if "$SAMPLES/player/offscreen-check.sh" "$GA" --scenes --size 360x640 --twice > "$GA/scenes.txt" 2>&1 \
+    && [ "$(tail -1 "$GA/scenes.txt")" = "SCENES OK: 8" ]; then
+  echo "   gallery, each scene stepped by hand and held: $(tail -1 "$GA/scenes.txt")"
+else
+  echo "FAIL: gallery: the scenes on a held game view (log: $GA/scenes.txt):"
+  grep -E '^(FAIL|FAILED|SCENES)' "$GA/scenes.txt" | head -40
+  tail -5 "$GA/scenes.txt"
+  FAILED=1
+fi
 
 if [ $PARPARVM -eq 0 ]; then
   [ $FAILED -eq 0 ] || exit 1

@@ -1,0 +1,336 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!29 &1
+OcclusionCullingSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+--- !u!1 &10
+GameObject:
+  m_ObjectHideFlags: 0
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 11}
+  - component: {fileID: 12}
+  m_Layer: 0
+  m_Name: Main Camera
+  m_TagString: MainCamera
+  m_IsActive: 1
+--- !u!4 &11
+Transform:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 10}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: -10}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children: []
+  m_Father: {fileID: 0}
+--- !u!20 &12
+Camera:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 10}
+  m_Enabled: 1
+  serializedVersion: 2
+  m_ClearFlags: 2
+  m_BackGroundColor: {r: 0.16, g: 0.14, b: 0.22, a: 0}
+  orthographic: 1
+  orthographic size: 5
+  m_Depth: -1
+--- !u!1 &20
+GameObject:
+  m_ObjectHideFlags: 0
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 21}
+  - component: {fileID: 22}
+  m_Layer: 0
+  m_Name: Floor
+  m_TagString: Untagged
+  m_IsActive: 1
+--- !u!4 &21
+Transform:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 20}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: -1.875, z: 0}
+  m_LocalScale: {x: 4.5, y: 0.25, z: 1}
+  m_Children: []
+  m_Father: {fileID: 0}
+--- !u!212 &22
+SpriteRenderer:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 20}
+  m_Enabled: 1
+  m_Sprite: {fileID: 21300000, guid: 9c4b6a8d0e2f4a1cb3d5e7f9a1b2c3d5, type: 3}
+  m_Color: {r: 0.4, g: 0.6, b: 0.4, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_SortingLayerID: 0
+  m_SortingOrder: 0
+--- !u!1 &30
+GameObject:
+  m_ObjectHideFlags: 0
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 31}
+  - component: {fileID: 32}
+  - component: {fileID: 33}
+  - component: {fileID: 34}
+  m_Layer: 0
+  m_Name: Runner
+  m_TagString: Untagged
+  m_IsActive: 1
+--- !u!4 &31
+Transform:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 30}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -1.2, y: 2, z: 0}
+  m_LocalScale: {x: 1.5, y: 1.5, z: 1}
+  m_Children:
+  - {fileID: 41}
+  m_Father: {fileID: 0}
+--- !u!212 &32
+SpriteRenderer:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 30}
+  m_Enabled: 1
+  m_Sprite: {fileID: 2001, guid: d1000000000000000000000000000002, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_SortingLayerID: 0
+  m_SortingOrder: 2
+--- !u!95 &33
+Animator:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 30}
+  serializedVersion: 5
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: d3000000000000000000000000000009, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+--- !u!114 &34
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 30}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6a11e7000000000000000000000000a2, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  runFrom: 4
+  hitAt: -1
+--- !u!1 &40
+GameObject:
+  m_ObjectHideFlags: 0
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 41}
+  - component: {fileID: 42}
+  m_Layer: 0
+  m_Name: Hat
+  m_TagString: Untagged
+  m_IsActive: 1
+--- !u!4 &41
+Transform:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 40}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0.625, z: 0}
+  m_LocalScale: {x: 0.5, y: 0.25, z: 1}
+  m_Children: []
+  m_Father: {fileID: 31}
+--- !u!212 &42
+SpriteRenderer:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 40}
+  m_Enabled: 1
+  m_Sprite: {fileID: 21300000, guid: d1000000000000000000000000000003, type: 3}
+  m_Color: {r: 0.8, g: 0.2, b: 0.6, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_SortingLayerID: 0
+  m_SortingOrder: 3
+--- !u!1 &50
+GameObject:
+  m_ObjectHideFlags: 0
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 51}
+  - component: {fileID: 52}
+  - component: {fileID: 53}
+  - component: {fileID: 54}
+  m_Layer: 0
+  m_Name: Hurt
+  m_TagString: Untagged
+  m_IsActive: 1
+--- !u!4 &51
+Transform:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 50}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1.2, y: 2, z: 0}
+  m_LocalScale: {x: 1.5, y: 1.5, z: 1}
+  m_Children:
+  - {fileID: 61}
+  m_Father: {fileID: 0}
+--- !u!212 &52
+SpriteRenderer:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 50}
+  m_Enabled: 1
+  m_Sprite: {fileID: 2001, guid: d1000000000000000000000000000002, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_FlipX: 1
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_SortingLayerID: 0
+  m_SortingOrder: 2
+--- !u!95 &53
+Animator:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 50}
+  serializedVersion: 5
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: d3000000000000000000000000000009, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+--- !u!114 &54
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 50}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6a11e7000000000000000000000000a2, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  runFrom: -1
+  hitAt: 80
+--- !u!1 &60
+GameObject:
+  m_ObjectHideFlags: 0
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 61}
+  - component: {fileID: 62}
+  m_Layer: 0
+  m_Name: Hat
+  m_TagString: Untagged
+  m_IsActive: 1
+--- !u!4 &61
+Transform:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 60}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0.625, z: 0}
+  m_LocalScale: {x: 0.5, y: 0.25, z: 1}
+  m_Children: []
+  m_Father: {fileID: 51}
+--- !u!212 &62
+SpriteRenderer:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 60}
+  m_Enabled: 1
+  m_Sprite: {fileID: 21300000, guid: d1000000000000000000000000000003, type: 3}
+  m_Color: {r: 0.8, g: 0.2, b: 0.6, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_SortingLayerID: 0
+  m_SortingOrder: 3
+--- !u!1 &70
+GameObject:
+  m_ObjectHideFlags: 0
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 71}
+  - component: {fileID: 72}
+  - component: {fileID: 73}
+  - component: {fileID: 74}
+  m_Layer: 0
+  m_Name: Idler
+  m_TagString: Untagged
+  m_IsActive: 1
+--- !u!4 &71
+Transform:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 70}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: -1, z: 0}
+  m_LocalScale: {x: 1.5, y: 1.5, z: 1}
+  m_Children:
+  - {fileID: 81}
+  m_Father: {fileID: 0}
+--- !u!212 &72
+SpriteRenderer:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 70}
+  m_Enabled: 1
+  m_Sprite: {fileID: 2001, guid: d1000000000000000000000000000002, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_SortingLayerID: 0
+  m_SortingOrder: 2
+--- !u!95 &73
+Animator:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 70}
+  serializedVersion: 5
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: d3000000000000000000000000000009, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+--- !u!114 &74
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 70}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6a11e7000000000000000000000000a2, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  runFrom: -1
+  hitAt: -1
+--- !u!1 &80
+GameObject:
+  m_ObjectHideFlags: 0
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 81}
+  - component: {fileID: 82}
+  m_Layer: 0
+  m_Name: Hat
+  m_TagString: Untagged
+  m_IsActive: 1
+--- !u!4 &81
+Transform:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 80}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0.625, z: 0}
+  m_LocalScale: {x: 0.5, y: 0.25, z: 1}
+  m_Children: []
+  m_Father: {fileID: 71}
+--- !u!212 &82
+SpriteRenderer:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 80}
+  m_Enabled: 1
+  m_Sprite: {fileID: 21300000, guid: d1000000000000000000000000000003, type: 3}
+  m_Color: {r: 0.8, g: 0.2, b: 0.6, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_SortingLayerID: 0
+  m_SortingOrder: 3

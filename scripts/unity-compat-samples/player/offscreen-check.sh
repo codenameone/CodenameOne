@@ -10,6 +10,13 @@
 #   [--seed n] [--frames n] [--size WxH] [--input file] [--dump f1,f2,...]
 #   [--png dir] [--trace file] [--count Prefix]... [--reference dir]
 #
+# With --scenes before the options it runs offscreen.SceneShots instead, which
+# shows every scene of the project by itself, stepped by hand to one frame and
+# held there, as a screenshot test of a scene does:
+#
+#   offscreen-check.sh <out dir> --scenes [--seed n] [--frames n] [--size WxH]
+#   [--png dir] [--twice]
+#
 # It opens nothing: the JVM is headless, and nothing in it is of one desktop --
 # no window toolkit, no GPU, fonts from the port's own jar -- so it runs the
 # same on a Linux runner with no display. It is not part of the framework's
@@ -55,4 +62,9 @@ find "$HERE/offscreen/java" -name '*.java' > "$OUT/offscreen.sources"
 "$(dirname "$JAVA")/javac" -nowarn -Xlint:-options -encoding ascii -d "$OUT/offscreen-classes" -cp "$CP" \
   "@$OUT/offscreen.sources" > "$OUT/offscreen-javac.log" 2>&1 \
   || { tail -40 "$OUT/offscreen-javac.log" >&2; fail "javac of the offscreen check (log: $OUT/offscreen-javac.log)"; }
-exec "$JAVA" -Djava.awt.headless=true -cp "$OUT/offscreen-classes:$CP" offscreen.OffscreenCheck "$@"
+MAIN=offscreen.OffscreenCheck
+if [ "${1:-}" = "--scenes" ]; then
+  MAIN=offscreen.SceneShots
+  shift
+fi
+exec "$JAVA" -Djava.awt.headless=true -cp "$OUT/offscreen-classes:$CP" "$MAIN" "$@"

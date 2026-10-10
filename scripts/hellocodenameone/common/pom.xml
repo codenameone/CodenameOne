@@ -15,6 +15,13 @@
         <!-- The Android compatibility gallery's Android Studio module, compiled
              into this app so its screens run as screenshot tests on every port. -->
         <android.gallery.dir>${project.basedir}/../../android-compat-samples/gallery/app/src/main</android.gallery.dir>
+        <!-- The Unity compatibility gallery's Unity project (Assets and
+             ProjectSettings), compiled into this app so its scenes run as
+             screenshot tests on every port. Its scripts need the .NET SDK only
+             where the compiled output is not already under target/unity:
+             scripts/unity-gallery-prebuilt.sh carries that output to a machine
+             without one. -->
+        <unity.gallery.dir>${project.basedir}/../../unity-compat-samples/gallery</unity.gallery.dir>
     </properties>
 
     <!-- Add your cn1lib dependencies to this section -->
@@ -22,6 +29,11 @@
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-android-compat</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-unity-compat</artifactId>
         </dependency>
 
         <dependency>
@@ -409,6 +421,18 @@
                         </goals>
                         <configuration>
                             <androidSourceDir>${android.gallery.dir}</androidSourceDir>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <!-- The Unity gallery: its scripts as classes, its
+                             scenes as generated Java source. -->
+                        <id>compile-unity</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>compile-unity</goal>
+                        </goals>
+                        <configuration>
+                            <unitySourceDir>${unity.gallery.dir}</unitySourceDir>
                         </configuration>
                     </execution>
                     <execution>

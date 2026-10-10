@@ -239,6 +239,11 @@ public final class UnityRuntime {
         PhysicsWorld.reset();
         ParticleSystem.reset();
         AudioSource.resetAll();
+        // What a script of the project before left behind and the next
+        // one would read: a request to quit above all, which a host looks
+        // for and leaves the application on.
+        Application.reset();
+        AudioListener.set_pause(false);
     }
 
     /// What `Resources.Load` answers.
@@ -475,9 +480,21 @@ public final class UnityRuntime {
     /// Loads the project's first scene, if one is installed, and wakes
     /// everything created so far.
     public static void begin() {
+        begin(0);
+    }
+
+    /// As [#begin()], with the scene of that index in the build settings
+    /// loaded first where `begin()` loads the first of them: for a host that
+    /// shows one scene of a project by itself, as a test of that scene does.
+    /// An index the project does not have is refused before anything wakes.
+    public static void begin(int firstScene) {
+        if (app != null && scene < 0 && app.sceneCount() > 0
+                && (firstScene < 0 || firstScene >= app.sceneCount())) {
+            throw new IllegalArgumentException("Scene " + firstScene + " is not in the build settings");
+        }
         running = true;
         if (app != null && scene < 0 && app.sceneCount() > 0) {
-            load(0);
+            load(firstScene);
         }
         for (int i = 0; i < objects.size(); i++) { // NOPMD ForLoopCanBeForeach
             wake((GameObject) objects.get(i));

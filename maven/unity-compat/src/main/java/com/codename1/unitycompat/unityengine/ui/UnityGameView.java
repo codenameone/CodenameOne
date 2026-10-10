@@ -43,6 +43,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 /// Shows a running Unity project on a Codename One game surface.
@@ -155,6 +156,31 @@ import java.util.concurrent.atomic.AtomicReference;
 /// and `OnApplicationPause(true)`, then the same two the other way round
 /// with the opposite values. A paused view still runs what
 /// [#callInFrame(Runnable)] is given.
+///
+/// #### Stepping by hand
+///
+/// A frame normally simulates as much time as passed since the one before
+/// it, which no two runs agree on. [#holdClock()] takes the clock away:
+/// from the next frame on nothing is simulated, and the view goes on
+/// drawing the scene as it stands -- no script runs, nothing animates and
+/// no particle moves. [#advance(int, float)] then runs a number of steps of
+/// a length that is given, so the picture after it is the same on every
+/// run and every machine:
+///
+/// ```java
+/// view.holdClock();
+/// view.start();
+/// view.advance(90, 1f / 60);
+/// // later, on the event dispatch thread:
+/// if (view.framesAdvanced() == 90) {
+///     // the ninetieth frame is on the view's scene, and stays there
+/// }
+/// ```
+///
+/// Unlike a pause the scripts are not told anything: the game has not lost
+/// the focus, it is being played a frame at a time. A held view takes no
+/// input; keys and touches that arrive are dropped. [#releaseClock()] gives
+/// the clock back.
 public class UnityGameView extends GameView {
     private static final int KEY_UP = 273;
     private static final int KEY_DOWN = 274;
@@ -291,6 +317,15 @@ public class UnityGameView extends GameView {
     /// What the frame last saw of it, and told the scripts. Only the frame
     /// reads or writes this.
     private boolean pauseSeen;
+
+    /// Whether the clock is held; see [#holdClock()]. Asked from any thread.
+    private final AtomicBoolean clockHeld = new AtomicBoolean();
+    /// The steps [#advance(int, float)] asked for and no frame has taken
+    /// yet: their number, and the bits of their length in seconds. An
+    /// immutable pair, replaced whole, since the two belong together.
+    private final AtomicReference stepsWanted = new AtomicReference(NO_KEYS);
+    /// How many steps asked for have been run and put on the scene.
+    private final AtomicInteger stepsRun = new AtomicInteger();
 
     private UnityGameAudio audio;
     private final UnityGamePrefs prefs = new UnityGamePrefs();
@@ -429,13 +464,92 @@ public class UnityGameView extends GameView {
 
     @Override
     public boolean handlesInput() {
-        return isRunning() && !pauseWanted.get();
+        return isRunning() && !pauseWanted.get() && !clockHeld.get();
+    }
+
+    /// Takes the clock away from the game: from the next frame on, a frame
+    /// simulates nothing but what [#advance(int, float)] asks for, and draws
+    /// the scene as it stands. Safe from any thread, before or after
+    /// [#start()]; held before it, not even the first frame simulates
+    /// anything.
+    public void holdClock() {
+        clockHeld.set(true);
+    }
+
+    /// Gives the clock back after [#holdClock()]: the next frame simulates
+    /// the time since the one before it again. Steps asked for and not yet
+    /// run are forgotten.
+    public void releaseClock() {
+        clockHeld.set(false);
+        stepsWanted.set(NO_KEYS);
+    }
+
+    /// Whether [#holdClock()] is in force.
+    public boolean isClockHeld() {
+        return clockHeld.get();
+    }
+
+    /// Asks for `frames` steps of `deltaSeconds` each, all run by the next
+    /// frame the view draws, whatever the time that frame really took.
+    /// Holds the clock if it is not held. Asked again before a frame took
+    /// the first request, the numbers add up and the newer length is used
+    /// for all of them.
+    ///
+    /// Safe from any thread. The steps have been run, and the scene shows
+    /// the last of them, once [#framesAdvanced()] has grown by `frames`.
+    public void advance(int frames, float deltaSeconds) {
+        if (frames < 0 || deltaSeconds < 0f || Float.isNaN(deltaSeconds)) {
+            throw new IllegalArgumentException("advance: " + frames + " frames of " + deltaSeconds + " seconds");
+        }
+        clockHeld.set(true);
+        int bits = Float.floatToIntBits(deltaSeconds);
+        while (true) {
+            int[] before = (int[]) stepsWanted.get();
+            int[] after = new int[] {before.length == 0 ? frames : before[0] + frames, bits};
+            if (stepsWanted.compareAndSet(before, after)) {
+                return;
+            }
+        }
+    }
+
+    /// The number of steps [#advance(int, float)] asked for that have been
+    /// run and put on the view's scene, since the view was made.
+    public int framesAdvanced() {
+        return stepsRun.get();
+    }
+
+    /// A frame of a view whose clock is held: the steps that were asked
+    /// for, at the length they were asked at, and the scene as it then is.
+    private void heldFrame() {
+        // What arrived is dropped, not kept for later: a press delivered
+        // twenty frames after it was made is not the press that was made.
+        pending.set(NO_KEYS);
+        pendingTouches.set(NO_TOUCHES);
+        pendingMouse.set(NO_KEYS);
+        int[] wanted = (int[]) stepsWanted.getAndSet(NO_KEYS);
+        int frames = wanted.length == 0 ? 0 : wanted[0];
+        if (frames == 0) {
+            // As a paused view does: what the application handed over
+            // must not wait for a step that may never be asked for.
+            UnityRuntime.runFrameCalls();
+        } else {
+            float dt = Float.intBitsToFloat(wanted[1]);
+            for (int i = 0; i < frames; i++) {
+                UnityRuntime.step(dt);
+            }
+        }
+        show(UnityRuntime.render());
+        stepsRun.addAndGet(frames);
     }
 
     @Override
     protected void update(double deltaSeconds) {
         int height = getHeight();
         UnityRuntime.resize(getWidth(), height);
+        if (clockHeld.get()) {
+            heldFrame();
+            return;
+        }
         // The scripts are told of a pause here, inside the frame, rather
         // than where it was asked for, which may be another thread.
         boolean paused = pauseWanted.get();

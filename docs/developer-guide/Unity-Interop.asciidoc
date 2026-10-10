@@ -326,6 +326,30 @@ background and resumes it on return, so no frame is simulated while nobody
 sees it and `Time.time` doesn't jump. A script that calls `Application.Quit()`
 exits the application.
 
+==== Stepping the game by hand
+
+A test that captures a scene, or a tool that renders one, needs the same
+picture on a fast device and on a slow one. The view normally simulates the
+time that passed since its last frame, so the picture depends on how fast the
+frames came. `gameView.holdClock()` takes the clock away from the game: a
+frame then simulates nothing and draws the scene as it stands.
+`gameView.advance(90, 1f / 60)` asks for 90 steps of a sixtieth of a second
+each, and the next frame the view draws runs all of them, however long that
+frame took. `framesAdvanced()` grows by the number of steps once they've been
+run and the scene shows the last of them, which is the moment to capture.
+`releaseClock()` hands the clock back.
+
+A view whose clock is held takes no input: keys and touches that arrive are
+dropped, so nothing but the steps you ask for moves the scene. Calls queued
+with `callInFrame` still run.
+
+To show one scene of a project by itself, start the runtime with
+`UnityRuntime.begin(index)` where `UnityApplication` calls `begin()`. The index is the
+scene's place in the build settings. `UnityRuntime.reset()` takes everything
+down again, the objects, the clock and the application's settings, so the next
+scene starts from nothing. Call `Random.InitState` before `begin` when the
+scene has particle systems or scripts that ask for random numbers.
+
 ==== On-screen controls
 
 For a game that reads keys, add buttons in `createForm` and forward their
