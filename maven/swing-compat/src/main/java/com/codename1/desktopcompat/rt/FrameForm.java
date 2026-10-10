@@ -47,6 +47,11 @@ public final class FrameForm extends Form implements WindowHost {
     private final Window window;
     private final ArrayList<Command> commands = new ArrayList<Command>();
     private Form previous;
+    /// The size the application gave the window and no window of the
+    /// operating system was asked for yet, in logical pixels; 0 when
+    /// there is none. See [#cn1Show].
+    private int askedWidth;
+    private int askedHeight;
     /// The display size the last whole paint of this form was made for.
     private int paintedWidth = -1;
     private int paintedHeight = -1;
@@ -61,6 +66,10 @@ public final class FrameForm extends Form implements WindowHost {
     public FrameForm(Window w) {
         super(w.cn1Title(), new BorderLayout());
         window = w;
+        // Before anything lays this form out: from then on the window has
+        // the size of the room the form gives it.
+        askedWidth = w.getWidth();
+        askedHeight = w.getHeight();
         setScrollable(false);
         setEnableCursors(true);
         com.codename1.ui.Component p = w.cn1Peer();
@@ -98,11 +107,24 @@ public final class FrameForm extends Form implements WindowHost {
             // gave the frame, which the form is about to replace with the
             // display's. A frame shown over a form that is not a frame's
             // is a guest in that window and leaves its size alone.
+            //
+            // The size is the one recorded when the application gave it,
+            // not the window's at this moment. A form with a toolbar,
+            // which is every form under a desktop theme, is laid out
+            // when its title is set, before it is shown, and the layout
+            // gives the window the size of the display less the title
+            // area: asking for that made every application window open
+            // a title bar shorter than the port had made it, whatever
+            // size the frame had been packed to. A size is asked for
+            // once; a frame shown again as it is leaves the window the
+            // size its user may have given it since.
             Display d = Display.getInstance();
             boolean own = current == null || current instanceof FrameForm;
-            if (own && d.isDesktop() && window.getWidth() > 0 && window.getHeight() > 0) {
-                d.setWindowSize(Units.toDevice(window.getWidth()), Units.toDevice(window.getHeight()));
+            if (own && d.isDesktop() && askedWidth > 0 && askedHeight > 0) {
+                d.setWindowSize(Units.toDevice(askedWidth), Units.toDevice(askedHeight));
             }
+            askedWidth = 0;
+            askedHeight = 0;
             show();
             nativeTitle();
         }
@@ -193,8 +215,24 @@ public final class FrameForm extends Form implements WindowHost {
     public void icon(Image icon) {
     }
 
+    /// The application set the window's bounds. A layout never comes
+    /// here: it tells the window the size its peer was given without
+    /// going through `setBounds`. While the form is showing the window
+    /// fills it and the size is the form's to give, so only a size set
+    /// on a window that is not showing is kept, for [#cn1Show]. A window
+    /// that was only moved still has the size its peer was laid out
+    /// with, which nobody asked for.
     @Override
     public void bounds() {
+        if (Display.getInstance().getCurrent() == this) {
+            return;
+        }
+        com.codename1.ui.Component p = window.cn1Peer();
+        if (p == null || window.getWidth() != Units.toLogical(p.getWidth())
+                || window.getHeight() != Units.toLogical(p.getHeight())) {
+            askedWidth = window.getWidth();
+            askedHeight = window.getHeight();
+        }
     }
 
     @Override

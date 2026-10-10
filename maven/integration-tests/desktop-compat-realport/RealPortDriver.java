@@ -26,7 +26,6 @@ import com.codename1.ui.Display;
 
 import java.awt.Component;
 import java.awt.Dimension;
-import java.awt.Insets;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Robot;
@@ -57,8 +56,12 @@ import javax.swing.SwingUtilities;
 ///
 /// Arguments: main class, width, height, script file, output directory.
 ///
+/// The width and height are the size the application's area is opened at. An
+/// application that sizes its own window gets the size it asks for, as it does
+/// under the desktop stub; the line `REALPORT area:` says what it came to.
+///
 /// A script line is one step. A position is a fraction of the application's
-/// area, so a script holds at any size.
+/// area.
 ///
 /// - `sleep <ms>`
 /// - `move <x> <y>`
@@ -176,14 +179,15 @@ public final class RealPortDriver {
         SwingUtilities.invokeAndWait(new Runnable() {
             @Override
             public void run() {
+                // Shown at whatever size it has by now, as the desktop stub shows it:
+                // the frame was packed to the size asked for before the application
+                // started, and an application that sizes its own window -- a packed
+                // JFrame, a Stage with a Scene of a given size -- has since asked the
+                // port for that. Sizing the frame again here took that size away from
+                // an application that asked while it started, and not from one that
+                // asked a moment later, on the next cycle of the event thread.
                 frame.setLocation(40, 40);
                 frame.setVisible(true);
-                frame.validate();
-                // The port adds a menu bar of its own: size the frame so that the
-                // application's area is what was asked for.
-                Insets in = frame.getInsets();
-                int bar = frame.getJMenuBar() == null ? 0 : frame.getJMenuBar().getPreferredSize().height;
-                frame.setSize(w + in.left + in.right, h + bar + in.top + in.bottom);
                 frame.validate();
                 frame.toFront();
                 canvas = frame.getContentPane().getComponent(0);
@@ -193,6 +197,8 @@ public final class RealPortDriver {
         robot = new Robot();
         robot.setAutoDelay(0);
         Thread.sleep(2500);
+        // What the fractions of a script are fractions of.
+        System.out.println("REALPORT area: " + area().width + "x" + area().height);
         shot("start");
         BufferedReader in = new BufferedReader(new FileReader(a[3]));
         try {

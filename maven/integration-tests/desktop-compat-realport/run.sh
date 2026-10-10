@@ -17,7 +17,9 @@
 # or newer, which is what the port itself needs at run time: REALPORT_JAVA_HOME,
 # then GRADLE_JAVA_HOME, JAVA17_HOME, JAVA_HOME. The framework jars come from
 # the local Maven repository (MAVEN_REPO_LOCAL when the reactor was installed
-# with -Dmaven.repo.local). SIZE=WIDTHxHEIGHT sets the application's area.
+# with -Dmaven.repo.local). SIZE=WIDTHxHEIGHT is the size the application's area
+# is opened at; an application that sizes its own window, as both galleries do,
+# then gets the size it asks for.
 #
 # With no arguments it runs the smoke scripts beside it against the samples
 # desktop-compat-test.sh staged: <sample>.txt against build/desktop-compat/<sample>.

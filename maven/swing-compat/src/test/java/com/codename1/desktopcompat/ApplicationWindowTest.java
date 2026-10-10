@@ -23,9 +23,11 @@
 package com.codename1.desktopcompat;
 
 import com.codename1.compat.testing.HeadlessImplementation;
+import com.codename1.desktopcompat.java.awt.Dimension;
 import com.codename1.desktopcompat.javax.swing.JFrame;
 import com.codename1.desktopcompat.javax.swing.JLabel;
 import com.codename1.desktopcompat.rt.Units;
+import com.codename1.ui.Toolbar;
 import org.junit.After;
 import org.junit.Test;
 
@@ -44,6 +46,7 @@ public class ApplicationWindowTest extends KernelTestBase {
         HeadlessImplementation.nativeTitle = false;
         HeadlessImplementation.windowTitle = null;
         HeadlessImplementation.windowSize = null;
+        Toolbar.setGlobalToolbar(false);
     }
 
     private static void desktop() {
@@ -82,6 +85,55 @@ public class ApplicationWindowTest extends KernelTestBase {
         f.setSize(400, 300);
         show(f);
         assertArrayEquals(new int[] {Units.toDevice(400), Units.toDevice(300)}, HeadlessImplementation.windowSize);
+    }
+
+    /// A desktop theme gives every form a toolbar, and a form with a
+    /// toolbar is laid out when its title is set, which is before it is
+    /// shown. That layout gives the frame the size of the display under
+    /// the title area: read then, the size of the frame was the room the
+    /// window already had less its title, and every application window
+    /// opened that much shorter than the last. The real port has the
+    /// toolbar; a test without one never saw it.
+    @Test
+    public void theSizeAskedForIsTheFramesAlsoUnderAThemeWithAToolbar() {
+        desktop();
+        Toolbar.setGlobalToolbar(true);
+        show(new JFrame("Earlier"));
+        HeadlessImplementation.windowSize = null;
+        JFrame f = new JFrame("Ledger");
+        f.getContentPane().add(new JLabel("content"));
+        f.setPreferredSize(new Dimension(400, 300));
+        f.pack();
+        show(f);
+        assertArrayEquals(new int[] {Units.toDevice(400), Units.toDevice(300)}, HeadlessImplementation.windowSize);
+    }
+
+    /// A frame hidden, given another size and shown again asks for that
+    /// size; shown again as it was, it asks for nothing, and leaves the
+    /// window the size its user may have dragged it to.
+    @Test
+    public void aFrameShownAgainAsksOnlyForASizeItWasGivenSince() {
+        desktop();
+        Toolbar.setGlobalToolbar(true);
+        show(new JFrame("Earlier"));
+        JFrame f = new JFrame("Ledger");
+        f.getContentPane().add(new JLabel("content"));
+        f.setSize(400, 300);
+        show(f);
+        f.setVisible(false);
+        HeadlessImplementation.windowSize = null;
+        f.setVisible(true);
+        assertNull(HeadlessImplementation.windowSize);
+        // Moved while hidden: the size it has is the one it was laid out
+        // with, not one the application chose.
+        f.setVisible(false);
+        f.setLocation(10, 10);
+        f.setVisible(true);
+        assertNull(HeadlessImplementation.windowSize);
+        f.setVisible(false);
+        f.setSize(500, 320);
+        f.setVisible(true);
+        assertArrayEquals(new int[] {Units.toDevice(500), Units.toDevice(320)}, HeadlessImplementation.windowSize);
     }
 
     /// Off a desktop the display is the screen, and nothing resizes it.

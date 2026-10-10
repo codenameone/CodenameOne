@@ -1,23 +1,31 @@
-# The Swing gallery under a real pointer and real keys, at 1000x800.
+# The Swing gallery under a real pointer and real keys.
 # Every step but the quiet ones has to change the picture, outside whatever
 # was moving by itself; see RealPortDriver.java.
+#
+# Positions are fractions of the application's area, which is the one the
+# gallery gives itself: it packs its frame to 820 by 600 logical pixels, and
+# under xvfb that is a window of 846 by 619 with 846 by 598 left under the
+# port's own menu bar ("REALPORT area: 846x598"). The window's title is the
+# strip on top, the frame's menu bar the row under it, the tabs the row under
+# that. A step that stops changing the picture after a change to either layer
+# is first checked against the frames: what it aimed at may have moved.
 sleep 4000
 shot start
 # A button and a radio button, then the check box, which disables both.
-click 0.061 0.268
-click 0.245 0.270
-click 0.132 0.270
+click 0.074 0.331
+click 0.290 0.331
+click 0.177 0.331
 # A text field: focus, typing, and Tab on to the next one.
-click 0.370 0.382
+click 0.374 0.433
 type bc
 key TAB
 # The slider follows a drag, and the progress bar starts.
-drag 0.536 0.573 0.640 0.573 400
-click 0.210 0.725
+drag 0.645 0.630 0.752 0.630 400
+click 0.251 0.776
 # Tabs: Layouts, Data and back.
-click 0.101 0.063
+click 0.124 0.119
 shot layouts
-click 0.158 0.063
+click 0.195 0.119
 shot data
-click 0.035 0.063
+click 0.041 0.119
 shot controls
