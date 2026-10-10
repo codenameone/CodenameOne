@@ -92,8 +92,10 @@ function Get-Median($values) {
 
 Start-Measured 0 | Out-Null
 $warm = @(1..$Runs | ForEach-Object { Start-Measured 0 })
-$sessions = @(1..$Sessions | ForEach-Object { Start-Measured $Idle })
-$good = @($sessions | Where-Object { $_.ok -and $_.idle })
+# Not $sessions: PowerShell names ignore case, so that would be the [int]
+# parameter above, and an array assigned to it fails to convert.
+$idleRuns = @(1..$Sessions | ForEach-Object { Start-Measured $Idle })
+$good = @($idleRuns | Where-Object { $_.ok -and $_.idle })
 $times = @($warm | Where-Object { $_.ok } | ForEach-Object { $_.window_ms })
 
 $summary = $null
@@ -109,7 +111,7 @@ $idleResult = @{}
 foreach ($field in 'rss_kb', 'uss_kb', 'threads', 'cpu_percent') {
     $idleResult[$field] = Get-Median @($good | ForEach-Object { $_.idle[$field] })
 }
-$errors = @(($warm + $sessions) | Where-Object { $_.error } | ForEach-Object { $_.error })
+$errors = @(($warm + $idleRuns) | Where-Object { $_.error } | ForEach-Object { $_.error })
 
 $document = @{
     label        = $Label

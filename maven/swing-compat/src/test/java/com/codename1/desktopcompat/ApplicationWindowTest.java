@@ -71,6 +71,12 @@ public class ApplicationWindowTest extends KernelTestBase {
     @Test
     public void theWindowIsAskedForTheSizeOfTheFrameInDevicePixels() {
         desktop();
+        // A frame sizes the window only when the window is the
+        // application's own: nothing showing yet, or another frame. An
+        // earlier test of this JVM may have left a form that is no frame's,
+        // which would make this frame a guest, so a frame is shown first.
+        show(new JFrame("Earlier"));
+        HeadlessImplementation.windowSize = null;
         JFrame f = new JFrame("Ledger");
         f.getContentPane().add(new JLabel("content"));
         f.setSize(400, 300);

@@ -120,6 +120,42 @@
         </plugins>
     </build>
 
+    <profiles>
+        <!-- Some JDK 8 distributions bundle JavaFX as an extension
+             (jre/lib/ext/jfxrt.jar), and an extension is found before the
+             class path. The main sources still compile there, because they
+             ARE the javafx classes, but the tests then meet the JDK's
+             javafx.scene.control.Control in place of this module's, at
+             compile time and again when they run. The extension directory
+             is pointed at nothing; the option does not exist after JDK 8,
+             where JavaFX is not part of the JDK either. -->
+        <profile>
+            <id>jdk8-without-bundled-javafx</id>
+            <activation>
+                <jdk>1.8</jdk>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <configuration>
+                            <compilerArgs>
+                                <arg>-extdirs</arg>
+                                <arg>${project.build.directory}/no-jdk-extensions</arg>
+                            </compilerArgs>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <argLine>-Djava.ext.dirs=${project.build.directory}/no-jdk-extensions</argLine>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
     <dependencies>
         <!-- ResourceNames: the one rule for the flat name a resource ships
              under, which the compiled style sheets are named by. -->
