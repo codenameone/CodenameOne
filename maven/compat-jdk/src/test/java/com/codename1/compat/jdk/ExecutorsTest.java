@@ -261,4 +261,84 @@ public class ExecutorsTest {
         }
         pool.shutdown();
     }
+
+    private static Callable<String> answering(final String value, final AtomicBoolean ran) {
+        return new Callable<String>() {
+            @Override
+            public String call() {
+                ran.set(true);
+                return value;
+            }
+        };
+    }
+
+    private static final Runnable NOTHING = new Runnable() {
+        @Override
+        public void run() {
+        }
+    };
+
+    /// What a JDK scheduled executor does by default: delayed work that was
+    /// accepted still runs after `shutdown()`, repeating work is cancelled.
+    @Test
+    public void anOrderlyShutdownStillRunsDelayedWorkAndCancelsWhatRepeats() throws Exception {
+        ScheduledExecutorService pool = Executors.newScheduledThreadPool(1);
+        AtomicBoolean ran = new AtomicBoolean();
+        ScheduledFuture<String> once = pool.schedule(answering("ran", ran), 300, TimeUnit.MILLISECONDS);
+        ScheduledFuture<?> repeating = pool.scheduleAtFixedRate(NOTHING, 50, 50, TimeUnit.MILLISECONDS);
+        ScheduledFuture<?> spaced = pool.scheduleWithFixedDelay(NOTHING, 50, 50, TimeUnit.MILLISECONDS);
+        pool.shutdown();
+        assertTrue(pool.isShutdown());
+        assertFalse("Accepted work is still due", pool.isTerminated());
+        assertTrue(repeating.isCancelled());
+        assertTrue(spaced.isCancelled());
+        assertFalse(once.isDone());
+        try {
+            pool.schedule(answering("late", new AtomicBoolean()), 1, TimeUnit.MILLISECONDS);
+            fail("Nothing new is accepted");
+        } catch (RejectedExecutionException expected) {
+            assertNotNull(expected);
+        }
+        try {
+            pool.execute(NOTHING);
+            fail("Nothing new is accepted");
+        } catch (RejectedExecutionException expected) {
+            assertNotNull(expected);
+        }
+        try {
+            pool.submit(NOTHING);
+            fail("Nothing new is accepted");
+        } catch (RejectedExecutionException expected) {
+            assertNotNull(expected);
+        }
+        assertEquals("ran", once.get(10, TimeUnit.SECONDS));
+        assertTrue(ran.get());
+        assertTrue("the executor did not stop after its last task", pool.awaitTermination(10, TimeUnit.SECONDS));
+        assertTrue(pool.isTerminated());
+
+        // With nothing due, it stops at once.
+        ScheduledExecutorService idle = Executors.newSingleThreadScheduledExecutor();
+        idle.scheduleAtFixedRate(NOTHING, 50, 50, TimeUnit.MILLISECONDS);
+        terminate(idle);
+
+        // Work cancelled before the shutdown is not waited for.
+        ScheduledExecutorService cancelled = Executors.newSingleThreadScheduledExecutor();
+        assertTrue(cancelled.schedule(answering("never", new AtomicBoolean()), 1, TimeUnit.HOURS).cancel(false));
+        terminate(cancelled);
+    }
+
+    @Test
+    public void shutdownNowDropsDelayedWork() throws Exception {
+        ScheduledExecutorService pool = Executors.newScheduledThreadPool(1);
+        AtomicBoolean ran = new AtomicBoolean();
+        ScheduledFuture<String> once = pool.schedule(answering("ran", ran), 150, TimeUnit.MILLISECONDS);
+        pool.shutdownNow();
+        assertTrue(pool.isShutdown());
+        assertTrue(pool.awaitTermination(10, TimeUnit.SECONDS));
+        Thread.sleep(400);
+        assertFalse(ran.get());
+        // As the JDK leaves the future of a dropped task.
+        assertFalse(once.isDone());
+        assertFalse(once.isCancelled());
+    }
 }
