@@ -514,6 +514,35 @@ public class Scene implements EventTarget {
         }
     }
 
+    /// Settles the focus of a scene a window has just shown. `chosen` is
+    /// the node the application gave the focus before the window opened,
+    /// or `null`: it keeps it, whatever the form focused as it came up,
+    /// and its widget now exists to be told. With no choice made the
+    /// first node that takes the focus gets it: what JavaFX does, and
+    /// what makes Space, Enter and the arrow keys mean something in a
+    /// window nobody has clicked in yet.
+    public final void cn1FocusInitial(Node chosen) {
+        if (getRoot() == null) {
+            return;
+        }
+        if (chosen != null && chosen.getScene() == this && chosen.isVisible() && !chosen.isDisabled()) {
+            if (focusOwner.get() == chosen) {
+                chosen.cn1FocusRequested();
+            } else {
+                cn1SetFocusOwner(chosen, true);
+            }
+            return;
+        }
+        if (focusOwner.get() != null) {
+            return;
+        }
+        ArrayList<Node> order = new ArrayList<Node>();
+        collectTraversable(getRoot(), order);
+        if (!order.isEmpty()) {
+            cn1SetFocusOwner(order.get(0), true);
+        }
+    }
+
     private void collectTraversable(Node n, ArrayList<Node> into) {
         if (!n.isVisible() || n.isDisabled()) {
             return;

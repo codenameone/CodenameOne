@@ -44,6 +44,7 @@ javafx.scene.Parent#cn1PeerChildOffset
 javafx.scene.Parent#cn1PickSelf
 javafx.scene.Parent#cn1SizedByChildren
 javafx.scene.Scene#cn1ContextMenu
+javafx.scene.Scene#cn1FocusInitial
 javafx.scene.Scene#cn1Host
 javafx.scene.Scene#cn1InitialHeight
 javafx.scene.Scene#cn1InitialWidth

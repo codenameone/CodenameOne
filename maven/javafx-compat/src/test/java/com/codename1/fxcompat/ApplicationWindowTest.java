@@ -25,6 +25,8 @@ package com.codename1.fxcompat;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 
 import org.junit.After;
 import org.junit.Before;
@@ -103,6 +105,33 @@ public class ApplicationWindowTest {
     /// The port pushes a title only when asked to, and Codename One asks
     /// only for a title set on the form that is showing. A stage is
     /// titled before it is shown, and the primary one has no title area.
+    /// A window opens with the focus on its first control, so Space fires
+    /// it before anything was clicked; a choice the application made stays.
+    @Test
+    public void aShownWindowStartsWithTheFocusOnItsFirstControl() {
+        desktop();
+        javafx.scene.control.Label title = new javafx.scene.control.Label("Title");
+        javafx.scene.control.Button first = new javafx.scene.control.Button("0");
+        javafx.scene.control.Button second = new javafx.scene.control.Button("1");
+        final int[] fired = new int[1];
+        first.setOnAction(e -> fired[0]++);
+        Scene scene = new Scene(new javafx.scene.layout.HBox(title, first, second), 320, 200);
+        primary("Ledger", scene);
+        assertSame(first, scene.getFocusOwner());
+        assertTrue(first.isFocused());
+        scene.cn1Key(javafx.scene.input.KeyEvent.KEY_PRESSED, javafx.scene.input.KeyCode.SPACE, " ");
+        scene.cn1Key(javafx.scene.input.KeyEvent.KEY_RELEASED, javafx.scene.input.KeyCode.SPACE, " ");
+        assertEquals(1, fired[0]);
+        stage.hide();
+
+        desktop();
+        javafx.scene.control.Button chosen = new javafx.scene.control.Button("chosen");
+        Scene other = new Scene(new javafx.scene.layout.HBox(new javafx.scene.control.Button("a"), chosen), 320, 200);
+        chosen.requestFocus();
+        primary("Ledger", other);
+        assertSame(chosen, other.getFocusOwner());
+    }
+
     @Test
     public void theTitleGivenBeforeShowingReachesTheWindow() {
         desktop();

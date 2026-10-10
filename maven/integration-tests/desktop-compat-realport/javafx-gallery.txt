@@ -10,9 +10,12 @@
 # what it aimed at may have moved.
 sleep 4000
 shot start
-# A button, a toggle, a check box and a radio button, each reported in the line below the controls.
-click 0.056 0.185
+# A toggle, a button, a check box and a radio button. The toggle goes first:
+# the window opens with the focus on the button, as a JavaFX window does, and
+# the line that reports a press is below the slider's ticks, out of a window
+# of this height. A press of the button shows in the focus leaving the toggle.
 click 0.433 0.185
+click 0.056 0.185
 click 0.028 0.309
 click 0.028 0.359
 # A text field: focus, typing, and Tab on to the next one.

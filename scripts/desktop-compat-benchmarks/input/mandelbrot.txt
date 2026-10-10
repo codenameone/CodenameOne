@@ -1,0 +1,14 @@
+# The Mandelbrot demo: fly to its position "1" and render the picture there.
+#
+# default.txt never pressed a button with the pointer. What it did came from
+# where Tab, the arrows and Space left the focus, which is not the same
+# button in a tool bar laid out for another look: one arm zoomed and the
+# other opened and closed the bar. The button is pressed here, per arm.
+#
+# One press only. The buttons are disabled while a picture renders, and how
+# long that takes is what differs between the arms: a second press would be
+# taken by the faster one and ignored by the slower.
+sleep 0.5
+jvm: click 0.228 0.077
+cn1: click 0.207 0.086
+sleep 15

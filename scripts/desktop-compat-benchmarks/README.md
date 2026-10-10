@@ -74,6 +74,16 @@ window-relative positions and key presses through XTEST, identical for all
 three variants. The scripts are short because they must mean the same thing to
 two different toolkits' renderings of one application.
 
+A position is a fraction of the window, and that is not enough to press the
+same control in both builds: the native look is taller than Metal or Modena,
+so a control is not at the same fraction in the two windows. `default.txt`
+ignores this, and with it the two builds of one application can end up doing
+different work. A script written for one application names such a press once
+for each arm, with a `jvm:` or `cn1:` prefix; the driver plays the lines of
+the arm it measures and every line that has no prefix. Check a new script with
+`x11bench.py --check-only` against both builds and look at the two
+`check-after.png` before trusting the numbers it produces.
+
 On **macOS** nothing may be launched unattended on a developer's desktop, so
 `bench.sh --stage build` only builds and sizes. `run-macos-bench.sh` is the
 runtime half, run by hand (or by CI, which has a desktop session): start-up to

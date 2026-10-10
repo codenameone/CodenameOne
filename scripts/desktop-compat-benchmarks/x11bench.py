@@ -390,12 +390,27 @@ class Screen(object):
         self.dpy.sync()
 
 
-def parse_script(path):
+ARMS = ("jvm", "cn1")
+
+
+def arm_of(label):
+    """The arm a variant belongs to: the Codename One build, or a JVM."""
+    return "cn1" if label.startswith("cn1") else "jvm"
+
+
+def parse_script(path, arm=None):
     """Read an input script: one action per line, '#' starts a comment.
 
     sleep SECONDS | move FX FY | click FX FY | key NAME | type TEXT
     FX and FY are fractions of the application window, so one script drives
     both variants even though their windows are not the same size.
+
+    A line that starts with "jvm:" or "cn1:" is for that arm alone. The two
+    builds do not lay a window out alike -- a native look is taller -- so a
+    script that is to press the same control in both names it once for each:
+
+        jvm: click 0.47 0.56
+        cn1: click 0.64 0.61
     """
     actions = []
     with open(path) as handle:
@@ -403,6 +418,13 @@ def parse_script(path):
             line = raw.split("#", 1)[0].strip()
             if not line:
                 continue
+            head = line.split(":", 1)[0]
+            if head in ARMS:
+                if arm is not None and head != arm:
+                    continue
+                line = line.split(":", 1)[1].strip()
+                if not line:
+                    continue
             parts = line.split(None, 1)
             verb = parts[0]
             argument = parts[1] if len(parts) > 1 else ""
@@ -637,6 +659,9 @@ def main():
     parser.add_argument("--settle-seconds", type=float, default=3.0)
     parser.add_argument("--startup-timeout", type=float, default=90.0)
     parser.add_argument("--script", default=None, help="input script (see parse_script)")
+    parser.add_argument("--arm", default=None, choices=ARMS,
+                        help="which arm's lines of the script to play "
+                             "(default: cn1 for a label that starts with cn1, else jvm)")
     parser.add_argument("--evict", action="append", default=[], metavar="PATH",
                         help="file or directory to evict before each cold start")
     parser.add_argument("--check-only", action="store_true",
@@ -655,7 +680,7 @@ def main():
     for item in args.env:
         name, _sep, value = item.partition("=")
         env[name] = value
-    script = parse_script(args.script) if args.script else None
+    script = parse_script(args.script, args.arm or arm_of(args.label)) if args.script else None
     os.makedirs(args.log_dir, exist_ok=True)
 
     def one(tag, idle, with_script):

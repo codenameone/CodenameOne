@@ -41,6 +41,7 @@ import javafx.event.EventDispatchChain;
 import javafx.event.EventHandler;
 import javafx.event.EventTarget;
 import javafx.event.EventType;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 
 /// A top level window that shows a scene.
@@ -256,11 +257,18 @@ public class Window implements EventTarget {
             return;
         }
         fireEvent(new WindowEvent(this, WindowEvent.WINDOW_SHOWING));
+        Scene shown = getScene();
+        Node chosen = shown == null ? null : shown.getFocusOwner();
         host = StageHosts.create(this);
         showing.set(true);
         WINDOWS.add(this);
         host.sceneChanged();
         host.open();
+        // A window that takes the keyboard starts with the focus on its
+        // first control. A popup does not take the keyboard from its owner.
+        if (shown != null && shown == getScene() && !(this instanceof PopupWindow)) {
+            shown.cn1FocusInitial(chosen);
+        }
         fireEvent(new WindowEvent(this, WindowEvent.WINDOW_SHOWN));
         if (block && host != null) {
             host.block();
