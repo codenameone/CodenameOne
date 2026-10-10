@@ -19,6 +19,9 @@
 CN1_PROJECT_ID="__CN1_PROJECT_ID__"
 CN1_MIN_JAVA="__CN1_MIN_JAVA__"
 CN1_EVENTS_URL="${CN1_EVENTS_URL:-https://cloud.codenameone.com/api/v2/funnel/initializr-event}"
+# Maven reports IDE builds itself (cn1.telemetry.* in pom.xml); this tells it the
+# launcher is already reporting this one, so it is counted once.
+export CN1_LAUNCHER=1
 
 function cn1_event {
   [ "${CN1_TELEMETRY:-1}" = "0" ] && return 0

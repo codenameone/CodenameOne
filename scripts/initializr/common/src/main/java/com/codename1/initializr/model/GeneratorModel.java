@@ -403,6 +403,10 @@ public class GeneratorModel {
     /// opt-out). Without it the funnel goes dark between "downloaded a project"
     /// and "first cloud build", which is exactly where new developers stall.
     private void addLauncherTelemetry(Map<String, byte[]> entries) throws IOException {
+        byte[] pom = entries.get("pom.xml");
+        if (pom != null) {
+            entries.put("pom.xml", withIdeBuildReporting(StringUtil.newString(pom)).getBytes("UTF-8"));
+        }
         byte[] sh = entries.get("build.sh");
         if (sh != null) {
             entries.put("build.sh", withShellTelemetry(StringUtil.newString(sh)).getBytes("UTF-8"));
@@ -445,6 +449,44 @@ public class GeneratorModel {
                 + fillTelemetryTokens(readResourceToString(LAUNCHER_TELEMETRY_BAT_START))
                 + script.substring(jump + 1, finish)
                 + fillTelemetryTokens(readResourceToString(LAUNCHER_TELEMETRY_BAT_FINISH));
+    }
+
+    /// The root pom with the same reporting for builds the launchers never see: the
+    /// IDE's own run configurations, and `mvn` typed by hand. Most developers open
+    /// the project in their IDE and never run build.sh, so without this the funnel
+    /// is dark for most of them. The two properties are the opt-in the Codename One
+    /// Maven plugin looks for (com.codename1.build.FirstBuildTelemetry), and
+    /// `<extensions>true</extensions>` is what lets the plugin see the end of the
+    /// build -- including a build that failed before any Codename One goal ran.
+    String withIdeBuildReporting(String pom) {
+        String plugin = "    <plugins>\n      <plugin>\n        <groupId>com.codenameone</groupId>\n"
+                + "        <artifactId>codenameone-maven-plugin</artifactId>\n"
+                + "        <version>${cn1.plugin.version}</version>\n      </plugin>\n    </plugins>\n  </build>";
+        int pluginAt = pom.indexOf(plugin);
+        int propsAt = pom.indexOf("  <properties>\n");
+        if (pluginAt < 0 || propsAt < 0) {
+            return pom;
+        }
+        String withExtension = pom.substring(0, pluginAt)
+                + StringUtil.replaceAll(plugin, "${cn1.plugin.version}</version>\n",
+                        "${cn1.plugin.version}</version>\n        <extensions>true</extensions>\n")
+                + pom.substring(pluginAt + plugin.length());
+        int insertAt = propsAt + "  <properties>\n".length();
+        return withExtension.substring(0, insertAt)
+                + "    <!-- Build progress reporting; see \"Build progress reporting\" in README.md. -->\n"
+                + "    <cn1.telemetry.project>" + projectId() + "</cn1.telemetry.project>\n"
+                + "    <cn1.telemetry.events>" + LAUNCHER_EVENTS_URL + "</cn1.telemetry.events>\n"
+                + withExtension.substring(insertAt);
+    }
+
+    /// gradle.properties with the same opt-in, read by the Codename One Gradle plugin's
+    /// settings half.
+    String withIdeBuildReportingGradle(String properties) {
+        String sep = properties.endsWith("\n") || properties.isEmpty() ? "" : "\n";
+        return properties + sep
+                + "\n# Build progress reporting; see \"Build progress reporting\" in README.md.\n"
+                + "cn1.telemetry.project=" + projectId() + "\n"
+                + "cn1.telemetry.events=" + LAUNCHER_EVENTS_URL + "\n";
     }
 
     private String fillTelemetryTokens(String text) {
@@ -606,7 +648,11 @@ public class GeneratorModel {
 
         addGradleIdeEntries(entries);
         putGradleText(entries, "settings.gradle.kts", gradleTemplate(scaffold, "settings.gradle.kts.txt", ""));
-        putGradleText(entries, "gradle.properties", gradleTemplate(scaffold, "gradle.properties.txt", ""));
+        String gradleProperties = gradleTemplate(scaffold, "gradle.properties.txt", "");
+        if (options.projectType != ProjectOptions.ProjectType.BACKEND_ONLY) {
+            gradleProperties = withIdeBuildReportingGradle(gradleProperties);
+        }
+        putGradleText(entries, "gradle.properties", gradleProperties);
         putGradleText(entries, ".gitignore", gradleTemplate(scaffold, "gitignore.txt", ""));
         // The wrapper (gradlew, gradlew.bat, gradle/wrapper/*) is every template file
         // that is not a .txt template, copied byte for byte.
@@ -1654,20 +1700,28 @@ public class GeneratorModel {
         return out.toString();
     }
 
-    /// Says what the launchers' build-progress reporting sends and how to turn it
-    /// off, where a developer reads before running anything. Only Maven app
-    /// downloads have the reporting launchers (see [addLauncherTelemetry(Map)]).
+    /// Says what build-progress reporting sends and how to turn it off, where a
+    /// developer reads before running anything: the launchers' reports and the
+    /// Maven/Gradle plugin's (see [withIdeBuildReporting(String)]).
     private void appendBuildProgressReportingSection(StringBuilder out) {
         out.append("## Build progress reporting\n\n")
-                .append("`build.sh` and `build.bat` tell Codename One when a build starts and how it ended, ")
-                .append("so we can see where first builds get stuck. They send only a one-way hash of the ")
+                .append(options.isGradle()
+                        ? "This project tells Codename One when a Gradle build starts and how it ended -- "
+                                + "from your IDE or from `./gradlew` -- "
+                        : "This project tells Codename One when a build starts and how it ended -- from "
+                                + "`build.sh` and `build.bat`, and from Maven when your IDE runs the build -- ")
+                .append("so we can see where first builds get stuck. It sends only a one-way hash of the ")
                 .append("package name (never the name itself), the build target, the OS family, the Java ")
                 .append("version, the exit code, a one-word failure reason and the duration, to ")
-                .append(LAUNCHER_EVENTS_URL).append(". Never your code, paths, user name or build output.\n\n")
+                .append(LAUNCHER_EVENTS_URL).append(", plus which tool ran the build (IntelliJ, Eclipse, ")
+                .append("NetBeans, VS Code or the command line). Never your code, paths, user name or build ")
+                .append("output.\n\n")
                 .append("To opt out, set `CN1_TELEMETRY` to `0` in the environment the build runs in:\n\n")
                 .append("- macOS/Linux: `export CN1_TELEMETRY=0`\n")
                 .append("- Windows PowerShell: `$Env:CN1_TELEMETRY = \"0\"`\n")
-                .append("- Windows Command Prompt: `set CN1_TELEMETRY=0`\n\n");
+                .append("- Windows Command Prompt: `set CN1_TELEMETRY=0`\n\n")
+                .append("or delete the `cn1.telemetry.project` and `cn1.telemetry.events` entries from ")
+                .append(options.isGradle() ? "`gradle.properties`" : "`pom.xml`").append(".\n\n");
     }
 
     private void appendIdeSection(StringBuilder out) {
@@ -2001,6 +2055,7 @@ public class GeneratorModel {
         appendGradleIdeSection(out);
 
         if (!backendOnly) {
+            appendBuildProgressReportingSection(out);
             out.append("## Signing\n\n")
                     .append("Use the Certificate Wizard to configure Apple signing assets, Android keystores, ")
                     .append("and desktop signing settings:\n\n")
