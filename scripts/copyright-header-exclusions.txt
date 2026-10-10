@@ -366,3 +366,4 @@ vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/TableSwi
 vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/TryCatchBlockNode.java | Rewrite of ASM org.objectweb.asm.tree.TryCatchBlockNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
 vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/TypeInsnNode.java | Rewrite of ASM org.objectweb.asm.tree.TypeInsnNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
 vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/VarInsnNode.java | Rewrite of ASM org.objectweb.asm.tree.VarInsnNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+scripts/backend-mvc/src/main/resources/static/htmx-2.0.11.min.js | Unmodified htmx 2.0.11 distribution, Zero-Clause BSD license in scripts/backend-mvc/HTMX-LICENSE.txt

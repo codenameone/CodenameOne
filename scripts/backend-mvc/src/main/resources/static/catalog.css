@@ -1,0 +1,23 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+:root{font:16px/1.5 system-ui,sans-serif;color:#183331;background:#f5f7f6}body{max-width:960px;margin:auto;padding:24px}header,.title,.actions{display:flex;align-items:center;justify-content:space-between;gap:18px}header{padding:12px 0 28px;border-bottom:1px solid #dbe3df}header>a{font-weight:750;text-decoration:none;font-size:22px}header span{font-size:13px;color:#5b7067}main{margin-top:40px}h1{margin:0;font-size:32px}p{color:#546960}a{color:#11664f}button,.button{background:#11664f;border:0;border-radius:6px;color:white;padding:10px 17px;text-decoration:none;font:inherit;cursor:pointer}table{margin:24px 0;width:100%;border-collapse:collapse;background:white}th,td{text-align:left;padding:16px;border-bottom:1px solid #dbe3df}th{font-size:13px;color:#546960}td.actions{justify-content:flex-start}td form{margin:0}.quiet{background:none;color:#94423d;padding:0}label{display:block;margin:20px 0 5px}input:not([type=checkbox]):not([type=hidden]){display:block;box-sizing:border-box;width:100%;max-width:480px;padding:10px;border:1px solid #8ba399;border-radius:5px;font:inherit}.check{margin-bottom:24px}.error{color:#9b2926;margin:6px 0;font-size:14px}.error:empty{display:none}main>form>.actions{justify-content:flex-start}@media(max-width:600px){body{padding:16px}header span{display:none}.title{align-items:flex-start}th,td{padding:10px}td.actions{gap:12px}}

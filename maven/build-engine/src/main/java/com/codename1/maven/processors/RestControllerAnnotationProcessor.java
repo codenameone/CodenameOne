@@ -73,6 +73,9 @@ import org.objectweb.asm.Type;
 public final class RestControllerAnnotationProcessor extends AbstractAnnotationProcessor {
 
     private static final String PKG = "Lcom/codename1/backend/annotations/";
+    private static final String MVC_CONTROLLER = PKG + "Controller;";
+    private static final String MODEL_ATTRIBUTE = PKG + "ModelAttribute;";
+    private static final String MVC = "com.codename1.backend.mvc.";
     private static final String CONTROLLER = PKG + "RestController;";
     private static final String REQUEST_MAPPING = PKG + "RequestMapping;";
     private static final String PATH_VARIABLE = PKG + "PathVariable;";
@@ -235,6 +238,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     private final Map<String, String> routeOwners = new LinkedHashMap<String, String>();
 
     private static final class Controller {
+        boolean mvc;
         String binaryName;
         /**
          * The name to WRITE, which is the binary one until the controller is a
@@ -255,6 +259,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         String pattern;
         String javaMethod;
         String returnJavaType;
+        boolean view;
         int status;
         List<Param> params = new ArrayList<Param>();
         /** The literal bytes before the first `{`; the whole pattern when there is none. */
@@ -287,6 +292,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
          * one; null when the body binds as parsed.
          */
         String codecRead;
+        String formBinding;
     }
 
     /// {AnnotatedClass, description} of every handler parameter the security
@@ -308,6 +314,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     public Set<String> getAnnotationDescriptors() {
         Set<String> out = new java.util.LinkedHashSet<String>();
         out.add(CONTROLLER);
+        out.add(MVC_CONTROLLER);
         out.add(WEBSOCKET_MAPPING);
         return out;
     }
@@ -320,7 +327,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             // controller and a websocket endpoint, and refusing that would be an
             // arbitrary rule rather than a real constraint.
         }
-        if (cls.getClassAnnotation(CONTROLLER) == null) {
+        if (cls.getClassAnnotation(CONTROLLER) == null && cls.getClassAnnotation(MVC_CONTROLLER) == null) {
             return;
         }
         // A CLASS WHOSE SOURCE IS GONE is not a controller any more. Maven leaves
@@ -341,7 +348,12 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             ctx.error(cls, "@RestController must be a concrete class: " + cls.getBinaryName());
             return;
         }
+        if (cls.getClassAnnotation(CONTROLLER) != null && cls.getClassAnnotation(MVC_CONTROLLER) != null) {
+            ctx.error(cls, "Choose @Controller or @RestController, not both");
+            return;
+        }
         Controller controller = new Controller();
+        controller.mvc = cls.getClassAnnotation(MVC_CONTROLLER) != null;
         controller.binaryName = cls.getBinaryName();
         controller.sourceName = cls.getSourceName();
         controller.packageName = RestClientAnnotationProcessor.packageOf(controller.binaryName);
@@ -785,6 +797,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         String[] genericParams = RestClientAnnotationProcessor.parseGenericParameterSignatures(
                 m.getSignature(), paramTypes.length);
         List<Map<String, AnnotationValues>> paramAnnotations = m.getParameterAnnotations();
+        Set<String> formNames = new LinkedHashSet<String>();
         for (int i = 0; i < paramTypes.length; i++) {
             Param p = new Param();
             p.javaType = RestClientAnnotationProcessor.javaTypeFor(paramTypes[i], null);
@@ -804,6 +817,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             AnnotationValues requestBody = annotations.get(REQUEST_BODY);
             AnnotationValues requestPart = annotations.get(REQUEST_PART);
             AnnotationValues principal = annotations.get(AUTHENTICATION_PRINCIPAL);
+            AnnotationValues form = annotations.get(MODEL_ATTRIBUTE);
             // EXACTLY one. The chain below is priority-ordered, so a parameter
             // carrying both @RequestHeader("Authorization") and @RequestParam("token")
             // silently bound whichever came first and read from a source the
@@ -812,7 +826,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             // caller writes. The contract client processor already refuses this.
             int bindings = (pathVariable != null ? 1 : 0) + (requestParam != null ? 1 : 0)
                     + (requestHeader != null ? 1 : 0) + (requestBody != null ? 1 : 0)
-                    + (requestPart != null ? 1 : 0) + (principal != null ? 1 : 0);
+                    + (requestPart != null ? 1 : 0) + (principal != null ? 1 : 0) + (form != null ? 1 : 0);
             if (bindings > 1) {
                 ctx.error(cls, "Parameter " + (i + 1) + " of " + cls.getBinaryName() + "."
                         + m.getName() + " carries more than one binding annotation. One "
@@ -821,7 +835,25 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                         + "@AuthenticationPrincipal, and drop the others.");
                 return null;
             }
-            if (pathVariable != null) {
+            if (form != null) {
+                p.kind = "FORM";
+                p.name = form.getStringOrDefault("value", "");
+                p.local = "cn1Form" + i;
+                if (!p.name.matches("[A-Za-z][A-Za-z0-9_]*")) { ctx.error(cls, "@ModelAttribute requires a simple nonempty name"); return null; }
+                if (!formNames.add(p.name)) {
+                    ctx.error(cls, "Duplicate @ModelAttribute name '" + p.name + "' on "
+                            + cls.getBinaryName() + "." + m.getName()
+                            + "; each form parameter on a route needs a distinct name");
+                    return null;
+                }
+                try { p.formBinding = MvcForms.binding(ctx, p.javaType, p.name, p.local); }
+                catch (IllegalArgumentException error) { ctx.error(cls, error.getMessage()); return null; }
+            } else if ((MVC + "Model").equals(p.javaType)) {
+                p.kind = "MODEL";
+            } else if ((MVC + "BindingResult").equals(p.javaType)) {
+                if (i == 0 || !"FORM".equals(route.params.get(i - 1).kind)) { ctx.error(cls, "BindingResult must immediately follow @ModelAttribute"); return null; }
+                p.kind = "ERRORS"; p.local = route.params.get(i - 1).local + "Errors";
+            } else if (pathVariable != null) {
                 p.kind = "PATH";
                 p.name = pathVariable.getStringOrDefault("value", "");
                 p.defaultValue = pathVariable.getStringOrDefault("defaultValue", "");
@@ -975,7 +1007,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                         + "generates the codecs.");
                 return null;
             }
-            if (!"REQUEST".equals(p.kind) && !"PART".equals(p.kind) && !isSecurityKind(p.kind)
+            if (!"REQUEST".equals(p.kind) && !"PART".equals(p.kind) && !isSecurityKind(p.kind) && !isMvcKind(p.kind)
                     && !isBindable(p.javaType, p.kind)) {
                 ctx.error(cls, "Cannot bind " + p.javaType + " from the request on "
                         + cls.getBinaryName() + "." + m.getName() + ". Path, query and "
@@ -1029,7 +1061,11 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                     + "start the work and return an id to ask about it by.");
             return null;
         }
-        if (!isEncodableReturn(route.returnJavaType, ctx)) {
+        route.view = cls.getClassAnnotation(MVC_CONTROLLER) != null
+                && cls.getClassAnnotation(PKG + "ResponseBody;") == null
+                && m.getAnnotation(PKG + "ResponseBody;") == null
+                && ("java.lang.String".equals(route.returnJavaType) || (MVC + "ModelAndView").equals(route.returnJavaType));
+        if (!route.view && !isEncodableReturn(route.returnJavaType, ctx)) {
             // One of the application's classes, or a container of them: written
             // through a codec the build generates for it, as Jackson would write
             // it for a Spring controller.
@@ -1478,6 +1514,20 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             }
             sources.putAll(codecSources);
         }
+        boolean hasViews = false;
+        for (Controller controller : controllers.values()) for (Route route : controller.routes) hasViews |= route.view;
+        if (hasViews || hasMvcControllers()) {
+            try {
+                Map<String, String> mvcSources = hasViews ? new MvcTemplates(ctx).sources() : new LinkedHashMap<String, String>();
+                mvcSources.putAll(MvcAssets.sources(MvcTemplates.projectDirectory(ctx)));
+                for (String generated : mvcSources.keySet()) if (isNotOurOwnOutput(ctx, generated)) {
+                    ctx.error("Generated MVC class would overwrite " + generated); return;
+                }
+                sources.putAll(mvcSources);
+                ctx.setAttribute("cn1.backend.mvc", Boolean.TRUE);
+            }
+            catch (IllegalArgumentException error) { ctx.error(error.getMessage()); return; }
+        }
         daos = hasGeneratedDaos(ctx);
         sources.put(wiring, generateWiring(entryPackage));
         sources.put(bootstrap, generateBootstrap(entryPackage));
@@ -1488,6 +1538,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 cp.add(new File(element));
             }
             JavaSourceCompiler.compile(sources, ctx.getOutputClassDir(), cp);
+            MvcAssets.removeObsoleteClasses(ctx.getOutputClassDir(), sources.keySet());
             ctx.emitResource(MAIN_CLASS_RESOURCE, asciiBytes(bootstrap));
             ctx.emitResource(WIRING_RESOURCE, asciiBytes(wiringRecord(entryPackage)));
         } catch (IOException ioe) {
@@ -1655,6 +1706,17 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         emitScalarGuards(sb, route, pad);
         emitBodyLocals(sb, route, pad);
 
+        boolean needsModel = route.view;
+        for (Param p : route.params) needsModel |= isMvcKind(p.kind);
+        if (needsModel) sb.append(pad).append("com.codename1.backend.mvc.Model cn1Model = com.codename1.backend.mvc.Html.model(request);\n");
+        for (int i = 0; i < route.params.size(); i++) {
+            Param p = route.params.get(i);
+            if ("FORM".equals(p.kind)) {
+                appendIndented(sb, p.formBinding, pad);
+                if (i + 1 >= route.params.size() || !"ERRORS".equals(route.params.get(i + 1).kind))
+                    sb.append(pad).append("if (").append(p.local).append("Errors.hasErrors()) return com.codename1.backend.HttpServer.Response.text(400, \"Invalid form\");\n");
+            }
+        }
         StringBuilder args = new StringBuilder();
         boolean principalRead = false;
         for (int i = 0; i < route.params.size(); i++) {
@@ -1672,7 +1734,15 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         }
 
         String call = "impl." + route.javaMethod + "(" + args + ")";
-        if ("void".equals(route.returnJavaType)) {
+        if (route.view) {
+            if ((MVC + "ModelAndView").equals(route.returnJavaType)) {
+                sb.append(pad).append(MVC).append("ModelAndView result = ").append(call).append(";\n");
+                sb.append(pad).append("if (result == null) return com.codename1.backend.HttpServer.Response.text(404, \"\");\n");
+                sb.append(pad).append("cn1Model.addAllAttributes(result.getModel());\n");
+                sb.append(pad).append("String view = result.getViewName();\n");
+            } else sb.append(pad).append("String view = ").append(call).append(";\n");
+            sb.append(pad).append("return com.codename1.generated.mvc.Views.respond(request, view, cn1Model, ").append(route.status).append(");\n");
+        } else if ("void".equals(route.returnJavaType)) {
             sb.append(pad).append(call).append(";\n");
             sb.append(pad).append("return request.respond(").append(route.status)
               .append(", \"text/plain\", EMPTY);\n");
@@ -2359,11 +2429,17 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
 
     /// Whether a parameter is filled from the security layer rather than read
     /// out of the request: who is signed in, their principal, or the CSRF token.
+    private static boolean isMvcKind(String kind) {
+        return "FORM".equals(kind) || "MODEL".equals(kind) || "ERRORS".equals(kind);
+    }
+
     private static boolean isSecurityKind(String kind) {
         return "AUTHENTICATION".equals(kind) || "PRINCIPAL".equals(kind) || "CSRF".equals(kind);
     }
 
     private static String argumentExpression(Param p) {
+        if ("MODEL".equals(p.kind)) return "cn1Model";
+        if ("FORM".equals(p.kind) || "ERRORS".equals(p.kind)) return p.local;
         if ("REQUEST".equals(p.kind)) {
             return "request";
         }
@@ -2974,10 +3050,16 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         return sb.toString();
     }
 
+    private boolean hasMvcControllers() {
+        for (Controller controller : controllers.values()) if (controller.mvc) return true;
+        return false;
+    }
+
     /// What [#WIRING_RESOURCE] holds for this build.
     String wiringRecord(String packageName) {
         StringBuilder sb = new StringBuilder();
         sb.append("package\t").append(packageName).append('\n');
+        if (hasMvcControllers()) sb.append("mvc-assets\ttrue\n");
         for (Controller c : controllers.values()) {
             sb.append("router\t").append(c.binaryName).append('\t')
               .append(qualify(c.packageName, c.routerSimpleName)).append('\n');
@@ -3360,7 +3442,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         return sb.append("}").toString();
     }
 
-    private static String quote(String value) {
+    static String quote(String value) {
         StringBuilder sb = new StringBuilder("\"");
         for (int i = 0; i < value.length(); i++) {
             char c = value.charAt(i);

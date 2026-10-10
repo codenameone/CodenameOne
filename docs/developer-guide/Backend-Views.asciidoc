@@ -1,0 +1,180 @@
+[[backend-views]]
+== Compiled HTML views
+
+The backend can serve HTML applications without a Codename One client. Write HTML
+with a supported subset of Thymeleaf attributes, return view names from Java
+controllers, and use htmx when an interaction should update part of the page.
+The build parses the templates and produces Java renderers. Native packaging
+translates those renderers through ParparVM to C along with the rest of the server.
+There is no template engine, expression interpreter or compiler in the request path.
+
+The runnable example is `scripts/backend-mvc`. It includes an in-memory product
+catalog, form errors, CSRF protection, shared page fragments, and a pinned local
+htmx script. Its forms work with JavaScript disabled too.
+
+=== Controllers and models
+
+Use `com.codename1.backend.annotations.Controller` for HTML controllers and
+`com.codename1.backend.mvc.Model` for their model. Existing REST controllers retain
+their response semantics. An HTML controller uses the same mapping annotations,
+constructor injection, sessions and security chains as a REST controller.
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/HtmlProducts.java[tag=backend-views-controller,indent=0]
+----
+
+A string return value selects a compiled view. `products` selects
+`src/main/resources/templates/products.html`; `products :: rows` selects that
+file's named fragment. `redirect:/products` redirects to a local absolute path:
+303 for normal requests, or 200 with `HX-Redirect` for requests from htmx. A null
+return is 404. Unknown view names fail the request; they never resolve file paths.
+
+`ModelAndView` carries a view name and attributes added with `addObject`.
+`@ResponseBody`, on the method or controller, retains the REST response rules.
+An explicit `HttpServer.Response` is returned unchanged. A view's default status
+is 200; `@ResponseStatus` can change it.
+
+=== Typed HTML
+
+Declare model types with comments. Names are explicit and types are fully qualified:
+
+[source,html]
+----
+include::../demos/backend/src/main/snippets/products.html[tag=backend-views-list,indent=0]
+----
+
+The build resolves public JavaBean getters or public fields and emits direct
+access. Generic type arguments are preserved through getters, fields, and inherited
+classes or interfaces. A missing property or undeclared model name fails the build with the
+file and source position. At runtime, a referenced model must be present and have
+the declared type. A present null renders as empty text; property navigation
+propagates null. Numeric comparisons require non-null operands. Fragments only
+require model names they read. Collection loops check element types before access.
+
+Supported directives:
+
+* `th:text`, `th:if`, `th:unless`, and `th:each="item, status : ${items}"`.
+  The optional status exposes `index`, `count`, `size`, `first`, `last`, `even`, and `odd`.
+* `th:href`, `src`, `action`, `value`, `id`, `name`, `class`, `title`, `alt`,
+  `placeholder`, `method`, and `for`, plus `th:classappend`.
+* Boolean attributes `checked`, `selected`, `disabled`, `readonly`, `multiple`,
+  `required`, `autofocus`, and `hidden`.
+* `th:attr="attribute=expression, other=expression"`, including htmx URLs.
+* `th:fragment="name"`, `th:insert="~{layout :: name}"`, and
+  `th:replace="~{layout :: name}"`. References are static, fragments have no
+  parameters, and recursive inclusion is a build error. `th:block` adds no wrapper.
+* `th:object`, `th:field`, and `th:errors` for forms.
+
+Expressions support `${model.property}`, typed list/array/map indexing, string,
+number, boolean and null literals, boolean operators, equality, numeric comparisons,
+addition/subtraction, and `condition ? yes : no`. Selection expressions `*{field}`
+use the enclosing `th:object`. URL expressions use local paths with encoded path
+and query arguments, such as `@{/search(q=${query})}`.
+
+Dynamic text and attributes are HTML-escaped. URL arguments use URL encoding
+before attribute escaping. Dynamic URL attributes reject executable URL schemes.
+Dynamic htmx attributes that evaluate expressions (`hx-on*`, `hx-vars`, `hx-vals`,
+`hx-headers`, `hx-request`, and `hx-trigger`) are rejected, including `data-hx-*`
+aliases. Define those attributes as static template content.
+Script sources, link-resource URLs (including stylesheets), and base URLs must be
+static template attributes. Meta `http-equiv` directives, including refresh content,
+must also be static. Named metadata such as a description can use dynamic content.
+Dynamic attributes are evaluated once per rendered
+element, including each iteration of a loop.
+Raw HTML, dynamic script/style content, arbitrary method calls, expression
+preprocessing, message expressions, inline expressions, custom dialects, and
+Spring EL are outside this subset. Unsupported `th:` attributes fail the build.
+This is a syntax-compatible subset, not the Thymeleaf library.
+
+=== Forms and validation
+
+A mapped method can receive a dedicated form DTO:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/HtmlProducts.java[tag=backend-views-save,indent=0]
+----
+
+Form DTOs need a public no-argument constructor and writable scalar fields or
+setters. Supported values are strings, numeric primitives/boxes, booleans and
+characters. Nested objects, collections, file uploads through the form DTO, and
+ORM entities are refused. Bind identifiers through route parameters.
+Unknown submitted fields are ignored; no property path from a request is executed.
+
+`BindingResult` must immediately follow its form parameter. Conversion errors are
+recorded before the controller runs. Without a `BindingResult`, conversion failure
+returns 400. `reject(message)` adds a global error; `rejectValue(field, message)`
+adds a field error. Validation is application code; Bean Validation annotations
+aren't implemented.
+
+[source,html]
+----
+include::../demos/backend/src/main/snippets/edit.html[tag=backend-views-form,indent=0]
+----
+
+`th:field` renders the name, a default id, and the submitted value if binding failed.
+It supports inputs, textareas, scalar selects, checkboxes and radio buttons.
+Boolean checkboxes use field presence, including with custom values. They emit a
+hidden marker so an unchecked field binds to false. The marker shares the
+checkbox's disabled state and form association. Without a marker, Boolean fields
+use strict value conversion.
+`th:errors="*{*}"` renders all errors for the selected form. Use distinct explicit
+ids for radio buttons in a group. Multiple-selection collection binding is deferred.
+
+Each `@ModelAttribute` parameter on a route must have a distinct name; duplicate
+names fail the build instead of overwriting form objects and validation results.
+
+=== htmx, CSRF and assets
+
+Ordinary `hx-*` attributes pass through. Put `hx-post` on a form and target a
+named fragment's wrapper. `Htmx.isRequest(request)` distinguishes fragment requests
+from normal navigation and history restoration. A controller chooses the view;
+request headers never select a template themselves. Return form-error fragments
+with status 200 so htmx swaps them normally. `Htmx.redirect`, `refresh`, and `trigger`
+provide response-header helpers.
+
+The existing security chain remains responsible for CSRF enforcement. The model
+contains `_csrf`, whose type is declared automatically. Unsafe forms include a
+hidden CSRF token when one is available; htmx serializes it with the other fields.
+Form `action`, submit-control `formaction`, mutating htmx URLs (`hx-post`,
+`hx-put`, `hx-patch`, `hx-delete`), and static base URLs must be local
+absolute paths such as `/products/save`, or empty to use the current document.
+This applies to static and dynamic form destinations, including controls in fragments,
+to prevent submissions from disclosing the generated token to another origin.
+For `hx-get`, generated `hx-params` filtering excludes the CSRF parameter while
+preserving the token for a native POST fallback. Explicit parameter allow lists
+and exclusion lists are retained; included fragments receive their parent's
+original parameter filter, so nested POST requests don't inherit the GET-only
+CSRF exclusion. The configured CSRF parameter name is used.
+When a CSRF token is available, submit controls can't override the native method
+with GET or an invalid value that defaults to GET. This restriction also applies
+to controls in fragments or controls linked to a form by its ID. Use a separate
+GET form for searches and previews. POST and dialog overrides remain supported.
+Form `enctype` and submit-control `formenctype` support
+`application/x-www-form-urlencoded` and `multipart/form-data`. Unsupported static
+encodings fail the build; unsupported dynamic values fail rendering. In particular,
+`text/plain` isn't supported by form binding.
+For requests outside forms, supply the existing token header explicitly. Defining
+HTML controllers doesn't enable a security chain automatically.
+
+Files in `src/main/resources/static` are embedded at build time and served under
+`/static/` after controller routes. Only enumerated assets are accessible; templates
+are private. Embedded assets use `Cache-Control: no-cache` and `nosniff`. Use URL-safe
+ASCII filenames. Each embedded asset is limited to 2 MiB; use the existing
+`cn1.static.root` facility for larger files.
+
+=== Building and porting
+
+Maven compiles views during `process-annotations` in `process-classes`; native
+packaging also runs this compiler. Gradle uses the same engine and tracks templates
+and static assets as compilation inputs. Rebuild after editing HTML. Generated
+view and asset registries are replaced on each build, including after file deletion.
+The first request only executes generated code.
+
+To port a small Spring MVC application, change the controller/model imports, add
+template model declarations, use dedicated scalar form DTOs, and replace unsupported
+expressions or dialect features. Keep existing HTML and htmx attributes within the
+supported subset. Controller advice, method-level `@ModelAttribute`, flash attributes,
+`forward:` views, custom converters, dynamic fragment selectors, and internationalized
+message bundles aren't part of this first version.

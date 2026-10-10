@@ -1,0 +1,9 @@
+<!-- tag::backend-views-list[] -->
+<!-- cn1:model products java.util.List<com.codenameone.developerguide.backend.HtmlProduct> -->
+<ul th:fragment="rows">
+  <li th:each="product : ${products}">
+    <a th:href="@{/products/{id}(id=${product.id})}"
+       th:text="${product.name}">Example product</a>
+  </li>
+</ul>
+<!-- end::backend-views-list[] -->
