@@ -126,7 +126,14 @@
                                      one. The .res is committed and kept in sync
                                      by .github/workflows/native-themes-sync.yml. -->
                                 <zip destfile="${project.build.directory}/codenameone/iosport-bundle/nativeios.jar">
+                                    <!-- *.md: the port's design notes (WATCHOS_PORT.md,
+                                         TVOS_PORT.md) live beside the natives for the people
+                                         editing them. Everything in this jar is copied into the
+                                         generated Xcode project, and a file Xcode does not
+                                         compile lands in the resources phase, so they shipped
+                                         inside every iOS application. -->
                                     <fileset dir="${codename1.nativeios.dir}">
+                                        <exclude name="*.md"/>
                                         <exclude name="iOSModernTheme.res"/>
                                         <exclude name="iOSModern27Theme.res"/>
                                     </fileset>

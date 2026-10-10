@@ -1,0 +1,15 @@
+a=2 b=1
+next1,next2
+a=2 b=1
+bump1,bump2
+a=second b=first
+Tag(first),Tag(second)
+a=3 b=2
+peek2,next3
+a=5 b=1
+a=7 b=7
+a=8 b=2
+a=11 b=2
+a=21 b=L11
+a=2 b=1
+tick1,tick2

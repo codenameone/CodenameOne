@@ -132,14 +132,15 @@ public @interface Android {
     int targetSDKVersion() default 0;
 
     /// `auto`, `modern` / `material`, `hololight` (default for existing apps),
-    /// `legacy`. `auto` and `modern` / `material` opt in to the CSS-generated
+    /// `legacy`, `custom`. `auto` and `modern` / `material` opt in to the CSS-generated
     /// Android Material 3 theme from `native-themes/android-material/theme.css`.
     /// `hololight` is Android Holo Light (what the framework shipped on API 14+
     /// before this refactor). `legacy` loads the pre-Holo Android theme. The
     /// legacy alias `cn1.androidTheme` is still accepted, and `and.hololight=true`
     /// still maps to `hololight`. The default stays on `hololight` for existing
-    /// apps until you flip in a future release.
-    @Hint(name = "and.themeMode", valuePattern = "auto|modern|hololight|legacy")
+    /// apps until you flip in a future release. `custom` packages and installs no
+    /// Android theme at all, for an application whose own theme is the only one.
+    @Hint(name = "and.themeMode", valuePattern = "auto|modern|hololight|legacy|custom")
     ThemeMode themeMode() default ThemeMode.DEFAULT;
 
     /// Statements added to the top-level Gradle build file rather than the app

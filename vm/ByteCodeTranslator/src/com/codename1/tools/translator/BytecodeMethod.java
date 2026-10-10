@@ -140,6 +140,7 @@ public class BytecodeMethod implements SignatureSet {
     private final static Set<String> virtualMethodsInvoked = new TreeSet<String>();    
     private String desc;
     private boolean eliminated;
+    private boolean bodyCulled;
     private boolean barebone;
     private boolean disableDebugInfo;
     private boolean disableNullAndArrayBoundsChecks;
@@ -174,6 +175,14 @@ public class BytecodeMethod implements SignatureSet {
 
     public static boolean isOnDeviceDebug() {
         return onDeviceDebug;
+    }
+
+    /// -Dcn1.cull.trap=true or CN1_CULL_TRAP=1: culled-method stubs abort, naming the
+    /// method, instead of returning 0. See appendMethodC. The dotted key is what makes
+    /// Util.getProperty's environment name CN1_CULL_TRAP.
+    static boolean isCullTrapEnabled() {
+        String v = Util.getProperty("cn1.cull.trap", "false");
+        return "true".equalsIgnoreCase(v) || "1".equals(v);
     }
 
     public boolean isBarebone() {
@@ -1759,12 +1768,23 @@ public class BytecodeMethod implements SignatureSet {
         if(nativeMethod) {
             return;
         }
-        if (onDeviceDebug && !eliminated) {
+        if (onDeviceDebug && !eliminated && !bodyCulled) {
             appendFrameInfoStruct(b);
         }
         appendCMethodPrefix(b, "");
         b.append(" {\n");
-        if(eliminated) {
+        if(eliminated || bodyCulled) {
+            // A culled method of a surviving class is still emitted, because dispatch
+            // tables name it -- and a stub that returns 0 turns a wrong cull into a silent
+            // null. CN1_CULL_TRAP (our CI sets it, as it does CN1_NATIVE_VERIFY) makes the
+            // stub abort with the method's name instead, so a cull that removed something
+            // live fails the suite that reached it. Abort, not a thrown Error: a
+            // catch (Throwable) would swallow that, and does in exactly the defensive code
+            // most likely to be the caller.
+            if (isCullTrapEnabled()) {
+                b.append("    cn1CulledMethodCalled(\"").append(clsName).append('.')
+                        .append(methodName).append(desc.replace('"', '\'')).append("\");\n");
+            }
             if(returnType.isVoid()) {
                 b.append("    return;\n}\n\n");
             } else {
@@ -3882,6 +3902,19 @@ public class BytecodeMethod implements SignatureSet {
      */
     public void setEliminated(boolean eliminated) {
         this.eliminated = eliminated;
+    }
+
+    /// Replaces the body with the culled-method stub but keeps the method: an instance
+    /// method live code calls that can never run, because nothing allocates its class
+    /// (ReachabilityCull.Allocation). The call site still names its virtual_ dispatcher,
+    /// so the method has to exist; what its body would have called does not.
+    void cullBody() {
+        bodyCulled = true;
+        instructions.clear();
+    }
+
+    boolean isBodyCulled() {
+        return bodyCulled;
     }
 
 

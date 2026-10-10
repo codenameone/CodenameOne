@@ -1,0 +1,28 @@
+[1]
+[2]
+2
+first
+set count 3
+3
+3
+2.5
+-2.5
+3
+3
+true
+8
+abc
+abab
+true
+true
+true
+eval b
+eval a
+ab
+eval 2
+eval 1
+1-2
+[a, b, c]
+-a-b-c-
+1.00000000000000000000
+1.00

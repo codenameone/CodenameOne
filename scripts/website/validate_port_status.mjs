@@ -119,8 +119,35 @@ function validate() {
             fail(`deployment and performance evidence is missing ${required}`);
         }
     }
-    if (/flutter/i.test(pageText)) {
+    // The Flutter benchmark is the one place this page may name another
+    // framework, and only inside its own marked section: it measures the same
+    // Flutter application built by Flutter and by Codename One on each port, so
+    // it belongs beside the ports it measures. Everywhere else the rule stands,
+    // so the check runs on the page with that section cut out rather than being
+    // dropped.
+    const benchmarkSections = Array.from(
+        page.matchAll(/<section\b(?=[^>]*\bdata-flutter-benchmark(?=[\s=>]))[^>]*>[\s\S]*?<\/section>/gi),
+        (match) => match[0]);
+    if (benchmarkSections.length > 1) {
+        fail("the Flutter benchmark must render as a single section");
+    }
+    const textOutsideBenchmark = benchmarkSections
+        .reduce((html, section) => html.replace(section, " "), page)
+        .replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+    if (/flutter/i.test(textOutsideBenchmark)) {
         fail("the Port Status page must not contain unrelated framework-comparison language");
+    }
+    for (const section of benchmarkSections) {
+        // Its own attributes only: the evidence counts above must not see it.
+        if (/\bdata-(?:performance|feature|deployment)-(?:row|cell)\b|\bdata-port=/i.test(section)) {
+            fail("the Flutter benchmark section reuses the compliance matrix's counted attributes");
+        }
+        const rows = Array.from(section.matchAll(/<tr\b[^>]*\bdata-flutter-benchmark-row=[^>]*>([\s\S]*?)<\/tr>/gi));
+        for (const [, row] of rows) {
+            if (!/\b\d+\.\d\dx\b/.test(row.replace(/<[^>]+>/g, " "))) {
+                fail("every Flutter benchmark row must state its ratio");
+            }
+        }
     }
 
     const portCards = countMatches(page, /\bdata-port-card(?:=|\s|>)/g);

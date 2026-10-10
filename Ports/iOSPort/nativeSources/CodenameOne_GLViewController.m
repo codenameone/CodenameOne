@@ -21,6 +21,8 @@
  * need additional information or have any questions.
  */
 #import <objc/runtime.h>
+#include <sys/stat.h>
+#include <limits.h>
 #import <QuartzCore/QuartzCore.h>
 #import "CodenameOne_GLViewController.h"
 
@@ -3119,7 +3121,8 @@ JAVA_BOOLEAN Java_com_codename1_impl_ios_IOSImplementation_isRoundedImageDrawSup
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedGlobalImpl
-(void* peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius) {
+(void* peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius,
+ float u0, float v0, float du, float dv) {
 #ifdef CN1_USE_METAL
     if(((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == peer) {
         Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
@@ -3127,6 +3130,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedGlobalI
     DrawImage* f = [[DrawImage alloc] initWithArgs:alpha xpos:x ypos:y i:(BRIDGE_CAST GLUIImage*)peer w:width h:height];
     [f setRenderingHints:renderingHints];
     [f setCornerRadius:cornerRadius];
+    [f setRegionX:u0 y:v0 w:du h:dv];
     [CodenameOne_GLViewController upcoming:f];
 #ifndef CN1_USE_ARC
     [f release];
@@ -3137,13 +3141,15 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedGlobalI
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedMutableImpl
-(void* peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius) {
+(void* peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius,
+ float u0, float v0, float du, float dv) {
 #ifdef CN1_USE_METAL
     GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
     if (target == nil) return;
     DrawImage *f = [[DrawImage alloc] initWithArgs:alpha xpos:x ypos:y i:(BRIDGE_CAST GLUIImage*)peer w:width h:height];
     [f setRenderingHints:renderingHints];
     [f setCornerRadius:cornerRadius];
+    [f setRegionX:u0 y:v0 w:du h:dv];
     [f setTarget:target];
     [CodenameOne_GLViewController upcoming:f];
 #ifndef CN1_USE_ARC
@@ -3228,10 +3234,16 @@ int getResourceSize(const char* name, int nameLen, const char* type, int typeLen
     if(path == nil) {
         return -1;
     }
-    NSData* iData = [NSData dataWithContentsOfFile:path];
-    int size = [iData length];
-    //CN1Log(@"getResourceSize %i finished", size);
-    return size;
+    // The size from the file system, not by reading the file. This used to load
+    // the whole resource into an NSData just to take its length, and it runs in
+    // front of every getResourceAsStream -- so each bundled resource was read in
+    // full twice, and the gallery's images, theme and fonts paid for it inside
+    // the first frame of a launch.
+    struct stat st;
+    if (stat([path fileSystemRepresentation], &st) != 0) {
+        return -1;
+    }
+    return st.st_size > INT_MAX ? INT_MAX : (int)st.st_size;
 }
 
 

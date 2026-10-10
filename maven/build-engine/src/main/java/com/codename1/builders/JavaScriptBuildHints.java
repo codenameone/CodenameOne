@@ -385,7 +385,7 @@ public final class JavaScriptBuildHints {
     /// Whether `text` holds `value` as a whole constant-pool string: a CONSTANT_Utf8 entry is a
     /// tag byte 1 and a two-byte length before its bytes. "nativeTheme" must not match inside
     /// "nativeThemeResource" or another longer name.
-    private static boolean containsConstant(String text, String value) {
+    static boolean containsConstant(String text, String value) {
         int len = value.length();
         int from = 0;
         while (true) {

@@ -5987,6 +5987,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private boolean nativeThemeAvailable;
 
     public boolean hasNativeTheme() {
+        if ("custom".equals(nativeThemeMode())) {
+            // The application ships the only theme it uses, and the builder packaged
+            // no native one for it. Asked every time rather than cached: the mode is a
+            // Display property the application may set before its theme loads.
+            return false;
+        }
         if (!testedNativeTheme) {
             testedNativeTheme = true;
             try {
@@ -6007,50 +6013,58 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return nativeThemeAvailable;
     }
 
+    /// The theme flavor the build hints ask for. and.themeMode is the per-platform
+    /// hint (auto | modern | material | hololight | legacy | custom); the legacy
+    /// name cn1.androidTheme is still honored for back-compat. The cross-platform
+    /// shortcut nativeTheme=modern/legacy/custom (deprecated alias: cn1.nativeTheme)
+    /// feeds in when no platform-specific hint is set. Default stays on
+    /// android_holo_light - what master shipped and what existing screenshot goldens
+    /// are anchored against. The ancient pre-Holo androidTheme.res is only reached
+    /// via explicit and.hololight=true (historical back-compat) or
+    /// and.themeMode=legacy.
+    ///
+    /// Mirrored by the builders' NativeThemes.androidThemesFor, which decides which
+    /// of the themes are packaged at all.
+    private static String nativeThemeMode() {
+        Display d = Display.getInstance();
+        String mode = d.getProperty("and.themeMode",
+                d.getProperty("cn1.androidTheme", null));
+        if (mode != null) {
+            return asciiLower(mode.trim());
+        }
+        String shared = d.getProperty("nativeTheme",
+                d.getProperty("cn1.nativeTheme", null));
+        // "native" is "modern plus the desktop": the desktop half belongs to
+        // the JavaSE port, and Android's own answer to "the platform's own
+        // look" is Material either way. Without it the value fell through to
+        // the hololight default below, so asking for the native look got the
+        // legacy one.
+        if ("modern".equalsIgnoreCase(shared) || "native".equalsIgnoreCase(shared)) {
+            return "material";
+        }
+        if ("custom".equalsIgnoreCase(shared)) {
+            return "custom";
+        }
+        if ("legacy".equalsIgnoreCase(shared)) {
+            return "hololight";
+        }
+        if ("true".equalsIgnoreCase(d.getProperty("and.hololight", "false"))) {
+            return "legacy";
+        }
+        return "hololight";
+    }
+
     /**
      * Installs the native theme, this is only applicable if hasNativeTheme()
      * returned true. Notice that this method might replace the
      * DefaultLookAndFeel instance and the default transitions.
      */
     public void installNativeTheme() {
-        hasNativeTheme();
-        if (!nativeThemeAvailable) {
+        if (!hasNativeTheme()) {
             return;
         }
         try {
-            // Resolve desired theme flavor. and.themeMode is the per-platform
-            // hint (auto | modern | material | hololight | legacy); the legacy
-            // name cn1.androidTheme is still honored for back-compat. The
-            // cross-platform shortcut nativeTheme=modern/legacy (deprecated
-            // alias: cn1.nativeTheme) feeds in when no platform-specific hint
-            // is set. Default stays on android_holo_light - what master
-            // shipped and what existing screenshot goldens are anchored
-            // against. The ancient pre-Holo androidTheme.res is only reached
-            // via explicit and.hololight=true (historical back-compat) or
-            // and.themeMode=legacy.
-            Display d = Display.getInstance();
-            String mode = d.getProperty("and.themeMode",
-                    d.getProperty("cn1.androidTheme", null));
-            if (mode == null) {
-                String shared = d.getProperty("nativeTheme",
-                        d.getProperty("cn1.nativeTheme", null));
-                // "native" is "modern plus the desktop": the desktop half belongs to
-                // the JavaSE port, and Android's own answer to "the platform's own
-                // look" is Material either way. Without it the value fell through to
-                // the hololight default below, so asking for the native look got the
-                // legacy one.
-                if ("modern".equalsIgnoreCase(shared) || "native".equalsIgnoreCase(shared)) {
-                    mode = "material";
-                } else if ("legacy".equalsIgnoreCase(shared)) {
-                    mode = "hololight";
-                } else if ("true".equalsIgnoreCase(d.getProperty("and.hololight", "false"))) {
-                    mode = "legacy";
-                } else {
-                    mode = "hololight";
-                }
-            } else {
-                mode = mode.toLowerCase();
-            }
+            String mode = nativeThemeMode();
 
             String resPath;
             if ("material".equals(mode) || "modern".equals(mode) || "auto".equals(mode)) {
@@ -6973,7 +6987,95 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
     
+    /// Java types Chromium passes as arguments when it calls back into Java during
+    /// a navigation (NavigationHandle.initialize and friends). JNI looks these up by
+    /// name, so R8 keeps them unobfuscated in every WebView build.
+    private static final String[] WEBVIEW_JNI_ARGUMENT_TYPES = {
+        "org.chromium.url.GURL",
+        "org.chromium.url.Origin",
+        "org.chromium.content_public.browser.NavigationHandle"
+    };
+
+    private static boolean webViewJniTypesPreloaded;
+
+    /// Loads [#WEBVIEW_JNI_ARGUMENT_TYPES] through the WebView provider's class
+    /// loader, so they are resolved before the first navigation calls back into
+    /// Java with them.
+    ///
+    /// This works around a bug in ART's CheckJNI, which is forced on for every
+    /// debuggable process. CheckMethodArguments (art/runtime/reflection.cc, which
+    /// carries a "compaction bug" TODO for exactly this) resolves each parameter
+    /// type of a JNI upcall while it holds the raw argument pointers. Resolving a
+    /// class that was never loaded suspends the thread. When a concurrent
+    /// mark-compact GC moves the arguments in that window, the check dereferences
+    /// a stale one and the whole app dies with a SIGSEGV at fault address 0xc in
+    /// CheckMethodArguments, under WebView.loadDataWithBaseURL. Only the first
+    /// navigation in a process is exposed: a browser-initiated load passes a null
+    /// Origin, so nothing has loaded that class yet. Once the types are loaded,
+    /// resolving them is a table lookup that cannot suspend. Release builds run
+    /// without CheckJNI and never take this path.
+    ///
+    /// Returns the names that did not resolve, or null when the platform has no
+    /// public WebView class loader (API 27 and older). The device suite asserts the
+    /// list is empty, so a rename on Chromium's side fails CI instead of silently
+    /// reopening the window.
+    public static List<String> preloadWebViewJniArgumentTypes() {
+        ClassLoader cl;
+        try {
+            // WebView.getWebViewClassLoader is API 28; the port compiles against an
+            // older android.jar.
+            cl = (ClassLoader) WebView.class.getMethod("getWebViewClassLoader").invoke(null);
+        } catch (Throwable t) {
+            return null;
+        }
+        if (cl == null) {
+            return null;
+        }
+        List<String> missing = new ArrayList<String>();
+        for (String name : WEBVIEW_JNI_ARGUMENT_TYPES) {
+            try {
+                Class.forName(name, false, cl);
+            } catch (Throwable t) {
+                missing.add(name);
+            }
+        }
+        return missing;
+    }
+
+    /// Runs [#preloadWebViewJniArgumentTypes] once per process, and only when the
+    /// application is debuggable, the only case where CheckJNI is on.
+    static void preloadWebViewJniArgumentTypesIfDebuggable(android.content.Context ctx) {
+        if (webViewJniTypesPreloaded) {
+            return;
+        }
+        webViewJniTypesPreloaded = true;
+        if ((ctx.getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
+            return;
+        }
+        List<String> missing = preloadWebViewJniArgumentTypes();
+        if (missing != null && !missing.isEmpty()) {
+            Log.w("CodenameOne", "WebView JNI argument types not found: " + missing);
+        }
+    }
+
     class AndroidBrowserComponent extends AndroidImplementation.AndroidPeer {
+        /// Set on the UI thread when destroy() runs, and read only there. A WebView
+        /// used after destroy() is undefined per the Android documentation, so every
+        /// call into the WebView checks it. (The NavigationControllerImpl SIGSEGV
+        /// once blamed on this is ART's CheckJNI; see preloadWebViewJniArgumentTypes.)
+        private boolean webDestroyed;
+
+        /// Runs `r` on the UI thread unless the WebView has been destroyed by then.
+        private void onWebThread(final Runnable r) {
+            act.runOnUiThread(new Runnable() {
+                public void run() {
+                    if (!webDestroyed) {
+                        r.run();
+                    }
+                }
+            });
+        }
+
 
         private Activity act;
         private WebView web;
@@ -6993,6 +7095,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             parent = (BrowserComponent) p;
             this.web = web;
+            // Before any load call; see preloadWebViewJniArgumentTypes.
+            preloadWebViewJniArgumentTypesIfDebuggable(act);
             layerType = web.getLayerType();
             web.getSettings().setJavaScriptEnabled(true);
             web.getSettings().setSupportZoom(parent.isPinchToZoomEnabled());
@@ -7265,7 +7369,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         @Override
         protected void initComponent() {
             if(android.os.Build.VERSION.SDK_INT == 21 && web.getLayerType() != layerType){
-                act.runOnUiThread(new Runnable() {
+                onWebThread(new Runnable() {
                     @Override
                     public void run() {
                         web.setLayerType(layerType, null); //setting layer type to original state
@@ -7284,7 +7388,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 final Bitmap nativeBuffer = Bitmap.createBitmap(
                         getWidth(), getHeight(), Bitmap.Config.ARGB_8888);
                 Image image = new AndroidImplementation.NativeImage(nativeBuffer);
-                getActivity().runOnUiThread(new Runnable() {
+                onWebThread(new Runnable() {
                     @Override
                     public void run() {
                         try {
@@ -7318,7 +7422,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         public void setScrollingEnabled(final boolean enabled){
             this.scrollingEnabled = enabled;
-            act.runOnUiThread(new Runnable() {
+            onWebThread(new Runnable() {
                 public void run() {
                     web.setHorizontalScrollBarEnabled(enabled);
                     web.setVerticalScrollBarEnabled(enabled);
@@ -7344,7 +7448,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public void setProperty(final String key, final Object value) {
-            act.runOnUiThread(new Runnable() {
+            onWebThread(new Runnable() {
                 public void run() {
                     WebSettings s = web.getSettings();
                     if(key.equalsIgnoreCase("useragent")) {
@@ -7377,6 +7481,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             act.runOnUiThread(new Runnable() {
                 public void run() {
                     try {
+                        if (webDestroyed) {
+                            return;
+                        }
 
                         retVal[0] = web.getTitle();
                     } finally {
@@ -7406,6 +7513,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             act.runOnUiThread(new Runnable() {
                 public void run() {
                     try {
+                        if (webDestroyed) {
+                            return;
+                        }
                         retVal[0] = web.getUrl();
                     } finally {
                         complete[0] = true;
@@ -7429,7 +7539,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public void setURL(final String url, final Map<String, String> headers) {
-            act.runOnUiThread(new Runnable() {
+            onWebThread(new Runnable() {
                 public void run() {
                     if(headers != null) {
                         web.loadUrl(url, headers);
@@ -7441,7 +7551,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public void reload() {
-            act.runOnUiThread(new Runnable() {
+            onWebThread(new Runnable() {
                 public void run() {
                     web.reload();
                 }
@@ -7455,6 +7565,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             act.runOnUiThread(new Runnable() {
                 public void run() {
                     try {
+                        if (webDestroyed) {
+                            return;
+                        }
                         retVal[0] = web.canGoBack();
                     } finally {
                         complete[0] = true;
@@ -7484,6 +7597,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             act.runOnUiThread(new Runnable() {
                 public void run() {
                     try {
+                        if (webDestroyed) {
+                            return;
+                        }
                         retVal[0] = web.canGoForward();
                     } finally {
                         complete[0] = true;
@@ -7508,7 +7624,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public void back() {
-            act.runOnUiThread(new Runnable() {
+            onWebThread(new Runnable() {
                 public void run() {
                     web.goBack();
                 }
@@ -7516,7 +7632,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public void forward() {
-            act.runOnUiThread(new Runnable() {
+            onWebThread(new Runnable() {
                 public void run() {
                     web.goForward();
                 }
@@ -7524,7 +7640,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public void clearHistory() {
-            act.runOnUiThread(new Runnable() {
+            onWebThread(new Runnable() {
                 public void run() {
                     web.clearHistory();
                 }
@@ -7532,7 +7648,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public void stop() {
-            act.runOnUiThread(new Runnable() {
+            onWebThread(new Runnable() {
                 public void run() {
                     web.stopLoading();
                 }
@@ -7542,13 +7658,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         public void destroy() {
             act.runOnUiThread(new Runnable() {
                 public void run() {
+                    if (webDestroyed) {
+                        return;
+                    }
+                    webDestroyed = true;
                     web.destroy();
                 }
             });
         }
 
         public void setPage(final String html, final String baseUrl) {
-            act.runOnUiThread(new Runnable() {
+            onWebThread(new Runnable() {
                 public void run() {
                     web.loadDataWithBaseURL(baseUrl, html, "text/html", "UTF-8", null);
                 }
@@ -7556,7 +7676,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public void exposeInJavaScript(final Object o, final String name) {
-            act.runOnUiThread(new Runnable() {
+            onWebThread(new Runnable() {
                 public void run() {
                     web.addJavascriptInterface(o, name);
                 }
@@ -7564,7 +7684,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public  void setPinchZoomEnabled(final boolean e) {
-            act.runOnUiThread(new Runnable() {
+            onWebThread(new Runnable() {
                 public void run() {
                     web.getSettings().setSupportZoom(e);
                     web.getSettings().setBuiltInZoomControls(e);
@@ -7574,7 +7694,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         protected void deinitialize() {
-            act.runOnUiThread(new Runnable() {
+            onWebThread(new Runnable() {
                 @Override
                 public void run() {
                     if(android.os.Build.VERSION.SDK_INT == 21) { // bugfix for Android 5.0.x

@@ -121,6 +121,11 @@ fragment float4 cn1_fs_textured(
 // the bitmap first.
 //
 // params.xy is the destination size in pixels and params.z the corner radius.
+// region is the part of the texture the quad shows -- (u0, v0, du, dv) in the
+// same normalised coordinates as texcoord -- so a picture scaled to OVERFLOW its
+// box (BoxFit.cover) can be drawn as just the box, with the box's corners
+// rounded. The corners are computed over the quad (texcoord), never over the
+// region, which is what makes that work. (0, 0, 1, 1) is the whole texture.
 // Coverage comes from a rounded-rectangle signed distance field and is a smooth
 // ramp across the last pixel, so the edge is ANTIALIASED. That is the whole
 // point of doing it here: a stencil clip of the same shape has a hard edge, and
@@ -131,6 +136,7 @@ fragment float4 cn1_fs_textured_rounded(
     VertexOutTextured in [[stage_in]],
     constant float4 &tint [[buffer(0)]],
     constant float4 &params [[buffer(1)]],
+    constant float4 &region [[buffer(2)]],
     texture2d<float> tex [[texture(0)]])
 {
     constexpr sampler s(mag_filter::linear, min_filter::linear, address::clamp_to_edge);
@@ -166,7 +172,7 @@ fragment float4 cn1_fs_textured_rounded(
     }
     // Coverage scales every channel: the texture pipeline works in
     // premultiplied terms, exactly as the tint modulator above it does.
-    return tex.sample(s, in.texcoord) * tint * coverage;
+    return tex.sample(s, region.xy + in.texcoord * region.zw) * tint * coverage;
 }
 
 // --------- AlphaMask pipeline (Phase 2/4) ---------

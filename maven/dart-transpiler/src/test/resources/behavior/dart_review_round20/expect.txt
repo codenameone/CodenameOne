@@ -1,0 +1,75 @@
+null
+null
+shorted []
+6
+7
+6 3 7
+assigned [side 1, side 2, side 3, side 4, set p 4, side 5, set p 9, side 6, side 7, set p 7]
+null
+null
+null
+shorted chain []
+0
+[9, 8]
+chain [side 0, side 0, side 9, side 1, side 8]
+true
+true
+4
+6
+6
+4
+11
+11
+makes=8 p=4 q=11
+setter values [set p 3, set p 4, set p 5, set p 6, set p 5, set p 4, set q 11]
+false
+true
+n=6 makes=8 p=0
+lazy setter values [set p 7, set p 6, set p 5, set p 4, set p 3, set p 2, set p 1, set p 0]
+5
+3
+3
+v=4 makes=2
+4
+6
+5
+6
+7
+8
+[0, 8, 0]
+5
+7
+7
+1
+2
+null
+5
+6
+7
+7 8
+40
+2
+values [set top 4, set top 6, set top 5, set top 6, cell 1=7, cell 1=8, set p 8, set p 40, set q null, set q 2]
+null
+4 5
+cascade [side 4, side 5, set p 5]
+null
+14
+null
+18
+callbacks [tapped, side 7, side 9]
+3 k
+{x: 10} [a, b]
+11 12
+statics [side 10, side 11]
+1 0 10 2 3 4
+7
+7 16 0
+9 3
+10
+3 3 3
+4
+42 43 44
+11 12 13
+4 4
+4

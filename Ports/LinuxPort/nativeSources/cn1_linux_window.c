@@ -1058,6 +1058,15 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_initDisplay___java_lang_String_in
     }
 
     cn1GtkThread = pthread_self();
+    /* GDK's own OpenGL, off unless the user asked for something else. Opening the
+     * display otherwise probes GLX to pick GL-capable visuals -- epoxy_glx_version,
+     * glXQueryServerString and a dlopen of the Mesa driver -- which was the larger
+     * part of gtk_init and about a tenth of the whole launch on the CI runner. This
+     * port never uses GDK's GL: it draws with cairo, and the 3D backend creates its
+     * own EGL context. WebKitGTK (the BrowserComponent peer) still renders without
+     * it, verified with WebKitGTK 2.50 under Xvfb. Not overwritten when set, so
+     * GDK_GL=... from the environment keeps working for anyone who needs it. */
+    g_setenv("GDK_GL", "disable", FALSE);
     gtk_init(0, 0);
     cn1Window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(GTK_WINDOW(cn1Window), t);
@@ -1543,8 +1552,41 @@ static void cn1A11yBeginMain(void* ignored) {
     }
 }
 
+/* One tree publication is queued on the calling thread and applied in a single
+ * hop to the GTK thread by accessibilityEnd. Each node and action used to make
+ * its own cn1LinuxRunOnMainAndWait, so publishing the gallery's tree was hundreds
+ * of synchronous round trips between the event dispatch thread and the GTK loop,
+ * each one waiting for the loop to come round. Begin, node, action and end are
+ * always called in that order from the one thread that publishes the tree, and
+ * only that thread touches this queue: accessibilityEnd hands the whole array to
+ * the GTK thread as a batch and starts a fresh one, so the queue needs no lock. */
+typedef struct {
+    int action; /* 0 = node, 1 = action */
+    void* data;
+} CN1A11yOp;
+static CN1A11yOp* cn1A11yOps = 0;
+static int cn1A11yOpCount = 0;
+static int cn1A11yOpCapacity = 0;
+
+static void cn1A11yQueue(int action, void* data) {
+    if (cn1A11yOpCount == cn1A11yOpCapacity) {
+        int capacity = cn1A11yOpCapacity == 0 ? 256 : cn1A11yOpCapacity * 2;
+        CN1A11yOp* grown = (CN1A11yOp*) realloc(cn1A11yOps, (size_t) capacity * sizeof(CN1A11yOp));
+        if (grown == 0) {
+            return;
+        }
+        cn1A11yOps = grown;
+        cn1A11yOpCapacity = capacity;
+    }
+    cn1A11yOps[cn1A11yOpCount].action = action;
+    cn1A11yOps[cn1A11yOpCount].data = data;
+    cn1A11yOpCount++;
+}
+
 JAVA_VOID com_codename1_impl_linux_LinuxNative_accessibilityBegin__(CODENAME_ONE_THREAD_STATE) {
-    cn1LinuxRunOnMainAndWait(cn1A11yBeginMain, 0);
+    /* Nothing reaches GTK yet; see accessibilityEnd. A publication that never
+     * reached its end leaves ops behind, and they are applied with this one. */
+    (void) threadStateData;
 }
 
 typedef struct {
@@ -1614,7 +1656,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_accessibilityNode___long_long_jav
     call->label = label == JAVA_NULL ? 0 : strdup(stringToUTF8(threadStateData, label));
     call->description = description == JAVA_NULL ? 0 : strdup(stringToUTF8(threadStateData, description));
     call->value = value == JAVA_NULL ? 0 : strdup(stringToUTF8(threadStateData, value));
-    cn1LinuxRunOnMainAndWait(cn1A11yNodeMain, call);
+    cn1A11yQueue(0, call);
 }
 
 static void cn1A11yActionActivated(GtkWidget* widget, gpointer pointer) {
@@ -1662,17 +1704,104 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_accessibilityAction___long_java_l
     action->nodeId = nodeId; action->actionHash = actionHash;
     action->actionId = actionId == JAVA_NULL ? strdup("") : strdup(stringToUTF8(threadStateData, actionId));
     action->label = label == JAVA_NULL ? 0 : strdup(stringToUTF8(threadStateData, label));
-    cn1LinuxRunOnMainAndWait(cn1A11yActionMain, action);
+    cn1A11yQueue(1, action);
 }
 
-static void cn1A11yEndMain(void* pointer) {
-    (void) pointer;
+/* A complete publication, handed from the publishing thread to the GTK thread. */
+typedef struct {
+    CN1A11yOp* ops;
+    int count;
+} CN1A11yBatch;
+
+/* The newest publication not yet applied, and whether an idle is already queued
+ * to apply it. Guarded by cn1A11yPendingLock: the publishing thread stores, the
+ * GTK thread takes. */
+static GMutex cn1A11yPendingLock;
+static CN1A11yBatch* cn1A11yPending = 0;
+static int cn1A11yApplyQueued = 0;
+
+static void cn1A11yFreeBatch(CN1A11yBatch* batch) {
+    int i;
+    if (batch == 0) {
+        return;
+    }
+    for (i = 0; i < batch->count; i++) {
+        if (batch->ops[i].action) {
+            cn1A11yActionFree(batch->ops[i].data, 0);
+        } else {
+            CN1A11yNodeCall* call = (CN1A11yNodeCall*) batch->ops[i].data;
+            free(call->role); free(call->label); free(call->description); free(call->value); free(call);
+        }
+    }
+    free(batch->ops);
+    free(batch);
+}
+
+static gboolean cn1A11yApplyIdle(gpointer ignored) {
+    int i;
+    CN1A11yBatch* batch;
+    (void) ignored;
+    g_mutex_lock(&cn1A11yPendingLock);
+    batch = cn1A11yPending;
+    cn1A11yPending = 0;
+    cn1A11yApplyQueued = 0;
+    g_mutex_unlock(&cn1A11yPendingLock);
+    if (batch == 0) {
+        return G_SOURCE_REMOVE;
+    }
+    cn1A11yBeginMain(0);
+    for (i = 0; i < batch->count; i++) {
+        if (batch->ops[i].action) {
+            cn1A11yActionMain(batch->ops[i].data);
+        } else {
+            cn1A11yNodeMain(batch->ops[i].data);
+        }
+    }
+    /* The node and action payloads now belong to the widgets and signal
+     * closures they were applied to; only the array is ours. */
+    free(batch->ops);
+    free(batch);
     if (cn1AccessibilityFixed) gtk_widget_show_all(cn1AccessibilityFixed);
+    return G_SOURCE_REMOVE;
 }
 
+/* Applied on the GTK thread LATER, at low priority, instead of while this thread
+ * waits. Building the tree creates a real GTK widget per node -- toggle buttons,
+ * entries, scales -- which on the first form of the transpiled Flutter gallery
+ * was about 5% of the launch's CPU, all of it before the first frame, with the
+ * event dispatch thread blocked until it finished. Nothing reads the tree back
+ * synchronously, and assistive technology cannot tell a tree built a few
+ * milliseconds after the frame from one built before it.
+ *
+ * Every publication replaces the whole tree (cn1A11yBeginMain destroys what the
+ * previous one built), so a publication that is still waiting when a newer one
+ * arrives is simply superseded and freed: a burst of form changes costs one
+ * rebuild, not one per change. */
 JAVA_VOID com_codename1_impl_linux_LinuxNative_accessibilityEnd___int(CODENAME_ONE_THREAD_STATE, JAVA_INT changeType) {
+    CN1A11yBatch* batch;
+    CN1A11yBatch* superseded;
+    int queue;
     (void) changeType;
-    cn1LinuxRunOnMainAndWait(cn1A11yEndMain, 0);
+    (void) threadStateData;
+    batch = (CN1A11yBatch*) calloc(1, sizeof(CN1A11yBatch));
+    if (batch == 0) {
+        return;
+    }
+    batch->ops = cn1A11yOps;
+    batch->count = cn1A11yOpCount;
+    cn1A11yOps = 0;
+    cn1A11yOpCount = 0;
+    cn1A11yOpCapacity = 0;
+    g_mutex_lock(&cn1A11yPendingLock);
+    superseded = cn1A11yPending;
+    cn1A11yPending = batch;
+    queue = !cn1A11yApplyQueued;
+    cn1A11yApplyQueued = 1;
+    g_mutex_unlock(&cn1A11yPendingLock);
+    cn1A11yFreeBatch(superseded);
+    if (queue) {
+        gdk_threads_add_idle_full(G_PRIORITY_LOW, cn1A11yApplyIdle, 0, 0);
+    }
 }
 
 JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_pumpMessages___R_boolean(CODENAME_ONE_THREAD_STATE) {

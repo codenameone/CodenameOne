@@ -394,7 +394,27 @@ static int cn1AtlasInitialDim(void) {
 
     CGPoint origin = CGPointMake((CGFloat)CN1_METAL_ATLAS_PADDING - bbox.origin.x,
                                  (CGFloat)CN1_METAL_ATLAS_PADDING - bbox.origin.y);
-    CTFontDrawGlyphs(_ctFont, &glyph, &origin, 1, ctx);
+    // Monochrome glyphs go through the CGFont path rather than CTFontDrawGlyphs.
+    // CTFontDrawGlyphs checks every draw for glyphs that overlap in a connected
+    // script, and the first time it does that for a font it loads the font's
+    // design-language metadata: 10-13ms on the main thread inside the first frame
+    // of a macOS launch, measured on every run, for text that has no connected
+    // script in it. CGContextShowGlyphsAtPositions rasterises through the same
+    // renderer without the check -- byte-identical coverage across 27 fonts and
+    // ~3.8M pixels (system weights and italics, Helvetica, Times, Menlo, the
+    // Material icon font, six Google fonts), and the first frame 12ms sooner.
+    // A font with its own matrix (a synthetic oblique) is the one case that did
+    // not match, because the matrix then also moves the glyph origin, so it
+    // keeps CTFontDrawGlyphs, as do colour glyphs.
+    if (!_isColor && CGAffineTransformIsIdentity(CTFontGetMatrix(_ctFont))) {
+        CGFontRef cgFont = CTFontCopyGraphicsFont(_ctFont, NULL);
+        CGContextSetFont(ctx, cgFont);
+        CGContextSetFontSize(ctx, CTFontGetSize(_ctFont));
+        CGContextShowGlyphsAtPositions(ctx, &glyph, &origin, 1);
+        CGFontRelease(cgFont);
+    } else {
+        CTFontDrawGlyphs(_ctFont, &glyph, &origin, 1, ctx);
+    }
     CGContextRelease(ctx);
 
     [_texture replaceRegion:MTLRegionMake2D((NSUInteger)slotX, (NSUInteger)slotY,

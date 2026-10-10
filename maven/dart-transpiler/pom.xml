@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <parent>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone</artifactId>
+        <version>8.0-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>codenameone-dart-transpiler</artifactId>
+    <version>8.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    <name>codenameone-dart-transpiler</name>
+    <description>
+        Build-time Dart-to-Java transpiler used by the Codename One Maven
+        plugin to compile src/main/flutter/**.dart into Java source targeting
+        the codenameone-flutter-runtime and codenameone-dart-runtime modules.
+        Pure Java: Dart is parsed with an ANTLR4 front end (vendored
+        spec-derived grammar); no Dart SDK is required at build time. The
+        transpiler itself runs on Java 8 (it executes inside the Maven
+        plugin); the Java source it EMITS is Java 17.
+    </description>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <!-- Last ANTLR line whose build-time tool still runs on a JDK 8
+             Maven JVM; the runtime is shaded into this jar. -->
+        <antlr.version>4.9.3</antlr.version>
+    </properties>
+
+    <build>
+        <plugins>
+            <plugin>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.antlr</groupId>
+                <artifactId>antlr4-maven-plugin</artifactId>
+                <version>${antlr.version}</version>
+                <configuration>
+                    <visitor>false</visitor>
+                    <listener>false</listener>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>antlr4</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.4.1</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <relocations>
+                                <relocation>
+                                    <pattern>org.antlr</pattern>
+                                    <shadedPattern>com.codename1.dart.shaded.antlr</shadedPattern>
+                                </relocation>
+                            </relocations>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.antlr</groupId>
+            <artifactId>antlr4-runtime</artifactId>
+            <version>${antlr.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!--
+          Test scope only, and only so a behavioral case can exercise a WIDGET api: the
+          case is resolved against this module's Dart stubs and then executed against its
+          classes. The transpiler itself does not depend on the Flutter runtime - it
+          reads whatever stubs are on the app's classpath - so this must never leave
+          test scope, or the compiler starts shipping a UI framework.
+        -->
+    </dependencies>
+
+    <profiles>
+        <!--
+          The transpiler's own tests transpile against the real runtime, so
+          they need it on the test classpath. That runtime compiles at release
+          17 while this module targets 1.8 and the framework is built on JDK 8,
+          so the dependency cannot be unconditional: on a JDK 8 reactor it
+          drags codenameone-flutter-runtime and codenameone-dart-runtime in and
+          the build dies compiling them.
+
+          Splitting it by JDK keeps this module buildable wherever
+          codenameone-maven-plugin is buildable - the plugin has a compile
+          dependency on it - and runs the tests where they can run.
+        -->
+        <profile>
+            <id>transpiler-tests</id>
+            <activation>
+                <jdk>[17,)</jdk>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-flutter-runtime</artifactId>
+                    <version>${project.version}</version>
+                    <scope>test</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+
+        <!--
+          Without the runtime on the test classpath the test SOURCES do not
+          compile, so they are skipped wholesale rather than left to fail. The
+          transpiler's main sources are what a JDK 8 build needs from this
+          module; its tests run on the JDK 17 legs.
+        -->
+        <profile>
+            <id>transpiler-tests-need-jdk17</id>
+            <activation>
+                <jdk>(,17)</jdk>
+            </activation>
+            <properties>
+                <maven.test.skip>true</maven.test.skip>
+            </properties>
+        </profile>
+    </profiles>
+</project>

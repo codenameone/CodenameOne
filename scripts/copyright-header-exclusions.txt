@@ -366,3 +366,14 @@ vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/TableSwi
 vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/TryCatchBlockNode.java | Rewrite of ASM org.objectweb.asm.tree.TryCatchBlockNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
 vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/TypeInsnNode.java | Rewrite of ASM org.objectweb.asm.tree.TypeInsnNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
 vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/VarInsnNode.java | Rewrite of ASM org.objectweb.asm.tree.VarInsnNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+
+maven/dart-transpiler/src/test/resources/golden/counter/expected/FlutterRegistry.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/counter/expected/MainLib.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/counter/expected/MyApp.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/counter/expected/MyHomePage.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/counter/expected/_MyHomePageState.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/m2demo/expected/DemoApp.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/m2demo/expected/DemoPage.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/m2demo/expected/FlutterRegistry.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/m2demo/expected/MainLib.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/m2demo/expected/_DemoPageState.java | Transpiler golden fixture: expected generated output, compared byte for byte

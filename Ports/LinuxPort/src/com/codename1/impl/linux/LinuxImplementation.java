@@ -219,9 +219,29 @@ public class LinuxImplementation extends CodenameOneImplementation {
      */
     private static LinuxImplementation mainLoopInstance;
 
+    /// The size the main window opens at, before the user or the window manager
+    /// changes it. Set by the generated bootstrap stub from the `desktop.width` and
+    /// `desktop.height` build hints, BEFORE Display.init: init creates the window,
+    /// and a resize afterwards would lay the first form out twice.
+    private static int defaultWindowWidth = 800;
+    private static int defaultWindowHeight = 600;
+
+    /// Called by the generated bootstrap stub only; see defaultWindowWidth.
+    ///
+    /// @param width the window's initial content width in pixels; ignored unless positive
+    /// @param height the window's initial content height in pixels; ignored unless positive
+    public static void setDefaultWindowSize(int width, int height) {
+        if (width > 0) {
+            defaultWindowWidth = width;
+        }
+        if (height > 0) {
+            defaultWindowHeight = height;
+        }
+    }
+
     @Override
     public void init(Object m) {
-        LinuxNative.initDisplay("Codename One", 800, 600);
+        LinuxNative.initDisplay("Codename One", defaultWindowWidth, defaultWindowHeight);
         windowGraphicsPeer = LinuxNative.getWindowGraphics();
         windowGraphics = Long.valueOf(windowGraphicsPeer);
         defaultFont = Long.valueOf(LinuxNative.getDefaultFont());
@@ -230,7 +250,19 @@ public class LinuxImplementation extends CodenameOneImplementation {
             screenDpi = 96;
         }
         mainLoopInstance = this;
-        installNativeTheme();
+        // Deferred, not installed here: an application that installs its own theme
+        // with setThemeProps -- every Flutter application, and any theme without
+        // @includeNativeBool -- resets the table and discards this one before
+        // anything reads it, and parsing and applying it was about 26ms of every
+        // launch of the transpiled Flutter gallery, all of it thrown away. It is
+        // still installed for an application with no theme of its own, the moment
+        // anything first reads the theme. See UIManager.setDeferredBaseTheme.
+        com.codename1.ui.plaf.UIManager.getInstance().setDeferredBaseTheme(new Runnable() {
+            @Override
+            public void run() {
+                installNativeTheme();
+            }
+        });
     }
 
     /**
@@ -300,7 +332,8 @@ public class LinuxImplementation extends CodenameOneImplementation {
      * iOSModernTheme.res. An app that loads its own theme layers over this.
      * Silently does nothing when the theme resource is absent. This is the
      * framework hook (UIManager calls it for {@code @includeNativeBool} themes);
-     * init() also calls it so an app with no theme of its own still gets it.
+     * init() defers it (UIManager.setDeferredBaseTheme) so an app with no
+     * theme of its own still gets it, without paying for it when the app installs one.
      */
     private boolean installingNativeTheme;
 
@@ -1929,6 +1962,25 @@ public class LinuxImplementation extends CodenameOneImplementation {
     @Override
     public void drawImage(Object graphics, Object img, int x, int y) {
         LinuxNative.drawImage(peer(graphics), peer(img), x, y);
+    }
+
+    /// Cairo scales while it paints (drawImageScaled: the same cairo_scale and
+    /// default filter a pre-scaled copy would have been made with), so this port
+    /// can draw an image at any size directly. It used to answer the inherited
+    /// false, and Graphics.drawImage(img, x, y, w, h) then scaled the picture
+    /// first -- which for an EncodedImage means EncodedImage.scaled: decode,
+    /// scale, RE-ENCODE to PNG (or lossy JPEG for an opaque picture), decode
+    /// again. On every paint, since nothing kept the result: the transpiled
+    /// Flutter gallery ran 13 PNG encodes before its first frame, all from
+    /// scaled draws of its cards, icons and logo.
+    @Override
+    public boolean isScaledImageDrawingSupported() {
+        return true;
+    }
+
+    @Override
+    public void drawImage(Object graphics, Object img, int x, int y, int w, int h) {
+        LinuxNative.drawImageScaled(peer(graphics), peer(img), x, y, w, h);
     }
 
     @Override

@@ -662,6 +662,7 @@ void com_codename1_impl_ios_IOSNative_initVM__(CN1_THREAD_STATE_MULTI_ARG JAVA_O
 #else
 #if !TARGET_OS_WATCH
     POOL_BEGIN();
+    cn1StartupPhase("initVM->UIApplicationMain");
     int retVal = UIApplicationMain(0, nil, nil, @"CodenameOne_GLAppDelegate");
     POOL_END();
 #else
@@ -2727,19 +2728,21 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isRoundedImageDrawSupported___R_bo
     return Java_com_codename1_impl_ios_IOSImplementation_isRoundedImageDrawSupportedImpl();
 }
 
-void com_codename1_impl_ios_IOSNative_nativeDrawImageRoundedGlobal___long_int_int_int_int_int_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT alpha, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT renderingHints, JAVA_FLOAT cornerRadius)
+// u0, v0, du, dv: the part of the picture shown, normalised; du or dv <= 0 means all of
+// it. See CN1MetalDrawImageRegionRounded.
+void com_codename1_impl_ios_IOSNative_nativeDrawImageRoundedGlobal___long_int_int_int_int_int_int_float_float_float_float_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT alpha, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT renderingHints, JAVA_FLOAT cornerRadius, JAVA_FLOAT u0, JAVA_FLOAT v0, JAVA_FLOAT du, JAVA_FLOAT dv)
 {
     POOL_BEGIN();
-    extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedGlobalImpl(void*, int, int, int, int, int, int, float);
-    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedGlobalImpl((void *)n1, alpha, n2, n3, n4, n5, renderingHints, cornerRadius);
+    extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedGlobalImpl(void*, int, int, int, int, int, int, float, float, float, float, float);
+    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedGlobalImpl((void *)n1, alpha, n2, n3, n4, n5, renderingHints, cornerRadius, u0, v0, du, dv);
     POOL_END();
 }
 
-void com_codename1_impl_ios_IOSNative_nativeDrawImageRoundedMutable___long_int_int_int_int_int_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT alpha, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT renderingHints, JAVA_FLOAT cornerRadius)
+void com_codename1_impl_ios_IOSNative_nativeDrawImageRoundedMutable___long_int_int_int_int_int_int_float_float_float_float_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT alpha, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT renderingHints, JAVA_FLOAT cornerRadius, JAVA_FLOAT u0, JAVA_FLOAT v0, JAVA_FLOAT du, JAVA_FLOAT dv)
 {
     POOL_BEGIN();
-    extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedMutableImpl(void*, int, int, int, int, int, int, float);
-    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedMutableImpl((void *)n1, alpha, n2, n3, n4, n5, renderingHints, cornerRadius);
+    extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedMutableImpl(void*, int, int, int, int, int, int, float, float, float, float, float);
+    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedMutableImpl((void *)n1, alpha, n2, n3, n4, n5, renderingHints, cornerRadius, u0, v0, du, dv);
     POOL_END();
 }
 
@@ -5612,7 +5615,6 @@ void com_codename1_impl_ios_IOSNative_clearRadialGradientPaintMutable__(CN1_THRE
 {
     [PaintOp setCurrentMutable:NULL];
 }
-
 
 void com_codename1_impl_ios_IOSNative_releasePeer___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
 #ifndef CN1_USE_ARC
@@ -13909,7 +13911,7 @@ static NSFont *cn1MacSystemFontForAlias(NSString *name, CGFloat size) {
         weight = NSFontWeightThin;
     } else if ([weightName isEqualToString:@"Light"]) {
         weight = NSFontWeightLight;
-    } else if ([weightName isEqualToString:@"Regular"]) {
+    } else if ([weightName isEqualToString:@"Regular"] || [weightName isEqualToString:@"Normal"]) {
         weight = NSFontWeightRegular;
     } else if ([weightName isEqualToString:@"Bold"]) {
         weight = NSFontWeightBold;
@@ -13937,6 +13939,13 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createTruetypeFont___java_lang_String
     // Explicit font names continue through the existing shared loader.
     fnt = cn1MacSystemFontForAlias(str, pSize);
 #endif
+    // The system font at its true regular weight. IOSImplementation maps
+    // native:MainNormal to this sentinel because no HelveticaNeue alias reaches
+    // UIFontWeightRegular -- native:MainRegular is deliberately Medium -- and a
+    // text style asking for weight 400 was therefore rendering one step heavy.
+    if(fnt == nil && [str isEqualToString:@"CN1SystemRegular"]) {
+        fnt = [CN1Font systemFontOfSize:pSize];
+    }
     if(fnt == nil && isIOS8_2() && [str hasPrefix:@"HelveticaNeue"]) {
         if([str isEqualToString:@"HelveticaNeue-UltraLight"]) {
             fnt = [CN1Font systemFontOfSize:pSize weight:UIFontWeightUltraLight];

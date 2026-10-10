@@ -249,4 +249,89 @@ class SimpleDateFormatTest extends UITestBase {
             return "Long";
         }
     }
+
+    @Test
+    void zonesSharingAnIdButNotTheirRulesAreNotEqual() {
+        SimpleDateFormat a = new SimpleDateFormat("HH:mm");
+        a.setTimeZone(new java.util.SimpleTimeZone(0, "Custom"));
+        SimpleDateFormat b = new SimpleDateFormat("HH:mm");
+        b.setTimeZone(new java.util.SimpleTimeZone(3600000, "Custom"));
+        assertNotEquals(a, b, "same ID, different raw offset");
+        SimpleDateFormat c = new SimpleDateFormat("HH:mm");
+        c.setTimeZone(new java.util.SimpleTimeZone(0, "Custom"));
+        assertEquals(a, c);
+        assertEquals(a.hashCode(), c.hashCode());
+    }
+
+    @Test
+    void formatsInTheZoneItIsGiven() {
+        java.util.TimeZone saved = java.util.TimeZone.getDefault();
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("America/New_York"));
+        try {
+            // 2024-03-10 02:30 UTC: the local 02:30 does not exist that morning in New York.
+            java.util.Calendar c = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"));
+            c.clear();
+            c.set(2024, java.util.Calendar.MARCH, 10, 2, 30, 0);
+            SimpleDateFormat f = new SimpleDateFormat("HH:mm");
+            f.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+            assertEquals("02:30", f.format(c.getTime()));
+            assertEquals("UTC", f.getTimeZone().getID());
+            SimpleDateFormat copy = (SimpleDateFormat) f.clone();
+            assertEquals("02:30", copy.format(c.getTime()), "a clone keeps the zone");
+            assertEquals("America/New_York", new SimpleDateFormat("HH:mm").getTimeZone().getID(),
+                    "without one, the device's zone");
+        } finally {
+            java.util.TimeZone.setDefault(saved);
+        }
+    }
+    @Test
+    void parsesInTheZoneItIsGiven() throws Exception {
+        java.util.TimeZone saved = java.util.TimeZone.getDefault();
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("America/New_York"));
+        try {
+            java.util.Calendar c = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"));
+            c.clear();
+            c.set(2024, java.util.Calendar.JANUARY, 1, 0, 0, 0);
+            SimpleDateFormat f = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+            f.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+            assertEquals(c.getTime().getTime(), f.parse("2024-01-01 00:00").getTime(),
+                    "text without a zone is read in the formatter's zone, not the device's");
+            // Summer, so the device zone's DST cannot leak into a zone without one.
+            c.set(2024, java.util.Calendar.JULY, 1, 12, 0, 0);
+            assertEquals(c.getTime().getTime(), f.parse("2024-07-01 12:00").getTime());
+            assertEquals("2024-07-01 12:00", f.format(f.parse("2024-07-01 12:00")), "round trip");
+
+            java.util.Calendar ny = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("America/New_York"));
+            ny.clear();
+            ny.set(2024, java.util.Calendar.JULY, 1, 12, 0, 0);
+            assertEquals(ny.getTime().getTime(),
+                    new SimpleDateFormat("yyyy-MM-dd HH:mm").parse("2024-07-01 12:00").getTime(),
+                    "without one, the device's zone");
+        } finally {
+            java.util.TimeZone.setDefault(saved);
+        }
+    }
+
+    @Test
+    void equalityCountsTheConfiguredZone() {
+        SimpleDateFormat utc = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+        utc.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+        SimpleDateFormat tokyo = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+        tokyo.setTimeZone(java.util.TimeZone.getTimeZone("Asia/Tokyo"));
+        assertNotEquals(utc, tokyo, "they format one instant differently, so they are not equal");
+        SimpleDateFormat utc2 = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+        utc2.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+        assertEquals(utc, utc2);
+        assertEquals(utc.hashCode(), utc2.hashCode());
+        java.util.TimeZone saved = java.util.TimeZone.getDefault();
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("Asia/Tokyo"));
+        try {
+            SimpleDateFormat device = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+            assertEquals(tokyo, device, "the device zone is the zone a formatter without one uses");
+            assertEquals(tokyo.hashCode(), device.hashCode());
+            assertNotEquals(utc, device);
+        } finally {
+            java.util.TimeZone.setDefault(saved);
+        }
+    }
 }

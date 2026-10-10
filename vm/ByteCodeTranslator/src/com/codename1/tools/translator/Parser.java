@@ -1526,6 +1526,23 @@ public class Parser extends ClassVisitor {
                 if(ByteCodeTranslator.verbose) {
                     System.out.println("unused Method cull removed "+neliminated+" methods in "+(dif/1000)+" seconds");
                 }
+                // What the cull left because something "calls" it, but nothing reachable
+                // does: dead cycles and long dead chains. See ReachabilityCull. The C
+                // targets only -- JavaScript runs its own, stricter RTA below.
+                // -Dcn1.reachabilityCull=false restores the cull's answer alone.
+                if (ByteCodeTranslator.output != ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT
+                        && !"false".equalsIgnoreCase(Util.getProperty("cn1.reachabilityCull", "true"))) {
+                    long reachStart = System.currentTimeMillis();
+                    int unreachable = ReachabilityCull.run(classes, dependencyGraph, nativeSources, nativeHeaders);
+                    // Drop the classes that no longer have a caller, and whatever their
+                    // removal leaves without one.
+                    int followUp = unreachable > 0 ? eliminateUnusedMethods(true, 0) : 0;
+                    neliminated += unreachable + followUp;
+                    if (ByteCodeTranslator.verbose) {
+                        System.out.println("reachability cull removed " + unreachable + " methods (+" + followUp
+                                + " after the class cull) in " + (System.currentTimeMillis() - reachStart) + " ms");
+                    }
+                }
             }
 
             // JavaScript-target-only Rapid Type Analysis pass. Runs AFTER
@@ -1641,6 +1658,7 @@ public class Parser extends ClassVisitor {
     }
     
     private static void readNativeFiles(File outputDirectory) throws IOException {
+        nativeHeaders = null;
         File[] mFiles = Util.listFiles(outputDirectory, file ->
                 file.getName().endsWith(".m") || file.getName().endsWith("." + ByteCodeTranslator.output.extension()));
         if(mFiles == null) {
@@ -1664,7 +1682,34 @@ public class Parser extends ClassVisitor {
         if(ByteCodeTranslator.verbose) {
             System.out.println("Native files total "+(size/1024)+"K");
         }
+        // The hand-written headers, for ReachabilityCull's allocation scan: runtime headers
+        // allocate classes no bytecode names (cn1_globals.h creates NullPointerException,
+        // ClassCastException, OutOfMemoryError...). Only hand-written ones are here yet --
+        // the generated class headers are written after the cull.
+        File[] hFiles = Util.listFiles(outputDirectory, file -> file.getName().endsWith(".h"));
+        nativeHeaders = new String[hFiles == null ? 0 : hFiles.length];
+        for (int iter = 0; iter < nativeHeaders.length; iter++) {
+            byte[] dat = new byte[(int) hFiles[iter].length()];
+            FileInputStream hi = new FileInputStream(hFiles[iter]);
+            new DataInputStream(hi).readFully(dat);
+            hi.close();
+            nativeHeaders[iter] = new String(dat, StandardCharsets.UTF_8);
+        }
+        // Every reader of these arrays asks "does the C side name this", so they see the
+        // natives as the compiler will: without a feature the builder left switched off.
+        // See NativeFeatureFilter.
+        if (NativeFeatureFilter.enabled()) {
+            long filterStart = System.currentTimeMillis();
+            String[][] filtered = NativeFeatureFilter.filterAll(nativeSources, nativeHeaders);
+            nativeSources = filtered[0];
+            nativeHeaders = filtered[1];
+            if (ByteCodeTranslator.verbose) {
+                System.out.println("native feature filter in " + (System.currentTimeMillis() - filterStart) + " ms");
+            }
+        }
     }
+
+    private static String[] nativeHeaders;
 
     /**
      * Fails the translation when a native method that survived into this program has

@@ -215,6 +215,32 @@ static int cn1GcFaultShouldFreeLive(JAVA_OBJECT o, int m) {
 }
 #define CN1_GC_FAULT_FREE_LIVE(o, m) cn1GcFaultShouldFreeLive(o, m)
 #endif
+// CN1_GC_FAULT=resumewindow / resumeescape: the mutator's half of the stop handshake
+// (cn1GcTryResumeActive in cn1_globals.h). Both widen EVERY resume window -- the gap
+// between a thread's last read of threadBlockedByGC and its store of threadActive -- by
+// CN1_GC_FAULT_RESUME_US (default 300us), standing in for the preemption that opened it on
+// an oversubscribed CI runner. "resumewindow" keeps the handshake and must stay clean, and
+// counts the blocks it caught inside the window so a clean run can be told from one that
+// never reached it. "resumeescape" also skips the re-check -- the protocol every resume
+// site had before -- and the verifier must catch a thread that ran Java while a
+// stop-the-world cycle held it. Read at the first collection, like every fault here.
+// CN1_GC_FAULT=stalebump reads every OWNED page's bump short in the post-sweep verifier
+// pass, which is what an arm64 core can show it while the newest allocations' bump stores
+// are still in flight (see cn1GcVerifyPublishedLate). It lets a host that keeps stores in
+// order exercise that path: the gate requires a run under it to stay clean AND to have
+// counted late publications.
+int cn1GcFaultStaleBump = 0;
+int cn1GcFaultResume = 0;
+long cn1GcFaultResumeCaught = 0;
+static int cn1GcFaultResumeUs = 300;
+void cn1GcFaultResumeWait(void) {
+    usleep((JAVA_INT)cn1GcFaultResumeUs);
+}
+static void cn1GcFaultResumeReport(void) {
+    fprintf(stderr, "[GC-FAULT] resume handshake caught %ld block(s) raised inside the window\n",
+            __atomic_load_n(&cn1GcFaultResumeCaught, __ATOMIC_RELAXED));
+    fflush(stderr);
+}
 long cn1GcFaultDropEvery = CN1_GC_FAULT_DROPMARK_EVERY;
 long cn1GcFaultDropsApplied = 0;
 void cn1GcFaultInitPublic(void);
@@ -246,6 +272,17 @@ static void cn1GcFaultInit(void) {
     } else if(strcmp(f, "refnoclear") == 0) {
         cn1GcFaultRefClear = 1;
         fprintf(stderr, "[GC-FAULT] dead referents left in place instead of cleared\n");
+    } else if(strcmp(f, "stalebump") == 0) {
+        cn1GcFaultStaleBump = 1;
+        fprintf(stderr, "[GC-FAULT] verifier reads owned pages' bump short\n");
+    } else if(strcmp(f, "resumewindow") == 0 || strcmp(f, "resumeescape") == 0) {
+        { const char* e = getenv("CN1_GC_FAULT_RESUME_US");
+          if(e != 0 && atoi(e) > 0) { cn1GcFaultResumeUs = atoi(e); } }
+        JAVA_BOOLEAN escape = strcmp(f, "resumeescape") == 0;
+        atexit(cn1GcFaultResumeReport);
+        fprintf(stderr, "[GC-FAULT] every resume window widened by %dus%s\n", cn1GcFaultResumeUs,
+                escape ? ", re-check skipped (the pre-handshake protocol)" : ", handshake intact");
+        __atomic_store_n(&cn1GcFaultResume, escape ? 2 : 1, __ATOMIC_RELEASE);
     } else {
         fprintf(stderr, "[GC-FAULT] unknown fault '%s'\n", f);
     }
@@ -1167,6 +1204,21 @@ static JAVA_BOOLEAN cn1GcHybridDecide(void) {
 // The sweep's liveness rule for a specific OBJECT, which is what the reference-clearing
 // passes must ask now that a fresh mark alone no longer decides it: they have to clear
 // exactly what the sweep frees, or get() hands out a freed slot.
+//
+// A CONSEQUENCE THAT LOOKS LIKE A LEAK AND IS NOT ONE. A referent on a page its thread is
+// still allocating into (bibopCurrent) stays mark -1 for as long as the page is owned: no
+// sweep touches an owned page (BIBOP-INVARIANTS R5), so nothing promotes it out of grace,
+// and a concurrent cycle answers 0 here. Measured: 64 WeakReferences to unreachable int[8]
+// referents, stack scrubbed, 0 cleared after 20 forced concurrent cycles, all 64 cleared
+// once the thread filled and retired that page or once a stop-the-world cycle held it
+// (cn1BibopRetireHeldThreadPages), on 1 and 4 markers, on master and before #5940 alike.
+// The root is the allocation page, not a stack word. It is not avoidable in a concurrent
+// cycle: the owner bumps that page while the cycle runs, and the barriers filter fresh
+// references there (cn1GcFreshFilter) on the strength of grace, so freeing an unmarked
+// fresh slot on it would be unsound -- and the clear must match what the sweep frees. It
+// is bounded: one page per size class per thread, released at the next page fill or the
+// next stop-the-world hold. A test that asserts a weak referent clears must therefore
+// retire the page first (or use a referent off the page heap), never just wait.
 static inline int cn1GcSweepReclaimsObj(JAVA_OBJECT o, int mark) {
     if(mark != -1) {
         return cn1GcSweepReclaims(mark);
@@ -5584,6 +5636,10 @@ void codenameOneGCMark() {
             }
         }
         unlockCriticalSection();
+        // Every block is raised before any threadActive is read: the collector's half of
+        // cn1GcTryResumeActive's handshake. The mutex release above does not order a
+        // store before a later load.
+        CN1_GC_BLOCK_FENCE();
         long long __pw0 = cn1MonotonicNanos();
         int __pwSleepUs = 50;
         for(;;) {
@@ -5837,6 +5893,12 @@ void codenameOneGCMark() {
                 // we don't have much control and who barely call into Java anyway
                 if(t->lightweightThread) {
                     t->threadBlockedByGC = JAVA_TRUE;
+                    // Full fence before the threadActive reads below: with the one in
+                    // cn1GcTryResumeActive, a thread going active either sees this block
+                    // and steps back down, or is seen active here and waited for. Without
+                    // it, both could read the other's flag stale and the thread would run
+                    // Java while this loop scanned and held it as parked.
+                    CN1_GC_BLOCK_FENCE();
                     /*
                      * CARRIER ASSOCIATION. Resolved once, before the wait, because
                      * it is a linear walk of the registry snapshot and has no
@@ -6146,6 +6208,19 @@ void codenameOneGCMark() {
                     cn1GcWaitNs += cn1GcNowNs() - __wt0;
 #endif
                 }
+#ifdef CN1_GC_VERIFY
+                // The collector has just taken this thread as PARKED. In a stop-the-world
+                // cycle it must stay that way until cn1GcReleaseBlockedThreads, which checks
+                // that its resume count has not moved. A forced stop is excluded: that thread
+                // is released early on purpose (cn1GcMarkReleaseForced).
+                t->gcVerifyHeld = JAVA_FALSE;
+                if(cn1GcStwCycle && t->lightweightThread && !forcedStop && !vtExecuting
+                   && vtOfState == 0) {
+                    __atomic_thread_fence(__ATOMIC_SEQ_CST);
+                    t->gcVerifyHeldAt = __atomic_load_n(&t->gcVerifyResumes, __ATOMIC_SEQ_CST);
+                    t->gcVerifyHeld = JAVA_TRUE;
+                }
+#endif
                 
                 // place allocations from the local thread into the global heap list.
                 // The critical section serializes this migration against
@@ -7073,12 +7148,46 @@ void cn1GcReleaseAllBlockedThreadsPublic(void) {
         cn1GcWakeUnblocked();
     }
 }
+#ifdef CN1_GC_VERIFY
+// HELD MEANS NOT RUNNING. A stop-the-world cycle retires a held thread's pages, takes the
+// remembered set and frees unmarked young objects on the premise that the thread it
+// scanned as parked has not run since. The resume handshake (cn1GcTryResumeActive) is
+// what makes that true; this checks it directly, before the release, for every thread the
+// cycle took as parked. It does not depend on the run happening to turn an escape into a
+// dangling reference -- an escape only does damage in a narrow interleaving, which one
+// host reached every run and a CI runner never did, so a gate that waited for the damage
+// was a gate that depended on the machine. Verifier builds only.
+static void cn1GcVerifyHeldThreadsStayedHeld(void) {
+    for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
+        lockCriticalSection();
+        struct ThreadLocalData* t = allThreads[iter];
+        unlockCriticalSection();
+        if(t == 0 || !t->gcVerifyHeld) {
+            continue;
+        }
+        t->gcVerifyHeld = JAVA_FALSE;
+        long now = __atomic_load_n(&t->gcVerifyResumes, __ATOMIC_SEQ_CST);
+        if(now != t->gcVerifyHeldAt) {
+            fprintf(stderr, "[GC-VERIFY] HELD THREAD RAN at epoch %d: thread %lld resumed %ld "
+                    "time(s) while a stop-the-world cycle held it as parked\n",
+                    currentGcMarkValue, (long long)t->threadId, now - t->gcVerifyHeldAt);
+            fflush(stderr);
+            if(getenv("CN1_GC_VERIFY_SOFT") == 0) {
+                abort();
+            }
+        }
+    }
+}
+#endif
 static void cn1GcReleaseBlockedThreads(void) {
     // A stop-the-world cycle raises every cooperative thread's flag before its loop, so it
     // releases them all whether or not the loop reached one.
     if(!hasAgressiveAllocator && !cn1GcStwCycle) {
         return;
     }
+#ifdef CN1_GC_VERIFY
+    cn1GcVerifyHeldThreadsStayedHeld();
+#endif
     for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
         lockCriticalSection();
         struct ThreadLocalData* t = allThreads[iter];
@@ -10529,15 +10638,14 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
                 // `volume > cap` true for longer, which is what made it reachable.
                 if(threadStateData->threadBlockedByGC) {
                     threadStateData->threadActive = JAVA_FALSE;
-                    {
+                    do {
                         int cn1__gcw = 0;
                         while(__atomic_load_n(&threadStateData->threadBlockedByGC, __ATOMIC_ACQUIRE)) {
                             if(!cn1VirtualThreadYieldIfVirtual()) {
                                 cn1GcHandshakeBackoff(&cn1__gcw);
                             }
                         }
-                    }
-                    threadStateData->threadActive = JAVA_TRUE;
+                    } while(!cn1GcTryResumeActive(threadStateData));
                 }
                 continue;
             }
@@ -10555,46 +10663,34 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
             // mark functions on it -- underneath a scan in progress, which loses
             // reachable objects. Wait the block out first, exactly as the tail of
             // this function does.
-            {
+            do {
                 int cn1__gcw = 0;
                 while(__atomic_load_n(&threadStateData->threadBlockedByGC, __ATOMIC_ACQUIRE)) {
                     if(!cn1VirtualThreadYieldIfVirtual()) {
                         cn1GcHandshakeBackoff(&cn1__gcw);
                     }
                 }
-            }
-            threadStateData->threadActive = JAVA_TRUE;
+            } while(!cn1GcTryResumeActive(threadStateData));
         }
         threadStateData->threadActive = JAVA_FALSE;
-        {
+        do {
             int cn1__gcw = 0;
             while(__atomic_load_n(&threadStateData->threadBlockedByGC, __ATOMIC_ACQUIRE)) {
                 if(!cn1VirtualThreadYieldIfVirtual()) {
                     cn1GcHandshakeBackoff(&cn1__gcw);
                 }
             }
-        }
-        threadStateData->threadActive = JAVA_TRUE;
-        // This is CN1_RESUME_THREAD's handshake, deliberately, and NOT a stronger
-        // one. A review asked for an atomic block-check-and-reactivate here on the
-        // grounds that the collector can set threadBlockedByGC after this loop's
-        // last read but before the store above, observe threadActive already
-        // false, and scan a stack that is about to start moving. The window is
-        // real and the description is accurate.
-        //
-        // It is also not this function's window. CN1_RESUME_THREAD is exactly
-        // `while(threadBlockedByGC) wait; threadActive = TRUE;`, the collector
-        // stops threads by setting the flag and then waiting for threadActive to
-        // clear with no re-validation afterwards, and that pair is the protocol at
-        // every native boundary in the VM. Making this one site atomic would close
-        // nothing -- the same window stays open at thousands of others -- while
-        // leaving one function speaking a different protocol from the collector it
-        // has to agree with, which is how the last few defects here happened.
-        //
-        // So it is left matching the protocol on purpose. If the window is worth
-        // closing it needs a collector-side acknowledgement applied to every
-        // resume site at once, which is a change to the VM's thread protocol and
-        // not something to smuggle in through a pacing fix.
+        } while(!cn1GcTryResumeActive(threadStateData));
+        // This is CN1_RESUME_THREAD's handshake, deliberately: every resume site in
+        // the VM goes active through cn1GcTryResumeActive, and the collector fences
+        // between raising threadBlockedByGC and reading threadActive. A review once
+        // asked for an atomic block-check-and-reactivate at this one site, on the
+        // grounds that the collector could raise the block after the wait's last read
+        // but before threadActive went up, read it as FALSE, and scan a stack that was
+        // about to move. That window was real, and it was the same at every native
+        // boundary, so closing it here alone would have closed nothing. It was closed
+        // at all of them at once when stop-the-world cycles made it fatal rather than
+        // rare: see cn1GcTryResumeActive.
         CN1_STALL_ADD(__stallVol, CN1_STALL_PACING_VOLUME, threadStateData);
         return;
     }
@@ -10750,8 +10846,7 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
     // Honour a stop-the-world before resuming, exactly like every other park here: the
     // loop above can exit while a mark is still running and the collector believes this
     // thread is paused.
-    CN1_GC_WAIT_UNBLOCKED(threadStateData);
-    threadStateData->threadActive = JAVA_TRUE;
+    CN1_GC_RESUME_ACTIVE(threadStateData);
     CN1_STALL_ADD(__stallBudget, CN1_STALL_PACING_BUDGET, threadStateData);
 }
 
@@ -10785,8 +10880,7 @@ static void cn1BibopMaybeGc(CODENAME_ONE_THREAD_STATE) {
         CN1_GC_PARK_CAPTURE(threadStateData);
         CN1_STALL_T0(__stallHs);
         threadStateData->threadActive = JAVA_FALSE;
-        CN1_GC_WAIT_UNBLOCKED(threadStateData);
-        threadStateData->threadActive = JAVA_TRUE;
+        CN1_GC_RESUME_ACTIVE(threadStateData);
         CN1_STALL_ADD(__stallHs, CN1_STALL_HANDSHAKE, threadStateData);
     }
     long __gcTrigger = atomic_load_explicit(&bibopGcTriggerBytes, memory_order_relaxed);
@@ -14379,6 +14473,72 @@ JAVA_BOOLEAN cn1GcVerifyQuarantineFree(JAVA_OBJECT obj) {
  * and the program read a dead frame. */
 #define CN1_GC_VS_STACK_ESCAPE 6
 
+// A REFERENCE CAN BE SEEN BEFORE THE BUMP THAT COVERS IT. The verifier runs after the
+// collector has released the mutators, so it walks a heap they are still writing. The
+// allocator publishes a slot as `header; dmb ishst; bumpIndex = bi + 1` (see
+// CN1_BIBOP_PUBLISH_BUMP): the fence orders the header BEFORE the bump, and nothing
+// orders the bump before the mutator's NEXT store -- the one that puts the new object
+// into a field. On arm64 those two stores may become visible to another core in either
+// order, so a verifier reading that field can find the object and then read a bumpIndex
+// that does not cover it yet. Classified as a recycled slot, that is a dangling
+// reference that does not exist: an Object[] at the current epoch pointing at a fresh
+// (mark -1) object "above the bump cursor" on its owner's page. That exact report failed
+// GcHeapIntegrityIntegrationTest on Linux arm64 CI twice, on a heap with nothing wrong
+// with it, and never reproduced on hardware that keeps the two stores in order.
+//
+// Nothing outside the verifier needs the reverse order. The collector proper never
+// rejects a precisely traced field on bumpIndex, and every walk bounded by bumpIndex
+// already copes with slots allocated after it read the bound (they are on pages their
+// owner holds, which no sweep touches, and are fresh). So the verifier, not the
+// allocator's hot path, is what changes: an in-flight publication is recognised by every
+// property it must have, and anything else is still reported.
+//   * the slot holds what an allocation just wrote: mark -1, a registered class;
+//   * it is among the page's newest slots (a store buffer holds a few, not a page);
+//   * and the page's bump really does cover it within a bounded wait.
+// A slot a sweep reclaimed fails the first test: verify builds stamp FREE_MARK on, or
+// poison, every slot they free. The one reclaimed slot that can still read as fresh is an
+// object allocated into a page after the sweep read its bump -- which only a thread
+// running while a stop-the-world cycle held it can do, and that is checked directly
+// (cn1GcVerifyHeldThreadsStayedHeld) rather than left to this classification.
+// Whether the page is still OWNED is deliberately not asked: the owner can fill and
+// retire it between the reference being read and this check, which a fault run showed
+// (owned=0, the slot covered by a full page's bump). Counted, and the count is printed
+// with the summary.
+static long cn1GcVerifyLatePublishes = 0;
+#define CN1_GC_LATE_PUBLISH_SLOTS 64
+// CN1_GC_FAULT=stalebump hides this many of every owned page's newest slots from the
+// post-sweep pass -- the pass that runs beside released mutators, which is the only place
+// a publication can be in flight (the resurrection audit runs with them held, so nothing
+// there ever catches up, and skewing it would test nothing real). Sixteen, so that the
+// fixture's 16-element sink, which holds its newest allocations, is reliably read through
+// the stale view on every run rather than only when a pass lands on the newest slot.
+#define CN1_GC_FAULT_STALE_SLOTS 16
+static int cn1GcVerifyPostSweep = 0;
+static JAVA_BOOLEAN cn1GcVerifyPublishedLate(CN1BibopPage* p, int idx, int bump, JAVA_OBJECT o) {
+    if(idx - bump >= CN1_GC_LATE_PUBLISH_SLOTS) {
+        return JAVA_FALSE;
+    }
+    if(CN1_OBJ_MARK_LOAD(o, __ATOMIC_ACQUIRE) != -1) {
+        return JAVA_FALSE;
+    }
+    struct clazz* c = CN1_OBJ_CLASS(o);
+    if(c == 0 || !cn1ClazzRegistryContains((uintptr_t)c)) {
+        return JAVA_FALSE;
+    }
+    // Bounded: a store in flight is visible within nanoseconds; a millisecond is far
+    // beyond any store buffer and still nothing next to a verify pass.
+    long long deadline = cn1MonotonicNanos() + 1000000LL;
+    do {
+        __atomic_thread_fence(__ATOMIC_SEQ_CST);
+        if(atomic_load_explicit(&p->bumpIndex, memory_order_acquire) > idx) {
+            cn1GcVerifyLatePublishes++;
+            return JAVA_TRUE;
+        }
+        cn1CpuRelax();
+    } while(cn1MonotonicNanos() < deadline);
+    return JAVA_FALSE;
+}
+
 // Classify a reference WITHOUT dereferencing anything it has not first proven
 // to be mapped. BiBOP pages are never unmapped (the registry is grow-only) and
 // quarantined blocks are held allocated, so both are safe to read once the
@@ -14403,7 +14563,20 @@ static int cn1GcVerifyClassify(JAVA_OBJECT o, CN1BibopPage** outPage, int* outId
             if(outPage != 0) *outPage = p;
             if(outIdx != 0) *outIdx = idx;
             int bump = atomic_load_explicit(&p->bumpIndex, memory_order_acquire);
-            if(idx >= bump) return CN1_GC_VS_STALE_SLOT;
+            if(cn1GcFaultStaleBump && cn1GcVerifyPostSweep && p->owned) {
+                // CN1_GC_FAULT=stalebump: see cn1GcVerifyPublishedLate. Only FRESH slots
+                // are hidden, as an in-flight publication only ever is: an object a
+                // collection has already marked was published long ago.
+                int hidden = 0;
+                while(hidden < CN1_GC_FAULT_STALE_SLOTS && bump > 0
+                      && CN1_OBJ_MARK_LOAD(cn1BibopSlot(p, bump - 1), __ATOMIC_ACQUIRE) == -1) {
+                    bump--;
+                    hidden++;
+                }
+            }
+            if(idx >= bump && !cn1GcVerifyPublishedLate(p, idx, bump, o)) {
+                return CN1_GC_VS_STALE_SLOT;
+            }
             int m = CN1_OBJ_MARK_LOAD(o, __ATOMIC_ACQUIRE);
             if(m == CN1_BIBOP_FREE_MARK) return CN1_GC_VS_FREE_SLOT;
             if(m == CN1_BIBOP_QUAR_MARK) return CN1_GC_VS_FREE_SLOT;   // the catch
@@ -14660,6 +14833,8 @@ static void cn1GcVerifySummary(void) {
     fprintf(stderr, "[GC-VERIFY] SUMMARY passes=%ld refs=%ld violations=%ld earlyFreed=%ld resurrected=%ld resurrectedDangling=%ld\n",
             cn1GcVerifyPasses, cn1GcVerifyTotalRefs, cn1GcVerifyTotalViolations,
             cn1GcVerifyEarlyFreed, cn1GcResTotal, cn1GcResDangling);
+    fprintf(stderr, "[GC-VERIFY] LATEPUBLISH seen=%ld (references found before the bump covering them was visible)\n",
+            cn1GcVerifyLatePublishes);
     fflush(stderr);
 }
 
@@ -14705,6 +14880,7 @@ void cn1GcVerifyHeap(CODENAME_ONE_THREAD_STATE) {
     memset(cn1GcVerifyStatus, 0, sizeof(cn1GcVerifyStatus));
     cn1GcCollectStackRanges();
     cn1GcVerifyActive = 1;
+    cn1GcVerifyPostSweep = 1;
     long holders = 0;
 #ifndef CN1_DISABLE_BIBOP
     {
@@ -14762,6 +14938,7 @@ void cn1GcVerifyHeap(CODENAME_ONE_THREAD_STATE) {
         }
     }
     cn1GcVerifyActive = 0;
+    cn1GcVerifyPostSweep = 0;
     cn1GcVerifyHolder = JAVA_NULL;
     cn1GcVerifyTotalRefs += cn1GcVerifyChecked;
     cn1GcVerifyTotalViolations += cn1GcVerifyViolations;
@@ -15675,8 +15852,7 @@ cn1GcMallocRetry:
             if(throttle) {
                 usleep((JAVA_INT)(1000));
             }
-            CN1_GC_WAIT_UNBLOCKED(threadStateData);
-            threadStateData->threadActive = JAVA_TRUE;
+            CN1_GC_RESUME_ACTIVE(threadStateData);
             CN1_STALL_ADD(__stallLow, CN1_STALL_LOWMEM, threadStateData);
         }
     }
@@ -15783,7 +15959,7 @@ cn1GcMallocRetry:
         // Then honour the handshake, unbounded, exactly like every other park here.
         CN1_GC_WAIT_UNBLOCKED(threadStateData);
         invokedGC = NO;
-        threadStateData->threadActive = JAVA_TRUE;
+        CN1_GC_RESUME_ACTIVE(threadStateData);
         // Retry by LOOPING, not by recursing. This used to be
         // `return codenameOneGcMalloc(threadStateData, size, parent);`, and the tail call
         // it looks like is not one: CN1_GC_PARK_CAPTURE takes the address of a local, which
@@ -15821,8 +15997,7 @@ cn1GcMallocRetry:
             CN1_GC_PARK_CAPTURE(threadStateData);   // PHASE 3b: native-stack capture at park
             CN1_STALL_T0(__stallLegHs);
             threadStateData->threadActive = JAVA_FALSE;
-            CN1_GC_WAIT_UNBLOCKED(threadStateData);
-            threadStateData->threadActive = JAVA_TRUE;
+            CN1_GC_RESUME_ACTIVE(threadStateData);
             CN1_STALL_ADD(__stallLegHs, CN1_STALL_HANDSHAKE, threadStateData);
         }
         long maxHeapSize = CN1_MAX_HEAP_SIZE;
@@ -15863,15 +16038,17 @@ cn1GcMallocRetry:
             // another and wait for that one too.
             CN1_GC_PARK_CAPTURE(threadStateData);
             threadStateData->threadActive = JAVA_FALSE;
-            while(gcCurrentlyRunning) {
+            do {
+                while(gcCurrentlyRunning) {
 #ifdef CN1_GC_CONFORM
-                if(threadStateData->heapAllocationSize == 0) {
-                    atomic_fetch_add_explicit(&cn1PendingEmptyWaits, 1, memory_order_relaxed);
-                }
+                    if(threadStateData->heapAllocationSize == 0) {
+                        atomic_fetch_add_explicit(&cn1PendingEmptyWaits, 1, memory_order_relaxed);
+                    }
 #endif
-                usleep((JAVA_INT)(1000));
-            }
-            threadStateData->threadActive = JAVA_TRUE;
+                    usleep((JAVA_INT)(1000));
+                }
+                CN1_GC_WAIT_UNBLOCKED(threadStateData);
+            } while(!cn1GcTryResumeActive(threadStateData));
             if(threadStateData->heapAllocationSize > 0) {
                 threadStateData->nativeAllocationMode = JAVA_TRUE;
                 java_lang_System_gc__(threadStateData);
@@ -15927,7 +16104,7 @@ cn1GcMallocRetry:
             // Honour the stop-the-world before resuming, exactly like every other park.
             CN1_GC_WAIT_UNBLOCKED(threadStateData);
             invokedGC = NO;
-            threadStateData->threadActive = JAVA_TRUE;
+            CN1_GC_RESUME_ACTIVE(threadStateData);
             CN1_STALL_ADD(__stallPending, CN1_STALL_PENDING_FULL, threadStateData);
         }
         {
@@ -20285,6 +20462,7 @@ void initConstantPool() {
     // it will wait two seconds unless an explicit GC occurs
     java_lang_System_startGCThread__(threadStateData);
     finishedNativeAllocations();
+    cn1StartupPhase("constantPoolReady");
 }
 
 JAVA_OBJECT utf8String = NULL;

@@ -85,7 +85,26 @@ public class MethodDependencyGraph {
         return new ArrayList<BytecodeMethod>(callers);
     }
 
+    /// The lookup signatures (`desc.name`) this method calls, or an empty set.
+    public Set<String> getCalls(BytecodeMethod method) {
+        Set<String> calls = methodToCalls.get(method);
+        return calls == null ? Collections.<String>emptySet() : calls;
+    }
+
     public void removeMethod(BytecodeMethod method) {
+        removeCalls(method);
+
+        Set<BytecodeMethod> byClass = methodsByClass.get(method.getClsName());
+        if (byClass != null) {
+            byClass.remove(method);
+            if (byClass.isEmpty()) {
+                methodsByClass.remove(method.getClsName());
+            }
+        }
+    }
+
+    /// Drops the calls a method makes but keeps the method: see BytecodeMethod.cullBody.
+    public void removeCalls(BytecodeMethod method) {
         Set<String> calls = methodToCalls.remove(method);
         if (calls != null) {
             for (String call : calls) {
@@ -96,14 +115,6 @@ public class MethodDependencyGraph {
                         callersByLookupSignature.remove(call);
                     }
                 }
-            }
-        }
-
-        Set<BytecodeMethod> byClass = methodsByClass.get(method.getClsName());
-        if (byClass != null) {
-            byClass.remove(method);
-            if (byClass.isEmpty()) {
-                methodsByClass.remove(method.getClsName());
             }
         }
     }

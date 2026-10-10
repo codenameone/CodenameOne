@@ -1,0 +1,234 @@
+{
+ "pr": 5883,
+ "rebaseline": {
+  "linux-x64@amd-epyc-9v45-96-core-processor": {
+   "arrayRandom": {
+    "all": {
+     "from": {
+      "memory": 0.207,
+      "time": 1.023,
+      "tolerance": {
+       "time": 0.45
+      }
+     },
+     "memory": 0.225,
+     "reason": "PR #5883: linux-x64 AMD EPYC 9V45 calibrated from this branch's runs, measured with its VM changes",
+     "runs": 1,
+     "time": 1.038,
+     "tolerance": {
+      "time": 0.45
+     }
+    }
+   },
+   "arraySequential": {
+    "all": {
+     "from": {
+      "memory": 0.356,
+      "time": 3.38,
+      "tolerance": {
+       "time": 0.3
+      }
+     },
+     "memory": 0.356,
+     "reason": "PR #5883: linux-x64 AMD EPYC 9V45 calibrated from this branch's runs, measured with its VM changes",
+     "runs": 1,
+     "time": 2.906,
+     "tolerance": {
+      "time": 0.3
+     }
+    }
+   },
+   "hashMapChurn": {
+    "all": {
+     "from": {
+      "memory": 0.091,
+      "time": 1.206,
+      "tolerance": {
+       "memory": 0.25,
+       "time": 0.55
+      }
+     },
+     "memory": 0.087,
+     "reason": "PR #5883: linux-x64 AMD EPYC 9V45 calibrated from this branch's runs, measured with its VM changes",
+     "runs": 1,
+     "time": 1.309,
+     "tolerance": {
+      "memory": 0.25,
+      "time": 0.55
+     }
+    }
+   },
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.86,
+      "time": 0.952,
+      "tolerance": {
+       "memory": 0.2,
+       "time": 0.5
+      }
+     },
+     "memory": 0.84,
+     "reason": "PR #5883: linux-x64 AMD EPYC 9V45 calibrated from this branch's runs, measured with its VM changes",
+     "runs": 1,
+     "time": 0.917,
+     "tolerance": {
+      "memory": 0.2,
+      "time": 0.5
+     }
+    }
+   },
+   "intArithmetic": {
+    "all": {
+     "from": {
+      "memory": 0.074,
+      "time": 0.999,
+      "tolerance": {
+       "memory": 0.55
+      }
+     },
+     "memory": 0.055,
+     "reason": "PR #5883: linux-x64 AMD EPYC 9V45 calibrated from this branch's runs, measured with its VM changes",
+     "runs": 1,
+     "time": 0.998,
+     "tolerance": {
+      "memory": 0.55
+     }
+    }
+   },
+   "longArithmetic": {
+    "all": {
+     "from": {
+      "memory": 0.074,
+      "time": 0.994,
+      "tolerance": {
+       "memory": 0.5
+      }
+     },
+     "memory": 0.073,
+     "reason": "PR #5883: linux-x64 AMD EPYC 9V45 calibrated from this branch's runs, measured with its VM changes",
+     "runs": 1,
+     "time": 0.995,
+     "tolerance": {
+      "memory": 0.5
+     }
+    }
+   },
+   "mathTranscendental": {
+    "all": {
+     "from": {
+      "memory": 0.076,
+      "time": 1.192,
+      "tolerance": {
+       "memory": 0.4,
+       "time": 0.3
+      }
+     },
+     "memory": 0.057,
+     "reason": "PR #5883: linux-x64 AMD EPYC 9V45 calibrated from this branch's runs, measured with its VM changes",
+     "runs": 1,
+     "time": 1.199,
+     "tolerance": {
+      "memory": 0.4,
+      "time": 0.3
+     }
+    }
+   },
+   "quicksort": {
+    "all": {
+     "from": {
+      "memory": 0.111,
+      "time": 1.056,
+      "tolerance": {
+       "memory": 0.25
+      }
+     },
+     "memory": 0.111,
+     "reason": "PR #5883: linux-x64 AMD EPYC 9V45 calibrated from this branch's runs, measured with its VM changes",
+     "runs": 1,
+     "time": 1.062,
+     "tolerance": {
+      "memory": 0.25
+     }
+    }
+   },
+   "recursion": {
+    "all": {
+     "from": {
+      "memory": 0.075,
+      "time": 1.35,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.076,
+     "reason": "PR #5883: linux-x64 AMD EPYC 9V45 calibrated from this branch's runs, measured with its VM changes",
+     "runs": 1,
+     "time": 1.339,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   },
+   "stringBuilding": {
+    "all": {
+     "from": {
+      "memory": 0.259,
+      "time": 1.557,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.216,
+     "reason": "PR #5883: linux-x64 AMD EPYC 9V45 calibrated from this branch's runs, measured with its VM changes",
+     "runs": 1,
+     "time": 1.577,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   }
+  },
+  "windows-arm64@armv8-64-bit-family-8-model-d84-microsoft-corporation": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.57,
+      "time": 0.775,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.452,
+     "reason": "Merge of master c717e15d2a changed the translator's own source (the workload is the translator), self-host RAM fell 0.57x -> 0.45x on Windows arm64; run 37728363561 at e565fc2b02",
+     "runs": 1,
+     "time": 0.775,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   }
+  },
+  "windows-x64@intel64-family-6-model-106-genuineintel": {
+   "valueEscape": {
+    "all": {
+     "from": {
+      "memory": 0.044,
+      "time": 0.132,
+      "tolerance": {
+       "memory": 0.55
+      }
+     },
+     "memory": 0.044,
+     "reason": "PR #5883: valueEscape time on this CPU is bimodal on the runner, not moved by this branch. Run 37135467315 read 0.216x against 0.132x: rounds 0.216, 0.215, 0.227, 0.223 and 0.132 (ParparVM 1.5-1.6 ms, then 0.9 ms; JDK 25 6.9-7.0 ms), so the SAME binary measured the old baseline exactly in round 5. Each round is the min of 5 reps timed with nanoTime, which on Windows reads GetSystemTimePreciseAsFileTime at 1 us, so 0.9 against 1.5 ms is not clock quantization. Elsewhere this branch's valueEscape equals master's on every row: Linux Xeon 8370C, the same Ice Lake model on Linux, 0.133x against base 0.133x; Windows AMD Family 25 Model 1 0.100x-0.101x (8 runs) against 0.100x (master 3, other branches 13); Neoverse-N2 0.507x-0.508x (13) against 0.508x (3); Windows arm64 D49 0.761x-0.762x (8) against 0.761x (3). This CPU has no other run on record (the 0.132x row came from one run of #5903's code, now expired), so the row is recalibrated from the two run medians that exist, 0.132x and 0.216x: baseline at their median with a tolerance from their spread, which passes either mode. A real regression on this CPU must now exceed 0.244x.",
+     "runs": 2,
+     "time": 0.174,
+     "tolerance": {
+      "memory": 0.55,
+      "time": 0.4
+     }
+    }
+   }
+  }
+ }
+}

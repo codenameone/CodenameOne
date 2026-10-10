@@ -2180,6 +2180,16 @@ struct ThreadLocalData {
     /// therefore puts the outer one on the stack and the inner one on the heap, which is
     /// correct rather than merely safe -- the inner one's lifetime is the outer one's.
     void* pendingStackIter;
+#ifdef CN1_GC_VERIFY
+    /// Verifier only: how many times this thread has gone active through
+    /// cn1GcTryResumeActive, and the count the collector saw when it took the thread as
+    /// parked in a stop-the-world cycle. A held thread whose count moves before the
+    /// cycle releases it RAN while held -- the invariant that cycle depends on, checked
+    /// directly rather than through whatever damage the run happened to do.
+    long gcVerifyResumes;
+    long gcVerifyHeldAt;
+    JAVA_BOOLEAN gcVerifyHeld;
+#endif
 };
 
 //#define BLOCK_FOR_GC() while(threadStateData->threadBlockedByGC) { usleep(500); }
@@ -2245,6 +2255,82 @@ extern void cn1GcWaitUnblockedSlow(struct ThreadLocalData* ts);
             } \
         } \
     } while(0)
+
+// THE OTHER HALF OF THE STOP HANDSHAKE: going active again. Every resume site used to be
+// `wait while threadBlockedByGC; threadActive = TRUE`, and that pair is a check-then-act.
+// The collector stops a thread by raising threadBlockedByGC and then reading threadActive,
+// so a thread that read the block as clear, and was then preempted (or merely had its
+// store sit in a store buffer) before it raised threadActive, let the collector read FALSE
+// and treat it as parked -- and it then raised the flag and ran Java while the collector
+// believed it was held. Under the concurrent collector that was mostly absorbed by SATB and
+// grace. A STOP-THE-WORLD cycle (cn1GcHybridDecide) is not so forgiving: it retires a held
+// thread's current pages as pre-cycle (cn1BibopRetireHeldThreadPages), takes the
+// remembered set and frees unmarked young objects on the premise that every held thread
+// is not running. A thread escaping the hold kept allocating into those pages and storing
+// young objects into old ones, and the minor freed them under a live parent. Widening this
+// window by 300us (CN1_GC_FAULT=resumewindow / resumeescape) reproduced it in every run, on
+// master as well as on the branch it was found from: an Object[] holding a FREED Filler.
+//
+// So raising the flag is a Dekker handshake with the collector's store of the block: raise,
+// FULL fence, re-read the block. The collector stores the block, fences, then reads
+// threadActive (see the stop loops in codenameOneGCMark). With a seq_cst fence on both
+// sides at least one of the two sees the other's store: either the collector sees this
+// thread active and waits for it, or this thread sees the block, lowers the flag again and
+// goes back to waiting. A collector that sees the transient TRUE only waits a little
+// longer. This side gets its ordering from a seq_cst store and load (see below) rather
+// than a standalone fence: one barrier per resume either way, but resumes are not
+// confined to blocking calls -- the allocation pacing parks and the allocation-path
+// safepoints resume through here too, so allocation-heavy code pays it often.
+//
+// Returns JAVA_TRUE when the thread is active and may run Java. JAVA_FALSE means the
+// collector raised the block inside the window: threadActive has been lowered again and
+// the caller must wait the block out (in whatever way that site waits) and call this again.
+#ifdef CN1_GC_VERIFY
+// CN1_GC_FAULT=resumewindow / resumeescape (see cn1GcFaultInit): verifier builds only.
+extern int cn1GcFaultResume;
+extern long cn1GcFaultResumeCaught;
+extern void cn1GcFaultResumeWait(void);
+#endif
+static inline JAVA_BOOLEAN cn1GcTryResumeActive(struct ThreadLocalData* ts) {
+#ifdef CN1_GC_VERIFY
+    int cn1__fault = __atomic_load_n(&cn1GcFaultResume, __ATOMIC_RELAXED);
+    if(__builtin_expect(cn1__fault != 0, 0)) {
+        cn1GcFaultResumeWait();
+        if(cn1__fault == 2) {
+            __atomic_store_n(&ts->threadActive, JAVA_TRUE, __ATOMIC_RELAXED);
+            __atomic_fetch_add(&ts->gcVerifyResumes, 1, __ATOMIC_SEQ_CST);
+            return JAVA_TRUE;
+        }
+    }
+#endif
+    // The store-load ordering the handshake needs, from a seq_cst store and a seq_cst
+    // load rather than a relaxed pair around a standalone fence. Both orders are
+    // correct against the collector's seq_cst fence (CN1_GC_BLOCK_FENCE: seq_cst fences
+    // and operations share one total order), but they cost very different amounts on
+    // a path allocation passes often: a standalone fence is MFENCE on x86-64, which on
+    // AMD Zen costs several times a locked instruction, while a seq_cst store is one XCHG
+    // there and STLR + LDAR on arm64 instead of a full DMB. With the fenced form, the
+    // self-hosted translator measured 0.63x of JDK 25 on a Linux x64 perf-gate runner
+    // (AMD EPYC 7763) where master measured 0.47-0.50x, its memory unchanged.
+    __atomic_store_n(&ts->threadActive, JAVA_TRUE, __ATOMIC_SEQ_CST);
+    if(!__atomic_load_n(&ts->threadBlockedByGC, __ATOMIC_SEQ_CST)) {
+#ifdef CN1_GC_VERIFY
+        __atomic_fetch_add(&ts->gcVerifyResumes, 1, __ATOMIC_SEQ_CST);
+#endif
+        return JAVA_TRUE;
+    }
+    __atomic_store_n(&ts->threadActive, JAVA_FALSE, __ATOMIC_RELEASE);
+#ifdef CN1_GC_VERIFY
+    __atomic_fetch_add(&cn1GcFaultResumeCaught, 1, __ATOMIC_RELAXED);
+#endif
+    return JAVA_FALSE;
+}
+// The common resume: wait out any block, then go active through the handshake above.
+#define CN1_GC_RESUME_ACTIVE(ts) do { \
+        CN1_GC_WAIT_UNBLOCKED(ts); \
+    } while(!cn1GcTryResumeActive((ts)))
+// The collector's side: called between storing threadBlockedByGC and reading threadActive.
+#define CN1_GC_BLOCK_FENCE() __atomic_thread_fence(__ATOMIC_SEQ_CST)
 
 #ifdef CN1_ON_DEVICE_DEBUG
 // One row of the variable side-table: a single (line, slot, typeCode) tuple.
@@ -3143,8 +3229,10 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
    This is the same hang as the reverted cn1VirtualThreadResume change, reached by a
    different path, which is why removing that assignment alone did not close it.
    Virtual-thread roots do not depend on the flag: cn1GcScanParkedVirtualThreads
-   scans every registered virtual thread whether or not it is running. */
-#define CN1_RESUME_THREAD do { struct ThreadLocalData* __cn1rts = getThreadLocalData(); CN1_STALL_T0(__cn1rt0); while (__cn1rts->threadBlockedByGC){ if(!cn1VirtualThreadYieldIfVirtual()) { usleep((JAVA_INT)1000); } } if(__cn1rts->gcPthreadValid) { __cn1rts->threadActive = JAVA_TRUE; } CN1_GC_PARK_RELEASE(__cn1rts); CN1_STALL_ADD(__cn1rt0, CN1_STALL_NATIVE_RESUME, __cn1rts); } while(0)
+   scans every registered virtual thread whether or not it is running.
+   Going active is cn1GcTryResumeActive's handshake, retried until the collector is not
+   holding this thread; see there for why a plain store of threadActive is not enough. */
+#define CN1_RESUME_THREAD do { struct ThreadLocalData* __cn1rts = getThreadLocalData(); CN1_STALL_T0(__cn1rt0); do { while (__cn1rts->threadBlockedByGC){ if(!cn1VirtualThreadYieldIfVirtual()) { usleep((JAVA_INT)1000); } } } while(__cn1rts->gcPthreadValid && !cn1GcTryResumeActive(__cn1rts)); CN1_GC_PARK_RELEASE(__cn1rts); CN1_STALL_ADD(__cn1rt0, CN1_STALL_NATIVE_RESUME, __cn1rts); } while(0)
 
 extern struct ThreadLocalData* getThreadLocalData();
 
@@ -3375,6 +3463,15 @@ extern CN1_NORETURN void cn1ThrowArrayIndexOrDie(CODENAME_ONE_THREAD_STATE, int 
 // Note this never covered the out-of-bounds case above: an out-of-range index
 // usually reads adjacent heap rather than faulting, so no signal ever arrives.
 extern CN1_NORETURN void cn1ThrowNullPointerOrDie(CODENAME_ONE_THREAD_STATE);
+
+/* Called from the stub of a method the translator culled, only when the translation
+ * ran with CN1_CULL_TRAP (see BytecodeMethod.appendMethodC). Reaching one means the
+ * cull removed live code, so this dies loudly, naming the method. */
+static inline void cn1CulledMethodCalled(const char *method) {
+    fprintf(stderr, "CN1 FATAL: called %s, which the translator culled as unreachable\n", method);
+    fflush(stderr);
+    abort();
+}
 
 /* Constructing throw helpers for the paths that must RETURN rather than die: a
  * frameless method hands the pending exception back to its caller's frame, and the

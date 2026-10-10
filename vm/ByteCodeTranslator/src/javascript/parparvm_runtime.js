@@ -576,7 +576,7 @@ function identityHash(obj) {
       return existing | 0;
     }
   }
-  const id = jvm.nextIdentity++ | 0;
+  const id = cn1Ids.n++ | 0;
   if (Object.isExtensible && Object.isExtensible(obj)) {
     try {
       obj.__id = id;
@@ -796,6 +796,57 @@ function threadDebugLabel(threadObject) {
 //     edits to the source file require ``mvn install`` on
 //     vm/ByteCodeTranslator before downstream tests pick them up.
 // ============================================================================
+// The backing store of a Java array, one ``new Array`` site per element family.
+// V8 records on each allocation site the most general elements kind an array it
+// made ever transitioned to, and starts every later array from that site in that
+// kind. With a single site for all arrays, the first Object[] turned every int[]
+// made after it into a generic ELEMENTS array holding a boxed HeapNumber for each
+// element outside the small-integer range -- the transpiled Flutter gallery's
+// 8M-element int[] in arraySequential was HOLEY_ELEMENTS, and every load chased a
+// pointer while every store allocated. Separate sites keep the families from
+// teaching each other: int[] stays SMI or DOUBLE, char/byte/short SMI, floating
+// DOUBLE. boolean and long get their own too, since what the translator stores in
+// them (JS booleans, long records) is not a plain number.
+function cn1IntElements(n) {
+  const a = new Array(n);
+  for (let i = 0; i < n; i++) a[i] = 0;
+  return a;
+}
+function cn1SmallIntElements(n) {
+  const a = new Array(n);
+  for (let i = 0; i < n; i++) a[i] = 0;
+  return a;
+}
+function cn1BooleanElements(n) {
+  const a = new Array(n);
+  for (let i = 0; i < n; i++) a[i] = 0;
+  return a;
+}
+function cn1FloatingElements(n) {
+  const a = new Array(n);
+  for (let i = 0; i < n; i++) a[i] = 0;
+  return a;
+}
+function cn1LongElements(n) {
+  const a = new Array(n);
+  for (let i = 0; i < n; i++) a[i] = 0;
+  return a;
+}
+function cn1ReferenceElements(n) {
+  const a = new Array(n);
+  for (let i = 0; i < n; i++) a[i] = null;
+  return a;
+}
+// The identity counter every allocation increments. It lives on its own
+// one-field object rather than on jvm: jvm carries hundreds of properties, so
+// V8 keeps it in dictionary mode and ``jvm.nextIdentity++`` was a hashed load
+// and store on every allocation -- which also kept V8 from removing an
+// allocation that never escapes (flutter-bench valueEscape, node: 50ms with
+// the counter on jvm, 14ms on this object). jvm.nextIdentity remains, as an
+// accessor onto it.
+const cn1Ids = { n: 1 };
+// Published for the translator's allocation functions (cn1_<class>___NEW__).
+global.cn1Ids = cn1Ids;
 const jvm = {
   classes: {},
   nativeMethods: Object.create(null),
@@ -804,7 +855,13 @@ const jvm = {
   methodTailCache: Object.create(null),
   remappedMethodIdCache: Object.create(null),
   resolvedVirtualCache: Object.create(null),
-  nextIdentity: 1,
+  get nextIdentity() { return cn1Ids.n; },
+  set nextIdentity(v) { cn1Ids.n = v; },
+  // Bumped by defineClass; newObject's cached per-class layouts carry the value
+  // they were built at (see instanceLayout).
+  __layoutEpoch: 0,
+  // componentClass -> [dimensions] -> array classDef; see arrayClassFor.
+  __arrayClassCache: Object.create(null),
   nextThreadId: 1,
   nextHostCallId: 1,
   // Registry of worker-side JS functions that can be invoked from the main
@@ -969,6 +1026,7 @@ const jvm = {
       cn1_staticFields: def.staticFields
     };
     this.classes[def.name] = def;
+    this.__layoutEpoch++;
     // ``def.c`` — inline clinit attachment. Replaces the old
     // separate ``jvm.classes["cls"].clinit = $fn`` statement that
     // used to follow ``_Z`` in the translated output.
@@ -1251,11 +1309,82 @@ const jvm = {
     cls.initialized = true;
   },
   newObject(className) {
-    this.ensureClassInitialized(className);
-    const classDef = this.classes[className];
-    const obj = { __class: className, __classDef: classDef, __id: this.nextIdentity++, __monitor: this.createMonitor() };
-    this.initInstanceFields(obj, className);
-    this.initFieldAliases(obj, className);
+    // Every ``new`` in translated code lands here, so the per-allocation work is
+    // kept to building the object. What used to be redone for every instance --
+    // walking the class chain to collect field defaults, re-parsing each field's
+    // descriptor, and a breadth-first ancestor search to decide whether the class
+    // is a Throwable (whose NEGATIVE answer was never cached, so every ordinary
+    // object paid for the search) -- is computed once per class by
+    // instanceLayout() below. The monitor is left null: every monitor user
+    // attaches one on first use (see the per-monitor state notes above), and a
+    // monitor plus its two arrays was three extra allocations on every object.
+    // Measured on the flutter-bench compute workloads under node: allocation-heavy
+    // loops (valueEscape, objectAllocation) spent ~80% of their time in this path.
+    let classDef = this.classes[className];
+    if (!classDef || !(classDef.initialized || classDef.initializing)) {
+      this.ensureClassInitialized(className);
+      classDef = this.classes[className];
+    }
+    const obj = { __class: className, __classDef: classDef, __id: cn1Ids.n++, __monitor: null };
+    let layout = classDef.__layout;
+    if (layout === undefined || layout.epoch !== this.__layoutEpoch) {
+      layout = this.instanceLayout(classDef, className);
+    }
+    const inits = layout.inits;
+    for (let i = 0; i < inits.length; i += 2) {
+      obj[inits[i]] = inits[i + 1];
+    }
+    if (layout.throwable) {
+      this.captureThrowableStack(obj);
+    }
+    return obj;
+  },
+  /**
+   * Field defaults and the Throwable flag for {@code className}, cached on its
+   * classDef. The fields are listed base class first, the order
+   * initInstanceFields always used, so every instance of a class is built with
+   * the same property order and V8 gives them one shape.
+   *
+   * Only cached when every class on the chain is registered: an answer taken
+   * while an ancestor was still missing could change once it arrives. The
+   * epoch drops every cache when defineClass (re)registers a class, because a
+   * subclass's list embeds its ancestors' fields.
+   */
+  instanceLayout(classDef, className) {
+    const inits = [];
+    const chain = [];
+    let complete = true;
+    for (let name = className; name; ) {
+      const cls = this.classes[name];
+      if (!cls) {
+        complete = false;
+        break;
+      }
+      chain.push(cls);
+      name = cls.baseClass;
+    }
+    for (let c = chain.length - 1; c >= 0; c--) {
+      const fields = chain[c].instanceFields;
+      for (let i = 0; i < fields.length; i++) {
+        inits.push(fields[i][0], this.isPrimitiveFieldDescriptor(fields[i][1]) ? 0 : null);
+      }
+    }
+    let throwable = false;
+    if (classDef.assignableTo) {
+      if (classDef.assignableTo["java_lang_Throwable"]) {
+        throwable = true;
+      } else if (this.assignableViaAncestors(className, "java_lang_Throwable")) {
+        throwable = true;
+        classDef.assignableTo["java_lang_Throwable"] = 1;
+      }
+    }
+    const layout = { epoch: this.__layoutEpoch, inits: inits, throwable: throwable };
+    if (complete) {
+      classDef.__layout = layout;
+    }
+    return layout;
+  },
+  captureThrowableStack(obj) {
     // If this object is a Throwable, capture ``new Error().stack`` into
     // ``Throwable.stack`` right away. The Codename One ``Throwable``
     // constructors don't invoke ``fillInStack`` themselves (every other
@@ -1279,28 +1408,18 @@ const jvm = {
     // ``assignableViaAncestors``, which walks the baseClass chain at
     // query time when every ancestor is guaranteed to be registered,
     // and cache the answer on the classDef so subsequent throws of
-    // the same exception type stay O(1).
-    let isThrowable = false;
-    if (classDef && classDef.assignableTo) {
-      if (classDef.assignableTo["java_lang_Throwable"]) {
-        isThrowable = true;
-      } else if (this.assignableViaAncestors(className, "java_lang_Throwable")) {
-        isThrowable = true;
-        classDef.assignableTo["java_lang_Throwable"] = 1;
-      }
+    // the same exception type stay O(1). instanceLayout() makes that
+    // decision once per class and newObject() calls this only for a
+    // Throwable.
+    try {
+      const prevLimit = Error.stackTraceLimit;
+      try { Error.stackTraceLimit = 200; } catch (_l) {}
+      const stack = new Error().stack || "";
+      try { Error.stackTraceLimit = prevLimit; } catch (_l) {}
+      obj[CN1_THROWABLE_STACK] = createJavaString(stack);
+    } catch (_err) {
+      // Best effort; an empty stack field is fine.
     }
-    if (isThrowable) {
-      try {
-        const prevLimit = Error.stackTraceLimit;
-        try { Error.stackTraceLimit = 200; } catch (_l) {}
-        const stack = new Error().stack || "";
-        try { Error.stackTraceLimit = prevLimit; } catch (_l) {}
-        obj[CN1_THROWABLE_STACK] = createJavaString(stack);
-      } catch (_err) {
-        // Best effort; an empty stack field is fine.
-      }
-    }
-    return obj;
   },
   initInstanceFields(obj, className) {
     const cls = this.classes[className];
@@ -1355,36 +1474,64 @@ const jvm = {
     if (size < 0) {
       throw new Error("Negative array size");
     }
-    const array = new Array(size);
     // Primitive leaf arrays use Java's zero defaults. Reference arrays and
-    // unallocated outer dimensions remain null.
-    let defaultValue = null;
+    // unallocated outer dimensions remain null. Each family is built at its own
+    // ``new Array`` site: see cn1IntElements.
+    let array;
     if (dimensions === 1) {
       switch (componentClass) {
-        case "JAVA_BOOLEAN":
+        case "JAVA_INT":
+          array = cn1IntElements(size);
+          break;
         case "JAVA_BYTE":
         case "JAVA_CHAR":
         case "JAVA_SHORT":
-        case "JAVA_INT":
+          array = cn1SmallIntElements(size);
+          break;
+        case "JAVA_BOOLEAN":
+          array = cn1BooleanElements(size);
+          break;
         case "JAVA_FLOAT":
         case "JAVA_DOUBLE":
-          defaultValue = 0;
+          array = cn1FloatingElements(size);
           break;
         case "JAVA_LONG":
-          defaultValue = _L0;
+          array = cn1LongElements(size);
+          break;
+        default:
+          array = cn1ReferenceElements(size);
           break;
       }
+    } else {
+      array = cn1ReferenceElements(size);
     }
-    for (let i = 0; i < size; i++) {
-      array[i] = defaultValue;
-    }
-    array.__class = this.arrayClassName(componentClass, dimensions);
-    array.__classDef = this.getArrayClass(componentClass, dimensions);
-    array.__id = this.nextIdentity++;
+    // The array class is looked up once per (component, dimensions) and the
+    // monitor is left for the first monitorEnter to attach, as newObject does.
+    // Every allocation used to build the class name twice by concatenation,
+    // probe the class table, and allocate a monitor with two arrays -- most of
+    // the cost of a small array (a char[] for each String, a StringBuilder
+    // growing).
+    const cls = this.arrayClassFor(componentClass, dimensions);
+    array.__class = cls.name;
+    array.__classDef = cls;
+    array.__id = cn1Ids.n++;
     array.__dimensions = dimensions;
     array.__array = true;
-    array.__monitor = this.createMonitor();
+    array.__monitor = null;
     return array;
+  },
+  arrayClassFor(componentClass, dimensions) {
+    let byComponent = this.__arrayClassCache[componentClass];
+    if (byComponent === undefined) {
+      byComponent = this.__arrayClassCache[componentClass] = [];
+    }
+    let cls = byComponent[dimensions];
+    // getArrayClass registers the def in this.classes; re-check it is still the
+    // registered one, since defineClass may replace an entry.
+    if (cls === undefined || this.classes[cls.name] !== cls) {
+      cls = byComponent[dimensions] = this.getArrayClass(componentClass, dimensions);
+    }
+    return cls;
   },
   newMultiArray(sizes, componentClass, dimensions, depth) {
     const level = depth || 0;
@@ -2184,20 +2331,35 @@ const jvm = {
     }
     return null;
   },
+  // A Java String literal: interned, one object per distinct value for the
+  // program's lifetime, as JLS 3.10.5 requires. Only literals come here -- see
+  // newJavaString for every string the runtime builds.
   createStringLiteral(value) {
-    if (!this.literalStrings[value]) {
-      const chars = this.newArray(value.length, "JAVA_CHAR", 1);
-      for (let i = 0; i < value.length; i++) {
-        chars[i] = value.charCodeAt(i);
-      }
-      const str = this.newObject("java_lang_String");
-      str[CN1_STRING_VALUE] = chars;
-      str[CN1_STRING_COUNT] = value.length;
-      str[CN1_STRING_HASH] = 0;
-      str.__nativeString = value;
-      this.literalStrings[value] = str;
+    const cached = this.literalStrings[value];
+    if (cached !== undefined) {
+      return cached;
     }
-    return this.literalStrings[value];
+    const str = this.newJavaString(value);
+    this.literalStrings[value] = str;
+    return str;
+  },
+  // A new java.lang.String holding the JS string's chars. Every runtime-built
+  // string (a concatenation, Integer.toString, StringBuilder.toString, a
+  // stack trace) used to go through createStringLiteral, so the table above
+  // kept every string the program ever built alive for good, and two
+  // separately built equal strings were the same object, which Java forbids
+  // (new String(s) != s; String.intern() has its own pool in the Java code).
+  newJavaString(value) {
+    const chars = this.newArray(value.length, "JAVA_CHAR", 1);
+    for (let i = 0; i < value.length; i++) {
+      chars[i] = value.charCodeAt(i);
+    }
+    const str = this.newObject("java_lang_String");
+    str[CN1_STRING_VALUE] = chars;
+    str[CN1_STRING_COUNT] = value.length;
+    str[CN1_STRING_HASH] = 0;
+    str.__nativeString = value;
+    return str;
   },
   toNativeString(value) {
     if (value == null) {
@@ -2360,7 +2522,7 @@ const jvm = {
       __class: resolvedClass,
       __classDef: classDef,
       __jsValue: value,
-      __id: this.nextIdentity++,
+      __id: cn1Ids.n++,
       __monitor: this.createMonitor()
     };
     // Several @JSBody natives (EventUtil._addEventListener,
@@ -2964,7 +3126,13 @@ const jvm = {
               vmLifecycle("main-thread-completed");
               emitVmMessage({
                 type: this.protocol.messages.LIFECYCLE || "lifecycle",
-                phase: "started"
+                phase: "started",
+                // Tells this signal apart from the one ParparVMBootstrap posts
+                // (source "bootstrap") once start() returns. A Codename One app
+                // must send that one FIRST: run-javascript-lifecycle-tests.mjs
+                // fails a bundle whose main thread finishes before it, which is
+                // the bootstrap returning without waiting for the lifecycle.
+                source: "main-thread"
               });
             }
             if (thread.object) {
@@ -3941,7 +4109,19 @@ global._Yv = _Yv;
 // ``jvm.aN``/``jvm.fr`` definitions above — an earlier placement
 // silently captured ``undefined`` because those assignments hadn't
 // run yet.
-global._I = (n) => jvm.ensureClassInitialized(n);
+// The class-initialization guard runs before every static call, static field
+// access and NEW on a class with an initializer -- in a hot loop, on every
+// iteration -- and the class is initialized on all but the first. So the
+// already-initialized answer is decided here, small enough for V8 to inline,
+// and only the first call (or a re-entrant one, which ensureClassInitialized
+// handles) goes through the full function. Measured on the flutter-bench
+// hashMapChurn workload: the unconditional call was 42% of its time.
+global._I = (n) => {
+  const cls = jvm.classes[n];
+  if (cls === undefined || cls.initialized !== true) {
+    jvm.ensureClassInitialized(n);
+  }
+};
 // Suspending class-init guard. The emitter uses this instead of ``_I`` at a
 // guard whose <clinit> chain contains a SUSPENDING initializer -- exactly where
 // driving the clinit synchronously would swallow a HOST_CALL and hand the
@@ -3972,6 +4152,9 @@ global._Ig = (n) => {
   return jvm.ensureClassInitializedSuspending(n);
 };
 global._L = (v) => jvm.createStringLiteral(v);
+// Per-literal slots for string literals read inside loops; the translator
+// writes `(_Lc[n]||(_Lc[n]=_L("...")))` there (appendStraightLineLdcInstruction).
+global._Lc = [];
 // Primitive class literals (``int.class`` etc.) -> interned primitive
 // ``Class`` object (carries ``isPrimitive=true``). Emitted by the translator
 // for ``getstatic <Wrapper>.TYPE`` (see JavascriptMethodGenerator
@@ -3979,62 +4162,156 @@ global._L = (v) => jvm.createStringLiteral(v);
 // ``TYPE = int.class`` would otherwise leave the field null.
 global._primClass = (n) => classObjectForName(n);
 global._O = (c) => jvm.newObject(c);
+// The classDef a translator-emitted allocation function (cn1_<class>___NEW__)
+// captures once at load. It is emitted after every class registration, so a
+// missing class is a translator bug; say so rather than building objects whose
+// __classDef is undefined, which would only fail at the first virtual call.
+global._Od = (c) => {
+  const def = jvm.classes[c];
+  if (!def) {
+    throw new Error("allocation function for unregistered class " + c);
+  }
+  return def;
+};
 global._C = jvm.cC;
 global._D = jvm.iO;
 global._A = jvm.aL;
 global._T = jvm.aS;
 global._N = jvm.aN;
 global._F = jvm.fr;
-// === Exact 64-bit Java long arithmetic (long == {__l, l, h} hi/lo pair) =======
+// === Exact 64-bit Java long arithmetic =======================================
 // The JS port historically modelled ``long`` as a double (53-bit), so 64-bit
 // math (SHA-384/512, bit twiddling) lost precision and bitwise long ops
 // truncated to 32 bits. BigInt is exact but ~10-50x slower and hung the
-// animation/timing hot paths, so longs are a single {__l, l, h} object instead
-// (the goog.math.Long representation: l = low 32 bits, h = high 32 bits, both
-// signed int32). One object = one value, preserving the one-slot model, and all
-// math is plain Number arithmetic. ``_Lc`` coerces anything entering a long op
-// to a Long: an existing Long (passthrough), a Number (int sharing the long
-// value space, or a leaked double), or null (uninitialised long[]/field).
+// animation/timing hot paths.
+//
+// A long is therefore held in one of two forms:
+//
+//   * a plain JS number, which is always a safe integer (|v| < 2^53) and never
+//     -0. That is every counter, index, checksum, timestamp and nanoTime a
+//     program holds, and arithmetic on it is ordinary Number arithmetic with no
+//     allocation;
+//   * a {__l: 1, l, h} hi/lo record (the goog.math.Long layout: l = low 32
+//     bits, h = high 32 bits, both signed int32), which any value may use and
+//     every value outside the safe range must.
+//
+// The two helpers that decide the form are deliberately asymmetric:
+//
+//   * the number/number FAST PATH of add, subtract and multiply returns a
+//     number whenever the result is a safe integer. It is exact: IEEE
+//     arithmetic on safe integers is exact whenever the TRUE result is itself
+//     safe, and a true result outside that range can never round back inside
+//     it (rounding is monotonic and 2^53 is representable);
+//   * a SLOW PATH -- a record operand, or a result past 2^53, which is also
+//     where 64-bit wrap-around happens -- returns a number only for an int32
+//     result (_LL / _Lnorm below) and a record otherwise.
+//
+// So a value between int32 and 2^53 can be in either form, and nothing may
+// depend on the form: every helper here reads a value through _LwL/_LwH or its
+// own typeof test, and Java code only compares longs through _Lcmp. Normalizing
+// every slow-path result to a number, when the value allowed it, measured 0.70x
+// on a full 64-bit workload (vm/benchmarks longArithmetic) against the
+// all-record representation: a 40-60 bit result came back from a helper as a
+// double, which V8 boxes on return, and the next 64-bit operation took it apart
+// again, so values flipped form on almost every operation. An int32 result is
+// the case that matters for leaving the record form -- a mask, a low-bits
+// extraction, a checksum's increment -- and V8 returns it unboxed.
+//
+// Every long used to be a record, and every long operation allocated one. On
+// the flutter-bench compute workloads under node that was the cost of any loop
+// with a long in it: a ``long sum += a[i]`` reduction, a recursive function
+// returning long, a long checksum.
+//
+// ``_Lc`` converts anything entering the record-only helpers into a record: a
+// record (passthrough), a number, or null / a legacy value (an uninitialised
+// slot, a leaked double).
 const _TWO_PWR_32 = 4294967296;
-function _LL(low, high) { return { __l: 1, l: low | 0, h: high | 0 }; }
-const _L0 = _LL(0, 0);
-const _L1 = _LL(1, 0);
-const _LMIN = _LL(0, -2147483648);          // 0x8000000000000000
-const _LMAX = _LL(-1, 2147483647);           // 0x7FFFFFFFFFFFFFFF
-const _LintCache = new Array(384); // cache small int->long (-128..255) to cut hot-path allocation
-function _LfromInt(v) {
-  v = v | 0;
-  if (v >= -128 && v <= 255) {
-    let c = _LintCache[v + 128];
-    if (c === undefined) { c = _LintCache[v + 128] = _LL(v, v < 0 ? -1 : 0); }
-    return c;
-  }
-  return _LL(v, v < 0 ? -1 : 0);
+const _TWO_PWR_53 = 9007199254740992;
+const _LPOW2 = [];
+for (let i = 0; i < 64; i++) { _LPOW2.push(Math.pow(2, i)); }
+// A raw hi/lo record. The record-only helpers build one directly.
+function _LO(low, high) { return { __l: 1, l: low | 0, h: high | 0 }; }
+// A slow-path result from its words: the int32 as a number when the high word
+// is just the sign extension of the low one, a record otherwise.
+function _LL(low, high) {
+  low = low | 0;
+  high = high | 0;
+  if (high === (low >> 31)) return low;
+  return { __l: 1, l: low, h: high };
 }
-function _LfromNumber(v) {
+// The same decision for a record a record-only helper returned. Records are
+// never mutated, so it is returned as is rather than copied.
+function _Lnorm(o) {
+  const low = o.l;
+  return o.h === (low >> 31) ? low : o;
+}
+const _L0 = 0;
+const _L1 = 1;
+const _LO0 = _LO(0, 0);
+const _LO1 = _LO(1, 0);
+const _LOM1 = _LO(-1, -1);
+const _LMIN = _LO(0, -2147483648);          // 0x8000000000000000
+const _LMAX = _LO(-1, 2147483647);           // 0x7FFFFFFFFFFFFFFF
+function _LfromInt(v) { return v | 0; }
+// Java's double/float -> long conversion (JLS 5.1.3): NaN is 0, out of range
+// saturates, everything else truncates toward zero. Returns a record.
+function _LfromNumberO(v) {
   v = Number(v);
-  if (isNaN(v)) return _L0;
+  if (isNaN(v)) return _LO0;
   if (v <= -9223372036854775808) return _LMIN;
   if (v + 1 >= 9223372036854775808) return _LMAX;
-  if (v < 0) return _Lneg(_LfromNumber(-v));
-  return _LL((v % _TWO_PWR_32) | 0, (v / _TWO_PWR_32) | 0);
+  if (v < 0) return _LnegO(_LfromNumberO(-v));
+  return _LO((v % _TWO_PWR_32) | 0, (v / _TWO_PWR_32) | 0);
 }
-function _LtoNumber(a) { return a.h * _TWO_PWR_32 + (a.l >>> 0); }
+function _LfromNumber(v) {
+  const t = Math.trunc(Number(v));
+  // NaN fails both comparisons and takes the slow path, which answers 0.
+  if (t > -_TWO_PWR_53 && t < _TWO_PWR_53) return t + 0; // + 0 folds -0 into 0
+  return _Lnorm(_LfromNumberO(v));
+}
+function _LtoNumber(a) { return typeof a === "number" ? a : a.h * _TWO_PWR_32 + (a.l >>> 0); }
 function _Lc(x) {
+  if (typeof x === "number") {
+    if (x > -_TWO_PWR_53 && x < _TWO_PWR_53 && x === Math.floor(x)) {
+      return _LO(x | 0, Math.floor(x / _TWO_PWR_32));
+    }
+    return _LfromNumberO(x);
+  }
   if (x && x.__l === 1) return x;
-  if (x == null) return _L0;
-  if (typeof x === 'number') return _LfromNumber(x);
-  if (typeof x === 'bigint') return _LfromNumber(Number(x)); // defensive legacy
-  return _L0;
+  if (typeof x === 'bigint') return _LfromNumberO(Number(x)); // defensive legacy
+  return _LO0;
 }
-function _LtoNum(x) { return (x && x.__l === 1) ? _LtoNumber(x) : Number(x); } // Long|Number -> Number
+// The low and high 32-bit words of a long in either form, without
+// building a record -- the slow paths used to convert every number operand
+// through _Lc, an allocation per operand, and a 64-bit expression flips between
+// the two forms constantly (x >>> 11 of a 64-bit x is a safe number, and the
+// next add takes it back to a record). An int32 is the common number operand
+// (a mask, a shift result, a small constant): x | 0 and x >> 31. Any other safe
+// number splits exactly: x | 0 is its low word (ToInt32 is exact modulo 2^32 for
+// an integer-valued double) and Math.floor(x / 2^32) its signed high word.
+// Anything else -- null, a leaked non-integer -- goes through _Lc.
+function _LwL(x) {
+  if (typeof x === "number") return x | 0;
+  return x !== null && x !== undefined && x.__l === 1 ? x.l : _Lc(x).l;
+}
+function _LwH(x) {
+  if (typeof x === "number") {
+    if ((x | 0) === x) return x >> 31;
+    return x === Math.floor(x) ? Math.floor(x / _TWO_PWR_32) | 0 : _Lc(x).h;
+  }
+  return x !== null && x !== undefined && x.__l === 1 ? x.h : _Lc(x).h;
+}
+function _LtoNum(x) { // Long|Number -> Number
+  if (typeof x === "number") return x;
+  return (x && x.__l === 1) ? _LtoNumber(x) : Number(x);
+}
 function _LisZero(a) { return a.h === 0 && a.l === 0; }
 function _LisNeg(a) { return a.h < 0; }
 function _Leq(a, b) { return a.h === b.h && a.l === b.l; }
-function _Ladd(a, b) {
-  a = _Lc(a); b = _Lc(b);
-  const a48 = a.h >>> 16, a32 = a.h & 0xFFFF, a16 = a.l >>> 16, a00 = a.l & 0xFFFF;
-  const b48 = b.h >>> 16, b32 = b.h & 0xFFFF, b16 = b.l >>> 16, b00 = b.l & 0xFFFF;
+// --- hi/lo record arithmetic: records in, records out ------------------------
+function _LaddW(al, ah, bl, bh) {
+  const a48 = ah >>> 16, a32 = ah & 0xFFFF, a16 = al >>> 16, a00 = al & 0xFFFF;
+  const b48 = bh >>> 16, b32 = bh & 0xFFFF, b16 = bl >>> 16, b00 = bl & 0xFFFF;
   let c00 = a00 + b00, c16 = 0, c32 = 0, c48 = 0;
   c16 += c00 >>> 16; c00 &= 0xFFFF;
   c16 += a16 + b16; c32 += c16 >>> 16; c16 &= 0xFFFF;
@@ -4042,13 +4319,13 @@ function _Ladd(a, b) {
   c48 += a48 + b48; c48 &= 0xFFFF;
   return _LL((c16 << 16) | c00, (c48 << 16) | c32);
 }
-function _Lneg(a) { a = _Lc(a); return _Leq(a, _LMIN) ? _LMIN : _Ladd(_LL(~a.l, ~a.h), _L1); }
-function _Lsub(a, b) {
-  // a - b = a + ~b + 1, inlined as a single 16-bit add chain (one allocation
-  // instead of _Lneg+_Ladd's two) -- LSUB is hot in timing/loops.
-  a = _Lc(a); b = _Lc(b);
-  const a48 = a.h >>> 16, a32 = a.h & 0xFFFF, a16 = a.l >>> 16, a00 = a.l & 0xFFFF;
-  const nl = ~b.l, nh = ~b.h;
+function _LaddC(a, b) { return _LaddW(a.l, a.h, b.l, b.h); }
+function _LaddO(a, b) { return _Lc(_LaddC(a, b)); }
+function _LnegO(a) { return _Leq(a, _LMIN) ? _LMIN : _LaddO(_LO(~a.l, ~a.h), _LO1); }
+function _LsubW(al, ah, bl, bh) {
+  // a - b = a + ~b + 1, inlined as a single 16-bit add chain.
+  const a48 = ah >>> 16, a32 = ah & 0xFFFF, a16 = al >>> 16, a00 = al & 0xFFFF;
+  const nl = ~bl, nh = ~bh;
   const b48 = nh >>> 16, b32 = nh & 0xFFFF, b16 = nl >>> 16, b00 = nl & 0xFFFF;
   let c00 = a00 + b00 + 1, c16 = 0, c32 = 0, c48 = 0; // +1 = the two's-complement carry-in
   c16 += c00 >>> 16; c00 &= 0xFFFF;
@@ -4057,10 +4334,11 @@ function _Lsub(a, b) {
   c48 += a48 + b48; c48 &= 0xFFFF;
   return _LL((c16 << 16) | c00, (c48 << 16) | c32);
 }
-function _Lmul(a, b) {
-  a = _Lc(a); b = _Lc(b);
-  const a48 = a.h >>> 16, a32 = a.h & 0xFFFF, a16 = a.l >>> 16, a00 = a.l & 0xFFFF;
-  const b48 = b.h >>> 16, b32 = b.h & 0xFFFF, b16 = b.l >>> 16, b00 = b.l & 0xFFFF;
+function _LsubC(a, b) { return _LsubW(a.l, a.h, b.l, b.h); }
+function _LsubO(a, b) { return _Lc(_LsubC(a, b)); }
+function _LmulW(al, ah, bl, bh) {
+  const a48 = ah >>> 16, a32 = ah & 0xFFFF, a16 = al >>> 16, a00 = al & 0xFFFF;
+  const b48 = bh >>> 16, b32 = bh & 0xFFFF, b16 = bl >>> 16, b00 = bl & 0xFFFF;
   let c00 = 0, c16 = 0, c32 = 0, c48 = 0;
   c00 += a00 * b00; c16 += c00 >>> 16; c00 &= 0xFFFF;
   c16 += a16 * b00; c32 += c16 >>> 16; c16 &= 0xFFFF;
@@ -4071,86 +4349,197 @@ function _Lmul(a, b) {
   c48 += a48 * b00 + a32 * b16 + a16 * b32 + a00 * b48; c48 &= 0xFFFF;
   return _LL((c16 << 16) | c00, (c48 << 16) | c32);
 }
-function _Lcmp(a, b) {
-  a = _Lc(a); b = _Lc(b);
-  // Allocation-free: the high word is signed, so it orders the full value; on a
-  // tie compare the low words as unsigned. Comparisons dominate loops/timing, so
-  // avoiding the _Lsub object churn here is the main hi/lo perf win.
+function _LmulC(a, b) { return _LmulW(a.l, a.h, b.l, b.h); }
+function _LmulO(a, b) { return _Lc(_LmulC(a, b)); }
+function _LcmpO(a, b) {
+  // The high word is signed, so it orders the full value; on a tie compare the
+  // low words as unsigned.
   if (a.h !== b.h) return a.h < b.h ? -1 : 1;
   const al = a.l >>> 0, bl = b.l >>> 0;
   return al === bl ? 0 : (al < bl ? -1 : 1);
 }
-function _Ldiv(a, b) {
-  a = _Lc(a); b = _Lc(b);
-  if (_LisZero(b)) { throw new Error("/ by zero"); }
-  if (_LisZero(a)) return _L0;
-  if (_Leq(a, _LMIN)) {
-    if (_Leq(b, _L1) || _Leq(b, _LL(-1, -1))) return _LMIN;
-    if (_Leq(b, _LMIN)) return _L1;
-    const approx = _Lshl(_Ldiv(_Lshr(a, 1), b), 1);
-    if (_LisZero(approx)) return _LisNeg(b) ? _L1 : _LL(-1, -1);
-    const rem = _Lsub(a, _Lmul(b, approx));
-    return _Ladd(approx, _Ldiv(rem, b));
-  }
-  if (_Leq(b, _LMIN)) return _L0;
-  if (_LisNeg(a)) return _LisNeg(b) ? _Ldiv(_Lneg(a), _Lneg(b)) : _Lneg(_Ldiv(_Lneg(a), b));
-  if (_LisNeg(b)) return _Lneg(_Ldiv(a, _Lneg(b)));
-  let res = _L0, rem = a;
-  while (_Lcmp(rem, b) >= 0) {
-    let approx = Math.max(1, Math.floor(_LtoNumber(rem) / _LtoNumber(b)));
-    const log2 = Math.ceil(Math.log(approx) / Math.LN2);
-    const delta = (log2 <= 48) ? 1 : Math.pow(2, log2 - 48);
-    let approxRes = _LfromNumber(approx);
-    let approxRem = _Lmul(approxRes, b);
-    while (_LisNeg(approxRem) || _Lcmp(approxRem, rem) > 0) {
-      approx -= delta;
-      approxRes = _LfromNumber(approx);
-      approxRem = _Lmul(approxRes, b);
-    }
-    if (_LisZero(approxRes)) approxRes = _L1;
-    res = _Ladd(res, approxRes);
-    rem = _Lsub(rem, approxRem);
-  }
-  return res;
+function _LshlW(l, h, n) {
+  if (n === 0) return _LL(l, h);
+  if (n < 32) return _LL(l << n, (h << n) | (l >>> (32 - n)));
+  return _LL(0, l << (n - 32));
 }
-function _Lrem(a, b) { a = _Lc(a); b = _Lc(b); return _Lsub(a, _Lmul(_Ldiv(a, b), b)); }
-function _Land(a, b) { a = _Lc(a); b = _Lc(b); return _LL(a.l & b.l, a.h & b.h); }
-function _Lor(a, b) { a = _Lc(a); b = _Lc(b); return _LL(a.l | b.l, a.h | b.h); }
-function _Lxor(a, b) { a = _Lc(a); b = _Lc(b); return _LL(a.l ^ b.l, a.h ^ b.h); }
-function _Lshl(a, n) { // shift count is a Java int (Number); only low 6 bits used
-  a = _Lc(a); n = (_LtoNum(n) | 0) & 63; if (n === 0) return a;
+function _LshrW(l, h, n) {
+  if (n === 0) return _LL(l, h);
+  if (n < 32) return _LL((l >>> n) | (h << (32 - n)), h >> n);
+  return _LL(h >> (n - 32), h >= 0 ? 0 : -1);
+}
+function _LushrW(l, h, n) {
+  if (n === 0) return _LL(l, h);
+  if (n < 32) return _LL((l >>> n) | (h << (32 - n)), h >>> n);
+  if (n === 32) return _LL(h, 0);
+  return _LL(h >>> (n - 32), 0);
+}
+function _LshlC(a, n) {
+  if (n === 0) return _Lnorm(a);
   if (n < 32) return _LL(a.l << n, (a.h << n) | (a.l >>> (32 - n)));
   return _LL(0, a.l << (n - 32));
 }
-function _Lshr(a, n) { // arithmetic right shift
-  a = _Lc(a); n = (_LtoNum(n) | 0) & 63; if (n === 0) return a;
+function _LshlO(a, n) { return _Lc(_LshlC(a, n)); }
+function _LshrC(a, n) {
+  if (n === 0) return _Lnorm(a);
   if (n < 32) return _LL((a.l >>> n) | (a.h << (32 - n)), a.h >> n);
   return _LL(a.h >> (n - 32), a.h >= 0 ? 0 : -1);
 }
-function _Lushr(a, n) { // logical right shift
-  a = _Lc(a); n = (_LtoNum(n) | 0) & 63; if (n === 0) return a;
+function _LshrO(a, n) { return _Lc(_LshrC(a, n)); }
+function _LushrC(a, n) {
+  if (n === 0) return _Lnorm(a);
   if (n < 32) return _LL((a.l >>> n) | (a.h << (32 - n)), a.h >>> n);
   if (n === 32) return _LL(a.h, 0);
   return _LL(a.h >>> (n - 32), 0);
 }
-function _Ll2i(x) { return _Lc(x).l | 0; } // low 32 bits as signed int (Number)
-function _LtoStr(a, radix) {
-  a = _Lc(a); radix = (radix | 0) || 10;
+function _LushrO(a, n) { return _Lc(_LushrC(a, n)); }
+function _LdivO(a, b) {
+  if (_LisZero(b)) { throw new Error("/ by zero"); }
+  if (_LisZero(a)) return _LO0;
+  if (_Leq(a, _LMIN)) {
+    if (_Leq(b, _LO1) || _Leq(b, _LOM1)) return _LMIN;
+    if (_Leq(b, _LMIN)) return _LO1;
+    const approx = _LshlO(_LdivO(_LshrO(a, 1), b), 1);
+    if (_LisZero(approx)) return _LisNeg(b) ? _LO1 : _LOM1;
+    const rem = _LsubO(a, _LmulO(b, approx));
+    return _LaddO(approx, _LdivO(rem, b));
+  }
+  if (_Leq(b, _LMIN)) return _LO0;
+  if (_LisNeg(a)) return _LisNeg(b) ? _LdivO(_LnegO(a), _LnegO(b)) : _LnegO(_LdivO(_LnegO(a), b));
+  if (_LisNeg(b)) return _LnegO(_LdivO(a, _LnegO(b)));
+  let res = _LO0, rem = a;
+  while (_LcmpO(rem, b) >= 0) {
+    let approx = Math.max(1, Math.floor(_LtoNumber(rem) / _LtoNumber(b)));
+    const log2 = Math.ceil(Math.log(approx) / Math.LN2);
+    const delta = (log2 <= 48) ? 1 : Math.pow(2, log2 - 48);
+    let approxRes = _LfromNumberO(approx);
+    let approxRem = _LmulO(approxRes, b);
+    while (_LisNeg(approxRem) || _LcmpO(approxRem, rem) > 0) {
+      approx -= delta;
+      approxRes = _LfromNumberO(approx);
+      approxRem = _LmulO(approxRes, b);
+    }
+    if (_LisZero(approxRes)) approxRes = _LO1;
+    res = _LaddO(res, approxRes);
+    rem = _LsubO(rem, approxRem);
+  }
+  return res;
+}
+// --- the helpers translated code calls: either form in, see above for out ---
+function _LaddS(a, b) { return _LaddW(_LwL(a), _LwH(a), _LwL(b), _LwH(b)); }
+function _Ladd(a, b) {
+  if (typeof a === "number" && typeof b === "number") {
+    const r = a + b;
+    if (r > -_TWO_PWR_53 && r < _TWO_PWR_53) return r;
+  }
+  return _LaddS(a, b);
+}
+function _LsubS(a, b) { return _LsubW(_LwL(a), _LwH(a), _LwL(b), _LwH(b)); }
+function _Lsub(a, b) {
+  if (typeof a === "number" && typeof b === "number") {
+    const r = a - b;
+    if (r > -_TWO_PWR_53 && r < _TWO_PWR_53) return r;
+  }
+  return _LsubS(a, b);
+}
+function _LmulS(a, b) { return _LmulW(_LwL(a), _LwH(a), _LwL(b), _LwH(b)); }
+function _Lmul(a, b) {
+  if (typeof a === "number" && typeof b === "number") {
+    const r = a * b;
+    if (r > -_TWO_PWR_53 && r < _TWO_PWR_53) return r + 0; // 0 * -n is -0
+  }
+  return _LmulS(a, b);
+}
+function _Lneg(a) {
+  if (typeof a === "number") return 0 - a; // the safe range is symmetric
+  return _Lnorm(_LnegO(_Lc(a)));
+}
+function _Lcmp(a, b) {
+  if (typeof a === "number" && typeof b === "number") return a < b ? -1 : (a > b ? 1 : 0);
+  const ah = _LwH(a), bh = _LwH(b);
+  if (ah !== bh) return ah < bh ? -1 : 1;
+  const al = _LwL(a) >>> 0, bl = _LwL(b) >>> 0;
+  return al === bl ? 0 : (al < bl ? -1 : 1);
+}
+function _Ldiv(a, b) {
+  if (typeof a === "number" && typeof b === "number") {
+    if (b === 0) { throw new Error("/ by zero"); }
+    // % is exact on doubles, so a - r is an exact multiple of b and the
+    // division is exact: truncating division without trusting a rounded a / b.
+    const r = a % b;
+    return (a - r) / b + 0;
+  }
+  return _Lnorm(_LdivO(_Lc(a), _Lc(b)));
+}
+function _Lrem(a, b) {
+  if (typeof a === "number" && typeof b === "number") {
+    if (b === 0) { throw new Error("/ by zero"); }
+    return a % b + 0; // the sign follows the dividend, as in Java
+  }
+  a = _Lc(a); b = _Lc(b);
+  return _Lnorm(_LsubO(a, _LmulO(_LdivO(a, b), b)));
+}
+// For a number, x | 0 is its low 32 bits (ToInt32 is exact modulo 2^32 for any
+// integer-valued double) and Math.floor(x / 2^32) its signed high word, so the
+// bitwise operators never need a record for a safe operand.
+function _Land(a, b) {
+  if (typeof a === "number" && typeof b === "number") {
+    if ((a | 0) === a && (b | 0) === b) return a & b;
+    return _LL((a | 0) & (b | 0), Math.floor(a / _TWO_PWR_32) & Math.floor(b / _TWO_PWR_32));
+  }
+  return _LL(_LwL(a) & _LwL(b), _LwH(a) & _LwH(b));
+}
+function _Lor(a, b) {
+  if (typeof a === "number" && typeof b === "number") {
+    if ((a | 0) === a && (b | 0) === b) return a | b;
+    return _LL((a | 0) | (b | 0), Math.floor(a / _TWO_PWR_32) | Math.floor(b / _TWO_PWR_32));
+  }
+  return _LL(_LwL(a) | _LwL(b), _LwH(a) | _LwH(b));
+}
+function _Lxor(a, b) {
+  if (typeof a === "number" && typeof b === "number") {
+    if ((a | 0) === a && (b | 0) === b) return a ^ b;
+    return _LL((a | 0) ^ (b | 0), Math.floor(a / _TWO_PWR_32) ^ Math.floor(b / _TWO_PWR_32));
+  }
+  return _LL(_LwL(a) ^ _LwL(b), _LwH(a) ^ _LwH(b));
+}
+function _Lshl(a, n) { // shift count is a Java int (Number); only low 6 bits used
+  n = (_LtoNum(n) | 0) & 63;
+  if (typeof a === "number") {
+    const r = a * _LPOW2[n];
+    if (r > -_TWO_PWR_53 && r < _TWO_PWR_53) return r + 0;
+  }
+  return _LshlW(_LwL(a), _LwH(a), n);
+}
+function _Lshr(a, n) { // arithmetic right shift
+  n = (_LtoNum(n) | 0) & 63;
+  // Division by a power of two is exact and floor rounds toward -infinity,
+  // which is what an arithmetic shift does to a negative value.
+  if (typeof a === "number") return Math.floor(a / _LPOW2[n]) + 0;
+  return _LshrW(_LwL(a), _LwH(a), n);
+}
+function _Lushr(a, n) { // logical right shift
+  n = (_LtoNum(n) | 0) & 63;
+  if (typeof a === "number" && (a >= 0 || n === 0)) return Math.floor(a / _LPOW2[n]) + 0;
+  return _LushrW(_LwL(a), _LwH(a), n);
+}
+function _Ll2i(x) { return _LwL(x) | 0; } // low 32 bits as signed int
+function _LtoStrO(a, radix) {
   if (_LisZero(a)) return "0";
   if (_LisNeg(a)) {
     if (_Leq(a, _LMIN)) {
-      const r = _LfromInt(radix);
-      const div = _Ldiv(a, r);
-      const rem = _Lsub(_Lmul(div, r), a);
-      return _LtoStr(div, radix) + (_Ll2i(rem) >>> 0).toString(radix);
+      const r = _LO(radix, 0);
+      const div = _LdivO(a, r);
+      const rem = _LsubO(_LmulO(div, r), a);
+      return _LtoStrO(div, radix) + ((rem.l | 0) >>> 0).toString(radix);
     }
-    return "-" + _LtoStr(_Lneg(a), radix);
+    return "-" + _LtoStrO(_LnegO(a), radix);
   }
   let rem = a, result = "";
-  const radixToPower = _LfromNumber(Math.pow(radix, 6));
+  const radixToPower = _LfromNumberO(Math.pow(radix, 6));
   for (;;) {
-    const remDiv = _Ldiv(rem, radixToPower);
-    const intval = (_Ll2i(_Lsub(rem, _Lmul(remDiv, radixToPower)))) >>> 0;
+    const remDiv = _LdivO(rem, radixToPower);
+    const intval = (_LsubO(rem, _LmulO(remDiv, radixToPower)).l | 0) >>> 0;
     let digits = intval.toString(radix);
     rem = remDiv;
     if (_LisZero(rem)) return digits + result;
@@ -4158,9 +4547,17 @@ function _LtoStr(a, radix) {
     result = digits + result;
   }
 }
+function _LtoStr(a, radix) {
+  radix = (radix | 0) || 10;
+  // Number.prototype.toString is exact for a safe integer and writes a negative
+  // value as "-" and the magnitude's digits, which is Long.toString's format.
+  if (typeof a === "number") return a.toString(radix);
+  return _LtoStrO(_Lc(a), radix);
+}
 global._Lc = _Lc;
 global._LtoNum = _LtoNum;
 global._LtoStr = _LtoStr;
+// True for the hi/lo record form only; a long within the safe range is a number.
 global._LisLong = (x) => !!(x && x.__l === 1);
 global._L0 = _L0;
 global._L1 = _L1;
@@ -4179,9 +4576,9 @@ global._Lshl = _Lshl;
 global._Lshr = _Lshr;
 global._Lushr = _Lushr;
 global._Lcmp = _Lcmp;
-global._Li2l = (x) => _LfromInt(x | 0);      // int -> long
+global._Li2l = (x) => x | 0;                 // int -> long
 global._Ll2i = _Ll2i;                        // long -> int
-global._Ll2d = (x) => _LtoNumber(_Lc(x));    // long -> float/double
+global._Ll2d = (x) => typeof x === "number" ? x : _LtoNumber(_Lc(x)); // long -> float/double
 global._Ld2l = (x) => _LfromNumber(x);       // float/double -> long
 // Class-registration aliases: ``_Z`` for defineClass (1592 calls, 15-char
 // prefix savings each) and ``_M`` for the methods-map registration
@@ -4578,18 +4975,26 @@ function* cn1_ivN(target, mid, args) {
 // a NAMED error rather than letting a raw generator object leak
 // downstream as the "result" (the silent-corruption failure mode of the
 // three earlier sync-dispatcher attempts).
+//
+// A time-slice yield (_Yv) is not a suspension, it is the budget check at a
+// generator's entry, so it is stepped through: hashCode() and equals() sites are
+// synchronous by design and drive their generator implementations here (see
+// JavascriptSuspensionAnalysis.isDrivenSignature). A contended monitor withdraws
+// its entrant before failing, so the monitor's queue is left as it was.
 function cn1_ivsDrive(r, mid) {
   if (r && typeof r.next === "function") {
     let step = r.next();
-    // A budget yield ({op:"byield"}) only offers the scheduler a turn; in a
-    // synchronous context there is nobody to hand it to, so keep stepping. Code
-    // translated later against an open-world bundle (the Playground) emits every
-    // method as a generator, so its overrides reach here and may hit one.
     while (!step.done && step.value === _Yv) {
       step = r.next();
     }
     if (!step.done) {
-      throw new Error("cn1_ivs: sync virtual dispatch reached a yielding method (CHA unsound): " + mid);
+      const op = step.value;
+      if (op && op.op === "monitor_enter" && op.monitor && op.monitor.__monitor) {
+        const q = op.monitor.__monitor.entrants;
+        const at = q.indexOf(op.entrant);
+        if (at >= 0) q.splice(at, 1);
+      }
+      throw new Error("cn1_ivs: sync virtual dispatch reached a blocking method: " + mid);
     }
     return step.value;
   }
@@ -4714,6 +5119,30 @@ global._dv0 = _dv0; global._dv1 = _dv1; global._dv2 = _dv2;
 global._dv3 = _dv3; global._dv4 = _dv4; global._dvN = _dvN;
 global._dw0 = _dw0; global._dw1 = _dw1; global._dw2 = _dw2;
 global._dw3 = _dw3; global._dw4 = _dw4; global._dwN = _dwN;
+// A direct call to a body the analysis classified SYNCHRONOUS: the null check
+// and the call, nothing else. _dw* also runs the result through cn1_ivsDrive,
+// whose ``typeof r.next`` test is a property load on whatever the method
+// returned -- numbers, strings, every class of object -- at every call site
+// of every direct call, so megamorphic everywhere. It guards against a
+// generator reaching a synchronous caller, which a target classified
+// synchronous cannot produce: a sync native is one whose binding is a plain
+// function (isSyncNativeBinding), and a method the bridge replaces is seeded
+// suspending. The emitter uses these for exactly those targets; _dw* stays for
+// anything emitted before them. The arguments are evaluated before the null
+// check, as Java evaluates them before the invoke.
+function _dn0(t, fn) { if (t == null) { cn1_ivsNpe(); } return fn(t); }
+function _dn1(t, fn, a0) { if (t == null) { cn1_ivsNpe(); } return fn(t, a0); }
+function _dn2(t, fn, a0, a1) { if (t == null) { cn1_ivsNpe(); } return fn(t, a0, a1); }
+function _dn3(t, fn, a0, a1, a2) { if (t == null) { cn1_ivsNpe(); } return fn(t, a0, a1, a2); }
+function _dn4(t, fn, a0, a1, a2, a3) { if (t == null) { cn1_ivsNpe(); } return fn(t, a0, a1, a2, a3); }
+function _dnN(t, fn, args) { if (t == null) { cn1_ivsNpe(); } return fn.apply(null, [t].concat(args)); }
+// The receiver of a direct call written at the site, `impl(_nn(t), ...)`: the
+// null check alone, so the call itself is the site's own and V8 can inline the
+// body (see JavascriptMethodGenerator's straight-line invoke).
+function _nn(t) { if (t == null) { cn1_ivsNpe(); } return t; }
+global._nn = _nn;
+global._dn0 = _dn0; global._dn1 = _dn1; global._dn2 = _dn2;
+global._dn3 = _dn3; global._dn4 = _dn4; global._dnN = _dnN;
 
 // Two/three-char aliases for the dispatch family: the helper name appears
 // at every INVOKEVIRTUAL / INVOKEINTERFACE call site (~42k in a real app),
@@ -4804,7 +5233,7 @@ function lowerFirst(value) {
 }
 function createJavaString(value) {
   value = value == null ? "" : String(value);
-  return jvm.createStringLiteral(value);
+  return jvm.newJavaString(value);
 }
 function javaClassName(className) {
   if (PRIMITIVE_INFO[className]) {
@@ -4943,8 +5372,11 @@ function runtimeBoxedPrimitiveValue(value) {
       return null;
   }
 }
+// The byte[] class name, built once: this test runs per character in the
+// append and toString loops, and used to concatenate the name on every call.
+const SB_LATIN1_CLASS = "JAVA_BYTE[]";
 function sbIsLatin1(data) {
-  return data && data.__class === jvm.arrayClassName("JAVA_BYTE", 1);
+  return data && data.__class === SB_LATIN1_CLASS;
 }
 function sbResize(sb, capacity, wide) {
   const data = sb[CN1_SB_VALUE];
@@ -4969,9 +5401,10 @@ function sbAppendNativeString(sb, value) {
   let wide = false;
   for (let i = 0; i < value.length; i++) if (value.charCodeAt(i) > 255) { wide = true; break; }
   const data = sbEnsureCapacity(sb, count + value.length, wide);
-  for (let i = 0; i < value.length; i++) {
-    const ch = value.charCodeAt(i);
-    data[count + i] = sbIsLatin1(data) ? (ch << 24) >> 24 : ch;
+  if (sbIsLatin1(data)) {
+    for (let i = 0; i < value.length; i++) data[count + i] = (value.charCodeAt(i) << 24) >> 24;
+  } else {
+    for (let i = 0; i < value.length; i++) data[count + i] = value.charCodeAt(i);
   }
   sb[CN1_SB_COUNT] = count + value.length;
   return sb;
@@ -5276,29 +5709,33 @@ function installNativeBindings() {
     // own implementation. So override the dispatch id ONLY on the
     // exact class extracted from the bindNative name; everywhere else
     // the existing emitted entry stays intact.
+    // Both lookups used to scan every class for every native -- a string
+    // concatenation per class to find the owner, then a hasOwnProperty per class
+    // for the key -- which on the transpiled Flutter gallery (thousands of
+    // classes, hundreds of natives) was 9% of the worker's whole CPU profile at
+    // start-up and deoptimized this function 808 times on methods maps of
+    // different shapes. The owner is now found by trying each underscore
+    // boundary against the class table, longest wins as before, and the classes
+    // holding a key come from an index built once over every methods map.
+    // Overriding only replaces a key that is already there, so the index stays
+    // exact while the loop below runs.
     let dispatchId = null;
     let targetClassName = null;
     if (name.indexOf("cn1_") === 0 && name.indexOf("cn1_s_") !== 0) {
-      let bestPrefix = null;
-      for (let i = 0; i < classNames.length; i++) {
-        const prefix = "cn1_" + classNames[i] + "_";
-        if (name.indexOf(prefix) === 0
-                && (bestPrefix == null || prefix.length > bestPrefix.length)) {
-          bestPrefix = prefix;
-          targetClassName = classNames[i];
+      for (let p = name.indexOf("_", 4); p > 4; p = name.indexOf("_", p + 1)) {
+        const candidate = name.substring(4, p);
+        if (Object.prototype.hasOwnProperty.call(classes, candidate)) {
+          targetClassName = candidate;
         }
       }
-      if (bestPrefix != null) {
-        dispatchId = "cn1_s_" + name.substring(bestPrefix.length);
+      if (targetClassName != null) {
+        dispatchId = "cn1_s_" + name.substring(targetClassName.length + 5);
       }
     }
-    for (let i = 0; i < classNames.length; i++) {
-      const cls = classes[classNames[i]];
-      if (!cls || !cls.methods) {
-        continue;
-      }
-      if (Object.prototype.hasOwnProperty.call(cls.methods, name)) {
-        cls.methods[name] = fn;
+    const holders = methodKeyIndex().get(name);
+    if (holders) {
+      for (let i = 0; i < holders.length; i++) {
+        holders[i].methods[name] = fn;
       }
     }
     if (targetClassName && dispatchId) {
@@ -5308,6 +5745,29 @@ function installNativeBindings() {
         targetCls.methods[dispatchId] = fn;
       }
     }
+  }
+  let keyIndex = null;
+  function methodKeyIndex() {
+    if (keyIndex) {
+      return keyIndex;
+    }
+    keyIndex = new Map();
+    for (let i = 0; i < classNames.length; i++) {
+      const cls = classes[classNames[i]];
+      if (!cls || !cls.methods) {
+        continue;
+      }
+      const keys = Object.keys(cls.methods);
+      for (let k = 0; k < keys.length; k++) {
+        let list = keyIndex.get(keys[k]);
+        if (!list) {
+          list = [];
+          keyIndex.set(keys[k], list);
+        }
+        list.push(cls);
+      }
+    }
+    return keyIndex;
   }
   const names = Object.keys(jvm.nativeMethods || {});
   for (let i = 0; i < names.length; i++) {
@@ -5465,9 +5925,14 @@ bindNative([
   "cn1_java_lang_Object_getClass___R_java_lang_Class",
   "cn1_java_lang_Object_getClassImpl_R_java_lang_Class",
   "cn1_java_lang_Object_getClassImpl___R_java_lang_Class"
-], function*(__cn1ThisObject) {
+], function(__cn1ThisObject) {
+  // A plain function, not a generator: a generator binding makes the native
+  // suspending, and getClass is what every boxed type's equals calls, so that
+  // one yield-free native made Object.equals -- and through it every HashMap
+  // lookup -- suspend. cn1_ivsNpe throws the same NullPointerException the
+  // generator form threw, synchronously.
   if (__cn1ThisObject == null) {
-    yield* throwNullPointerException();
+    cn1_ivsNpe();
   }
   if (__cn1ThisObject.__classDef) {
     return __cn1ThisObject.__classDef.classObject;
@@ -5504,8 +5969,38 @@ bindNative(["cn1_java_io_PrintStream_println_java_lang_Object"], function(__cn1T
   return invokeTranslatedNativeFallback(__cn1ThisObject, "cn1_s_println_java_lang_Object",
       "cn1_java_io_PrintStream_println_java_lang_Object", [value]);
 });
+// System's static initializer. This used to REPLACE the translated one with just
+// ensureSystemPrintStreams(), so every other static of java.lang.System was never
+// assigned -- LOCK above all, which System.gc() and the GC thread synchronize
+// on. Any app that called System.gc() (the Codename One core does, from the
+// EDT) died on "Cannot read properties of undefined (reading '__monitor')"; the
+// transpiled Flutter gallery did, right after its first frame. The translated
+// initializer now runs first -- installNativeBindings keeps it in
+// jvm.translatedMethods -- and the console print streams replace the ones it
+// built. Still a plain function: a generator binding would make System's
+// initializer, and with it every class-init guard in front of System, suspend.
+// A translated initializer that returns a generator is handed back for the
+// class-init driver to run, with the stream swap after it.
+function useConsolePrintStreams() {
+  const systemClass = jvm.classes["java_lang_System"];
+  if (!systemClass) {
+    return;
+  }
+  const staticFields = systemClass.staticFields || (systemClass.staticFields = {});
+  staticFields.out = createConsolePrintStream();
+  staticFields.err = staticFields.out;
+}
 bindNative(["cn1_java_lang_System___CLINIT__"], function() {
-  ensureSystemPrintStreams();
+  const translated = jvm.translatedMethods ? jvm.translatedMethods["cn1_java_lang_System___CLINIT__"] : null;
+  const result = typeof translated === "function" ? translated() : null;
+  if (result && typeof result.next === "function") {
+    return (function*() {
+      yield* result;
+      useConsolePrintStreams();
+      return null;
+    })();
+  }
+  useConsolePrintStreams();
   return null;
 });
 bindNative(["cn1_java_lang_Object_toString_R_java_lang_String"], function(__cn1ThisObject) {
@@ -5596,46 +6091,30 @@ bindNative(["cn1_java_lang_System_isHighFrequencyGC_R_boolean", "cn1_java_lang_S
 // collector that does nothing.
 bindNative(["cn1_java_lang_System_gcIdleWaitMillis_R_int", "cn1_java_lang_System_gcIdleWaitMillis___R_int"], function() { return 30000; });
 // Tagged-immediate Integer natives (C-side poor-man's-Valhalla). The JS port
-// has no tagged pointers: cn1Value reads the heap field, valueOf delegates to
-// the pure-Java cache twin (valueOfHeap).
+// has no tagged pointers: cn1Value reads the heap field, and valueOf is emitted
+// by the translator as a call to the pure-Java cache twin (valueOfHeap), see
+// JavascriptNativeRegistry.TRANSLATED_DELEGATES.
 bindNative(["cn1_java_lang_Integer_cn1Value_R_int"], function(__cn1ThisObject) {
   return __cn1ThisObject.cn1_java_lang_Integer_value | 0;
 });
-bindNative(["cn1_java_lang_Integer_valueOf_int_R_java_lang_Integer"], function*(i) {
-  return yield* adaptVirtualResult(cn1_java_lang_Integer_valueOfHeap_int_R_java_lang_Integer(i));
-});
-// The same pair for the other five tagged boxes. Every native the C runtime gains for this
+// cn1Value for the other five tagged boxes (their valueOf, like Integer's, is a
+// translator-emitted delegate). Every other native the C runtime gains for this
 // scheme needs a binding here or the JS port fails at run time on a missing symbol, and
 // JavascriptNativeAuditTest does not catch an omission -- these are checked by hand.
 bindNative(["cn1_java_lang_Long_cn1Value_R_long"], function(__cn1ThisObject) {
   return __cn1ThisObject.cn1_java_lang_Long_value;
 });
-bindNative(["cn1_java_lang_Long_valueOf_long_R_java_lang_Long"], function*(i) {
-  return yield* adaptVirtualResult(cn1_java_lang_Long_valueOfHeap_long_R_java_lang_Long(i));
-});
 bindNative(["cn1_java_lang_Double_cn1Value_R_double"], function(__cn1ThisObject) {
   return __cn1ThisObject.cn1_java_lang_Double_value;
-});
-bindNative(["cn1_java_lang_Double_valueOf_double_R_java_lang_Double"], function*(d) {
-  return yield* adaptVirtualResult(cn1_java_lang_Double_valueOfHeap_double_R_java_lang_Double(d));
 });
 bindNative(["cn1_java_lang_Float_cn1Value_R_float"], function(__cn1ThisObject) {
   return __cn1ThisObject.cn1_java_lang_Float_value;
 });
-bindNative(["cn1_java_lang_Float_valueOf_float_R_java_lang_Float"], function*(f) {
-  return yield* adaptVirtualResult(cn1_java_lang_Float_valueOfHeap_float_R_java_lang_Float(f));
-});
 bindNative(["cn1_java_lang_Character_cn1Value_R_char"], function(__cn1ThisObject) {
   return __cn1ThisObject.cn1_java_lang_Character_value | 0;
 });
-bindNative(["cn1_java_lang_Character_valueOf_char_R_java_lang_Character"], function*(c) {
-  return yield* adaptVirtualResult(cn1_java_lang_Character_valueOfHeap_char_R_java_lang_Character(c));
-});
 bindNative(["cn1_java_lang_Short_cn1Value_R_short"], function(__cn1ThisObject) {
   return __cn1ThisObject.cn1_java_lang_Short_value | 0;
-});
-bindNative(["cn1_java_lang_Short_valueOf_short_R_java_lang_Short"], function*(v) {
-  return yield* adaptVirtualResult(cn1_java_lang_Short_valueOfHeap_short_R_java_lang_Short(v));
 });
 bindNative(["cn1_java_lang_System_exit_int", "cn1_java_lang_System_exit___int"], function(status) { jvm.finish(status); return null; });
 bindNative(["cn1_java_lang_Runtime_totalMemoryImpl_R_long"], function() { return _LfromNumber(67108864); });
@@ -5651,7 +6130,11 @@ bindNative(["cn1_java_lang_Throwable_getStack_R_java_lang_String"], function(__c
 bindNative(["cn1_java_lang_Math_abs_double_R_double"], function(v) { return Math.abs(v); });
 bindNative(["cn1_java_lang_Math_abs_float_R_float"], function(v) { return Math.abs(v); });
 bindNative(["cn1_java_lang_Math_abs_int_R_int"], function(v) { return Math.abs(v | 0); });
-bindNative(["cn1_java_lang_Math_abs_long_R_long"], function(v) { const x = _Lc(v); return x.h < 0 ? _Lneg(x) : x; });
+bindNative(["cn1_java_lang_Math_abs_long_R_long"], function(v) {
+  if (typeof v === "number") return v < 0 ? 0 - v : v;
+  const x = _Lc(v);
+  return x.h < 0 ? _Lneg(x) : _Lnorm(x);
+});
 bindNative(["cn1_java_lang_Math_ceil_double_R_double"], function(v) { return Math.ceil(v); });
 bindNative(["cn1_java_lang_Math_floor_double_R_double"], function(v) { return Math.floor(v); });
 bindNative(["cn1_java_lang_Math_max_double_double_R_double"], function(a, b) { return Math.max(a, b); });
@@ -5770,8 +6253,10 @@ bindNative(["cn1_java_lang_StringBuilder_toString_R_java_lang_String"], function
   const count = __cn1ThisObject[CN1_SB_COUNT] | 0;
   const data = __cn1ThisObject[CN1_SB_VALUE];
   let out = "";
-  for (let i = 0; i < count; i++) {
-    out += String.fromCharCode(sbIsLatin1(data) ? data[i] & 255 : data[i] | 0);
+  if (sbIsLatin1(data)) {
+    for (let i = 0; i < count; i++) out += String.fromCharCode(data[i] & 255);
+  } else {
+    for (let i = 0; i < count; i++) out += String.fromCharCode(data[i] | 0);
   }
   return createJavaString(out);
 });
@@ -6389,24 +6874,6 @@ bindNative(["cn1_java_text_DateFormat_format_java_util_Date_java_lang_StringBuff
   }
   return formatted;
 });
-bindNative(["cn1_java_util_HashMap_areEqualKeys_java_lang_Object_java_lang_Object_R_boolean"], function*(key1, key2) {
-  if (key1 === key2) {
-    return 1;
-  }
-  if (key1 == null || key2 == null) {
-    return 0;
-  }
-  if (areStringLikeEqual(key1, key2)) {
-    return 1;
-  }
-  if (!key1.__class) {
-    return 0;
-  }
-  // Shared dispatch id — see the equivalent change in
-  // ``cn1_java_lang_Object_equals_java_lang_Object_R_boolean`` above.
-  const equalsMethod = jvm.resolveVirtual(key1.__class, "cn1_s_equals_java_lang_Object_R_boolean");
-  return (yield* adaptVirtualResult(equalsMethod(key1, key2))) ? 1 : 0;
-});
 // A private long handle carries its backing store on JS. It is never used in
 // arithmetic; _Lc preserves the handle object. No global table retains dead buffers.
 // The Java fallback preserves custom collection semantics on this target.
@@ -6421,7 +6888,12 @@ let cn1StorageId = 1;
 function cn1StorageAbsent(b) { return b == null || typeof b === "number" || _LisZero(b); }
 function cn1StorageAllocate(capacity, references) {
   if (capacity === 0) return _L0;
-  const handle = _LfromNumber(cn1StorageId++);
+  // The handle is a long the Java side only stores, passes back and tests
+  // against 0, and the storage hangs off it -- so it must be an OBJECT, the
+  // hi/lo record form, even though a value that small is usually a number.
+  // Every long helper takes the exact slow path for a record, so it still
+  // compares and converts correctly; it just can never be a number.
+  const handle = _LO(cn1StorageId++, 0);
   handle.storage = references ? new Array(capacity).fill(null) : new Int32Array(capacity);
   return handle;
 }
@@ -6482,47 +6954,11 @@ bindNative(["cn1_java_util_NativeStorage_rehash_long_long_long_long_int_long_lon
   }
   return tail;
 });
-// COMPACT HashMap natives: the C implementations are hand-tuned probe loops;
-// on the JS backend every one of them simply delegates to the pure-Java *Impl
-// twin (the semantic source of truth) that the translator compiled to JS.
-bindNative(["cn1_java_util_HashMap_get_java_lang_Object_R_java_lang_Object"], function*(__cn1ThisObject, key) {
-  return yield* adaptVirtualResult(cn1_java_util_HashMap_getImpl_java_lang_Object_R_java_lang_Object(__cn1ThisObject, key));
-});
-bindNative(["cn1_java_util_HashMap_put_java_lang_Object_java_lang_Object_R_java_lang_Object"], function*(__cn1ThisObject, key, value) {
-  return yield* adaptVirtualResult(cn1_java_util_HashMap_putImpl_java_lang_Object_java_lang_Object_R_java_lang_Object(__cn1ThisObject, key, value));
-});
-bindNative(["cn1_java_util_HashMap_remove_java_lang_Object_R_java_lang_Object"], function*(__cn1ThisObject, key) {
-  return yield* adaptVirtualResult(cn1_java_util_HashMap_removeImpl_java_lang_Object_R_java_lang_Object(__cn1ThisObject, key));
-});
-bindNative(["cn1_java_util_HashMap_containsKey_java_lang_Object_R_boolean"], function*(__cn1ThisObject, key) {
-  return yield* adaptVirtualResult(cn1_java_util_HashMap_containsKeyImpl_java_lang_Object_R_boolean(__cn1ThisObject, key));
-});
-bindNative(["cn1_java_util_HashMap_clear"], function*(__cn1ThisObject) {
-  return yield* adaptVirtualResult(cn1_java_util_HashMap_clearImpl(__cn1ThisObject));
-});
-// HashSet keeps its table natively on the C targets; here each native delegates to
-// the pure-Java twin in HashSet.java, exactly as HashMap's do above.
-bindNative(["cn1_java_util_HashSet_cn1AddNative_java_lang_Object_R_boolean"], function*(__cn1ThisObject, element) {
-  return yield* adaptVirtualResult(cn1_java_util_HashSet_cn1AddImpl_java_lang_Object_R_boolean(__cn1ThisObject, element));
-});
-bindNative(["cn1_java_util_HashSet_cn1ContainsNative_java_lang_Object_R_boolean"], function*(__cn1ThisObject, element) {
-  return yield* adaptVirtualResult(cn1_java_util_HashSet_cn1ContainsImpl_java_lang_Object_R_boolean(__cn1ThisObject, element));
-});
-bindNative(["cn1_java_util_HashSet_cn1RemoveNative_java_lang_Object_R_boolean"], function*(__cn1ThisObject, element) {
-  return yield* adaptVirtualResult(cn1_java_util_HashSet_cn1RemoveImpl_java_lang_Object_R_boolean(__cn1ThisObject, element));
-});
-bindNative(["cn1_java_util_HashSet_cn1ClearNative"], function*(__cn1ThisObject) {
-  return yield* adaptVirtualResult(cn1_java_util_HashSet_cn1ClearImpl(__cn1ThisObject));
-});
-bindNative(["cn1_java_util_HashSet_cn1NextOccupied_int_R_int"], function*(__cn1ThisObject, from) {
-  return yield* adaptVirtualResult(cn1_java_util_HashSet_cn1NextOccupiedImpl_int_R_int(__cn1ThisObject, from));
-});
-bindNative(["cn1_java_util_HashSet_cn1ElementAt_int_R_java_lang_Object"], function*(__cn1ThisObject, index) {
-  return yield* adaptVirtualResult(cn1_java_util_HashSet_cn1ElementAtImpl_int_R_java_lang_Object(__cn1ThisObject, index));
-});
-bindNative(["cn1_java_util_HashSet_cn1RemoveSlot_int"], function*(__cn1ThisObject, index) {
-  return yield* adaptVirtualResult(cn1_java_util_HashSet_cn1RemoveSlotImpl_int(__cn1ThisObject, index));
-});
+// COMPACT HashMap and HashSet natives, and the boxed types' valueOf: the C
+// implementations are hand-tuned probe loops and tagged immediates. On the JS
+// backend each simply calls its pure-Java twin, so the TRANSLATOR emits it
+// (JavascriptNativeRegistry.TRANSLATED_DELEGATES) as a plain function wherever
+// the twin is one. A binding here would replace that function with a generator.
 bindNative(["cn1_java_io_NSLogOutputStream_write_byte_1ARRAY_int_int"], function*(__cn1ThisObject, bytes, off, len) {
   const chars = yield* adaptVirtualResult(cn1_java_lang_String_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(bytes, off, len, createJavaString("utf-8")));
   jvm.log(nativeStringFromCharArray(chars));
