@@ -192,6 +192,12 @@ button 0, with `Input.mousePosition` at the touch, and canvas buttons respond
 to it. A game played with the mouse or with canvas buttons therefore needs
 nothing more on a phone.
 
+A script that shows its touch controls only on a handheld can keep asking
+`Application.isMobilePlatform`, which is true on iOS and on Android. In a
+browser, ask `Input.touchSupported` instead: it reports whether the device has
+a touch screen, which is the question on a phone's browser and a laptop's
+alike.
+
 A game played with keys needs a way to press them on a device that has none.
 The game's view accepts key events from Java code: call `keyPressed` and
 `keyReleased` on it with the character of the key, and the script sees
@@ -594,8 +600,13 @@ include::../demos/common/src/main/snippets/developer-guide/unity-interop.cs[tag=
 * Prefabs, prefab instances placed in a scene with their property overrides,
   and nested prefabs.
 * `SceneManager.LoadScene` by name or by build index, `Time` with
-  `timeScale`, `Random`, `Screen.width` and `Screen.height`, `Debug.Log` and
-  its warning and error forms, and `UnityEngine.Assertions.Assert`.
+  `timeScale` and `timeSinceLevelLoad`, `Random`, `Screen.width` and
+  `Screen.height`, `Debug.Log` and its warning and error forms, and
+  `UnityEngine.Assertions.Assert`.
+* `Application.platform` and `Application.isMobilePlatform`, answered from the
+  device the game runs on: `IPhonePlayer` on iOS, `Android` on Android,
+  `WebGLPlayer` in a browser, and the desktop's own player on macOS, Windows
+  and Linux. The simulator reports the desktop it runs on.
 
 ==== Rendering
 
