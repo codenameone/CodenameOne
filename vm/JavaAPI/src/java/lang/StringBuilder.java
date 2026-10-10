@@ -26,6 +26,8 @@ package java.lang;
 /** Mutable UTF-16 sequence with compact storage for Latin-1 code units. */
 public final class StringBuilder implements CharSequence, Appendable {
     static final int INITIAL_CAPACITY = 16;
+    // Private native buffer lock. Explicit initialization also covers no-zero allocation.
+    private long cn1AccessOwner = 0;
     private long cn1Storage;
     private int capacity;
     private boolean wide;
