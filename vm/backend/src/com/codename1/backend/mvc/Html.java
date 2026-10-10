@@ -128,6 +128,30 @@ public final class Html {
         return value == null ? null : string(value);
     }
 
+    /// A submitter can belong to a form outside this template or fragment.
+    public static String submitMethod(Model model, String value) {
+        if (value != null
+                && model.getAttribute("_csrf") != null
+                && !"post".equalsIgnoreCase(value)
+                && !"dialog".equalsIgnoreCase(value)) {
+            throw new IllegalArgumentException(
+                    "GET submit-method overrides are not supported with CSRF tokens; use a separate"
+                        + " GET form");
+        }
+        return value;
+    }
+
+    /// Form binding supports the two structured HTML form encodings.
+    public static String formEncoding(String value) {
+        if (value != null
+                && value.length() > 0
+                && !"application/x-www-form-urlencoded".equalsIgnoreCase(value)
+                && !"multipart/form-data".equalsIgnoreCase(value)) {
+            throw new IllegalArgumentException("Unsupported form encoding: " + value);
+        }
+        return value;
+    }
+
     /// Preserve parameter filtering while keeping CSRF tokens out of htmx GET URLs.
     public static String htmxParameters(Model model, boolean get, String parameters) {
         String filter =

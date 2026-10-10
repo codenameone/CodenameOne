@@ -78,7 +78,9 @@ Dynamic htmx attributes that evaluate expressions (`hx-on*`, `hx-vars`, `hx-vals
 `hx-headers`, `hx-request`, and `hx-trigger`) are rejected, including `data-hx-*`
 aliases. Define those attributes as static template content.
 Script sources, link-resource URLs (including stylesheets), and base URLs must be
-static template attributes. Dynamic attributes are evaluated once per rendered
+static template attributes. Meta `http-equiv` directives, including refresh content,
+must also be static. Named metadata such as a description can use dynamic content.
+Dynamic attributes are evaluated once per rendered
 element, including each iteration of a loop.
 Raw HTML, dynamic script/style content, arbitrary method calls, expression
 preprocessing, message expressions, inline expressions, custom dialects, and
@@ -141,10 +143,18 @@ absolute paths such as `/products/save`, or empty to use the current document.
 This applies to static and dynamic form destinations, including controls in fragments,
 to prevent submissions from disclosing the generated token to another origin.
 For `hx-get`, generated `hx-params` filtering excludes the CSRF parameter while
-preserving the token for a native POST fallback. Explicit parameter allowlists
+preserving the token for a native POST fallback. Explicit parameter allow lists
 and exclusion lists are retained; included fragments receive their parent's
-original parameter filter, so nested POST requests do not inherit the GET-only
+original parameter filter, so nested POST requests don't inherit the GET-only
 CSRF exclusion. The configured CSRF parameter name is used.
+When a CSRF token is available, submit controls can't override the native method
+with GET or an invalid value that defaults to GET. This restriction also applies
+to controls in fragments or controls linked to a form by its ID. Use a separate
+GET form for searches and previews. POST and dialog overrides remain supported.
+Form `enctype` and submit-control `formenctype` support
+`application/x-www-form-urlencoded` and `multipart/form-data`. Unsupported static
+encodings fail the build; unsupported dynamic values fail rendering. In particular,
+`text/plain` isn't supported by form binding.
 For requests outside forms, supply the existing token header explicitly. Defining
 HTML controllers doesn't enable a security chain automatically.
 

@@ -881,7 +881,7 @@ public class MvcTemplatesTest {
                         + " id=\"fragment\"><div th:replace=\"~{control ::"
                         + " save}\"></div></form><form id=\"external\"></form><button"
                         + " form=\"external\" formmethod=\"post\">Save</button><form"
-                        + " id=\"get\"><button formmethod=\"get\">Search</button></form>");
+                        + " id=\"get\"><button>Search</button></form>");
         template(
                 "control",
                 declaration
@@ -914,7 +914,7 @@ public class MvcTemplatesTest {
         }
         assertEquals("token<&", html.select("input[name=_csrf][form=external]").val());
         assertTrue(html.select("form#get input[name=_csrf]").isEmpty());
-        model.addAttribute("method", "get");
+        model.addAttribute("method", null);
         html = org.jsoup.Jsoup.parse(render("forms", model));
         assertTrue(
                 html.select("form#dynamic input[name=_csrf], form#fragment input[name=_csrf]")
@@ -2342,6 +2342,166 @@ public class MvcTemplatesTest {
         compile();
         assertTrue(render("link", new Model()).contains("href=\"/static/catalog.css\""));
         assertTrue(render("link", new Model()).contains("href=\"https://example.test/\""));
+    }
+
+    @Test
+    public void nativeGetSubmitOverridesCannotDiscloseCsrfTokens() throws Exception {
+        setup();
+        String declaration = "<!-- cn1:model method java.lang.String -->";
+        template(
+                "buttonGet",
+                "<form method=\"post\"><button formmethod=\"get\">Preview</button></form>");
+        template(
+                "inputGet",
+                "<form method=\"post\"><input type=\"submit\" formmethod=\"GET\"></form>");
+        template(
+                "ownedGet",
+                "<form id=\"save\" method=\"post\"></form><button form=\"save\""
+                        + " formmethod=\"get\">Preview</button>");
+        template(
+                "dynamicGet",
+                declaration
+                        + "<form method=\"post\"><button"
+                        + " th:attr=\"formmethod=${method}\">Preview</button></form>");
+        template(
+                "fragmentGet",
+                declaration
+                        + "<button th:fragment=\"preview\" form=\"save\""
+                        + " th:attr=\"formmethod=${method}\">Preview</button>");
+        template(
+                "separateGet",
+                "<form method=\"post\"><button>Save</button></form><form method=\"get\"><input"
+                        + " name=\"query\"><button>Search</button></form>");
+        compile();
+        for (String view :
+                Arrays.asList(
+                        "buttonGet",
+                        "inputGet",
+                        "ownedGet",
+                        "dynamicGet",
+                        "fragmentGet :: preview")) {
+            try {
+                render(view, csrfModel().addAttribute("method", "get"));
+                fail("Accepted GET override with CSRF token: " + view);
+            } catch (IllegalArgumentException expected) {
+                assertTrue(
+                        expected.getMessage(),
+                        expected.getMessage().contains("GET submit-method overrides"));
+            }
+            assertTrue(
+                    render(view, new Model().addAttribute("method", "get"))
+                            .contains("formmethod="));
+        }
+        for (String method : Arrays.asList("", "unknown", " post ")) {
+            try {
+                render("dynamicGet", csrfModel().addAttribute("method", method));
+                fail("Accepted override that defaults to GET: " + method);
+            } catch (IllegalArgumentException expected) {
+                assertTrue(expected.getMessage().contains("GET submit-method overrides"));
+            }
+        }
+        for (String method : Arrays.asList("post", "POST", "dialog", null)) {
+            assertTrue(
+                    render("dynamicGet", csrfModel().addAttribute("method", method))
+                            .contains("name=\"_csrf\""));
+        }
+        org.jsoup.nodes.Document html = org.jsoup.Jsoup.parse(render("separateGet", csrfModel()));
+        assertEquals("secret", html.select("form[method=post] input[name=_csrf]").val());
+        assertTrue(html.select("form[method=get] input[name=_csrf]").isEmpty());
+    }
+
+    @Test
+    public void metaHttpEquivDirectivesMustBeStatic() throws Exception {
+        setup();
+        for (String meta :
+                Arrays.asList(
+                        "<meta http-equiv=\"refresh\" th:attr=\"content=${target}\">",
+                        "<meta th:attr=\"HTTP-EQUIV=${kind},CONTENT=${target}\">",
+                        "<meta content=\"0;URL=https://external.test/\""
+                                + " th:attr=\"http-equiv=${kind}\">")) {
+            template(
+                    "meta",
+                    "<!-- cn1:model target java.lang.String --><!-- cn1:model kind java.lang.String"
+                            + " -->"
+                            + meta);
+            try {
+                new MvcTemplates(context).sources();
+                fail("Accepted dynamic meta directive");
+            } catch (IllegalArgumentException expected) {
+                assertTrue(
+                        expected.getMessage(),
+                        expected.getMessage().contains("Dynamic meta http-equiv directives"));
+            }
+        }
+        template(
+                "meta",
+                "<!-- cn1:model description java.lang.String --><meta name=\"description\""
+                        + " th:attr=\"content=${description}\"><meta http-equiv=\"refresh\""
+                        + " content=\"5;URL=/products\">");
+        compile();
+        String html = render("meta", new Model().addAttribute("description", "Search & browse"));
+        assertTrue(html, html.contains("content=\"Search &amp; browse\""));
+        assertTrue(html, html.contains("content=\"5;URL=/products\""));
+    }
+
+    @Test
+    public void formEncodingsMustBeSupportedByRequestBinding() throws Exception {
+        setup();
+        for (String element :
+                Arrays.asList(
+                        "<form method=\"post\" enctype=\"text/plain\"></form>",
+                        "<button formenctype=\"text/plain\">Save</button>",
+                        "<input type=\"submit\" formenctype=\"TEXT/PLAIN\">")) {
+            template("encoding", element);
+            try {
+                new MvcTemplates(context).sources();
+                fail("Accepted unsupported static encoding: " + element);
+            } catch (IllegalArgumentException expected) {
+                assertTrue(
+                        expected.getMessage(),
+                        expected.getMessage().contains("Unsupported form encoding"));
+            }
+        }
+        template(
+                "encoding",
+                "<!-- cn1:model encoding java.lang.String --><form method=\"post\""
+                        + " enctype=\"text/plain\" th:attr=\"enctype=${encoding}\"><button"
+                        + " th:attr=\"formenctype=${encoding}\">Save</button><input type=\"submit\""
+                        + " th:attr=\"formenctype=${encoding}\"></form>");
+        template(
+                "buttonEncoding",
+                "<!-- cn1:model encoding java.lang.String --><form method=\"post\"><button"
+                    + " th:attr=\"formenctype=${encoding}\">Save</button></form>");
+        template(
+                "inputEncoding",
+                "<!-- cn1:model encoding java.lang.String --><form method=\"post\"><input"
+                    + " type=\"submit\" th:attr=\"formenctype=${encoding}\"></form>");
+        compile();
+        for (String view : Arrays.asList("encoding", "buttonEncoding", "inputEncoding")) {
+            for (String encoding : Arrays.asList("text/plain", "TEXT/PLAIN", "application/json")) {
+                try {
+                    render(view, csrfModel().addAttribute("encoding", encoding));
+                    fail("Accepted dynamic encoding: " + encoding);
+                } catch (IllegalArgumentException expected) {
+                    assertTrue(
+                            expected.getMessage(),
+                            expected.getMessage().contains("Unsupported form encoding"));
+                }
+            }
+            for (String encoding :
+                    Arrays.asList(
+                            "application/x-www-form-urlencoded",
+                            "multipart/form-data",
+                            "MULTIPART/FORM-DATA",
+                            "",
+                            null)) {
+                String html = render(view, csrfModel().addAttribute("encoding", encoding));
+                assertTrue(html, html.contains("name=\"_csrf\""));
+                if (encoding != null)
+                    assertTrue(html, html.contains("formenctype=\"" + encoding + "\""));
+                else assertFalse(html, html.contains("enctype="));
+            }
+        }
     }
 
     private static volatile int benchmarkSink;

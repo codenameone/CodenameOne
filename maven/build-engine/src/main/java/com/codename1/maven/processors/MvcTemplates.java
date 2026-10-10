@@ -506,6 +506,31 @@ final class MvcTemplates {
         }
         Set<MvcExpression.Value> snapshots = new HashSet<MvcExpression.Value>();
         cacheAttributes(dynamic, snapshots, out);
+        if (tag.equals("meta")
+                && (dynamic.containsKey("http-equiv")
+                        || (e.hasAttr("http-equiv") && dynamic.containsKey("content"))))
+            throw new IllegalArgumentException(
+                    "Dynamic meta http-equiv directives are not supported");
+        for (String attribute : Arrays.asList("enctype", "formenctype", "formmethod")) {
+            if (attribute.equals("enctype")
+                    ? !tag.equals("form")
+                    : !(tag.equals("button") || tag.equals("input"))) continue;
+            MvcExpression.Value value = dynamic.get(attribute);
+            if (value == null && !e.hasAttr(attribute)) continue;
+            boolean method = attribute.equals("formmethod");
+            if (!method && value == null) {
+                String encoding = e.attr(attribute);
+                if (!encoding.isEmpty()
+                        && !encoding.equalsIgnoreCase("application/x-www-form-urlencoded")
+                        && !encoding.equalsIgnoreCase("multipart/form-data"))
+                    throw new IllegalArgumentException("Unsupported form encoding: " + encoding);
+            }
+            String code = value == null ? q(e.attr(attribute)) : value.code;
+            String checked =
+                    HTML + (method ? "submitMethod(model, " : "formEncoding(") + code + ")";
+            if (value == null) out.append(checked).append(";\n");
+            else dynamic.put(attribute, new MvcExpression.Value(checked, "java.lang.String"));
+        }
         if (tag.equals("link") && dynamic.containsKey("href"))
             throw new IllegalArgumentException("Dynamic link resource URLs are not supported");
         if (tag.equals("script")
