@@ -378,4 +378,22 @@ public class ExecutorsTest {
             assertTrue(String.valueOf(expected.getCause()), expected.getCause() instanceof TimeoutException);
         }
     }
+
+    /// The stage answered completes as the future does, and completing it
+    /// leaves the future alone. That it is an ordinary future, not one that
+    /// refuses to be completed, is documented on the method.
+    @Test
+    public void aMinimalCompletionStageIsACopy() throws Exception {
+        CompletableFuture<String> source = new CompletableFuture<String>();
+        CompletionStage<String> stage = source.minimalCompletionStage();
+        assertTrue(stage.toCompletableFuture().complete("the stage's own"));
+        assertFalse(source.isDone());
+        assertTrue(source.complete("the source's"));
+        assertEquals("the source's", source.get());
+
+        CompletableFuture<String> second = new CompletableFuture<String>();
+        CompletionStage<String> follows = second.minimalCompletionStage();
+        second.complete("value");
+        assertEquals("value", follows.toCompletableFuture().get(10, TimeUnit.SECONDS));
+    }
 }

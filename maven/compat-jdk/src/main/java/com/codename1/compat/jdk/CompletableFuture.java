@@ -1128,6 +1128,19 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         });
     }
 
+    /// A stage that completes as this one does, and that completing does
+    /// not complete this one: a [#copy].
+    ///
+    /// **Not provided: the JDK's refusal.** There the stage answered is of
+    /// a class whose `complete`, `cancel`, `get` and the rest throw
+    /// `UnsupportedOperationException`, and whose `toCompletableFuture`
+    /// answers yet another copy. Here it is an ordinary future, as what
+    /// [#completedStage] and [#failedStage] answer is, so code that casts
+    /// the stage back to a `CompletableFuture`, or calls
+    /// `toCompletableFuture()` on it, and completes that, completes the
+    /// stage its dependents hang off instead of being refused. What the
+    /// method is called for holds either way: whoever is handed the stage
+    /// cannot complete, fail or cancel the future it was made from.
     public CompletionStage<T> minimalCompletionStage() {
         return copy();
     }
