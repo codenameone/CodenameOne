@@ -91,6 +91,38 @@ static CN1Font* cn1MakeFont(const char* family, int weight, int italic, int pixe
     return f;
 }
 
+/*
+ * The weight and the slant a "native:" face asks for. The names are Codename One's:
+ * Main or Italic, then Thin, Light, Regular, Bold or Black ("native:ItalicBold").
+ *
+ * Every one of them used to load as the regular upright face: the name was reduced
+ * to the family and the rest of it dropped. A label a theme styles with
+ * native:MainBold drew like the text around it, and text an application asked for
+ * in bold or italic -- which the Swing and JavaFX layers ask for under these names
+ * -- was neither. deriveTrueTypeFont copies the description it is handed, so a font
+ * derived from one of these keeps what is set here.
+ */
+static void cn1NativeFace(const char* face, int* weight, int* italic) {
+    const char* rest = face;
+    *weight = PANGO_WEIGHT_NORMAL;
+    *italic = 0;
+    if (strncmp(face, "Italic", 6) == 0) {
+        *italic = 1;
+        rest = face + 6;
+    } else if (strncmp(face, "Main", 4) == 0) {
+        rest = face + 4;
+    }
+    if (strcmp(rest, "Thin") == 0) {
+        *weight = PANGO_WEIGHT_THIN;
+    } else if (strcmp(rest, "Light") == 0) {
+        *weight = PANGO_WEIGHT_LIGHT;
+    } else if (strcmp(rest, "Bold") == 0) {
+        *weight = PANGO_WEIGHT_BOLD;
+    } else if (strcmp(rest, "Black") == 0) {
+        *weight = PANGO_WEIGHT_HEAVY;
+    }
+}
+
 JAVA_LONG com_codename1_impl_linux_LinuxNative_createFont___int_int_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_INT face, JAVA_INT style, JAVA_INT size) {
     const char* family = "Sans";
     int pixelSize = 18;
@@ -237,12 +269,15 @@ JAVA_INT com_codename1_impl_linux_LinuxNative_fontHeight___long_R_int(CODENAME_O
 JAVA_LONG com_codename1_impl_linux_LinuxNative_loadTrueTypeFont___java_lang_String_java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT fontName, JAVA_OBJECT fileName) {
     const char* name = fontName == JAVA_NULL ? "Sans" : stringToUTF8(threadStateData, fontName);
     const char* family = name;
+    int weight = PANGO_WEIGHT_NORMAL;
+    int italic = 0;
     (void) fileName;
-    /* "native:" scheme maps to the system UI family. */
+    /* "native:" scheme maps to the system UI family, in the weight and slant the name asks for. */
     if (strncmp(name, "native:", 7) == 0) {
+        cn1NativeFace(name + 7, &weight, &italic);
         family = "Sans";
     }
-    return (JAVA_LONG) (intptr_t) cn1MakeFont(family, PANGO_WEIGHT_NORMAL, 0, 18);
+    return (JAVA_LONG) (intptr_t) cn1MakeFont(family, weight, italic, 18);
 }
 
 JAVA_LONG com_codename1_impl_linux_LinuxNative_loadTrueTypeFontFromMemory___java_lang_String_byte_1ARRAY_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT fontName, JAVA_OBJECT data) {
@@ -260,10 +295,13 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_loadTrueTypeFontFromMemory___java
     FT_Face face = 0;
     family[0] = 0;
     if (data == JAVA_NULL || (len = (int) (*(JAVA_ARRAY) data).length) <= 0) {
+        int weight = PANGO_WEIGHT_NORMAL;
+        int italic = 0;
         if (strncmp(name, "native:", 7) == 0) {
+            cn1NativeFace(name + 7, &weight, &italic);
             name = "Sans";
         }
-        return (JAVA_LONG) (intptr_t) cn1MakeFont(name, PANGO_WEIGHT_NORMAL, 0, 18);
+        return (JAVA_LONG) (intptr_t) cn1MakeFont(name, weight, italic, 18);
     }
     bytes = (unsigned char*) CN1_ARRAY_DATA(data);
 
