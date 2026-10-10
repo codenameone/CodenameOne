@@ -144,6 +144,14 @@ public final class UnityGameAudio implements AudioOutput {
         }
     }
 
+    @Override
+    public void seek(int voice, float seconds) {
+        Object media = playing.get(Integer.valueOf(voice));
+        if (media instanceof Media) {
+            ((Media) media).setTime((int) (seconds * 1000f + 0.5f));
+        }
+    }
+
     /// Silences everything, for a view that is leaving the screen.
     public void stopAll() {
         ArrayList voices = new ArrayList(playing.keySet());

@@ -34,6 +34,13 @@ import java.util.HashMap;
 /// `equals` and `hashCode`, which a translated struct defines field by
 /// field and a boxed primitive or string has already.
 ///
+/// One boxed primitive needs help. .NET's `float.Equals` and
+/// `double.Equals` call `0.0` and `-0.0` the same number, so they are one
+/// key; Java's boxes compare bits and call them two. The map is therefore
+/// keyed by [Interop#hashKey], which is the key itself for everything but
+/// a boxed negative zero, while `keys` keeps what was added, sign and all,
+/// which is what .NET's `Keys` hands back.
+///
 /// The entries live in numbered slots and a `foreach` walks the slots, so
 /// the order is .NET's and is the same on every target: the order things
 /// were added in, with an entry added after a removal taking the slot most
@@ -76,7 +83,7 @@ public class Dictionary_2 implements IEnumerable_1 {
     }
 
     private int slot(Object key) {
-        Integer at = slots.get(key(key));
+        Integer at = slots.get(Interop.hashKey(key(key)));
         return at == null ? -1 : at.intValue();
     }
 
@@ -103,7 +110,7 @@ public class Dictionary_2 implements IEnumerable_1 {
         keys[at] = key;
         values[at] = value;
         next[at] = LIVE;
-        slots.put(key, Integer.valueOf(at));
+        slots.put(Interop.hashKey(key), Integer.valueOf(at));
         version++;
     }
 
@@ -167,7 +174,7 @@ public class Dictionary_2 implements IEnumerable_1 {
         if (at < 0) {
             return false;
         }
-        slots.remove(key);
+        slots.remove(Interop.hashKey(key));
         keys[at] = null;
         values[at] = null;
         next[at] = free;

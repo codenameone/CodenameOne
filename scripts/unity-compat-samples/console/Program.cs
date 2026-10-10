@@ -23,6 +23,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 
 // The CIL translator's conformance program. Every section exercises one lowering
 // rule, and the whole output is compared byte for byte with what `dotnet run`
@@ -103,6 +104,40 @@ namespace Spike
         Ground = 1,
         Player = 2,
         Enemy = 4
+    }
+
+    // Enums whose values are not in ascending order as written, or are stored
+    // as something other than an int.
+    public enum Signed
+    {
+        All = -1,
+        None = 0,
+        One = 1
+    }
+
+    public enum Big : long
+    {
+        Small = 1,
+        Huge = 5000000000,
+        Neg = -2
+    }
+
+    public enum Tiny : byte
+    {
+        A = 200,
+        B = 3
+    }
+
+    public enum Wide : ushort
+    {
+        A = 60000,
+        B = 3
+    }
+
+    public enum Unsigned : uint
+    {
+        Top = 4000000000,
+        Low = 1
     }
 
     public interface IShape
@@ -1303,6 +1338,277 @@ namespace Spike
             }
         }
 
+        // ---- System.Enum ---------------------------------------------------------
+
+        // What a call gives, or the kind of exception it ends in. Only the kind:
+        // the wording of a message changes between versions of .NET.
+        private static string Outcome(Func<object> call)
+        {
+            try
+            {
+                object o = call();
+                return o == null ? "null" : o.ToString();
+            }
+            catch (ArgumentNullException)
+            {
+                return "ArgumentNull";
+            }
+            catch (ArgumentException)
+            {
+                return "Argument";
+            }
+            catch (OverflowException)
+            {
+                return "Overflow";
+            }
+            catch (InvalidOperationException)
+            {
+                return "InvalidOperation";
+            }
+            catch (FormatException)
+            {
+                return "Format";
+            }
+        }
+
+        private static void EnumMethods()
+        {
+            Section("enum methods");
+            // Values and names come sorted by value as an unsigned number, in an
+            // array of the enum's own integer type.
+            string s = "";
+            foreach (Signed v in (Signed[])Enum.GetValues(typeof(Signed)))
+            {
+                s += v + "=" + (int)v + " ";
+            }
+            foreach (string name in Enum.GetNames(typeof(Signed)))
+            {
+                s += name + " ";
+            }
+            Log("signed " + s);
+            Big[] bigs = (Big[])Enum.GetValues(typeof(Big));
+            s = "";
+            for (int i = 0; i < bigs.Length; i++)
+            {
+                s += bigs[i] + "=" + (long)bigs[i] + " ";
+            }
+            Tiny[] tinies = (Tiny[])Enum.GetValues(typeof(Tiny));
+            Wide[] wides = (Wide[])Enum.GetValues(typeof(Wide));
+            Unsigned[] unsigneds = (Unsigned[])Enum.GetValues(typeof(Unsigned));
+            Log("big " + s + "tiny " + tinies[0] + "=" + (int)tinies[0] + " " + tinies[1] + "=" + (int)tinies[1]
+                + " wide " + wides[0] + " " + wides[1] + "=" + (int)wides[1] + " unsigned " + unsigneds[0] + " "
+                + unsigneds[1] + "=" + (uint)unsigneds[1]);
+            int phases = 0;
+            foreach (Phase p in Enum.GetValues(typeof(Phase)))
+            {
+                phases = phases * 10 + (int)p;
+            }
+            object boxedWide = Wide.A;
+            object boxedTiny = Tiny.A;
+            object boxedBig = Big.Huge;
+            Log("walked " + phases + " unboxed " + (int)(Wide)boxedWide + " " + (int)(Tiny)boxedTiny + " "
+                + (long)(Big)boxedBig + " undefined " + (Unsigned)3000000000 + " " + (Tiny)250 + " " + (Wide)65535
+                + " " + (Big)(-7) + " " + (Signed)(-1));
+            Log("defined " + Enum.IsDefined(typeof(Unsigned), Unsigned.Top) + Enum.IsDefined(typeof(Big), 5000000000)
+                + Enum.IsDefined(typeof(Tiny), (byte)200) + Enum.IsDefined(typeof(Tiny), (byte)4)
+                + Enum.IsDefined(typeof(Signed), -1) + Enum.IsDefined(typeof(Signed), "One")
+                + Enum.IsDefined(typeof(Signed), "one"));
+
+            // A value of another enum is refused, where the numbers alone would
+            // have answered; GetName is the one that reads the number out of anything.
+            Log("other enum " + Outcome(() => Enum.IsDefined(typeof(Phase), Layers.Ground)) + " "
+                + Outcome(() => Enum.IsDefined(typeof(Phase), 1L)) + " "
+                + Outcome(() => Enum.IsDefined(typeof(Phase), 1f)) + " "
+                + Outcome(() => Enum.IsDefined(typeof(Phase), Phase.Moved)) + " "
+                + Outcome(() => Enum.GetName(typeof(Phase), Layers.Ground)) + " "
+                + Outcome(() => Enum.GetName(typeof(Phase), 7L)) + " "
+                + Outcome(() => Enum.GetName(typeof(Phase), 3)) + " "
+                + Outcome(() => Enum.GetName(typeof(Phase), "Moved")));
+            Enum ground = Layers.Ground;
+            Layers both = Layers.Ground | Layers.Enemy;
+            Phase moved = Phase.Moved;
+            Log("has flag " + Outcome(() => ground.HasFlag(Phase.Moved)) + " "
+                + Outcome(() => ground.HasFlag(Layers.Ground)) + " " + Outcome(() => ground.HasFlag(null)) + " "
+                + Outcome(() => both.HasFlag(Layers.Enemy)) + " " + Outcome(() => both.HasFlag(Layers.Player)) + " "
+                + Outcome(() => both.HasFlag(Phase.Moved)));
+            Log("compare " + Outcome(() => ground.CompareTo(Phase.Moved)) + " "
+                + Outcome(() => ground.CompareTo(1)) + " " + Outcome(() => ground.CompareTo(null)) + " "
+                + Outcome(() => ground.CompareTo(Layers.Enemy)) + " " + Outcome(() => moved.CompareTo(Phase.Began)) + " "
+                + Outcome(() => moved.CompareTo(Layers.Ground)) + " "
+                + Outcome(() => Unsigned.Top.CompareTo(Unsigned.Low)) + " "
+                + Outcome(() => Signed.All.CompareTo(Signed.One)) + " equals " + ground.Equals(Phase.Moved)
+                + ground.Equals(1) + ground.Equals(Layers.Ground) + moved.Equals(Phase.Moved)
+                + moved.Equals(Layers.Ground) + moved.Equals(1));
+
+            // Parse: one name or several with commas between, or a number.
+            Log("parse " + Outcome(() => Enum.Parse(typeof(Layers), "Ground, Enemy")) + "|"
+                + Outcome(() => Enum.Parse(typeof(Layers), "  Ground ,Player  ")) + "|"
+                + Outcome(() => Enum.Parse(typeof(Layers), "ground,ENEMY", true)) + "|"
+                + Outcome(() => Enum.Parse(typeof(Layers), "ground,ENEMY")) + "|"
+                + Outcome(() => (int)(Phase)Enum.Parse(typeof(Phase), "Moved, Ended")) + "|"
+                + Outcome(() => Enum.Parse(typeof(Layers), "\u00a0Ground\u2003")) + "|"
+                + Outcome(() => (long)(Big)Enum.Parse(typeof(Big), "Huge")) + "|"
+                + Outcome(() => Enum.Parse(typeof(Phase), "Ended")));
+            Log("parse bad " + Outcome(() => Enum.Parse(typeof(Layers), "1, Enemy")) + " "
+                + Outcome(() => Enum.Parse(typeof(Layers), "Enemy, 1")) + " "
+                + Outcome(() => Enum.Parse(typeof(Layers), "")) + " "
+                + Outcome(() => Enum.Parse(typeof(Layers), "   ")) + " "
+                + Outcome(() => Enum.Parse(typeof(Layers), "Ground,")) + " "
+                + Outcome(() => Enum.Parse(typeof(Layers), "Ground,,Enemy")) + " "
+                + Outcome(() => Enum.Parse(typeof(Layers), ",Enemy")) + " "
+                + Outcome(() => Enum.Parse(typeof(Layers), "Nope")) + " "
+                + Outcome(() => Enum.Parse(typeof(Layers), null)));
+            Log("parse number " + Outcome(() => Enum.Parse(typeof(Layers), " 6 ")) + "|"
+                + Outcome(() => Enum.Parse(typeof(Layers), "+3")) + "|"
+                + Outcome(() => (int)(Layers)Enum.Parse(typeof(Layers), "-1")) + "|"
+                + Outcome(() => Enum.Parse(typeof(Layers), "5000000000")) + "|"
+                + Outcome(() => Enum.Parse(typeof(Tiny), "300")) + "|"
+                + Outcome(() => Enum.Parse(typeof(Tiny), "-1")) + "|"
+                + Outcome(() => Enum.Parse(typeof(Tiny), "200")) + "|"
+                + Outcome(() => Enum.Parse(typeof(Unsigned), "4000000000")) + "|"
+                + Outcome(() => Enum.Parse(typeof(Unsigned), "4294967296")) + "|"
+                + Outcome(() => Enum.Parse(typeof(Big), "-9223372036854775808")) + "|"
+                + Outcome(() => Enum.Parse(typeof(Big), "9223372036854775808")) + "|"
+                + Outcome(() => Enum.Parse(typeof(Signed), "-")));
+            object parsed;
+            bool ok = Enum.TryParse(typeof(Layers), "Ground, Enemy", out parsed);
+            string tried = ok + " " + parsed;
+            ok = Enum.TryParse(typeof(Layers), "player", true, out parsed);
+            tried += " " + ok + " " + parsed;
+            ok = Enum.TryParse(typeof(Layers), "Nope", out parsed);
+            tried += " " + ok + (parsed == null);
+            ok = Enum.TryParse(typeof(Layers), null, out parsed);
+            tried += " " + ok + (parsed == null);
+            ok = Enum.TryParse(typeof(Tiny), "300", out parsed);
+            Log("try parse " + tried + " " + ok + (parsed == null));
+        }
+
+        // ---- the base library, where it differs from java.lang ----------------------
+
+        private static int released;
+
+        // An iterator that holds something: its finally block is what a using
+        // statement or a lock inside a real one comes down to.
+        private static IEnumerable<int> Guarded(int limit)
+        {
+            try
+            {
+                for (int i = 0; i < limit; i++)
+                {
+                    yield return i;
+                }
+            }
+            finally
+            {
+                released++;
+            }
+        }
+
+        private static void BaseLibrary()
+        {
+            Section("base library");
+            // A query that stops early still disposes the enumerator, which is
+            // what runs the iterator's finally block.
+            string linq = "";
+            linq += Guarded(5).Any() + "/" + released;
+            linq += " " + Guarded(5).First() + "/" + released;
+            linq += " " + Guarded(5).Contains(2) + "/" + released;
+            linq += " " + Guarded(5).ElementAt(3) + "/" + released;
+            linq += " " + Guarded(5).Any(v => v == 1) + "/" + released;
+            linq += " " + Guarded(5).All(v => v < 2) + "/" + released;
+            linq += " " + Guarded(5).First(v => v > 2) + "/" + released;
+            linq += " " + Guarded(5).FirstOrDefault() + "/" + released;
+            linq += " " + Guarded(5).FirstOrDefault(v => v > 3) + "/" + released;
+            int taken = 0;
+            foreach (int v in Guarded(5).Take(2))
+            {
+                taken = taken * 10 + v + 1;
+            }
+            linq += " " + taken + "/" + released;
+            linq += " " + Guarded(5).Count() + "/" + released;
+            linq += " " + Guarded(5).Last() + "/" + released;
+            linq += " " + Guarded(4).ToList().Count + "/" + released;
+            List<int> grown = new List<int>();
+            grown.AddRange(Guarded(3));
+            linq += " " + grown.Count + "/" + released;
+            try
+            {
+                linq += Guarded(5).First(v => v / (v - 2) > 9);
+            }
+            catch (DivideByZeroException)
+            {
+                linq += " thrown/" + released;
+            }
+            try
+            {
+                linq += Guarded(0).First();
+            }
+            catch (InvalidOperationException)
+            {
+                linq += " empty/" + released;
+            }
+            Log("linq " + linq);
+
+            // A type is its .NET name: int and uint are one class on the JVM.
+            Log("types " + (typeof(int) == typeof(uint)) + (typeof(long) == typeof(ulong))
+                + (typeof(byte) == typeof(sbyte)) + (typeof(short) == typeof(ushort)) + (typeof(char) == typeof(ushort))
+                + (typeof(int) == typeof(int)) + (typeof(uint) == typeof(uint)) + (typeof(ulong) != typeof(long))
+                + " " + typeof(uint).FullName + " " + typeof(ulong).FullName + " " + typeof(int).FullName + " "
+                + typeof(sbyte) + " " + typeof(ushort) + " " + typeof(Holder).FullName
+                + (typeof(Holder) == typeof(Shape)));
+
+            // Zero and negative zero are one number, so they are one key.
+            Dictionary<float, string> byFloat = new Dictionary<float, string>();
+            byFloat[0f] = "pos";
+            string zeros = byFloat.ContainsKey(-0f) + " " + byFloat[-0f] + " " + byFloat.Count;
+            byFloat[-0f] = "neg";
+            byFloat[float.NaN] = "nan";
+            zeros += " " + byFloat.Count + " " + byFloat[0f] + " " + byFloat.ContainsKey(float.NaN) + " "
+                + byFloat.Remove(-0f) + " " + byFloat.Count;
+            Dictionary<double, int> byDouble = new Dictionary<double, int>();
+            byDouble.Add(-0.0, 1);
+            try
+            {
+                byDouble.Add(0.0, 2);
+                zeros += " added";
+            }
+            catch (ArgumentException)
+            {
+                double kept = 0;
+                foreach (double key in byDouble.Keys)
+                {
+                    kept = key;
+                }
+                // The key that went in first is the one kept, sign and all.
+                zeros += " same " + byDouble[0.0] + " " + (1 / kept < 0);
+            }
+            Dictionary<(float, int), int> byPair = new Dictionary<(float, int), int>();
+            byPair[(0f, 1)] = 5;
+            List<double> doubles = new List<double>();
+            doubles.Add(-0.0);
+            List<float> floats = new List<float>();
+            floats.Add(float.NaN);
+            object boxedZero = 0f;
+            Log("zeros " + zeros + " " + byPair.ContainsKey((-0f, 1)) + " "
+                + doubles.Contains(0.0) + floats.IndexOf(float.NaN) + boxedZero.Equals(-0f)
+                + ((0f).GetHashCode() == (-0f).GetHashCode()) + ((0.0).GetHashCode() == (-0.0).GetHashCode()));
+
+            // Only a doubled brace is a literal one.
+            Log("format " + Outcome(() => string.Format("a}b", 1)) + " " + Outcome(() => string.Format("a}}b{0}{{", 1))
+                + " " + Outcome(() => string.Format("{0}}}", 1)) + " " + Outcome(() => string.Format("{0}}", 1)) + " "
+                + Outcome(() => string.Format("{0", 1)) + " " + Outcome(() => string.Format("}", 1)));
+
+            // Trim takes off what char.IsWhiteSpace calls white space: a no-break
+            // space and an ideographic one, and not a control character.
+            string padded = "\u0001\u00a0 x\u3000\u0001 \u2003";
+            string trimmed = padded.Trim();
+            Log("trim " + trimmed.Length + (int)trimmed[0] + " " + "\u00a0 x \u3000".TrimStart().Length
+                + "\u00a0 x \u3000".TrimEnd().Length + " " + "xxaxx".Trim('x') + " " + "xyaxy".TrimStart('x', 'y') + " "
+                + "xyaxy".TrimEnd('x', 'y') + " " + " \u0001 ".Trim().Length + "\u200b ".Trim().Length
+                + "\ufeff".Trim().Length + "\t\r\n a b \u000b\u000c\u0085".Trim().Length + "   ".Trim().Length + "[" + "".Trim()
+                + "]");
+        }
+
         private static void StaticInit()
         {
             Section("static init");
@@ -1327,6 +1633,8 @@ namespace Spike
             MultiDimensional();
             SplittingAndParsing();
             Dictionaries();
+            EnumMethods();
+            BaseLibrary();
             StaticInit();
             Console.WriteLine("done");
         }

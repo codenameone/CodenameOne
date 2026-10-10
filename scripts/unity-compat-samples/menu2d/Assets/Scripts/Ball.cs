@@ -35,6 +35,7 @@ public class Ball : MonoBehaviour
 
     private AudioSource source;
     private int count;
+    private int soughtAt;
 
     private void Awake()
     {
@@ -48,5 +49,56 @@ public class Ball : MonoBehaviour
         Bounced?.Invoke(this, (menu.level, count));
         Debug.Log("bounce " + count + " on " + collision.gameObject.name + " at y=" + Menu.Cm(transform.position.y)
             + " frame " + Time.frameCount);
+        if (count == 1)
+        {
+            Seek();
+            Refused();
+        }
+    }
+
+    // The source's own voice, at half speed and moved to a place in the clip:
+    // `time` is that place whatever the pitch, and it goes on from there at
+    // the pitch. Update reads it again a few frames on.
+    private void Seek()
+    {
+        source.clip = beep;
+        source.pitch = 0.5f;
+        source.Play();
+        source.time = 0.04f;
+        soughtAt = Time.frameCount;
+        Debug.Log("sought to " + Mathf.RoundToInt(source.time * 1000f) + "ms of "
+            + Mathf.RoundToInt(beep.length * 1000f) + " playing=" + source.isPlaying);
+    }
+
+    // What the engine refuses, a script can catch: an axis that is not set
+    // up is an ArgumentException in Unity, and anything is an Exception.
+    private void Refused()
+    {
+        try
+        {
+            Debug.Log("never " + Input.GetAxis("Nope"));
+        }
+        catch (ArgumentException e)
+        {
+            Debug.Log("caught: " + e.Message);
+        }
+        try
+        {
+            Debug.Log("never " + transform.GetChild(3).name);
+        }
+        catch (Exception e)
+        {
+            Debug.Log("caught a child out of range=" + (e is IndexOutOfRangeException));
+        }
+    }
+
+    private void Update()
+    {
+        int since = soughtAt == 0 ? 0 : Time.frameCount - soughtAt;
+        if (since == 3 || since == 9)
+        {
+            Debug.Log("voice " + since + " frames on: " + Mathf.RoundToInt(source.time * 1000f) + "ms playing="
+                + source.isPlaying);
+        }
     }
 }

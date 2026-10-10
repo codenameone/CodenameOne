@@ -39,6 +39,14 @@ import com.codename1.unitycompat.system.collections.generic.List_1;
 /// allocated per element. And the type arguments are erased: each arrives
 /// as a class after the declared parameters, which is how `FirstOrDefault`
 /// knows that the default of an `int` is zero and not null.
+///
+/// Every method that asks for an enumerator disposes it, in a `finally`,
+/// whether it walked to the end, stopped at the element it wanted or was
+/// thrown out by a predicate. A C# iterator method runs its own `finally`
+/// blocks -- and the `Dispose` of a `using` inside it -- from the
+/// enumerator's `Dispose`, which is how `foreach` releases what a sequence
+/// holds; `First` or `Any` abandoning the enumerator would leave that
+/// undone for good.
 @SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
 public final class Enumerable {
     private Enumerable() {
@@ -85,27 +93,40 @@ public final class Enumerable {
     }
 
     public static boolean Any(IEnumerable_1 source, Class t) {
-        return walk(source).MoveNext();
+        IEnumerator_1 e = walk(source);
+        try {
+            return e.MoveNext();
+        } finally {
+            e.Dispose();
+        }
     }
 
     public static boolean Any(IEnumerable_1 source, Func_2 predicate, Class t) {
         IEnumerator_1 e = walk(source);
-        while (e.MoveNext()) {
-            if (yes(predicate.Invoke(e.get_Current()))) {
-                return true;
+        try {
+            while (e.MoveNext()) {
+                if (yes(predicate.Invoke(e.get_Current()))) {
+                    return true;
+                }
             }
+            return false;
+        } finally {
+            e.Dispose();
         }
-        return false;
     }
 
     public static boolean All(IEnumerable_1 source, Func_2 predicate, Class t) {
         IEnumerator_1 e = walk(source);
-        while (e.MoveNext()) {
-            if (!yes(predicate.Invoke(e.get_Current()))) {
-                return false;
+        try {
+            while (e.MoveNext()) {
+                if (!yes(predicate.Invoke(e.get_Current()))) {
+                    return false;
+                }
             }
+            return true;
+        } finally {
+            e.Dispose();
         }
-        return true;
     }
 
     public static int Count(IEnumerable_1 source, Class t) {
@@ -114,8 +135,12 @@ public final class Enumerable {
         }
         int n = 0;
         IEnumerator_1 e = walk(source);
-        while (e.MoveNext()) {
-            n++;
+        try {
+            while (e.MoveNext()) {
+                n++;
+            }
+        } finally {
+            e.Dispose();
         }
         return n;
     }
@@ -123,88 +148,124 @@ public final class Enumerable {
     public static int Count(IEnumerable_1 source, Func_2 predicate, Class t) {
         int n = 0;
         IEnumerator_1 e = walk(source);
-        while (e.MoveNext()) {
-            if (yes(predicate.Invoke(e.get_Current()))) {
-                n++;
+        try {
+            while (e.MoveNext()) {
+                if (yes(predicate.Invoke(e.get_Current()))) {
+                    n++;
+                }
             }
+        } finally {
+            e.Dispose();
         }
         return n;
     }
 
     public static boolean Contains(IEnumerable_1 source, Object value, Class t) {
         IEnumerator_1 e = walk(source);
-        while (e.MoveNext()) {
-            if (Interop.areEqual(e.get_Current(), value)) {
-                return true;
+        try {
+            while (e.MoveNext()) {
+                if (Interop.areEqual(e.get_Current(), value)) {
+                    return true;
+                }
             }
+            return false;
+        } finally {
+            e.Dispose();
         }
-        return false;
     }
 
     public static Object First(IEnumerable_1 source, Class t) {
         IEnumerator_1 e = walk(source);
-        if (!e.MoveNext()) {
-            throw new InvalidOperationException("Sequence contains no elements");
+        try {
+            if (!e.MoveNext()) {
+                throw new InvalidOperationException("Sequence contains no elements");
+            }
+            return e.get_Current();
+        } finally {
+            e.Dispose();
         }
-        return e.get_Current();
     }
 
     public static Object First(IEnumerable_1 source, Func_2 predicate, Class t) {
         IEnumerator_1 e = walk(source);
-        while (e.MoveNext()) {
-            Object o = e.get_Current();
-            if (yes(predicate.Invoke(o))) {
-                return o;
+        try {
+            while (e.MoveNext()) {
+                Object o = e.get_Current();
+                if (yes(predicate.Invoke(o))) {
+                    return o;
+                }
             }
+        } finally {
+            e.Dispose();
         }
         throw new InvalidOperationException("Sequence contains no matching element");
     }
 
     public static Object FirstOrDefault(IEnumerable_1 source, Class t) {
         IEnumerator_1 e = walk(source);
-        return e.MoveNext() ? e.get_Current() : zero(t);
+        try {
+            return e.MoveNext() ? e.get_Current() : zero(t);
+        } finally {
+            e.Dispose();
+        }
     }
 
     public static Object FirstOrDefault(IEnumerable_1 source, Func_2 predicate, Class t) {
         IEnumerator_1 e = walk(source);
-        while (e.MoveNext()) {
-            Object o = e.get_Current();
-            if (yes(predicate.Invoke(o))) {
-                return o;
+        try {
+            while (e.MoveNext()) {
+                Object o = e.get_Current();
+                if (yes(predicate.Invoke(o))) {
+                    return o;
+                }
             }
+        } finally {
+            e.Dispose();
         }
         return zero(t);
     }
 
     public static Object Last(IEnumerable_1 source, Class t) {
         IEnumerator_1 e = walk(source);
-        if (!e.MoveNext()) {
-            throw new InvalidOperationException("Sequence contains no elements");
+        try {
+            if (!e.MoveNext()) {
+                throw new InvalidOperationException("Sequence contains no elements");
+            }
+            Object last = e.get_Current();
+            while (e.MoveNext()) {
+                last = e.get_Current();
+            }
+            return last;
+        } finally {
+            e.Dispose();
         }
-        Object last = e.get_Current();
-        while (e.MoveNext()) {
-            last = e.get_Current();
-        }
-        return last;
     }
 
     public static Object LastOrDefault(IEnumerable_1 source, Class t) {
         IEnumerator_1 e = walk(source);
-        Object last = zero(t);
-        while (e.MoveNext()) {
-            last = e.get_Current();
+        try {
+            Object last = zero(t);
+            while (e.MoveNext()) {
+                last = e.get_Current();
+            }
+            return last;
+        } finally {
+            e.Dispose();
         }
-        return last;
     }
 
     public static Object ElementAt(IEnumerable_1 source, int index, Class t) {
         IEnumerator_1 e = walk(source);
-        int at = 0;
-        while (e.MoveNext()) {
-            if (at == index) {
-                return e.get_Current();
+        try {
+            int at = 0;
+            while (e.MoveNext()) {
+                if (at == index) {
+                    return e.get_Current();
+                }
+                at++;
             }
-            at++;
+        } finally {
+            e.Dispose();
         }
         throw new com.codename1.unitycompat.system.ArgumentOutOfRangeException();
     }
@@ -212,11 +273,15 @@ public final class Enumerable {
     public static IEnumerable_1 Where(IEnumerable_1 source, Func_2 predicate, Class t) {
         List_1 out = new List_1();
         IEnumerator_1 e = walk(source);
-        while (e.MoveNext()) {
-            Object o = e.get_Current();
-            if (yes(predicate.Invoke(o))) {
-                out.Add(o);
+        try {
+            while (e.MoveNext()) {
+                Object o = e.get_Current();
+                if (yes(predicate.Invoke(o))) {
+                    out.Add(o);
+                }
             }
+        } finally {
+            e.Dispose();
         }
         return out;
     }
@@ -224,8 +289,12 @@ public final class Enumerable {
     public static IEnumerable_1 Select(IEnumerable_1 source, Func_2 selector, Class t, Class r) {
         List_1 out = new List_1();
         IEnumerator_1 e = walk(source);
-        while (e.MoveNext()) {
-            out.Add(selector.Invoke(e.get_Current()));
+        try {
+            while (e.MoveNext()) {
+                out.Add(selector.Invoke(e.get_Current()));
+            }
+        } finally {
+            e.Dispose();
         }
         return out;
     }
@@ -239,8 +308,12 @@ public final class Enumerable {
     public static IEnumerable_1 Take(IEnumerable_1 source, int count, Class t) {
         List_1 out = new List_1();
         IEnumerator_1 e = walk(source);
-        while (out.get_Count() < count && e.MoveNext()) {
-            out.Add(e.get_Current());
+        try {
+            while (out.get_Count() < count && e.MoveNext()) {
+                out.Add(e.get_Current());
+            }
+        } finally {
+            e.Dispose();
         }
         return out;
     }
@@ -248,12 +321,16 @@ public final class Enumerable {
     public static IEnumerable_1 Skip(IEnumerable_1 source, int count, Class t) {
         List_1 out = new List_1();
         IEnumerator_1 e = walk(source);
-        int at = 0;
-        while (e.MoveNext()) {
-            if (at >= count) {
-                out.Add(e.get_Current());
+        try {
+            int at = 0;
+            while (e.MoveNext()) {
+                if (at >= count) {
+                    out.Add(e.get_Current());
+                }
+                at++;
             }
-            at++;
+        } finally {
+            e.Dispose();
         }
         return out;
     }
@@ -261,11 +338,15 @@ public final class Enumerable {
     public static IEnumerable_1 Distinct(IEnumerable_1 source, Class t) {
         List_1 out = new List_1();
         IEnumerator_1 e = walk(source);
-        while (e.MoveNext()) {
-            Object o = e.get_Current();
-            if (!out.Contains(o)) {
-                out.Add(o);
+        try {
+            while (e.MoveNext()) {
+                Object o = e.get_Current();
+                if (!out.Contains(o)) {
+                    out.Add(o);
+                }
             }
+        } finally {
+            e.Dispose();
         }
         return out;
     }
@@ -273,8 +354,12 @@ public final class Enumerable {
     public static IEnumerable_1 Concat(IEnumerable_1 first, IEnumerable_1 second, Class t) {
         List_1 out = ToList(first, t);
         IEnumerator_1 e = walk(second);
-        while (e.MoveNext()) {
-            out.Add(e.get_Current());
+        try {
+            while (e.MoveNext()) {
+                out.Add(e.get_Current());
+            }
+        } finally {
+            e.Dispose();
         }
         return out;
     }
@@ -282,8 +367,12 @@ public final class Enumerable {
     public static List_1 ToList(IEnumerable_1 source, Class t) {
         List_1 out = new List_1();
         IEnumerator_1 e = walk(source);
-        while (e.MoveNext()) {
-            out.Add(e.get_Current());
+        try {
+            while (e.MoveNext()) {
+                out.Add(e.get_Current());
+            }
+        } finally {
+            e.Dispose();
         }
         return out;
     }

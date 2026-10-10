@@ -23,6 +23,7 @@
 package com.codename1.unitycompat.system.collections.generic;
 
 import com.codename1.unitycompat.system.ArgumentOutOfRangeException;
+import com.codename1.unitycompat.system.Interop;
 import com.codename1.unitycompat.system.InvalidOperationException;
 import com.codename1.unitycompat.system.NotSupportedException;
 import com.codename1.unitycompat.system.Struct;
@@ -85,7 +86,8 @@ public class List_1 implements IEnumerable_1 {
 
     public int IndexOf(Object value) {
         for (int i = 0; i < size; i++) {
-            if (value == null ? items[i] == null : value.equals(items[i])) {
+            // Not `equals` alone: 0f and -0f are one value to .NET.
+            if (Interop.areEqual(value, items[i])) {
                 return i;
             }
         }
@@ -130,9 +132,15 @@ public class List_1 implements IEnumerable_1 {
             }
             return;
         }
+        // Disposed as `foreach` would: an iterator's `finally` blocks run
+        // from there, also when the walk ends early because it threw.
         IEnumerator_1 e = values.GetEnumerator();
-        while (e.MoveNext()) {
-            Add(e.get_Current());
+        try {
+            while (e.MoveNext()) {
+                Add(e.get_Current());
+            }
+        } finally {
+            e.Dispose();
         }
     }
 

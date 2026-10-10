@@ -1203,7 +1203,12 @@ public final class Translator implements Opcodes {
             mv.visitInsn(LASTORE);
         }
         mv.visitInsn(type.assembly.attributes((MetadataReader.TYPE_DEF << 24) | type.row).contains("System.FlagsAttribute") ? ICONST_1 : ICONST_0);
-        String descriptor = "(Ljava/lang/String;[Ljava/lang/String;[JZ)" + TYPE_DESCRIPTOR;
+        // The integer type the enum is stored as, by its .NET name: the
+        // runtime needs it to hand `Enum.GetValues` back as an array of that
+        // type, to order and print the values of an unsigned enum, and to
+        // tell a number the enum can hold from one it cannot.
+        mv.visitLdcInsn(type.enumUnderlyingType().typeName());
+        String descriptor = "(Ljava/lang/String;[Ljava/lang/String;[JZLjava/lang/String;)" + TYPE_DESCRIPTOR;
         index.requireMethod(TYPE, "$enum", descriptor, "the enum " + type.fullName());
         mv.visitMethodInsn(INVOKESTATIC, TYPE, "$enum", descriptor, false);
         mv.visitFieldInsn(PUTSTATIC, name, "$TYPE", TYPE_DESCRIPTOR);

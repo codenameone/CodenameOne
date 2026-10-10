@@ -73,8 +73,15 @@ input frame=90 key=32 down
 key frame 90 over interface=False panel=False clicks=1
 input frame=92 key=32 up
 bounce 1 on Floor at y=-210 frame 100
+sought to 40ms of 100 playing=True
+caught: Input Axis Nope is not setup.
+caught a child out of range=True
 audio frame=100 shot beep
+audio frame=100 play beep
+audio frame=100 seek beep 40
+voice 3 frames on: 65ms playing=True
 tick, frame 104 clicks=1 selected=True
+voice 9 frames on: 100ms playing=False
 frame 120 objects=17 Ledge=1 drawn=9 text="hard" text="Best: 1 Hard"
 tick, frame 135 clicks=1 selected=True
 tick, frame 166 clicks=1 selected=True

@@ -2137,6 +2137,18 @@ final class MethodTranslator implements Opcodes {
         }
     }
 
+    /// The runtime's method for a `System.Enum` method called on a value of
+    /// an enum's own type with one reference argument, or null.
+    private static String enumMethod(String name) {
+        if ("HasFlag".equals(name)) {
+            return "$hasFlag";
+        }
+        if ("CompareTo".equals(name)) {
+            return "$compareTo";
+        }
+        return "Equals".equals(name) ? "$equals" : null;
+    }
+
     private static boolean isObjectVirtual(MethodRef ref) {
         return Names.objectVirtual(ref.name, ref.sig) != null;
     }
@@ -2187,12 +2199,29 @@ final class MethodTranslator implements Opcodes {
         // integer alone cannot give: the enum's type goes with it.
         boolean enumToString = constrainedPrimitive != null && host.hasEnumType(ct) && ref.name.equals("ToString")
                 && n == 0;
+        // `mask.HasFlag(f)`, `side.CompareTo(o)` and `side.Equals(o)` on an
+        // enum need the type for the same reason: each asks whether the
+        // argument is a value of the *same* enum, and .NET throws for the
+        // first two when it is not. The integer's own helper class cannot
+        // know, so these go where `ToString` goes, type last.
+        String enumMethod = constrainedPrimitive != null && host.hasEnumType(ct) && n == 1
+                && !names.norm(sig.params[0]).isPrimitive() && !names.isStruct(sig.params[0])
+                ? enumMethod(ref.name) : null;
         if (enumToString) {
             opcode = INVOKESTATIC;
             target = Translator.TYPE;
             name = "$name";
-            descriptor = "(" + names.descriptor(constrainedPrimitive) + Translator.TYPE_DESCRIPTOR
+            // An int or a long: an enum over byte, short or ushort is an
+            // int on the stack like any other, and the runtime has the two.
+            descriptor = "(" + (names.kind(constrainedPrimitive) == Val.I8 ? "J" : "I") + Translator.TYPE_DESCRIPTOR
                     + ")Ljava/lang/String;";
+            erased = false;
+        } else if (enumMethod != null) {
+            opcode = INVOKESTATIC;
+            target = Translator.TYPE;
+            name = enumMethod;
+            descriptor = "(" + (names.kind(constrainedPrimitive) == Val.I8 ? "J" : "I") + "Ljava/lang/Object;"
+                    + Translator.TYPE_DESCRIPTOR + ")" + ("$compareTo".equals(enumMethod) ? "I" : "Z");
             erased = false;
         } else if (constrainedPrimitive != null) {
             // A method called on a primitive through `object` or an interface
@@ -2318,7 +2347,7 @@ final class MethodTranslator implements Opcodes {
         if (structResult) {
             loadResultTarget(sig.returnType.substitute(typeArgs, ref.methodArgs));
         }
-        if (enumToString) {
+        if (enumToString || enumMethod != null) {
             mv.visitFieldInsn(GETSTATIC, names.className(ct.name), "$TYPE", Translator.TYPE_DESCRIPTOR);
         }
         invoke(opcode, target, name, descriptor, isInterface);

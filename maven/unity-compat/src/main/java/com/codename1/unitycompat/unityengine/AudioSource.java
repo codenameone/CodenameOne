@@ -35,7 +35,8 @@ import java.util.ArrayList;
 /// sound. Everything is 2D: there is no distance attenuation or panning.
 ///
 /// Every start is also recorded in a log a test or a trace can read, in
-/// the order it happened.
+/// the order it happened, and so is every move of the voice within its
+/// clip, as `seek clip milliseconds`.
 @SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
 public final class AudioSource extends Behaviour {
     private static AudioOutput output;
@@ -53,7 +54,10 @@ public final class AudioSource extends Behaviour {
     private int voice;
     private boolean playing;
     private boolean paused;
-    /// When the voice started, on the unscaled clock.
+    /// Where in the clip the voice was, in seconds, at `startedAt`.
+    private float startedFrom;
+    /// When the voice was at `startedFrom`, on the unscaled clock: the
+    /// moment it started, or the last time it was moved or changed speed.
     private float startedAt;
     private float pausedAt;
     private boolean autoPlayed;
@@ -167,7 +171,13 @@ public final class AudioSource extends Behaviour {
         return pitch;
     }
 
+    /// A change of speed counts from now: what has played so far played at
+    /// the old one.
     public void set_pitch(float value) {
+        if (playing && clip != null) {
+            startedFrom = position();
+            startedAt = paused ? pausedAt : Time.unscaledTime;
+        }
         pitch = value;
     }
 
@@ -208,18 +218,28 @@ public final class AudioSource extends Behaviour {
         if (loop) {
             return true;
         }
+        // What is left of the clip from where the voice last started, was
+        // moved to or changed speed, at the speed it has now.
         float speed = pitch < 0f ? -pitch : pitch;
-        if (clip == null || !(Time.unscaledTime - startedAt < clip.get_length() / (speed > 0f ? speed : 1f))) { // NOPMD LogicInversion
+        if (clip == null || !(Time.unscaledTime - startedAt < (clip.get_length() - startedFrom) // NOPMD LogicInversion
+                / (speed > 0f ? speed : 1f))) {
             playing = false;
         }
         return playing;
+    }
+
+    /// Where the voice is in its clip, in seconds, before it is wrapped
+    /// for a loop or held to the clip: the place it was last known to be,
+    /// and the time since then at the speed the pitch sets.
+    private float position() {
+        return startedFrom + ((paused ? pausedAt : Time.unscaledTime) - startedAt) * pitch;
     }
 
     public float get_time() {
         if (!playing || clip == null) {
             return 0f;
         }
-        float at = ((paused ? pausedAt : Time.unscaledTime) - startedAt) * pitch;
+        float at = position();
         float length = clip.get_length();
         if (loop && length > 0f) {
             at = at - length * (float) Math.floor(at / length);
@@ -227,8 +247,29 @@ public final class AudioSource extends Behaviour {
         return at < 0f ? 0f : at > length ? length : at;
     }
 
+    /// Moves the voice to a place in its clip, in seconds. Two things
+    /// move together: the account `time` and `isPlaying` are worked out
+    /// from, which restarts from the new place so that the pitch applies to
+    /// the time after it and not to the place itself, and the sound, which
+    /// the output is asked to seek. Before this the device kept playing
+    /// from where it was while the script was told otherwise.
+    ///
+    /// On a source that is not playing there is no voice to move, and the
+    /// next `Play` starts the clip from its beginning.
     public void set_time(float value) {
-        startedAt = Time.unscaledTime - value;
+        if (!playing || clip == null) {
+            return;
+        }
+        float length = clip.get_length();
+        float at = value < 0f || value != value ? 0f : value > length ? length : value; // NOPMD ComparisonWithNaN
+        startedFrom = at;
+        startedAt = paused ? pausedAt : Time.unscaledTime;
+        if (logging) {
+            log.add("seek " + clip.name + " " + (int) (at * 1000f + 0.5f));
+        }
+        if (output != null) {
+            output.seek(voice, at);
+        }
     }
 
     private static int newVoice() {
@@ -245,6 +286,7 @@ public final class AudioSource extends Behaviour {
         voice = newVoice();
         playing = true;
         paused = false;
+        startedFrom = 0f;
         startedAt = Time.unscaledTime;
         record(loop ? "loop" : "play", clip);
         if (output != null) {

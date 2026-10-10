@@ -57,7 +57,43 @@ public final class Interop {
         if (t instanceof NegativeArraySizeException) {
             return new OverflowException();
         }
+        // What the runtime itself, or the Codename One API under it, throws
+        // in Java's own vocabulary: `Input.GetAxis` of an axis that is not
+        // set up, `SceneManager.LoadScene` of a scene that is not built,
+        // `Instantiate` of nothing. None of it is a `System.Exception`, so
+        // without the lines below a C# `catch (Exception)` around such a call
+        // matched nothing and the frame died of what the script had asked to
+        // handle. This is the one place every translated `catch` goes
+        // through, which is why the mapping is here and not at each API.
+        // The message is kept: it is the runtime's, and names the cause.
+        if (t instanceof NumberFormatException) {
+            // Before its superclass, IllegalArgumentException.
+            return new FormatException(described(t, "Input string was not in a correct format."));
+        }
+        if (t instanceof IllegalArgumentException) {
+            return new ArgumentException(described(t, "Value does not fall within the expected range."));
+        }
+        if (t instanceof IllegalStateException) {
+            return new InvalidOperationException(
+                    described(t, "Operation is not valid due to the current state of the object."));
+        }
+        if (t instanceof UnsupportedOperationException) {
+            return new NotSupportedException(described(t, "Specified method is not supported."));
+        }
+        if (t instanceof java.lang.Exception) {
+            // Anything else a Java method threw. Every .NET exception is a
+            // `System.Exception`, so `catch (Exception)` catches it; a clause
+            // for a narrower type does not match and the original goes on up.
+            // A `java.lang.Error` is left alone: the VM is out of memory or
+            // stack, and no script is written to carry on from that.
+            return new Exception(described(t, t.toString()));
+        }
         return t;
+    }
+
+    private static String described(Throwable t, String otherwise) {
+        String m = t.getMessage();
+        return m == null || m.length() == 0 ? otherwise : m;
     }
 
     /// Reached when a `castclass` fails. Explicit because ParparVM does not
@@ -139,6 +175,10 @@ public final class Interop {
     public static char unboxChar(Object o) {
         if (boxed(o) instanceof Character) {
             return ((Character) o).charValue();
+        }
+        if (o instanceof EnumBox) {
+            // An enum over `ushort`, which is a `char` here.
+            return (char) ((EnumBox) o).value;
         }
         throw new InvalidCastException();
     }
@@ -402,12 +442,43 @@ public final class Interop {
         return a.equals(b);
     }
 
+    /// `EqualityComparer<T>.Default.Equals` on erased values. A boxed
+    /// `float` or `double` is the one case `equals` gets wrong for .NET:
+    /// Java's compares bits, so `0f` and `-0f` differ, where
+    /// `float.Equals` says they are the same number. (NaN equals NaN in
+    /// both.) The extra test is reached only once `equals` has said no.
     public static boolean areEqual(Object a, Object b) {
-        return a == b || (a != null && a.equals(b)); // NOPMD CompareObjectsWithEquals
+        return a == b || (a != null && (a.equals(b) || bothZero(a, b))); // NOPMD CompareObjectsWithEquals
+    }
+
+    private static boolean bothZero(Object a, Object b) {
+        if (a instanceof Float) {
+            return b instanceof Float && ((Float) a).floatValue() == 0f && ((Float) b).floatValue() == 0f;
+        }
+        if (a instanceof Double) {
+            return b instanceof Double && ((Double) a).doubleValue() == 0d && ((Double) b).doubleValue() == 0d;
+        }
+        return false;
+    }
+
+    private static final Float FLOAT_ZERO = Float.valueOf(0f);
+    private static final Double DOUBLE_ZERO = Double.valueOf(0d);
+
+    /// The value to hash and look up by: itself, except that a boxed
+    /// negative zero is the positive one, so that the two are one key as
+    /// [#areEqual] says they are. Two type tests for any other key.
+    public static Object hashKey(Object o) {
+        if (o instanceof Float) {
+            return ((Float) o).floatValue() == 0f ? FLOAT_ZERO : o;
+        }
+        if (o instanceof Double) {
+            return ((Double) o).doubleValue() == 0d ? DOUBLE_ZERO : o;
+        }
+        return o;
     }
 
     public static int hash(Object o) {
-        return o == null ? 0 : o.hashCode();
+        return o == null ? 0 : hashKey(o).hashCode();
     }
 
     // ------------------------------------------------------ erased arrays

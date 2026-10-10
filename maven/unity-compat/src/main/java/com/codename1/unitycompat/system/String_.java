@@ -137,9 +137,12 @@ public final class String_ {
                 sb.append(text(args[index]));
                 i = close;
             } else if (c == '}') {
-                if (i + 1 < n && format.charAt(i + 1) == '}') {
-                    i++;
+                // Only a doubled brace is a literal one. A `}` by itself
+                // closes nothing, and .NET refuses the whole string.
+                if (i + 1 >= n || format.charAt(i + 1) != '}') {
+                    throw new FormatException("Input string was not in a correct format.");
                 }
+                i++;
                 sb.append('}');
             } else {
                 sb.append(c);
@@ -357,8 +360,76 @@ public final class String_ {
         return s.endsWith(value);
     }
 
+    // `Trim` and its two halves take off what `char.IsWhiteSpace` calls
+    // white space, which is not what `java.lang.String.trim` takes off:
+    // that removes every character up to U+0020, control characters such
+    // as U+0001 among them, which .NET keeps, and leaves a no-break space
+    // or an ideographic one, which .NET removes.
+
     public static String Trim(String s) {
-        return s.trim();
+        return trim(s, null, true, true);
+    }
+
+    public static String TrimStart(String s) {
+        return trim(s, null, true, false);
+    }
+
+    public static String TrimEnd(String s) {
+        return trim(s, null, false, true);
+    }
+
+    /// `Trim(params char[])`: the characters named, or white space when
+    /// the array is null or empty.
+    public static String Trim(String s, char[] chars) {
+        return trim(s, chars, true, true);
+    }
+
+    public static String TrimStart(String s, char[] chars) {
+        return trim(s, chars, true, false);
+    }
+
+    public static String TrimEnd(String s, char[] chars) {
+        return trim(s, chars, false, true);
+    }
+
+    public static String Trim(String s, char c) {
+        return trim(s, new char[] {c}, true, true);
+    }
+
+    public static String TrimStart(String s, char c) {
+        return trim(s, new char[] {c}, true, false);
+    }
+
+    public static String TrimEnd(String s, char c) {
+        return trim(s, new char[] {c}, false, true);
+    }
+
+    private static boolean trimmed(char c, char[] chars) {
+        if (chars == null || chars.length == 0) {
+            return Char_.IsWhiteSpace(c);
+        }
+        for (int i = 0; i < chars.length; i++) { // NOPMD ForLoopCanBeForeach
+            if (chars[i] == c) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String trim(String s, char[] chars, boolean head, boolean tail) {
+        int from = 0;
+        int to = s.length();
+        if (head) {
+            while (from < to && trimmed(s.charAt(from), chars)) {
+                from++;
+            }
+        }
+        if (tail) {
+            while (to > from && trimmed(s.charAt(to - 1), chars)) {
+                to--;
+            }
+        }
+        return from == 0 && to == s.length() ? s : s.substring(from, to);
     }
 
     public static String Replace(String s, String from, String to) {

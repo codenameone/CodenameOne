@@ -42,4 +42,9 @@ public interface AudioOutput {
     void pause(int voice, boolean paused);
 
     void volume(int voice, float volume);
+
+    /// Moves a voice that is playing or paused to a position in its clip,
+    /// in seconds from the start: what a script's `source.time = t` asks
+    /// for. A voice that has ended is not there to move.
+    void seek(int voice, float seconds);
 }

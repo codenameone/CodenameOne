@@ -127,6 +127,24 @@ order zed=13 cat=4 bob=2 dan=5 zedcatbobdan total=24 TrueFalse4
 slots 100x 7n1 200y 21n3 28n4 35n5 300z Truen3FalseTrue
 changed while walked
 cleared 1 5five
+== enum methods
+signed None=0 One=1 All=-1 None One All 
+big Small=1 Huge=5000000000 Neg=-2 tiny B=3 A=200 wide B A=60000 unsigned Low Top=4000000000
+walked 17 unboxed 60000 200 5000000000 undefined 3000000000 250 65535 -7 All
+defined TrueTrueTrueFalseTrueTrueFalse
+other enum Argument Argument InvalidOperation True Moved Ended null Argument
+has flag Argument True ArgumentNull True False Argument
+compare Argument Argument 1 -1 1 Argument 1 -1 equals FalseFalseTrueTrueFalseFalse
+parse Ground, Enemy|Ground, Player|Ground, Enemy|Argument|7|Ground|5000000000|Ended
+parse bad Argument Argument Argument Argument Argument Argument Argument Argument ArgumentNull
+parse number Player, Enemy|Ground, Player|-1|Overflow|Overflow|Overflow|A|Top|Overflow|-9223372036854775808|Overflow|Argument
+try parse True Ground, Enemy True Player FalseTrue FalseTrue FalseTrue
+== base library
+linq True/1 0/2 True/3 3/4 True/5 False/6 3/7 0/8 4/9 12/10 5/11 4/12 4/13 3/14 thrown/15 empty/16
+types FalseFalseFalseFalseFalseTrueTrueTrue System.UInt32 System.UInt64 System.Int32 System.SByte System.UInt16 Spike.HolderFalse
+zeros True pos 1 2 neg True True 1 same 1 True True True0TrueTrueTrue
+format Format a}b1{ 1} Format Format Format
+trim 61 33 a axy xya 11130[]
 == static init
 before
 Order.cctor

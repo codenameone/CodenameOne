@@ -49,7 +49,7 @@ public final class Object_ {
 
     /// Both `a.Equals(b)` and the static `Object.Equals(a, b)`.
     public static boolean Equals(Object a, Object b) {
-        return a == b || (a != null && a.equals(b)); // NOPMD CompareObjectsWithEquals
+        return Interop.areEqual(a, b);
     }
 
     public static boolean ReferenceEquals(Object a, Object b) {
@@ -60,6 +60,6 @@ public final class Object_ {
         if (o == null) {
             throw new NullReferenceException();
         }
-        return o.hashCode();
+        return Interop.hash(o);
     }
 }

@@ -64,6 +64,16 @@ public final class Array_ {
         throw new InvalidCastException();
     }
 
+    /// `Array.GetEnumerator`, which is what `foreach` over something typed
+    /// as `Array` calls -- the result of `Enum.GetValues` above all. The
+    /// elements come boxed, as they do from a non-generic enumerator.
+    public static com.codename1.unitycompat.system.collections.IEnumerator GetEnumerator(Object array) {
+        if (array == null) {
+            throw new NullReferenceException();
+        }
+        return ArrayView.$of(array).GetEnumerator();
+    }
+
     public static int get_Length(Object array) {
         return array instanceof MdArray ? ((MdArray) array).length() : vectorLength(array);
     }

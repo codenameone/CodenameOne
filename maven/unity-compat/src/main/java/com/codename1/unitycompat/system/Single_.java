@@ -46,7 +46,8 @@ public final class Single_ {
     }
 
     public static int GetHashCode(float v) {
-        return Float.floatToIntBits(v);
+        // Zero and negative zero are equal, so they hash alike.
+        return v == 0f ? 0 : Float.floatToIntBits(v);
     }
 
     public static int CompareTo(float v, float o) {

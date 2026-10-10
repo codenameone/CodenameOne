@@ -46,7 +46,8 @@ public final class Double_ {
     }
 
     public static int GetHashCode(double v) {
-        return (int) (Double.doubleToLongBits(v) ^ (Double.doubleToLongBits(v) >>> 32));
+        // Zero and negative zero are equal, so they hash alike.
+        return v == 0d ? 0 : (int) (Double.doubleToLongBits(v) ^ (Double.doubleToLongBits(v) >>> 32));
     }
 
     public static int CompareTo(double v, double o) {
