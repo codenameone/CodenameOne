@@ -34,6 +34,7 @@
  */
 
 #include "cn1_linux_gfx.h"
+#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -232,6 +233,73 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_getImageGraphics___long_R_long(CO
     g->clipH = img->height;
     cairo_matrix_init_identity(&g->transform);
     img->mutableGraphics = g;
+    return (JAVA_LONG) (intptr_t) g;
+}
+
+/*
+ * Disposal.
+ *
+ * An image handle's finalizer runs on the collector's thread while the event
+ * dispatch thread may be inside cairo with the very surface, so the finalizer only
+ * queues the pointer (releaseImage) and the drawing thread frees what is queued
+ * between frames (nextReleasedImage / disposeImage). Until these existed nothing
+ * in the port destroyed an image surface at all.
+ */
+static pthread_mutex_t cn1ReleasedLock = PTHREAD_MUTEX_INITIALIZER;
+static CN1Image** cn1Released = 0;
+static int cn1ReleasedCount = 0;
+static int cn1ReleasedCapacity = 0;
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_releaseImage___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG image) {
+    CN1Image* img = CN1I(image);
+    if (!img) {
+        return;
+    }
+    pthread_mutex_lock(&cn1ReleasedLock);
+    if (cn1ReleasedCount == cn1ReleasedCapacity) {
+        int capacity = cn1ReleasedCapacity == 0 ? 64 : cn1ReleasedCapacity * 2;
+        CN1Image** grown = (CN1Image**) realloc(cn1Released, sizeof(CN1Image*) * (size_t) capacity);
+        if (grown == 0) {
+            /* Out of memory for the queue itself: the image stays allocated, which
+             * is what happened to every image before this queue existed. */
+            pthread_mutex_unlock(&cn1ReleasedLock);
+            return;
+        }
+        cn1Released = grown;
+        cn1ReleasedCapacity = capacity;
+    }
+    cn1Released[cn1ReleasedCount++] = img;
+    pthread_mutex_unlock(&cn1ReleasedLock);
+}
+
+JAVA_LONG com_codename1_impl_linux_LinuxNative_nextReleasedImage___R_long(CODENAME_ONE_THREAD_STATE) {
+    CN1Image* img = 0;
+    pthread_mutex_lock(&cn1ReleasedLock);
+    if (cn1ReleasedCount > 0) {
+        img = cn1Released[--cn1ReleasedCount];
+    }
+    pthread_mutex_unlock(&cn1ReleasedLock);
+    return (JAVA_LONG) (intptr_t) img;
+}
+
+JAVA_LONG com_codename1_impl_linux_LinuxNative_disposeImage___long_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG image) {
+    CN1Image* img = CN1I(image);
+    CN1Graphics* g;
+    if (!img) {
+        return 0;
+    }
+    g = img->mutableGraphics;
+    if (g != 0) {
+        if (g->cr != 0) {
+            cairo_destroy(g->cr);
+        }
+        cn1LinuxFreeClipShape(g);
+        free(g);
+    }
+    if (img->surface != 0) {
+        cairo_surface_destroy(img->surface);
+    }
+    free(img);
     return (JAVA_LONG) (intptr_t) g;
 }
 

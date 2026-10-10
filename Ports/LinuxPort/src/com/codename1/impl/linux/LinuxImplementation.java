@@ -180,7 +180,98 @@ public class LinuxImplementation extends CodenameOneImplementation {
     /* -------------------------------------------------------------- helpers */
 
     private static long peer(Object o) {
-        return o == null ? 0L : ((Long) o).longValue();
+        if (o instanceof Long) {
+            return ((Long) o).longValue();
+        }
+        if (o instanceof NativeImage) {
+            return ((NativeImage) o).peer;
+        }
+        if (o instanceof ImageGraphics) {
+            return ((ImageGraphics) o).peer;
+        }
+        return 0L;
+    }
+
+    /// The native half of an image: a Cairo surface, and the graphics context drawing
+    /// into it once one was asked for.
+    ///
+    /// An image used to be a boxed pointer, and nothing ever gave the surface back:
+    /// there was no native to do it. An application that made a picture per frame --
+    /// 800x600 is 1.9 MB -- grew by that much per frame for as long as it ran, with
+    /// the collector reclaiming every Java object on schedule. The handle is what
+    /// tells the port the image is gone.
+    ///
+    /// `finalize` runs on the collector's thread, where a surface the event dispatch
+    /// thread may be part way through blitting must not be destroyed. It only queues
+    /// the pointer; `#disposeReleasedImages()` frees it between frames.
+    static final class NativeImage {
+        final long peer;
+
+        NativeImage(long peer) {
+            this.peer = peer;
+        }
+
+        @Override
+        protected void finalize() {
+            if (peer != 0) {
+                LinuxNative.releaseImage(peer);
+            }
+        }
+    }
+
+    /// The graphics of a mutable image. It keeps the image: the context draws into
+    /// the image's surface and is freed with it, so the image must outlive every
+    /// graphics object still drawing there.
+    static final class ImageGraphics {
+        final long peer;
+        final Object image;
+
+        ImageGraphics(long peer, Object image) {
+            this.peer = peer;
+            this.image = image;
+        }
+    }
+
+    /// Surface bytes handed out since a collection was last asked for. A surface is
+    /// invisible to the collector -- the Java side of a 2 MB picture is 16 bytes --
+    /// so a program can allocate images for a long time without the heap ever
+    /// reaching the size that starts a cycle. Plain, not atomic: a lost update only
+    /// postpones the request by one image.
+    private static long imageBytesSinceGc;
+
+    private static final long IMAGE_BYTES_PER_GC = 32L * 1024 * 1024;
+
+    static Object wrapImage(long peer, int width, int height) {
+        if (peer != 0) {
+            if (width <= 0 || height <= 0) {
+                width = LinuxNative.imageWidth(peer);
+                height = LinuxNative.imageHeight(peer);
+            }
+            imageBytesSinceGc += 4L * width * height;
+            if (imageBytesSinceGc > IMAGE_BYTES_PER_GC) {
+                imageBytesSinceGc = 0;
+                System.gc();
+            }
+        }
+        return new NativeImage(peer);
+    }
+
+    /// Frees the images whose handles the collector finalized. Event dispatch thread
+    /// only, between frames: it is the one moment no native draw can be holding one.
+    /// The graphics context freed with an image takes its entries in the transform
+    /// and clip-stack tables with it; a context allocated later at the same address
+    /// would otherwise start life under a dead image's transform.
+    private void disposeReleasedImages() {
+        long image = LinuxNative.nextReleasedImage();
+        while (image != 0) {
+            long graphics = LinuxNative.disposeImage(image);
+            if (graphics != 0) {
+                Long key = Long.valueOf(graphics);
+                graphicsTransforms.remove(key);
+                clipStacks.remove(key);
+            }
+            image = LinuxNative.nextReleasedImage();
+        }
     }
 
     private String storagePath(String name) {
@@ -645,8 +736,64 @@ public class LinuxImplementation extends CodenameOneImplementation {
         return LinuxNative.getDisplayHeight();
     }
 
+    /// Resizes the application window. The size is the outer one, frame included,
+    /// as on the JavaSE port; the display follows through the size-changed event
+    /// the window's new allocation produces, so nothing is laid out here.
+    ///
+    /// The window still OPENS at 800x600: it exists before any application code
+    /// runs, and that default is what every screenshot baseline was taken at.
+    @Override
+    public void setWindowSize(int width, int height) {
+        if (width > 0 && height > 0) {
+            LinuxNative.mainWindowSetSize(width, height);
+        }
+    }
+
+    @Override
+    public com.codename1.ui.geom.Rectangle getWindowBounds() {
+        int[] frame = new int[4];
+        if (!LinuxNative.mainWindowGetFrame(frame)) {
+            return super.getWindowBounds();
+        }
+        return new com.codename1.ui.geom.Rectangle(frame[0], frame[1], frame[2], frame[3]);
+    }
+
+    /// The monitor the application window is on, which is the desktop a
+    /// percentage of it is taken from.
+    @Override
+    public com.codename1.ui.geom.Dimension getDesktopSize() {
+        int[] bounds = new int[4];
+        if (!LinuxNative.mainWindowGetFrame(bounds)) {
+            return super.getDesktopSize();
+        }
+        LinuxNative.monitorBounds(LinuxNative.monitorForMainWindow(), false, bounds);
+        if (bounds[2] <= 0 || bounds[3] <= 0) {
+            return super.getDesktopSize();
+        }
+        return new com.codename1.ui.geom.Dimension(bounds[2], bounds[3]);
+    }
+
+    /// The hint is a size for the window the first form opens in. Here that window
+    /// already exists, so the hint is applied as it arrives and consumed, the way
+    /// the JavaSE port consumes it when it builds its frame.
+    @Override
+    public void setInitialWindowSizeHintPercent(com.codename1.ui.geom.Dimension hint) {
+        super.setInitialWindowSizeHintPercent(hint);
+        com.codename1.ui.geom.Dimension desktop = hint == null ? null : getDesktopSize();
+        if (desktop == null) {
+            return;
+        }
+        int width = Math.min(desktop.getWidth(),
+                Math.max(1, Math.round(desktop.getWidth() * (hint.getWidth() / 100f))));
+        int height = Math.min(desktop.getHeight(),
+                Math.max(1, Math.round(desktop.getHeight() * (hint.getHeight() / 100f))));
+        super.setInitialWindowSizeHintPercent(null);
+        setWindowSize(width, height);
+    }
+
     @Override
     public void flushGraphics() {
+        disposeReleasedImages();
         LinuxNative.flushGraphics(windowGraphicsPeer, 0, 0, getDisplayWidth(), getDisplayHeight());
     }
 
@@ -721,6 +868,8 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     @Override
     public void flushGraphics(int x, int y, int width, int height) {
+        // Most frames repaint a part of the window and come through here.
+        disposeReleasedImages();
         LinuxNative.flushGraphics(windowGraphicsPeer, x, y, width, height);
     }
 
@@ -736,61 +885,6 @@ public class LinuxImplementation extends CodenameOneImplementation {
     }
 
     /*
-    /// Resizes the application window. The size is the outer one, frame included,
-    /// as on the JavaSE port; the display follows through the size-changed event
-    /// the window's new allocation produces, so nothing is laid out here.
-    ///
-    /// The window still OPENS at 800x600: it exists before any application code
-    /// runs, and that default is what every screenshot baseline was taken at.
-    @Override
-    public void setWindowSize(int width, int height) {
-        if (width > 0 && height > 0) {
-            LinuxNative.mainWindowSetSize(width, height);
-        }
-    }
-
-    @Override
-    public com.codename1.ui.geom.Rectangle getWindowBounds() {
-        int[] frame = new int[4];
-        if (!LinuxNative.mainWindowGetFrame(frame)) {
-            return super.getWindowBounds();
-        }
-        return new com.codename1.ui.geom.Rectangle(frame[0], frame[1], frame[2], frame[3]);
-    }
-
-    /// The monitor the application window is on, which is the desktop a
-    /// percentage of it is taken from.
-    @Override
-    public com.codename1.ui.geom.Dimension getDesktopSize() {
-        int[] bounds = new int[4];
-        if (!LinuxNative.mainWindowGetFrame(bounds)) {
-            return super.getDesktopSize();
-        }
-        LinuxNative.monitorBounds(LinuxNative.monitorForMainWindow(), false, bounds);
-        if (bounds[2] <= 0 || bounds[3] <= 0) {
-            return super.getDesktopSize();
-        }
-        return new com.codename1.ui.geom.Dimension(bounds[2], bounds[3]);
-    }
-
-    /// The hint is a size for the window the first form opens in. Here that window
-    /// already exists, so the hint is applied as it arrives and consumed, the way
-    /// the JavaSE port consumes it when it builds its frame.
-    @Override
-    public void setInitialWindowSizeHintPercent(com.codename1.ui.geom.Dimension hint) {
-        super.setInitialWindowSizeHintPercent(hint);
-        com.codename1.ui.geom.Dimension desktop = hint == null ? null : getDesktopSize();
-        if (desktop == null) {
-            return;
-        }
-        int width = Math.min(desktop.getWidth(),
-                Math.max(1, Math.round(desktop.getWidth() * (hint.getWidth() / 100f))));
-        int height = Math.min(desktop.getHeight(),
-                Math.max(1, Math.round(desktop.getHeight() * (hint.getHeight() / 100f))));
-        super.setInitialWindowSizeHintPercent(null);
-        setWindowSize(width, height);
-    }
-
      * Capture the already-rendered window instead of the base behaviour, which
      * re-paints the current form into a fresh mutable image
      * (current.paintComponent(img.getGraphics(), true)). Re-painting a *heavy*
@@ -1240,7 +1334,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     @Override
     public Object getNativeGraphics(Object image) {
-        return Long.valueOf(LinuxNative.getImageGraphics(peer(image)));
+        return new ImageGraphics(LinuxNative.getImageGraphics(peer(image)), image);
     }
 
     /* ------------------------------------------------------------- transforms
@@ -2104,28 +2198,28 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     @Override
     public Object createImage(int[] rgb, int width, int height) {
-        return Long.valueOf(LinuxNative.createImageFromARGB(rgb, width, height));
+        return wrapImage(LinuxNative.createImageFromARGB(rgb, width, height), width, height);
     }
 
     @Override
     public Object createImage(String path) throws IOException {
-        return Long.valueOf(LinuxNative.createImageFromFile(stripFileUrl(path)));
+        return wrapImage(LinuxNative.createImageFromFile(stripFileUrl(path)), 0, 0);
     }
 
     @Override
     public Object createImage(InputStream i) throws IOException {
         byte[] data = readFully(i);
-        return Long.valueOf(LinuxNative.createImageFromBytes(data, 0, data.length));
+        return wrapImage(LinuxNative.createImageFromBytes(data, 0, data.length), 0, 0);
     }
 
     @Override
     public Object createImage(byte[] bytes, int offset, int len) {
-        return Long.valueOf(LinuxNative.createImageFromBytes(bytes, offset, len));
+        return wrapImage(LinuxNative.createImageFromBytes(bytes, offset, len), 0, 0);
     }
 
     @Override
     public Object createMutableImage(int width, int height, int fillColor) {
-        return Long.valueOf(LinuxNative.createMutableImage(width, height, fillColor));
+        return wrapImage(LinuxNative.createMutableImage(width, height, fillColor), width, height);
     }
 
     @Override
@@ -2140,7 +2234,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     @Override
     public Object scale(Object nativeImage, int width, int height) {
-        return Long.valueOf(LinuxNative.scaleImage(peer(nativeImage), width, height));
+        return wrapImage(LinuxNative.scaleImage(peer(nativeImage), width, height), width, height);
     }
 
     @Override

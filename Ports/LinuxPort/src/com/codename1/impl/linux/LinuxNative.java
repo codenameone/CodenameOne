@@ -495,6 +495,18 @@ public final class LinuxNative {
 
     public static native long getImageGraphics(long image);
 
+    /// Queues an image for disposal. Safe from any thread: this is what an image
+    /// handle's finalizer calls, on the collector's thread. Nothing is freed here.
+    public static native void releaseImage(long image);
+
+    /// The next queued image, or 0 when the queue is empty.
+    public static native long nextReleasedImage();
+
+    /// Destroys an image's surface and the graphics context cached for it, and
+    /// returns that context's pointer (0 if it never had one) so the caller can
+    /// forget what it kept under it. Drawing thread only.
+    public static native long disposeImage(long image);
+
     /* ------------------------------------------------------- filesystem */
 
     /**

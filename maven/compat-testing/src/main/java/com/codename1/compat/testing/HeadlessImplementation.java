@@ -169,6 +169,9 @@ public class HeadlessImplementation extends CodenameOneImplementation {
     /// counts sets it to zero first.
     public static int imagesMade;
 
+    /// How many of those were made to be drawn on.
+    public static int mutableImagesMade;
+
     @Override
     public java.lang.Object createImage(int[] a0, int a1, int a2) {
         imagesMade++;
@@ -205,6 +208,7 @@ public class HeadlessImplementation extends CodenameOneImplementation {
     @Override
     public java.lang.Object createMutableImage(int a0, int a1, int a2) {
         imagesMade++;
+        mutableImagesMade++;
         if (rasterImages && a0 > 0 && a1 > 0) {
             int[][] rows = new int[a1][a0];
             for (int y = 0; y < a1; y++) {
@@ -657,10 +661,6 @@ public class HeadlessImplementation extends CodenameOneImplementation {
         shapeClip = null;
     }
 
-    @Override
-    public void clipRect(java.lang.Object a0, int a1, int a2, int a3, int a4) {
-        int x2 = Math.min(clipX + clipW, a1 + a3);
-        int y2 = Math.min(clipY + clipH, a2 + a4);
     /// When set, the implementation is a port with affine transforms whose
     /// clip stays in the coordinates of the screen, which is how the native
     /// Linux port behaves: `setClip` and the clip getters carry the same
@@ -821,8 +821,8 @@ public class HeadlessImplementation extends CodenameOneImplementation {
         t.setTransform(getTransform(graphics));
     }
 
-        clipX = Math.max(clipX, a1);
-        clipY = Math.max(clipY, a2);
+    @Override
+    public void clipRect(java.lang.Object a0, int a1, int a2, int a3, int a4) {
         if (screenSpaceClip && !plain(matrix)) {
             double[] m = matrix;
             double minX = Double.MAX_VALUE;
@@ -846,6 +846,10 @@ public class HeadlessImplementation extends CodenameOneImplementation {
             shapeClip = null;
             return;
         }
+        int x2 = Math.min(clipX + clipW, a1 + a3);
+        int y2 = Math.min(clipY + clipH, a2 + a4);
+        clipX = Math.max(clipX, a1);
+        clipY = Math.max(clipY, a2);
         clipW = Math.max(0, x2 - clipX);
         clipH = Math.max(0, y2 - clipY);
         shapeClip = null;
