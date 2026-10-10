@@ -110,6 +110,15 @@ public class AntExecutor {
                 project.executeTarget(targetToExecute);
                 project.fireBuildFinished(null);
                 success = true;
+                teeOut.flush();
+                teeErr.flush();
+                // The build client returns normally from the free plan's size limit
+                // and from an upload it never confirmed; only its output says so.
+                try {
+                    com.codename1.build.FirstBuildTelemetry.noteBuildClientOutput(captured.toString("UTF-8"), true);
+                } catch (UnsupportedEncodingException e) {
+                    throw new IllegalStateException("UTF-8 not supported", e);
+                }
             } catch (BuildException buildException) {
                 project.fireBuildFinished(buildException);
                 teeOut.flush();
@@ -120,6 +129,7 @@ public class AntExecutor {
                 } catch (UnsupportedEncodingException e) {
                     throw new IllegalStateException("UTF-8 not supported", e);
                 }
+                com.codename1.build.FirstBuildTelemetry.noteBuildClientOutput(capturedText, false);
                 String detail = extractServerErrorDetail(capturedText);
                 StringBuilder message = new StringBuilder("Ant task failed: ").append(buildException.getMessage());
                 if (detail != null) {

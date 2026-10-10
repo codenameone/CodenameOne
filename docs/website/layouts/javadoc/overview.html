@@ -7,7 +7,7 @@
     <h1 class="post-title cn1-api__title">{{ $j.title | default "Codename One API" }}</h1>
     <p class="cn1-api__intro">
       {{ $j.typeCount }} documented types across {{ len $j.packages }} packages.
-      Search the API from the <a href="/search/">site search</a>, or
+      Search the API from the <a href="/search/?scope=javadoc">Javadoc search</a>, or
       {{ if eq $j.audience "backend" -}}
       <a href="/files/backend-javadocs.zip">download the whole backend reference as a zip</a>.
       {{- else -}}
