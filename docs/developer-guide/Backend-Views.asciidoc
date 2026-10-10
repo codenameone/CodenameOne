@@ -77,6 +77,7 @@ before attribute escaping. Dynamic URL attributes reject executable URL schemes.
 Dynamic htmx attributes that evaluate expressions (`hx-on*`, `hx-vars`, `hx-vals`,
 `hx-headers`, `hx-request`, and `hx-trigger`) are rejected, including `data-hx-*`
 aliases. Define those attributes as static template content.
+Script sources and base URLs must be static template attributes.
 Raw HTML, dynamic script/style content, arbitrary method calls, expression
 preprocessing, message expressions, inline expressions, custom dialects, and
 Spring EL are outside this subset. Unsupported `th:` attributes fail the build.

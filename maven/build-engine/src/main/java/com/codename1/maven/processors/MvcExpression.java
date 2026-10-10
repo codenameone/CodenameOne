@@ -41,14 +41,41 @@ final class MvcExpression {
         }
     }
 
+    static final class Helpers {
+        final List<String> sources = new ArrayList<String>();
+        private final Map<String, String> names = new LinkedHashMap<String, String>();
+
+        String call(String result, String parameters, String body, String arguments) {
+            String key = result + "(" + parameters + ")" + body;
+            String name = names.get(key);
+            if (name == null) {
+                name = "mvcAccess" + sources.size();
+                names.put(key, name);
+                sources.add(
+                        "private static "
+                                + result
+                                + " "
+                                + name
+                                + "("
+                                + parameters
+                                + ") { "
+                                + body
+                                + " }\n");
+            }
+            return name + "(" + arguments + ")";
+        }
+    }
+
     private final ProcessorContext ctx;
     private final Map<String, Value> names;
     private final List<String> tokens = new ArrayList<String>();
     private int at;
+    private final Helpers helpers;
 
-    MvcExpression(ProcessorContext ctx, Map<String, Value> names) {
+    MvcExpression(ProcessorContext ctx, Map<String, Value> names, Helpers helpers) {
         this.ctx = ctx;
         this.names = names;
+        this.helpers = helpers;
     }
 
     Value parse(String expression) {
@@ -229,26 +256,19 @@ final class MvcExpression {
     }
 
     private Value checkedElement(String code, String type) {
-        String object = "((Object)(" + code + "))";
-        return new Value(
-                "("
-                        + object
-                        + " == null || "
-                        + object
-                        + " instanceof "
+        String body =
+                "return receiver == null || receiver instanceof "
                         + raw(type)
                         + " ? ("
                         + type
-                        + ")"
-                        + object
-                        + " : ("
+                        + ")receiver : ("
                         + type
                         + ")"
                         + HTML
                         + "badModel("
                         + MvcForms.q("Expected indexed element of type " + type)
-                        + "))",
-                type);
+                        + ");";
+        return new Value(helpers.call(type, "java.lang.Object receiver", body, code), type);
     }
 
     Value property(Value owner, String name) {
@@ -322,19 +342,21 @@ final class MvcExpression {
         }
         if (access == null) throw error("No readable property '" + name + "' on " + owner.type);
         String boxed = box(MvcTypes.sourceType(ctx, type));
-        return new Value(
-                "("
-                        + owner.code
-                        + " == null ? null : ("
-                        + boxed
-                        + ")("
-                        + owner.code
-                        + access
-                        + "))",
-                boxed);
+        String body = "return receiver == null ? null : (" + boxed + ")(receiver" + access + ");";
+        return new Value(helpers.call(boxed, owner.type + " receiver", body, owner.code), boxed);
     }
 
-    private static String numericEquality(Value left, Value right) {
+    private String numericEquality(Value left, Value right) {
+        String comparison =
+                numericEqualityCode(new Value("left", left.type), new Value("right", right.type));
+        return helpers.call(
+                "boolean",
+                left.type + " left, " + right.type + " right",
+                "return " + comparison + ";",
+                left.code + ", " + right.code);
+    }
+
+    private static String numericEqualityCode(Value left, Value right) {
         String comparison = "(" + unboxNumber(left) + " == " + unboxNumber(right) + ")";
         boolean leftBoxed = left.type.startsWith("java.lang.");
         boolean rightBoxed = right.type.startsWith("java.lang.");

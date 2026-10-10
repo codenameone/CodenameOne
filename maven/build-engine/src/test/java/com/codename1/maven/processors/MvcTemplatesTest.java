@@ -1777,6 +1777,157 @@ public class MvcTemplatesTest {
         assertTrue(html, html.contains("<b>true</b><i>true</i><em>true</em><u>true</u>"));
     }
 
+    @Test
+    public void scriptSourcesAndBaseUrlsMustBeStatic() throws Exception {
+        setup();
+        for (String element : Arrays.asList("script", "base")) {
+            String attr = element.equals("script") ? "src" : "href";
+            for (String directive :
+                    Arrays.asList(
+                            "th:" + attr + "=\"${url}\"",
+                            "th:attr=\"" + attr.toUpperCase(java.util.Locale.ROOT) + "=${url}\"")) {
+                template(
+                        "unsafe",
+                        "<!-- cn1:model url java.lang.String --><"
+                                + element
+                                + " "
+                                + directive
+                                + "></"
+                                + element
+                                + ">");
+                try {
+                    new MvcTemplates(context).sources();
+                    fail("Accepted dynamic " + element + " " + attr);
+                } catch (IllegalArgumentException expected) {
+                    assertTrue(
+                            expected.getMessage(),
+                            expected.getMessage().contains("Dynamic " + element));
+                }
+            }
+        }
+        template("unsafe", "<base href=\"/\"><script src=\"/static/app.js\"></script>");
+        compile();
+        assertTrue(render("unsafe", new Model()).contains("src=\"/static/app.js\""));
+    }
+
+    @Test
+    public void embeddedAssetMimeTypesMatchStaticFiles() throws Exception {
+        setup();
+        File root = new File(project, "src/main/resources/static");
+        assertTrue(root.mkdirs());
+        String[] extensions = {
+            "mjs", "MJS", "wasm", "htm", "json", "gif", "webp", "woff", "ttf", "pdf", "md", "xml",
+            "mp4", "zip", "unknown"
+        };
+        for (int i = 0; i < extensions.length; i++)
+            Files.write(
+                    new File(root, "app" + i + "." + extensions[i]).toPath(), new byte[] {1, 2});
+        JavaSourceCompiler.compile(MvcAssets.sources(project), classes, classpath());
+        loader =
+                new URLClassLoader(
+                        new URL[] {classes.toURI().toURL()}, getClass().getClassLoader());
+        HttpServer.Handler handler =
+                (HttpServer.Handler)
+                        loader.loadClass("com.codename1.generated.mvc.Assets").newInstance();
+        Method mime =
+                com.codename1.backend.StaticFiles.class.getDeclaredMethod(
+                        "contentType", String.class);
+        mime.setAccessible(true);
+        for (int i = 0; i < extensions.length; i++) {
+            String path = "/static/app" + i + "." + extensions[i];
+            Object response = handler.handle(request("GET", path, null, false));
+            assertEquals(path, mime.invoke(null, path), field(response, "contentType"));
+            assertEquals(
+                    "nosniff",
+                    ((Map<?, ?>) field(response, "extraHeaders")).get("X-Content-Type-Options"));
+        }
+    }
+
+    @Test
+    public void responseOnlyMvcControllersWireEmbeddedAssetsWithoutViews() throws Exception {
+        setup();
+        File asset = new File(project, "src/main/resources/static/app.mjs");
+        assertTrue(asset.getParentFile().mkdirs());
+        Files.write(asset.toPath(), "export const ok=true;".getBytes(StandardCharsets.UTF_8));
+        controller(
+                "package sample; import com.codename1.backend.annotations.*; import"
+                        + " com.codename1.backend.HttpServer; @Controller public class Pages {"
+                        + " @GetMapping(\"/\") public HttpServer.Response page(){return"
+                        + " HttpServer.Response.text(200,\"page\");} }");
+        assertFalse(new File(classes, "com/codename1/generated/mvc/Views.class").exists());
+        com.codename1.impl.backend.WiringEnvironment environment =
+                new com.codename1.impl.backend.WiringEnvironment(
+                        com.codename1.backend.Config.of(new Properties(), "test"),
+                        null,
+                        null,
+                        new ArrayList(),
+                        new ArrayList());
+        Object wiring = loader.loadClass("sample.BackendWiring").newInstance();
+        HttpServer.Handler[] handlers =
+                (HttpServer.Handler[])
+                        wiring.getClass()
+                                .getMethod(
+                                        "create",
+                                        com.codename1.impl.backend.WiringEnvironment.class)
+                                .invoke(wiring, environment);
+        Object response = null;
+        for (HttpServer.Handler h : handlers) {
+            response = h.handle(request("GET", "/static/app.mjs", null, false));
+            if (response != null) break;
+        }
+        assertNotNull("Assets missing from actual generated wiring", response);
+        assertEquals("export const ok=true;", body(response));
+        assertEquals("text/javascript; charset=utf-8", field(response, "contentType"));
+    }
+
+    @Test
+    public void propertyChainsEvaluateReceiversOnceAndKeepLazyBranches() throws Exception {
+        setup();
+        fixtureSources(
+                Collections.singletonMap(
+                        "sample.Node",
+                        "package sample; public class Node { public int calls; public Node next;"
+                            + " public Node getChild(){calls++;return calls==1 ? next : null;}"
+                            + " public int getCount(){calls++;return 7;} public String"
+                            + " getName(){calls++;return \"leaf\";} }"));
+        String decl =
+                "<!-- cn1:model root sample.Node --><!-- cn1:model flag java.lang.Boolean -->";
+        template("chain", decl + "<b th:text=\"${root.child.child.name}\"></b>");
+        template("equal", decl + "<b th:text=\"${root.child.count == 7}\"></b>");
+        template("lazy", decl + "<b th:text=\"${flag ? root.child.name : 'skip'}\"></b>");
+        template(
+                "loop",
+                "<!-- cn1:model roots java.util.List<sample.Node> --><b th:each=\"root : ${roots}\""
+                        + " th:text=\"${root.child.name}\"></b>");
+        compile();
+        Class<?> node = loader.loadClass("sample.Node");
+        Object root = node.newInstance(), middle = node.newInstance(), leaf = node.newInstance();
+        node.getField("next").set(root, middle);
+        node.getField("next").set(middle, leaf);
+        Model model = new Model().addAttribute("root", root).addAttribute("flag", false);
+        assertTrue(render("lazy", model).contains("<b>skip</b>"));
+        assertEquals(0, node.getField("calls").getInt(root));
+        assertTrue(render("chain", model).contains("<b>leaf</b>"));
+        for (Object n : Arrays.asList(root, middle, leaf))
+            assertEquals(1, node.getField("calls").getInt(n));
+        assertTrue(render("chain", model.addAttribute("root", null)).contains("<b></b>"));
+        Object first = node.newInstance(), second = node.newInstance();
+        node.getField("next").set(first, node.newInstance());
+        node.getField("next").set(second, node.newInstance());
+        assertTrue(
+                render("loop", new Model().addAttribute("roots", Arrays.asList(first, second)))
+                        .contains("<b>leaf</b><b>leaf</b>"));
+        assertEquals(1, node.getField("calls").getInt(first));
+        assertEquals(1, node.getField("calls").getInt(second));
+        Object equalRoot = node.newInstance(), equalLeaf = node.newInstance();
+        node.getField("next").set(equalRoot, equalLeaf);
+        assertTrue(
+                render("equal", new Model().addAttribute("root", equalRoot))
+                        .contains("<b>true</b>"));
+        assertEquals(1, node.getField("calls").getInt(equalRoot));
+        assertEquals(1, node.getField("calls").getInt(equalLeaf));
+    }
+
     private static volatile int benchmarkSink;
 
     @Test

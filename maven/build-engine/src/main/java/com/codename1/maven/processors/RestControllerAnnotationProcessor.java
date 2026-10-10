@@ -238,6 +238,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     private final Map<String, String> routeOwners = new LinkedHashMap<String, String>();
 
     private static final class Controller {
+        boolean mvc;
         String binaryName;
         /**
          * The name to WRITE, which is the binary one until the controller is a
@@ -352,6 +353,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             return;
         }
         Controller controller = new Controller();
+        controller.mvc = cls.getClassAnnotation(MVC_CONTROLLER) != null;
         controller.binaryName = cls.getBinaryName();
         controller.sourceName = cls.getSourceName();
         controller.packageName = RestClientAnnotationProcessor.packageOf(controller.binaryName);
@@ -1507,9 +1509,9 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         }
         boolean hasViews = false;
         for (Controller controller : controllers.values()) for (Route route : controller.routes) hasViews |= route.view;
-        if (hasViews) {
+        if (hasViews || hasMvcControllers()) {
             try {
-                Map<String, String> mvcSources = new MvcTemplates(ctx).sources();
+                Map<String, String> mvcSources = hasViews ? new MvcTemplates(ctx).sources() : new LinkedHashMap<String, String>();
                 mvcSources.putAll(MvcAssets.sources(MvcTemplates.projectDirectory(ctx)));
                 for (String generated : mvcSources.keySet()) if (isNotOurOwnOutput(ctx, generated)) {
                     ctx.error("Generated MVC class would overwrite " + generated); return;
@@ -3041,13 +3043,16 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         return sb.toString();
     }
 
+    private boolean hasMvcControllers() {
+        for (Controller controller : controllers.values()) if (controller.mvc) return true;
+        return false;
+    }
+
     /// What [#WIRING_RESOURCE] holds for this build.
     String wiringRecord(String packageName) {
         StringBuilder sb = new StringBuilder();
         sb.append("package\t").append(packageName).append('\n');
-        boolean mvc = false;
-        for (Controller controller : controllers.values()) for (Route route : controller.routes) mvc |= route.view;
-        if (mvc) sb.append("mvc-assets\ttrue\n");
+        if (hasMvcControllers()) sb.append("mvc-assets\ttrue\n");
         for (Controller c : controllers.values()) {
             sb.append("router\t").append(c.binaryName).append('\t')
               .append(qualify(c.packageName, c.routerSimpleName)).append('\n');

@@ -157,16 +157,65 @@ final class MvcAssets {
     }
 
     private static String mime(String path) {
-        path = path.toLowerCase(java.util.Locale.ROOT);
-        if (path.endsWith(".js")) return "text/javascript; charset=utf-8";
-        if (path.endsWith(".css")) return "text/css; charset=utf-8";
-        if (path.endsWith(".svg")) return "image/svg+xml";
-        if (path.endsWith(".png")) return "image/png";
-        if (path.endsWith(".jpg") || path.endsWith(".jpeg")) return "image/jpeg";
-        if (path.endsWith(".ico")) return "image/x-icon";
-        if (path.endsWith(".woff2")) return "font/woff2";
-        if (path.endsWith(".html")) return "text/html; charset=utf-8";
-        if (path.endsWith(".txt")) return "text/plain; charset=utf-8";
+        int dot = path.lastIndexOf('.');
+        String ext = dot < 0 ? "" : path.substring(dot + 1).toLowerCase(java.util.Locale.ROOT);
+        if ("html".equals(ext) || "htm".equals(ext)) {
+            return "text/html; charset=utf-8";
+        }
+        if ("css".equals(ext)) {
+            return "text/css; charset=utf-8";
+        }
+        if ("js".equals(ext) || "mjs".equals(ext)) {
+            return "text/javascript; charset=utf-8";
+        }
+        if ("json".equals(ext)) {
+            return "application/json; charset=utf-8";
+        }
+        if ("svg".equals(ext)) {
+            return "image/svg+xml";
+        }
+        if ("png".equals(ext)) {
+            return "image/png";
+        }
+        if ("jpg".equals(ext) || "jpeg".equals(ext)) {
+            return "image/jpeg";
+        }
+        if ("gif".equals(ext)) {
+            return "image/gif";
+        }
+        if ("webp".equals(ext)) {
+            return "image/webp";
+        }
+        if ("ico".equals(ext)) {
+            return "image/x-icon";
+        }
+        if ("woff2".equals(ext)) {
+            return "font/woff2";
+        }
+        if ("woff".equals(ext)) {
+            return "font/woff";
+        }
+        if ("ttf".equals(ext)) {
+            return "font/ttf";
+        }
+        if ("wasm".equals(ext)) {
+            return "application/wasm";
+        }
+        if ("pdf".equals(ext)) {
+            return "application/pdf";
+        }
+        if ("txt".equals(ext) || "md".equals(ext)) {
+            return "text/plain; charset=utf-8";
+        }
+        if ("xml".equals(ext)) {
+            return "application/xml";
+        }
+        if ("mp4".equals(ext)) {
+            return "video/mp4";
+        }
+        if ("zip".equals(ext)) {
+            return "application/zip";
+        }
         return "application/octet-stream";
     }
 }

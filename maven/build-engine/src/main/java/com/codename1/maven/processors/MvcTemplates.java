@@ -85,6 +85,7 @@ final class MvcTemplates {
     private final Set<String> compiling = new HashSet<String>();
     private final List<byte[]> constants = new ArrayList<byte[]>();
     private int sequence;
+    private final MvcExpression.Helpers helpers = new MvcExpression.Helpers();
 
     private static final class Template {
         String name;
@@ -160,6 +161,7 @@ final class MvcTemplates {
         source.append(
                 "throw new IllegalArgumentException(\"Unknown compiled view: \" + view); }\n");
         for (String method : methods.values()) source.append(method);
+        for (String helper : helpers.sources) source.append(helper);
         source.append("}\n");
         Map<String, String> result = new LinkedHashMap<String, String>();
         result.put(PACKAGE + ".Views", source.toString());
@@ -501,6 +503,13 @@ final class MvcTemplates {
                     dynamic.put(attr, expression(assignment.substring(equal + 1), env, form));
                 }
         }
+        if (tag.equals("script")
+                && (dynamic.containsKey("src")
+                        || dynamic.containsKey("href")
+                        || dynamic.containsKey("xlink:href")))
+            throw new IllegalArgumentException("Dynamic script sources are not supported");
+        if (tag.equals("base") && dynamic.containsKey("href"))
+            throw new IllegalArgumentException("Dynamic base URLs are not supported");
         if (e.hasAttr("th:classappend")) {
             MvcExpression.Value v = expression(e.attr("th:classappend"), env, form);
             MvcExpression.Value base = dynamic.get("class");
@@ -746,7 +755,7 @@ final class MvcTemplates {
     private MvcExpression.Value expression(
             String value, Map<String, MvcExpression.Value> env, String form) {
         value = value.trim();
-        MvcExpression parser = new MvcExpression(ctx, env);
+        MvcExpression parser = new MvcExpression(ctx, env, helpers);
         if (value.startsWith("@{") && value.endsWith("}"))
             return url(value.substring(2, value.length() - 1), env, form);
         if ((value.startsWith("${") || value.startsWith("*{")) && value.endsWith("}")) {

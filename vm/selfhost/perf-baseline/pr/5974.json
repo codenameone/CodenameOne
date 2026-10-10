@@ -42,6 +42,28 @@
      }
     }
    }
+  },
+  "linux-x64@intel-xeon-platinum-8573c": {
+   "hello": {
+    "all": {
+     "memory": 0.876,
+     "runs": 2,
+     "time": 0.942,
+     "tolerance": {
+      "memory": 0.2,
+      "time": 0.5
+     },
+     "from": {
+      "memory": 0.732,
+      "time": 0.942,
+      "tolerance": {
+       "memory": 0.2,
+       "time": 0.5
+      }
+     },
+     "reason": "Recalibrate only hello RAM on Intel Xeon Platinum 8573C from runs 38060057999 (CI merge 77379c47) and 38063026105 (CI merge 531c1e44), five rounds each. Native translator, JavaAPI, benchmark and measurement sources are identical; the workflow difference only removes Xvfb from the separate common-build job. Run-median RAM ratios are 0.883 and 0.869, against the old 0.732 baseline. Preserve timing and existing tolerances."
+    }
+   }
   }
  }
 }
