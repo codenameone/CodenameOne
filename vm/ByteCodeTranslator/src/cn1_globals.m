@@ -1873,6 +1873,7 @@ void cn1InvokeFinalizer(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, void (*ptr)(
             threadStateData->blocks[threadStateData->tryBlockOffset].monitor = 0;
             threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass = 0; // catch-all
             threadStateData->blocks[threadStateData->tryBlockOffset].nativeBuffers = threadStateData->nativeBuffers;
+            threadStateData->blocks[threadStateData->tryBlockOffset].builderAccess = threadStateData->builderAccess;
             memcpy(threadStateData->blocks[threadStateData->tryBlockOffset].destination, __finTryJmp, sizeof(jmp_buf));
             threadStateData->tryBlockOffset++;
             ptr(threadStateData, obj);
@@ -3203,9 +3204,62 @@ static void cn1RefBlockFreeNow(JAVA_LONG block) {
     }
 }
 
-// Primitive buffers are never read by the marker. Unlike reference blocks,
-// they need no retirement and can use realloc without retaining the old copy.
-// On allocation failure the original block and accounting remain intact.
+/* A lock word fits StringBuilder's alignment padding in the default 64-bit
+ * layout. No monitor allocation, side-table lookup, or Java monitor is involved.
+ * Reentrancy is by pthread: native callbacks may pass a different ThreadLocalData
+ * on the same pthread. Pin virtual threads until the scope releases its locks. */
+static JAVA_LONG* cn1BuilderLock(CODENAME_ONE_THREAD_STATE, JAVA_LONG* lock, JAVA_LONG self) {
+    int spins = 0;
+    for(;;) {
+        JAVA_LONG owner = __atomic_load_n(lock, __ATOMIC_RELAXED);
+        if(owner == self) return NULL;
+        if(owner == 0 && __atomic_compare_exchange_n(lock, &owner, self, 0,
+                __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) return lock;
+        // Remain scannable while waiting; never let a stopped owner strand the GC.
+        if(threadStateData->threadBlockedByGC) {
+            JAVA_BOOLEAN active = threadStateData->threadActive;
+            CN1_GC_PARK_CAPTURE(threadStateData);
+            threadStateData->threadActive = JAVA_FALSE;
+            CN1_GC_WAIT_UNBLOCKED(threadStateData);
+            threadStateData->threadActive = active;
+            CN1_GC_PARK_RELEASE(threadStateData);
+        }
+        cn1GcHandshakeBackoff(&spins);
+    }
+}
+void cn1BuilderAccessEnter(CODENAME_ONE_THREAD_STATE, struct CN1BuilderAccess* access,
+        JAVA_OBJECT first, JAVA_LONG* firstLock, JAVA_OBJECT second, JAVA_LONG* secondLock) {
+    if(first == second) { second = JAVA_NULL; secondLock = NULL; }
+    if(second != JAVA_NULL && (uintptr_t)first > (uintptr_t)second) {
+        JAVA_OBJECT swap = first; first = second; second = swap;
+        JAVA_LONG* word = firstLock; firstLock = secondLock; secondLock = word;
+    }
+    access->firstLock = access->secondLock = NULL;
+    access->thread = threadStateData;
+    access->firstOwner = first;
+    access->secondOwner = second;
+    access->previous = threadStateData->builderAccess;
+    threadStateData->builderAccess = access;
+    cn1VirtualThreadMonitorEntered();
+    JAVA_LONG self = CN1_MONITOR_SELF();
+    if(CN1_OBJ_HEAPPOS(first) != CN1_GC_STACK_BUILDER)
+        access->firstLock = cn1BuilderLock(threadStateData, firstLock, self);
+    if(second != JAVA_NULL && CN1_OBJ_HEAPPOS(second) != CN1_GC_STACK_BUILDER)
+        access->secondLock = cn1BuilderLock(threadStateData, secondLock, self);
+}
+void cn1BuilderAccessLeave(struct CN1BuilderAccess* access) {
+    if(access->secondLock != NULL) __atomic_store_n(access->secondLock, 0, __ATOMIC_RELEASE);
+    if(access->firstLock != NULL) __atomic_store_n(access->firstLock, 0, __ATOMIC_RELEASE);
+    access->thread->builderAccess = access->previous;
+    access->thread = NULL;
+    cn1VirtualThreadMonitorExited();
+    cn1NativeOwnerFence(&access->firstOwner);
+    cn1NativeOwnerFence(&access->secondOwner);
+}
+void cn1BuilderAccessUnwind(struct ThreadLocalData* thread, struct CN1BuilderAccess* until) {
+    while(thread->builderAccess != until) cn1BuilderAccessLeave(thread->builderAccess);
+}
+
 void cn1StackBufferUnwind(struct ThreadLocalData* thread, struct CN1StackBuffer* until) {
     while(thread->nativeBuffers != until) {
         struct CN1StackBuffer* scope = thread->nativeBuffers;
@@ -3214,6 +3268,9 @@ void cn1StackBufferUnwind(struct ThreadLocalData* thread, struct CN1StackBuffer*
     }
 }
 
+// Primitive buffers are never read by the marker. Unlike reference blocks,
+// they need no retirement and can use realloc without retaining the old copy.
+// On allocation failure the original block and accounting remain intact.
 JAVA_LONG cn1PrimitiveBlockResize(JAVA_LONG block, JAVA_INT bytes) {
     if(bytes < 0) return 0;
     if(bytes == 0) { cn1RefBlockFree(block); return 0; }
@@ -20518,6 +20575,7 @@ void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
             continue;
         } else if(threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass <= 0 || instanceofFunction(threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass, CN1_OBJ_CLASS(exceptionArg)->classId)) {
             int off = threadStateData->tryBlockOffset;
+            cn1BuilderAccessUnwind(threadStateData, threadStateData->blocks[off].builderAccess);
             cn1StackBufferUnwind(threadStateData, threadStateData->blocks[off].nativeBuffers);
             CN1_TRY_LONGJMP(threadStateData->blocks[off].destination, 1);
             return;
@@ -20537,6 +20595,7 @@ void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
      * old behaviour, because making this fatal everywhere would change what apps
      * that ship today do.
      */
+    cn1BuilderAccessUnwind(threadStateData, NULL);
     if(cn1AbortOnUncaughtException) {
         cn1StackBufferUnwind(threadStateData, NULL);
         cn1ReportUncaughtException(threadStateData, exceptionArg);
