@@ -162,7 +162,7 @@ no TLS, and what it does need is exactly what a translated binary is good at.
   `instanceof` branches for native code instead. Compiled tests likewise honor Maven's
   `testSource`/`testTarget`/`testRelease` and Gradle's `compileTestJava` settings.
   Compiler arguments, including `--enable-preview`, are passed to application
-  and test recompilation. Classpath annotation processors run during those
+  and test recompilation. Annotation processors on the class path run during those
   compilations unless disabled with the compiler's `proc` setting.
 * A virtual thread parks on sockets and on nothing else. A PostgreSQL or MySQL
   query, a `Web` call and a TLS handshake all park it, and its host serves other

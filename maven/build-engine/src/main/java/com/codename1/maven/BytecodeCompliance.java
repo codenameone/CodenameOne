@@ -344,7 +344,7 @@ public class BytecodeCompliance {
         Map<String, ClassMetadata> project = buildClassIndexWithOutput(output, dependencies);
         // A dependency must not replace a native Java platform class during checks.
         for (String name : new ArrayList<String>(project.keySet())) {
-            if (name.startsWith("java/") || name.startsWith("javax/")) {
+            if (allowed.containsKey(name)) {
                 project.remove(name);
             }
         }

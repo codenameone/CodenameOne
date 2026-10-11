@@ -38,6 +38,32 @@ import java.util.Collections;
 import static org.junit.jupiter.api.Assertions.*;
 
 class BackendJavaLevelTest {
+    @Test void applicationCannotOverwriteRuntimeClass(@TempDir Path dir) throws Exception {
+        Path runtime = Files.createDirectory(dir.resolve("runtime"));
+        Files.write(runtime.resolve("Library.java"), "public class Library {}".getBytes("UTF-8"));
+        Path source = Files.createDirectory(dir.resolve("src"));
+        Files.write(source.resolve("Library.java"), "public class Library { int application; }".getBytes("UTF-8"));
+        File classes = Files.createDirectory(dir.resolve("classes")).toFile();
+        BackendPackager packager = new BackendPackager(host(dir, source));
+        packager.javaLevel(null, null, "17");
+        File jdk = jdk("17"), api = api(dir);
+        BuildExecutionException failure = assertThrows(BuildExecutionException.class,
+                () -> packager.compile(jdk, api, runtime.toFile(), classes));
+        assertTrue(failure.getMessage().contains("Library conflicts with a backend runtime class"));
+        assertEquals(52, major(classes.toPath().resolve("Library.class")), "runtime must remain untouched");
+    }
+
+    @Test void generatedNestedClassesCannotOverwriteRuntime(@TempDir Path dir) throws Exception {
+        Path application = Files.createDirectories(dir.resolve("application/pkg"));
+        Path runtime = Files.createDirectories(dir.resolve("runtime/pkg"));
+        Files.write(application.resolve("Generated$Nested.class"), new byte[] {1});
+        Files.write(runtime.resolve("Generated$Nested.class"), new byte[] {2});
+        BuildExecutionException failure = assertThrows(BuildExecutionException.class, () ->
+                BackendPackager.rejectRuntimeClassCollisions(application.getParent().toFile(), runtime.getParent().toFile()));
+        assertTrue(failure.getMessage().contains("pkg.Generated$Nested"));
+        assertArrayEquals(new byte[] {2}, Files.readAllBytes(runtime.resolve("Generated$Nested.class")));
+    }
+
     @Test void defaultApplicationAndRuntimeRemainJava8(@TempDir Path dir) throws Exception {
         File jdk = jdk("8");
         File api = api(dir);

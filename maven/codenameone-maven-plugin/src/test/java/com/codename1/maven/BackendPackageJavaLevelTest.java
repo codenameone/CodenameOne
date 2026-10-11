@@ -33,6 +33,67 @@ import java.util.Properties;
 import static org.junit.jupiter.api.Assertions.*;
 
 class BackendPackageJavaLevelTest {
+    @Test void processorPathsResolveTransitivelyWithManagementAndExclusions() throws Exception {
+        MavenProject project = project();
+        Plugin compiler = new Plugin();
+        compiler.setArtifactId("maven-compiler-plugin");
+        Xpp3Dom config = configuration("annotationProcessorPathsUseDepMgmt", "true");
+        Xpp3Dom paths = new Xpp3Dom("annotationProcessorPaths");
+        Xpp3Dom path = new Xpp3Dom("path");
+        path.addChild(configuration("groupId", "processors").getChild("groupId"));
+        path.addChild(configuration("artifactId", "main").getChild("artifactId"));
+        Xpp3Dom exclusions = new Xpp3Dom("exclusions"), exclusion = new Xpp3Dom("exclusion");
+        exclusion.addChild(configuration("groupId", "excluded").getChild("groupId"));
+        exclusion.addChild(configuration("artifactId", "helper").getChild("artifactId"));
+        exclusions.addChild(exclusion); path.addChild(exclusions); paths.addChild(path); config.addChild(paths);
+        Xpp3Dom processors = new Xpp3Dom("annotationProcessors");
+        processors.addChild(configuration("annotationProcessor", "processors.Main").getChild("annotationProcessor"));
+        config.addChild(processors);
+        compiler.setConfiguration(config);
+        PluginExecution test = execution("default-testCompile", null, "testCompile", "release", "25");
+        Xpp3Dom testConfig = (Xpp3Dom) test.getConfiguration();
+        Xpp3Dom testPaths = new Xpp3Dom(paths);
+        testPaths.getChild("path").getChild("artifactId").setValue("tests");
+        testPaths.getChild("path").addChild(configuration("version", "2").getChild("version"));
+        testConfig.addChild(testPaths); compiler.addExecution(test);
+        project.getBuild().addPlugin(compiler);
+        org.apache.maven.model.Dependency managed = new org.apache.maven.model.Dependency();
+        managed.setGroupId("processors"); managed.setArtifactId("main"); managed.setVersion("1");
+        org.apache.maven.model.DependencyManagement management = new org.apache.maven.model.DependencyManagement();
+        management.addDependency(managed); project.getModel().setDependencyManagement(management);
+        org.eclipse.aether.DefaultRepositorySystemSession session = new org.eclipse.aether.DefaultRepositorySystemSession();
+        session.setArtifactTypeRegistry(new org.eclipse.aether.util.artifact.DefaultArtifactTypeRegistry());
+        for (boolean tests : new boolean[] {false, true}) {
+            final boolean testCompilation = tests;
+            org.eclipse.aether.RepositorySystem resolver = (org.eclipse.aether.RepositorySystem)
+                    java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),
+                            new Class<?>[] {org.eclipse.aether.RepositorySystem.class}, (proxy, method, args) -> {
+                assertEquals("resolveDependencies", method.getName());
+                org.eclipse.aether.resolution.DependencyRequest request = (org.eclipse.aether.resolution.DependencyRequest) args[1];
+                org.eclipse.aether.graph.Dependency root = request.getCollectRequest().getDependencies().get(0);
+                assertEquals(testCompilation ? "tests" : "main", root.getArtifact().getArtifactId());
+                assertEquals(testCompilation ? "2" : "1", root.getArtifact().getVersion());
+                assertEquals("excluded", root.getExclusions().iterator().next().getGroupId());
+                assertEquals(1, request.getCollectRequest().getManagedDependencies().size());
+                java.util.List<org.eclipse.aether.resolution.ArtifactResult> artifacts = new java.util.ArrayList<>();
+                for (String name : new String[] {"processor", "transitive-helper"}) {
+                    org.eclipse.aether.resolution.ArtifactResult result = new org.eclipse.aether.resolution.ArtifactResult(
+                            new org.eclipse.aether.resolution.ArtifactRequest());
+                    result.setArtifact(new org.eclipse.aether.artifact.DefaultArtifact("processors", name, "jar", "1")
+                            .setFile(new java.io.File(name + ".jar")));
+                    artifacts.add(result);
+                }
+                return new org.eclipse.aether.resolution.DependencyResult(request).setArtifactResults(artifacts);
+            });
+            java.util.List<String> options = BackendPackageMojo.resolvedCompilerOptions(project,
+                    new Properties(), tests, resolver, session);
+            assertEquals("processors.Main", options.get(options.indexOf("-processor") + 1));
+            assertEquals(new java.io.File("processor.jar").getAbsolutePath() + java.io.File.pathSeparator
+                    + new java.io.File("transitive-helper.jar").getAbsolutePath(), options.get(options.indexOf("-processorpath") + 1));
+            assertFalse(options.contains("-classpath"), "processors must not become application dependencies");
+        }
+    }
+
     @Test void propertiesAndCommandLineRelease() {
         MavenProject project = project();
         Properties cli = new Properties();

@@ -94,6 +94,9 @@ public class BackendPackageMojo extends AbstractMojo {
     @Component
     private RepositorySystem repositorySystem;
 
+    @Component
+    private org.eclipse.aether.RepositorySystem processorRepositorySystem;
+
     /**
      * The class whose main() becomes the program's entry point.
      *
@@ -181,7 +184,7 @@ public class BackendPackageMojo extends AbstractMojo {
     }
 
     /** The engine packager, answering from this mojo's project and parameters. */
-    private BackendPackager packager() {
+    private BackendPackager packager() throws MojoExecutionException {
         BackendPackager p = new BackendPackager(new MavenModuleHost(project, MavenLog.of(getLog()))) {
             @Override
             protected String binaryName() {
@@ -215,6 +218,9 @@ public class BackendPackageMojo extends AbstractMojo {
         };
         configureJavaLevel(p, project,
                 session == null ? new java.util.Properties() : session.getUserProperties());
+        if (project != null) p.compilerOptions(resolvedCompilerOptions(project,
+                session == null ? new java.util.Properties() : session.getUserProperties(), false,
+                processorRepositorySystem, session == null ? null : session.getRepositorySession()));
         return p.mainClass(mainClass).output(output).target(target).jdk(jdkHome, jdk8Home).cflags(cflags)
                 .sqlite(sqlite).checkedCasts(checkedCasts).devTools(devTools);
     }
@@ -250,9 +256,96 @@ public class BackendPackageMojo extends AbstractMojo {
         }
         if (Boolean.parseBoolean(compilerOption(project, userProperties, "enablePreview", tests))
                 && !options.contains("--enable-preview")) options.add("--enable-preview");
+        if (configuration != null && configuration.getChild("annotationProcessors") != null) {
+            List<String> processors = new java.util.ArrayList<String>();
+            for (Xpp3Dom processor : configuration.getChild("annotationProcessors").getChildren()) {
+                if (processor.getValue() != null) processors.add(processor.getValue().trim());
+            }
+            if (!processors.isEmpty()) {
+                options.add("-processor");
+                options.add(String.join(",", processors));
+            }
+        }
         String proc = compilerOption(project, userProperties, "proc", tests);
         if (proc != null) options.add("-proc:" + proc);
         return options;
+    }
+
+    static List<String> resolvedCompilerOptions(MavenProject project, java.util.Properties properties,
+            boolean tests, org.eclipse.aether.RepositorySystem resolver,
+            org.eclipse.aether.RepositorySystemSession repositorySession) throws MojoExecutionException {
+        List<String> options = compilerOptions(project, properties, tests);
+        Xpp3Dom config = compilerConfiguration(project, tests);
+        Xpp3Dom paths = config == null ? null : config.getChild("annotationProcessorPaths");
+        if (paths == null || paths.getChildCount() == 0) return options;
+        if (resolver == null || repositorySession == null) {
+            throw new MojoExecutionException("Cannot resolve backend annotation processor paths without a Maven repository session");
+        }
+        org.eclipse.aether.collection.CollectRequest request = new org.eclipse.aether.collection.CollectRequest();
+        request.setRepositories(project.getRemoteProjectRepositories());
+        List<org.apache.maven.model.Dependency> managed = project.getDependencyManagement() == null
+                ? java.util.Collections.<org.apache.maven.model.Dependency>emptyList()
+                : project.getDependencyManagement().getDependencies();
+        if (Boolean.parseBoolean(compilerOption(project, properties, "annotationProcessorPathsUseDepMgmt", tests))) {
+            for (org.apache.maven.model.Dependency dependency : managed) {
+                request.addManagedDependency(org.apache.maven.RepositoryUtils.toDependency(dependency,
+                        repositorySession.getArtifactTypeRegistry()));
+            }
+        }
+        for (Xpp3Dom path : paths.getChildren()) {
+            org.apache.maven.model.Dependency dependency = new org.apache.maven.model.Dependency();
+            dependency.setGroupId(pathValue(path, "groupId", project, properties));
+            dependency.setArtifactId(pathValue(path, "artifactId", project, properties));
+            dependency.setVersion(pathValue(path, "version", project, properties));
+            String type = pathValue(path, "type", project, properties);
+            if (type != null) dependency.setType(type);
+            dependency.setClassifier(pathValue(path, "classifier", project, properties));
+            dependency.setScope("runtime");
+            if (dependency.getVersion() == null) {
+                for (org.apache.maven.model.Dependency candidate : managed) {
+                    if (candidate.getManagementKey().equals(dependency.getManagementKey())) {
+                        dependency.setVersion(candidate.getVersion());
+                        break;
+                    }
+                }
+            }
+            if (dependency.getVersion() == null) {
+                throw new MojoExecutionException("Missing version for annotation processor " + dependency.getManagementKey());
+            }
+            Xpp3Dom exclusions = path.getChild("exclusions");
+            if (exclusions != null) for (Xpp3Dom excluded : exclusions.getChildren()) {
+                org.apache.maven.model.Exclusion exclusion = new org.apache.maven.model.Exclusion();
+                exclusion.setGroupId(pathValue(excluded, "groupId", project, properties));
+                exclusion.setArtifactId(pathValue(excluded, "artifactId", project, properties));
+                dependency.addExclusion(exclusion);
+            }
+            request.addDependency(org.apache.maven.RepositoryUtils.toDependency(dependency,
+                    repositorySession.getArtifactTypeRegistry()));
+        }
+        try {
+            org.eclipse.aether.resolution.DependencyResult result = resolver.resolveDependencies(repositorySession,
+                    new org.eclipse.aether.resolution.DependencyRequest(request,
+                            org.eclipse.aether.util.filter.DependencyFilterUtils.classpathFilter("runtime")));
+            java.util.Set<String> files = new java.util.LinkedHashSet<String>();
+            for (org.eclipse.aether.resolution.ArtifactResult artifact : result.getArtifactResults()) {
+                files.add(artifact.getArtifact().getFile().getAbsolutePath());
+            }
+            options.add("-processorpath");
+            options.add(String.join(File.pathSeparator, files));
+            return options;
+        } catch (org.eclipse.aether.resolution.DependencyResolutionException ex) {
+            throw new MojoExecutionException("Could not resolve backend annotation processor paths", ex);
+        }
+    }
+
+    private static String pathValue(Xpp3Dom path, String name, MavenProject project,
+            java.util.Properties properties) {
+        Xpp3Dom node = path.getChild(name);
+        String value = node == null || node.getValue() == null ? null : node.getValue().trim();
+        if (value != null && value.startsWith("${") && value.endsWith("}")) {
+            value = property(project, properties, value.substring(2, value.length() - 1));
+        }
+        return value;
     }
 
     private static Xpp3Dom compilerConfiguration(MavenProject project, boolean tests) {
@@ -404,7 +497,7 @@ public class BackendPackageMojo extends AbstractMojo {
 
     // ---- Kept under their old names for the tests; see BackendPackager. ----
 
-    private File resolveJdk() throws MojoFailureException {
+    private File resolveJdk() throws MojoFailureException, MojoExecutionException {
         try {
             return packager().resolveJdk();
         } catch (BuildFailureException ex) {
@@ -412,7 +505,7 @@ public class BackendPackageMojo extends AbstractMojo {
         }
     }
 
-    private File requireEightOrNewer(File home) throws MojoFailureException {
+    private File requireEightOrNewer(File home) throws MojoFailureException, MojoExecutionException {
         try {
             return packager().requireEightOrNewer(home);
         } catch (BuildFailureException ex) {

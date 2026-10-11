@@ -49,6 +49,21 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class BytecodeComplianceTest {
     @Test
+    void backendAllowsThirdPartyJavaxButProtectsNativeApi(@TempDir Path dir) throws Exception {
+        Path output = Files.createDirectories(dir.resolve("output"));
+        Path api = Files.createDirectories(dir.resolve("api"));
+        Path dependency = Files.createDirectories(dir.resolve("dependency"));
+        writeJavaLangObject(api);
+        writeApiClass(dependency, "javax/inject/Provider", "get", "()V");
+        writeClass(output, "app/Caller", "javax/inject/Provider", "get", "()V");
+        BytecodeCompliance compliance = new BytecodeCompliance(TestProjectHost.empty());
+        compliance.checkBackend(output.toFile(), api.toFile(), Collections.singletonList(dependency.toFile()));
+        writeApiClass(api, "javax/inject/Provider", "nativeOnly", "()V");
+        org.junit.jupiter.api.Assertions.assertThrows(com.codename1.build.BuildFailureException.class, () ->
+                compliance.checkBackend(output.toFile(), api.toFile(), Collections.singletonList(dependency.toFile())));
+    }
+
+    @Test
     void backendComplianceUsesTheFirstClasspathDefinition(@TempDir Path dir) throws Exception {
         Path output = Files.createDirectories(dir.resolve("output"));
         Path api = Files.createDirectories(dir.resolve("api"));
