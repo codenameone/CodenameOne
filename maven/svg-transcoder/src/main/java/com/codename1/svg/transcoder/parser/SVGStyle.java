@@ -56,6 +56,15 @@ public final class SVGStyle {
     private Boolean visible;
     private Float strokeDashOffset;
 
+    private boolean nonScalingStroke;
+
+    /**
+     * Whether the stroke keeps its width however the drawing is scaled
+     * ({@code vector-effect: non-scaling-stroke}). Not inherited.
+     */
+    public boolean isNonScalingStroke() { return nonScalingStroke; }
+    public void setNonScalingStroke(boolean v) { this.nonScalingStroke = v; }
+
     private Boolean clipEvenOdd;
 
     /** Whether clip-rule is evenodd; null when the element does not say. Inherited. */

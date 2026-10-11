@@ -107,6 +107,22 @@ class CssImportDependenciesTest {
     }
 
     @Test
+    void aUrlWrittenInsideAStringNamesNoFile(@TempDir Path tmp) throws Exception {
+        File dir = tmp.toFile();
+        File css = new File(dir, "css");
+        write(new File(css, "theme.css"), "A { font-family: \"url(../../ghost.ttf)\"; }\n"
+                + "B::before { content: 'see url( ../../other.png )'; }\n"
+                + "C { background-image: url( \"../shared/real.png\" ); }\n");
+        File real = write(new File(dir, "shared/real.png"), "x");
+
+        Set<File> found = CssImportDependencies.outside(css);
+
+        assertEquals(1, found.size(), found.toString());
+        assertTrue(found.contains(real.getCanonicalFile()));
+        assertTrue(CssImportDependencies.lastModified(css) < Long.MAX_VALUE);
+    }
+
+    @Test
     void aCommentDelimiterInsideAStringHidesNothingAfterIt(@TempDir Path tmp) throws Exception {
         File dir = tmp.toFile();
         File css = new File(dir, "css");

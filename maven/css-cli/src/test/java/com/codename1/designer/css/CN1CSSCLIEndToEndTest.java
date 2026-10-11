@@ -237,6 +237,26 @@ class CN1CSSCLIEndToEndTest {
     }
 
     @Test
+    void aMergedBuildCarriesAMultiImageOfAnImportFromOutsideTheInputDirectory(@TempDir Path tmp) throws Exception {
+        File dir = tmp.toFile();
+        write(new File(dir, "shared/base.css"), "SharedLogo { background-image: url(img/logo); }\n");
+        png(new File(dir, "shared/img/logo/2hd.png"), 40, 16, 0xff993366);
+        png(new File(dir, "shared/img/logo/4k.png"), 80, 32, 0xff993366);
+        File app = write(new File(dir, "app/css/theme.css"),
+                "@import \"../../shared/base.css\";\nLabel { color: #222222; }\n");
+        File merged = new File(dir, "work/theme.css.merged");
+        File res = new File(dir, "work/theme.res");
+
+        assertEquals(0, CN1CSSCLI.run(new String[]{"-input", app.getPath(),
+            "-output", res.getPath(), "-merge", merged.getPath()}), stderr());
+
+        String mergedText = new String(Files.readAllBytes(merged.toPath()), StandardCharsets.UTF_8);
+        assertFalse(mergedText.contains("../"), "no url() climbs out of the mirror, was: " + mergedText);
+        assertTrue(Arrays.asList(open(res).getImageResourceNames()).contains("logo"),
+                "the multi-image is in the theme: " + Arrays.toString(open(res).getImageResourceNames()));
+    }
+
+    @Test
     void anEditToAnImageAloneRecompilesAMergedBuild(@TempDir Path tmp) throws Exception {
         File dir = tmp.toFile();
         File app = write(new File(dir, "app/theme.css"),

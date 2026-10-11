@@ -48,9 +48,8 @@ import java.util.Map;
 /// multiplied in. Lengths are those of the filtered element: a blur of 2 on
 /// an element drawn at three times its size is a blur of 6 pixels.
 ///
-/// `feImage` is not read; its result is empty, as are the page behind the
-/// element and its fill and stroke as inputs, which no browser gives a
-/// filter either.
+/// `feImage` is not read; its result is empty, as is the page behind the
+/// element as an input, which no browser gives a filter either.
 final class SvgFilter {
     /// One image in the chain: four planes, colour multiplied by opacity.
     private static final class Plane {
@@ -98,6 +97,9 @@ final class SvgFilter {
     private final Rectangle2D box;
     private final boolean boxUnits;
     private final Map<String, Plane> named = new HashMap<String, Plane>();
+    /// The region covered with the element's fill and with its stroke, or null.
+    private Plane fillPaint;
+    private Plane strokePaint;
 
     private SvgFilter(int w, int h, AffineTransform at, Rectangle2D box, boolean boxUnits) {
         this.w = w;
@@ -120,7 +122,13 @@ final class SvgFilter {
     ///   null when it has none to measure
     ///
     /// - `device`: from the element's coordinates to the pixels of `layer`
-    static void apply(BufferedImage layer, SVGFilter filter, Rectangle2D box, AffineTransform device) {
+    ///
+    /// - `fillPaint`: the size of `layer` and covered with the element's
+    ///   fill, for a filter that reads `FillPaint`; null for an empty one
+    ///
+    /// - `strokePaint`: the same of its stroke
+    static void apply(BufferedImage layer, SVGFilter filter, Rectangle2D box, AffineTransform device,
+            BufferedImage fillPaint, BufferedImage strokePaint) {
         int lw = layer.getWidth();
         int lh = layer.getHeight();
         boolean boxed = box != null && box.getWidth() > 0 && box.getHeight() > 0;
@@ -143,18 +151,10 @@ final class SvgFilter {
             at.concatenate(device);
             SvgFilter f = new SvgFilter(px.width, px.height, at, boxed ? box : null,
                     filter.isPrimitiveObjectBoundingBox());
-            Plane source = new Plane(px.width, px.height, false);
-            for (int y = 0; y < px.height; y++) {
-                for (int x = 0; x < px.width; x++) {
-                    int argb = all[(y + px.y) * lw + x + px.x];
-                    float a = (argb >>> 24) / 255f;
-                    int i = y * px.width + x;
-                    source.a[i] = a;
-                    source.r[i] = ((argb >> 16) & 0xff) / 255f * a;
-                    source.g[i] = ((argb >> 8) & 0xff) / 255f * a;
-                    source.b[i] = (argb & 0xff) / 255f * a;
-                }
-            }
+            Plane source = plane(all, lw, px);
+            f.fillPaint = fillPaint == null ? null : plane(fillPaint.getRGB(0, 0, lw, lh, null, 0, lw), lw, px);
+            f.strokePaint = strokePaint == null ? null
+                    : plane(strokePaint.getRGB(0, 0, lw, lh, null, 0, lw), lw, px);
             Plane result = f.in(f.run(filter, source), false);
             for (int y = 0; y < px.height; y++) {
                 for (int x = 0; x < px.width; x++) {
@@ -171,6 +171,39 @@ final class SvgFilter {
             }
         }
         layer.setRGB(0, 0, lw, lh, out, 0, lw);
+    }
+
+    /// The part `px` of an image `lw` wide, as a plane.
+    private static Plane plane(int[] all, int lw, Rectangle px) {
+        Plane out = new Plane(px.width, px.height, false);
+        for (int y = 0; y < px.height; y++) {
+            for (int x = 0; x < px.width; x++) {
+                int argb = all[(y + px.y) * lw + x + px.x];
+                float a = (argb >>> 24) / 255f;
+                int i = y * px.width + x;
+                out.a[i] = a;
+                out.r[i] = ((argb >> 16) & 0xff) / 255f * a;
+                out.g[i] = ((argb >> 8) & 0xff) / 255f * a;
+                out.b[i] = (argb & 0xff) / 255f * a;
+            }
+        }
+        return out;
+    }
+
+    /// Whether an effect of `filter` reads the input of that name.
+    static boolean reads(SVGFilter filter, String input) {
+        return reads(filter.getPrimitives(), input);
+    }
+
+    private static boolean reads(java.util.List<Primitive> primitives, String input) {
+        for (Primitive p : primitives) {
+            if ((p.get("in") != null && input.equals(p.get("in").trim()))
+                    || (p.get("in2") != null && input.equals(p.get("in2").trim()))
+                    || reads(p.getChildren(), input)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private Plane run(SVGFilter filter, Plane source) {
@@ -279,8 +312,11 @@ final class SvgFilter {
             found = source;
         } else if ("SourceAlpha".equals(name)) {
             found = alphaOf(source);
-        } else if ("BackgroundImage".equals(name) || "BackgroundAlpha".equals(name)
-                || "FillPaint".equals(name) || "StrokePaint".equals(name)) {
+        } else if ("FillPaint".equals(name)) {
+            found = fillPaint == null ? new Plane(w, h, linear) : fillPaint;
+        } else if ("StrokePaint".equals(name)) {
+            found = strokePaint == null ? new Plane(w, h, linear) : strokePaint;
+        } else if ("BackgroundImage".equals(name) || "BackgroundAlpha".equals(name)) {
             found = new Plane(w, h, linear);
         } else {
             found = named.containsKey(name) ? named.get(name) : last;

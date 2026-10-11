@@ -787,7 +787,9 @@ public class CN1CSSCLI {
     private static final String OUTSIDE_ASSETS_DIR = "cn1-imported-assets";
 
     /// Copies into `mirrorDir` every file a `url()` of `contents` names that
-    /// lies outside `inputDir`, and points the `url()` at the copy.
+    /// lies outside `inputDir`, and points the `url()` at the copy. A
+    /// directory, which is how a multi-image is named, is copied with what
+    /// is in it.
     ///
     /// An input's directory is mirrored whole, which covers everything the
     /// input and the stylesheets beside it refer to. A stylesheet imported
@@ -815,7 +817,20 @@ public class CN1CSSCLI {
                 } catch (java.nio.file.InvalidPathException ex) {
                     return url;
                 }
-                if (target.startsWith(base) || !Files.isRegularFile(target)) {
+                if (target.startsWith(base)) {
+                    return url;
+                }
+                if (Files.isDirectory(target) && target.getParent() != null && target.getFileName() != null) {
+                    // A multi-image: a directory holding one picture for
+                    // each density. It goes over whole, under its own name,
+                    // which is the name of the image.
+                    String from = getMd5(target.getParent().toString());
+                    String name = target.getFileName().toString();
+                    syncDirectories(target.toFile(),
+                            new File(new File(new File(mirrorDir, OUTSIDE_ASSETS_DIR), from), name));
+                    return OUTSIDE_ASSETS_DIR + "/" + from + "/" + name;
+                }
+                if (!Files.isRegularFile(target)) {
                     return url;
                 }
                 String origin = getMd5(target.getParent().toString());

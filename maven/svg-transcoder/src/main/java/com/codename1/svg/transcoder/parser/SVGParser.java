@@ -1059,6 +1059,7 @@ public final class SVGParser {
                     || "stroke-dasharray".equals(k) || "stroke-dashoffset".equals(k)
                     || "display".equals(k) || "visibility".equals(k) || "mask".equals(k)
                     || "color".equals(k) || "filter".equals(k) || "marker".equals(k) || "clip-rule".equals(k)
+                    || "vector-effect".equals(k)
                     || "marker-start".equals(k) || "marker-mid".equals(k) || "marker-end".equals(k)) {
                 pres.put(k, e.getValue());
             }

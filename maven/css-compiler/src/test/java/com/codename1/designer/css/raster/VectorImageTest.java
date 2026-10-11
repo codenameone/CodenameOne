@@ -773,6 +773,66 @@ class VectorImageTest {
     }
 
     @Test
+    void aNonScalingStrokeKeepsItsWidthWhenTheDrawingIsEnlarged() throws Exception {
+        String line = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 10 10\">"
+                + "<path d=\"M 0 5 H 10\" stroke=\"#ff0000\" stroke-width=\"2\"%s/></svg>";
+        BufferedImage scaled = read(String.format(line, "")).paint(100, 100);
+        assertEquals(0xffff0000, scaled.getRGB(50, 42), "two units are twenty pixels at ten times the size");
+        BufferedImage kept = read(String.format(line, " vector-effect=\"non-scaling-stroke\"")).paint(100, 100);
+        assertEquals(0xffff0000, kept.getRGB(50, 50));
+        assertEquals(0, alpha(kept, 50, 47), "and two pixels when the stroke does not scale");
+        assertEquals(0, alpha(kept, 50, 53));
+    }
+
+    @Test
+    void aReferenceToNothingIsPaintedInTheColourAfterIt() throws Exception {
+        BufferedImage img = paint("<defs><linearGradient id=\"g\"><stop offset=\"0\" stop-color=\"#0000ff\"/>"
+                + "</linearGradient></defs>"
+                + "<rect width=\"50\" height=\"50\" fill=\"url(#missing) #ff0000\"/>"
+                + "<rect x=\"50\" width=\"50\" height=\"50\" fill=\"url(#missing)\"/>"
+                + "<rect y=\"50\" width=\"50\" height=\"50\" fill=\"url(#g) #ff0000\"/>"
+                + "<rect x=\"50\" y=\"50\" width=\"50\" height=\"50\" fill=\"url(#missing) none\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(25, 25));
+        assertEquals(0, alpha(img, 75, 25), "with nothing after it, nothing is painted");
+        assertEquals(0xff0000ff, img.getRGB(25, 75), "a reference that is there is what paints");
+        assertEquals(0, alpha(img, 75, 75));
+    }
+
+    @Test
+    void aFilterCanReadTheFillAndTheStrokeOfItsElement() throws Exception {
+        String region = " filterUnits=\"userSpaceOnUse\" x=\"0\" y=\"0\" width=\"100\" height=\"100\">";
+        BufferedImage img = paint("<filter id=\"f\"" + region
+                + "<feComposite in=\"StrokePaint\" in2=\"SourceGraphic\" operator=\"in\"/></filter>"
+                + "<rect x=\"40\" y=\"40\" width=\"20\" height=\"20\" fill=\"#ff0000\" stroke=\"#0000ff\""
+                + " stroke-opacity=\"0\" filter=\"url(#f)\"/>", 100, 100);
+        assertEquals(0, alpha(img, 50, 50), "a stroke that is not opaque gives nothing");
+        BufferedImage filled = paint("<filter id=\"f\"" + region + "<feOffset dx=\"30\"/>"
+                + "<feComposite in=\"FillPaint\" operator=\"out\"/></filter>"
+                + "<rect x=\"40\" y=\"40\" width=\"20\" height=\"20\" fill=\"#ff0000\" filter=\"url(#f)\"/>", 100, 100);
+        assertEquals(0xffff0000, filled.getRGB(10, 10), "the fill, everywhere the moved element is not");
+        assertEquals(0, alpha(filled, 80, 50));
+    }
+
+    @Test
+    void aUseDrawsAnElementOfAnotherFileBesideIt(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tmp)
+            throws Exception {
+        java.nio.file.Files.write(tmp.resolve("sprite.svg"), ("<svg xmlns=\"http://www.w3.org/2000/svg\">"
+                + "<defs><linearGradient id=\"g\"><stop offset=\"0\" stop-color=\"#00ff00\"/></linearGradient></defs>"
+                + "<symbol id=\"icon\" viewBox=\"0 0 10 10\"><rect width=\"10\" height=\"10\" fill=\"url(#g)\"/>"
+                + "</symbol></svg>").getBytes(StandardCharsets.UTF_8));
+        java.nio.file.Path main = tmp.resolve("main.svg");
+        java.nio.file.Files.write(main, ("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\">"
+                + "<use href=\"sprite.svg#icon\" x=\"50\" width=\"50\" height=\"50\"/>"
+                + "<use href=\"gone.svg#icon\" width=\"50\" height=\"50\"/></svg>").getBytes(StandardCharsets.UTF_8));
+        BufferedImage img;
+        try (java.io.InputStream in = java.nio.file.Files.newInputStream(main)) {
+            img = VectorImage.readSvg(in, main.toUri().toURL()).paint(100, 100);
+        }
+        assertEquals(0xff00ff00, img.getRGB(75, 25), "the symbol, painted with a gradient of its own file");
+        assertEquals(0, alpha(img, 25, 25), "a file that is not there draws nothing");
+    }
+
+    @Test
     void aUseThatNamesItselfDrawsNothingAndEnds() throws Exception {
         BufferedImage img = paint("<g id=\"loop\"><use href=\"#loop\"/></g>", 20, 20);
         assertEquals(0, alpha(img, 10, 10));

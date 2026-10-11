@@ -94,6 +94,8 @@ public final class StyleParser {
         if (fillRule != null) {
             out.setFillEvenOdd(Boolean.valueOf("evenodd".equals(fillRule.trim())));
         }
+        String effect = merged.get("vector-effect");
+        out.setNonScalingStroke(effect != null && "non-scaling-stroke".equals(effect.trim()));
         String clipRule = merged.get("clip-rule");
         if (clipRule != null) {
             out.setClipEvenOdd(Boolean.valueOf("evenodd".equals(clipRule.trim())));

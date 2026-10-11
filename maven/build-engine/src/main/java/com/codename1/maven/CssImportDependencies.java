@@ -78,6 +78,41 @@ public final class CssImportDependencies {
         return out.toString();
     }
 
+    /// `text` with every string emptied that is not the argument of a
+    /// `url()`. What is left of one is its two quotes.
+    static String withoutLooseStrings(String text) {
+        StringBuilder out = new StringBuilder(text.length());
+        int len = text.length();
+        int i = 0;
+        while (i < len) {
+            char c = text.charAt(i);
+            if (c != '"' && c != '\'') {
+                out.append(c);
+                i++;
+                continue;
+            }
+            int end = i + 1;
+            while (end < len && text.charAt(end) != c) {
+                end += text.charAt(end) == '\\' ? 2 : 1;
+            }
+            end = Math.min(len, end + 1);
+            // Whether what comes before it, white space aside, is `url(`.
+            int before = out.length();
+            while (before > 0 && Character.isWhitespace(out.charAt(before - 1))) {
+                before--;
+            }
+            boolean argument = before >= 4 && out.substring(before - 4, before).equalsIgnoreCase("url(")
+                    && (before == 4 || !Character.isLetterOrDigit(out.charAt(before - 5)));
+            if (argument) {
+                out.append(text, i, end);
+            } else {
+                out.append(c).append(c);
+            }
+            i = end;
+        }
+        return out.toString();
+    }
+
     private static final Pattern IMPORT = Pattern.compile(
             "@import\\s+(?:url\\(\\s*)?(?:\"([^\"]*)\"|'([^']*)'|([^\"')\\s;]+))", Pattern.CASE_INSENSITIVE);
 
@@ -120,7 +155,9 @@ public final class CssImportDependencies {
             // the pass below, which knows that `base.css?v=1` names
             // `base.css`: taken here as written it would be a file that is
             // never there, and a missing file makes every build stale.
-            Matcher asset = URL.matcher(IMPORT.matcher(text).replaceAll("@import "));
+            // Nor is `url(...)` written inside a string, a font name or
+            // some generated content: that is text, and names no file.
+            Matcher asset = URL.matcher(withoutLooseStrings(IMPORT.matcher(text).replaceAll("@import ")));
             while (asset.find()) {
                 // A quoted name may hold a parenthesis of its own.
                 String name = asset.group(1) != null ? asset.group(1)

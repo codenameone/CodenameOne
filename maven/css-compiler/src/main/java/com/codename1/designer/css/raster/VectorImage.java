@@ -251,6 +251,7 @@ public final class VectorImage {
             style.inherit(own);
             style.setOpacity(own.getOpacity());
             style.setClipPathRef(own.getClipPathRef());
+            style.setNonScalingStroke(own.isNonScalingStroke());
         }
         style.inherit(parentStyle);
         // `currentColor` is the `color` of the element it is used on, which
@@ -313,7 +314,12 @@ public final class VectorImage {
                 if (t != null) {
                     device.concatenate(new AffineTransform(t.a, t.b, t.c, t.d, t.e, t.f));
                 }
-                SvgFilter.apply(layer, filter, boundsOf(node), device);
+                BufferedImage fillPaint = SvgFilter.reads(filter, "FillPaint")
+                        ? flooded(style.getFill() == null ? SVGPaint.BLACK : style.getFill(),
+                                style.getFillOpacity(), node, device, w, h) : null;
+                BufferedImage strokePaint = SvgFilter.reads(filter, "StrokePaint")
+                        ? flooded(style.getStroke(), style.getStrokeOpacity(), node, device, w, h) : null;
+                SvgFilter.apply(layer, filter, boundsOf(node), device, fillPaint, strokePaint);
                 Shape outline = clipRef == null ? null : clipShape(node, clipRef);
                 if (outline != null) {
                     BufferedImage cut = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
@@ -346,6 +352,31 @@ public final class VectorImage {
             return;
         }
         paintOpaque(g, node, style, w, h);
+    }
+
+    /// The whole image covered with a paint of `node`, its fill or its
+    /// stroke, which is what a filter reads as `FillPaint` or `StrokePaint`.
+    /// Empty when the paint is `none`.
+    private BufferedImage flooded(SVGPaint paint, Float opacity, SVGNode node, AffineTransform device, int w, int h) {
+        BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        if (paint == null || paint.isNone()) {
+            return out;
+        }
+        Graphics2D fg = out.createGraphics();
+        try {
+            Pixels.hints(fg);
+            fg.setTransform(device);
+            Shape all = device.createInverse().createTransformedShape(new Rectangle2D.Double(0, 0, w, h));
+            Rectangle2D box = boundsOf(node);
+            paintWith(fg, paint, opacity == null ? 1f : clamp(opacity.floatValue()), all,
+                    box == null ? all.getBounds2D() : box);
+        } catch (java.awt.geom.NoninvertibleTransformException ex) {
+            // Squashed flat: there is nowhere to paint.
+            return out;
+        } finally {
+            fg.dispose();
+        }
+        return out;
     }
 
     /// Lets through as much of `layer`, which holds `node`, as `mask` says.
@@ -582,6 +613,12 @@ public final class VectorImage {
     /// Draws the markers of a line on its points: `marker-start` on the
     /// first, `marker-end` on the last and `marker-mid` on each between.
     ///
+    /// First and last are of the whole element. A path of several subpaths
+    /// has one first point and one last, and where one subpath ends and the
+    /// next begins are points between like any other: that is how the
+    /// browser these images used to be captured in places them, and what
+    /// the specification says ("the first vertex of the given shape").
+    ///
     /// A point is where a segment of the line ends. A marker that turns
     /// with the line faces the way the line runs there, and where the line
     /// bends, half way between the two directions. An arc is drawn as a
@@ -814,7 +851,16 @@ public final class VectorImage {
     /// element does not set for itself it takes from the `<use>`, as if it
     /// were written there.
     private void paintUse(Graphics2D g, SVGUse use, SVGStyle style, int w, int h) {
-        SVGNode target = use.getHref() == null ? null : doc.getDefinitions().get(use.getHref());
+        String href = use.getHref();
+        SVGNode target = href == null ? null : doc.getDefinitions().get(href);
+        // The file the element is in, which is the one that knows the
+        // gradients and clip paths it refers to.
+        VectorImage owner = this;
+        if (target == null && href != null && href.indexOf('#') > 0) {
+            // `sprite.svg#icon`: an element of another file beside this one.
+            owner = beside(href.substring(0, href.indexOf('#')));
+            target = owner == null ? null : owner.doc.getDefinitions().get(href.substring(href.indexOf('#') + 1));
+        }
         if (target == null || target instanceof SVGClipPath || target instanceof SVGPattern
                 || target instanceof SVGMarker || target instanceof SVGFilter
                 || target instanceof SVGLinearGradient
@@ -827,12 +873,50 @@ public final class VectorImage {
             return;
         }
         useDepth++;
+        int ownerDepth = owner.useDepth;
         try {
+            owner.useDepth = useDepth;
             g.transform(placing(use, target));
-            paintNode(g, target, style, w, h);
+            owner.paintNode(g, target, style, w, h);
         } finally {
+            owner.useDepth = ownerDepth;
             useDepth--;
         }
+    }
+
+    /// The SVG files this one has drawn elements of, by the name it calls
+    /// them; a name that could not be read is kept with null.
+    private java.util.Map<String, VectorImage> besides;
+
+    /// The SVG file of that name beside this one, or null: when this one
+    /// has no beside, the name is not that of a file there, it cannot be
+    /// read, or the files are nested too deep. Like a picture, it is only
+    /// ever a file; nothing is fetched.
+    private VectorImage beside(String name) {
+        if (besides == null) {
+            besides = new java.util.HashMap<String, VectorImage>();
+        }
+        if (besides.containsKey(name)) {
+            return besides.get(name);
+        }
+        VectorImage found = null;
+        if (base != null && name.indexOf(':') < 0 && fileDepth < MAX_FILE_DEPTH) {
+            try {
+                java.net.URL at = new java.net.URL(base, name);
+                if ("file".equals(at.getProtocol())) {
+                    try (InputStream in = at.openStream()) {
+                        found = readSvg(in, at);
+                        found.fileDepth = fileDepth + 1;
+                    }
+                }
+            } catch (IOException ex) {
+                found = null;
+            } catch (RuntimeException ex) {
+                found = null;
+            }
+        }
+        besides.put(name, found);
+        return found;
     }
 
     /// How the content of a nested `<svg>` gets into its box: moved to the
@@ -1187,7 +1271,20 @@ public final class VectorImage {
                             : join == SVGStyle.LINEJOIN_BEVEL ? BasicStroke.JOIN_BEVEL : BasicStroke.JOIN_MITER,
                     Math.max(1f, miter), dashes, phase);
             float a = style.getStrokeOpacity() == null ? 1f : clamp(style.getStrokeOpacity().floatValue());
-            paintWith(g, stroke, a, pen.createStrokedShape(shape), shape);
+            Shape stroked = null;
+            if (style.isNonScalingStroke()) {
+                // The pen is as wide as it says on the image, whatever the
+                // drawing is scaled by: the line is drawn where it lands,
+                // and brought back to be filled like any other.
+                AffineTransform at = g.getTransform();
+                try {
+                    stroked = at.createInverse().createTransformedShape(
+                            pen.createStrokedShape(at.createTransformedShape(shape)));
+                } catch (java.awt.geom.NoninvertibleTransformException ex) {
+                    stroked = null;
+                }
+            }
+            paintWith(g, stroke, a, stroked == null ? pen.createStrokedShape(shape) : stroked, shape);
         }
     }
 
@@ -1205,9 +1302,20 @@ public final class VectorImage {
                 paintPattern(g, (SVGPattern) def, alpha, area, boundsOf.getBounds2D());
                 return;
             }
-            p = gradient(def, boundsOf.getBounds2D());
-            if (p == null) {
-                return;
+            if (def instanceof SVGLinearGradient || def instanceof SVGRadialGradient) {
+                p = gradient(def, boundsOf.getBounds2D());
+                if (p == null) {
+                    return;
+                }
+            } else {
+                // Nothing to paint with has that id. The colour written
+                // after the reference stands in; with none, nothing is
+                // painted.
+                SVGPaint fallback = paint.getFallback();
+                if (fallback == null || fallback.isNone()) {
+                    return;
+                }
+                p = new Color(fallback.getColor(), true);
             }
         } else {
             p = new Color(paint.getColor(), true);
