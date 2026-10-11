@@ -181,7 +181,7 @@ def main():
                     if stream == 1 and flags & 1:
                         break
         assert metrics() == before
-        path = args.artifacts / 'http2.zip' 
+        path = args.artifacts / 'http2.zip'
         with h2start('/large.zip', 1024) as sock, path.open('wb') as output:
             total = 0
             while True:
