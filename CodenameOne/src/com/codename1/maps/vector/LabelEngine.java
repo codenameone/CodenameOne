@@ -291,10 +291,13 @@ final class LabelEngine {
             if (perGlyph) {
                 // Each glyph's share of the name as it is drawn, not its width
                 // on its own. A stretch of the name is drawn as one string,
-                // which a font with kerning or fractional advances sets
-                // narrower than its letters add up to singly; laid out by the
-                // single widths, every stretch stopped short of the next one
-                // and a name that turned a corner read "Bro adway".
+                // and a port that measures in whole pixels rounds every
+                // letter measured singly, so the letters do not add up to the
+                // string: on macOS they came short, and where a name turned a
+                // corner one stretch was drawn over the start of the next.
+                // This does not close the small gap a bend itself opens on
+                // its outer side, which is the geometry of two straight
+                // pieces meeting at an angle.
                 int len = text.length();
                 widths = new int[len];
                 textW = 0;
