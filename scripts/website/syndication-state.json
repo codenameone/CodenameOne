@@ -2680,6 +2680,15 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-10-11T00:01:19+00:00"
+      },
+      "devto": {
+        "id": 4834000,
+        "url": "https://dev.to/codenameone/can-you-tell-the-difference-between-these-ios-tab-bars-dmg",
+        "syndicated_at": "2026-10-11T18:18:59+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/c4a63ec4ef2a/edit",
+        "syndicated_at": "2026-10-11T19:01:28+00:00"
       }
     }
   }
