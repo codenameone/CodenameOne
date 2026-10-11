@@ -189,10 +189,23 @@ public final class BackgroundImagePainter {
             // Divided, not multiplied: two counts large enough wrap around
             // to a small product, and the loops below would then never end.
             if (nx > MAX_DRAWN_TILES / ny) {
-                // Too many to draw one by one. The gaps of `space` between
-                // tiles this small are fractions of a pixel and are not
-                // kept.
-                g.setPaint(new TexturePaint(src, new Rectangle2D.Double(x0, y0, tw, th)));
+                // Too many to draw one by one. What repeats is one step of
+                // the layout, so with `space` it is the tile and the gap
+                // after it: a tile wide enough to leave a gap one can see
+                // gets here too, when there are many rows of it.
+                BufferedImage cell = src;
+                if (stepX > tw || stepY > th) {
+                    int cw = (int) Math.max(src.getWidth(), Math.round(stepX * src.getWidth() / tw));
+                    int ch = (int) Math.max(src.getHeight(), Math.round(stepY * src.getHeight() / th));
+                    cell = new BufferedImage(cw, ch, BufferedImage.TYPE_INT_ARGB);
+                    Graphics2D cg = cell.createGraphics();
+                    try {
+                        cg.drawImage(src, 0, 0, null);
+                    } finally {
+                        cg.dispose();
+                    }
+                }
+                g.setPaint(new TexturePaint(cell, new Rectangle2D.Double(x0, y0, stepX, stepY)));
                 g.fill(new Rectangle2D.Double(x0, y0, nx * stepX, ny * stepY));
             } else {
                 double sx = tw / src.getWidth();

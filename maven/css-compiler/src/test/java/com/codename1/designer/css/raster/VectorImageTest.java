@@ -492,6 +492,24 @@ class VectorImageTest {
     }
 
     @Test
+    void anSvgInsideTheDrawingLaysItsContentOutInItsOwnBox() throws Exception {
+        BufferedImage img = paint("<svg x=\"50\" y=\"0\" width=\"50\" height=\"50\" viewBox=\"0 0 10 10\">"
+                + "<rect width=\"5\" height=\"10\" fill=\"#ff0000\"/>"
+                + "<rect x=\"-10\" y=\"0\" width=\"10\" height=\"10\" fill=\"#0000ff\"/></svg>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(60, 25), "ten units of the view box are the fifty of the box");
+        assertEquals(0, alpha(img, 85, 25));
+        assertEquals(0, alpha(img, 25, 25), "what falls outside the box is cut off");
+        assertEquals(0, alpha(img, 60, 75));
+
+        BufferedImage plain = paint("<svg x=\"20\" y=\"20\" width=\"30\" height=\"30\">"
+                + "<rect id=\"r\" width=\"100\" height=\"10\" fill=\"#ff0000\"/></svg>"
+                + "<use href=\"#r\" y=\"80\"/>", 100, 100);
+        assertEquals(0xffff0000, plain.getRGB(25, 25), "with no view box the content is only moved");
+        assertEquals(0, alpha(plain, 60, 25));
+        assertEquals(0xffff0000, plain.getRGB(90, 85), "and what is in it can still be referred to");
+    }
+
+    @Test
     void aUseThatNamesItselfDrawsNothingAndEnds() throws Exception {
         BufferedImage img = paint("<g id=\"loop\"><use href=\"#loop\"/></g>", 20, 20);
         assertEquals(0, alpha(img, 10, 10));

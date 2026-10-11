@@ -242,6 +242,10 @@ public final class SVGParser {
                 applyCommon(g, attrs(r));
                 parent.addChild(g);
                 readChildren(r, g, doc);
+            } else if ("svg".equals(name)) {
+                // Read for a renderer that can lay one out. The class the
+                // transcoder generates does not draw it.
+                parent.addChild(readViewport(r, doc));
             } else if ("defs".equals(name)) {
                 readDefs(r, doc);
             } else if ("use".equals(name)) {
@@ -352,10 +356,47 @@ public final class SVGParser {
         if (node != doc && node.getId() != null && !doc.getDefinitions().containsKey(node.getId())) {
             doc.getDefinitions().put(node.getId(), node);
         }
+        if (node instanceof SVGViewport) {
+            indexById(((SVGViewport) node).getContent(), doc);
+        }
         if (node instanceof SVGGroup) {
             for (SVGNode child : ((SVGGroup) node).getChildren()) {
                 indexById(child, doc);
             }
+        }
+    }
+
+    private SVGViewport readViewport(XMLStreamReader r, SVGDocument doc) throws XMLStreamException {
+        SVGViewport v = new SVGViewport();
+        Map<String, String> a = attrs(r);
+        applyCommon(v, a);
+        v.setX(viewportSide(a.get("x"), 0f, doc.getViewBoxWidth()));
+        v.setY(viewportSide(a.get("y"), 0f, doc.getViewBoxHeight()));
+        // Left out, a side is the whole of the drawing it is in.
+        v.setWidth(viewportSide(a.get("width"), 1f, doc.getViewBoxWidth()));
+        v.setHeight(viewportSide(a.get("height"), 1f, doc.getViewBoxHeight()));
+        v.setPreserveAspectRatio(a.get("preserveAspectRatio"));
+        String vb = a.get("viewBox");
+        if (vb != null) {
+            NumberParser np = new NumberParser(vb);
+            try {
+                v.setViewBox(np.nextFloat(), np.nextFloat(), np.nextFloat(), np.nextFloat());
+            } catch (RuntimeException e) {
+                // no view box
+            }
+        }
+        readChildren(r, v.getContent(), doc);
+        return v;
+    }
+
+    /** A side of a nested viewport: a length, or a share of the drawing's when it is a percentage or left out. */
+    private float viewportSide(String value, float share, float whole) {
+        if (value == null) return share * whole;
+        try {
+            float n = parseGradCoord(value);
+            return value.trim().endsWith("%") ? n * whole : n;
+        } catch (RuntimeException e) {
+            return share * whole;
         }
     }
 

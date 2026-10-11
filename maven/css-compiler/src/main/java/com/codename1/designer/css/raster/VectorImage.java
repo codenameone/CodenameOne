@@ -41,6 +41,7 @@ import com.codename1.svg.transcoder.model.SVGRect;
 import com.codename1.svg.transcoder.model.SVGSymbol;
 import com.codename1.svg.transcoder.model.SVGText;
 import com.codename1.svg.transcoder.model.SVGUse;
+import com.codename1.svg.transcoder.model.SVGViewport;
 import com.codename1.svg.transcoder.parser.PathCommand;
 import com.codename1.svg.transcoder.parser.SVGPaint;
 import com.codename1.svg.transcoder.parser.SVGParser;
@@ -516,7 +517,19 @@ public final class VectorImage {
                 paintUse(g, (SVGUse) node, style, w, h);
                 return;
             }
-            if (node instanceof SVGGroup) {
+            if (node instanceof SVGViewport) {
+                // An `<svg>` inside the drawing: its content is laid out in
+                // its box and cut off at the box's edges. A box with no
+                // size shows nothing.
+                SVGViewport port = (SVGViewport) node;
+                if (port.getWidth() > 0 && port.getHeight() > 0) {
+                    g.clip(new Rectangle2D.Double(port.getX(), port.getY(), port.getWidth(), port.getHeight()));
+                    g.transform(layout(port));
+                    for (SVGNode child : port.getContent().getChildren()) {
+                        paintNode(g, child, style, w, h);
+                    }
+                }
+            } else if (node instanceof SVGGroup) {
                 for (SVGNode child : ((SVGGroup) node).getChildren()) {
                     paintNode(g, child, style, w, h);
                 }
@@ -561,6 +574,34 @@ public final class VectorImage {
         } finally {
             useDepth--;
         }
+    }
+
+    /// How the content of a nested `<svg>` gets into its box: moved to the
+    /// box's corner, and with a view box fitted to the box the way
+    /// `preserveAspectRatio` says, which by default keeps its shape and
+    /// centres it.
+    private static AffineTransform layout(SVGViewport port) {
+        AffineTransform at = AffineTransform.getTranslateInstance(port.getX(), port.getY());
+        double vw = port.getViewBoxWidth();
+        double vh = port.getViewBoxHeight();
+        if (!(vw > 0) || !(vh > 0)) {
+            return at;
+        }
+        String par = port.getPreserveAspectRatio() == null ? "" : port.getPreserveAspectRatio().trim();
+        double sx = port.getWidth() / vw;
+        double sy = port.getHeight() / vh;
+        if (!par.startsWith("none")) {
+            double s = par.endsWith("slice") ? Math.max(sx, sy) : Math.min(sx, sy);
+            double freeX = port.getWidth() - vw * s;
+            double freeY = port.getHeight() - vh * s;
+            at.translate(par.startsWith("xMin") ? 0 : (par.startsWith("xMax") ? freeX : freeX / 2),
+                    par.indexOf("YMin") >= 0 ? 0 : (par.indexOf("YMax") >= 0 ? freeY : freeY / 2));
+            sx = s;
+            sy = s;
+        }
+        at.scale(sx, sy);
+        at.translate(-port.getViewBoxX(), -port.getViewBoxY());
+        return at;
     }
 
     /// Where a `<use>` puts the element it draws: at its offset, and a
@@ -617,6 +658,17 @@ public final class VectorImage {
                 at.concatenate(new AffineTransform(t.a, t.b, t.c, t.d, t.e, t.f));
             }
             return at.createTransformedShape(box).getBounds2D();
+        }
+        if (node instanceof SVGViewport) {
+            // No more than its box, which is all of it that shows.
+            SVGViewport port = (SVGViewport) node;
+            Rectangle2D inside = boundsOf(port.getContent(), depth);
+            if (inside == null || !(port.getWidth() > 0) || !(port.getHeight() > 0)) {
+                return null;
+            }
+            Rectangle2D shown = layout(port).createTransformedShape(inside).getBounds2D().createIntersection(
+                    new Rectangle2D.Double(port.getX(), port.getY(), port.getWidth(), port.getHeight()));
+            return shown.isEmpty() ? null : shown;
         }
         if (node instanceof SVGClipPath || node instanceof SVGPattern) {
             return null;

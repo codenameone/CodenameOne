@@ -287,6 +287,24 @@ class BackgroundImagePainterTest {
     }
 
     @Test
+    void spacedTilesKeepTheirGapsWhenThereAreTooManyToDrawOneByOne() {
+        BufferedImage bar = new BufferedImage(30, 1, BufferedImage.TYPE_INT_ARGB);
+        for (int x = 0; x < 30; x++) {
+            bar.setRGB(x, 0, RED);
+        }
+        // Three across with 5px between them, and 4500 rows of that.
+        BufferedImage img = paint(BoxStyle.builder().size(100, 4500).backgroundImage(
+                new BackgroundImage(bar).withFit(BackgroundImage.Fit.SPACE, BackgroundImage.Fit.NONE)));
+        for (int y : new int[] {0, 2000, 4499}) {
+            assertPixel(RED, img, 10, y);
+            assertTransparent(img, 32, y);
+            assertPixel(RED, img, 50, y);
+            assertTransparent(img, 67, y);
+            assertPixel(RED, img, 90, y);
+        }
+    }
+
+    @Test
     void tilesTooSmallToCountAreStillPaintedPromptly() {
         // Both tile counts are past what a long holds, and their product
         // wraps around to something small.
