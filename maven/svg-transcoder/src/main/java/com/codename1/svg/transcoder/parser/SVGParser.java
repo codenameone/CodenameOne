@@ -523,6 +523,9 @@ public final class SVGParser {
         return image;
     }
 
+    // A percentage in the region of a mask, a filter or a pattern is a share
+    // of the viewport the definition is written in: the nested `<svg>` it is
+    // inside, when it is inside one, and not the whole drawing.
     private SVGClipPath readClipPath(XMLStreamReader r, SVGDocument doc, boolean mask) throws XMLStreamException {
         SVGClipPath cp = new SVGClipPath();
         Map<String, String> a = attrs(r);
@@ -538,10 +541,10 @@ public final class SVGParser {
         if (mask) {
             boolean user = "userSpaceOnUse".equals(a.get("maskUnits"));
             cp.setRegionUserSpace(user);
-            cp.setRegion(regionSide(a.get("x"), -0.1f, user, doc.getViewBoxWidth()),
-                    regionSide(a.get("y"), -0.1f, user, doc.getViewBoxHeight()),
-                    regionSide(a.get("width"), 1.2f, user, doc.getViewBoxWidth()),
-                    regionSide(a.get("height"), 1.2f, user, doc.getViewBoxHeight()));
+            cp.setRegion(regionSide(a.get("x"), -0.1f, user, viewportWidth),
+                    regionSide(a.get("y"), -0.1f, user, viewportHeight),
+                    regionSide(a.get("width"), 1.2f, user, viewportWidth),
+                    regionSide(a.get("height"), 1.2f, user, viewportHeight));
         }
         readChildren(r, cp, doc);
         return cp;
@@ -605,10 +608,10 @@ public final class SVGParser {
         f.setId(a.get("id"));
         boolean user = "userSpaceOnUse".equals(a.get("filterUnits"));
         f.setRegionUserSpace(user);
-        f.setRegion(regionSide(a.get("x"), -0.1f, user, doc.getViewBoxWidth()),
-                regionSide(a.get("y"), -0.1f, user, doc.getViewBoxHeight()),
-                regionSide(a.get("width"), 1.2f, user, doc.getViewBoxWidth()),
-                regionSide(a.get("height"), 1.2f, user, doc.getViewBoxHeight()));
+        f.setRegion(regionSide(a.get("x"), -0.1f, user, viewportWidth),
+                regionSide(a.get("y"), -0.1f, user, viewportHeight),
+                regionSide(a.get("width"), 1.2f, user, viewportWidth),
+                regionSide(a.get("height"), 1.2f, user, viewportHeight));
         f.setPrimitiveObjectBoundingBox("objectBoundingBox".equals(a.get("primitiveUnits")));
         String space = mergedValue(a, "color-interpolation-filters");
         f.setSrgb(space != null && "sRGB".equalsIgnoreCase(space.trim()));
@@ -647,15 +650,15 @@ public final class SVGParser {
         p.setTransform(null);
         boolean user = "userSpaceOnUse".equals(a.get("patternUnits"));
         if (a.containsKey("patternUnits")) { p.markGiven("patternUnits"); p.setUserSpace(user); }
-        if (a.containsKey("x")) { p.markGiven("x"); p.setX(patternSide(a.get("x"), user, doc.getViewBoxWidth())); }
-        if (a.containsKey("y")) { p.markGiven("y"); p.setY(patternSide(a.get("y"), user, doc.getViewBoxHeight())); }
+        if (a.containsKey("x")) { p.markGiven("x"); p.setX(patternSide(a.get("x"), user, viewportWidth)); }
+        if (a.containsKey("y")) { p.markGiven("y"); p.setY(patternSide(a.get("y"), user, viewportHeight)); }
         if (a.containsKey("width")) {
             p.markGiven("width");
-            p.setWidth(patternSide(a.get("width"), user, doc.getViewBoxWidth()));
+            p.setWidth(patternSide(a.get("width"), user, viewportWidth));
         }
         if (a.containsKey("height")) {
             p.markGiven("height");
-            p.setHeight(patternSide(a.get("height"), user, doc.getViewBoxHeight()));
+            p.setHeight(patternSide(a.get("height"), user, viewportHeight));
         }
         if (a.containsKey("patternContentUnits")) {
             p.markGiven("patternContentUnits");
@@ -884,7 +887,24 @@ public final class SVGParser {
                 if (family != null) child.setFontFamily(family.trim());
                 String size = mergedValue(a, "font-size");
                 if (size != null) {
-                    try { child.setFontSize(Float.valueOf(NumberParser.parseFloat(size))); } catch (RuntimeException ignored) { /* inherited */ }
+                    try {
+                        float given = NumberParser.parseFloat(size);
+                        // A share of the size the span is in, or so many
+                        // times it: half of 20 is 10, not 50.
+                        String unit = size.trim();
+                        float around = child.getFontSize() != null ? child.getFontSize().floatValue()
+                                : text.getFontSize() > 0 ? text.getFontSize() : 12f;
+                        if (unit.endsWith("%")) {
+                            given = given / 100 * around;
+                        } else if (unit.endsWith("rem")) {
+                            given = given * 16f;
+                        } else if (unit.endsWith("em")) {
+                            given = given * around;
+                        } else if (unit.endsWith("ex")) {
+                            given = given * around / 2;
+                        }
+                        child.setFontSize(Float.valueOf(given));
+                    } catch (RuntimeException ignored) { /* inherited */ }
                 }
                 String weight = mergedValue(a, "font-weight");
                 if (weight != null) {
@@ -1131,6 +1151,31 @@ public final class SVGParser {
                     + viewportHeight * (double) viewportHeight) / 2);
             n.getStyle().setStrokeWidth(Float.valueOf((float) (n.getStyle().getStrokeWidth().floatValue() / 100 * diagonal)));
         }
+        // So are the dashes and where they start.
+        String dashes = mergedValue(a, "stroke-dasharray");
+        float[] lengths = n.getStyle() == null ? null : n.getStyle().getStrokeDashArray();
+        if (dashes != null && dashes.indexOf('%') >= 0 && lengths != null && lengths.length > 0) {
+            String[] parts = dashes.trim().split("[\\s,]+");
+            // An odd list is stored written out twice.
+            float[] scaled = lengths.clone();
+            for (int i = 0; i < scaled.length && parts.length > 0; i++) {
+                if (parts[i % parts.length].endsWith("%")) {
+                    scaled[i] = (float) (scaled[i] / 100 * diagonal());
+                }
+            }
+            n.getStyle().setStrokeDashArray(scaled);
+        }
+        String dashOffset = mergedValue(a, "stroke-dashoffset");
+        if (dashOffset != null && dashOffset.trim().endsWith("%") && n.getStyle() != null
+                && n.getStyle().getStrokeDashOffset() != null) {
+            n.getStyle().setStrokeDashOffset(Float.valueOf(
+                    (float) (n.getStyle().getStrokeDashOffset().floatValue() / 100 * diagonal())));
+        }
+    }
+
+    /** What a percentage of a length that runs neither across nor down is a share of. */
+    private double diagonal() {
+        return Math.sqrt((viewportWidth * (double) viewportWidth + viewportHeight * (double) viewportHeight) / 2);
     }
 
     /** What the style attribute, with the stylesheet's rules folded in, declares for a property; null when it does not. */

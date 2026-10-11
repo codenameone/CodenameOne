@@ -1045,4 +1045,89 @@ class VectorImageTest {
         assertEquals(0xff000000, img.getRGB(62, 50), "nor does a print block");
         assertEquals(0xff0000ff, img.getRGB(87, 50), "a screen block does");
     }
+
+    @Test
+    void percentageDashesAreASharesOfTheDiagonal() throws Exception {
+        // 10% of a 200 by 100 viewport is 15.8: a dash ends there, not at 10.
+        VectorImage wide = read("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 200 100\">"
+                + "<line x1=\"0\" y1=\"50\" x2=\"200\" y2=\"50\" stroke=\"#ff0000\" stroke-width=\"10\""
+                + " stroke-dasharray=\"10% 10%\"/></svg>");
+        BufferedImage img = wide.paint(200, 100);
+        assertEquals(0xffff0000, img.getRGB(13, 50), "still inside the first dash");
+        assertEquals(0, alpha(img, 20, 50), "the gap after it");
+        assertEquals(0xffff0000, img.getRGB(36, 50), "the second dash");
+    }
+
+    @Test
+    void aSpanSizedInPartsOfItsTextIsThatMuchOfIt() throws Exception {
+        String font = " font-family=\"monospace\"";
+        BufferedImage half = paint("<text x=\"5\" y=\"50\" font-size=\"40\"" + font
+                + "><tspan font-size=\"50%\">MMM</tspan></text>", 100, 100);
+        BufferedImage twenty = paint("<text x=\"5\" y=\"50\" font-size=\"40\"" + font
+                + "><tspan font-size=\"20\">MMM</tspan></text>", 100, 100);
+        BufferedImage em = paint("<text x=\"5\" y=\"50\" font-size=\"40\"" + font
+                + "><tspan font-size=\"0.5em\">MMM</tspan></text>", 100, 100);
+        assertEquals(inkRight(twenty), inkRight(half), "half of 40");
+        assertEquals(inkRight(twenty), inkRight(em), "half an em of 40");
+    }
+
+    @Test
+    void aFilterRegionInANestedViewportIsMeasuredAgainstIt() throws Exception {
+        // The region is all of the nested viewport, 100 units, and not a
+        // tenth of it: the whole square is still there after the filter.
+        VectorImage image = read("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 10 10\">"
+                + "<svg width=\"10\" height=\"10\" viewBox=\"0 0 100 100\"><defs>"
+                + "<filter id=\"f\" filterUnits=\"userSpaceOnUse\" x=\"0\" y=\"0\" width=\"100%\" height=\"100%\">"
+                + "<feOffset dx=\"0\"/></filter></defs>"
+                + "<rect width=\"100\" height=\"100\" fill=\"#ff0000\" filter=\"url(#f)\"/></svg></svg>");
+        BufferedImage img = image.paint(100, 100);
+        assertEquals(0xffff0000, img.getRGB(5, 5));
+        assertEquals(0xffff0000, img.getRGB(90, 90), "inside a region as large as the nested viewport");
+    }
+
+    @Test
+    void aFloodOpacityWrittenAsAPercentageIsAFraction() throws Exception {
+        BufferedImage img = paint("<defs><filter id=\"f\" x=\"0\" y=\"0\" width=\"1\" height=\"1\""
+                + " color-interpolation-filters=\"sRGB\"><feFlood flood-color=\"#ff0000\" flood-opacity=\"50%\"/>"
+                + "</filter></defs><rect width=\"100\" height=\"100\" filter=\"url(#f)\"/>", 100, 100);
+        assertEquals(128, alpha(img, 50, 50), 2);
+    }
+
+    @Test
+    void anImageSaysHowTheFileItShowsIsFitted(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tmp)
+            throws Exception {
+        java.nio.file.Files.write(tmp.resolve("square.svg"), ("<svg xmlns=\"http://www.w3.org/2000/svg\""
+                + " viewBox=\"0 0 10 10\"><rect width=\"10\" height=\"10\" fill=\"#ff0000\"/></svg>")
+                .getBytes(StandardCharsets.UTF_8));
+        java.nio.file.Path main = tmp.resolve("main.svg");
+        java.nio.file.Files.write(main, ("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 200 200\">"
+                + "<image href=\"square.svg\" width=\"200\" height=\"100\" preserveAspectRatio=\"none\"/>"
+                + "<image href=\"square.svg\" y=\"100\" width=\"200\" height=\"100\"/></svg>")
+                .getBytes(StandardCharsets.UTF_8));
+        BufferedImage img;
+        try (java.io.InputStream in = java.nio.file.Files.newInputStream(main)) {
+            img = VectorImage.readSvg(in, main.toUri().toURL()).paint(200, 200);
+        }
+        assertEquals(0xffff0000, img.getRGB(10, 50), "stretched over the box, as the image asks");
+        assertEquals(0, alpha(img, 10, 150), "and kept square in the middle of it by default");
+        assertEquals(0xffff0000, img.getRGB(100, 150));
+    }
+
+    @Test
+    void aBlurWiderOneWayTurnsWithTheElement() throws Exception {
+        // Blurred along its own length only. Turned a quarter, that length
+        // runs down the image, so the bar spreads down and not across.
+        String defs = "<defs><filter id=\"f\" filterUnits=\"userSpaceOnUse\" x=\"-200\" y=\"-200\" width=\"400\""
+                + " height=\"400\"><feGaussianBlur stdDeviation=\"8 0\"/></filter></defs>";
+        BufferedImage img = paint(defs + "<rect x=\"-10\" y=\"-5\" width=\"20\" height=\"10\" fill=\"#ff0000\""
+                + " filter=\"url(#f)\" transform=\"translate(50 50) rotate(90)\"/>", 100, 100);
+        assertTrue(alpha(img, 50, 66) > 20, "spread along the bar, which now runs down");
+        assertEquals(0, alpha(img, 62, 50), "and not across it");
+
+        // Turned an eighth, it spreads along the diagonal and not off it.
+        BufferedImage slanted = paint(defs + "<rect x=\"-10\" y=\"-5\" width=\"20\" height=\"10\" fill=\"#ff0000\""
+                + " filter=\"url(#f)\" transform=\"translate(50 50) rotate(45)\"/>", 100, 100);
+        assertTrue(alpha(slanted, 62, 62) > 20, "along the diagonal");
+        assertTrue(alpha(slanted, 62, 38) < 5, "not across it");
+    }
 }

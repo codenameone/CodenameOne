@@ -106,6 +106,9 @@ public final class VectorImage {
     /// SVG with pictures of its own, and one that names itself would never
     /// end.
     private int fileDepth;
+    /// The `preserveAspectRatio` of the `<image>` this file is drawn by,
+    /// which takes the place of its own; null when it is drawn by none.
+    private String fitAs;
     private static final int MAX_FILE_DEPTH = 4;
 
     private VectorImage(SVGDocument doc, boolean scales) {
@@ -213,7 +216,8 @@ public final class VectorImage {
             if (scales) {
                 double vw = doc.getViewBoxWidth() > 0 ? doc.getViewBoxWidth() : getWidth();
                 double vh = doc.getViewBoxHeight() > 0 ? doc.getViewBoxHeight() : getHeight();
-                String par = doc.getPreserveAspectRatio() == null ? "" : doc.getPreserveAspectRatio().trim();
+                String par = fitAs != null ? fitAs.trim()
+                        : doc.getPreserveAspectRatio() == null ? "" : doc.getPreserveAspectRatio().trim();
                 double sx = width / vw;
                 double sy = height / vh;
                 double tx = 0;
@@ -611,6 +615,14 @@ public final class VectorImage {
             inner.fileDepth = fileDepth + 1;
             double pw = image.getWidth() > 0 ? image.getWidth() : inner.getWidth();
             double ph = image.getHeight() > 0 ? image.getHeight() : inner.getHeight();
+            if (!inner.scales) {
+                // No view box to fit: it is the size it says, and is laid
+                // in the box like any other picture.
+                return inner.paint(inner.getWidth(), inner.getHeight(), 4096);
+            }
+            // How it is fitted to the box is for the `<image>` to say. What
+            // the file's own root says is for when it is shown by itself.
+            inner.fitAs = image.getPreserveAspectRatio() == null ? "" : image.getPreserveAspectRatio();
             return inner.paint(pw, ph, 4096);
         } catch (IOException ex) {
             return null;

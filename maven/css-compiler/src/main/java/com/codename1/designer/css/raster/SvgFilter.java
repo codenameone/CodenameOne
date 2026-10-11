@@ -234,7 +234,8 @@ final class SvgFilter {
             double[] sd = numbers(p.get("stdDeviation"));
             double sdx = sd.length > 0 ? sd[0] : 0;
             double sdy = sd.length > 1 ? sd[1] : sdx;
-            return blur(input(p, "in", last, source, linear), sdx * ux, sdy * uy);
+            return blur(input(p, "in", last, source, linear), boxUnits ? sdx * box.getWidth() : sdx,
+                    boxUnits ? sdy * box.getHeight() : sdy);
         }
         if ("feOffset".equals(name)) {
             return offset(input(p, "in", last, source, linear), number(p, "dx", 0), number(p, "dy", 0));
@@ -268,7 +269,8 @@ final class SvgFilter {
             double[] sd = numbers(p.get("stdDeviation"));
             double sdx = sd.length > 0 ? sd[0] : 2;
             double sdy = sd.length > 1 ? sd[1] : sdx;
-            Plane shadow = offset(blur(alphaOf(in), sdx * ux, sdy * uy), number(p, "dx", 2), number(p, "dy", 2));
+            Plane shadow = offset(blur(alphaOf(in), boxUnits ? sdx * box.getWidth() : sdx,
+                    boxUnits ? sdy * box.getHeight() : sdy), number(p, "dx", 2), number(p, "dy", 2));
             Plane colour = flood(p.get("flood-color"), alpha(p, "flood-opacity"), linear);
             for (int i = 0; i < w * h; i++) {
                 float a = shadow.a[i];
@@ -427,7 +429,60 @@ final class SvgFilter {
         return out;
     }
 
-    private Plane blur(Plane in, double sx, double sy) {
+    /// Blurs by `dx` across and `dy` down in the element's coordinates.
+    ///
+    /// Those are not the rows and columns of the image when the element is
+    /// turned or sheared, and a blur wider one way than the other turns
+    /// with it. What the blur spreads by on the image is worked out whole,
+    /// as how far it goes along the rows, down the columns, and how much
+    /// the two lean together. Where they do not lean it is a blur along
+    /// each; where they do, it is one along the rows and one along a
+    /// slanted line, which together are the same spread.
+    private Plane blur(Plane in, double dx, double dy) {
+        if (dx < 0 || dy < 0 || (dx == 0 && dy == 0)) {
+            return copy(in);
+        }
+        double vx = dx * dx;
+        double vy = dy * dy;
+        double xx = at.getScaleX() * at.getScaleX() * vx + at.getShearX() * at.getShearX() * vy;
+        double yy = at.getShearY() * at.getShearY() * vx + at.getScaleY() * at.getScaleY() * vy;
+        double xy = at.getScaleX() * at.getShearY() * vx + at.getShearX() * at.getScaleY() * vy;
+        if (Math.abs(xy) < 1e-9 * Math.max(1e-12, Math.max(xx, yy)) || !(yy > 0)) {
+            return blurAlong(in, Math.sqrt(xx), Math.sqrt(yy));
+        }
+        Plane out = blurAlong(in, Math.sqrt(Math.max(0, xx - xy * xy / yy)), 0);
+        float[] k = GaussianBlur.kernel(Math.sqrt(yy));
+        int r = k.length / 2;
+        double lean = xy / yy;
+        for (int c = 0; c < 4; c++) {
+            float[] data = out.channel(c);
+            float[] src = data.clone();
+            for (int y = 0; y < h; y++) {
+                for (int x = 0; x < w; x++) {
+                    float sum = 0;
+                    for (int j = Math.max(-r, -y); j <= Math.min(r, h - 1 - y); j++) {
+                        double fx = x + lean * j;
+                        int x0 = (int) Math.floor(fx);
+                        float part = (float) (fx - x0);
+                        int row = (y + j) * w;
+                        float v = 0;
+                        if (x0 >= 0 && x0 < w) {
+                            v += src[row + x0] * (1 - part);
+                        }
+                        if (x0 + 1 >= 0 && x0 + 1 < w) {
+                            v += src[row + x0 + 1] * part;
+                        }
+                        sum += v * k[j + r];
+                    }
+                    data[y * w + x] = sum;
+                }
+            }
+        }
+        return out;
+    }
+
+    /// Blurs by `sx` pixels along the rows and `sy` down the columns.
+    private Plane blurAlong(Plane in, double sx, double sy) {
         Plane out = copy(in);
         if (sx < 0 || sy < 0 || (sx == 0 && sy == 0)) {
             return out;
@@ -1130,8 +1185,13 @@ final class SvgFilter {
     /// An opacity attribute, 1 when it is not given. `50%` is a half.
     private static float alpha(Primitive p, String attribute) {
         String value = p.get(attribute);
-        double v = number(p, attribute, 1);
-        return (float) (value != null && value.trim().endsWith("%") ? v / 100 : v);
+        if (value != null && value.trim().endsWith("%")) {
+            // The sign is taken off before the number is read, which with
+            // it on is no number at all.
+            double[] v = numbers(value.trim().substring(0, value.trim().length() - 1));
+            return v.length == 0 ? 1f : (float) (v[0] / 100);
+        }
+        return (float) number(p, attribute, 1);
     }
 
     private static double number(Primitive p, String attribute, double fallback) {
