@@ -274,6 +274,28 @@ public class FabRenderElement extends RenderElement {
     /** Material 3's FAB corner radius. */
     private static final double FAB_CORNER_LP = 16;
 
+    /**
+     * Whether the widget's own {@code icon:} constructor parameter is set -- Flutter's
+     * {@code FloatingActionButtonThemeData.extendedPadding}'s {@code hasChild} for an
+     * extended FAB, where {@code child} IS that {@code icon} parameter (see Dart's
+     * {@code FloatingActionButton.extended}, which forwards {@code icon} as {@code child}
+     * to the base constructor). Distinct from {@link #iconChar()}, which always falls
+     * back to a '+' glyph so this runtime never draws a blank extended FAB -- the
+     * padding asymmetry below is about what the WIDGET stated, not about whatever glyph
+     * ends up on screen (Reply's compose FAB states no {@code icon:} at all and embeds
+     * its own inside {@code label}'s Row instead, so {@code hasChild} is false for it).
+     */
+    private boolean hasIconParam() {
+        return fab().isExtended() && fab().getIcon() != null;
+    }
+
+    /** Flutter 3.35's {@code extendedPadding} end inset, on every extended FAB. */
+    private static final double EXTENDED_PADDING_END_LP = 20;
+    /** The start inset WITH an icon; without one it is the same as the end inset. */
+    private static final double EXTENDED_PADDING_START_WITH_ICON_LP = 16;
+    /** {@code extendedIconLabelSpacing}: the gap between the icon and the label. */
+    private static final double EXTENDED_ICON_LABEL_SPACING_LP = 8;
+
     private void applyStyle(Component c) {
         String label = labelText();
         if (c instanceof com.codename1.ui.Button) {
@@ -290,9 +312,24 @@ public class FabRenderElement extends RenderElement {
         all.setMargin(0, 0, 0, 0);
         if (label != null) {
             all.setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
-            int h = (int) Math.round(com.codename1.flutter.rendering.Dp.px(16));
+            // Material 3's extendedPadding (packages/flutter/lib/src/material/
+            // floating_action_button.dart, _FABDefaultsM3.extendedPadding):
+            // EdgeInsetsDirectional.only(start: 16, end: 20) with an icon, 20/20
+            // without -- never the symmetric 16/16 this used to paint, which is why
+            // the gallery's floating "Back" pill (which DOES state an icon:) measured
+            // narrower than the reference on its leading edge.
+            int start = (int) Math.round(com.codename1.flutter.rendering.Dp.px(
+                    hasIconParam() ? EXTENDED_PADDING_START_WITH_ICON_LP : EXTENDED_PADDING_END_LP));
+            int end = (int) Math.round(com.codename1.flutter.rendering.Dp.px(EXTENDED_PADDING_END_LP));
             int v = (int) Math.round(com.codename1.flutter.rendering.Dp.px(12));
-            all.setPadding(v, v, h, h);
+            all.setPadding(v, v, start, end);
+            // extendedIconLabelSpacing: Flutter inserts this as a SizedBox between the
+            // icon and the label inside the pill's Row; this runtime draws both as one
+            // CN1 Button's native icon+text, so the equivalent is the Button's own gap.
+            if (c instanceof com.codename1.ui.Button) {
+                ((com.codename1.ui.Button) c).setGap((int) Math.round(
+                        com.codename1.flutter.rendering.Dp.px(EXTENDED_ICON_LABEL_SPACING_LP)));
+            }
             com.codename1.ui.plaf.Border b = all.getBorder();
             if (b instanceof com.codename1.ui.plaf.RoundBorder) {
                 all.setBorder(((com.codename1.ui.plaf.RoundBorder) b).rectangle(true));

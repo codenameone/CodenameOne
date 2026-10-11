@@ -1005,12 +1005,36 @@ public class TextFieldRenderElement extends RenderElement {
      * into it still focuses it and typing still works.</p>
      */
     private void releaseUnrequestedFocus(com.codename1.ui.TextField tf) {
+        releaseUnrequestedFocus(tf, 2);
+    }
+
+    /**
+     * {@code releaseUnrequestedFocus(TextField)}'s retrying form, bounded the same way
+     * {@link #focusField(int)} already is for the mirror-image problem.
+     *
+     * <p>The ONLY caller, {@code apply(TextField)}, runs from {@code createComponent()}
+     * -- before this element is mounted into the render tree its {@code Component} is
+     * attached through, so {@code tf.getComponentForm()} is reliably null right there.
+     * {@code apply} runs again on every {@code updateComponent}, which used to be
+     * "the next apply" this retried on -- but a STATIC page (Shrine's login, never
+     * rebuilt once shown) never calls it again, so the release never happened and the
+     * form's own arrival focus stuck, caret and all, for the rest of the page's life.</p>
+     */
+    private void releaseUnrequestedFocus(final com.codename1.ui.TextField tf, final int retries) {
         if (focusReleased || touched) {
             return;
         }
         try {
             com.codename1.ui.Form f = tf.getComponentForm();
             if (f == null) {
+                if (retries > 0 && Display.isInitialized()) {
+                    Display.getInstance().callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            releaseUnrequestedFocus(tf, retries - 1);
+                        }
+                    });
+                }
                 return;
             }
             focusReleased = true;
@@ -1018,7 +1042,8 @@ public class TextFieldRenderElement extends RenderElement {
                 f.setFocused(null);
             }
         } catch (Throwable noForm) {
-            // not on a form yet: the next apply tries again
+            // not on a form yet and even the retry above could not tell: give up
+            // rather than risk looping on an exception that keeps recurring
         }
     }
 

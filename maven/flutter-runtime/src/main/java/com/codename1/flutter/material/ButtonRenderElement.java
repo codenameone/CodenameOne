@@ -596,10 +596,10 @@ public class ButtonRenderElement extends RenderElement {
      * -- the only caller that ever states one, Material's own {@code styleFrom} call
      * sites in this gallery never do -- composed onto a Material button role's capsule
      * padding (24lp/10lp, or TextButton's halved 12lp/10lp) instead of Flutter's own
-     * {@code _kButtonPadding} (16 on every side) / {@code _kBackgroundButtonPadding} (64
-     * horizontal, 14 vertical). An explicit padding REPLACES the role's own outright --
-     * TextButton's horizontal halving is a Material convention for an UNSTATED padding,
-     * not something a stated one is still subject to.</p>
+     * {@code kCupertinoButtonPadding} (see CupertinoButton's class comment for the exact
+     * numbers, which moved again in 3.35). An explicit padding REPLACES the role's own
+     * outright -- TextButton's horizontal halving is a Material convention for an
+     * UNSTATED padding, not something a stated one is still subject to.</p>
      *
      * <p>Only the top/left are read: every padding this runtime actually produces
      * (the Material role defaults above, Cupertino's two) is symmetric per axis, so a
@@ -763,7 +763,35 @@ public class ButtonRenderElement extends RenderElement {
         com.codename1.ui.plaf.RoundRectBorder border =
                 com.codename1.ui.plaf.RoundRectBorder.create()
                         .useCache(false)
-                        .cornerRadius(Dp.mm(radiusLp));
+                        .cornerRadius(Dp.mm(radiusLp))
+                        // RoundRectBorder's OWN default shadowSpread is density-squared, not
+                        // density-linear like every other measurement here: its constructor
+                        // seeds the field with Display.convertToPixels(0.2f) -- a PIXEL count
+                        // -- but paintBorderBackground() always re-reads the field through
+                        // convertToPixels() AGAIN, as though it were millimetres (the class's
+                        // own comment above the field says this is deliberate -- "borders that
+                        // follow the CSS box model do not reserve any spread" is the one
+                        // escape, which this border does not take -- and that fixing the
+                        // shared default would reshadow every hand-written RoundRectBorder in
+                        // the tree, so it stays). Left alone, that is what collapsed Shrine's
+                        // "NEXT": measured under the test suite's own density bucket, the
+                        // unset default comes back as 20 device px of spread subtracted from
+                        // BOTH dimensions of an 80x42 button -- paintBorderBackground's
+                        // createTargetComponentImage shrinks the painted fill to a 60x22 box
+                        // offset by (10,10), eating very nearly half the button's own height,
+                        // and at a higher-density bucket the SQUARED growth pushes the fill
+                        // height negative outright: no pill left to see, just the shadow
+                        // gradient at roughly the full button size with the native label (laid
+                        // out independently, at the button's own correct, un-shrunk bounds)
+                        // reading as if it had been pushed out from under it. The float (mm)
+                        // overload stores its argument directly with no such re-reading, so
+                        // stating ONE explicit millimetre here -- a visible spread, matching
+                        // the order of magnitude #style's own un-shaped ElevatedButton branch
+                        // already gets from RoundBorder's correctly single-converted 2mm
+                        // default -- fixes the growth to linear without touching the shared
+                        // class, same as CupertinoButton.filled already pins its own shape
+                        // parameters locally rather than relying on a border's defaults.
+                        .shadowSpread(1f);
         if (w instanceof OutlinedButton) {
             all.setFgColor(fg.rgb());
             border = border.stroke(Dp.mm(0.3), true).strokeColor(fg.rgb())

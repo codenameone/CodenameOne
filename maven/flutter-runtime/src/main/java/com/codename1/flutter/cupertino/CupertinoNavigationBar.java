@@ -45,6 +45,7 @@ public class CupertinoNavigationBar extends StatelessWidget {
     private Widget trailing;
     private Color backgroundColor;
     private boolean automaticallyImplyLeading = true;
+    private boolean automaticBackgroundVisibility = true;
 
     /**
      * The iOS bar's own defaults, so the material {@code AppBarTheme} never
@@ -101,6 +102,10 @@ public class CupertinoNavigationBar extends StatelessWidget {
         this.backgroundColor = v;
     }
 
+    public void automaticBackgroundVisibility(boolean v) {
+        this.automaticBackgroundVisibility = v;
+    }
+
     public void brightness(Object v) {
     }
 
@@ -120,8 +125,7 @@ public class CupertinoNavigationBar extends StatelessWidget {
             bar.title(middle);
         }
         bar.centerTitle(true);
-        bar.backgroundColor(backgroundColor != null
-                ? backgroundColor : new Color(BAR_BACKGROUND));
+        bar.backgroundColor(resolveBackgroundColor(context));
         bar.foregroundColor(new Color(BAR_FOREGROUND));
         TextStyle title = new TextStyle();
         title.fontSize(TITLE_SIZE);
@@ -139,5 +143,45 @@ public class CupertinoNavigationBar extends StatelessWidget {
             bar.actions(actions);
         }
         return bar;
+    }
+
+    /**
+     * Flutter's {@code automaticBackgroundVisibility} (default true,
+     * packages/flutter/lib/src/cupertino/nav_bar.dart): inside a {@code
+     * CupertinoPageScaffold}, the bar's background (and bottom border --
+     * {@code _kTransparentNavBarBorder}, which this runtime has nothing to
+     * suppress since it never paints a Cupertino border of its own, only the
+     * composed {@link AppBar}'s) stays transparent until content scrolls
+     * under it, instead of the stated/default {@code backgroundColor}
+     * painting immediately.
+     *
+     * <p>Flutter tracks that scroll offset itself ({@code
+     * _CupertinoNavigationBarState}'s scroll-notification listener, which
+     * needs a {@code PrimaryScrollController} this runtime's {@code Scaffold}
+     * composition does not wire up) and lerps the fill between the page's
+     * own background colour and {@code backgroundColor} as it grows; this
+     * runtime has no cheap way to observe that from here, so it only
+     * reproduces the REST state -- fully transparent, matching the gallery's
+     * reference screenshots, which never scroll content under a nav bar --
+     * and stays that way rather than flipping opaque once a real scroll
+     * happens. A real scroll-under re-opacifying the bar is NOT implemented.</p>
+     *
+     * <p>{@code automaticBackgroundVisibility} is true by default for either
+     * the default or an explicit {@code backgroundColor} (Flutter applies
+     * the SAME lerp regardless of which one it holds), and has no effect at
+     * all outside a {@code CupertinoPageScaffold} -- exactly Flutter's own
+     * rule -- which {@link #build} with a null {@code context} (every bare,
+     * unmounted-widget test in this package) also satisfies, since there is
+     * then no ancestor to find.</p>
+     */
+    private Color resolveBackgroundColor(BuildContext context) {
+        Color resolved = backgroundColor != null ? backgroundColor : new Color(BAR_BACKGROUND);
+        if (!automaticBackgroundVisibility || context == null) {
+            return resolved;
+        }
+        if (context.findAncestorWidgetOfExactType(CupertinoPageScaffold.class) == null) {
+            return resolved;
+        }
+        return new Color(0x00000000L);
     }
 }

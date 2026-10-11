@@ -57,25 +57,43 @@ import dart.runtime.Funcs;
  * Flutter's CupertinoButton never casts a shadow, unlike the Material
  * {@link ElevatedButton} it is composed onto here.</p>
  *
- * <p>Size follows the same source, {@code _kButtonPadding}/{@code
- * _kBackgroundButtonPadding} and {@code kMinInteractiveDimensionCupertino} (44,
- * square), and the label's font is {@code CupertinoTheme.of(context).textTheme
- * .actionTextStyle} (17 logical pixels) -- composed onto the Material button
- * through {@link ButtonStyle}'s padding/textStyle/minimumSize, which a plain
- * Material button never states and so never sees.</p>
+ * <p>Size follows the same source, {@code kCupertinoButtonPadding}/{@code
+ * kCupertinoButtonSizeBorderRadius}/{@code kCupertinoButtonMinSize} (all keyed
+ * by {@code sizeStyle}, packages/flutter/lib/src/cupertino/constants.dart) --
+ * this runtime never states a {@code sizeStyle}, matching Flutter's own
+ * un-stated default of {@code CupertinoButtonSize.large} -- and the label's
+ * font is {@code CupertinoTheme.of(context).textTheme.actionTextStyle} (17
+ * logical pixels) -- composed onto the Material button through {@link
+ * ButtonStyle}'s padding/textStyle/minimumSize, which a plain Material
+ * button never states and so never sees.</p>
  */
 public class CupertinoButton extends StatelessWidget {
 
-    /** Flutter's default {@code CupertinoButton.borderRadius}: 8 logical pixels. */
-    private static final double DEFAULT_RADIUS_LP = 8;
+    /**
+     * {@code kCupertinoButtonSizeBorderRadius[CupertinoButtonSize.large]}:
+     * {@code BorderRadius.circular(12)}. Flutter 3.35 replaced the single
+     * {@code borderRadius: 8} default with this per-size map; large is the
+     * un-stated {@code sizeStyle} default both constructors fall back to.
+     */
+    private static final double DEFAULT_RADIUS_LP = 12;
 
-    /** {@code _kButtonPadding}: the unfilled form's default, on every side. */
-    private static final double DEFAULT_PADDING_LP = 16;
-    /** {@code _kBackgroundButtonPadding}.horizontal. */
-    private static final double FILLED_PADDING_H_LP = 64;
-    /** {@code _kBackgroundButtonPadding}.vertical. */
-    private static final double FILLED_PADDING_V_LP = 14;
-    /** {@code kMinInteractiveDimensionCupertino}: every Cupertino control's floor. */
+    /**
+     * {@code kCupertinoButtonPadding[CupertinoButtonSize.large]}:
+     * {@code EdgeInsets.symmetric(vertical: 16, horizontal: 20)}. Flutter 3.35
+     * replaced the separate {@code _kButtonPadding} (all 16, unfilled) /
+     * {@code _kBackgroundButtonPadding} (64 horizontal, 14 vertical, filled)
+     * constants with this ONE per-size map, read the same way regardless of
+     * {@code _style} (plain/tinted/filled) -- so the filled and unfilled forms
+     * now share the exact same default padding.
+     */
+    private static final double PADDING_H_LP = 20;
+    private static final double PADDING_V_LP = 16;
+    /**
+     * {@code kCupertinoButtonMinSize[CupertinoButtonSize.large]}: 44, the same
+     * value {@code kMinInteractiveDimensionCupertino} used to supply directly
+     * (that constant is now only the map's own fallback for a null entry, per
+     * {@code _CupertinoButtonState.build}'s {@code ConstrainedBox}).
+     */
     private static final double MIN_INTERACTIVE_LP = 44;
 
     private Funcs.VoidFunc0 onPressed;
@@ -177,21 +195,30 @@ public class CupertinoButton extends StatelessWidget {
         return b;
     }
 
-    /** The caller's own padding when it is a plain (non-directional) one, or {@code _kButtonPadding}. */
+    /**
+     * The caller's own padding when it is a plain (non-directional) one, or
+     * {@code kCupertinoButtonPadding[CupertinoButtonSize.large]}. Shared with
+     * {@link #filledPadding()} -- Flutter's own map does not vary by {@code
+     * _style} -- kept as two methods only because the unfilled/filled
+     * branches in {@link #build} already read two differently-named ones.
+     */
     private com.codename1.flutter.EdgeInsets plainPadding() {
         return padding instanceof com.codename1.flutter.EdgeInsets
                 ? (com.codename1.flutter.EdgeInsets) padding
-                : com.codename1.flutter.EdgeInsets.all(DEFAULT_PADDING_LP);
+                : com.codename1.flutter.EdgeInsets.symmetric(PADDING_H_LP, PADDING_V_LP);
     }
 
-    /** The caller's own padding when stated, or {@code _kBackgroundButtonPadding}. */
+    /** The caller's own padding when stated, or {@code kCupertinoButtonPadding[CupertinoButtonSize.large]}. */
     private com.codename1.flutter.EdgeInsets filledPadding() {
         return padding instanceof com.codename1.flutter.EdgeInsets
                 ? (com.codename1.flutter.EdgeInsets) padding
-                : com.codename1.flutter.EdgeInsets.symmetric(FILLED_PADDING_H_LP, FILLED_PADDING_V_LP);
+                : com.codename1.flutter.EdgeInsets.symmetric(PADDING_H_LP, PADDING_V_LP);
     }
 
-    /** {@code BorderRadius.circular(8)}, matching the un-stated {@code borderRadius}. */
+    /**
+     * {@code BorderRadius.circular(12)}, matching the un-stated {@code borderRadius}
+     * ({@code kCupertinoButtonSizeBorderRadius[CupertinoButtonSize.large]}).
+     */
     private RoundedRectangleBorder filledShape() {
         RoundedRectangleBorder shape = new RoundedRectangleBorder();
         shape.borderRadius(BorderRadius.circular(DEFAULT_RADIUS_LP));

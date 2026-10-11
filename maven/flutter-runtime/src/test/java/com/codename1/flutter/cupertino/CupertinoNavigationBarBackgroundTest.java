@@ -23,8 +23,13 @@
  */
 package com.codename1.flutter.cupertino;
 
+import com.codename1.flutter.BuildContext;
+import com.codename1.flutter.BuildOwner;
+import com.codename1.flutter.StatelessWidget;
 import com.codename1.flutter.Widget;
 import com.codename1.flutter.material.AppBar;
+import com.codename1.flutter.rendering.RenderHost;
+import com.codename1.flutter.testsupport.ProbeBox;
 import com.codename1.flutter.widgets.Text;
 
 import org.junit.jupiter.api.Test;
@@ -63,5 +68,79 @@ class CupertinoNavigationBarBackgroundTest {
 
         Widget built = bar.build(null);
         assertEquals(custom.value(), ((AppBar) built).getBackgroundColor().value());
+    }
+
+    // ------------------------------------------------------------------
+    // automaticBackgroundVisibility (default true, Flutter 3.35,
+    // packages/flutter/lib/src/cupertino/nav_bar.dart): see
+    // CupertinoNavigationBar.resolveBackgroundColor's own doc comment for the
+    // Flutter mechanism and what this runtime does not reproduce (scroll-under).
+    // ------------------------------------------------------------------
+
+    /** Captures the BuildContext a CupertinoPageScaffold mounts its navigationBar with. */
+    private static final class ContextProbe extends StatelessWidget {
+        BuildContext captured;
+
+        @Override
+        public Widget build(BuildContext context) {
+            captured = context;
+            return new ProbeBox(0, 0);
+        }
+    }
+
+    /** A BuildContext whose nearest CupertinoPageScaffold ancestor is {@code scaffold}. */
+    private static BuildContext insideScaffoldContext() {
+        CupertinoPageScaffold scaffold = new CupertinoPageScaffold();
+        ContextProbe probe = new ContextProbe();
+        scaffold.navigationBar(probe);
+        com.codename1.flutter.FlutterUI.mount(scaffold, new RenderHost(), new BuildOwner());
+        return probe.captured;
+    }
+
+    @Test
+    void atRestInsideAScaffoldTheDefaultBackgroundIsFullyTransparent() {
+        CupertinoNavigationBar bar = new CupertinoNavigationBar();
+        bar.middle((Widget) new Text("Buttons"));
+
+        Widget built = bar.build(insideScaffoldContext());
+        com.codename1.flutter.Color bg = ((AppBar) built).getBackgroundColor();
+        assertEquals(0, bg.alpha(), "transparent at rest, matching the reference's "
+                + "no-content-scrolled-under state (CupertinoPageScaffold bodies in this "
+                + "gallery never scroll content under the bar)");
+    }
+
+    @Test
+    void atRestInsideAScaffoldAnExplicitBackgroundColorIsStillOverriddenTransparent() {
+        // Flutter's automaticBackgroundVisibility lerps the SAME way whether
+        // backgroundColor is the default or an explicit override -- it decides
+        // whether to show backgroundColor at all, not which one to pick.
+        CupertinoNavigationBar bar = new CupertinoNavigationBar();
+        bar.backgroundColor(new com.codename1.flutter.Color(0xFF00FF00L));
+
+        Widget built = bar.build(insideScaffoldContext());
+        assertEquals(0, ((AppBar) built).getBackgroundColor().alpha());
+    }
+
+    @Test
+    void automaticBackgroundVisibilityFalseKeepsTheBarAlwaysOpaque() {
+        CupertinoNavigationBar bar = new CupertinoNavigationBar();
+        bar.automaticBackgroundVisibility(false);
+
+        Widget built = bar.build(insideScaffoldContext());
+        assertEquals(0xF0F9F9F9L, ((AppBar) built).getBackgroundColor().value(),
+                "false means ALWAYS use backgroundColor, per Flutter's own doc");
+    }
+
+    @Test
+    void outsideAScaffoldAutomaticBackgroundVisibilityHasNoEffect() {
+        // Flutter's own rule: "If the navigation bar is not a child of a
+        // CupertinoPageScaffold, this has no effect." build(null) -- every other
+        // test in this file -- has no ancestor at all, so it already covers this;
+        // this test names the rule explicitly rather than relying on that as a
+        // side effect of context being null.
+        CupertinoNavigationBar bar = new CupertinoNavigationBar();
+
+        Widget built = bar.build(null);
+        assertEquals(0xF0F9F9F9L, ((AppBar) built).getBackgroundColor().value());
     }
 }

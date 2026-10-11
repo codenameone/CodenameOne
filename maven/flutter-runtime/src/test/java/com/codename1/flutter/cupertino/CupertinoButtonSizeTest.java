@@ -87,7 +87,7 @@ class CupertinoButtonSizeTest {
     }
 
     @Test
-    void unfilledGetsSixteenPixelPaddingAndSeventeenPointLabel() {
+    void unfilledGetsTwentyBySixteenPaddingAndSeventeenPointLabel() {
         CupertinoButton b = new CupertinoButton();
         b.onPressed(() -> { });
         b.child(new Text("Button"));
@@ -96,29 +96,36 @@ class CupertinoButtonSizeTest {
         Component c = el.component();
         assertNotNull(c, "RasterDisplay gives createComponent a real Button");
         Style s = c.getUnselectedStyle();
-        int expected16 = (int) Math.round(Dp.px(16));
-        assertEquals(expected16, s.getPaddingTop());
-        assertEquals(expected16, s.getPaddingBottom());
-        assertEquals(expected16, s.getPaddingLeftNoRTL());
-        assertEquals(expected16, s.getPaddingRightNoRTL());
+        // kCupertinoButtonPadding[CupertinoButtonSize.large] (Flutter 3.35):
+        // vertical 16, horizontal 20.
+        int expectedV = (int) Math.round(Dp.px(16));
+        int expectedH = (int) Math.round(Dp.px(20));
+        assertEquals(expectedV, s.getPaddingTop());
+        assertEquals(expectedV, s.getPaddingBottom());
+        assertEquals(expectedH, s.getPaddingLeftNoRTL());
+        assertEquals(expectedH, s.getPaddingRightNoRTL());
         assertEquals((float) Dp.px(17), s.getFont().getPixelSize(), 0.01f);
     }
 
     @Test
-    void filledGetsSixtyFourBySeventeenPaddingAndFortyFourMinimum() {
+    void filledGetsTwentyBySixteenPaddingAndFortyFourMinimum() {
         CupertinoButton b = CupertinoButton.filled(null, () -> { }, new Text("With Background"));
 
         ButtonRenderElement el = mount(b);
         Component c = el.component();
         assertNotNull(c);
         Style s = c.getUnselectedStyle();
-        assertEquals((int) Math.round(Dp.px(14)), s.getPaddingTop());
-        assertEquals((int) Math.round(Dp.px(14)), s.getPaddingBottom());
-        assertEquals((int) Math.round(Dp.px(64)), s.getPaddingLeftNoRTL());
-        assertEquals((int) Math.round(Dp.px(64)), s.getPaddingRightNoRTL());
+        // Same kCupertinoButtonPadding[CupertinoButtonSize.large] map the unfilled
+        // form reads -- Flutter 3.35 no longer gives the filled form its own, much
+        // wider default.
+        assertEquals((int) Math.round(Dp.px(16)), s.getPaddingTop());
+        assertEquals((int) Math.round(Dp.px(16)), s.getPaddingBottom());
+        assertEquals((int) Math.round(Dp.px(20)), s.getPaddingLeftNoRTL());
+        assertEquals((int) Math.round(Dp.px(20)), s.getPaddingRightNoRTL());
 
-        // kMinInteractiveDimensionCupertino (44, SQUARE) -- not Material 3's 64x40 --
-        // read from performLayout, not from the style, since it is a layout floor.
+        // kCupertinoButtonMinSize[CupertinoButtonSize.large] (44, SQUARE) -- not
+        // Material 3's 64x40 -- read from performLayout, not from the style, since
+        // it is a layout floor.
         com.codename1.flutter.rendering.Size laidOut = el.layout(
                 com.codename1.flutter.rendering.BoxConstraints.loose(1000, 1000));
         assertTrue(laidOut.height() >= Dp.px(44) - 0.5,

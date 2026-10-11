@@ -152,47 +152,54 @@ class CupertinoButtonThemeTest {
         assertEquals(CupertinoColors.white.value(), st.getForegroundColor().value());
         assertEquals(0.0, st.getElevation(), 0.0, "filled is still a flat Cupertino fill, no shadow");
 
-        // Flutter's un-stated CupertinoButton.borderRadius default: circular(8).
+        // Flutter 3.35's un-stated CupertinoButton.borderRadius default:
+        // kCupertinoButtonSizeBorderRadius[CupertinoButtonSize.large] = circular(12).
         assertTrue(st.getShape() instanceof RoundedRectangleBorder);
         Object radius = ((RoundedRectangleBorder) st.getShape()).getBorderRadius();
         assertTrue(radius instanceof BorderRadius);
-        assertEquals(8.0, ((BorderRadius) radius).topLeft().x(), 0.001);
+        assertEquals(12.0, ((BorderRadius) radius).topLeft().x(), 0.001);
     }
 
     // ------------------------------------------------------------------
-    // Size: _kButtonPadding / _kBackgroundButtonPadding, actionTextStyle,
-    // kMinInteractiveDimensionCupertino -- see CupertinoButton's own class
-    // comment for the Flutter source each one matches.
+    // Size: kCupertinoButtonPadding, actionTextStyle, kCupertinoButtonMinSize
+    // -- see CupertinoButton's own class comment for the Flutter source each
+    // one matches.
     // ------------------------------------------------------------------
 
     @Test
-    void unfilledPadsSixteenOnEverySide() {
+    void unfilledPadsTwentyHorizontalSixteenVertical() {
         CupertinoButton b = new CupertinoButton();
         b.onPressed(() -> { });
         b.child(new Text("Button"));
 
         ButtonStyle st = styleOf(b.build(bareContext()));
         com.codename1.flutter.EdgeInsets pad = st.getPadding();
+        // kCupertinoButtonPadding[CupertinoButtonSize.large]: vertical 16, horizontal 20
+        // (Flutter 3.35, packages/flutter/lib/src/cupertino/constants.dart) -- read the
+        // same way for every _style, so unfilled and filled now match exactly.
         assertEquals(16.0, pad.top(), 0.001);
         assertEquals(16.0, pad.bottom(), 0.001);
-        assertEquals(16.0, pad.left(), 0.001);
-        assertEquals(16.0, pad.right(), 0.001);
+        assertEquals(20.0, pad.left(), 0.001);
+        assertEquals(20.0, pad.right(), 0.001);
         assertEquals(17.0, st.getTextStyle().getFontSize(), 0.001, "actionTextStyle is 17pt");
-        assertEquals(44.0, st.getMinimumSize(), 0.001, "kMinInteractiveDimensionCupertino");
+        assertEquals(44.0, st.getMinimumSize(), 0.001, "kCupertinoButtonMinSize[large]");
     }
 
     @Test
-    void filledPadsSixtyFourHorizontalFourteenVertical() {
+    void filledPadsTwentyHorizontalSixteenVertical() {
         CupertinoButton b = CupertinoButton.filled(null, () -> { }, new Text("With Background"));
 
         ButtonStyle st = styleOf(b.build(bareContext()));
         com.codename1.flutter.EdgeInsets pad = st.getPadding();
-        assertEquals(14.0, pad.top(), 0.001);
-        assertEquals(14.0, pad.bottom(), 0.001);
-        assertEquals(64.0, pad.left(), 0.001);
-        assertEquals(64.0, pad.right(), 0.001);
+        // Same kCupertinoButtonPadding[CupertinoButtonSize.large] map as unfilled --
+        // Flutter 3.35 dropped the old, much wider _kBackgroundButtonPadding (64
+        // horizontal, 14 vertical) that only the filled constructor used to read.
+        assertEquals(16.0, pad.top(), 0.001);
+        assertEquals(16.0, pad.bottom(), 0.001);
+        assertEquals(20.0, pad.left(), 0.001);
+        assertEquals(20.0, pad.right(), 0.001);
         assertEquals(17.0, st.getTextStyle().getFontSize(), 0.001, "actionTextStyle is 17pt");
-        assertEquals(44.0, st.getMinimumSize(), 0.001, "kMinInteractiveDimensionCupertino");
+        assertEquals(44.0, st.getMinimumSize(), 0.001, "kCupertinoButtonMinSize[large]");
     }
 
     @Test
