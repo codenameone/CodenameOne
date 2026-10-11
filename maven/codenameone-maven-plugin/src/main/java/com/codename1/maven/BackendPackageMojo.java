@@ -57,11 +57,9 @@ import java.util.List;
  *
  * What it does, in order:
  *
- * 1. Compiles the module's sources together with the backend runtime's SHARED and
- *    PARPARVM halves against the ParparVM JavaAPI as the BOOTCLASSPATH. That last
- *    part is the important one: the bootclasspath IS the server-safe surface, so a
- *    reference to something the translated runtime does not have fails here, in
- *    the IDE and in the build, rather than at link time or in production.
+ * 1. Compiles the backend runtime at Java 8 and the module's sources at their
+ *    configured Java level. Checks application bytecode against the ParparVM
+ *    JavaAPI before translation so unsupported JDK API references fail early.
  * 2. Runs the translator over the result, with the runtime's C sources already in
  *    the source root -- they have to be there BEFORE it runs, because a native's
  *    Java method is kept alive by its C symbol being present.
@@ -90,11 +88,17 @@ public class BackendPackageMojo extends AbstractMojo {
     @Parameter(defaultValue = "${reactorProjects}", readonly = true)
     private java.util.List<MavenProject> reactorProjects;
 
+    @Parameter(defaultValue = "${session}", readonly = true, required = true)
+    private org.apache.maven.execution.MavenSession session;
+
     @Parameter(defaultValue = "${localRepository}", readonly = true, required = true)
     private ArtifactRepository localRepository;
 
     @Component
     private RepositorySystem repositorySystem;
+
+    @Component
+    private org.eclipse.aether.RepositorySystem processorRepositorySystem;
 
     /**
      * The class whose main() becomes the program's entry point.
@@ -133,9 +137,8 @@ public class BackendPackageMojo extends AbstractMojo {
     /**
      * The JDK 8 this goal used to require.
      *
-     * Kept, and still honoured, because projects and CI jobs are setting it. It is
-     * no longer a requirement: with neither this nor cn1.backend.jdk set, the JDK
-     * running Maven is what compiles and translates.
+     * Honoured for Java 8 applications and tests. Modern source levels use the
+     * JDK running Maven unless cn1.backend.jdk explicitly selects another JDK.
      */
     @Parameter(property = "cn1.backend.jdk8", defaultValue = "${env.JDK_8_HOME}")
     private String jdk8Home;
@@ -212,7 +215,7 @@ public class BackendPackageMojo extends AbstractMojo {
     }
 
     /** The engine packager, answering from this mojo's project and parameters. */
-    private BackendPackager packager() {
+    private BackendPackager packager() throws MojoExecutionException {
         BackendPackager p = new BackendPackager(new MavenModuleHost(project, MavenLog.of(getLog()))) {
             @Override
             protected String binaryName() {
@@ -244,8 +247,229 @@ public class BackendPackageMojo extends AbstractMojo {
                 }
             }
         };
+        configureJavaLevel(p, project,
+                session == null ? new java.util.Properties() : session.getUserProperties());
+        if (project != null) p.compilerOptions(resolvedCompilerOptions(project,
+                session == null ? new java.util.Properties() : session.getUserProperties(), false,
+                processorRepositorySystem, session == null ? null : session.getRepositorySession()));
         return p.mainClass(mainClass).output(output).target(target).jdk(jdkHome, jdk8Home).cflags(cflags)
                 .sqlite(sqlite).checkedCasts(checkedCasts).devTools(devTools);
+    }
+
+    static void configureJavaLevel(BackendPackager packager, MavenProject project,
+            java.util.Properties userProperties) {
+        if (project == null) return;
+        packager.javaLevel(compilerOption(project, userProperties, "source", false),
+                compilerOption(project, userProperties, "target", false),
+                compilerOption(project, userProperties, "release", false));
+        packager.compilerOptions(compilerOptions(project, userProperties, false));
+        packager.generatedSources(java.util.Collections.singletonList(
+                generatedSourcesDirectory(project, userProperties, false)));
+    }
+
+    static void configureTestJavaLevel(BackendTestPackager packager, MavenProject project,
+            java.util.Properties userProperties) {
+        String source = compilerOption(project, userProperties, "testSource", true);
+        String target = compilerOption(project, userProperties, "testTarget", true);
+        String release = compilerOption(project, userProperties, "testRelease", true);
+        if (source == null) source = compilerOption(project, userProperties, "source", true);
+        if (target == null) target = compilerOption(project, userProperties, "target", true);
+        if (release == null) release = compilerOption(project, userProperties, "release", true);
+        packager.testJavaLevel(source, target, release);
+        packager.testCompilerOptions(compilerOptions(project, userProperties, true));
+        packager.testGeneratedSources(java.util.Collections.singletonList(
+                generatedSourcesDirectory(project, userProperties, true)));
+    }
+
+    static File generatedSourcesDirectory(MavenProject project, java.util.Properties properties, boolean tests) {
+        String configured = compilerOption(project, properties,
+                tests ? "generatedTestSourcesDirectory" : "generatedSourcesDirectory", tests);
+        String build = project.getBuild().getDirectory();
+        File directory = configured == null
+                ? new File(build == null ? "target" : build,
+                        tests ? "generated-test-sources/test-annotations" : "generated-sources/annotations")
+                : new File(configured);
+        return directory.isAbsolute() ? directory : new File(project.getBasedir(), directory.getPath());
+    }
+
+    static List<String> compilerOptions(MavenProject project, java.util.Properties userProperties, boolean tests) {
+        List<String> options = new java.util.ArrayList<String>();
+        Xpp3Dom configuration = compilerConfiguration(project, tests);
+        if (configuration != null && configuration.getChild("compilerArgs") != null) {
+            for (Xpp3Dom arg : configuration.getChild("compilerArgs").getChildren()) {
+                if (arg.getValue() != null) options.add(arg.getValue());
+            }
+        }
+        if (Boolean.parseBoolean(compilerOption(project, userProperties, "enablePreview", tests))
+                && !options.contains("--enable-preview")) options.add("--enable-preview");
+        if (configuration != null && configuration.getChild("annotationProcessors") != null) {
+            List<String> processors = new java.util.ArrayList<String>();
+            for (Xpp3Dom processor : configuration.getChild("annotationProcessors").getChildren()) {
+                if (processor.getValue() != null) processors.add(processor.getValue().trim());
+            }
+            if (!processors.isEmpty()) {
+                options.add("-processor");
+                options.add(String.join(",", processors));
+            }
+        }
+        String proc = compilerOption(project, userProperties, "proc", tests);
+        if (proc != null) options.add("-proc:" + proc);
+        return options;
+    }
+
+    static List<String> resolvedCompilerOptions(MavenProject project, java.util.Properties properties,
+            boolean tests, org.eclipse.aether.RepositorySystem resolver,
+            org.eclipse.aether.RepositorySystemSession repositorySession) throws MojoExecutionException {
+        List<String> options = compilerOptions(project, properties, tests);
+        Xpp3Dom config = compilerConfiguration(project, tests);
+        Xpp3Dom paths = config == null ? null : config.getChild("annotationProcessorPaths");
+        if (paths == null || paths.getChildCount() == 0) return options;
+        if (resolver == null || repositorySession == null) {
+            throw new MojoExecutionException("Cannot resolve backend annotation processor paths without a Maven repository session");
+        }
+        org.eclipse.aether.collection.CollectRequest request = new org.eclipse.aether.collection.CollectRequest();
+        request.setRepositories(project.getRemoteProjectRepositories());
+        List<org.apache.maven.model.Dependency> managed = project.getDependencyManagement() == null
+                ? java.util.Collections.<org.apache.maven.model.Dependency>emptyList()
+                : project.getDependencyManagement().getDependencies();
+        if (Boolean.parseBoolean(compilerOption(project, properties, "annotationProcessorPathsUseDepMgmt", tests))) {
+            for (org.apache.maven.model.Dependency dependency : managed) {
+                request.addManagedDependency(org.apache.maven.RepositoryUtils.toDependency(dependency,
+                        repositorySession.getArtifactTypeRegistry()));
+            }
+        }
+        for (Xpp3Dom path : paths.getChildren()) {
+            org.apache.maven.model.Dependency dependency = new org.apache.maven.model.Dependency();
+            dependency.setGroupId(pathValue(path, "groupId", project, properties));
+            dependency.setArtifactId(pathValue(path, "artifactId", project, properties));
+            dependency.setVersion(pathValue(path, "version", project, properties));
+            String type = pathValue(path, "type", project, properties);
+            if (type != null) dependency.setType(type);
+            dependency.setClassifier(pathValue(path, "classifier", project, properties));
+            dependency.setScope("runtime");
+            if (dependency.getVersion() == null) {
+                for (org.apache.maven.model.Dependency candidate : managed) {
+                    if (candidate.getManagementKey().equals(dependency.getManagementKey())) {
+                        dependency.setVersion(candidate.getVersion());
+                        break;
+                    }
+                }
+            }
+            if (dependency.getVersion() == null) {
+                throw new MojoExecutionException("Missing version for annotation processor " + dependency.getManagementKey());
+            }
+            Xpp3Dom exclusions = path.getChild("exclusions");
+            if (exclusions != null) for (Xpp3Dom excluded : exclusions.getChildren()) {
+                org.apache.maven.model.Exclusion exclusion = new org.apache.maven.model.Exclusion();
+                exclusion.setGroupId(pathValue(excluded, "groupId", project, properties));
+                exclusion.setArtifactId(pathValue(excluded, "artifactId", project, properties));
+                dependency.addExclusion(exclusion);
+            }
+            request.addDependency(org.apache.maven.RepositoryUtils.toDependency(dependency,
+                    repositorySession.getArtifactTypeRegistry()));
+        }
+        try {
+            org.eclipse.aether.resolution.DependencyResult result = resolver.resolveDependencies(repositorySession,
+                    new org.eclipse.aether.resolution.DependencyRequest(request,
+                            org.eclipse.aether.util.filter.DependencyFilterUtils.classpathFilter("runtime")));
+            java.util.Set<String> files = new java.util.LinkedHashSet<String>();
+            for (org.eclipse.aether.resolution.ArtifactResult artifact : result.getArtifactResults()) {
+                files.add(artifact.getArtifact().getFile().getAbsolutePath());
+            }
+            options.add("-processorpath");
+            options.add(String.join(File.pathSeparator, files));
+            return options;
+        } catch (org.eclipse.aether.resolution.DependencyResolutionException ex) {
+            throw new MojoExecutionException("Could not resolve backend annotation processor paths", ex);
+        }
+    }
+
+    private static String pathValue(Xpp3Dom path, String name, MavenProject project,
+            java.util.Properties properties) {
+        Xpp3Dom node = path.getChild(name);
+        String value = node == null || node.getValue() == null ? null : node.getValue().trim();
+        if (value != null && value.startsWith("${") && value.endsWith("}")) {
+            value = property(project, properties, value.substring(2, value.length() - 1));
+        }
+        return value;
+    }
+
+    private static Xpp3Dom compilerConfiguration(MavenProject project, boolean tests) {
+        Plugin compiler = compilerPlugin(project);
+        Xpp3Dom configuration = compilerExecutionConfiguration(compiler, tests ? "testCompile" : "compile");
+        if (compiler != null && compiler.getConfiguration() instanceof Xpp3Dom) {
+            Xpp3Dom defaults = new Xpp3Dom((Xpp3Dom) compiler.getConfiguration());
+            configuration = configuration == null ? defaults
+                    : Xpp3Dom.mergeXpp3Dom(new Xpp3Dom(configuration), defaults);
+        }
+        return configuration;
+    }
+
+    static String compilerOption(MavenProject project, java.util.Properties userProperties,
+            String name, boolean tests) {
+        Xpp3Dom configuration = compilerConfiguration(project, tests);
+        if (configuration != null) {
+            Xpp3Dom option = configuration.getChild(name);
+            if (option != null && option.getValue() != null) {
+                String value = option.getValue().trim();
+                if (value.startsWith("${") && value.endsWith("}")) {
+                    value = property(project, userProperties, value.substring(2, value.length() - 1));
+                }
+                if (value != null && !value.isEmpty()) return value;
+            }
+        }
+        return property(project, userProperties, "maven.compiler." + name);
+    }
+
+    private static Plugin compilerPlugin(MavenProject project) {
+        Plugin compiler = project.getPlugin("org.apache.maven.plugins:maven-compiler-plugin");
+        if (compiler == null && project.getPluginManagement() != null) {
+            // Lifecycle-bound plugins can be configured solely in pluginManagement.
+            for (Plugin managed : project.getPluginManagement().getPlugins()) {
+                if ("org.apache.maven.plugins:maven-compiler-plugin".equals(managed.getKey())) {
+                    return managed;
+                }
+            }
+        }
+        return compiler;
+    }
+
+    private static Xpp3Dom compilerExecutionConfiguration(Plugin compiler, String goal) {
+        if (compiler == null) return null;
+        // Follow lifecycle order up to the phase whose sources we recompile.
+        // A custom execution may replace a default execution bound to "none".
+        List<String> phases = java.util.Arrays.asList("validate", "initialize", "generate-sources",
+                "process-sources", "generate-resources", "process-resources", "compile", "process-classes",
+                "generate-test-sources", "process-test-sources", "generate-test-resources",
+                "process-test-resources", "test-compile");
+        int lastPhase = phases.indexOf("testCompile".equals(goal) ? "test-compile" : "compile");
+        org.apache.maven.model.PluginExecution selected = null;
+        // Maven binds default-compile/default-testCompile even when no execution
+        // with that ID appears in the POM. An explicit binding replaces it.
+        int selectedPhase = lastPhase;
+        for (org.apache.maven.model.PluginExecution execution : compiler.getExecutions()) {
+            if (("default-" + goal).equals(execution.getId())) {
+                selectedPhase = -1;
+                break;
+            }
+        }
+        for (org.apache.maven.model.PluginExecution execution : compiler.getExecutions()) {
+            boolean isDefault = ("default-" + goal).equals(execution.getId());
+            if (!isDefault && !execution.getGoals().contains(goal)) continue;
+            int phase = execution.getPhase() == null ? lastPhase : phases.indexOf(execution.getPhase());
+            if (phase < 0 || phase > lastPhase) continue;
+            // Lifecycle defaults execute before custom goals in the same phase.
+            if (phase > selectedPhase || (phase == selectedPhase && !isDefault)) {
+                selected = execution;
+                selectedPhase = phase;
+            }
+        }
+        return selected != null && selected.getConfiguration() instanceof Xpp3Dom
+                ? new Xpp3Dom((Xpp3Dom) selected.getConfiguration()) : null;
+    }
+
+    private static String property(MavenProject project, java.util.Properties userProperties, String name) {
+        return userProperties.getProperty(name, project.getProperties().getProperty(name));
     }
 
     /**
@@ -272,7 +496,7 @@ public class BackendPackageMojo extends AbstractMojo {
     /// [#sourceEncoding] for any module; the backend-test goal compiles the same
     /// sources and has to read them the same way.
     static String sourceEncodingOf(MavenProject project) {
-        Plugin compiler = project.getPlugin("org.apache.maven.plugins:maven-compiler-plugin");
+        Plugin compiler = compilerPlugin(project);
         if (compiler != null && compiler.getConfiguration() instanceof Xpp3Dom) {
             Xpp3Dom encoding = ((Xpp3Dom) compiler.getConfiguration()).getChild("encoding");
             if (encoding != null && encoding.getValue() != null) {
@@ -319,7 +543,7 @@ public class BackendPackageMojo extends AbstractMojo {
 
     // ---- Kept under their old names for the tests; see BackendPackager. ----
 
-    private File resolveJdk() throws MojoFailureException {
+    private File resolveJdk() throws MojoFailureException, MojoExecutionException {
         try {
             return packager().resolveJdk();
         } catch (BuildFailureException ex) {
@@ -327,7 +551,7 @@ public class BackendPackageMojo extends AbstractMojo {
         }
     }
 
-    private File requireEightOrNewer(File home) throws MojoFailureException {
+    private File requireEightOrNewer(File home) throws MojoFailureException, MojoExecutionException {
         try {
             return packager().requireEightOrNewer(home);
         } catch (BuildFailureException ex) {

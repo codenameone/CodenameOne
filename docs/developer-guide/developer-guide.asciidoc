@@ -123,6 +123,8 @@ include::Backend.asciidoc[]
 
 include::Backend-Web.asciidoc[]
 
+include::Backend-Views.asciidoc[]
+
 include::Backend-Beans.asciidoc[]
 
 include::Backend-Testing.asciidoc[]

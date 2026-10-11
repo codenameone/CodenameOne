@@ -58,6 +58,7 @@ a server and go into depth:
 
 * <<backend-web>>: mapping HTTP requests to methods, sharing a typed contract
   with the app, and holding WebSocket connections open.
+* <<backend-views>>: compiled HTML pages, typed templates, forms and htmx fragments.
 * <<backend-beans>>: splitting a server into services the build wires together,
   with scopes, conditions and configuration binding.
 * <<backend-data>>: the connection pool, the object mapping, and

@@ -1,0 +1,9 @@
+<!-- tag::backend-views-form[] -->
+<!-- cn1:model form com.codenameone.developerguide.backend.ProductForm -->
+<form method="post" action="/products" th:object="${form}">
+  <label for="name">Name</label>
+  <input th:field="*{name}">
+  <span th:errors="*{name}"></span>
+  <button type="submit">Save</button>
+</form>
+<!-- end::backend-views-form[] -->

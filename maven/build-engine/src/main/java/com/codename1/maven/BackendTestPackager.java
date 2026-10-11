@@ -161,6 +161,44 @@ public abstract class BackendTestPackager extends BackendPackager {
         return this;
     }
 
+    private String testSource;
+    private String testTarget;
+    private String testRelease;
+    private boolean testJavaLevelConfigured;
+    private List<String> testCompilerOptions;
+    private List<File> testGeneratedSources = new ArrayList<File>();
+
+    public BackendTestPackager testGeneratedSources(List<File> directories) {
+        testGeneratedSources = new ArrayList<File>(directories);
+        return this;
+    }
+
+    private List<String> effectiveTestCompilerOptions() {
+        return testCompilerOptions == null ? applicationCompilerOptions : testCompilerOptions;
+    }
+
+    public BackendTestPackager testCompilerOptions(List<String> options) {
+        testCompilerOptions = new ArrayList<String>(options);
+        return this;
+    }
+
+    @Override
+    protected int requiredJavaFeature() throws BuildFailureException {
+        int feature = super.requiredJavaFeature();
+        if (testRelease != null) return Math.max(feature, javaFeature(testRelease));
+        if (testSource != null) feature = Math.max(feature, javaFeature(testSource));
+        if (testTarget != null) feature = Math.max(feature, javaFeature(testTarget));
+        return feature;
+    }
+
+    public BackendTestPackager testJavaLevel(String source, String target, String release) {
+        testJavaLevelConfigured = true;
+        testSource = source;
+        testTarget = target;
+        testRelease = release;
+        return this;
+    }
+
     /// Whether the module has any test source to compile.
     public boolean hasTests() {
         // Kotlin sources count: a suite of only Kotlin tests is one the compiled run
@@ -220,23 +258,15 @@ public abstract class BackendTestPackager extends BackendPackager {
         List<String> classpath = new ArrayList<String>();
         classpath.add(classes.getAbsolutePath());
         classpath.addAll(compileClasspathWithoutRuntime());
-        List<String> command = new ArrayList<String>(Arrays.asList(
-                new File(jdk, "bin/javac").getAbsolutePath(),
-                "-nowarn", "-encoding", sourceEncoding(),
-                "-bootclasspath", javaApi.getAbsolutePath(),
-                "-source", "1.8", "-target", "1.8",
-                "-classpath", join(classpath, File.pathSeparator),
-                // The selected tests are named; whatever else of the test sources
-                // they use -- a helper, a base class, a configuration -- javac
-                // finds here and compiles too. A test the run did not select is
-                // not compiled at all, so one using an API the server runtime
-                // lacks cannot fail a run that never executes it.
-                "-sourcepath", join(testSourceRoots(), File.pathSeparator),
-                "-implicit:class",
-                "-d", testClasses.getAbsolutePath()));
-        command.addAll(sources);
-        run(command, host.baseDir(), "compile the tests against the backend's class "
-                + "library (a test that uses a JDK class the server runtime lacks fails here)");
+        List<String> options = new ArrayList<String>(effectiveTestCompilerOptions());
+        List<String> sourcePath = recompilationInputs(testSourceRoots(), testGeneratedSources, options);
+        options.addAll(Arrays.asList("-sourcepath", join(sourcePath, File.pathSeparator), "-implicit:class"));
+        compileSources(jdk, javaApi, testClasses, sources, classpath,
+                testSource == null ? applicationSource : testSource,
+                testTarget == null ? applicationTarget : testTarget,
+                testJavaLevelConfigured ? testRelease : applicationRelease,
+                "compile the backend tests", options);
+        checkApplication(testClasses, javaApi, classpath);
         File processed = testOutputDirectory();
         if (processed != null && processed.isDirectory()) {
             copyResources(processed, testClasses);
@@ -420,7 +450,7 @@ public abstract class BackendTestPackager extends BackendPackager {
             File base = new File(root);
             List<String> found = new ArrayList<String>();
             collectJava(base, found);
-            for (String path : found) {
+            for (String path : recompilationInputs(found, testGeneratedSources, effectiveTestCompilerOptions())) {
                 File f = new File(path);
                 try {
                     texts.put(f, new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8));

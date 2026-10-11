@@ -88,7 +88,8 @@ final class BackendSupport {
                     compile.getDestinationDirectory().getAsFile(), AppSupport.stubsDir(layout), layout.projectDir(),
                     layout.settingsFile(), project.provider(() -> AppSupport.sourceRoots(main, layout)),
                     "UTF-8", userProperties, compile.getClasspath())
-                    .withSourceEncoding(AppSupport.javaEncoding(project, main)));
+                    .withSourceEncoding(AppSupport.javaEncoding(project, main))
+                    .withCompilerJdk(compile.getJavaCompiler().map(c -> c.getMetadata().getInstallationPath().getAsFile())));
             compile.doLast("cn1SplitOutputCheck", new com.codename1.gradle.tasks.SplitOutputCheck(
                     compile.getDestinationDirectory().getAsFile(), main.getOutput().getClassesDirs()));
         });
@@ -263,7 +264,8 @@ final class BackendSupport {
             compile.doLast("processCn1TestAnnotations", new ProcessTestAnnotationsAction(
                     main.getOutput().getClassesDirs(), compile.getDestinationDirectory().getAsFile(),
                     stubs, layout.projectDir(), roots, AppSupport.javaEncoding(project, main),
-                    compile.getClasspath(), kotlinTestClasses, null));
+                    compile.getClasspath(), kotlinTestClasses, null)
+                    .withCompilerJdk(compile.getJavaCompiler().map(c -> c.getMetadata().getInstallationPath().getAsFile())));
         });
         project.getPluginManager().withPlugin("org.jetbrains.kotlin.jvm", kotlin ->
                 project.getTasks().named("compileTestKotlin").configure(compile -> {
@@ -290,7 +292,8 @@ final class BackendSupport {
         compile.getInputs().files(project.fileTree(layout.projectDir(), tree -> {
             tree.include("application.properties", "application-*.properties",
                     "src/main/resources/application.properties",
-                    "src/main/resources/application-*.properties");
+                    "src/main/resources/application-*.properties",
+                    "src/main/resources/templates/**/*.html", "src/main/resources/static/**");
         })).withPropertyName("cn1BackendSettings")
                 .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE);
     }
