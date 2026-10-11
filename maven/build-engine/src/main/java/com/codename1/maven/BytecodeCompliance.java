@@ -95,6 +95,8 @@ public class BytecodeCompliance {
 
     private List<File> siblingClassRoots = Collections.emptyList();
 
+    private boolean backendCheck;
+
     private Set<String> pendingProjectClasses = Collections.emptySet();
 
     /// A check of the project `host` describes.
@@ -329,6 +331,33 @@ public class BytecodeCompliance {
 
         writeComplianceSuccess("Completed compliance check on " + host.finalName(), rewrittenClassCount);
         getLog().info("Invocation rewrite summary: classes rewritten=" + invocationRewriteSummary.rewrittenClasses + ", callsites rewritten=" + invocationRewriteSummary.rewrittenCallsites);
+    }
+
+    /// Checks freshly compiled backend application/test classes against the native
+    /// JavaAPI, not the client runtime or host JDK. Never skips or consults the
+    /// client's success marker. Backend bytecode retains its configured version.
+    public void checkBackend(File output, File javaApi, List<File> dependencies)
+            throws BuildExecutionException {
+        complianceOutputFile = new File(output.getParentFile(), output.getName() + "-compliance.txt");
+        Map<String, ClassMetadata> allowed = buildClassIndex(Collections.singletonList(javaApi));
+        Map<String, ClassMetadata> project = buildClassIndexWithOutput(output, dependencies);
+        // A dependency must not replace a native Java platform class during checks.
+        for (String name : new ArrayList<String>(project.keySet())) {
+            if (name.startsWith("java/") || name.startsWith("javax/")) {
+                project.remove(name);
+            }
+        }
+        List<Violation> violations;
+        backendCheck = true;
+        try {
+            violations = scanProjectClasses(output, allowed, project);
+        } finally {
+            backendCheck = false;
+        }
+        if (!violations.isEmpty()) {
+            writeComplianceReport(violations, output, dependencies, 0);
+            throw new BuildFailureException(buildFailureSummary(violations));
+        }
     }
 
     private boolean shouldSkipComplianceCheck() {
@@ -1246,20 +1275,84 @@ public class BytecodeCompliance {
         @Override
         public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
             className = name;
+            if (backendCheck) {
+                if (superName != null) checkTypeReference(name, "<class>", superName);
+                if (interfaces != null) for (String iface : interfaces) checkTypeReference(name, "<class>", iface);
+            }
+        }
+
+        @Override
+        public FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
+            if (backendCheck) checkDescriptor(name, descriptor);
+            return null;
+        }
+
+        private void checkDescriptor(String member, String descriptor) {
+            Type type = Type.getType(descriptor);
+            if (type.getSort() == Type.METHOD) {
+                for (Type argument : type.getArgumentTypes()) checkDescriptor(member, argument.getDescriptor());
+                checkDescriptor(member, type.getReturnType().getDescriptor());
+            } else if (type.getSort() == Type.ARRAY) {
+                checkDescriptor(member, type.getElementType().getDescriptor());
+            } else if (type.getSort() == Type.OBJECT) {
+                checkTypeReference(className, member, type.getInternalName());
+            }
+        }
+
+        private void checkHandle(String member, org.objectweb.asm.Handle handle) {
+            if (handle.getTag() <= Opcodes.H_PUTSTATIC) {
+                checkFieldReference(className, member, handle.getOwner(), handle.getName(), handle.getDesc());
+            } else {
+                checkMethodReference(className, member, handle.getOwner(), handle.getName(), handle.getDesc());
+            }
+            checkDescriptor(member, handle.getDesc());
         }
 
         @Override
         public MethodVisitor visitMethod(int access, final String name, final String descriptor, String signature, String[] exceptions) {
             final String sourceMethod = name + descriptor;
+            if (backendCheck) {
+                checkDescriptor(sourceMethod, descriptor);
+                if (exceptions != null) for (String exception : exceptions) checkTypeReference(className, sourceMethod, exception);
+            }
             return new MethodVisitor(Opcodes.ASM9) {
+                @Override
+                public void visitLdcInsn(Object value) {
+                    if (!backendCheck) return;
+                    if (value instanceof Type) checkDescriptor(sourceMethod, ((Type) value).getDescriptor());
+                    if (value instanceof org.objectweb.asm.Handle) checkHandle(sourceMethod, (org.objectweb.asm.Handle) value);
+                }
+
+                @Override
+                public void visitInvokeDynamicInsn(String name, String descriptor, org.objectweb.asm.Handle bootstrap, Object... args) {
+                    if (!backendCheck) return;
+                    checkDescriptor(sourceMethod, descriptor);
+                    for (Object arg : args) {
+                        if (arg instanceof org.objectweb.asm.Handle) checkHandle(sourceMethod, (org.objectweb.asm.Handle) arg);
+                        if (arg instanceof Type) checkDescriptor(sourceMethod, ((Type) arg).getDescriptor());
+                    }
+                }
+
+                @Override
+                public void visitMultiANewArrayInsn(String descriptor, int dimensions) {
+                    if (backendCheck) checkDescriptor(sourceMethod, descriptor);
+                }
+
+                @Override
+                public void visitTryCatchBlock(org.objectweb.asm.Label start, org.objectweb.asm.Label end, org.objectweb.asm.Label handler, String type) {
+                    if (backendCheck && type != null) checkTypeReference(className, sourceMethod, type);
+                }
+
                 @Override
                 public void visitMethodInsn(int opcode, String owner, String memberName, String memberDescriptor, boolean isInterface) {
                     checkMethodReference(className, sourceMethod, owner, memberName, memberDescriptor);
+                    if (backendCheck) checkDescriptor(sourceMethod, memberDescriptor);
                 }
 
                 @Override
                 public void visitFieldInsn(int opcode, String owner, String memberName, String memberDescriptor) {
                     checkFieldReference(className, sourceMethod, owner, memberName, memberDescriptor);
+                    if (backendCheck) checkDescriptor(sourceMethod, memberDescriptor);
                 }
 
                 @Override
@@ -1285,6 +1378,7 @@ public class BytecodeCompliance {
 
         private void checkTypeReference(String sourceClass, String sourceMethod, String owner) {
             if (isArrayDescriptor(owner)) {
+                if (backendCheck) checkDescriptor(sourceMethod, owner);
                 return;
             }
             if (isInternalRewriteHelper(owner)) {

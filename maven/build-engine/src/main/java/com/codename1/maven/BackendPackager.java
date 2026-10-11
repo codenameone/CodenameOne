@@ -35,6 +35,7 @@ import com.codename1.maven.annotations.AnnotatedClass;
 import com.codename1.maven.annotations.ClassScanner;
 import com.codename1.maven.annotations.ProcessingException;
 import com.codename1.maven.annotations.ProcessorContext;
+import com.codename1.maven.annotations.JavaSourceCompiler;
 import com.codename1.maven.processors.OrmAnnotationProcessor;
 import com.codename1.maven.processors.RestControllerAnnotationProcessor;
 import java.io.InputStream;
@@ -60,11 +61,9 @@ import java.util.zip.ZipFile;
  *
  * What it does, in order:
  *
- * 1. Compiles the module's sources together with the backend runtime's SHARED and
- *    PARPARVM halves against the ParparVM JavaAPI as the BOOTCLASSPATH. That last
- *    part is the important one: the bootclasspath IS the server-safe surface, so a
- *    reference to something the translated runtime does not have fails here, in
- *    the IDE and in the build, rather than at link time or in production.
+ * 1. Compiles the native backend runtime at Java 8 against its JavaAPI, then the
+ *    application at its configured Java level. Checks application bytecode against
+ *    the native API so unavailable host-JDK calls fail before translation.
  * 2. Runs the translator over the result, with the runtime's C sources already in
  *    the source root -- they have to be there BEFORE it runs, because a native's
  *    Java method is kept alive by its C symbol being present.
@@ -107,6 +106,18 @@ public class BackendPackager {
     protected boolean checkedCasts = true;
     /// Whether the binary carries the development MCP tools; see [#devTools(boolean)].
     protected boolean devTools;
+
+    protected String applicationSource = "8";
+    protected String applicationTarget = "8";
+    protected String applicationRelease;
+
+    /// The application's compiler settings, independent of the Java 8 runtime.
+    public BackendPackager javaLevel(String source, String target, String release) {
+        applicationSource = source == null || source.trim().isEmpty() ? "8" : source.trim();
+        applicationTarget = target == null || target.trim().isEmpty() ? applicationSource : target.trim();
+        applicationRelease = release == null || release.trim().isEmpty() ? null : release.trim();
+        return this;
+    }
 
     /// Sets [mainClass].
     public BackendPackager mainClass(String v) {
@@ -243,8 +254,12 @@ public class BackendPackager {
 
         prepareSources(work, runtimeVersion);
         compile(jdk, javaApi, runtimeSources, classes);
-        generateControllers(classes, work);
-        afterGenerate(jdk, javaApi, classes, work);
+        // Generated code stays at Java 8, but its compiler must be able to read
+        // the application's newer class files (including when Maven runs on 8).
+        try (JavaSourceCompiler.CompilerScope ignored = JavaSourceCompiler.useJdk(jdk)) {
+            generateControllers(classes, work);
+            afterGenerate(jdk, javaApi, classes, work);
+        }
         requireMainClass(classes);
         translate(jdk, compilerJar, javaApi, classes, nativeSources, translated,
                 dependencyClasses);
@@ -407,33 +422,8 @@ public class BackendPackager {
     }
 
     /**
-     * Fails here, with the reason, rather than inside the translator.
-     *
-     * The compile below reads .java and only .java, on purpose: recompiling against
-     * the JavaAPI bootclasspath is what turns "this backend uses a class the runtime
-     * does not have" into a compile error instead of a link failure on the device,
-     * and reusing the jar Maven already built would give that up. The cost is that a
-     * main class written in Kotlin -- which `cn1:backend` runs happily, because that
-     * goal is a JVM launch -- never reaches this directory, and the translator's own
-     * complaint about it names neither Kotlin nor the reason. So say it plainly. The
-     * developer guide's "Limits worth knowing" carries the same statement.
-     */
-    /**
-     * The encoding this module's sources are actually written in.
-     *
-     * <p>These are the SAME sources the lifecycle has already compiled, so
-     * reading them differently here is a second, disagreeing compilation of one
-     * tree: a module that declares another encoding either fails packaging on
-     * bytes javac accepted a phase earlier, or -- worse, because nothing says so
-     * -- translates string literals and identifiers that are not the ones the JVM
-     * build produced.
-     *
-     * <p>Resolved the way the compiler plugin resolves it, most specific first:
-     * an explicit &lt;encoding&gt; on maven-compiler-plugin, then
-     * project.build.sourceEncoding, and UTF-8 only when the module says nothing.
-     * The platform default is deliberately not the last resort -- it makes the
-     * build depend on the machine that runs it, which is the reason Maven warns
-     * about it.
+     * The native path compiles Java source. Name a missing or non-Java entry point
+     * here so it does not become an unexplained translator failure.
      */
     private void requireMainClass(File classes) throws BuildFailureException {
         if (mainClass == null || mainClass.length() == 0) {
@@ -452,67 +442,103 @@ public class BackendPackager {
                 + "cn1:backend");
     }
 
-    private void compile(File jdk, File javaApi, File runtimeSources, File classes)
+    protected void compile(File jdk, File javaApi, File runtimeSources, File classes)
             throws BuildExecutionException, BuildFailureException {
-        List<String> sources = new ArrayList<String>();
-        for (Object root : host.compileSourceRoots()) {
-            collectJava(new File(String.valueOf(root)), sources);
-        }
-        collectJava(runtimeSources, sources);
+        List<String> runtime = new ArrayList<String>();
+        collectJava(runtimeSources, runtime);
         for (File extra : extraSources) {
-            collectJava(extra, sources);
+            collectJava(extra, runtime);
         }
-        if (sources.isEmpty()) {
-            throw new BuildFailureException("No Java sources to compile");
-        }
+        List<String> dependencies = compileClasspathWithoutRuntime();
+        compileSources(jdk, javaApi, classes, runtime, dependencies, "8", "8", null,
+                "compile the backend runtime");
 
-        List<String> command = new ArrayList<String>(Arrays.asList(
-                new File(jdk, "bin/javac").getAbsolutePath(),
-                "-nowarn", "-encoding", sourceEncoding(),
-                "-bootclasspath", javaApi.getAbsolutePath(),
-                "-source", "1.8", "-target", "1.8",
-                "-d", classes.getAbsolutePath()));
-        // The module's own dependencies, MINUS the backend runtime: its compiled
-        // form was built against a JDK, and the sources unpacked above are the
-        // half that belongs on this bootclasspath.
+        List<String> application = new ArrayList<String>();
+        for (String root : host.compileSourceRoots()) {
+            collectJava(new File(root), application);
+        }
+        File applicationClasses = new File(classes.getParentFile(), "application-classes");
+        emptyDirs(applicationClasses);
+        mkdirs(applicationClasses);
         List<String> classpath = new ArrayList<String>();
-        for (Object element : compileClasspathWithoutRuntime()) {
-            classpath.add(String.valueOf(element));
-        }
-        if (!classpath.isEmpty()) {
-            command.add("-classpath");
-            command.add(join(classpath, File.pathSeparator));
-        }
-        command.addAll(sources);
-        // -source/-target 8 is the translator's input format and is not a property
-        // of the compiler running here: every javac from 8 up emits the same class
-        // file version 52 for it. A javac that has dropped the option says so in
-        // its own words and names no remedy, so the remedy is added to it.
-        //
-        // THE REMEDY IS THE JDK RUNNING MAVEN, not -Dcn1.backend.jdk, even though
-        // that property is what selects the compiler on this line. Only the two
-        // FORKED steps read it -- this javac and the translator's java.
-        // generateControllers() compiles the router and the entry point in
-        // process, through ToolProvider.getSystemJavaCompiler(), which is the
-        // Maven JVM's compiler and cannot be pointed anywhere; it asks for
-        // -source 1.8 as well, so it fails next on a compiler that has dropped
-        // it. Naming the property here would send a developer to a setting that
-        // moves the failure by one step and no further.
-        //
-        // Routing that in-process compile through the selected JDK is not the
-        // answer either. A release that removes -source 8 takes it away from the
-        // Maven JVM too, and this build needs a javac that emits class file
-        // version 52 in many more places than this goal -- codenameone-core
-        // compiles at 1.5. The whole toolchain moves then, not one mojo.
+        classpath.add(classes.getAbsolutePath());
+        classpath.addAll(dependencies);
+        compileSources(jdk, javaApi, applicationClasses, application, classpath,
+                applicationSource, applicationTarget, applicationRelease, "compile the backend application");
+        checkApplication(applicationClasses, javaApi, classpath);
         try {
-            run(command, host.baseDir(), "compile the backend sources");
-        } catch (BuildFailureException err) {
-            throw dropsSourceEight(err)
-                    ? new BuildFailureException(err.getMessage() + "\n\n"
-                            + SOURCE_EIGHT_REMOVED_HINT, err)
-                    : err;
+            org.apache.commons.io.FileUtils.copyDirectory(applicationClasses, classes);
+        } catch (IOException ex) {
+            throw new BuildExecutionException("Could not stage the backend application", ex);
         }
         stageResources(classes);
+    }
+
+    /// Compiles library sources at 8 and application sources at their own level.
+    /// Modern javac cannot use -bootclasspath: check the resulting application
+    /// bytecode against the actual native API before it reaches the translator.
+    protected void compileSources(File jdk, File javaApi, File destination,
+            List<String> sources, List<String> classpath, String source, String target,
+            String release, String operation) throws BuildExecutionException {
+        compileSources(jdk, javaApi, destination, sources, classpath, source, target,
+                release, operation, java.util.Collections.<String>emptyList());
+    }
+
+    protected void compileSources(File jdk, File javaApi, File destination,
+            List<String> sources, List<String> classpath, String source, String target,
+            String release, String operation, List<String> extraOptions) throws BuildExecutionException {
+        if (sources.isEmpty()) {
+            return;
+        }
+        List<String> command = new ArrayList<String>(Arrays.asList(
+                new File(jdk, "bin/javac").getAbsolutePath(),
+                "-nowarn", "-proc:none", "-encoding", sourceEncoding()));
+        if (javaFeature(release == null ? target : release) <= 8) {
+            // --release cannot be combined with a custom bootclasspath. At 8
+            // the latter already enforces the runtime's API, not the host JDK's.
+            command.addAll(Arrays.asList("-bootclasspath", javaApi.getAbsolutePath(),
+                    "-source", release == null ? source : release,
+                    "-target", release == null ? target : release));
+        } else if (release != null) {
+            command.addAll(Arrays.asList("--release", release));
+        } else {
+            command.addAll(Arrays.asList("-source", source, "-target", target));
+        }
+        if (!classpath.isEmpty()) {
+            command.addAll(Arrays.asList("-classpath", join(classpath, File.pathSeparator)));
+        }
+        command.addAll(Arrays.asList("-d", destination.getAbsolutePath()));
+        command.addAll(extraOptions);
+        command.addAll(sources);
+        try {
+            run(command, host.baseDir(), operation);
+        } catch (BuildFailureException ex) {
+            throw dropsSourceEight(ex)
+                    ? new BuildFailureException(ex.getMessage() + "\n\n" + SOURCE_EIGHT_REMOVED_HINT, ex)
+                    : ex;
+        }
+    }
+
+    static int javaFeature(String level) throws BuildFailureException {
+        try {
+            return Integer.parseInt(level.startsWith("1.") ? level.substring(2) : level);
+        } catch (RuntimeException ex) {
+            throw new BuildFailureException("Invalid backend Java level: " + level, ex);
+        }
+    }
+
+    protected void checkApplication(File output, File javaApi, List<String> classpath)
+            throws BuildExecutionException {
+        List<File> dependencies = new ArrayList<File>();
+        for (String entry : classpath) {
+            dependencies.add(new File(entry));
+        }
+        try {
+            BackendRecordMethods.rewrite(output);
+        } catch (IOException ex) {
+            throw new BuildExecutionException("Could not materialize backend record methods", ex);
+        }
+        new BytecodeCompliance(host).checkBackend(output, javaApi, dependencies);
     }
 
     /**
@@ -1118,21 +1144,11 @@ public class BackendPackager {
         }
     }
 
-    /**
-     * What to do about a javac that has dropped -source 8.
-     *
-     * Package private so a test can hold the wording to a remedy that WORKS. An
-     * earlier version of this sent the developer to -Dcn1.backend.jdk, which
-     * selects the two forked steps and not the in-process compile of the
-     * generated router and entry point, so following it moved the failure by one
-     * step and no further. See #compile.
-     */
+    /** The runtime libraries and generated wiring still use Java 8 bytecode. */
     static final String SOURCE_EIGHT_REMOVED_HINT =
-            "This javac no longer accepts -source 8, which is the format the "
-            + "translator reads. Run Maven itself on a JDK that still does: "
-            + "-Dcn1.backend.jdk selects the compiler for this step and the "
-            + "translator, but the generated router and entry point are compiled "
-            + "in process by the JDK running Maven.";
+            "This javac no longer accepts -source 8, used for backend libraries and generated wiring. "
+            + "Set -Dcn1.backend.jdk (Maven) or -Pcn1.backend.jdk (Gradle) to a JDK that "
+            + "accepts both Java 8 library sources and the application's configured Java level.";
 
     /**
      * Whether a failed compile is javac refusing -source 8 outright, rather than

@@ -57,11 +57,9 @@ import java.util.List;
  *
  * What it does, in order:
  *
- * 1. Compiles the module's sources together with the backend runtime's SHARED and
- *    PARPARVM halves against the ParparVM JavaAPI as the BOOTCLASSPATH. That last
- *    part is the important one: the bootclasspath IS the server-safe surface, so a
- *    reference to something the translated runtime does not have fails here, in
- *    the IDE and in the build, rather than at link time or in production.
+ * 1. Compiles the backend runtime at Java 8 and the module's sources at their
+ *    configured Java level. Checks application bytecode against the ParparVM
+ *    JavaAPI before translation so unsupported JDK API references fail early.
  * 2. Runs the translator over the result, with the runtime's C sources already in
  *    the source root -- they have to be there BEFORE it runs, because a native's
  *    Java method is kept alive by its C symbol being present.
@@ -86,6 +84,9 @@ public class BackendPackageMojo extends AbstractMojo {
 
     @Parameter(defaultValue = "${project}", readonly = true, required = true)
     private MavenProject project;
+
+    @Parameter(defaultValue = "${session}", readonly = true, required = true)
+    private org.apache.maven.execution.MavenSession session;
 
     @Parameter(defaultValue = "${localRepository}", readonly = true, required = true)
     private ArtifactRepository localRepository;
@@ -213,8 +214,57 @@ public class BackendPackageMojo extends AbstractMojo {
                 }
             }
         };
+        configureJavaLevel(p, project,
+                session == null ? new java.util.Properties() : session.getUserProperties());
         return p.mainClass(mainClass).output(output).target(target).jdk(jdkHome, jdk8Home).cflags(cflags)
                 .sqlite(sqlite).checkedCasts(checkedCasts).devTools(devTools);
+    }
+
+    static void configureJavaLevel(BackendPackager packager, MavenProject project,
+            java.util.Properties userProperties) {
+        if (project == null) return;
+        packager.javaLevel(compilerOption(project, userProperties, "source", false),
+                compilerOption(project, userProperties, "target", false),
+                compilerOption(project, userProperties, "release", false));
+    }
+
+    static void configureTestJavaLevel(BackendTestPackager packager, MavenProject project,
+            java.util.Properties userProperties) {
+        String source = compilerOption(project, userProperties, "testSource", true);
+        String target = compilerOption(project, userProperties, "testTarget", true);
+        String release = compilerOption(project, userProperties, "testRelease", true);
+        if (source == null) source = compilerOption(project, userProperties, "source", true);
+        if (target == null) target = compilerOption(project, userProperties, "target", true);
+        if (release == null) release = compilerOption(project, userProperties, "release", true);
+        packager.testJavaLevel(source, target, release);
+    }
+
+    static String compilerOption(MavenProject project, java.util.Properties userProperties,
+            String name, boolean tests) {
+        String goal = tests ? "testCompile" : "compile";
+        Xpp3Dom configuration = project.getGoalConfiguration("org.apache.maven.plugins",
+                "maven-compiler-plugin", "default-" + goal, goal);
+        Plugin compiler = project.getPlugin("org.apache.maven.plugins:maven-compiler-plugin");
+        if (compiler != null && compiler.getConfiguration() instanceof Xpp3Dom) {
+            Xpp3Dom defaults = new Xpp3Dom((Xpp3Dom) compiler.getConfiguration());
+            configuration = configuration == null ? defaults
+                    : Xpp3Dom.mergeXpp3Dom(new Xpp3Dom(configuration), defaults);
+        }
+        if (configuration != null) {
+            Xpp3Dom option = configuration.getChild(name);
+            if (option != null && option.getValue() != null) {
+                String value = option.getValue().trim();
+                if (value.startsWith("${") && value.endsWith("}")) {
+                    value = property(project, userProperties, value.substring(2, value.length() - 1));
+                }
+                if (value != null && !value.isEmpty()) return value;
+            }
+        }
+        return property(project, userProperties, "maven.compiler." + name);
+    }
+
+    private static String property(MavenProject project, java.util.Properties userProperties, String name) {
+        return userProperties.getProperty(name, project.getProperties().getProperty(name));
     }
 
     /**

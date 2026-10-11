@@ -143,14 +143,21 @@ no TLS, and what it does need is exactly what a translated binary is good at.
   by scanning, a proxy created for a class decided at run time -- isn't
   available. There is no starter ecosystem, and validation and error mapping are
   written by hand or generated from the REST contract.
-* The packaging goal compiles Java. It recompiles the module's sources against the
-  backend's class library instead of reusing the jar Maven built, which is what
-  keeps a server off classes the runtime doesn't have, and is also why Kotlin is
-  not wired into this path yet even though the client ports support it. It uses
-  the JDK running Maven -- any release from 8 up -- and `-Dcn1.backend.jdk` names
-  a different one. What it can't change is the language level: the module's
-  sources are compiled at Java 8, because that's the bytecode the translator
-  reads.
+* Native packaging compiles Java sources and checks them against the backend's
+  class library. Kotlin sources are not wired into this packaging path yet.
+  Application sources use Maven's compiler `release` or `source`/`target`, or
+  Gradle's `compileJava.options.release` or `sourceCompatibility`/`targetCompatibility`.
+  For example, set `maven.compiler.release` to `17` or `25`, or set
+  `compileJava.options.release` to the corresponding value in Gradle. Use a JDK
+  that supports the selected level. Maven defaults to its own JDK; Gradle uses
+  `compileJava`'s Java toolchain. `cn1.backend.jdk` can select a different JDK
+  (`-D` for Maven, `-P` for Gradle).
+  The backend libraries and generated wiring remain at Java 8 independently of
+  the application's language level. Records, pattern matching for `instanceof`,
+  and switch expressions can be used by application code. A newer language level
+  does not add Java SE APIs to the native runtime: unsupported API references
+  fail packaging before translation. Compiled tests likewise honor Maven's
+  `testSource`/`testTarget`/`testRelease` and Gradle's `compileTestJava` settings.
 * A virtual thread parks on sockets and on nothing else. A PostgreSQL or MySQL
   query, a `Web` call and a TLS handshake all park it, and its host serves other
   connections meanwhile. SQLite, file access, resolving a host name and

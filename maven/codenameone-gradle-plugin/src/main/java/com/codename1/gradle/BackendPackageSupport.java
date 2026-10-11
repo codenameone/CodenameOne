@@ -90,6 +90,14 @@ final class BackendPackageSupport {
             // its test classpath; the packager drops the JVM-only ones (JUnit,
             // Mockito) and compiles the rest with the tests.
             t.getTestClasspath().from(test.getCompileClasspath());
+            org.gradle.api.tasks.TaskProvider<org.gradle.api.tasks.compile.JavaCompile> testCompile =
+                    project.getTasks().named(test.getCompileJavaTaskName(), org.gradle.api.tasks.compile.JavaCompile.class);
+            t.getTestJavaSource().set(testCompile.map(c -> c.getSourceCompatibility()));
+            t.getTestJavaTarget().set(testCompile.map(c -> c.getTargetCompatibility()));
+            t.getTestJavaRelease().set(testCompile.flatMap(c -> c.getOptions().getRelease()).map(String::valueOf));
+            t.getJdk().set(project.getProviders().gradleProperty("cn1.backend.jdk").orElse(
+                    testCompile.flatMap(c -> c.getJavaCompiler())
+                            .map(c -> c.getMetadata().getInstallationPath().getAsFile().getAbsolutePath())));
             t.getTestSources().from(test.getJava().getSrcDirs());
             // What test annotation processors generated, as configure() adds the
             // main ones: the compiled run recompiles the tests from source.
@@ -130,11 +138,18 @@ final class BackendPackageSupport {
                 org.gradle.api.tasks.compile.JavaCompile.class)
                 .flatMap(c -> c.getOptions().getGeneratedSourceOutputDirectory()));
         t.getSourceEncoding().set(AppSupport.javaEncoding(project, main));
+        org.gradle.api.tasks.TaskProvider<org.gradle.api.tasks.compile.JavaCompile> compile =
+                project.getTasks().named(main.getCompileJavaTaskName(), org.gradle.api.tasks.compile.JavaCompile.class);
+        t.getJavaSource().set(compile.map(c -> c.getSourceCompatibility()));
+        t.getJavaTarget().set(compile.map(c -> c.getTargetCompatibility()));
+        t.getJavaRelease().set(compile.flatMap(c -> c.getOptions().getRelease()).map(String::valueOf));
+        t.getJdk().set(project.getProviders().gradleProperty("cn1.backend.jdk").orElse(
+                compile.flatMap(c -> c.getJavaCompiler())
+                        .map(c -> c.getMetadata().getInstallationPath().getAsFile().getAbsolutePath())));
         t.getProcessedResources().from(project.provider(() -> main.getOutput().getResourcesDir()));
         t.getProcessedResources().builtBy(main.getProcessResourcesTaskName());
         t.getMainClass().set(project.getProviders().gradleProperty("cn1.backend.mainClass"));
         t.getTarget().set(project.getProviders().gradleProperty("cn1.backend.target"));
-        t.getJdk().set(project.getProviders().gradleProperty("cn1.backend.jdk"));
         t.getCflags().set(project.getProviders().gradleProperty("cn1.backend.cflags"));
         t.getSqlite().set(project.getProviders().gradleProperty("cn1.backend.sqlite")
                 .map(Boolean::parseBoolean).orElse(Boolean.TRUE));
@@ -174,10 +189,14 @@ final class BackendPackageSupport {
         @Optional
         public abstract Property<String> getTarget();
 
-        /// The JDK to compile and translate with; defaults to Gradle's.
+        /// The JDK to compile and translate with; defaults to compileJava's toolchain.
         @Input
         @Optional
         public abstract Property<String> getJdk();
+
+        @Input public abstract Property<String> getJavaSource();
+        @Input public abstract Property<String> getJavaTarget();
+        @Input @Optional public abstract Property<String> getJavaRelease();
 
         /// The encoding compileJava reads the sources in; the packager recompiles
         /// the same sources and must read them the same way.
@@ -235,6 +254,7 @@ final class BackendPackageSupport {
             File processed = resources.hasNext() ? resources.next() : layout.resourcesOutputDir();
             BackendPackager packager = packager(host, layout, toolchain, processed);
             try {
+                packager.javaLevel(getJavaSource().get(), getJavaTarget().get(), getJavaRelease().getOrNull());
                 packager.mainClass(getMainClass().getOrNull()).output(getBinary().get().getAsFile())
                         .target(getTarget().getOrNull()).jdk(getJdk().getOrNull(), null).cflags(getCflags().getOrNull())
                         .sqlite(getSqlite().get()).checkedCasts(getCheckedCasts().get())
@@ -352,6 +372,10 @@ final class BackendPackageSupport {
     /// engine's BackendTestPackager.
     @DisableCachingByDefault(because = "Runs a native toolchain and the tests")
     public abstract static class TestTask extends PackageTask {
+        @Input public abstract Property<String> getTestJavaSource();
+        @Input public abstract Property<String> getTestJavaTarget();
+        @Input @Optional public abstract Property<String> getTestJavaRelease();
+
         @InputFiles
         @PathSensitive(PathSensitivity.RELATIVE)
         public abstract ConfigurableFileCollection getTestSources();
@@ -382,6 +406,7 @@ final class BackendPackageSupport {
             com.codename1.maven.BackendTestPackager p = new GradleBackendTestPackager(host, layout, toolchain,
                     processed, roots, testResources, testClasspath);
             p.strict(getStrict().get());
+            p.testJavaLevel(getTestJavaSource().get(), getTestJavaTarget().get(), getTestJavaRelease().getOrNull());
             return p;
         }
     }

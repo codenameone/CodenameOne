@@ -61,6 +61,9 @@ public class BackendTestMojo extends AbstractMojo {
     @Parameter(defaultValue = "${project}", readonly = true, required = true)
     private MavenProject project;
 
+    @Parameter(defaultValue = "${session}", readonly = true, required = true)
+    private org.apache.maven.execution.MavenSession session;
+
     @Parameter(defaultValue = "${localRepository}", readonly = true, required = true)
     private ArtifactRepository localRepository;
 
@@ -205,6 +208,9 @@ public class BackendTestMojo extends AbstractMojo {
         };
         p.strict(strict).timeoutSeconds(timeoutSeconds);
         p.jdk(jdkHome, jdk8Home).cflags(cflags);
+        java.util.Properties userProperties = session == null ? new java.util.Properties() : session.getUserProperties();
+        BackendPackageMojo.configureJavaLevel(p, project, userProperties);
+        BackendPackageMojo.configureTestJavaLevel(p, project, userProperties);
         return p;
     }
 }
