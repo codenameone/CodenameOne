@@ -4918,6 +4918,12 @@ public class CSSTheme {
                 paintHeight = boxHeight;
             }
 
+            // One gradient, the first: a second one after a comma was never
+            // painted under it. The page these images used to be captured
+            // from was written `background:` and the head of the value, one
+            // function, with nothing of what follows it, so the browser had
+            // a single layer to draw. Stacking the rest now would change
+            // images that already ship.
             LexicalUnit gradient = styles.get("background");
             while (gradient != null && !isGradient(gradient)) {
                 gradient = gradient.getNextLexicalUnit();
@@ -4930,7 +4936,14 @@ public class CSSTheme {
             // the first image. Painting the rest would change images that
             // already ship.
             LexicalUnit bgImage = styles.get("background-image");
-            // The style map keeps the order the properties were declared in.
+            // The style map keeps the order the properties were declared in,
+            // by where each was first written: declaring one again changes
+            // its value and not its place. `background: g1;
+            // background-image: url(a); background: g2` is therefore
+            // `background: g2` and then the image, and the image wins. That
+            // is the order the properties were written to the page these
+            // images used to be captured from, out of the same map, so it
+            // is what the browser saw as well and what shipped images hold.
             boolean imageDeclaredLater = false;
             for (String key : styles.keySet()) {
                 if ("background".equals(key)) {

@@ -56,6 +56,38 @@ public final class SVGStyle {
     private Boolean visible;
     private Float strokeDashOffset;
 
+    private Integer color;
+    private boolean fillCurrent;
+    private boolean strokeCurrent;
+    private String filterRef;
+    private String markerStart;
+    private String markerMid;
+    private String markerEnd;
+
+    /** The {@code color} property as ARGB, which is what {@code currentColor} stands for; null when not set. Inherited. */
+    public Integer getColor() { return color; }
+    public void setColor(Integer color) { this.color = color; }
+    /**
+     * Whether the fill is {@code currentColor}. The fill itself is then
+     * left unset, as it always was; a renderer that knows the colour puts
+     * it in.
+     */
+    public boolean isFillCurrent() { return fillCurrent; }
+    public void setFillCurrent(boolean v) { this.fillCurrent = v; }
+    /** Whether the stroke is {@code currentColor}; see {@link #isFillCurrent()}. */
+    public boolean isStrokeCurrent() { return strokeCurrent; }
+    public void setStrokeCurrent(boolean v) { this.strokeCurrent = v; }
+    /** The id of the filter the element is drawn through, or null. Not inherited. */
+    public String getFilterRef() { return filterRef; }
+    public void setFilterRef(String v) { this.filterRef = v; }
+    /** The ids of the markers drawn at the first, the middle and the last points of a line; null for none. Inherited. */
+    public String getMarkerStart() { return markerStart; }
+    public void setMarkerStart(String v) { this.markerStart = v; }
+    public String getMarkerMid() { return markerMid; }
+    public void setMarkerMid(String v) { this.markerMid = v; }
+    public String getMarkerEnd() { return markerEnd; }
+    public void setMarkerEnd(String v) { this.markerEnd = v; }
+
     public SVGPaint getFill() { return fill; }
     public void setFill(SVGPaint fill) { this.fill = fill; }
     public SVGPaint getStroke() { return stroke; }
@@ -101,8 +133,19 @@ public final class SVGStyle {
     public void setMaskRef(String maskRef) { this.maskRef = maskRef; }
     public SVGStyle inherit(SVGStyle parent) {
         if (parent == null) return this;
-        if (fill == null) fill = parent.fill;
-        if (stroke == null) stroke = parent.stroke;
+        if (fill == null) {
+            fill = parent.fill;
+            fillCurrent = fillCurrent || parent.fillCurrent;
+        }
+        if (stroke == null) {
+            stroke = parent.stroke;
+            strokeCurrent = strokeCurrent || parent.strokeCurrent;
+        }
+        if (color == null) color = parent.color;
+        // "" is `none` written out, which stops a marker being inherited.
+        if (markerStart == null) markerStart = parent.markerStart;
+        if (markerMid == null) markerMid = parent.markerMid;
+        if (markerEnd == null) markerEnd = parent.markerEnd;
         if (fillOpacity == null) fillOpacity = parent.fillOpacity;
         if (strokeOpacity == null) strokeOpacity = parent.strokeOpacity;
         // opacity does NOT inherit per SVG spec -- leave alone.

@@ -509,6 +509,171 @@ class VectorImageTest {
         assertEquals(0xffff0000, plain.getRGB(90, 85), "and what is in it can still be referred to");
     }
 
+    private static VectorImage read(String svg) throws Exception {
+        return VectorImage.readSvg(new ByteArrayInputStream(svg.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    @Test
+    void currentColorIsTheColorOfTheElementItIsUsedOn() throws Exception {
+        BufferedImage img = paint("<g color=\"#ff0000\" fill=\"currentColor\">"
+                + "<rect width=\"50\" height=\"50\"/>"
+                + "<rect x=\"50\" width=\"50\" height=\"50\" color=\"#0000ff\"/></g>"
+                + "<rect y=\"50\" width=\"100\" height=\"50\" fill=\"currentColor\"/>"
+                + "<path d=\"M 0 75 H 100\" style=\"color: #00ff00\" stroke=\"currentColor\" stroke-width=\"10\"/>",
+                100, 100);
+        assertEquals(0xffff0000, img.getRGB(25, 25), "the colour of the group");
+        assertEquals(0xff0000ff, img.getRGB(75, 25), "an element's own colour, though the fill is inherited");
+        assertEquals(0xff000000, img.getRGB(50, 60), "black when nothing gives one");
+        assertEquals(0xff00ff00, img.getRGB(50, 75), "a stroke too");
+
+        BufferedImage root = read("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 10 10\" color=\"red\">"
+                + "<rect width=\"10\" height=\"10\" fill=\"currentColor\"/></svg>").paint(10, 10);
+        assertEquals(0xffff0000, root.getRGB(5, 5), "from the root element as well");
+    }
+
+    @Test
+    void aPercentageIsAShareOfTheViewport() throws Exception {
+        BufferedImage img = read("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 200 100\">"
+                + "<rect x=\"50%\" width=\"50%\" height=\"100%\" fill=\"#ff0000\"/>"
+                + "<circle cx=\"25%\" cy=\"50%\" r=\"10\" fill=\"#0000ff\"/></svg>").paint(200, 100);
+        assertEquals(0xffff0000, img.getRGB(150, 50));
+        assertEquals(0xffff0000, img.getRGB(105, 95));
+        assertEquals(0xff0000ff, img.getRGB(50, 50), "across is a share of the width and down of the height");
+        assertEquals(0, alpha(img, 80, 50));
+    }
+
+    @Test
+    void aSizeInInchesOrMillimetresIsThatManyPixels() throws Exception {
+        VectorImage image = read("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1in\" height=\"25.4mm\""
+                + " viewBox=\"0 0 10 10\"/>");
+        assertEquals(96.0, image.getWidth(), 0.01);
+        assertEquals(96.0, image.getHeight(), 0.01);
+        VectorImage points = read("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"72pt\" height=\"2.54cm\"/>");
+        assertEquals(96.0, points.getWidth(), 0.01);
+        assertEquals(96.0, points.getHeight(), 0.01);
+        VectorImage pixels = read("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"30px\" height=\"40\"/>");
+        assertEquals(30.0, pixels.getWidth(), 0.01);
+        assertEquals(40.0, pixels.getHeight(), 0.01);
+    }
+
+    @Test
+    void aSymbolIsFittedTheWayItSays() throws Exception {
+        String symbol = "<rect width=\"10\" height=\"10\" fill=\"#ff0000\"/></symbol>"
+                + "<use href=\"#s\" width=\"100\" height=\"50\"/>";
+        BufferedImage stretched = paint("<symbol id=\"s\" viewBox=\"0 0 10 10\" preserveAspectRatio=\"none\">"
+                + symbol, 100, 100);
+        assertEquals(0xffff0000, stretched.getRGB(5, 25), "stretched over the whole of what the use gives it");
+        assertEquals(0xffff0000, stretched.getRGB(95, 25));
+        BufferedImage right = paint("<symbol id=\"s\" viewBox=\"0 0 10 10\" preserveAspectRatio=\"xMaxYMid\">"
+                + symbol, 100, 100);
+        assertEquals(0, alpha(right, 40, 25), "kept square and put against the right side");
+        assertEquals(0xffff0000, right.getRGB(95, 25));
+    }
+
+    @Test
+    void aGradientStartsOverOrRunsBackPastItsEnd() throws Exception {
+        String stops = "<stop offset=\"0\" stop-color=\"#ff0000\"/><stop offset=\"1\" stop-color=\"#0000ff\"/>"
+                + "</linearGradient></defs><rect width=\"100\" height=\"100\" fill=\"url(#g)\"/>";
+        String gradient = "<defs><linearGradient id=\"g\" gradientUnits=\"userSpaceOnUse\" x1=\"0\" x2=\"20\"";
+        BufferedImage padded = paint(gradient + ">" + stops, 100, 100);
+        assertTrue((padded.getRGB(42, 50) & 0xff) > 240, "left alone it goes on in its last colour");
+        BufferedImage repeated = paint(gradient + " spreadMethod=\"repeat\">" + stops, 100, 100);
+        assertTrue(((repeated.getRGB(42, 50) >> 16) & 0xff) > 200, "the third round has just begun");
+        assertTrue((repeated.getRGB(38, 50) & 0xff) > 200, "and the second was about to end");
+        BufferedImage reflected = paint(gradient + " spreadMethod=\"reflect\">" + stops, 100, 100);
+        assertTrue(((reflected.getRGB(38, 50) >> 16) & 0xff) > 200, "the second round runs back to the first colour");
+        assertTrue((reflected.getRGB(22, 50) & 0xff) > 200);
+    }
+
+    @Test
+    void markersAreDrawnOnThePointsOfALine() throws Exception {
+        String square = "<marker id=\"m\" markerWidth=\"10\" markerHeight=\"10\" refX=\"5\" refY=\"5\""
+                + " markerUnits=\"userSpaceOnUse\"><rect width=\"10\" height=\"10\" fill=\"#ff0000\"/></marker>";
+        BufferedImage ends = paint(square + "<path d=\"M 20 50 L 50 50 L 80 50\" fill=\"none\" stroke=\"#000000\""
+                + " marker-end=\"url(#m)\"/>", 100, 100);
+        assertEquals(0xffff0000, ends.getRGB(83, 47), "on the last point, its reference point on the point");
+        assertEquals(0, alpha(ends, 17, 47), "and not on the first");
+        assertEquals(0, alpha(ends, 50, 46), "or the one between");
+
+        BufferedImage all = paint(square + "<polyline points=\"20,50 50,50 80,50\" fill=\"none\" stroke=\"#000000\""
+                + " marker=\"url(#m)\"/>", 100, 100);
+        assertEquals(0xffff0000, all.getRGB(17, 47));
+        assertEquals(0xffff0000, all.getRGB(50, 46));
+        assertEquals(0xffff0000, all.getRGB(83, 47));
+
+        // A bar ten long and two thick that starts at the point: it lies
+        // along the line, so on a line that runs down it points down.
+        String bar = "<marker id=\"m\" markerWidth=\"10\" markerHeight=\"2\" refX=\"0\" refY=\"1\" orient=\"auto\""
+                + " markerUnits=\"userSpaceOnUse\"><rect width=\"10\" height=\"2\" fill=\"#ff0000\"/></marker>";
+        BufferedImage turned = paint(bar + "<line x1=\"50\" y1=\"20\" x2=\"50\" y2=\"80\" stroke=\"#000000\""
+                + " stroke-opacity=\"0\" marker-end=\"url(#m)\"/>", 100, 100);
+        assertEquals(0xffff0000, turned.getRGB(50, 85));
+        assertEquals(0, alpha(turned, 56, 80));
+
+        BufferedImage scaled = paint("<marker id=\"m\" refX=\"0\" refY=\"0\"><rect width=\"3\" height=\"3\""
+                + " fill=\"#ff0000\"/></marker><line x1=\"10\" y1=\"10\" x2=\"50\" y2=\"10\" stroke=\"#000000\""
+                + " stroke-opacity=\"0\" stroke-width=\"4\" marker-end=\"url(#m)\"/>", 100, 100);
+        assertEquals(0xffff0000, scaled.getRGB(60, 20), "three by three, in widths of the stroke");
+        assertEquals(0, alpha(scaled, 64, 20));
+    }
+
+    @Test
+    void aFilterChangesTheElementItIsOn() throws Exception {
+        String region = " filterUnits=\"userSpaceOnUse\" x=\"0\" y=\"0\" width=\"100\" height=\"100\">";
+        String red = "<rect x=\"40\" y=\"40\" width=\"20\" height=\"20\" fill=\"#ff0000\" filter=\"url(#f)\"/>";
+
+        BufferedImage blurred = paint("<filter id=\"f\"" + region + "<feGaussianBlur stdDeviation=\"3\"/></filter>"
+                + red, 100, 100);
+        int edge = alpha(blurred, 36, 50);
+        assertTrue(edge > 5 && edge < 200, "a blur spreads past the edge and thins out: " + edge);
+        assertTrue(alpha(blurred, 50, 50) > 230);
+        assertEquals(0, alpha(blurred, 10, 50));
+
+        BufferedImage narrow = paint("<filter id=\"f\"><feGaussianBlur stdDeviation=\"3\"/></filter>" + red, 100, 100);
+        assertTrue(alpha(narrow, 39, 50) > 5, "left alone the region is the element and a tenth more each way");
+        assertEquals(0, alpha(narrow, 36, 50), "and nothing is drawn outside it");
+
+        BufferedImage moved = paint("<filter id=\"f\"" + region + "<feOffset dx=\"30\" dy=\"-20\"/></filter>" + red,
+                100, 100);
+        assertEquals(0xffff0000, moved.getRGB(80, 30));
+        assertEquals(0, alpha(moved, 50, 50));
+
+        BufferedImage flooded = paint("<filter id=\"f\"" + region + "<feFlood flood-color=\"#0000ff\"/>"
+                + "<feComposite in2=\"SourceGraphic\" operator=\"in\"/></filter>" + red, 100, 100);
+        assertEquals(0xff0000ff, flooded.getRGB(50, 50), "a flood kept to where the element is");
+        assertEquals(0, alpha(flooded, 20, 20));
+
+        BufferedImage grey = paint("<filter id=\"f\"" + region
+                + "<feColorMatrix type=\"saturate\" values=\"0\"/></filter>" + red, 100, 100);
+        int g = grey.getRGB(50, 50);
+        assertEquals((g >> 16) & 0xff, (g >> 8) & 0xff);
+        assertEquals((g >> 8) & 0xff, g & 0xff);
+        assertTrue((g & 0xff) > 0 && (g & 0xff) < 255);
+
+        BufferedImage shadowed = paint("<filter id=\"f\"" + region + "<feDropShadow dx=\"10\" dy=\"10\""
+                + " stdDeviation=\"0\" flood-color=\"#0000ff\"/></filter>" + red, 100, 100);
+        assertEquals(0xffff0000, shadowed.getRGB(50, 50), "the element is over its shadow");
+        assertEquals(0xff0000ff, shadowed.getRGB(65, 65));
+
+        BufferedImage merged = paint("<filter id=\"f\"" + region + "<feOffset dx=\"30\" result=\"aside\"/>"
+                + "<feMerge><feMergeNode in=\"aside\"/><feMergeNode in=\"SourceGraphic\"/></feMerge></filter>" + red,
+                100, 100);
+        assertEquals(0xffff0000, merged.getRGB(50, 50));
+        assertEquals(0xffff0000, merged.getRGB(80, 50));
+
+        BufferedImage fattened = paint("<filter id=\"f\"" + region
+                + "<feMorphology operator=\"dilate\" radius=\"5\"/></filter>" + red, 100, 100);
+        assertEquals(0xffff0000, fattened.getRGB(37, 50));
+        assertEquals(0, alpha(fattened, 33, 50));
+
+        BufferedImage clipped = paint("<clipPath id=\"c\"><rect x=\"40\" y=\"0\" width=\"60\" height=\"100\"/></clipPath>"
+                + "<filter id=\"f\"" + region + "<feGaussianBlur stdDeviation=\"3\"/></filter>"
+                + "<rect x=\"40\" y=\"40\" width=\"20\" height=\"20\" fill=\"#ff0000\" filter=\"url(#f)\""
+                + " clip-path=\"url(#c)\"/>", 100, 100);
+        assertEquals(0, alpha(clipped, 37, 50), "the clip cuts the blur off");
+        assertTrue(alpha(clipped, 63, 50) > 5);
+    }
+
     @Test
     void aUseThatNamesItselfDrawsNothingAndEnds() throws Exception {
         BufferedImage img = paint("<g id=\"loop\"><use href=\"#loop\"/></g>", 20, 20);

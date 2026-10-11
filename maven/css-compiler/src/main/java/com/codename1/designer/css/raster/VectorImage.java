@@ -27,11 +27,13 @@ import com.codename1.svg.transcoder.model.SVGCircle;
 import com.codename1.svg.transcoder.model.SVGClipPath;
 import com.codename1.svg.transcoder.model.SVGDocument;
 import com.codename1.svg.transcoder.model.SVGEllipse;
+import com.codename1.svg.transcoder.model.SVGFilter;
 import com.codename1.svg.transcoder.model.SVGGradientStop;
 import com.codename1.svg.transcoder.model.SVGGroup;
 import com.codename1.svg.transcoder.model.SVGImage;
 import com.codename1.svg.transcoder.model.SVGLine;
 import com.codename1.svg.transcoder.model.SVGLinearGradient;
+import com.codename1.svg.transcoder.model.SVGMarker;
 import com.codename1.svg.transcoder.model.SVGNode;
 import com.codename1.svg.transcoder.model.SVGPath;
 import com.codename1.svg.transcoder.model.SVGPattern;
@@ -81,8 +83,9 @@ import java.util.List;
 ///
 /// Nothing here is shared with the class the transcoders generate, which
 /// draws through the framework at runtime, so the two can differ: this
-/// follows `<use>` references and `fill-rule`, tiles a `<pattern>` and
-/// sees through a `<mask>`, none of which that class draws.
+/// follows `<use>` references and `fill-rule`, tiles a `<pattern>`, sees
+/// through a `<mask>`, draws markers and applies filters, none of which
+/// that class does.
 ///
 /// An animated file is painted at rest: the values its elements are written
 /// with, before any animation has moved them. A Lottie file is painted the
@@ -268,9 +271,28 @@ public final class VectorImage {
             style.setClipPathRef(own.getClipPathRef());
         }
         style.inherit(parentStyle);
+        // `currentColor` is the `color` of the element it is used on, which
+        // is its own or the nearest one above it, and black when nobody
+        // gives one. It is put in here, each time, because an element that
+        // inherits a `currentColor` fill takes the word and not the colour:
+        // it stands for that element's own `color`.
+        int current = style.getColor() == null ? 0xff000000 : style.getColor().intValue();
+        if (style.isFillCurrent()) {
+            style.setFill(SVGPaint.ofColor(current));
+        }
+        if (style.isStrokeCurrent()) {
+            style.setStroke(SVGPaint.ofColor(current));
+        }
         float opacity = style.getOpacity() == null ? 1f : clamp(style.getOpacity().floatValue());
         if (opacity <= 0f) {
             return;
+        }
+        SVGFilter filter = null;
+        if (own != null && own.getFilterRef() != null) {
+            SVGNode def = doc.getDefinitions().get(own.getFilterRef());
+            if (def instanceof SVGFilter) {
+                filter = (SVGFilter) def;
+            }
         }
         SVGClipPath mask = null;
         if (own != null && own.getMaskRef() != null && useDepth < MAX_USE_DEPTH) {
@@ -279,7 +301,7 @@ public final class VectorImage {
                 mask = (SVGClipPath) def;
             }
         }
-        if (opacity < 1f || mask != null) {
+        if (opacity < 1f || mask != null || filter != null) {
             // An element that is not opaque is painted whole on a layer of
             // its own, and the layer is laid down once at that opacity.
             // Fading its parts one by one would let them show through each
@@ -288,6 +310,12 @@ public final class VectorImage {
             // handed down: what a Graphics2D reports as its device is not
             // the image behind it on every JDK.
             BufferedImage layer = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+            // A filter comes before the clip: what it spreads, a blur for
+            // one, is cut off at the clip's edge and not blurred past it.
+            String clipRef = style.getClipPathRef();
+            if (filter != null) {
+                style.setClipPathRef(null);
+            }
             Graphics2D lg = layer.createGraphics();
             try {
                 Pixels.hints(lg);
@@ -296,6 +324,29 @@ public final class VectorImage {
                 paintOpaque(lg, node, style, w, h);
             } finally {
                 lg.dispose();
+            }
+            if (filter != null) {
+                AffineTransform device = new AffineTransform(g.getTransform());
+                SVGTransform t = node.getTransform();
+                if (t != null) {
+                    device.concatenate(new AffineTransform(t.a, t.b, t.c, t.d, t.e, t.f));
+                }
+                SvgFilter.apply(layer, filter, boundsOf(node), device);
+                Shape outline = clipRef == null ? null : clipShape(node, clipRef);
+                if (outline != null) {
+                    BufferedImage cut = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+                    Graphics2D cg = cut.createGraphics();
+                    try {
+                        Pixels.hints(cg);
+                        cg.setTransform(device);
+                        cg.clip(outline);
+                        cg.setTransform(new AffineTransform());
+                        cg.drawImage(layer, 0, 0, null);
+                    } finally {
+                        cg.dispose();
+                    }
+                    layer = cut;
+                }
             }
             if (mask != null) {
                 applyMask(layer, mask, node, g, w, h);
@@ -495,17 +546,8 @@ public final class VectorImage {
                 g.transform(new AffineTransform(t.a, t.b, t.c, t.d, t.e, t.f));
             }
             if (style.getClipPathRef() != null) {
-                SVGNode clip = doc.getDefinitions().get(style.getClipPathRef());
-                if (clip instanceof SVGClipPath) {
-                    Shape outline = clipOutline((SVGClipPath) clip);
-                    if (((SVGClipPath) clip).isObjectBoundingBox()) {
-                        // In fractions of the box around what is clipped.
-                        // With no box to measure, nothing is inside it.
-                        Rectangle2D box = boundsOf(node);
-                        outline = box == null || box.isEmpty() ? new Rectangle2D.Double()
-                                : new AffineTransform(box.getWidth(), 0, 0, box.getHeight(), box.getX(), box.getY())
-                                        .createTransformedShape(outline);
-                    }
+                Shape outline = clipShape(node, style.getClipPathRef());
+                if (outline != null) {
                     g.clip(outline);
                 }
             }
@@ -544,6 +586,9 @@ public final class VectorImage {
                 Shape shape = outline(node);
                 if (shape != null) {
                     fillAndStroke(g, shape, style);
+                    if (node instanceof SVGPath || node instanceof SVGLine || node instanceof SVGPolyline) {
+                        paintMarkers(g, shape, style, w, h);
+                    }
                 }
             }
         } finally {
@@ -552,12 +597,244 @@ public final class VectorImage {
         }
     }
 
+    /// Draws the markers of a line on its points: `marker-start` on the
+    /// first, `marker-end` on the last and `marker-mid` on each between.
+    ///
+    /// A point is where a segment of the line ends. A marker that turns
+    /// with the line faces the way the line runs there, and where the line
+    /// bends, half way between the two directions. An arc is drawn as a
+    /// few curves, and the points where those meet count as points of the
+    /// line.
+    private void paintMarkers(Graphics2D g, Shape shape, SVGStyle style, int w, int h) {
+        SVGMarker start = markerOf(style.getMarkerStart());
+        SVGMarker mid = markerOf(style.getMarkerMid());
+        SVGMarker end = markerOf(style.getMarkerEnd());
+        if (start == null && mid == null && end == null) {
+            return;
+        }
+        // Each point: where it is, the way the line comes in and the way
+        // it leaves, either of which a point at an end does not have.
+        List<double[]> points = new ArrayList<double[]>();
+        double[] seg = new double[6];
+        double[] first = null;
+        double[] last = null;
+        for (java.awt.geom.PathIterator it = shape.getPathIterator(null); !it.isDone(); it.next()) {
+            int type = it.currentSegment(seg);
+            if (type == java.awt.geom.PathIterator.SEG_MOVETO) {
+                last = new double[] {seg[0], seg[1], Double.NaN, 0, Double.NaN, 0};
+                first = last;
+                points.add(last);
+                continue;
+            }
+            if (last == null) {
+                continue;
+            }
+            double ex;
+            double ey;
+            double outX;
+            double outY;
+            double inX;
+            double inY;
+            if (type == java.awt.geom.PathIterator.SEG_CLOSE) {
+                ex = first[0];
+                ey = first[1];
+                outX = ex - last[0];
+                outY = ey - last[1];
+                inX = outX;
+                inY = outY;
+            } else if (type == java.awt.geom.PathIterator.SEG_LINETO) {
+                ex = seg[0];
+                ey = seg[1];
+                outX = ex - last[0];
+                outY = ey - last[1];
+                inX = outX;
+                inY = outY;
+            } else if (type == java.awt.geom.PathIterator.SEG_QUADTO) {
+                ex = seg[2];
+                ey = seg[3];
+                outX = seg[0] - last[0];
+                outY = seg[1] - last[1];
+                inX = ex - seg[0];
+                inY = ey - seg[1];
+            } else {
+                ex = seg[4];
+                ey = seg[5];
+                outX = seg[0] - last[0];
+                outY = seg[1] - last[1];
+                if (outX == 0 && outY == 0) {
+                    outX = seg[2] - last[0];
+                    outY = seg[3] - last[1];
+                }
+                inX = ex - seg[2];
+                inY = ey - seg[3];
+                if (inX == 0 && inY == 0) {
+                    inX = ex - seg[0];
+                    inY = ey - seg[1];
+                }
+            }
+            // A control point on top of an end gives no direction; the
+            // straight line between the ends does.
+            if (outX == 0 && outY == 0) {
+                outX = ex - last[0];
+                outY = ey - last[1];
+            }
+            if (inX == 0 && inY == 0) {
+                inX = ex - last[0];
+                inY = ey - last[1];
+            }
+            if (outX != 0 || outY != 0) {
+                last[4] = outX;
+                last[5] = outY;
+            }
+            double[] next = new double[] {ex, ey, Double.NaN, 0, Double.NaN, 0};
+            if (inX != 0 || inY != 0) {
+                next[2] = inX;
+                next[3] = inY;
+            }
+            if (type == java.awt.geom.PathIterator.SEG_CLOSE) {
+                // Back where the line began: it bends there as it does
+                // anywhere else, between its last stretch and its first.
+                next[4] = first[4];
+                next[5] = first[5];
+                first[2] = next[2];
+                first[3] = next[3];
+            }
+            points.add(next);
+            last = next;
+        }
+        float strokeWidth = style.getStrokeWidth() == null ? 1f : style.getStrokeWidth().floatValue();
+        for (int i = 0; i < points.size(); i++) {
+            SVGMarker marker = i == 0 ? start : i == points.size() - 1 ? end : mid;
+            if (marker == null) {
+                continue;
+            }
+            double[] p = points.get(i);
+            double angle = 0;
+            boolean in = !Double.isNaN(p[2]);
+            boolean out = !Double.isNaN(p[4]);
+            if (in && out) {
+                double li = Math.hypot(p[2], p[3]);
+                double lo = Math.hypot(p[4], p[5]);
+                double bx = p[2] / li + p[4] / lo;
+                double by = p[3] / li + p[5] / lo;
+                // Doubling straight back, there is no half way: the way in.
+                angle = bx == 0 && by == 0 ? Math.atan2(p[3], p[2]) : Math.atan2(by, bx);
+            } else if (in) {
+                angle = Math.atan2(p[3], p[2]);
+            } else if (out) {
+                angle = Math.atan2(p[5], p[4]);
+            }
+            paintMarker(g, marker, p[0], p[1], angle, i == 0, strokeWidth, w, h);
+        }
+    }
+
+    private SVGMarker markerOf(String id) {
+        SVGNode def = id == null || id.length() == 0 ? null : doc.getDefinitions().get(id);
+        return def instanceof SVGMarker ? (SVGMarker) def : null;
+    }
+
+    /// Draws one marker with its reference point on a point of a line.
+    private void paintMarker(Graphics2D g, SVGMarker marker, double x, double y, double angle, boolean first,
+            float strokeWidth, int w, int h) {
+        double mw = marker.getMarkerWidth();
+        double mh = marker.getMarkerHeight();
+        if (useDepth >= MAX_USE_DEPTH || !(mw > 0) || !(mh > 0)) {
+            return;
+        }
+        String orient = marker.getOrient() == null ? "" : marker.getOrient();
+        double turn = 0;
+        if ("auto".equals(orient)) {
+            turn = angle;
+        } else if ("auto-start-reverse".equals(orient)) {
+            turn = first ? angle + Math.PI : angle;
+        } else if (orient.length() > 0) {
+            try {
+                turn = Math.toRadians(Double.parseDouble(orient.endsWith("deg")
+                        ? orient.substring(0, orient.length() - 3) : orient));
+            } catch (NumberFormatException ex) {
+                turn = 0;
+            }
+        }
+        AffineTransform savedTransform = g.getTransform();
+        Shape savedClip = g.getClip();
+        useDepth++;
+        try {
+            g.translate(x, y);
+            g.rotate(turn);
+            if (!marker.isUserSpace()) {
+                // Sized in widths of the stroke it is on.
+                g.scale(strokeWidth, strokeWidth);
+            }
+            AffineTransform fit = marker.getViewBoxWidth() > 0 && marker.getViewBoxHeight() > 0
+                    ? fit(marker.getPreserveAspectRatio(), mw, mh, marker.getViewBoxX(), marker.getViewBoxY(),
+                            marker.getViewBoxWidth(), marker.getViewBoxHeight())
+                    : new AffineTransform();
+            Point2D ref = fit.transform(new Point2D.Double(marker.getRefX(), marker.getRefY()), null);
+            g.translate(-ref.getX(), -ref.getY());
+            if (!marker.isOverflowVisible()) {
+                g.clip(new Rectangle2D.Double(0, 0, mw, mh));
+            }
+            g.transform(fit);
+            for (SVGNode child : marker.getChildren()) {
+                paintNode(g, child, marker.getStyle(), w, h);
+            }
+        } finally {
+            useDepth--;
+            g.setTransform(savedTransform);
+            g.setClip(savedClip);
+        }
+    }
+
+    /// Fits a view box into a box of `width` by `height` at the origin the
+    /// way `par`, a `preserveAspectRatio`, says: stretched for `none`, and
+    /// otherwise keeping its shape, as large as fits or for `slice` as
+    /// small as covers, in the middle unless it names a side.
+    private static AffineTransform fit(String par, double width, double height, double vx, double vy,
+            double vw, double vh) {
+        AffineTransform at = new AffineTransform();
+        String p = par == null ? "" : par.trim();
+        double sx = width / vw;
+        double sy = height / vh;
+        if (!p.startsWith("none")) {
+            double s = p.endsWith("slice") ? Math.max(sx, sy) : Math.min(sx, sy);
+            double freeX = width - vw * s;
+            double freeY = height - vh * s;
+            at.translate(p.startsWith("xMin") ? 0 : (p.startsWith("xMax") ? freeX : freeX / 2),
+                    p.indexOf("YMin") >= 0 ? 0 : (p.indexOf("YMax") >= 0 ? freeY : freeY / 2));
+            sx = s;
+            sy = s;
+        }
+        at.scale(sx, sy);
+        at.translate(-vx, -vy);
+        return at;
+    }
+
+    /// The outline `node` is clipped to by the clip path of that id, in the
+    /// coordinates of `node`, or null when there is no such clip path.
+    private Shape clipShape(SVGNode node, String ref) {
+        SVGNode clip = doc.getDefinitions().get(ref);
+        if (!(clip instanceof SVGClipPath)) {
+            return null;
+        }
+        Shape outline = clipOutline((SVGClipPath) clip);
+        if (((SVGClipPath) clip).isObjectBoundingBox()) {
+            // In fractions of the box around what is clipped. With no box
+            // to measure, nothing is inside it.
+            Rectangle2D box = boundsOf(node);
+            outline = box == null || box.isEmpty() ? new Rectangle2D.Double()
+                    : new AffineTransform(box.getWidth(), 0, 0, box.getHeight(), box.getX(), box.getY())
+                            .createTransformedShape(outline);
+        }
+        return outline;
+    }
+
     /// Draws the element a `<use>` names, at the offset it gives. What the
     /// element does not set for itself it takes from the `<use>`, as if it
     /// were written there.
     private void paintUse(Graphics2D g, SVGUse use, SVGStyle style, int w, int h) {
         SVGNode target = use.getHref() == null ? null : doc.getDefinitions().get(use.getHref());
         if (target == null || target instanceof SVGClipPath || target instanceof SVGPattern
+                || target instanceof SVGMarker || target instanceof SVGFilter
                 || target instanceof SVGLinearGradient
                 || target instanceof SVGRadialGradient) {
             return;
@@ -587,37 +864,23 @@ public final class VectorImage {
         if (!(vw > 0) || !(vh > 0)) {
             return at;
         }
-        String par = port.getPreserveAspectRatio() == null ? "" : port.getPreserveAspectRatio().trim();
-        double sx = port.getWidth() / vw;
-        double sy = port.getHeight() / vh;
-        if (!par.startsWith("none")) {
-            double s = par.endsWith("slice") ? Math.max(sx, sy) : Math.min(sx, sy);
-            double freeX = port.getWidth() - vw * s;
-            double freeY = port.getHeight() - vh * s;
-            at.translate(par.startsWith("xMin") ? 0 : (par.startsWith("xMax") ? freeX : freeX / 2),
-                    par.indexOf("YMin") >= 0 ? 0 : (par.indexOf("YMax") >= 0 ? freeY : freeY / 2));
-            sx = s;
-            sy = s;
-        }
-        at.scale(sx, sy);
-        at.translate(-port.getViewBoxX(), -port.getViewBoxY());
+        at.concatenate(fit(port.getPreserveAspectRatio(), port.getWidth(), port.getHeight(),
+                port.getViewBoxX(), port.getViewBoxY(), vw, vh));
         return at;
     }
 
     /// Where a `<use>` puts the element it draws: at its offset, and a
-    /// symbol with a view box fitted into the size the `<use>` gives.
+    /// symbol with a view box fitted into the size the `<use>` gives, the
+    /// way the symbol's `preserveAspectRatio` says.
     private static AffineTransform placing(SVGUse use, SVGNode target) {
         AffineTransform at = AffineTransform.getTranslateInstance(use.getX(), use.getY());
         if (target instanceof SVGSymbol) {
             SVGSymbol symbol = (SVGSymbol) target;
             if (symbol.getViewBoxWidth() > 0 && symbol.getViewBoxHeight() > 0
                     && use.getWidth() > 0 && use.getHeight() > 0) {
-                double s = Math.min(use.getWidth() / symbol.getViewBoxWidth(),
-                        use.getHeight() / symbol.getViewBoxHeight());
-                at.translate((use.getWidth() - symbol.getViewBoxWidth() * s) / 2,
-                        (use.getHeight() - symbol.getViewBoxHeight() * s) / 2);
-                at.scale(s, s);
-                at.translate(-symbol.getViewBoxX(), -symbol.getViewBoxY());
+                at.concatenate(fit(symbol.getPreserveAspectRatio(), use.getWidth(), use.getHeight(),
+                        symbol.getViewBoxX(), symbol.getViewBoxY(),
+                        symbol.getViewBoxWidth(), symbol.getViewBoxHeight()));
             }
         }
         return at;
@@ -670,7 +933,7 @@ public final class VectorImage {
                     new Rectangle2D.Double(port.getX(), port.getY(), port.getWidth(), port.getHeight()));
             return shown.isEmpty() ? null : shown;
         }
-        if (node instanceof SVGClipPath || node instanceof SVGPattern) {
+        if (node instanceof SVGClipPath || node instanceof SVGPattern || node instanceof SVGMarker) {
             return null;
         }
         if (!(node instanceof SVGGroup)) {
@@ -1006,6 +1269,13 @@ public final class VectorImage {
             f[i] = fractions.get(i).floatValue();
         }
         Color[] c = colors.toArray(new Color[0]);
+        // Past its ends a gradient goes on in its last colour, unless it
+        // says to start over or to run back.
+        String spread = def instanceof SVGLinearGradient ? ((SVGLinearGradient) def).getSpreadMethod()
+                : ((SVGRadialGradient) def).getSpreadMethod();
+        MultipleGradientPaint.CycleMethod cycle = "repeat".equals(spread) ? MultipleGradientPaint.CycleMethod.REPEAT
+                : "reflect".equals(spread) ? MultipleGradientPaint.CycleMethod.REFLECT
+                        : MultipleGradientPaint.CycleMethod.NO_CYCLE;
         SVGTransform gt = def instanceof SVGLinearGradient ? ((SVGLinearGradient) def).getGradientTransform()
                 : ((SVGRadialGradient) def).getGradientTransform();
         AffineTransform turned = gt == null ? null : new AffineTransform(gt.a, gt.b, gt.c, gt.d, gt.e, gt.f);
@@ -1031,7 +1301,7 @@ public final class VectorImage {
                 at.setTransform(bounds.getWidth(), 0, 0, bounds.getHeight(), bounds.getX(), bounds.getY());
             }
             at.concatenate(turned);
-            return new LinearGradientPaint(start, end, f, c, MultipleGradientPaint.CycleMethod.NO_CYCLE,
+            return new LinearGradientPaint(start, end, f, c, cycle,
                     MultipleGradientPaint.ColorSpaceType.SRGB, at);
         }
         if (def instanceof SVGLinearGradient) {
@@ -1041,7 +1311,7 @@ public final class VectorImage {
             if (start.equals(end)) {
                 return c[c.length - 1];
             }
-            return new LinearGradientPaint(start, end, f, c);
+            return new LinearGradientPaint(start, end, f, c, cycle);
         }
         SVGRadialGradient rg = (SVGRadialGradient) def;
         if (rg.isUserSpace()) {
@@ -1049,7 +1319,7 @@ public final class VectorImage {
                 return c[c.length - 1];
             }
             return new RadialGradientPaint(new Point2D.Double(rg.getCx(), rg.getCy()), rg.getR(), focusOf(rg), f, c,
-                    MultipleGradientPaint.CycleMethod.NO_CYCLE, MultipleGradientPaint.ColorSpaceType.SRGB,
+                    cycle, MultipleGradientPaint.ColorSpaceType.SRGB,
                     turned == null ? new AffineTransform() : turned);
         }
         if (rg.getR() <= 0 || bounds.getWidth() <= 0 || bounds.getHeight() <= 0) {
@@ -1064,7 +1334,7 @@ public final class VectorImage {
         }
         Point2D centre = new Point2D.Double(rg.getCx(), rg.getCy());
         return new RadialGradientPaint(centre, rg.getR(), focusOf(rg), f, c,
-                MultipleGradientPaint.CycleMethod.NO_CYCLE, MultipleGradientPaint.ColorSpaceType.SRGB, toBox);
+                cycle, MultipleGradientPaint.ColorSpaceType.SRGB, toBox);
     }
 
     /// Where a radial gradient's first colour starts: its focal point,
@@ -1123,8 +1393,13 @@ public final class VectorImage {
         SVGTransform transform = null;
         List<SVGGradientStop> stops = null;
         boolean unitsFound = false;
+        String spread = null;
         for (SVGNode node : chain) {
             boolean linear = node instanceof SVGLinearGradient;
+            if (spread == null && node.isGiven("spreadMethod")) {
+                spread = linear ? ((SVGLinearGradient) node).getSpreadMethod()
+                        : ((SVGRadialGradient) node).getSpreadMethod();
+            }
             if (!unitsFound && node.isGiven("gradientUnits")) {
                 unitsFound = true;
                 userSpace = linear ? ((SVGLinearGradient) node).isUserSpace()
@@ -1159,6 +1434,7 @@ public final class VectorImage {
                 out.setY2(from.getY2());
             }
             out.setUserSpace(userSpace);
+            out.setSpreadMethod(spread);
             out.setGradientTransform(transform);
             if (stops != null) {
                 out.getStops().addAll(stops);
@@ -1187,6 +1463,7 @@ public final class VectorImage {
             out.setFy(from.getFy());
         }
         out.setUserSpace(userSpace);
+        out.setSpreadMethod(spread);
         out.setGradientTransform(transform);
         if (stops != null) {
             out.getStops().addAll(stops);

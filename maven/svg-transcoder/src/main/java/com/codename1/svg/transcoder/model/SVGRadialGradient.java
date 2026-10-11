@@ -55,6 +55,12 @@ public final class SVGRadialGradient extends SVGNode {
     public boolean isUserSpace() { return userSpace; }
     public void setUserSpace(boolean userSpace) { this.userSpace = userSpace; }
 
+    private String spreadMethod;
+
+    /** The spreadMethod attribute as written (pad, reflect or repeat), or null. Only a renderer that reads the model applies it. */
+    public String getSpreadMethod() { return spreadMethod; }
+    public void setSpreadMethod(String v) { this.spreadMethod = v; }
+
     public String getHref() { return href; }
     public void setHref(String href) { this.href = href; }
 

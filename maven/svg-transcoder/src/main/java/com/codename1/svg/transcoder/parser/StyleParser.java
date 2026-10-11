@@ -54,6 +54,22 @@ public final class StyleParser {
         SVGStyle out = new SVGStyle();
         out.setFill(toPaint(merged.get("fill")));
         out.setStroke(toPaint(merged.get("stroke")));
+        out.setFillCurrent(ColorParser.isCurrentColor(merged.get("fill")));
+        out.setStrokeCurrent(ColorParser.isCurrentColor(merged.get("stroke")));
+        String color = merged.get("color");
+        if (color != null && !ColorParser.isCurrentColor(color) && !"inherit".equals(color.trim())) {
+            try {
+                out.setColor(Integer.valueOf(ColorParser.parse(color)));
+            } catch (RuntimeException e) {
+                // not a colour: inherited
+            }
+        }
+        String filter = merged.get("filter");
+        if (filter != null) out.setFilterRef(SVGPaint.stripUrl(filter));
+        String all = merged.get("marker");
+        out.setMarkerStart(toMarker(merged.get("marker-start"), all));
+        out.setMarkerMid(toMarker(merged.get("marker-mid"), all));
+        out.setMarkerEnd(toMarker(merged.get("marker-end"), all));
         out.setFillOpacity(toFloat(merged.get("fill-opacity")));
         out.setStrokeOpacity(toFloat(merged.get("stroke-opacity")));
         out.setOpacity(toFloat(merged.get("opacity")));
@@ -102,12 +118,20 @@ public final class StyleParser {
         return out;
     }
 
+    /** The id a marker property names, "" for {@code none}, null when neither it nor the shorthand is set. */
+    private static String toMarker(String value, String shorthand) {
+        String v = value != null ? value : shorthand;
+        if (v == null) return null;
+        String ref = SVGPaint.stripUrl(v);
+        return ref == null ? ("none".equals(v.trim()) ? "" : null) : ref;
+    }
+
     private static SVGPaint toPaint(String value) {
         if (value == null) return null;
         String v = value.trim();
         if (v.isEmpty()) return null;
         if (ColorParser.isNone(v)) return SVGPaint.NONE;
-        if (ColorParser.isCurrentColor(v)) return null; // treat as inherit; renderer defaults to black
+        if (ColorParser.isCurrentColor(v)) return null; // left unset; SVGStyle.isFillCurrent / isStrokeCurrent say it was written
         SVGPaint ref = SVGPaint.setReference(v);
         if (ref != null) return ref;
         try {

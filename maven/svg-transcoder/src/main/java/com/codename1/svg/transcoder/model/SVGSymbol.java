@@ -35,6 +35,12 @@ public final class SVGSymbol extends SVGGroup {
     public float getViewBoxWidth() { return viewBoxWidth; }
     public float getViewBoxHeight() { return viewBoxHeight; }
 
+    private String preserveAspectRatio;
+
+    /** The preserveAspectRatio attribute as written, or null. */
+    public String getPreserveAspectRatio() { return preserveAspectRatio; }
+    public void setPreserveAspectRatio(String v) { this.preserveAspectRatio = v; }
+
     public void setViewBox(float x, float y, float width, float height) {
         this.viewBoxX = x;
         this.viewBoxY = y;

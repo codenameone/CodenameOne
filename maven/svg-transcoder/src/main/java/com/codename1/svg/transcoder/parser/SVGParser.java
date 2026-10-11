@@ -59,6 +59,10 @@ public final class SVGParser {
      */
     private Map<Integer, String[]> sheetStyles;
 
+    /** The size of the viewport being read, which a percentage in it is a share of. */
+    private float viewportWidth;
+    private float viewportHeight;
+
     /** The reader of the pass that builds the tree. */
     private CountingReader reader;
 
@@ -214,6 +218,29 @@ public final class SVGParser {
         if (doc.getViewBoxHeight() == 0) doc.setViewBoxHeight(doc.getHeight());
         if (doc.getWidth() == 0) doc.setWidth(doc.getViewBoxWidth());
         if (doc.getHeight() == 0) doc.setHeight(doc.getViewBoxHeight());
+        viewportWidth = doc.getViewBoxWidth();
+        viewportHeight = doc.getViewBoxHeight();
+    }
+
+    /** A horizontal length: a percentage is that share of the viewport's width. */
+    private float lengthX(String value) {
+        return length(value, viewportWidth);
+    }
+
+    /** A vertical length: a percentage is that share of the viewport's height. */
+    private float lengthY(String value) {
+        return length(value, viewportHeight);
+    }
+
+    /** A length with no direction, a radius for one: a percentage is a share of the viewport's diagonal, evened out. */
+    private float lengthAcross(String value) {
+        return length(value, (float) Math.sqrt((viewportWidth * viewportWidth + viewportHeight * viewportHeight) / 2.0));
+    }
+
+    private static float length(String value, float whole) {
+        if (value == null) return 0f;
+        float v = NumberParser.parseFloat(value);
+        return value.trim().endsWith("%") ? v / 100f * whole : v;
     }
 
     /**
@@ -259,6 +286,7 @@ public final class SVGParser {
                 SVGSymbol symbol = new SVGSymbol();
                 Map<String, String> sa = attrs(r);
                 applyCommon(symbol, sa);
+                symbol.setPreserveAspectRatio(sa.get("preserveAspectRatio"));
                 String svb = sa.get("viewBox");
                 if (svb != null) {
                     NumberParser np = new NumberParser(svb);
@@ -313,6 +341,15 @@ public final class SVGParser {
             } else if ("radialGradient".equals(name)) {
                 SVGRadialGradient rg = readRadialGradient(r);
                 if (rg.getId() != null) doc.getDefinitions().put(rg.getId(), rg);
+            } else if ("marker".equals(name)) {
+                // Read for a renderer that draws them. The class the
+                // transcoder generates does not.
+                SVGMarker marker = readMarker(r, doc);
+                if (marker.getId() != null) doc.getDefinitions().put(marker.getId(), marker);
+                indexById(marker, doc);
+            } else if ("filter".equals(name)) {
+                SVGFilter filter = readFilter(r, doc);
+                if (filter.getId() != null) doc.getDefinitions().put(filter.getId(), filter);
             } else if ("pattern".equals(name)) {
                 // Read for a renderer that can tile one. The class the
                 // transcoder generates does not paint with it.
@@ -370,11 +407,11 @@ public final class SVGParser {
         SVGViewport v = new SVGViewport();
         Map<String, String> a = attrs(r);
         applyCommon(v, a);
-        v.setX(viewportSide(a.get("x"), 0f, doc.getViewBoxWidth()));
-        v.setY(viewportSide(a.get("y"), 0f, doc.getViewBoxHeight()));
-        // Left out, a side is the whole of the drawing it is in.
-        v.setWidth(viewportSide(a.get("width"), 1f, doc.getViewBoxWidth()));
-        v.setHeight(viewportSide(a.get("height"), 1f, doc.getViewBoxHeight()));
+        v.setX(viewportSide(a.get("x"), 0f, viewportWidth));
+        v.setY(viewportSide(a.get("y"), 0f, viewportHeight));
+        // Left out, a side is the whole of the viewport it is in.
+        v.setWidth(viewportSide(a.get("width"), 1f, viewportWidth));
+        v.setHeight(viewportSide(a.get("height"), 1f, viewportHeight));
         v.setPreserveAspectRatio(a.get("preserveAspectRatio"));
         String vb = a.get("viewBox");
         if (vb != null) {
@@ -385,11 +422,21 @@ public final class SVGParser {
                 // no view box
             }
         }
-        readChildren(r, v.getContent(), doc);
+        // What is inside measures its percentages against this one.
+        float outerWidth = viewportWidth;
+        float outerHeight = viewportHeight;
+        viewportWidth = v.getViewBoxWidth() > 0 ? v.getViewBoxWidth() : v.getWidth();
+        viewportHeight = v.getViewBoxHeight() > 0 ? v.getViewBoxHeight() : v.getHeight();
+        try {
+            readChildren(r, v.getContent(), doc);
+        } finally {
+            viewportWidth = outerWidth;
+            viewportHeight = outerHeight;
+        }
         return v;
     }
 
-    /** A side of a nested viewport: a length, or a share of the drawing's when it is a percentage or left out. */
+    /** A side of a nested viewport: a length, or a share of the enclosing viewport's when it is a percentage or left out. */
     private float viewportSide(String value, float share, float whole) {
         if (value == null) return share * whole;
         try {
@@ -409,11 +456,21 @@ public final class SVGParser {
             href = href.trim();
             use.setHref(href.startsWith("#") ? href.substring(1) : href);
         }
-        use.setX(NumberParser.parseFloat(a.get("x")));
-        use.setY(NumberParser.parseFloat(a.get("y")));
-        use.setWidth(NumberParser.parseFloat(a.get("width")));
-        use.setHeight(NumberParser.parseFloat(a.get("height")));
+        use.setX(lengthX(a.get("x")));
+        use.setY(lengthY(a.get("y")));
+        use.setWidth(lengthX(a.get("width")));
+        use.setHeight(lengthY(a.get("height")));
         return use;
+    }
+
+    /** A side of a picture's box; zero, for the picture's own size, when it is left out or cannot be read. */
+    private static float imageSide(String value, float whole) {
+        if (value == null) return 0f;
+        try {
+            return length(value, whole);
+        } catch (RuntimeException e) {
+            return 0f;
+        }
     }
 
     private SVGImage readImage(XMLStreamReader r) {
@@ -422,10 +479,10 @@ public final class SVGParser {
         applyCommon(image, a);
         String href = a.get("href");
         if (href != null) image.setHref(href.trim());
-        image.setX(NumberParser.parseFloat(a.get("x")));
-        image.setY(NumberParser.parseFloat(a.get("y")));
-        image.setWidth(lengthOrZero(a.get("width")));
-        image.setHeight(lengthOrZero(a.get("height")));
+        image.setX(lengthX(a.get("x")));
+        image.setY(lengthY(a.get("y")));
+        image.setWidth(imageSide(a.get("width"), viewportWidth));
+        image.setHeight(imageSide(a.get("height"), viewportHeight));
         image.setPreserveAspectRatio(a.get("preserveAspectRatio"));
         return image;
     }
@@ -462,6 +519,81 @@ public final class SVGParser {
             return userSpace && value.trim().endsWith("%") ? v * whole : v;
         } catch (RuntimeException e) {
             return userSpace ? fraction * whole : fraction;
+        }
+    }
+
+    private SVGMarker readMarker(XMLStreamReader r, SVGDocument doc) throws XMLStreamException {
+        SVGMarker m = new SVGMarker();
+        Map<String, String> a = attrs(r);
+        applyCommon(m, a);
+        m.setTransform(null);
+        if (a.containsKey("markerWidth")) m.setMarkerWidth(lengthX(a.get("markerWidth")));
+        if (a.containsKey("markerHeight")) m.setMarkerHeight(lengthY(a.get("markerHeight")));
+        m.setRefX(markerRef(a.get("refX")));
+        m.setRefY(markerRef(a.get("refY")));
+        m.setOrient(a.get("orient") == null ? null : a.get("orient").trim());
+        m.setUserSpace("userSpaceOnUse".equals(a.get("markerUnits")));
+        m.setPreserveAspectRatio(a.get("preserveAspectRatio"));
+        String overflow = mergedValue(a, "overflow");
+        m.setOverflowVisible(overflow != null && ("visible".equals(overflow.trim()) || "auto".equals(overflow.trim())));
+        String vb = a.get("viewBox");
+        if (vb != null) {
+            NumberParser np = new NumberParser(vb);
+            try {
+                m.setViewBox(np.nextFloat(), np.nextFloat(), np.nextFloat(), np.nextFloat());
+            } catch (RuntimeException e) {
+                // no view box
+            }
+        }
+        readChildren(r, m, doc);
+        return m;
+    }
+
+    private static float markerRef(String value) {
+        try {
+            return NumberParser.parseFloat(value);
+        } catch (RuntimeException e) {
+            // A keyword (left, center, ...): the corner, as when left out.
+            return 0f;
+        }
+    }
+
+    private SVGFilter readFilter(XMLStreamReader r, SVGDocument doc) throws XMLStreamException {
+        SVGFilter f = new SVGFilter();
+        Map<String, String> a = attrs(r);
+        f.setId(a.get("id"));
+        boolean user = "userSpaceOnUse".equals(a.get("filterUnits"));
+        f.setRegionUserSpace(user);
+        f.setRegion(regionSide(a.get("x"), -0.1f, user, doc.getViewBoxWidth()),
+                regionSide(a.get("y"), -0.1f, user, doc.getViewBoxHeight()),
+                regionSide(a.get("width"), 1.2f, user, doc.getViewBoxWidth()),
+                regionSide(a.get("height"), 1.2f, user, doc.getViewBoxHeight()));
+        f.setPrimitiveObjectBoundingBox("objectBoundingBox".equals(a.get("primitiveUnits")));
+        String space = mergedValue(a, "color-interpolation-filters");
+        f.setSrgb(space != null && "sRGB".equalsIgnoreCase(space.trim()));
+        readPrimitives(r, f.getPrimitives());
+        return f;
+    }
+
+    private void readPrimitives(XMLStreamReader r, List<SVGFilter.Primitive> into) throws XMLStreamException {
+        while (r.hasNext()) {
+            int ev = r.next();
+            if (ev == XMLStreamConstants.END_ELEMENT) return;
+            if (ev != XMLStreamConstants.START_ELEMENT) continue;
+            String name = r.getLocalName();
+            Map<String, String> a = attrs(r);
+            // A property written in the style is the property: it is
+            // looked up like an attribute and wins over one.
+            String style = a.get("style");
+            if (style != null) {
+                for (String decl : style.split(";")) {
+                    int colon = decl.indexOf(':');
+                    if (colon > 0) a.put(decl.substring(0, colon).trim(), decl.substring(colon + 1).trim());
+                }
+            }
+            SVGFilter.Primitive p = new SVGFilter.Primitive(name, a);
+            into.add(p);
+            readPrimitives(r, p.getChildren());
         }
     }
 
@@ -525,12 +657,12 @@ public final class SVGParser {
         SVGRect s = new SVGRect();
         Map<String, String> a = attrs(r);
         applyCommon(s, a);
-        s.setX(NumberParser.parseFloat(a.get("x")));
-        s.setY(NumberParser.parseFloat(a.get("y")));
-        s.setWidth(NumberParser.parseFloat(a.get("width")));
-        s.setHeight(NumberParser.parseFloat(a.get("height")));
-        s.setRx(NumberParser.parseFloat(a.get("rx")));
-        s.setRy(NumberParser.parseFloat(a.get("ry")));
+        s.setX(lengthX(a.get("x")));
+        s.setY(lengthY(a.get("y")));
+        s.setWidth(lengthX(a.get("width")));
+        s.setHeight(lengthY(a.get("height")));
+        s.setRx(lengthX(a.get("rx")));
+        s.setRy(lengthY(a.get("ry")));
         return s;
     }
 
@@ -538,9 +670,9 @@ public final class SVGParser {
         SVGCircle s = new SVGCircle();
         Map<String, String> a = attrs(r);
         applyCommon(s, a);
-        s.setCx(NumberParser.parseFloat(a.get("cx")));
-        s.setCy(NumberParser.parseFloat(a.get("cy")));
-        s.setR(NumberParser.parseFloat(a.get("r")));
+        s.setCx(lengthX(a.get("cx")));
+        s.setCy(lengthY(a.get("cy")));
+        s.setR(lengthAcross(a.get("r")));
         return s;
     }
 
@@ -548,10 +680,10 @@ public final class SVGParser {
         SVGEllipse s = new SVGEllipse();
         Map<String, String> a = attrs(r);
         applyCommon(s, a);
-        s.setCx(NumberParser.parseFloat(a.get("cx")));
-        s.setCy(NumberParser.parseFloat(a.get("cy")));
-        s.setRx(NumberParser.parseFloat(a.get("rx")));
-        s.setRy(NumberParser.parseFloat(a.get("ry")));
+        s.setCx(lengthX(a.get("cx")));
+        s.setCy(lengthY(a.get("cy")));
+        s.setRx(lengthX(a.get("rx")));
+        s.setRy(lengthY(a.get("ry")));
         return s;
     }
 
@@ -559,10 +691,10 @@ public final class SVGParser {
         SVGLine s = new SVGLine();
         Map<String, String> a = attrs(r);
         applyCommon(s, a);
-        s.setX1(NumberParser.parseFloat(a.get("x1")));
-        s.setY1(NumberParser.parseFloat(a.get("y1")));
-        s.setX2(NumberParser.parseFloat(a.get("x2")));
-        s.setY2(NumberParser.parseFloat(a.get("y2")));
+        s.setX1(lengthX(a.get("x1")));
+        s.setY1(lengthY(a.get("y1")));
+        s.setX2(lengthX(a.get("x2")));
+        s.setY2(lengthY(a.get("y2")));
         return s;
     }
 
@@ -586,8 +718,8 @@ public final class SVGParser {
         SVGText t = new SVGText();
         Map<String, String> a = attrs(r);
         applyCommon(t, a);
-        t.setX(NumberParser.parseFloat(a.get("x")));
-        t.setY(NumberParser.parseFloat(a.get("y")));
+        t.setX(lengthX(a.get("x")));
+        t.setY(lengthY(a.get("y")));
         String anchor = mergedValue(a, "text-anchor");
         if (anchor != null) {
             String norm = anchor.trim().toLowerCase();
@@ -662,6 +794,10 @@ public final class SVGParser {
         if (a.containsKey("x2")) g.setX2(parseGradCoord(a.get("x2")));
         if (a.containsKey("y2")) g.markGiven("y2");
         if (a.containsKey("y2")) g.setY2(parseGradCoord(a.get("y2")));
+        if (a.containsKey("spreadMethod")) {
+            g.markGiven("spreadMethod");
+            g.setSpreadMethod(a.get("spreadMethod").trim());
+        }
         if (a.containsKey("gradientUnits")) g.markGiven("gradientUnits");
         if ("userSpaceOnUse".equals(a.get("gradientUnits"))) g.setUserSpace(true);
         if (a.get("gradientTransform") != null) g.setGradientTransform(TransformParser.parse(a.get("gradientTransform")));
@@ -687,6 +823,10 @@ public final class SVGParser {
         if (a.containsKey("fy")) g.markGiven("fy");
         if (a.containsKey("fy")) g.setFy(Float.valueOf(parseGradCoord(a.get("fy"))));
         if (a.get("gradientTransform") != null) g.setGradientTransform(TransformParser.parse(a.get("gradientTransform")));
+        if (a.containsKey("spreadMethod")) {
+            g.markGiven("spreadMethod");
+            g.setSpreadMethod(a.get("spreadMethod").trim());
+        }
         if (a.containsKey("gradientUnits")) g.markGiven("gradientUnits");
         if ("userSpaceOnUse".equals(a.get("gradientUnits"))) g.setUserSpace(true);
         String href = a.get("href");
@@ -811,7 +951,9 @@ public final class SVGParser {
                     || "stroke-linejoin".equals(k) || "stroke-miterlimit".equals(k)
                     || "clip-path".equals(k) || "fill-rule".equals(k)
                     || "stroke-dasharray".equals(k) || "stroke-dashoffset".equals(k)
-                    || "display".equals(k) || "visibility".equals(k) || "mask".equals(k)) {
+                    || "display".equals(k) || "visibility".equals(k) || "mask".equals(k)
+                    || "color".equals(k) || "filter".equals(k) || "marker".equals(k)
+                    || "marker-start".equals(k) || "marker-mid".equals(k) || "marker-end".equals(k)) {
                 pres.put(k, e.getValue());
             }
         }
