@@ -60,6 +60,67 @@ public class OrmAnnotationProcessorTest {
     public TemporaryFolder tmp = new TemporaryFolder();
 
     @Test
+    public void generatedRepositoryExecutesCrudDerivedPagingLocksAndDeclaredQueries() throws Exception {
+        generatedRepository(false);
+        generatedRepository(true);
+    }
+    private void generatedRepository(boolean backend) throws Exception {
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("repositories.Note","package repositories; import com.codename1.annotations.*; @Entity(table=\"repository_note\") public class Note { @Id public long id; public String name; public long score; }");
+        sources.put("repositories.Notes","package repositories; import com.codename1.orm.repository.*; import java.util.List; @Repository(entity=Note.class,key=Long.class) public interface Notes extends CrudRepository<Note,Long> { "
+            + "List<Note> findByNameAndScoreGreaterThanOrderByScoreDescIdAsc(String name,long score,PageRequest page); "
+            + "List<Note> findTop1ByNameOrderByScoreDesc(String name); long countByName(String name); boolean existsByName(String name); int deleteByName(String name); "
+            + "@Lock(com.codename1.orm.session.LockMode.PESSIMISTIC_WRITE) Note findById(Long id); "
+            + "@Query(\"select sum(case when e.score>=:floor then 1 else 0 end) from repositories.Note e\") Long qualified(@Param(\"floor\") long floor); "
+            + "@Modifying @Query(\"update repositories.Note e set e.score=:score where e.name=:name\") int revise(@Param(\"name\") String name,@Param(\"score\") long score); "
+            + "@Query(value=\"SELECT COUNT(*) FROM repository_note WHERE name=:name\",nativeSql=true) Long nativeCount(@Param(\"name\") String name); }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        // Compile a real caller against the generated class, so generic signatures and all
+        // CRUD methods are checked by javac as well as exercised against a database.
+        sources.clear();
+        sources.put("repositories.Check","package repositories; import com.codename1.orm.repository.*; import com.codename1.orm.session.*; public class Check { public static void run(Session s) { "
+            + "Notes repo=new NotesCn1Repository(s); s.createTables(); s.beginTransaction(); Note a=new Note(); a.name=\"same\";a.score=3;repo.insert(a);Note b=new Note();b.name=\"same\";b.score=9;repo.insert(b);s.commitTransaction(); "
+            + "if(repo.count()!=2 || !repo.existsByName(\"same\") || repo.countByName(\"same\")!=2 || repo.nativeCount(\"same\")!=2) throw new AssertionError(\"counts\"); "
+            + "if(repo.findByNameAndScoreGreaterThanOrderByScoreDescIdAsc(\"same\",0,new PageRequest(1,1)).get(0)!=a || repo.findTop1ByNameOrderByScoreDesc(\"same\").get(0)!=b || repo.qualified(5)!=1) throw new AssertionError(\"queries\"); "
+            + "s.beginTransaction(); a.score=4; if(repo.revise(\"same\",11)!=2 || s.contains(a)) throw new AssertionError(\"bulk\"); s.rollbackTransaction(); "
+            + "if(s.find(Note.class,a.id).score!=3) throw new AssertionError(\"rollback\"); "
+            + "s.beginTransaction(); try { repo.findById(a.id); throw new AssertionError(\"SQLite should refuse row lock\"); } catch(UnsupportedOperationException expected) {} s.rollbackTransaction(); "
+            + "s.beginTransaction(); if(repo.save(a)==a) throw new AssertionError(\"merge returns managed copy\"); repo.deleteById(b.id); s.commitTransaction(); "
+            + "s.beginTransaction(); if(repo.deleteByName(\"same\")!=1) throw new AssertionError(\"delete\");s.commitTransaction();if(repo.count()!=0) throw new AssertionError(); }}");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(classes,testClassesDir()));
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+        loader.loadClass(backend ? "cn1app.BackendDaoBootstrap" : "cn1app.DaoBootstrap").newInstance();
+        com.codename1.backend.orm.EntityManager server=backend ? com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:")) : null;
+        com.codename1.orm.EntityManager client=backend ? null : com.codename1.orm.EntityManager.open(new com.codename1.impl.javase.SEDatabase(java.sql.DriverManager.getConnection("jdbc:sqlite::memory:")));
+        com.codename1.orm.session.Session session=backend ? server.openSession() : client.openSession();
+        try { loader.loadClass("repositories.Check").getMethod("run",com.codename1.orm.session.Session.class).invoke(null,session); }
+        finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
+    }
+
+    @Test
+    public void generatedRepositoriesRejectUnsupportedSignatures() throws Exception {
+        for(String declaration:new String[]{
+            "java.util.List<Note> findByMissing(String value);",
+            "long findByName(String value);",
+            "java.util.List<Note> findByName();",
+            "java.util.List<Note> findByName(long value);",
+            "@Query(\"select e from badrepo.Note e where e.name=:name\") Note lookup(String name);",
+            "@Query(\"update badrepo.Note e set e.name=:name\") int rename(@Param(\"name\") String name);",
+            "@Lock(com.codename1.orm.session.LockMode.PESSIMISTIC_WRITE) Note findByName(String name);"
+        }) {
+            File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+            sources.put("badrepo.Note","package badrepo; import com.codename1.annotations.*; @Entity public class Note { @Id public long id; public String name; }");
+            sources.put("badrepo.Notes","package badrepo; import com.codename1.orm.repository.*; @Repository(entity=Note.class,key=Long.class) public interface Notes extends CrudRepository<Note,Long> {"+declaration+"}");
+            JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+            ProcessorContext ctx=runProcessor(classes,backendClasspath());
+            assertTrue(declaration+ctx.getErrors(),ctx.hasErrors());
+            assertFalse(new File(classes,"badrepo/NotesCn1Repository.class").exists());
+        }
+    }
+
+    @Test
     public void managedPublicContractsDoNotExposeRuntimePlumbing() {
         Class<?>[] contracts = {
             com.codename1.orm.session.Session.class,

@@ -73,6 +73,7 @@ public class OrmCheck {
             notes.dropTable();
             notes.createTable();
             try {
+                generatedRepositories(em, pool.dialect().getName());
                 roundTripsEveryColumn(notes);
                 updatesAndDeletes(notes);
                 queriesByFieldName(notes, pool.dialect().getName());
@@ -106,6 +107,39 @@ public class OrmCheck {
         if(!failures.isEmpty()) {
             System.exit(1);
         }
+    }
+
+    private static void generatedRepositories(EntityManager em, String dialect) {
+        com.codename1.orm.session.Session s=em.openSession();
+        try {
+            s.createTables();
+            Records records=new RecordsCn1Repository(s);
+            s.beginTransaction();
+            s.createQuery("delete from com.demo.RepositoryRecord").executeUpdate();
+            RepositoryRecord first=new RepositoryRecord();first.name="repository";first.score=3;records.insert(first);
+            RepositoryRecord second=new RepositoryRecord();second.name="repository";second.score=9;records.insert(second);
+            s.commitTransaction();
+            check("repository count", "2", ""+records.count());
+            check("repository exists", "true", ""+records.existsByName("repository"));
+            check("repository native binding", "2", ""+records.nativeCount("repository"));
+            check("repository CASE aggregate", "1", ""+records.qualified(5));
+            check("repository ordered page", ""+first.id, ""+records.findByNameAndScoreGreaterThanOrderByScoreDescIdAsc(
+                    "repository",0,new com.codename1.orm.repository.PageRequest(1,1)).get(0).id);
+            s.beginTransaction();first.score=4;
+            check("repository bulk rows", "2", ""+records.revise("repository",11));
+            check("repository bulk clears", "false", ""+s.contains(first));
+            s.rollbackTransaction();
+            check("repository rollback", "1", ""+records.qualified(5));
+            s.beginTransaction();
+            if (!"sqlite".equals(dialect)) {
+                check("repository locked lookup", "3", ""+records.findById(first.id).score);
+            } else {
+                try { records.findById(first.id); check("repository SQLite lock rejection","rejected","accepted"); }
+                catch(UnsupportedOperationException expected) { passed++; }
+            }
+            check("repository derived delete", "2", ""+records.deleteByName("repository"));
+            s.commitTransaction();
+        } finally { s.close(); }
     }
 
     /**

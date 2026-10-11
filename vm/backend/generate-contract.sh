@@ -131,7 +131,8 @@ for f in $(find contract -name '*.java'); do
     dao="gen/${rel%.java}Cn1BackendDao.class"
     # An @Entity ships for the same reason a DTO does: the generated dao names
     # it, so dropping the class would leave the dao unlinkable.
-    if [ ! -f "$codec" ] && [ ! -f "$dao" ]; then
+    repository="gen/${rel%.java}Cn1Repository.class"
+    if [ ! -f "$codec" ] && [ ! -f "$dao" ] && [ ! -f "$repository" ]; then
         rm -f "$cls" "gen/${rel%.java}"'$'*.class 2>/dev/null || true
     fi
 done

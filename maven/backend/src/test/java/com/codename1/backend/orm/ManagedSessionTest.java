@@ -33,6 +33,45 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ManagedSessionTest {
+    @Test void caseAndNativeQueriesUseSessionSemantics() throws Exception {
+        EntityManager em=manager(); Session session=em.openSession();
+        try { session.createTables(); assertCaseAndNativeQueries(session); }
+        finally { session.close(); em.close(); }
+    }
+    static void assertCaseAndNativeQueries(Session s) {
+        s.beginTransaction();
+        Record one=new Record();one.name="case-first";one.counter=4;s.persist(one);
+        Record two=new Record();two.name="case-second";two.counter=7;s.persist(two);
+        Record three=new Record();three.counter=2;s.persist(three);
+        s.commitTransaction();
+        assertEquals(Long.valueOf(11),s.createQuery("select sum(case when r.counter>=:floor then r.counter else 0 end) from "+Record.class.getName()+" r",Long.class).setParameter("floor",4L).first());
+        assertEquals(Long.valueOf(2),s.createQuery("select sum(case r.name when :first then 1 when 'case-second' then 1 else 0 end) from "+Record.class.getName()+" r",Long.class).setParameter("first","case-first").first());
+        assertEquals(Long.valueOf(2),s.createQuery("select sum(case (r.counter>=4) when true then 1 else 0 end) from "+Record.class.getName()+" r",Long.class).first());
+        assertEquals(Long.valueOf(1),s.createQuery("select sum(case when r.name is null then 1 end) from "+Record.class.getName()+" r",Long.class).first());
+        assertNull(s.createQuery("select sum(case when r.counter<0 then 1 end) from "+Record.class.getName()+" r",Long.class).first());
+        assertEquals(Double.valueOf(1.5),s.createQuery("select case when r.counter=4 then 1.5 else 0 end from "+Record.class.getName()+" r where r.id=:id",Double.class).setParameter("id",one.id).first());
+        assertEquals("yes",s.createQuery("select case when r.counter=4 then case when r.name=:name then 'yes' else 'no' end else 'other' end from "+Record.class.getName()+" r where r.id=:id",String.class).setParameter("name","case-first").setParameter("id",one.id).first());
+        assertEquals(Long.valueOf(1),s.createQuery("select count(r) from "+Record.class.getName()+" r where r.name=case when true then :name else 'none' end",Long.class).setParameter("name","case-first").first());
+        s.beginTransaction();
+        assertEquals(3,s.createQuery("update "+Record.class.getName()+" r set r.name=case when true then :name else r.name end").setParameter("name","renamed").executeUpdate());
+        s.rollbackTransaction();one=s.find(Record.class,one.id);
+        assertThrows(IllegalArgumentException.class,()->s.createQuery("select case when r.counter>0 then 1 else 'text' end from "+Record.class.getName()+" r"));
+        assertThrows(IllegalArgumentException.class,()->s.createQuery("select case when r.counter>0 then :a else :b end from "+Record.class.getName()+" r"));
+        assertThrows(IllegalArgumentException.class,()->s.createQuery("select case when r.counter>0 then 1 from "+Record.class.getName()+" r"));
+        assertThrows(IllegalArgumentException.class,()->s.createQuery("select sum(case when r.counter>:floor then 1 else 0 end) from "+Record.class.getName()+" r").first());
+        assertEquals(Long.valueOf(2),s.createNativeQuery("SELECT COUNT(*) FROM managed_record WHERE counter>=:floor OR counter=:floor",Long.class).setParameter("floor",4L).first());
+        assertEquals(Integer.valueOf(4),s.createNativeQuery("SELECT counter FROM managed_record WHERE id=:id",Integer.class).setParameter("id",one.id).first());
+        assertEquals(":literal",s.createNativeQuery("SELECT ':literal' FROM managed_record WHERE id=:id",String.class).setParameter("id",one.id).first());
+        assertThrows(IllegalArgumentException.class,()->s.createNativeQuery("SELECT counter FROM managed_record; DELETE FROM managed_record",Long.class));
+        assertThrows(IllegalArgumentException.class,()->s.createNativeQuery("SELECT counter FROM managed_record WHERE id=:id",Long.class).first());
+        assertThrows(PersistenceException.class,()->s.createNativeQuery("UPDATE managed_record SET counter=:n",Object.class).setParameter("n",9L).executeUpdate());
+        s.beginTransaction();one.counter=8;
+        assertEquals(1,s.createNativeQuery("UPDATE managed_record SET counter=:n WHERE id=:id AND counter=:old",Object.class).setParameter("n",9L).setParameter("id",one.id).setParameter("old",8L).executeUpdate());
+        assertFalse(s.contains(one));assertEquals(9,s.find(Record.class,one.id).counter);
+        s.rollbackTransaction();assertEquals(4,s.find(Record.class,one.id).counter);
+        s.beginTransaction();s.createQuery("delete from "+Record.class.getName()+"").executeUpdate();s.commitTransaction();
+    }
+
     static class Record {
         long id,version,counter;
         String name;

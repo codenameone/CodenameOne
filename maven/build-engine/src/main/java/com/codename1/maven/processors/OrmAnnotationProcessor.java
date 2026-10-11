@@ -101,6 +101,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     static {
         Set<String> s = new LinkedHashSet<String>();
         s.add(ENTITY_DESC);
+        s.add(RepositoryGenerator.REPOSITORY);
         s.add(MIGRATION_DESC);
         DESCRIPTORS = Collections.unmodifiableSet(s);
     }
@@ -114,6 +115,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     /// Whether this module's daos go over the server-side backend runtime
     /// rather than over the Codename One core. Settled once in [#start].
     private boolean backend;
+    private final List<AnnotatedClass> repositories = new ArrayList<AnnotatedClass>();
 
     /// Set to skip the detection in [#start]. The native packaging goal knows
     /// the answer and the classpath cannot tell it: `cn1:backend-package`
@@ -138,6 +140,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     @Override
     public void start(ProcessorContext ctx) throws ProcessingException {
         accepted.clear();
+        repositories.clear();
         javaMigrations.clear();
         try { dependencyOverlays=OrmEnhancer.prepare(ctx); }
         catch(IOException error) { throw new ProcessingException("Could not refresh enhanced dependencies",error); }
@@ -271,6 +274,10 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
 
     @Override
     public void processClass(AnnotatedClass cls, ProcessorContext ctx) throws ProcessingException {
+        if (cls.getClassAnnotation(RepositoryGenerator.REPOSITORY) != null
+                && BuildHintAnnotationProcessor.hasBackingSource(cls, ctx.getCompileSourceRoots(), ctx.getSourceEncoding())) {
+            repositories.add(cls);
+        }
         processClass(cls, ctx, true);
     }
 
@@ -784,6 +791,17 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             sources.put(MigrationGenerator.BACKEND_CLI_BINARY,
                     MigrationGenerator.cliSource(librarySets, !migrations.isEmpty()));
         }
+        for (AnnotatedClass repository : repositories) {
+            try {
+                String name = repository.getBinaryName() + "Cn1Repository";
+                if (!wouldReplaceAnExistingClass(name, "repository for " + repository.getBinaryName(), ctx)) {
+                    sources.put(name, RepositoryGenerator.generate(repository, accepted));
+                }
+            } catch (IllegalArgumentException error) {
+                ctx.error(repository.getBinaryName() + ": " + error.getMessage());
+            }
+        }
+        if (ctx.hasErrors()) return;
         if (accepted.isEmpty() && migrations.isEmpty()) {
             removeAStaleBootstrap(ctx);
             if (!sources.isEmpty()) {

@@ -331,6 +331,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         String field;
         Parameter parameter;
         final List<Expr> children = new ArrayList<Expr>();
+        List<Expr> resultBranches;
         boolean literal;
         boolean aggregate;
         boolean numericOperands;
@@ -845,7 +846,62 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             }
             return left;
         }
+        private Expr caseExpression() {
+            Expr operand = peek("WHEN") ? null : expression();
+            List<Expr> conditions = new ArrayList<Expr>();
+            List<Expr> branches = new ArrayList<Expr>();
+            List<String> predicates = new ArrayList<String>();
+            do {
+                expect("WHEN");
+                Expr test = expression();
+                if (operand != null) {
+                    compatible(operand, test);
+                    bindType(operand, test);
+                    bindType(test, operand);
+                    String left = operand.sql, right = test.sql;
+                    if (operand.kind == Attribute.BOOLEAN || test.kind == Attribute.BOOLEAN) {
+                        left = condition(operand); right = condition(test);
+                    } else if (numericKind(operand.kind) && numericKind(test.kind)
+                            && (operand.kind == Attribute.REAL || test.kind == Attribute.REAL)) {
+                        left = session.numericOperand(left, Attribute.REAL);
+                        right = session.numericOperand(right, Attribute.REAL);
+                    }
+                    test = node("(" + left + " = " + right + ")", Attribute.BOOLEAN, operand, test);
+                }
+                predicates.add(condition(test));
+                conditions.add(test);
+                expect("THEN");
+                branches.add(expression());
+            } while (peek("WHEN"));
+            branches.add(take("ELSE") ? expression() : literal(-1, null));
+            expect("END");
+            int kind = commonKind(branches);
+            if (kind < 0) throw error("CASE needs at least one typed result branch");
+            Expr mapping = coalesceMapping(branches);
+            StringBuilder sql = new StringBuilder("CASE");
+            for (int i = 0; i < branches.size(); i++) {
+                Expr branch = branches.get(i);
+                requireKind(branch, kind);
+                if (branch.entity != null || branch.association || branch.predicate) {
+                    throw error("CASE result branches must be scalar values, not entities or predicates");
+                }
+                if (mapping != null && mapping.projectionQuery != null) bindType(mapping, branch);
+                sql.append(i < predicates.size() ? " WHEN " + predicates.get(i) + " THEN " : " ELSE ");
+                // Explicit numeric casts give PostgreSQL the same branch promotion as SQLite.
+                sql.append(numericKind(kind) ? session.numericOperand(branch.sql, kind) : branch.sql);
+            }
+            Expr result = new Expr(sql.append(" END").toString(), kind);
+            result.resultBranches = branches;
+            result.children.addAll(conditions);
+            result.children.addAll(branches);
+            if (mapping != null && mapping.projectionQuery != null && kind == mapping.kind) {
+                result.query = result.projectionQuery = mapping.projectionQuery;
+                result.field = result.projectionField = mapping.projectionField;
+            }
+            return result;
+        }
         private Expr primary() {
+            if (take("CASE")) return caseExpression();
             if (take("-")) {
                 String magnitude = peek();
                 if (magnitude.length() > 0 && Character.isDigit(magnitude.charAt(0))
@@ -1137,6 +1193,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             result.nullPreserving = true;
             result.numericOperands = true;
             result.predicate = value.predicate;
+            result.resultBranches = value.resultBranches;
             result.association = value.association;
             result.projectionQuery = value.projectionQuery;
             result.projectionField = value.projectionField;
@@ -1181,6 +1238,12 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 return value.literalBinding.convert() != null;
             }
             if (value.nonNull) {
+                return true;
+            }
+            if (value.resultBranches != null) {
+                for (Expr branch : value.resultBranches) {
+                    if (!nonNullExpression(branch, allowParameters, enforce)) return false;
+                }
                 return true;
             }
             if (value.coalesce) {
@@ -1255,8 +1318,8 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             if (value.parameter != null) {
                 value.parameter.integralAssignment = true;
             }
-            if (value.kind < 0 || value.numericOperands) {
-                for (Expr child : value.children) {
+            if (value.kind < 0 || value.numericOperands || value.resultBranches != null) {
+                for (Expr child : value.resultBranches == null ? value.children : value.resultBranches) {
                     requireIntegralAssignment(child);
                 }
             }
@@ -1269,7 +1332,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     && !mapping.equals(value.projectionQuery.mapping(value.projectionField))) {
                 throw error("Bulk assignment requires matching domain and converter mappings");
             }
-            for (Expr child : value.children) {
+            for (Expr child : value.resultBranches == null ? value.children : value.resultBranches) {
                 validateAssignment(mapping, child);
             }
         }
@@ -1285,7 +1348,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 value.parameter.query = attribute.query;
                 value.parameter.field = attribute.field;
             }
-            for (Expr child : value.children) {
+            for (Expr child : value.resultBranches == null ? value.children : value.resultBranches) {
                 bindType(attribute, child);
             }
         }
