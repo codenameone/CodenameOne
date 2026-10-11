@@ -33,6 +33,25 @@ import java.util.Properties;
 import static org.junit.jupiter.api.Assertions.*;
 
 class BackendPackageJavaLevelTest {
+    @Test void generatedSourceDirectoriesFollowCompilerConfiguration() {
+        MavenProject project = project();
+        project.getBuild().setDirectory("custom-target");
+        assertEquals(new java.io.File("custom-target/generated-sources/annotations"),
+                BackendPackageMojo.generatedSourcesDirectory(project, new Properties(), false));
+        assertEquals(new java.io.File("custom-target/generated-test-sources/test-annotations"),
+                BackendPackageMojo.generatedSourcesDirectory(project, new Properties(), true));
+        Plugin compiler = new Plugin();
+        compiler.setArtifactId("maven-compiler-plugin");
+        compiler.setConfiguration(configuration("generatedSourcesDirectory", "custom/main"));
+        compiler.addExecution(execution("default-testCompile", null, "testCompile", "generatedTestSourcesDirectory", "custom/tests"));
+        project.getBuild().addPlugin(compiler);
+        project.getBuild().flushPluginMap();
+        assertEquals(new java.io.File("custom/main"),
+                BackendPackageMojo.generatedSourcesDirectory(project, new Properties(), false));
+        assertEquals(new java.io.File("custom/tests"),
+                BackendPackageMojo.generatedSourcesDirectory(project, new Properties(), true));
+    }
+
     @Test void processorPathsResolveTransitivelyWithManagementAndExclusions() throws Exception {
         MavenProject project = project();
         Plugin compiler = new Plugin();

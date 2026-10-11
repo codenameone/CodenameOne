@@ -232,6 +232,8 @@ public class BackendPackageMojo extends AbstractMojo {
                 compilerOption(project, userProperties, "target", false),
                 compilerOption(project, userProperties, "release", false));
         packager.compilerOptions(compilerOptions(project, userProperties, false));
+        packager.generatedSources(java.util.Collections.singletonList(
+                generatedSourcesDirectory(project, userProperties, false)));
     }
 
     static void configureTestJavaLevel(BackendTestPackager packager, MavenProject project,
@@ -244,6 +246,19 @@ public class BackendPackageMojo extends AbstractMojo {
         if (release == null) release = compilerOption(project, userProperties, "release", true);
         packager.testJavaLevel(source, target, release);
         packager.testCompilerOptions(compilerOptions(project, userProperties, true));
+        packager.testGeneratedSources(java.util.Collections.singletonList(
+                generatedSourcesDirectory(project, userProperties, true)));
+    }
+
+    static File generatedSourcesDirectory(MavenProject project, java.util.Properties properties, boolean tests) {
+        String configured = compilerOption(project, properties,
+                tests ? "generatedTestSourcesDirectory" : "generatedSourcesDirectory", tests);
+        String build = project.getBuild().getDirectory();
+        File directory = configured == null
+                ? new File(build == null ? "target" : build,
+                        tests ? "generated-test-sources/test-annotations" : "generated-sources/annotations")
+                : new File(configured);
+        return directory.isAbsolute() ? directory : new File(project.getBasedir(), directory.getPath());
     }
 
     static List<String> compilerOptions(MavenProject project, java.util.Properties userProperties, boolean tests) {

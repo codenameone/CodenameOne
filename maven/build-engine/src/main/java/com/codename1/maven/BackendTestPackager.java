@@ -166,6 +166,16 @@ public abstract class BackendTestPackager extends BackendPackager {
     private String testRelease;
     private boolean testJavaLevelConfigured;
     private List<String> testCompilerOptions;
+    private List<File> testGeneratedSources = new ArrayList<File>();
+
+    public BackendTestPackager testGeneratedSources(List<File> directories) {
+        testGeneratedSources = new ArrayList<File>(directories);
+        return this;
+    }
+
+    private List<String> effectiveTestCompilerOptions() {
+        return testCompilerOptions == null ? applicationCompilerOptions : testCompilerOptions;
+    }
 
     public BackendTestPackager testCompilerOptions(List<String> options) {
         testCompilerOptions = new ArrayList<String>(options);
@@ -248,9 +258,9 @@ public abstract class BackendTestPackager extends BackendPackager {
         List<String> classpath = new ArrayList<String>();
         classpath.add(classes.getAbsolutePath());
         classpath.addAll(compileClasspathWithoutRuntime());
-        List<String> options = new ArrayList<String>(testCompilerOptions == null
-                ? applicationCompilerOptions : testCompilerOptions);
-        options.addAll(Arrays.asList("-sourcepath", join(testSourceRoots(), File.pathSeparator), "-implicit:class"));
+        List<String> options = new ArrayList<String>(effectiveTestCompilerOptions());
+        List<String> sourcePath = recompilationInputs(testSourceRoots(), testGeneratedSources, options);
+        options.addAll(Arrays.asList("-sourcepath", join(sourcePath, File.pathSeparator), "-implicit:class"));
         compileSources(jdk, javaApi, testClasses, sources, classpath,
                 testSource == null ? applicationSource : testSource,
                 testTarget == null ? applicationTarget : testTarget,
@@ -440,7 +450,7 @@ public abstract class BackendTestPackager extends BackendPackager {
             File base = new File(root);
             List<String> found = new ArrayList<String>();
             collectJava(base, found);
-            for (String path : found) {
+            for (String path : recompilationInputs(found, testGeneratedSources, effectiveTestCompilerOptions())) {
                 File f = new File(path);
                 try {
                     texts.put(f, new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8));

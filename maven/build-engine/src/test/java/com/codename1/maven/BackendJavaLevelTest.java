@@ -147,7 +147,7 @@ class BackendJavaLevelTest {
         Path service = processors.resolve("META-INF/services/javax.annotation.processing.Processor");
         Files.createDirectories(service.getParent());
         Files.write(service, "Generate".getBytes("UTF-8"));
-        Path source = dir.resolve("UsesGenerated.java");
+        Path source = Files.createDirectory(dir.resolve("src")).resolve("UsesGenerated.java");
         Files.write(source, "public class UsesGenerated { int value() {return Generated.value();} }".getBytes("UTF-8"));
         BackendPackager packager = new BackendPackager(host(dir, dir));
         File output = Files.createDirectory(dir.resolve("out")).toFile();
@@ -155,6 +155,27 @@ class BackendJavaLevelTest {
         packager.compileSources(jdk, nativeApi, output, Collections.singletonList(source.toString()),
                 Collections.singletonList(processors.toString()), "25", "25", "25", "compile with processor");
         assertTrue(new File(output, "Generated.class").isFile());
+        // The JVM build has already generated sources. Reproduces both adapters
+        // passing those sources explicitly while the processor runs again.
+        TestProjectHost nativeHost = host(dir, source.getParent());
+        nativeHost.sourceRoots.add(output.toString());
+        BackendPackager nativePackager = new BackendPackager(nativeHost);
+        nativePackager.javaLevel(null, null, "25").compilerOptions(Arrays.asList("-processorpath", processors.toString()));
+        Path runtime = Files.createDirectory(dir.resolve("runtime"));
+        Files.write(runtime.resolve("Library.java"), "public class Library {}".getBytes("UTF-8"));
+        File nativeClasses = Files.createDirectory(dir.resolve("native-classes")).toFile();
+        BuildExecutionException duplicate = assertThrows(BuildExecutionException.class, () ->
+                nativePackager.compile(jdk, nativeApi, runtime.toFile(), nativeClasses));
+        assertTrue(duplicate.getMessage().contains("Attempt to recreate a file"), duplicate.getMessage());
+        nativePackager.generatedSources(Collections.singletonList(output));
+        nativePackager.compile(jdk, nativeApi, runtime.toFile(), nativeClasses);
+        assertTrue(new File(nativeClasses, "Generated.class").isFile());
+        // With processing disabled, use the prior generated sources instead.
+        org.apache.commons.io.FileUtils.cleanDirectory(nativeClasses);
+        nativePackager.compilerOptions(Collections.singletonList("-proc:none"));
+        nativePackager.compile(jdk, nativeApi, runtime.toFile(), nativeClasses);
+        assertTrue(new File(nativeClasses, "Generated.class").isFile());
+
         File disabled = Files.createDirectory(dir.resolve("disabled")).toFile();
         assertThrows(BuildExecutionException.class, () -> packager.compileSources(jdk, nativeApi, disabled,
                 Collections.singletonList(source.toString()), Collections.singletonList(processors.toString()),

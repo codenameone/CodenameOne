@@ -106,11 +106,8 @@ final class BackendPackageSupport {
                                             ? mainCompiler : testCompiler)
                             .map(c -> c.getMetadata().getInstallationPath().getAsFile().getAbsolutePath())));
             t.getTestSources().from(test.getJava().getSrcDirs());
-            // What test annotation processors generated, as configure() adds the
-            // main ones: the compiled run recompiles the tests from source.
-            t.getTestSources().from(project.getTasks().named(test.getCompileJavaTaskName(),
-                    org.gradle.api.tasks.compile.JavaCompile.class)
-                    .flatMap(c -> c.getOptions().getGeneratedSourceOutputDirectory()));
+            t.getTestGeneratedSources().from(testCompile.flatMap(c -> c.getOptions().getGeneratedSourceOutputDirectory()));
+            t.getTestSources().from(t.getTestGeneratedSources());
             // The Kotlin test directory too, so the packager can refuse Kotlin
             // tests by name instead of compiling the run without them. Only the
             // conventional one: a Kotlin source set moved elsewhere is not looked
@@ -147,12 +144,12 @@ final class BackendPackageSupport {
                 .getIncoming().artifactView(v -> v.setLenient(true)).getArtifacts().getResolvedArtifacts()
                 .map(set -> AppSupport.encode(set, "compile")));
         t.getSources().from(main.getJava().getSrcDirs());
-        // What annotation processors (annotationProcessor(...)) generated: the
-        // packager compiles the sources again, without javac's processor path,
-        // so it needs their output the way runBackend has it from the classes.
-        t.getSources().from(project.getTasks().named(main.getCompileJavaTaskName(),
+        // Retain prior processor output only when processing is disabled. The
+        // engine excludes these directories when it reruns the processors.
+        t.getGeneratedSources().from(project.getTasks().named(main.getCompileJavaTaskName(),
                 org.gradle.api.tasks.compile.JavaCompile.class)
                 .flatMap(c -> c.getOptions().getGeneratedSourceOutputDirectory()));
+        t.getSources().from(t.getGeneratedSources());
         t.getSourceEncoding().set(AppSupport.javaEncoding(project, main));
         org.gradle.api.tasks.TaskProvider<org.gradle.api.tasks.compile.JavaCompile> compile =
                 project.getTasks().named(main.getCompileJavaTaskName(), org.gradle.api.tasks.compile.JavaCompile.class);
@@ -196,6 +193,10 @@ final class BackendPackageSupport {
         @InputFiles
         @PathSensitive(PathSensitivity.RELATIVE)
         public abstract ConfigurableFileCollection getSources();
+
+        @InputFiles
+        @PathSensitive(PathSensitivity.RELATIVE)
+        public abstract ConfigurableFileCollection getGeneratedSources();
 
         /// The entry point, when not the generated one.
         @Input
@@ -274,7 +275,8 @@ final class BackendPackageSupport {
             File processed = resources.hasNext() ? resources.next() : layout.resourcesOutputDir();
             BackendPackager packager = packager(host, layout, toolchain, processed);
             try {
-                packager.compilerOptions(withProcessors(getCompilerOptions().get(), getAnnotationProcessorPath()));
+                packager.compilerOptions(withProcessors(getCompilerOptions().get(), getAnnotationProcessorPath()))
+                        .generatedSources(new ArrayList<File>(getGeneratedSources().getFiles()));
                 packager.javaLevel(getJavaSource().get(), getJavaTarget().get(), getJavaRelease().getOrNull());
                 packager.mainClass(getMainClass().getOrNull()).output(getBinary().get().getAsFile())
                         .target(getTarget().getOrNull()).jdk(getJdk().getOrNull(), null).cflags(getCflags().getOrNull())
@@ -405,6 +407,10 @@ final class BackendPackageSupport {
 
         @InputFiles
         @PathSensitive(PathSensitivity.RELATIVE)
+        public abstract ConfigurableFileCollection getTestGeneratedSources();
+
+        @InputFiles
+        @PathSensitive(PathSensitivity.RELATIVE)
         public abstract ConfigurableFileCollection getTestResources();
 
         @Classpath
@@ -429,6 +435,7 @@ final class BackendPackageSupport {
             com.codename1.maven.BackendTestPackager p = new GradleBackendTestPackager(host, layout, toolchain,
                     processed, roots, testResources, testClasspath);
             p.strict(getStrict().get());
+            p.testGeneratedSources(new ArrayList<File>(getTestGeneratedSources().getFiles()));
             p.testCompilerOptions(withProcessors(getTestCompilerOptions().get(), getTestAnnotationProcessorPath()));
             p.testJavaLevel(getTestJavaSource().get(), getTestJavaTarget().get(), getTestJavaRelease().getOrNull());
             return p;
