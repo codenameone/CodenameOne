@@ -138,8 +138,19 @@ final class BackendRecordMethods implements Opcodes {
         for (RecordComponentNode field : node.recordComponents) {
             mv.visitIntInsn(BIPUSH, 31);
             mv.visitInsn(IMUL);
-            component(node, mv, field, 0);
-            mv.visitMethodInsn(INVOKESTATIC, "java/util/Objects", "hashCode", "(Ljava/lang/Object;)I", false);
+            if ("Z".equals(field.descriptor)) {
+                // The native Boolean wrapper does not implement the JDK hash.
+                // Emit true -> 1231 / false -> 1237 without boxing or branches.
+                mv.visitIntInsn(SIPUSH, 1237);
+                mv.visitVarInsn(ALOAD, 0);
+                mv.visitFieldInsn(GETFIELD, node.name, field.name, "Z");
+                mv.visitIntInsn(BIPUSH, 6);
+                mv.visitInsn(IMUL);
+                mv.visitInsn(ISUB);
+            } else {
+                component(node, mv, field, 0);
+                mv.visitMethodInsn(INVOKESTATIC, "java/util/Objects", "hashCode", "(Ljava/lang/Object;)I", false);
+            }
             mv.visitInsn(IADD);
         }
         mv.visitInsn(IRETURN);

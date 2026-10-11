@@ -77,6 +77,44 @@ class BackendPackageJavaLevelTest {
         assertEquals("25", option(project, cli, "testRelease", true));
     }
 
+    @Test void honorsCustomCompilerExecutionsAndSkipsDisabledDefaults() {
+        MavenProject project = project();
+        Plugin compiler = new Plugin();
+        compiler.setGroupId("org.apache.maven.plugins");
+        compiler.setArtifactId("maven-compiler-plugin");
+        compiler.setConfiguration(configuration("release", "8"));
+        compiler.addExecution(execution("default-compile", "none", "compile", "release", "8"));
+        compiler.addExecution(execution("modern-main", "compile", "compile", "release", "25"));
+        compiler.addExecution(execution("default-testCompile", "none", "testCompile", "testRelease", "8"));
+        compiler.addExecution(execution("modern-tests", "test-compile", "testCompile", "testRelease", "17"));
+        // An execution outside the lifecycle interval must not override the active one.
+        compiler.addExecution(execution("later-main", "package", "compile", "release", "8"));
+        project.getBuild().addPlugin(compiler);
+        assertEquals("25", option(project, new Properties(), "release", false));
+        assertEquals("17", option(project, new Properties(), "testRelease", true));
+    }
+
+    @Test void customExecutionUsesGoalDefaultPhaseAndMergesPluginSettings() {
+        MavenProject project = project();
+        Plugin compiler = new Plugin();
+        compiler.setGroupId("org.apache.maven.plugins");
+        compiler.setArtifactId("maven-compiler-plugin");
+        compiler.setConfiguration(configuration("source", "17"));
+        compiler.addExecution(execution("custom-main", null, "compile", "target", "25"));
+        // Declaring a lifecycle default later in the model does not make it run last.
+        compiler.addExecution(execution("default-compile", null, "compile", "target", "8"));
+        project.getBuild().addPlugin(compiler);
+        assertEquals("17", option(project, new Properties(), "source", false));
+        assertEquals("25", option(project, new Properties(), "target", false));
+    }
+
+    private static PluginExecution execution(String id, String phase, String goal, String name, String value) {
+        PluginExecution execution = new PluginExecution();
+        execution.setId(id); execution.setPhase(phase); execution.addGoal(goal);
+        execution.setConfiguration(configuration(name, value));
+        return execution;
+    }
+
     private static MavenProject project() {
         Model model = new Model();
         model.setBuild(new Build());

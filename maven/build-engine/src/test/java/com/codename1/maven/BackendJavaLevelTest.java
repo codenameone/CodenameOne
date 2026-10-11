@@ -156,6 +156,67 @@ class BackendJavaLevelTest {
         assertEquals(expected, run(jdk, "java", "-cp", output.toString(), "RecordSemantics"));
     }
 
+    @Test void rejectsPatternSwitchBeforeTranslation(@TempDir Path dir) throws Exception {
+        File jdk = jdk("25");
+        Path source = dir.resolve("PatternSwitch.java");
+        Files.write(source, ("class PatternSwitch { static int length(Object value) {"
+                + " return switch(value) { case String s -> s.length(); default -> 0; }; } }").getBytes("UTF-8"));
+        File classes = Files.createDirectory(dir.resolve("classes")).toFile();
+        run(jdk, "javac", "--release", "25", "-d", classes.toString(), source.toString());
+        BackendPackager packager = new BackendPackager(host(dir, dir));
+        BuildExecutionException error = assertThrows(BuildExecutionException.class,
+                () -> packager.checkApplication(classes, api(dir), Collections.<String>emptyList()));
+        assertTrue(error.getMessage().contains("SwitchBootstraps.typeSwitch"), error.getMessage());
+        File staged = Files.createDirectory(dir.resolve("staged")).toFile();
+        File natives = Files.createDirectory(dir.resolve("natives")).toFile();
+        error = assertThrows(BuildExecutionException.class, () -> packager.prepareDependencyClasses(
+                Collections.singletonList(classes.toString()), staged, natives));
+        assertTrue(error.getMessage().contains("SwitchBootstraps.typeSwitch"), error.getMessage());
+    }
+
+    @Test void permitsLambdaAndStringConcatenationBootstraps(@TempDir Path dir) throws Exception {
+        File jdk = jdk("17");
+        Path source = dir.resolve("Supported.java");
+        Files.write(source, ("class Supported { static java.util.function.Supplier<String> make(int value) {"
+                + " return () -> \"value=\" + value; } }").getBytes("UTF-8"));
+        File classes = Files.createDirectory(dir.resolve("classes")).toFile();
+        run(jdk, "javac", "--release", "17", "-d", classes.toString(), source.toString());
+        new BackendPackager(host(dir, dir)).checkApplication(classes, api(dir), Collections.<String>emptyList());
+    }
+
+    @Test void stagesAndMaterializesRecordDependenciesWithoutChangingOriginals(@TempDir Path dir) throws Exception {
+        File jdk = jdk("17");
+        Path source = dir.resolve("Shared.java");
+        Files.write(source, ("public record Shared(boolean enabled) {"
+                + " public static void main(String[] args) {"
+                + " System.out.println(new Shared(true).hashCode());"
+                + " System.out.println(new Shared(false).hashCode());"
+                + " System.out.println(new Shared(true));"
+                + " System.out.println(new Shared(true).equals(new Shared(true)));"
+                + " System.out.println(new Shared(true).equals(new Shared(false))); } }").getBytes("UTF-8"));
+        Path original = Files.createDirectory(dir.resolve("dependency"));
+        run(jdk, "javac", "--release", "17", "-d", original.toString(), source.toString());
+        byte[] originalBytes = Files.readAllBytes(original.resolve("Shared.class"));
+        Path jar = dir.resolve("dependency.jar");
+        try (java.util.jar.JarOutputStream out = new java.util.jar.JarOutputStream(Files.newOutputStream(jar))) {
+            out.putNextEntry(new java.util.jar.JarEntry("Shared.class"));
+            out.write(originalBytes); out.closeEntry();
+        }
+        byte[] originalJar = Files.readAllBytes(jar);
+        BackendPackager packager = new BackendPackager(host(dir, dir));
+        for (Path dependency : Arrays.asList(original, jar)) {
+            File staged = Files.createDirectory(dir.resolve(dependency.getFileName() + "-staged")).toFile();
+            File natives = Files.createDirectory(dir.resolve(dependency.getFileName() + "-natives")).toFile();
+            assertEquals(Collections.singletonList(staged.toString()), packager.prepareDependencyClasses(
+                    Collections.singletonList(dependency.toString()), staged, natives));
+            assertFalse(Arrays.equals(originalBytes, Files.readAllBytes(staged.toPath().resolve("Shared.class"))));
+            assertEquals("1231\n1237\nShared[enabled=true]\ntrue\nfalse\n",
+                    run(jdk, "java", "-cp", staged.toString(), "Shared").replace("\r\n", "\n"));
+        }
+        assertArrayEquals(originalBytes, Files.readAllBytes(original.resolve("Shared.class")));
+        assertArrayEquals(originalJar, Files.readAllBytes(jar));
+    }
+
     private static TestProjectHost host(Path dir, Path source) {
         TestProjectHost host = TestProjectHost.empty();
         host.projectDir = dir.toFile();

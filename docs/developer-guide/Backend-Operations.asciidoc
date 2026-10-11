@@ -144,7 +144,7 @@ no TLS, and what it does need is exactly what a translated binary is good at.
   available. There is no starter ecosystem, and validation and error mapping are
   written by hand or generated from the REST contract.
 * Native packaging compiles Java sources and checks them against the backend's
-  class library. Kotlin sources are not wired into this packaging path yet.
+  class library. Kotlin sources aren't wired into this packaging path yet.
   Application sources use Maven's compiler `release` or `source`/`target`, or
   Gradle's `compileJava.options.release` or `sourceCompatibility`/`targetCompatibility`.
   For example, set `maven.compiler.release` to `17` or `25`, or set
@@ -155,8 +155,10 @@ no TLS, and what it does need is exactly what a translated binary is good at.
   The backend libraries and generated wiring remain at Java 8 independently of
   the application's language level. Records, pattern matching for `instanceof`,
   and switch expressions can be used by application code. A newer language level
-  does not add Java SE APIs to the native runtime: unsupported API references
-  fail packaging before translation. Compiled tests likewise honor Maven's
+  doesn't add Java SE APIs to the native runtime: unsupported API references
+  fail packaging before translation. Pattern matching in `switch` needs a
+  bootstrap the native translator doesn't implement and fails packaging; use
+  `instanceof` branches for native code instead. Compiled tests likewise honor Maven's
   `testSource`/`testTarget`/`testRelease` and Gradle's `compileTestJava` settings.
 * A virtual thread parks on sockets and on nothing else. A PostgreSQL or MySQL
   query, a `Web` call and a TLS handshake all park it, and its host serves other

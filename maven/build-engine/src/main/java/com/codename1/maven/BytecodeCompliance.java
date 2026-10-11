@@ -338,6 +338,7 @@ public class BytecodeCompliance {
     /// client's success marker. Backend bytecode retains its configured version.
     public void checkBackend(File output, File javaApi, List<File> dependencies)
             throws BuildExecutionException {
+        checkBackendBootstraps(output);
         complianceOutputFile = new File(output.getParentFile(), output.getName() + "-compliance.txt");
         Map<String, ClassMetadata> allowed = buildClassIndex(Collections.singletonList(javaApi));
         Map<String, ClassMetadata> project = buildClassIndexWithOutput(output, dependencies);
@@ -357,6 +358,55 @@ public class BytecodeCompliance {
         if (!violations.isEmpty()) {
             writeComplianceReport(violations, output, dependencies, 0);
             throw new BuildFailureException(buildFailureSummary(violations));
+        }
+    }
+
+    /// Both application classes and staged dependencies must use bootstraps the
+    /// native translator implements. Record ObjectMethods must be lowered first.
+    public void checkBackendBootstraps(File output) throws BuildExecutionException {
+        List<File> files = new ArrayList<File>();
+        collectClassFiles(output, files);
+        final List<String> unsupported = new ArrayList<String>();
+        for (final File file : files) {
+            try (InputStream input = new BufferedInputStream(new FileInputStream(file))) {
+                new ClassReader(input).accept(new ClassVisitor(Opcodes.ASM9) {
+                    @Override
+                    public MethodVisitor visitMethod(int access, final String name, final String descriptor,
+                            String signature, String[] exceptions) {
+                        return new MethodVisitor(Opcodes.ASM9) {
+                            @Override
+                            public void visitInvokeDynamicInsn(String invokedName, String invokedDescriptor,
+                                    org.objectweb.asm.Handle bootstrap, Object... arguments) {
+                                String owner = bootstrap.getOwner();
+                                String method = bootstrap.getName();
+                                boolean supported = bootstrap.getTag() == Opcodes.H_INVOKESTATIC
+                                        && !bootstrap.isInterface()
+                                        && (("java/lang/invoke/StringConcatFactory".equals(owner)
+                                                && ("makeConcat".equals(method) || "makeConcatWithConstants".equals(method)))
+                                            || ("java/lang/invoke/LambdaMetafactory".equals(owner)
+                                                && ("metafactory".equals(method) || "altMetafactory".equals(method))));
+                                if (!supported) unsupported.add(file + " in " + name + descriptor
+                                        + ": " + owner + "." + method);
+                            }
+
+                            @Override
+                            public void visitLdcInsn(Object value) {
+                                if (value instanceof org.objectweb.asm.ConstantDynamic) {
+                                    unsupported.add(file + " in " + name + descriptor
+                                            + ": dynamic constant " + ((org.objectweb.asm.ConstantDynamic) value).getName());
+                                }
+                            }
+                        };
+                    }
+                }, ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+            } catch (IOException ex) {
+                throw new BuildExecutionException("Could not check native bootstraps in " + file, ex);
+            }
+        }
+        if (!unsupported.isEmpty()) {
+            throw new BuildFailureException("Unsupported native bytecode bootstrap(s): " + unsupported
+                    + ". The native translator supports lambda and string-concatenation bootstraps; "
+                    + "rewrite the unsupported construct before native packaging.");
         }
     }
 

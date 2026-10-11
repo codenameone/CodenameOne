@@ -775,6 +775,19 @@ public class BackendPackager {
         return out;
     }
 
+    /// Transform copies only: never modify dependency jars or reactor outputs.
+    List<String> prepareDependencyClasses(List<String> classpath, File staged,
+            File nativeSources) throws BuildExecutionException {
+        List<String> inputs = stageDependencyClasses(classpath, staged, nativeSources);
+        try {
+            BackendRecordMethods.rewrite(staged);
+        } catch (IOException ex) {
+            throw new BuildExecutionException("Could not materialize dependency record methods", ex);
+        }
+        new BytecodeCompliance(host).checkBackendBootstraps(staged);
+        return inputs;
+    }
+
     private void translate(File jdk, File compilerJar, File javaApi, File classes,
             File nativeSources, File translated, File dependencyClasses)
             throws BuildExecutionException, BuildFailureException {
@@ -784,7 +797,7 @@ public class BackendPackager {
 
         // BEFORE the natives are copied below, because a dependency that ships
         // cn1-native adds to them.
-        List<String> dependencyInputs = stageDependencyClasses(
+        List<String> dependencyInputs = prepareDependencyClasses(
                 compileClasspathWithoutRuntime(), dependencyClasses, nativeSources);
 
         // The C has to be in the source root BEFORE the translator runs: it reads

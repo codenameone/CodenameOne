@@ -242,9 +242,8 @@ public class BackendPackageMojo extends AbstractMojo {
     static String compilerOption(MavenProject project, java.util.Properties userProperties,
             String name, boolean tests) {
         String goal = tests ? "testCompile" : "compile";
-        Xpp3Dom configuration = project.getGoalConfiguration("org.apache.maven.plugins",
-                "maven-compiler-plugin", "default-" + goal, goal);
         Plugin compiler = project.getPlugin("org.apache.maven.plugins:maven-compiler-plugin");
+        Xpp3Dom configuration = compilerExecutionConfiguration(compiler, goal);
         if (compiler != null && compiler.getConfiguration() instanceof Xpp3Dom) {
             Xpp3Dom defaults = new Xpp3Dom((Xpp3Dom) compiler.getConfiguration());
             configuration = configuration == null ? defaults
@@ -261,6 +260,32 @@ public class BackendPackageMojo extends AbstractMojo {
             }
         }
         return property(project, userProperties, "maven.compiler." + name);
+    }
+
+    private static Xpp3Dom compilerExecutionConfiguration(Plugin compiler, String goal) {
+        if (compiler == null) return null;
+        // Follow lifecycle order up to the phase whose sources we recompile.
+        // A custom execution may replace a default execution bound to "none".
+        List<String> phases = java.util.Arrays.asList("validate", "initialize", "generate-sources",
+                "process-sources", "generate-resources", "process-resources", "compile", "process-classes",
+                "generate-test-sources", "process-test-sources", "generate-test-resources",
+                "process-test-resources", "test-compile");
+        int lastPhase = phases.indexOf("testCompile".equals(goal) ? "test-compile" : "compile");
+        org.apache.maven.model.PluginExecution selected = null;
+        int selectedPhase = -1;
+        for (org.apache.maven.model.PluginExecution execution : compiler.getExecutions()) {
+            boolean isDefault = ("default-" + goal).equals(execution.getId());
+            if (!isDefault && !execution.getGoals().contains(goal)) continue;
+            int phase = execution.getPhase() == null ? lastPhase : phases.indexOf(execution.getPhase());
+            if (phase < 0 || phase > lastPhase) continue;
+            // Lifecycle defaults execute before custom goals in the same phase.
+            if (phase > selectedPhase || (phase == selectedPhase && !isDefault)) {
+                selected = execution;
+                selectedPhase = phase;
+            }
+        }
+        return selected != null && selected.getConfiguration() instanceof Xpp3Dom
+                ? new Xpp3Dom((Xpp3Dom) selected.getConfiguration()) : null;
     }
 
     private static String property(MavenProject project, java.util.Properties userProperties, String name) {
