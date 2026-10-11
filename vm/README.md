@@ -119,3 +119,24 @@ Parpar is a butterfly in Hebrew.
 
 Initially when we worked at Sun and produced LWUIT we wanted to call it Morpho (butterfly I think in Spanish) but marketing shot it down.
 Unfortunately MorphoVM is already taken so we decided to go with ParparVM instead.
+
+### Streaming ZIP support
+
+`JavaAPI` includes the streaming `java.util.zip` API, using the existing JZlib
+engine. `com.codename1.io.zip.ZipArchiveOutputStream` adds portable Unix file
+permissions for JVM and native applications. See the **Streaming ZIP archives**
+section in `docs/developer-guide/Backend-Operations.asciidoc` for the supported
+classes, ZIP64 refusal, metadata limits, and stream ownership.
+
+The compression sources under `JavaAPI/src/com/codename1/impl/zip` and the
+standard `ZipOutputStream` are generated from canonical core sources. After
+editing the engine or `ZipArchiveOutputStream`, run
+`python3 scripts/sync-zip-runtime.py` from the repository root. Use `--check` to
+check for drift. After compiling `vm/JavaAPI` with JDK 8, regenerate the mobile
+API declarations with `JAVA_HOME=/path/to/jdk8 python3 scripts/generate-zip-api-stubs.py`.
+The latter also supports `--check`.
+
+`ZipApiIntegrationTest` runs the same archive program against the JDK, the actual
+JavaAPI ZIP classes on HotSpot, and a locally translated ParparVM executable.
+It uses the JDK ZIP reader and system `unzip` as independent readers, checks Unix
+mode bits after extraction, and compares contents and metadata across runtimes.

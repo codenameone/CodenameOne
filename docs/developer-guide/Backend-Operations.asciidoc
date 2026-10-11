@@ -187,3 +187,127 @@ no TLS, and what it does need is exactly what a translated binary is good at.
 The reasons to choose this are cold start, footprint, deployment shape, and one
 language across the app and its server. If none of those matter for the service in
 front of you, use a JVM framework.
+
+[[backend-zip]]
+=== Streaming ZIP archives
+
+ParparVM provides the streaming subset of `java.util.zip` in its Java runtime.
+The same API is declared in the mobile compile-time library. It includes
+`ZipEntry`, `ZipInputStream`, `ZipOutputStream`, `Deflater`, `Inflater`,
+`DeflaterOutputStream`, `InflaterInputStream`, `GZIPInputStream`,
+`GZIPOutputStream`, `Checksum`, `CRC32`, `Adler32`, `CheckedInputStream`,
+`CheckedOutputStream`, `ZipException`, and `DataFormatException`.
+Compression uses the existing pure-Java JZlib engine. JVM and Android targets
+use their platform implementation of the standard classes.
+
+This is a streaming API, not the entire Java SE ZIP package. Random-access
+`ZipFile`, `DeflaterInputStream`, `InflaterOutputStream`, and the `FileTime`
+methods on `ZipEntry` are not provided. Reading a ZIP entry verifies its CRC
+and sizes when its end is reached; call `closeEntry()` to consume and verify
+an entry you have only partly read. Closing the input stream does not drain
+or verify unread entries. ZIP input does not extract files or interpret Unix
+permissions.
+
+==== Executable files in a project download
+
+Java SE's `ZipEntry` has no setter for Unix external attributes. Use
+`com.codename1.io.zip.ZipArchiveOutputStream` when an extracted launcher must
+remain executable. It accepts standard `ZipEntry` objects and adds
+`putNextEntry(entry, permissions)`. This helper runs with both JVM and ParparVM
+compression and writes the Unix creator platform and external attributes in
+the central directory.
+
+[source,java]
+----
+try (ZipArchiveOutputStream zip = new ZipArchiveOutputStream(destination)) {
+    ZipEntry directory = new ZipEntry("project/");
+    directory.setTime(0);
+    zip.putNextEntry(directory, 0755);
+    zip.closeEntry();
+
+    ZipEntry launcher = new ZipEntry("project/run.sh");
+    launcher.setTime(0);
+    zip.putNextEntry(launcher, 0755);
+    try (InputStream source = openLauncher()) {
+        byte[] buffer = new byte[8192];
+        int count;
+        while ((count = source.read(buffer)) != -1) {
+            zip.write(buffer, 0, count);
+        }
+    }
+    zip.closeEntry();
+}
+----
+
+The permission argument accepts `0000` through `0777`. The writer infers a
+regular file or directory from the trailing slash; it does not create symlinks
+or special files. Use `0644` for ordinary files. Names are archive paths with
+`/` separators. The writer does not sanitize names for extraction, so choose
+relative names without `..` components.
+
+The runnable example is `vm/backend/demo/zipdownload/com/demo/ZipDownload.java`.
+It serves a small, fixed project at `http://127.0.0.1:8099/project.zip`:
+
+[source,bash]
+----
+export CN1_BACKEND_DEMO=demo/zipdownload
+export CN1_BACKEND_STANDALONE_DEMO=1
+export JDK_8_HOME=/path/to/jdk8
+export JAVA_HOME="$JDK_8_HOME"
+export PATH="$JAVA_HOME/bin:$PATH"
+cd vm/backend
+./build.sh ZipDownload com.demo /tmp/zipdownload
+/tmp/zipdownload
+----
+
+The same binary can generate a file without starting HTTP:
+`/tmp/zipdownload --write /tmp/project.zip`. Extract it with `unzip`, then run
+`project/run.sh`. The JVM version can be run with
+`CN1_BACKEND_DEMO=demo/zipdownload ./run-javase.sh com.demo.ZipDownload`.
+
+The HTTP example buffers only its fixed literals. `HttpServer.Response` currently
+accepts a byte array or an already-open file descriptor; it has no streaming
+output callback. ZIP generation itself streams to any `OutputStream`, but this
+change does not add HTTP streaming or cancellation notifications during archive
+generation. For large downloads, generate to an application-owned file and use
+the existing file response lifecycle; the application must manage deletion of
+that file. Do not collect arbitrary project contents in a byte array.
+
+==== Format limits and ownership
+
+* The default name/comment encoding is UTF-8, with the ZIP UTF-8 flag set.
+  Charset constructors also accept encodings available in the runtime.
+* Files may be empty. Directories are explicit entries ending in `/`.
+  Duplicate entry names and empty entry names are rejected.
+* `DEFLATED` entries stream with data descriptors. `STORED` entries require a
+  size and CRC before `putNextEntry`; actual size and CRC are checked at close.
+* ParparVM's writer and `ZipArchiveOutputStream` refuse ZIP64. Each entry size,
+  compressed size, and the complete archive must remain below `0xffffffff`
+  bytes. There may be at most 65,534 entries. Caller-supplied ZIP64 extra fields
+  are rejected. A limit discovered while streaming raises `ZipException` and
+  leaves an incomplete archive; discard that output.
+* Payload memory does not grow with file size. Compression uses a fixed window
+  and output buffer. Central-directory records grow with entry count and encoded
+  names, extras, and comments; the writer caps their serialized total at 16 MiB.
+  Java objects and strings add overhead beyond that serialized limit.
+* ZIP field lengths are limited to 65,535 encoded bytes. The writer reserves
+  nine extra-field bytes for an extended timestamp where representable.
+  It records UTC modification times at one-second precision for signed 32-bit
+  Unix seconds; dates outside that range use the DOS timestamp, with two-second
+  precision and a 1980--2107 range. Explicit `setTime(0)` gives stable metadata.
+* For repeatable archives, fix entry order, names, comments, permissions,
+  timestamps, and compression level. JVM and ParparVM archives have equivalent
+  contents and metadata, but compressed bytes need not match between engines.
+* `finish()` writes the directory and leaves the destination open. `close()`
+  releases compressor state and closes the destination, including after a write
+  failure. A write failure makes the writer unusable. Source streams belong to
+  the caller; use a separate try-with-resources block for each source. No
+  temporary files are created by the ZIP API.
+* Reading supports STORED and DEFLATED ZIP entries, with or without descriptors
+  for DEFLATED entries. ZIP64, encryption, other compression methods, and STORED
+  descriptors are explicitly rejected. GZIP supports concatenated members and
+  validates header and trailer checksums.
+
+These explicit ZIP limits belong to the ParparVM implementation and the CN1
+helper. The platform's own `java.util.zip.ZipOutputStream` may have broader
+limits, including ZIP64 support.

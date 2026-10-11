@@ -1492,11 +1492,16 @@ final class Deflate {
         int length = dictLength;
         int index = 0;
 
-        if (dictionary == null || status != INIT_STATE) {
+        // Raw DEFLATE begins in BUSY_STATE because it has no zlib header.
+        // A preset dictionary is still valid before any input is compressed.
+        if (dictionary == null || (status != INIT_STATE &&
+                !(wrap == 0 && status == BUSY_STATE && strm.totalIn == 0))) {
             return Z_STREAM_ERROR;
         }
 
-        strm.adler.update(dictionary, 0, dictLength);
+        if (wrap != 0) {
+            strm.adler.update(dictionary, 0, dictLength);
+        }
 
         if (length < MIN_MATCH) {
             return Z_OK;
