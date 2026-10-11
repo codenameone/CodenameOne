@@ -6168,8 +6168,11 @@ public class CSSTheme {
             if (type == LexicalUnit.SAC_DEGREE) return v;
             if (type == LexicalUnit.SAC_RADIAN) return (float)(v * 180.0 / Math.PI);
             if (type == LexicalUnit.SAC_GRADIAN) return v * 0.9f;
-            // SAC has no `turn` constant in older flute; fall through to
-            // raw float (assume degrees).
+            // SAC has no constant for `turn`: it comes as a dimension that
+            // carries its unit as text. Anything else is taken as degrees.
+            if (type == LexicalUnit.SAC_DIMENSION && "turn".equalsIgnoreCase(p.getDimensionUnitText())) {
+                return v * 360f;
+            }
             return v;
         }
 

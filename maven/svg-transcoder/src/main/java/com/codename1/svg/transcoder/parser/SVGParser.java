@@ -251,6 +251,7 @@ public final class SVGParser {
         fontSize = null;
         fontBold = null;
         fontItalic = null;
+        inheritedColor = null;
         enterFont(a);
     }
 
@@ -314,7 +315,9 @@ public final class SVGParser {
 
     /** Takes in the font properties of a container; what is returned undoes it with {@link #leaveFont}. */
     private Object[] enterFont(Map<String, String> a) {
-        Object[] saved = {fontFamily, fontSize, fontBold, fontItalic};
+        Object[] saved = {fontFamily, fontSize, fontBold, fontItalic, inheritedColor};
+        Integer color = colorOf(a);
+        if (color != null) inheritedColor = color;
         String family = mergedValue(a, "font-family");
         if (family != null) fontFamily = family.trim();
         Float size = fontSizeOf(mergedValue(a, "font-size"));
@@ -331,6 +334,7 @@ public final class SVGParser {
         fontSize = (Float) saved[1];
         fontBold = (Boolean) saved[2];
         fontItalic = (Boolean) saved[3];
+        inheritedColor = (Integer) saved[4];
     }
 
     /** A font size, a relative one taken against the size around it; null when there is none to read. */
@@ -1037,6 +1041,8 @@ public final class SVGParser {
                     run.setFontSize(span.getFontSize());
                     run.setBold(span.getBold());
                     run.setItalic(span.getItalic());
+                    run.setPathRef(span.getPathRef());
+                    run.setStartOffset(span.getStartOffset(), span.isStartOffsetShare());
                     if (spanUnplaced) {
                         // A span is moved once, where its text begins.
                         run.setX(span.getX());
@@ -1057,6 +1063,8 @@ public final class SVGParser {
                         placed.setFontSize(run.getFontSize());
                         placed.setBold(run.getBold());
                         placed.setItalic(run.getItalic());
+                        placed.setPathRef(run.getPathRef());
+                        placed.setStartOffset(run.getStartOffset(), run.isStartOffsetShare());
                         if (at < glyphLists[0].length) placed.setX(Float.valueOf(glyphLists[0][at]));
                         if (at < glyphLists[1].length) placed.setY(Float.valueOf(glyphLists[1][at]));
                         if (at < glyphLists[2].length) placed.setDx(glyphLists[2][at]);
@@ -1067,8 +1075,31 @@ public final class SVGParser {
                 }
             } else if (ev == XMLStreamConstants.START_ELEMENT) {
                 // tspan / textPath / etc.
+                boolean onPath = "textPath".equals(r.getLocalName());
                 Map<String, String> a = attrs(r);
                 SVGText.Run child = new SVGText.Run();
+                if (span != null) {
+                    child.setPathRef(span.getPathRef());
+                    child.setStartOffset(span.getStartOffset(), span.isStartOffsetShare());
+                }
+                if (onPath) {
+                    // Laid along the path it names, from as far along it as
+                    // it says.
+                    String href = a.get("href");
+                    child.setPathRef(href != null && href.trim().startsWith("#") ? href.trim().substring(1) : "");
+                    String offset = a.get("startOffset");
+                    float from = 0f;
+                    boolean share = offset != null && offset.trim().endsWith("%");
+                    if (offset != null) {
+                        try {
+                            from = NumberParser.parseFloat(offset);
+                            if (share) from /= 100f;
+                        } catch (RuntimeException e) {
+                            from = 0f;
+                        }
+                    }
+                    child.setStartOffset(from, share);
+                }
                 SVGNode styled = new SVGGroup();
                 applyCommon(styled, a);
                 child.setStyle(styled.getStyle());
@@ -1193,7 +1224,7 @@ public final class SVGParser {
         String href = a.get("href");
         if (href == null) href = a.get("xlink:href");
         if (href != null && href.startsWith("#")) g.setHref(href.substring(1));
-        readGradientStops(r, g.getStops());
+        readGradientStops(r, g.getStops(), colorOf(a) != null ? colorOf(a) : inheritedColor);
         return g;
     }
 
@@ -1222,7 +1253,7 @@ public final class SVGParser {
         String href = a.get("href");
         if (href == null) href = a.get("xlink:href");
         if (href != null && href.startsWith("#")) g.setHref(href.substring(1));
-        readGradientStops(r, g.getStops());
+        readGradientStops(r, g.getStops(), colorOf(a) != null ? colorOf(a) : inheritedColor);
         return g;
     }
 
@@ -1245,7 +1276,22 @@ public final class SVGParser {
         return NumberParser.parseFloat(v);
     }
 
-    private void readGradientStops(XMLStreamReader r, List<SVGGradientStop> stops) throws XMLStreamException {
+    /** The {@code color} the element being read has from what it is in; null where nothing sets one. */
+    private Integer inheritedColor;
+
+    /** A {@code color} property as a colour, or null when it is not written or not one. */
+    private Integer colorOf(Map<String, String> a) {
+        String color = mergedValue(a, "color");
+        if (color == null || ColorParser.isCurrentColor(color)) return null;
+        try {
+            return Integer.valueOf(ColorParser.parse(color));
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private void readGradientStops(XMLStreamReader r, List<SVGGradientStop> stops, Integer around)
+            throws XMLStreamException {
         while (r.hasNext()) {
             int ev = r.next();
             if (ev == XMLStreamConstants.END_ELEMENT) return;
@@ -1257,7 +1303,12 @@ public final class SVGParser {
             SVGStyle s = StyleParser.parse(presentationFor(a, "stop-color", "stop-opacity"), a.get("style"));
             // stop-color is held as fill in our merged map. Use directly:
             String sc = mergedValue(a, "stop-color");
-            if (sc != null && !ColorParser.isNone(sc)) {
+            if (sc != null && ColorParser.isCurrentColor(sc)) {
+                // The stop's own `color`, or the one it has from the
+                // gradient and what that is in; black when nobody gives one.
+                Integer own = colorOf(a);
+                stop.setColor(own != null ? own.intValue() : around != null ? around.intValue() : ColorParser.BLACK);
+            } else if (sc != null && !ColorParser.isNone(sc)) {
                 try {
                     stop.setColor(ColorParser.parse(sc));
                 } catch (RuntimeException e) {

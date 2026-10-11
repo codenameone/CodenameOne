@@ -1246,4 +1246,50 @@ class VectorImageTest {
         assertEquals(0xffff0000, img.getRGB(10, 20), "the left half of the element");
         assertEquals(0, alpha(img, 30, 20), "the right half, cut off");
     }
+
+    @Test
+    void textOnAPathRunsAlongIt() throws Exception {
+        // The path runs straight down the image at x = 50, so the letters
+        // go down it and not across.
+        String font = " font-family=\"monospace\" font-size=\"12\" fill=\"#ff0000\"";
+        BufferedImage img = paint("<defs><path id=\"down\" d=\"M 50 5 L 50 95\"/></defs>"
+                + "<text" + font + "><textPath href=\"#down\">MMMMMMMM</textPath></text>", 100, 100);
+        assertTrue(inkRight(img) < 65, "no further across than the letters are tall, was " + inkRight(img));
+        int lowest = -1;
+        for (int y = 0; y < 100; y++) {
+            for (int x = 0; x < 100; x++) {
+                if (alpha(img, x, y) > 128) {
+                    lowest = y;
+                }
+            }
+        }
+        assertTrue(lowest > 50, "the letters run down the path, was " + lowest);
+
+        BufferedImage offset = paint("<defs><path id=\"down\" d=\"M 50 5 L 50 95\"/></defs>"
+                + "<text" + font + "><textPath href=\"#down\" startOffset=\"50%\">M</textPath></text>", 100, 100);
+        assertEquals(0, alpha(offset, 54, 20), "nothing before where it starts");
+        BufferedImage none = paint("<text" + font + "><textPath href=\"#gone\">MMM</textPath></text>", 100, 100);
+        assertEquals(-1, inkRight(none), "a path that is not there draws no text");
+    }
+
+    @Test
+    void aUseSizesTheNestedDrawingItDraws() throws Exception {
+        BufferedImage img = paint("<defs><svg id=\"icon\" width=\"10\" height=\"10\" viewBox=\"0 0 10 10\">"
+                + "<rect width=\"10\" height=\"10\" fill=\"#ff0000\"/></svg></defs>"
+                + "<use href=\"#icon\" width=\"80\" height=\"80\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(60, 60), "as large as the use says");
+        assertEquals(0, alpha(img, 90, 90));
+    }
+
+    @Test
+    void aStopCanTakeTheCurrentColor() throws Exception {
+        BufferedImage img = paint("<g color=\"#00ff00\"><defs><linearGradient id=\"g\">"
+                + "<stop offset=\"0\" color=\"#ff0000\" stop-color=\"currentColor\"/>"
+                + "<stop offset=\"0.5\" color=\"#ff0000\" stop-color=\"currentColor\"/>"
+                + "<stop offset=\"0.5\" stop-color=\"currentColor\"/>"
+                + "<stop offset=\"1\" stop-color=\"currentColor\"/></linearGradient></defs></g>"
+                + "<rect width=\"100\" height=\"100\" fill=\"url(#g)\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(25, 50), "the stop's own color");
+        assertEquals(0xff00ff00, img.getRGB(75, 50), "the color it is in");
+    }
 }

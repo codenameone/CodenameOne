@@ -1072,6 +1072,25 @@ public final class VectorImage {
         try {
             owner.useDepth = useDepth;
             g.transform(placing(use, target));
+            if (target instanceof SVGViewport && (use.getWidth() > 0 || use.getHeight() > 0)) {
+                // The size a `<use>` gives is the size of the `<svg>` it
+                // draws, in place of the one that element gives itself.
+                SVGViewport as = (SVGViewport) target;
+                SVGViewport sized = new SVGViewport();
+                sized.setStyle(as.getStyle());
+                sized.setTransform(as.getTransform());
+                sized.setX(as.getX());
+                sized.setY(as.getY());
+                sized.setWidth(use.getWidth() > 0 ? use.getWidth() : as.getWidth());
+                sized.setHeight(use.getHeight() > 0 ? use.getHeight() : as.getHeight());
+                sized.setViewBox(as.getViewBoxX(), as.getViewBoxY(), as.getViewBoxWidth(), as.getViewBoxHeight());
+                sized.setPreserveAspectRatio(as.getPreserveAspectRatio());
+                sized.setOverflowVisible(as.isOverflowVisible());
+                for (SVGNode child : as.getContent().getChildren()) {
+                    sized.getContent().addChild(child);
+                }
+                target = sized;
+            }
             owner.paintNode(g, target, style, w, h);
         } finally {
             owner.useDepth = ownerDepth;
@@ -2008,7 +2027,7 @@ public final class VectorImage {
     /// where it starts. `text-anchor` is about each piece that starts
     /// somewhere of its own: that piece, with the stretches that run on
     /// from it, begins, is centred or ends at the point given.
-    private static List<Shape> textOutlines(SVGText text, List<SVGText.Run> runs,
+    private List<Shape> textOutlines(SVGText text, List<SVGText.Run> runs,
             java.awt.font.FontRenderContext context) {
         List<Shape> out = new ArrayList<Shape>();
         double cx = text.getX();
@@ -2016,10 +2035,24 @@ public final class VectorImage {
         int i = 0;
         while (i < runs.size()) {
             int end = i + 1;
-            while (end < runs.size() && runs.get(end).getX() == null && runs.get(end).getY() == null) {
+            String along = runs.get(i).getPathRef();
+            while (end < runs.size() && runs.get(end).getX() == null && runs.get(end).getY() == null
+                    && (along == null ? runs.get(end).getPathRef() == null : along.equals(runs.get(end).getPathRef()))) {
                 end++;
             }
             SVGText.Run head = runs.get(i);
+            if (along != null) {
+                // Text on a path: each glyph is set down on the path, turned
+                // the way the path runs there. What follows it goes on from
+                // where the path ends.
+                double[] ended = onPath(text, runs, i, end, context, out);
+                if (ended != null) {
+                    cx = ended[0];
+                    cy = ended[1];
+                }
+                i = end;
+                continue;
+            }
             if (head.getX() != null) {
                 cx = head.getX().floatValue();
             }
@@ -2062,9 +2095,121 @@ public final class VectorImage {
         return out;
     }
 
+    /// Lays the stretches `from` to `to`, which are on one `<textPath>`,
+    /// along its path, adding an outline for each to `out`: null for one
+    /// with no text or none of it on the path. A glyph is where its middle
+    /// falls on the path, and one whose middle is off either end is not
+    /// drawn. Returns where the path ends, or null when there is no such
+    /// path, in which case the text is not drawn at all.
+    private double[] onPath(SVGText text, List<SVGText.Run> runs, int from, int to,
+            java.awt.font.FontRenderContext context, List<Shape> out) {
+        SVGNode target = doc.getDefinitions().get(runs.get(from).getPathRef());
+        Shape line = target == null ? null : outline(target);
+        if (line == null) {
+            for (int k = from; k < to; k++) {
+                out.add(null);
+            }
+            return null;
+        }
+        SVGTransform moved = target.getTransform();
+        AffineTransform at = moved == null ? null
+                : new AffineTransform(moved.a, moved.b, moved.c, moved.d, moved.e, moved.f);
+        // The path as short straight pieces: where each starts, and how
+        // far along the path that is.
+        List<double[]> pieces = new ArrayList<double[]>();
+        double[] seg = new double[6];
+        double total = 0;
+        double px = 0;
+        double py = 0;
+        double sx = 0;
+        double sy = 0;
+        for (java.awt.geom.PathIterator it = new java.awt.geom.FlatteningPathIterator(line.getPathIterator(at), 0.05);
+                !it.isDone(); it.next()) {
+            int kind = it.currentSegment(seg);
+            double nx = kind == java.awt.geom.PathIterator.SEG_CLOSE ? sx : seg[0];
+            double ny = kind == java.awt.geom.PathIterator.SEG_CLOSE ? sy : seg[1];
+            if (kind == java.awt.geom.PathIterator.SEG_MOVETO) {
+                sx = nx;
+                sy = ny;
+            } else {
+                double len = Math.hypot(nx - px, ny - py);
+                if (len > 0) {
+                    pieces.add(new double[] {px, py, nx, ny, total, len});
+                    total += len;
+                }
+            }
+            px = nx;
+            py = ny;
+        }
+        if (pieces.isEmpty()) {
+            for (int k = from; k < to; k++) {
+                out.add(null);
+            }
+            return null;
+        }
+        List<java.awt.font.GlyphVector> glyphs = new ArrayList<java.awt.font.GlyphVector>();
+        double advance = 0;
+        for (int k = from; k < to; k++) {
+            SVGText.Run run = runs.get(k);
+            float size = run.getFontSize() != null ? run.getFontSize().floatValue() : text.getFontSize();
+            if (!(size > 0)) {
+                size = 12f;
+            }
+            boolean bold = run.getBold() != null ? run.getBold().booleanValue() : text.isBold();
+            boolean italic = run.getItalic() != null ? run.getItalic().booleanValue() : text.isItalic();
+            String family = run.getFontFamily() != null ? run.getFontFamily() : text.getFontFamily();
+            Font font = new Font(familyOf(family), (bold ? Font.BOLD : 0) | (italic ? Font.ITALIC : 0), 1)
+                    .deriveFont(size);
+            java.awt.font.GlyphVector gv = font.createGlyphVector(context, run.getText());
+            glyphs.add(gv);
+            advance += run.getDx() + gv.getLogicalBounds().getWidth();
+        }
+        SVGText.Run head = runs.get(from);
+        double along = head.isStartOffsetShare() ? head.getStartOffset() * total : head.getStartOffset();
+        along += text.getAnchor() == SVGText.Anchor.MIDDLE ? -advance / 2.0
+                : text.getAnchor() == SVGText.Anchor.END ? -advance : 0;
+        int piece = 0;
+        for (int k = from; k < to; k++) {
+            SVGText.Run run = runs.get(k);
+            java.awt.font.GlyphVector gv = glyphs.get(k - from);
+            along += run.getDx();
+            Path2D.Double drawn = null;
+            for (int j = 0; j < gv.getNumGlyphs(); j++) {
+                double wide = gv.getGlyphMetrics(j).getAdvanceX();
+                double middle = along + wide / 2;
+                along += wide;
+                if (middle < 0 || middle > total) {
+                    continue;
+                }
+                while (piece > 0 && pieces.get(piece)[4] > middle) {
+                    piece--;
+                }
+                while (piece < pieces.size() - 1 && pieces.get(piece)[4] + pieces.get(piece)[5] < middle) {
+                    piece++;
+                }
+                double[] on = pieces.get(piece);
+                double part = (middle - on[4]) / on[5];
+                AffineTransform place = AffineTransform.getTranslateInstance(on[0] + (on[2] - on[0]) * part,
+                        on[1] + (on[3] - on[1]) * part);
+                place.rotate(Math.atan2(on[3] - on[1], on[2] - on[0]));
+                // `dy` lifts the glyph off the path, across the way it runs.
+                place.translate(-wide / 2, run.getDy());
+                Point2D origin = gv.getGlyphPosition(j);
+                Shape glyph = gv.getGlyphOutline(j, (float) -origin.getX(), (float) -origin.getY());
+                if (drawn == null) {
+                    drawn = new Path2D.Double();
+                }
+                drawn.append(place.createTransformedShape(glyph), false);
+            }
+            out.add(drawn);
+        }
+        double[] last = pieces.get(pieces.size() - 1);
+        return new double[] {last[2], last[3]};
+    }
+
     /// The outlines of all the glyphs of a `<text>`, or null when it has no
     /// text.
-    private static Shape textOutline(SVGText text, java.awt.font.FontRenderContext context) {
+    private Shape textOutline(SVGText text, java.awt.font.FontRenderContext context) {
         Path2D.Double all = null;
         for (Shape outline : textOutlines(text, runsOf(text), context)) {
             if (outline != null) {

@@ -162,4 +162,18 @@ class CSSImportTest {
         assertTrue(assets.contains(medium.getCanonicalFile()), assets.toString());
         assertTrue(assets.contains(high.getCanonicalFile()), assets.toString());
     }
+
+    @Test
+    void aHueRotationInTurnsIsThatMuchOfACircle(@TempDir Path tmp) throws Exception {
+        File root = write(new File(tmp.toFile(), "theme.css"),
+                "Half { filter: hue-rotate(.5turn); }\nSame { filter: hue-rotate(180deg); }\n");
+        Hashtable theme = compile(root);
+        Object half = theme.get("Half.filterColorMatrix");
+        assertNotNull(half, theme.keySet().toString());
+        assertEquals(String.valueOf(asText(theme.get("Same.filterColorMatrix"))), String.valueOf(asText(half)));
+    }
+
+    private static String asText(Object value) {
+        return value instanceof float[] ? java.util.Arrays.toString((float[]) value) : String.valueOf(value);
+    }
 }

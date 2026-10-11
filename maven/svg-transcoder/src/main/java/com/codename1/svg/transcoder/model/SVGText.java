@@ -59,6 +59,23 @@ public final class SVGText extends SVGShape {
         private Boolean bold;
         private Boolean italic;
 
+        private String pathRef;
+        private float startOffset;
+        private boolean startOffsetShare;
+
+        /// The id of the path a `<textPath>` lays this text along, or null
+        /// for text on a straight line.
+        public String getPathRef() { return pathRef; }
+        public void setPathRef(String pathRef) { this.pathRef = pathRef; }
+        /// How far along that path the text begins: a length, or with
+        /// [#isStartOffsetShare] a fraction of the path's own.
+        public float getStartOffset() { return startOffset; }
+        public boolean isStartOffsetShare() { return startOffsetShare; }
+        public void setStartOffset(float startOffset, boolean share) {
+            this.startOffset = startOffset;
+            this.startOffsetShare = share;
+        }
+
         public String getText() { return text; }
         public void setText(String text) { this.text = text; }
         /** Where the stretch starts, when it says; null to go on from the one before. */
