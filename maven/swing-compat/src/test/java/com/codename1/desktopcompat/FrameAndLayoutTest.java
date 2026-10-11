@@ -179,6 +179,43 @@ public class FrameAndLayoutTest extends KernelTestBase {
         assertEquals(Units.toDevice(30), late.cn1Peer().getWidth());
     }
 
+    /// A row that fits the display need not fit the room it is given: three
+    /// options beside a label on a phone. The flow wraps them, and a flow
+    /// that answered the height of one row all the same was one row high,
+    /// with the options after the first row placed below it and never
+    /// seen. The rows are counted at the width the flow was given, and the
+    /// container above lays it out again at the height they take.
+    @Test
+    public void aFlowNarrowerThanItsRowIsGivenTheHeightOfTheRowsItWrapsInto() {
+        JFrame f = new JFrame();
+        JPanel flow = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        JPanel[] options = {sized(90, 20), sized(90, 20), sized(90, 20)};
+        for (int i = 0; i < options.length; i++) {
+            flow.add(options[i]);
+        }
+        int row = flow.getPreferredSize().width;
+        assertTrue("the row fits the display", row < Units.toLogical(Display.getInstance().getDisplayWidth()));
+        assertEquals(20, flow.getPreferredSize().height);
+        JPanel column = new JPanel(new BorderLayout());
+        column.add(flow, BorderLayout.NORTH);
+        column.add(new JPanel(), BorderLayout.CENTER);
+        f.add(sized(f.getWidth() > 0 ? f.getWidth() - 200 : 340, 10), BorderLayout.WEST);
+        f.add(column, BorderLayout.CENTER);
+        show(f);
+        com.codename1.compat.testing.MainThreadRule.drain();
+        f.cn1Form().revalidate();
+        assertTrue("narrower than its row: " + flow.getWidth() + " < " + row, flow.getWidth() < row);
+        assertTrue("wide enough for one option", flow.getWidth() >= 90 + 12);
+        for (int i = 0; i < options.length; i++) {
+            assertTrue("option " + i + " at " + options[i].getBounds() + " is inside " + flow.getBounds(),
+                    options[i].getY() >= 0 && options[i].getY() + options[i].getHeight() <= flow.getHeight());
+        }
+        assertTrue("more rows than one", options[2].getY() > options[0].getY());
+        // The width it asks for is still that of the one row, so that it
+        // gets the room wherever there is some.
+        assertEquals(row, flow.getPreferredSize().width);
+    }
+
     private static JPanel sized(int w, int h) {
         JPanel p = new JPanel();
         p.setPreferredSize(new Dimension(w, h));

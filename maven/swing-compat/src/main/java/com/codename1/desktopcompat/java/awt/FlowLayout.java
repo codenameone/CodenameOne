@@ -45,6 +45,8 @@ public class FlowLayout implements LayoutManager {
     private int hgap;
     private int vgap;
     private boolean alignOnBaseline;
+    private int answeredRows;
+    private int askedAt = -1;
 
     public FlowLayout() {
         this(CENTER, 5, 5);
@@ -134,8 +136,9 @@ public class FlowLayout implements LayoutManager {
         }
         Insets in = target.getInsets();
         int across = in.left + in.right + hgap * 2;
-        int limit = wrapWidth(target, w + across);
+        int limit = wrapWidth(target);
         if (w + across <= limit) {
+            answeredRows = first ? 0 : 1;
             return new Dimension(w + across, h + in.top + in.bottom + vgap * 2);
         }
         // The row does not fit and will be wrapped: say how high the rows
@@ -144,6 +147,7 @@ public class FlowLayout implements LayoutManager {
         int y = 0;
         int rowh = 0;
         int widest = 0;
+        int rows = 1;
         for (int i = 0; i < n; i++) {
             Component c = target.getComponent(i);
             if (!c.isVisible()) {
@@ -160,8 +164,10 @@ public class FlowLayout implements LayoutManager {
                 y += rowh + vgap;
                 x = d.width;
                 rowh = d.height;
+                rows++;
             }
         }
+        answeredRows = rows;
         // The width asked for stays that of one row, which is what the
         // container is given wherever there is room; while a window asks
         // how narrow it can be, it is the widest component.
@@ -169,26 +175,41 @@ public class FlowLayout implements LayoutManager {
         return new Dimension(wide + across, y + rowh + in.top + in.bottom + vgap * 2);
     }
 
-    /// The width rows are wrapped at when sizes are asked for: for a row
-    /// wider than the display, that of the container once it has one, and
-    /// never more than the display's.
+    /// The width rows are wrapped at when sizes are asked for: that of the
+    /// container once it has one, and never more than the display's.
     ///
     /// On a desktop a flow layout answers the size of a single row whatever
     /// width it has, and the rows it wraps into a narrower container are
     /// cut off. A window there is as wide as its content asks; on a phone
     /// it is as wide as the display, so a row of buttons wraps routinely
     /// and has to be given the height for it.
-    private static int wrapWidth(Container target, int row) {
+    ///
+    /// That holds for a row narrower than the display as well. Three
+    /// radio buttons beside a label fit a phone and do not fit the column
+    /// the label leaves them: the second and third went into rows below
+    /// the container, which was one row high, and were not there at all.
+    /// So whatever width the container was last given is where the rows
+    /// are counted, and [#layoutContainer(Container)] has the container
+    /// measured again when it wraps into another number of rows than the
+    /// last answer was for.
+    ///
+    /// Only where the display decides the width, though, and only for a
+    /// container that is on it. A desktop window takes the size its content
+    /// asks for, so there the answer stays the desktop's one row; and a
+    /// container nothing shows has a width only because the application
+    /// set one, which is not a width anything wrapped it into.
+    private static int wrapWidth(Container target) {
         int limit = com.codename1.desktopcompat.rt.RootPan.displayWidth();
-        if (row <= limit) {
-            // It fits the display: the answer of a desktop.
-            return limit;
-        }
         int w = target.getWidth();
-        if (w > 0 && w < limit) {
+        if (w > 0 && w < limit && followsItsWidth(target)) {
             limit = w;
         }
         return limit;
+    }
+
+    private static boolean followsItsWidth(Container target) {
+        return target.isDisplayable() && com.codename1.ui.Display.isInitialized()
+                && !com.codename1.ui.Display.getInstance().isDesktop();
     }
 
     @Override
@@ -200,6 +221,7 @@ public class FlowLayout implements LayoutManager {
         int y = in.top + vgap;
         int rowHeight = 0;
         int rowStart = 0;
+        int rows = 0;
         for (int i = 0; i < n; i++) {
             Component c = target.getComponent(i);
             if (!c.isVisible()) {
@@ -217,6 +239,7 @@ public class FlowLayout implements LayoutManager {
                 }
             } else {
                 placeRow(target, in.left + hgap, y, avail - used, rowHeight, rowStart, i);
+                rows++;
                 y += vgap + rowHeight;
                 used = d.width;
                 rowHeight = d.height;
@@ -224,6 +247,21 @@ public class FlowLayout implements LayoutManager {
             }
         }
         placeRow(target, in.left + hgap, y, avail - used, rowHeight, rowStart, n);
+        if (used > 0) {
+            rows++;
+        }
+        // The height this container was given is the one answered for the
+        // rows counted at the width it had then. In another number of rows
+        // it wants another height, and whatever placed it is asked again:
+        // once for a width, so that a container that cannot be given the
+        // height is not laid out for ever.
+        int width = target.getWidth();
+        if (rows != answeredRows && answeredRows > 0 && width != askedAt && followsItsWidth(target)) {
+            askedAt = width;
+            com.codename1.desktopcompat.rt.PeerSupport.layoutAgain(target);
+        } else if (rows == answeredRows) {
+            askedAt = -1;
+        }
     }
 
     private void placeRow(Container target, int x, int y, int spare, int rowHeight, int from, int to) {
