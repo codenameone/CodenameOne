@@ -541,12 +541,23 @@ public final class VectorImage {
             }
             int m = through[i];
             float share = (m >>> 24) / 255f;
-            if (!mask.isAlphaMask()) {
+            if (!mask.isAlphaMask() && mask.isLinearLuminance()) {
+                // The brightness of the light, not of the number written
+                // for it: a mid grey lets a fifth through, not a half.
+                share *= (float) (0.2126 * linearLight((m >> 16) & 0xff) + 0.7152 * linearLight((m >> 8) & 0xff)
+                        + 0.0722 * linearLight(m & 0xff));
+            } else if (!mask.isAlphaMask()) {
                 share *= (0.2126f * ((m >> 16) & 0xff) + 0.7152f * ((m >> 8) & 0xff) + 0.0722f * (m & 0xff)) / 255f;
             }
             kept[i] = (Math.round(a * share) << 24) | (kept[i] & 0xffffff);
         }
         layer.setRGB(0, 0, w, h, kept, 0, w);
+    }
+
+    /// An sRGB channel, 0 to 255, as linear light, 0 to 1.
+    private static double linearLight(int channel) {
+        double c = channel / 255.0;
+        return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
     }
 
     /// Draws the picture an `<image>` names into the box it gives, fitted
@@ -1922,10 +1933,12 @@ public final class VectorImage {
             // the tile's `x` and `y` say where the tiles are laid, and what
             // is in them moves along. A rectangle at 20 in a tile at 20 is
             // 20 inside the tile, in a browser as here, so the tile is not
-            // shifted back by its own position. The specification's words,
-            // that the content is in the coordinates of the element the
-            // pattern is used on, read otherwise; what browsers draw is
-            // this, and moving a pattern's `x` moves its picture whole.
+            // shifted back by its own position. This is the specification:
+            // "If there is no viewBox attribute, then the new coordinate
+            // system has its origin at (x, y)" of the pattern (SVG 1.1,
+            // 13.3). That the content is in the user space of the element
+            // the pattern is used on says which units and directions it is
+            // drawn in, not where its origin is.
             tg.scale(iw / tw, ih / th);
             SVGPattern boxGiver = giver(chain, "viewBox", SVGPattern.class);
             SVGPattern contentUnits = giver(chain, "patternContentUnits", SVGPattern.class);

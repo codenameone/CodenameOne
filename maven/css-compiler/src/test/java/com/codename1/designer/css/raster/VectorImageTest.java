@@ -1318,13 +1318,53 @@ class VectorImageTest {
     }
 
     @Test
-    void aFilterInSharesOfABoxWithNoHeightDrawsNothing() throws Exception {
-        String blur = "<defs><filter id=\"f\"><feGaussianBlur stdDeviation=\"2\"/></filter></defs>";
+    void aFilterInSharesOfABoxWithNoHeightIsIgnored() throws Exception {
+        String blur = "<defs><filter id=\"f\"><feGaussianBlur stdDeviation=\"4\"/></filter></defs>";
         BufferedImage level = paint(blur + "<line x1=\"10\" y1=\"50\" x2=\"90\" y2=\"50\" stroke=\"#ff0000\""
                 + " stroke-width=\"6\" filter=\"url(#f)\"/>", 100, 100);
-        assertEquals(0, alpha(level, 50, 50), "a level line has no box to take a share of");
-        BufferedImage slanted = paint(blur + "<line x1=\"10\" y1=\"40\" x2=\"90\" y2=\"60\" stroke=\"#ff0000\""
-                + " stroke-width=\"6\" filter=\"url(#f)\"/>", 100, 100);
-        assertTrue(alpha(slanted, 50, 50) > 128, "one with a box is drawn");
+        assertEquals(0xffff0000, level.getRGB(50, 50), "a level line has no box to take a share of: drawn as it is");
+        assertEquals(0, alpha(level, 50, 56), "and not blurred");
+    }
+
+    @Test
+    void aPercentageTranslationIsAShareOfTheViewport() throws Exception {
+        BufferedImage img = paint("<rect width=\"20\" height=\"20\" fill=\"#ff0000\""
+                + " style=\"transform: translate(50%, 25%)\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(60, 35));
+        assertEquals(0, alpha(img, 10, 10));
+    }
+
+    @Test
+    void aLengthInEmsIsInTheFontItIsIn() throws Exception {
+        BufferedImage img = paint("<g font-size=\"20\"><rect width=\"2em\" height=\"1em\" fill=\"#ff0000\"/></g>",
+                100, 100);
+        assertEquals(0xffff0000, img.getRGB(35, 15), "40 wide and 20 high");
+        assertEquals(0, alpha(img, 45, 15));
+        assertEquals(0, alpha(img, 35, 25));
+    }
+
+    @Test
+    void hrefIsTheAttributeAndXlinkStandsInForIt() throws Exception {
+        String defs = "<defs><rect id=\"new\" width=\"50\" height=\"100\" fill=\"#00ff00\"/>"
+                + "<rect id=\"old\" x=\"50\" width=\"50\" height=\"100\" fill=\"#ff0000\"/></defs>";
+        String ns = " xmlns:xlink=\"http://www.w3.org/1999/xlink\"";
+        for (String use : new String[] {"<use" + ns + " href=\"#new\" xlink:href=\"#old\"/>",
+            "<use" + ns + " xlink:href=\"#old\" href=\"#new\"/>"}) {
+            BufferedImage img = paint(defs + use, 100, 100);
+            assertEquals(0xff00ff00, img.getRGB(25, 50), use);
+            assertEquals(0, alpha(img, 75, 50), use);
+        }
+        BufferedImage alone = paint(defs + "<use" + ns + " xlink:href=\"#old\"/>", 100, 100);
+        assertEquals(0xffff0000, alone.getRGB(75, 50), "and is used where there is no href");
+    }
+
+    @Test
+    void aMaskCanMeasureItsLuminanceOnLinearLight() throws Exception {
+        String shape = "<rect width=\"100\" height=\"100\" fill=\"#808080\"/></mask></defs>"
+                + "<rect width=\"100\" height=\"100\" fill=\"#ff0000\" mask=\"url(#m)\"/>";
+        BufferedImage plain = paint("<defs><mask id=\"m\">" + shape, 100, 100);
+        BufferedImage linear = paint("<defs><mask id=\"m\" color-interpolation=\"linearRGB\">" + shape, 100, 100);
+        assertEquals(128, alpha(plain, 50, 50), 2, "a mid grey as written");
+        assertEquals(55, alpha(linear, 50, 50), 2, "and as the light it stands for");
     }
 }

@@ -69,6 +69,14 @@ public final class TransformParser {
      * @throws IllegalArgumentException for a function that is not a flat transform
      */
     public static SVGTransform parseCss(String s) {
+        return parseCss(s, 0f, 0f);
+    }
+
+    /**
+     * As {@link #parseCss(String)}, with the size of the box a percentage
+     * in a translation is a share of: the viewport the element is in.
+     */
+    public static SVGTransform parseCss(String s, float boxWidth, float boxHeight) {
         String t = s == null ? "" : s.trim();
         if (t.isEmpty() || "none".equals(t)) return null;
         SVGTransform result = SVGTransform.identity();
@@ -88,6 +96,10 @@ public final class TransformParser {
             float[] args = new float[parts.length];
             for (int k = 0; k < parts.length; k++) {
                 args[k] = turns ? degrees(parts[k]) : NumberParser.parseFloat(parts[k]);
+                if (parts[k].endsWith("%") && name.startsWith("translate")) {
+                    boolean down = "translateY".equals(name) || ("translate".equals(name) && k == 1);
+                    args[k] = args[k] / 100f * (down ? boxHeight : boxWidth);
+                }
             }
             SVGTransform op;
             if ("translateX".equals(name)) {

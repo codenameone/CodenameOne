@@ -166,10 +166,10 @@ final class SvgFilter {
         }
         if (region == null && box != null) {
             // A region in shares of a box that has no width or no height,
-            // around a level line say, is no region: the filter cannot be
-            // worked out and the element is not drawn, which is why a
-            // browser shows no such line at all.
-            layer.setRGB(0, 0, lw, lh, new int[lw * lh], 0, lw);
+            // around a level line say, is no region. The specification
+            // has the effect ignored then (SVG 1.1, 7.11): the element is
+            // drawn as it is, without the filter. Browsers draw nothing
+            // of it instead, which is not what is written.
             return;
         }
         // With no box to take a share of, the region is all there is.

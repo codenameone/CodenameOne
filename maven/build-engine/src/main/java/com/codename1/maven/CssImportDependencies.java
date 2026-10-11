@@ -148,7 +148,7 @@ public final class CssImportDependencies {
             return out;
         }
         Deque<File> pending = new ArrayDeque<File>();
-        collectStylesheets(root, pending);
+        collectStylesheets(root, pending, new java.util.HashSet<File>());
         Set<File> seen = new LinkedHashSet<File>(pending);
         while (!pending.isEmpty()) {
             File css = pending.removeFirst();
@@ -268,14 +268,24 @@ public final class CssImportDependencies {
         return newest;
     }
 
-    private static void collectStylesheets(File dir, Deque<File> into) {
+    /// `seen` is every directory looked in, by where it really is. One
+    /// reached again is reached through a link back to itself or to
+    /// something it is in, and looking in it again would never end.
+    private static void collectStylesheets(File dir, Deque<File> into, Set<File> seen) {
+        try {
+            if (!seen.add(dir.getCanonicalFile())) {
+                return;
+            }
+        } catch (IOException ex) {
+            return;
+        }
         File[] children = dir.listFiles();
         if (children == null) {
             return;
         }
         for (File child : children) {
             if (child.isDirectory()) {
-                collectStylesheets(child, into);
+                collectStylesheets(child, into, seen);
             } else if (child.getName().regionMatches(true, Math.max(0, child.getName().length() - 4), ".css", 0, 4)) {
                 into.addLast(child);
             }

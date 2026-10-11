@@ -220,4 +220,19 @@ class CssImportDependenciesTest {
         assertEquals(java.util.Collections.singleton(real.getCanonicalFile()), CssImportDependencies.outside(css));
         assertTrue(CssImportDependencies.lastModified(css) < Long.MAX_VALUE);
     }
+
+    @Test
+    void aDirectoryLinkedBackToItselfIsLookedInOnce(@TempDir Path tmp) throws Exception {
+        File dir = tmp.toFile();
+        File css = new File(dir, "css");
+        write(new File(css, "theme.css"), "@import \"../shared.css\";\n");
+        File shared = write(new File(dir, "shared.css"), "Label { color: red; }\n");
+        try {
+            java.nio.file.Files.createSymbolicLink(new File(css, "again").toPath(), css.toPath());
+        } catch (UnsupportedOperationException | java.io.IOException ex) {
+            org.junit.jupiter.api.Assumptions.assumeTrue(false, "no symbolic links here");
+        }
+
+        assertEquals(java.util.Collections.singleton(shared.getCanonicalFile()), CssImportDependencies.outside(css));
+    }
 }

@@ -40,6 +40,11 @@ public final class SVGClipPath extends SVGGroup {
 
     /// Whether a mask goes by the opacity of its content (`mask-type:
     /// alpha`) and not by how light it is.
+    private boolean linearLuminance;
+    /// Whether the luminance of a mask is worked out on linear light
+    /// (`color-interpolation="linearRGB"`) and not on the colours as written.
+    public boolean isLinearLuminance() { return linearLuminance; }
+    public void setLinearLuminance(boolean linearLuminance) { this.linearLuminance = linearLuminance; }
     public boolean isAlphaMask() { return alphaMask; }
     public void setAlphaMask(boolean alphaMask) { this.alphaMask = alphaMask; }
 

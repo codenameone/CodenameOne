@@ -275,10 +275,18 @@ public final class SVGParser {
         return length(value, (float) Math.sqrt((viewportWidth * viewportWidth + viewportHeight * viewportHeight) / 2.0));
     }
 
-    private static float length(String value, float whole) {
+    private float length(String value, float whole) {
         if (value == null) return 0f;
         float v = NumberParser.parseFloat(value);
-        return value.trim().endsWith("%") ? v / 100f * whole : v;
+        String unit = value.trim();
+        if (unit.endsWith("%")) return v / 100f * whole;
+        // Lengths in the size of the font are in the one the element has
+        // from what it is in: 2em under `font-size="20"` is 40.
+        float font = fontSize != null ? fontSize.floatValue() : 12f;
+        if (unit.endsWith("rem")) return v * 16f;
+        if (unit.endsWith("em")) return v * font;
+        if (unit.endsWith("ex")) return v * font / 2;
+        return v;
     }
 
     /**
@@ -626,7 +634,7 @@ public final class SVGParser {
     }
 
     /** A side of a picture's box; zero, for the picture's own size, when it is left out or cannot be read. */
-    private static float imageSide(String value, float whole) {
+    private float imageSide(String value, float whole) {
         if (value == null) return 0f;
         try {
             return length(value, whole);
@@ -663,6 +671,8 @@ public final class SVGParser {
         if (mask) cp.setTransform(null);
         cp.setMask(mask);
         cp.setAlphaMask(mask && "alpha".equals(mergedValue(a, "mask-type")));
+        String space = mergedValue(a, "color-interpolation");
+        cp.setLinearLuminance(mask && space != null && "linearRGB".equalsIgnoreCase(space.trim()));
         cp.setObjectBoundingBox("objectBoundingBox".equals(a.get(mask ? "maskContentUnits" : "clipPathUnits")));
         if (mask) {
             boolean user = "userSpaceOnUse".equals(a.get("maskUnits"));
@@ -1430,7 +1440,7 @@ public final class SVGParser {
         String declared = declaredValue(a, "transform");
         if (declared != null) {
             try {
-                n.setTransform(TransformParser.parseCss(declared));
+                n.setTransform(TransformParser.parseCss(declared, viewportWidth, viewportHeight));
             } catch (RuntimeException e) {
                 // Not a transform this reads: the attribute stands.
             }
@@ -1517,8 +1527,17 @@ public final class SVGParser {
             String name = r.getAttributeLocalName(i);
             String key = (prefix == null || prefix.isEmpty()) ? name : prefix + ":" + name;
             m.put(key, r.getAttributeValue(i));
-            // also stash bare local name so callers can ignore namespace prefixes
-            m.put(name, r.getAttributeValue(i));
+        }
+        // Also under the bare local name, so callers can ignore namespace
+        // prefixes -- but never over an attribute written without one:
+        // `href` is the attribute and `xlink:href` what stands in for it
+        // only where it is missing, whichever comes first in the file.
+        for (int i = 0; i < n; i++) {
+            String prefix = r.getAttributePrefix(i);
+            String name = r.getAttributeLocalName(i);
+            if (prefix != null && !prefix.isEmpty() && !m.containsKey(name)) {
+                m.put(name, r.getAttributeValue(i));
+            }
         }
         // Stylesheet rules are folded into the style attribute, around the
         // element's own: every reader of a style then sees them, and a later
