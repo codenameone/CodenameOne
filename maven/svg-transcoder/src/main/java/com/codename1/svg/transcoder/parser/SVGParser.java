@@ -739,7 +739,23 @@ public final class SVGParser {
                 // no view box
             }
         }
-        readChildren(r, m, doc);
+        // What is inside measures its percentages against the marker's view
+        // box, or without one against the marker's own size.
+        float outerWidth = viewportWidth;
+        float outerHeight = viewportHeight;
+        if (m.getViewBoxWidth() > 0 && m.getViewBoxHeight() > 0) {
+            viewportWidth = m.getViewBoxWidth();
+            viewportHeight = m.getViewBoxHeight();
+        } else {
+            viewportWidth = m.getMarkerWidth();
+            viewportHeight = m.getMarkerHeight();
+        }
+        try {
+            readChildren(r, m, doc);
+        } finally {
+            viewportWidth = outerWidth;
+            viewportHeight = outerHeight;
+        }
         return m;
     }
 
@@ -756,6 +772,12 @@ public final class SVGParser {
         SVGFilter f = new SVGFilter();
         Map<String, String> a = attrs(r);
         f.setId(a.get("id"));
+        // A filter may name another to take from what it leaves out itself.
+        String href = a.get("href");
+        if (href != null && href.trim().startsWith("#")) f.setHref(href.trim().substring(1));
+        for (String given : new String[] {"x", "y", "width", "height", "filterUnits", "primitiveUnits"}) {
+            if (a.containsKey(given)) f.markGiven(given);
+        }
         boolean user = "userSpaceOnUse".equals(a.get("filterUnits"));
         f.setRegionUserSpace(user);
         f.setRegion(regionSide(a.get("x"), -0.1f, user, viewportWidth),
@@ -1021,6 +1043,8 @@ public final class SVGParser {
      */
     private float[][] glyphLists = new float[4][0];
     private int glyphIndex;
+    /** How many characters of the text being read have been read in all. */
+    private int textRead;
 
     /** A list of lengths; empty when there is none or it cannot be read. */
     private float[] lengths(String value, boolean horizontal) {
@@ -1074,6 +1098,7 @@ public final class SVGParser {
                 for (float[] list : glyphLists) listed = Math.max(listed, list.length);
                 int from = glyphIndex;
                 glyphIndex += shown.length();
+                textRead += shown.length();
                 int head = 0;
                 while (head < shown.length() && (from + head < 1 || from + head >= listed)) head++;
                 String rest = shown.substring(head);
@@ -1165,9 +1190,12 @@ public final class SVGParser {
                 }
                 if (a.get("x") != null) child.setX(firstLength(a.get("x"), true));
                 if (a.get("y") != null) child.setY(firstLength(a.get("y"), false));
+                float[][] outerLists = glyphLists;
+                int outerIndex = glyphIndex;
+                int outerRead = textRead;
                 if (a.get("x") != null || a.get("y") != null || a.get("dx") != null || a.get("dy") != null) {
                     // A span that places itself places its characters by
-                    // its own lists from here on.
+                    // its own lists, until it ends.
                     glyphLists = new float[][] {lengths(a.get("x"), true), lengths(a.get("y"), false),
                         lengths(a.get("dx"), true), lengths(a.get("dy"), false)};
                     glyphIndex = 0;
@@ -1210,7 +1238,15 @@ public final class SVGParser {
                     child.setItalic(Boolean.valueOf("italic".equals(s) || "oblique".equals(s)));
                 }
                 spanUnplaced = true;
-                readTextContent(r, out, text, child);
+                try {
+                    readTextContent(r, out, text, child);
+                } finally {
+                    // The lists of what the span is in take up again after
+                    // it, past the characters the span used up: they count
+                    // against those lists as well as its own.
+                    glyphLists = outerLists;
+                    glyphIndex = outerIndex + (textRead - outerRead);
+                }
                 // Back in the enclosing span, which has been placed by now
                 // or handed its position on.
                 spanUnplaced = false;
@@ -1565,13 +1601,21 @@ public final class SVGParser {
             }
             m.put("style", (sheet == null ? "" : sheet[0]) + normal + (sheet == null ? "" : sheet[1]) + important);
         }
-        String shorthand = declaredValue(m, "font");
-        if (shorthand != null) {
+        if (declaredValue(m, "font") != null) {
             // `font: italic bold 24px serif` is the four properties this
-            // reads, written as one. They are put ahead of the rest of the
-            // style, where a longhand written beside it still has the last
-            // word.
-            m.put("style", fontLonghands(shorthand) + m.get("style"));
+            // reads, written as one. Each is written out where the
+            // shorthand stands, so that it overrides what comes before it
+            // and is overridden by what comes after, like any declaration.
+            StringBuilder expanded = new StringBuilder();
+            for (String decl : m.get("style").split(";")) {
+                int colon = decl.indexOf(':');
+                if (colon > 0 && "font".equals(decl.substring(0, colon).trim())) {
+                    expanded.append(fontLonghands(decl.substring(colon + 1)));
+                } else if (decl.trim().length() > 0) {
+                    expanded.append(decl).append(';');
+                }
+            }
+            m.put("style", expanded.toString());
         }
         return m;
     }

@@ -371,7 +371,7 @@ public final class VectorImage {
         if (own != null && own.getFilterRef() != null) {
             SVGNode def = doc.getDefinitions().get(own.getFilterRef());
             if (def instanceof SVGFilter) {
-                filter = (SVGFilter) def;
+                filter = inherited((SVGFilter) def);
             }
         }
         SVGClipPath mask = null;
@@ -717,6 +717,55 @@ public final class VectorImage {
         } catch (RuntimeException ex) {
             return null;
         }
+    }
+
+    /// A filter with what it takes from the one it names through `href`:
+    /// the effects, when it has none of its own, and each of the region,
+    /// the region's units and the effects' units that it does not give.
+    /// The filter itself when it names none.
+    private SVGFilter inherited(SVGFilter filter) {
+        SVGFilter from = filter;
+        SVGFilter out = filter;
+        for (int depth = 0; depth < MAX_USE_DEPTH && from.getHref() != null; depth++) {
+            SVGNode def = doc.getDefinitions().get(from.getHref());
+            if (!(def instanceof SVGFilter) || def == filter) {
+                break;
+            }
+            from = (SVGFilter) def;
+            if (out == filter) {
+                out = new SVGFilter();
+                out.setId(filter.getId());
+                out.getPrimitives().addAll(filter.getPrimitives());
+                out.setRegion(filter.getRegionX(), filter.getRegionY(), filter.getRegionWidth(),
+                        filter.getRegionHeight());
+                out.setRegionUserSpace(filter.isRegionUserSpace());
+                out.setPrimitiveObjectBoundingBox(filter.isPrimitiveObjectBoundingBox());
+                out.setSrgb(filter.isSrgb());
+                for (String given : new String[] {"x", "y", "width", "height", "filterUnits", "primitiveUnits"}) {
+                    if (filter.isGiven(given)) {
+                        out.markGiven(given);
+                    }
+                }
+            }
+            if (out.getPrimitives().isEmpty()) {
+                out.getPrimitives().addAll(from.getPrimitives());
+                out.setSrgb(from.isSrgb());
+            }
+            // A side is a length in the units it was written in, so the
+            // region is taken whole, with its units, or not at all.
+            if (!out.isGiven("x") && !out.isGiven("y") && !out.isGiven("width") && !out.isGiven("height")
+                    && !out.isGiven("filterUnits") && (from.isGiven("x") || from.isGiven("y")
+                    || from.isGiven("width") || from.isGiven("height") || from.isGiven("filterUnits"))) {
+                out.setRegion(from.getRegionX(), from.getRegionY(), from.getRegionWidth(), from.getRegionHeight());
+                out.setRegionUserSpace(from.isRegionUserSpace());
+                out.markGiven("filterUnits");
+            }
+            if (!out.isGiven("primitiveUnits") && from.isGiven("primitiveUnits")) {
+                out.setPrimitiveObjectBoundingBox(from.isPrimitiveObjectBoundingBox());
+                out.markGiven("primitiveUnits");
+            }
+        }
+        return out;
     }
 
     /// Paints `node` with everything but its own opacity.
@@ -1291,6 +1340,10 @@ public final class VectorImage {
     private void addOutlines(java.awt.geom.Area all, SVGGroup group, AffineTransform at, Boolean evenOdd,
             int depth) {
         for (SVGNode child : group.getChildren()) {
+            // What is not displayed cuts nothing, nor does anything in it.
+            if (child.getStyle() != null && child.getStyle().isDisplayNone()) {
+                continue;
+            }
             AffineTransform childAt = new AffineTransform(at);
             SVGTransform t = child.getTransform();
             if (t != null) {

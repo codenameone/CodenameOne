@@ -675,6 +675,40 @@ class CN1CSSCLIEndToEndTest {
     }
 
     @Test
+    void watchModeRecompilesAnEditWhoseTimeMovedBack(@TempDir Path tmp) throws Exception {
+        File dir = tmp.toFile();
+        final File css = write(new File(dir, "theme.css"), "Label { color: #000001; }\n");
+        final File res = new File(dir, "theme.res");
+
+        ServerSocket parent = new ServerSocket(0);
+        try {
+            System.setProperty("parent.port", String.valueOf(parent.getLocalPort()));
+            Thread watcher = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    CN1CSSCLI.run(new String[]{"-input", css.getPath(), "-output", res.getPath(), "-watch"});
+                }
+            }, "css-watch-under-test");
+            watcher.start();
+            Socket child = parent.accept();
+            awaitStdout("CSS file successfully compiled.");
+
+            // An older file put back, as a checkout does: a change, though
+            // the stylesheet is now older than the theme built from it.
+            write(css, "Label { color: #000002; }\n");
+            assertTrue(css.setLastModified(res.lastModified() - 60000));
+            awaitStdout(CN1CSSCLI.REFRESH_SIGNAL);
+            assertEquals("2", theme(res).get("Label.fgColor"));
+
+            child.close();
+            watcher.join(20000);
+            assertFalse(watcher.isAlive());
+        } finally {
+            parent.close();
+        }
+    }
+
+    @Test
     void aFailedRecompileInWatchModeIsNotAReload(@TempDir Path tmp) throws Exception {
         File dir = tmp.toFile();
         final File css = write(new File(dir, "theme.css"), "Label { color: #000001; }\n");

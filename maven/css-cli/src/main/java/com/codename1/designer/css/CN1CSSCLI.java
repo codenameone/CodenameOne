@@ -312,6 +312,15 @@ public class CN1CSSCLI {
     /// true when the output was written, false when it was already newer than
     /// everything it is built from.
     private static boolean compileOnce(Options options) throws IOException {
+        return compileOnce(options, false);
+    }
+
+    /// As above; with `changed` the output is written whatever the times
+    /// say. Watch mode knows a file changed because its time moved, either
+    /// way: a checkout that puts an older file back, or an edit within the
+    /// same second as the last build, is a change no comparison of times
+    /// with the output would call one.
+    private static boolean compileOnce(Options options, boolean changed) throws IOException {
         File css = options.mergeFile != null ? options.mergeFile : options.inputFiles[0];
         File outputDir = options.outputFile.getAbsoluteFile().getParentFile();
         if (outputDir != null && !outputDir.isDirectory() && !outputDir.mkdirs()) {
@@ -350,7 +359,7 @@ public class CN1CSSCLI {
                 if (options.mergeFile != null) {
                     updateMergeFile(options.inputFiles, options.mergeFile);
                 }
-                if (isUpToDate(css, options)) {
+                if (!changed && isUpToDate(css, options)) {
                     System.out.println("File has not changed since last compile.");
                     return false;
                 }
@@ -518,7 +527,7 @@ public class CN1CSSCLI {
             PollingFileWatcher watcher = new PollingFileWatcher(watchedFiles(options), 1000);
             boolean failed = false;
             try {
-                if (compileOnce(options) && first) {
+                if (compileOnce(options, !first) && first) {
                     System.out.println("CSS file successfully compiled.  " + options.outputFile);
                 }
             } catch (Throwable t) {

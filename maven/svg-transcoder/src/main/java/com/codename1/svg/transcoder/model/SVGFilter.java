@@ -66,6 +66,13 @@ public final class SVGFilter extends SVGNode {
 
     public List<Primitive> getPrimitives() { return primitives; }
 
+    private String href;
+    /// The id of the filter this one takes from what it does not say
+    /// itself: its effects when it has none, its region and its units when
+    /// it gives none. Null when it names none.
+    public String getHref() { return href; }
+    public void setHref(String href) { this.href = href; }
+
     /// Whether the region is in the coordinates of the filtered element
     /// (`filterUnits="userSpaceOnUse"`) and not in fractions of its
     /// bounding box.

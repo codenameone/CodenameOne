@@ -1367,4 +1367,59 @@ class VectorImageTest {
         assertEquals(128, alpha(plain, 50, 50), 2, "a mid grey as written");
         assertEquals(55, alpha(linear, 50, 50), 2, "and as the light it stands for");
     }
+
+    @Test
+    void theListsOfATextTakeUpAgainAfterASpan() throws Exception {
+        String font = " font-family=\"monospace\" font-size=\"10\" fill=\"#ff0000\"";
+        BufferedImage img = paint("<text x=\"5 20 80\" y=\"30\"" + font + ">I<tspan x=\"40\">I</tspan>I</text>",
+                100, 100);
+        assertTrue(inkRight(img) > 80, "the third where the text's own list puts it, was " + inkRight(img));
+    }
+
+    @Test
+    void aFontShorthandOverridesWhatComesBeforeIt() throws Exception {
+        BufferedImage wanted = paint("<text x=\"5\" y=\"60\" font-size=\"30\" font-family=\"monospace\">MMM</text>",
+                100, 100);
+        BufferedImage img = paint("<style>text { font-size: 8px; }</style>"
+                + "<text x=\"5\" y=\"60\" style=\"font: 30px monospace\">MMM</text>", 100, 100);
+        assertEquals(inkRight(wanted), inkRight(img), "the inline shorthand, not the rule's size");
+        BufferedImage later = paint("<text x=\"5\" y=\"60\" style=\"font: 8px monospace; font-size: 30px\">MMM</text>",
+                100, 100);
+        assertEquals(inkRight(wanted), inkRight(later), "and a size written after it");
+    }
+
+    @Test
+    void aMarkersPercentagesAreOfItsOwnViewBox() throws Exception {
+        BufferedImage img = paint("<defs><marker id=\"m\" viewBox=\"0 0 10 10\" markerWidth=\"20\" markerHeight=\"20\""
+                + " refX=\"5\" refY=\"5\" markerUnits=\"userSpaceOnUse\"><rect x=\"50%\" width=\"50%\" height=\"100%\""
+                + " fill=\"#00ff00\"/></marker></defs>"
+                + "<line x1=\"10\" y1=\"50\" x2=\"50\" y2=\"50\" stroke=\"#ff0000\" marker-end=\"url(#m)\"/>", 100, 100);
+        assertEquals(0xff00ff00, img.getRGB(55, 45), "the right half of the marker");
+        assertEquals(0, alpha(img, 45, 42), "and not the left");
+    }
+
+    @Test
+    void whatIsNotDisplayedCutsNothingOutOfAClip() throws Exception {
+        BufferedImage img = paint("<defs><clipPath id=\"c\"><rect width=\"100\" height=\"100\" display=\"none\"/>"
+                + "<rect width=\"30\" height=\"100\"/></clipPath></defs>"
+                + "<rect width=\"100\" height=\"100\" fill=\"#ff0000\" clip-path=\"url(#c)\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(15, 50));
+        assertEquals(0, alpha(img, 60, 50), "the hidden rectangle lets nothing through");
+    }
+
+    @Test
+    void aFilterTakesFromTheOneItNames() throws Exception {
+        BufferedImage img = paint("<defs><filter id=\"base\" filterUnits=\"userSpaceOnUse\" x=\"0\" y=\"0\" width=\"100\""
+                + " height=\"100\" color-interpolation-filters=\"sRGB\"><feFlood flood-color=\"#00ff00\"/></filter>"
+                + "<filter id=\"derived\" href=\"#base\"/></defs>"
+                + "<rect width=\"20\" height=\"20\" fill=\"#ff0000\" filter=\"url(#derived)\"/>", 100, 100);
+        assertEquals(0xff00ff00, img.getRGB(80, 80), "the effects and the region of the filter it names");
+    }
+
+    @Test
+    void anAlphaWrittenAsAPercentageIsAFraction() throws Exception {
+        BufferedImage img = paint("<rect width=\"100\" height=\"100\" fill=\"rgba(255, 0, 0, 50%)\"/>", 100, 100);
+        assertEquals(128, alpha(img, 50, 50), 2);
+        assertEquals(0xff0000, img.getRGB(50, 50) & 0xffffff);
+    }
 }
