@@ -201,11 +201,11 @@ Compression uses the existing pure-Java JZlib engine. JVM and Android targets
 use their platform implementation of the standard classes.
 
 This is a streaming API, not the entire Java SE ZIP package. Random-access
-`ZipFile`, `DeflaterInputStream`, `InflaterOutputStream`, and the `FileTime`
-methods on `ZipEntry` are not provided. Reading a ZIP entry verifies its CRC
+`ZipFile`, reverse compression filters, and the `FileTime` methods on
+`ZipEntry` aren't provided. Reading a ZIP entry verifies its CRC
 and sizes when its end is reached; call `closeEntry()` to consume and verify
-an entry you have only partly read. Closing the input stream does not drain
-or verify unread entries. ZIP input does not extract files or interpret Unix
+an entry you have only partly read. Closing the input stream doesn't drain
+or verify unread entries. ZIP input doesn't extract files or interpret Unix
 permissions.
 
 ==== Executable files in a project download
@@ -223,9 +223,9 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/Z
 ----
 
 The permission argument accepts `0000` through `0777`. The writer infers a
-regular file or directory from the trailing slash; it does not create symlinks
+regular file or directory from the trailing slash; it doesn't create symlinks
 or special files. Use `0644` for ordinary files. Names are archive paths with
-`/` separators. The writer does not sanitize names for extraction, so choose
+`/` separators. The writer doesn't sanitize names for extraction, so choose
 relative names without `..` components.
 
 The runnable example is `vm/backend/demo/zipdownload/com/demo/ZipDownload.java`.
@@ -243,7 +243,7 @@ The same binary can generate a file without starting HTTP:
 
 `HttpServer.Response.stream` invokes the writer when it sends the response. Open
 sources inside this callback and close them with try-with-resources. HEAD and
-statuses without a body do not invoke it, so they do not open sources. Closing
+statuses without a body don't invoke it, so they don't open sources. Closing
 the supplied output flushes it without closing the connection. The server ends
 the response only after the callback returns successfully.
 
@@ -265,8 +265,8 @@ The local JVM transport supports HTTP/1; test HTTP/2 with the packaged backend.
 ==== Format limits and ownership
 
 * The default name/comment encoding is UTF-8, with the ZIP UTF-8 flag set.
-  Charset constructors also accept encodings available in the runtime. Names and
-  comments that cannot be encoded without replacement are rejected.
+  `Charset` constructors also accept encodings available in the runtime. Names and
+  comments that can't be encoded without replacement are rejected.
 * Files may be empty. Directories are explicit entries ending in `/`.
   Duplicate entry names and empty entry names are rejected.
 * `DEFLATED` entries stream with data descriptors. `STORED` entries require a
@@ -276,7 +276,7 @@ The local JVM transport supports HTTP/1; test HTTP/2 with the packaged backend.
   bytes. There may be at most 65,534 entries. Caller-supplied ZIP64 extra fields
   are rejected. A limit discovered while streaming raises `ZipException` and
   leaves an incomplete archive; discard that output.
-* Payload memory does not grow with file size. Compression uses a fixed window
+* Payload memory doesn't grow with file size. Compression uses a fixed window
   and output buffer. Central-directory records grow with entry count and encoded
   names, extras, and comments; the writer caps their serialized total at 16 MiB.
   Java objects and strings add overhead beyond that serialized limit.
