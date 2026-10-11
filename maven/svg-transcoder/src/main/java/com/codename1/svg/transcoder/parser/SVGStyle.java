@@ -51,6 +51,8 @@ public final class SVGStyle {
     private String clipPathRef;
     private Boolean fillEvenOdd;
     private float[] strokeDashArray;
+    private boolean displayNone;
+    private Boolean visible;
     private Float strokeDashOffset;
 
     public SVGPaint getFill() { return fill; }
@@ -87,6 +89,12 @@ public final class SVGStyle {
     /** How far into the dash pattern a stroke starts. */
     public Float getStrokeDashOffset() { return strokeDashOffset; }
     public void setStrokeDashOffset(Float v) { this.strokeDashOffset = v; }
+    /** Whether the element says display: none, which takes it and everything in it out of the drawing. */
+    public boolean isDisplayNone() { return displayNone; }
+    public void setDisplayNone(boolean v) { this.displayNone = v; }
+    /** The visibility of the element; null when it does not say. A hidden element's children may still be visible. */
+    public Boolean getVisible() { return visible; }
+    public void setVisible(Boolean v) { this.visible = v; }
     public SVGStyle inherit(SVGStyle parent) {
         if (parent == null) return this;
         if (fill == null) fill = parent.fill;
@@ -100,6 +108,8 @@ public final class SVGStyle {
         if (strokeMiterLimit == null) strokeMiterLimit = parent.strokeMiterLimit;
         if (fillEvenOdd == null) fillEvenOdd = parent.fillEvenOdd;
         if (strokeDashArray == null) strokeDashArray = parent.strokeDashArray;
+        if (visible == null) visible = parent.visible;
+        // display does NOT inherit: a hidden element is skipped with its subtree.
         if (strokeDashOffset == null) strokeDashOffset = parent.strokeDashOffset;
         // clip-path does NOT inherit per SVG spec.
         return this;

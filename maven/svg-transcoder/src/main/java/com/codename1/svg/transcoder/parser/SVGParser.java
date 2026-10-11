@@ -187,8 +187,8 @@ public final class SVGParser {
     private void readSVGRoot(XMLStreamReader r, SVGDocument doc) {
         Map<String, String> a = attrs(r);
         applyCommon(doc, a);
-        doc.setWidth(NumberParser.parseFloat(a.get("width")));
-        doc.setHeight(NumberParser.parseFloat(a.get("height")));
+        doc.setWidth(lengthOrZero(a.get("width")));
+        doc.setHeight(lengthOrZero(a.get("height")));
         doc.setPreserveAspectRatio(a.get("preserveAspectRatio"));
         String vb = a.get("viewBox");
         if (vb != null) {
@@ -203,10 +203,31 @@ public final class SVGParser {
                 // leave defaults
             }
         }
+        if (doc.isViewBoxDeclared()) {
+            // One side given and the other not: the missing one follows the
+            // shape of the view box.
+            float ratio = doc.getViewBoxWidth() / doc.getViewBoxHeight();
+            if (doc.getWidth() > 0 && doc.getHeight() == 0) doc.setHeight(doc.getWidth() / ratio);
+            else if (doc.getHeight() > 0 && doc.getWidth() == 0) doc.setWidth(doc.getHeight() * ratio);
+        }
         if (doc.getViewBoxWidth() == 0) doc.setViewBoxWidth(doc.getWidth());
         if (doc.getViewBoxHeight() == 0) doc.setViewBoxHeight(doc.getHeight());
         if (doc.getWidth() == 0) doc.setWidth(doc.getViewBoxWidth());
         if (doc.getHeight() == 0) doc.setHeight(doc.getViewBoxHeight());
+    }
+
+    /**
+     * A width or height of the root element; zero for one that is missing,
+     * unreadable, or a percentage, which is a share of a viewport the file
+     * does not know and so no size of its own.
+     */
+    private static float lengthOrZero(String value) {
+        if (value == null || value.trim().endsWith("%")) return 0f;
+        try {
+            return NumberParser.parseFloat(value);
+        } catch (RuntimeException e) {
+            return 0f;
+        }
     }
 
     private void readChildren(XMLStreamReader r, SVGGroup parent, SVGDocument doc) throws XMLStreamException {
@@ -347,6 +368,7 @@ public final class SVGParser {
         SVGClipPath cp = new SVGClipPath();
         Map<String, String> a = attrs(r);
         cp.setId(a.get("id"));
+        cp.setObjectBoundingBox("objectBoundingBox".equals(a.get("clipPathUnits")));
         readChildren(r, cp, doc);
         return cp;
     }
@@ -489,6 +511,7 @@ public final class SVGParser {
         if (a.containsKey("x2")) g.setX2(parseGradCoord(a.get("x2")));
         if (a.containsKey("y2")) g.setY2(parseGradCoord(a.get("y2")));
         if ("userSpaceOnUse".equals(a.get("gradientUnits"))) g.setUserSpace(true);
+        if (a.get("gradientTransform") != null) g.setGradientTransform(TransformParser.parse(a.get("gradientTransform")));
         String href = a.get("href");
         if (href == null) href = a.get("xlink:href");
         if (href != null && href.startsWith("#")) g.setHref(href.substring(1));
@@ -505,6 +528,7 @@ public final class SVGParser {
         if (a.containsKey("r")) g.setR(parseGradCoord(a.get("r")));
         if (a.containsKey("fx")) g.setFx(Float.valueOf(parseGradCoord(a.get("fx"))));
         if (a.containsKey("fy")) g.setFy(Float.valueOf(parseGradCoord(a.get("fy"))));
+        if (a.get("gradientTransform") != null) g.setGradientTransform(TransformParser.parse(a.get("gradientTransform")));
         if ("userSpaceOnUse".equals(a.get("gradientUnits"))) g.setUserSpace(true);
         String href = a.get("href");
         if (href == null) href = a.get("xlink:href");
@@ -627,7 +651,8 @@ public final class SVGParser {
                     || "opacity".equals(k) || "stroke-width".equals(k) || "stroke-linecap".equals(k)
                     || "stroke-linejoin".equals(k) || "stroke-miterlimit".equals(k)
                     || "clip-path".equals(k) || "fill-rule".equals(k)
-                    || "stroke-dasharray".equals(k) || "stroke-dashoffset".equals(k)) {
+                    || "stroke-dasharray".equals(k) || "stroke-dashoffset".equals(k)
+                    || "display".equals(k) || "visibility".equals(k)) {
                 pres.put(k, e.getValue());
             }
         }

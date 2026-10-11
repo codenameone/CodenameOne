@@ -208,14 +208,10 @@ public class CSSImageImporter {
                 .append("}\n");
         appendCSS(css.toString());
         // run(), not main(): main ends the JVM, and this is the editor's own.
-        // Only the project's own stylesheet is compiled. The stylesheets of
-        // installed cn1libs are merged in by the Maven and Gradle builds, which
-        // know where a project keeps them and rebuild this file with them; the
-        // editor does not look for the lib/impl/css directory of an Ant project.
-        int status = CN1CSSCLI.run(new String[]{
-            "-input", getCSSFile().getAbsolutePath(),
-            "-output", getResourceFile().getAbsolutePath()
-        });
+        // The stylesheets of the project's libraries are compiled in ahead
+        // of its own, so the theme written here still has what they define.
+        int status = CN1CSSCLI.run(CN1CSSCLI.legacyArguments(
+            getCSSFile().getAbsolutePath(), getResourceFile().getAbsolutePath()));
         if (status != 0) {
             throw new IOException("Failed to compile CSS file " + getCSSFile() + ". See the console for the reason.");
         }

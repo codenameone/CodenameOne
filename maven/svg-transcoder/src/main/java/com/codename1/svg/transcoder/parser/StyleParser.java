@@ -78,6 +78,14 @@ public final class StyleParser {
         if (fillRule != null) {
             out.setFillEvenOdd(Boolean.valueOf("evenodd".equals(fillRule.trim())));
         }
+        String display = merged.get("display");
+        out.setDisplayNone(display != null && "none".equals(display.trim()));
+        String visibility = merged.get("visibility");
+        if (visibility != null) {
+            String v = visibility.trim();
+            if ("hidden".equals(v) || "collapse".equals(v)) out.setVisible(Boolean.FALSE);
+            else if ("visible".equals(v)) out.setVisible(Boolean.TRUE);
+        }
         out.setStrokeDashArray(toDashes(merged.get("stroke-dasharray")));
         out.setStrokeDashOffset(toFloat(merged.get("stroke-dashoffset")));
         String clipPath = merged.get("clip-path");

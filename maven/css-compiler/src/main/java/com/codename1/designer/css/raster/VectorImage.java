@@ -143,6 +143,9 @@ public final class VectorImage {
         return new VectorImage(LottieParser.parse(new java.io.ByteArrayInputStream(fallback)), true);
     }
 
+    // A file that gives only a view box is the size of that box: the
+    // parser fills in a side the root element leaves open, in the shape of
+    // the view box. The 1 below is for a file with neither.
     /// The width the file asks for, in CSS pixels. At least 1.
     public double getWidth() {
         return doc.getWidth() > 0 ? doc.getWidth() : 1;
@@ -223,6 +226,9 @@ public final class VectorImage {
         SVGStyle style = new SVGStyle();
         SVGStyle own = node.getStyle();
         if (own != null) {
+            if (own.isDisplayNone()) {
+                return;
+            }
             style.inherit(own);
             style.setOpacity(own.getOpacity());
             style.setClipPathRef(own.getClipPathRef());
@@ -277,7 +283,16 @@ public final class VectorImage {
             if (style.getClipPathRef() != null) {
                 SVGNode clip = doc.getDefinitions().get(style.getClipPathRef());
                 if (clip instanceof SVGClipPath) {
-                    g.clip(clipOutline((SVGClipPath) clip));
+                    Shape outline = clipOutline((SVGClipPath) clip);
+                    if (((SVGClipPath) clip).isObjectBoundingBox()) {
+                        // In fractions of the box around what is clipped.
+                        // With no box to measure, nothing is inside it.
+                        Rectangle2D box = boundsOf(node);
+                        outline = box == null || box.isEmpty() ? new Rectangle2D.Double()
+                                : new AffineTransform(box.getWidth(), 0, 0, box.getHeight(), box.getX(), box.getY())
+                                        .createTransformedShape(outline);
+                    }
+                    g.clip(outline);
                 }
             }
             if (node instanceof SVGClipPath) {
@@ -292,6 +307,9 @@ public final class VectorImage {
                 for (SVGNode child : ((SVGGroup) node).getChildren()) {
                     paintNode(g, child, style, w, h);
                 }
+            } else if (Boolean.FALSE.equals(style.getVisible())) {
+                // Hidden, which unlike `display: none` a child may undo.
+                return;
             } else if (node instanceof SVGText) {
                 paintText(g, (SVGText) node, style);
             } else {
@@ -339,6 +357,38 @@ public final class VectorImage {
         } finally {
             useDepth--;
         }
+    }
+
+    /// The box around the shapes of `node`, in its own coordinates, or null
+    /// when it has none that can be measured.
+    private static Rectangle2D boundsOf(SVGNode node) {
+        if (node.getStyle() != null && node.getStyle().isDisplayNone()) {
+            return null;
+        }
+        if (!(node instanceof SVGGroup)) {
+            Shape shape = outline(node);
+            return shape == null ? null : shape.getBounds2D();
+        }
+        Rectangle2D all = null;
+        for (SVGNode child : ((SVGGroup) node).getChildren()) {
+            if (child instanceof SVGClipPath) {
+                continue;
+            }
+            Rectangle2D box = boundsOf(child);
+            if (box == null) {
+                continue;
+            }
+            SVGTransform t = child.getTransform();
+            if (t != null) {
+                box = new AffineTransform(t.a, t.b, t.c, t.d, t.e, t.f).createTransformedShape(box).getBounds2D();
+            }
+            if (all == null) {
+                all = box;
+            } else {
+                all = all.createUnion(box);
+            }
+        }
+        return all;
     }
 
     /// The union of the shapes of a clip path.
@@ -635,6 +685,34 @@ public final class VectorImage {
             f[i] = fractions.get(i).floatValue();
         }
         Color[] c = colors.toArray(new Color[0]);
+        SVGTransform gt = def instanceof SVGLinearGradient ? ((SVGLinearGradient) def).getGradientTransform()
+                : ((SVGRadialGradient) def).getGradientTransform();
+        AffineTransform turned = gt == null ? null : new AffineTransform(gt.a, gt.b, gt.c, gt.d, gt.e, gt.f);
+        if (turned != null && Math.abs(turned.getDeterminant()) < 1e-12) {
+            // Squashed flat: there is no gradient left to see.
+            return c[c.length - 1];
+        }
+        if (def instanceof SVGLinearGradient && turned != null) {
+            SVGLinearGradient lg = (SVGLinearGradient) def;
+            Point2D start = new Point2D.Double(lg.getX1(), lg.getY1());
+            Point2D end = new Point2D.Double(lg.getX2(), lg.getY2());
+            if (start.equals(end)) {
+                return c[c.length - 1];
+            }
+            // The gradient is laid out in its own coordinates and those are
+            // then moved: by its transform, and for one given in fractions
+            // of the bounding box by that box after it.
+            AffineTransform at = new AffineTransform();
+            if (!lg.isUserSpace()) {
+                if (bounds.getWidth() <= 0 || bounds.getHeight() <= 0) {
+                    return c[c.length - 1];
+                }
+                at.setTransform(bounds.getWidth(), 0, 0, bounds.getHeight(), bounds.getX(), bounds.getY());
+            }
+            at.concatenate(turned);
+            return new LinearGradientPaint(start, end, f, c, MultipleGradientPaint.CycleMethod.NO_CYCLE,
+                    MultipleGradientPaint.ColorSpaceType.SRGB, at);
+        }
         if (def instanceof SVGLinearGradient) {
             SVGLinearGradient lg = (SVGLinearGradient) def;
             Point2D start = point(lg.getX1(), lg.getY1(), lg.isUserSpace(), bounds);
@@ -650,7 +728,8 @@ public final class VectorImage {
                 return c[c.length - 1];
             }
             return new RadialGradientPaint(new Point2D.Double(rg.getCx(), rg.getCy()), rg.getR(), focusOf(rg), f, c,
-                    MultipleGradientPaint.CycleMethod.NO_CYCLE);
+                    MultipleGradientPaint.CycleMethod.NO_CYCLE, MultipleGradientPaint.ColorSpaceType.SRGB,
+                    turned == null ? new AffineTransform() : turned);
         }
         if (rg.getR() <= 0 || bounds.getWidth() <= 0 || bounds.getHeight() <= 0) {
             return c[c.length - 1];
@@ -659,6 +738,9 @@ public final class VectorImage {
         // ellipse when the box is not square.
         AffineTransform toBox = new AffineTransform(bounds.getWidth(), 0, 0, bounds.getHeight(),
                 bounds.getX(), bounds.getY());
+        if (turned != null) {
+            toBox.concatenate(turned);
+        }
         Point2D centre = new Point2D.Double(rg.getCx(), rg.getCy());
         return new RadialGradientPaint(centre, rg.getR(), focusOf(rg), f, c,
                 MultipleGradientPaint.CycleMethod.NO_CYCLE, MultipleGradientPaint.ColorSpaceType.SRGB, toBox);

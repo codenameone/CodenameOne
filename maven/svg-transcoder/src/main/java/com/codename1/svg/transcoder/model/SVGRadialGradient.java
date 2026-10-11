@@ -22,6 +22,8 @@
  */
 package com.codename1.svg.transcoder.model;
 
+import com.codename1.svg.transcoder.parser.SVGTransform;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,6 +31,7 @@ public final class SVGRadialGradient extends SVGNode {
     private float cx = 0.5f, cy = 0.5f, r = 0.5f;
     private Float fx, fy;
     private boolean userSpace;
+    private SVGTransform gradientTransform;
     private String href;
     private final List<SVGGradientStop> stops = new ArrayList<SVGGradientStop>();
 
@@ -44,6 +47,10 @@ public final class SVGRadialGradient extends SVGNode {
     public void setFx(Float fx) { this.fx = fx; }
     public Float getFy() { return fy; }
     public void setFy(Float fy) { this.fy = fy; }
+
+    /** The gradientTransform, or null. Only a renderer that reads the model applies it. */
+    public SVGTransform getGradientTransform() { return gradientTransform; }
+    public void setGradientTransform(SVGTransform t) { this.gradientTransform = t; }
 
     public boolean isUserSpace() { return userSpace; }
     public void setUserSpace(boolean userSpace) { this.userSpace = userSpace; }

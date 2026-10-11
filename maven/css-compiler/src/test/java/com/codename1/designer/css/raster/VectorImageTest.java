@@ -256,6 +256,64 @@ class VectorImageTest {
     }
 
     @Test
+    void anElementThatIsNotDisplayedIsLeftOutWithEverythingInIt() throws Exception {
+        BufferedImage img = paint("<style>.off { display: none; }</style>"
+                + "<g display=\"none\"><rect width=\"30\" height=\"100\" fill=\"#ff0000\"/></g>"
+                + "<rect class=\"off\" x=\"30\" width=\"30\" height=\"100\" fill=\"#ff0000\"/>"
+                + "<g visibility=\"hidden\"><rect x=\"60\" width=\"20\" height=\"100\" fill=\"#ff0000\"/>"
+                + "<rect x=\"80\" width=\"20\" height=\"100\" fill=\"#00ff00\" visibility=\"visible\"/></g>",
+                100, 100);
+        assertEquals(0, alpha(img, 15, 50), "inside a group that is not displayed");
+        assertEquals(0, alpha(img, 45, 50), "not displayed by a stylesheet rule");
+        assertEquals(0, alpha(img, 70, 50), "hidden with its group");
+        assertEquals(0xff00ff00, img.getRGB(90, 50), "visible again inside a hidden group");
+    }
+
+    @Test
+    void aGradientIsMovedByItsTransform() throws Exception {
+        String stops = "<stop offset=\"0\" stop-color=\"#ff0000\"/><stop offset=\"0.5\" stop-color=\"#ff0000\"/>"
+                + "<stop offset=\"0.5\" stop-color=\"#0000ff\"/><stop offset=\"1\" stop-color=\"#0000ff\"/>";
+        // Left to right as written; a quarter turn makes it top to bottom.
+        BufferedImage img = paint("<defs><linearGradient id=\"g\" gradientTransform=\"rotate(90 0.5 0.5)\">"
+                + stops + "</linearGradient></defs><rect width=\"100\" height=\"100\" fill=\"url(#g)\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(10, 20));
+        assertEquals(0xffff0000, img.getRGB(90, 20));
+        assertEquals(0xff0000ff, img.getRGB(10, 80));
+        assertEquals(0xff0000ff, img.getRGB(90, 80));
+
+        BufferedImage radial = paint("<defs><radialGradient id=\"g\" gradientUnits=\"userSpaceOnUse\" cx=\"0\""
+                + " cy=\"0\" r=\"20\" gradientTransform=\"translate(50 50) scale(2 1)\">" + stops
+                + "</radialGradient></defs><rect width=\"100\" height=\"100\" fill=\"url(#g)\"/>", 100, 100);
+        assertEquals(0xffff0000, radial.getRGB(65, 50), "moved to the middle and twice as wide");
+        assertEquals(0xff0000ff, radial.getRGB(50, 65), "but no taller");
+    }
+
+    @Test
+    void aClipPathInFractionsOfTheBoxCoversThatShareOfIt() throws Exception {
+        BufferedImage img = paint("<clipPath id=\"c\" clipPathUnits=\"objectBoundingBox\">"
+                + "<rect width=\"0.5\" height=\"1\"/></clipPath>"
+                + "<rect x=\"20\" y=\"20\" width=\"60\" height=\"60\" fill=\"#ff0000\" clip-path=\"url(#c)\"/>",
+                100, 100);
+        assertEquals(0xffff0000, img.getRGB(35, 50), "the left half is kept");
+        assertEquals(0, alpha(img, 65, 50), "the right half is clipped away");
+    }
+
+    @Test
+    void aFileWithOnlyAViewBoxIsThatSize() throws Exception {
+        VectorImage wide = VectorImage.readSvg(new ByteArrayInputStream(
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 200 100\"/>"
+                        .getBytes(StandardCharsets.UTF_8)));
+        assertEquals(200.0, wide.getWidth(), 0.001);
+        assertEquals(100.0, wide.getHeight(), 0.001);
+
+        VectorImage oneSide = VectorImage.readSvg(new ByteArrayInputStream(
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"50\" height=\"100%\" viewBox=\"0 0 200 100\"/>"
+                        .getBytes(StandardCharsets.UTF_8)));
+        assertEquals(50.0, oneSide.getWidth(), 0.001);
+        assertEquals(25.0, oneSide.getHeight(), 0.001, "the side left open follows the view box");
+    }
+
+    @Test
     void aUseThatNamesItselfDrawsNothingAndEnds() throws Exception {
         BufferedImage img = paint("<g id=\"loop\"><use href=\"#loop\"/></g>", 20, 20);
         assertEquals(0, alpha(img, 10, 10));
