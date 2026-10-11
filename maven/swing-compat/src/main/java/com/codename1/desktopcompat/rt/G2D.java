@@ -857,6 +857,22 @@ public final class G2D extends Graphics2D {
             double y1 = gp.getPoint1().getY();
             double x2 = gp.getPoint2().getX();
             double y2 = gp.getPoint2().getY();
+            if (fillGradientPixels(p, gp, x1, y1, x2, y2)) {
+                dirty = true;
+                return;
+            }
+            // Only a fill too large to work out pixel by pixel gets here.
+            // The platform's paint is right for it on a port whose clipRect
+            // keeps a shape clip, and for a rectangle on every port; see
+            // GradientFill for what it did to a rounded shape elsewhere.
+            // It draws under a matrix of its own and throws on a graphics
+            // that has none, where the first color has to do.
+            if (!g.isTransformSupported()) {
+                applyColor(gp.getColor1());
+                g.fillShape(p);
+                dirty = true;
+                return;
+            }
             g.setColor(new LinearGradientPaint(mapX(x1, y1), mapY(x1, y1), mapX(x2, y2), mapY(x2, y2),
                     new float[]{0f, 1f},
                     new int[]{gp.getColor1().getRGB() & 0xffffff, gp.getColor2().getRGB() & 0xffffff},
@@ -870,6 +886,39 @@ public final class G2D extends Graphics2D {
         } else {
             g.fillShape(p);
         }
+    }
+
+    /// Draws the gradient through a path in device coordinates pixel by
+    /// pixel (see [GradientFill]); false when that could not be done.
+    private boolean fillGradientPixels(GeneralPath p, GradientPaint gp, double x1, double y1, double x2,
+                                       double y2) {
+        double det = a * d - b * c;
+        if (det == 0) {
+            return false;
+        }
+        double dx = x2 - x1;
+        double dy = y2 - y1;
+        double length = dx * dx + dy * dy;
+        double ta = 0;
+        double tb = 0;
+        double tc = 0;
+        if (length > 0) {
+            // The place of a user point on the gradient is the foot of its
+            // perpendicular on the line from the first point to the second,
+            // which is measured in USER space: under a matrix that scales
+            // the two axes differently the bands are no longer square to the
+            // line on the device. A device point is taken back through the
+            // inverse of the matrix, and since both steps are affine the
+            // place is one linear expression in the device coordinates.
+            ta = (d * dx - b * dy) / (det * length);
+            tb = (a * dy - c * dx) / (det * length);
+            double ux = (c * f - d * e) / det;
+            double uy = (b * e - a * f) / det;
+            tc = ((ux - x1) * dx + (uy - y1) * dy) / length;
+        }
+        return GradientFill.fill(g, p, new int[] {clipX, clipY, clipW, clipH},
+                antialias >= 0 ? antialias == 1 : g.isAntiAliased(), ta, tb, tc, gp.getColor1().getRGB(),
+                gp.getColor2().getRGB(), gp.isCyclic(), Math.round(target.alpha * composite.getAlpha()));
     }
 
     /// Fills each subpath as a polygon, for a port without shapes. Holes

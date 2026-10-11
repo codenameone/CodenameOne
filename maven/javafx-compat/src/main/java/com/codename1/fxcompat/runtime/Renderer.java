@@ -351,10 +351,28 @@ public final class Renderer {
             fill(path, stops.get(stops.size() / 2).getColor(), bx, by, bw, bh);
             return;
         }
-        // A gradient that repeats or reflects is coloured here, point by
-        // point: the platform's paint put the reflected half of a
-        // reflecting gradient first, so the stops read backwards.
-        if (lg.getCycleMethod() != CycleMethod.NO_CYCLE && masked(path, null, lg, bx, by, bw, bh)) {
+        // Every linear gradient is coloured here, point by point, and not
+        // by the platform's paint. That paint confines itself to the shape
+        // with a rectangle on top of a shape clip, and what a port made of
+        // the pair decided the picture: one kept only the rectangle, so
+        // the fill ran over the bounds of whatever clipped the node, and
+        // two rebuilt a shape with a round corner as slivers along its
+        // edges, leaving an outline. It also put the reflected half of a
+        // reflecting gradient first, so the stops read backwards, and under
+        // a rotation it is made of lines one pixel wide that show as a
+        // hatch. Colouring a mask needs none of that from a port -- a shape
+        // filled in one colour, pixels read, an image drawn -- and it is
+        // what a radial gradient has always gone through. It costs an
+        // image the size of the shape inside the clip; the last few are
+        // kept, so a shape repainted where it was is one image drawn.
+        if (masked(path, null, lg, bx, by, bw, bh)) {
+            return;
+        }
+        // Only a fill past RASTER_LIMIT, or on an image without shapes,
+        // is left to the platform's paint below -- which draws under a
+        // matrix of its own and throws on a graphics that has none.
+        if (!g.isTransformSupported()) {
+            fill(path, stops.get(stops.size() / 2).getColor(), bx, by, bw, bh);
             return;
         }
         double sx = lg.isProportional() ? bx + lg.getStartX() * bw : lg.getStartX();

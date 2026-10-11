@@ -99,6 +99,60 @@ public class GradientAndImageTest {
         assertEquals(expected.getOpacity(), actual.getOpacity(), 0.004);
     }
 
+    private static int channel(int argb, int shift) {
+        return (argb >> shift) & 0xff;
+    }
+
+    private static void near(String what, int expected, int actual) {
+        assertTrue(what + ": alpha " + (actual >>> 24), (actual >>> 24) >= 250);
+        for (int shift = 0; shift <= 16; shift += 8) {
+            assertTrue(what + ": expected " + Integer.toHexString(expected) + ", was "
+                    + Integer.toHexString(actual), Math.abs(channel(expected, shift) - channel(actual, shift)) <= 4);
+        }
+    }
+
+    /// A gradient that does not cycle, through a shape with round corners:
+    /// the scene the captures of three ports drew wrong. The colours are
+    /// those of the definition, and nothing is painted outside the shape --
+    /// not in the square corner its bounds have and the shape has not, and
+    /// not anywhere else on the surface. The platform's paint confined
+    /// itself with a rectangle on top of a shape clip, which a port may
+    /// drop or mangle; the implementation these tests run on does not clip
+    /// to a shape at all, so a fill that leans on one shows here.
+    @Test
+    public void aGradientThatDoesNotCycleStaysInsideARoundedShape() {
+        HeadlessImplementation.rasterImages = true;
+        HeadlessImplementation.shapes = true;
+        try {
+            com.codename1.ui.Image surface = com.codename1.ui.Image.createImage(200, 120, 0);
+            Renderer r = new Renderer(surface.getGraphics(), 0, 0);
+            com.codename1.fxcompat.runtime.FxPath path = new com.codename1.fxcompat.runtime.FxPath();
+            path.addRoundRect(20, 30, 100, 60, 20, 20);
+            Stop[] stops = {new Stop(0, Color.web("#11998e")), new Stop(1, Color.web("#38ef7d"))};
+            r.fill(path, new LinearGradient(0, 0, 1, 0, true, CycleMethod.NO_CYCLE, stops), 20, 30, 100, 60);
+            int[] px = surface.getRGB();
+            // Along the middle: the first colour, the mean, the last.
+            near("start", 0xff11998e, px[60 * 200 + 21]);
+            near("middle", 0xff25c486, px[60 * 200 + 70]);
+            near("end", 0xff38ef7d, px[60 * 200 + 118]);
+            // The corner of the bounds lies outside the round corner.
+            assertEquals("the corner of the bounds", 0, px[31 * 200 + 21] >>> 24);
+            assertEquals("the far corner of the bounds", 0, px[88 * 200 + 118] >>> 24);
+            // And nothing reaches past the shape on any side.
+            for (int y = 0; y < 120; y++) {
+                for (int x = 0; x < 200; x++) {
+                    if (x < 20 || x >= 120 || y < 30 || y >= 90) {
+                        assertEquals("painted outside the shape at " + x + "," + y, 0, px[y * 200 + x] >>> 24);
+                    }
+                }
+            }
+        } finally {
+            HeadlessImplementation.rasterImages = false;
+            HeadlessImplementation.shapes = false;
+            HeadlessImplementation.resetRaster();
+        }
+    }
+
     @Test
     public void aLinearGradientGivesAPointThePlaceOfItsFootOnTheLine() {
         Stop[] stops = {new Stop(0, Color.BLACK), new Stop(1, Color.WHITE)};

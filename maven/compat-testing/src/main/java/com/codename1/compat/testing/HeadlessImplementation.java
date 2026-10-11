@@ -381,6 +381,168 @@ public class HeadlessImplementation extends CodenameOneImplementation {
         }
     }
 
+    // ------------------------------------------------------------ shapes
+
+    /// When set, the graphics of a raster image (see [#rasterImages]) draws
+    /// shapes: `isShapeSupported` answers true for it, `fillShape` colours
+    /// every pixel whose middle is inside the path by its winding rule, and
+    /// `drawShape` draws the outline one pixel wide. Curves are cut into
+    /// straight pieces. Off by default, when no graphics has shapes and code
+    /// under test takes the path of a port without them.
+    ///
+    /// What it deliberately does NOT do is clip to a shape. `setClip(Shape)`
+    /// stays what it was -- the bounds of the shape with [#trackClip] and
+    /// nothing at all without -- because a rectangle put on top of a shape
+    /// clip with `clipRect` is exactly what real ports have got wrong: one
+    /// forgot the shape and kept the rectangle that was the clip before it,
+    /// two more rebuilt a shape with a curved corner as slivers along its
+    /// edges. Code that confines a fill to a shape that way -- which is what
+    /// `Graphics.fillShape` does for a `Paint` -- therefore paints outside
+    /// the shape here, and a test that looks at a pixel between a rounded
+    /// corner and the corner of its bounds sees it.
+    public static boolean shapes;
+
+    @Override
+    public boolean isShapeSupported(Object graphics) {
+        return shapes && raster(graphics);
+    }
+
+    /// The path as closed or open runs of points, `{x0, y0, x1, y1, ...}`
+    /// each, its curves cut into [#CURVE_PIECES] straight pieces.
+    private static java.util.List<float[]> flatten(com.codename1.ui.geom.Shape shape, boolean close) {
+        java.util.List<float[]> out = new java.util.ArrayList<float[]>();
+        java.util.List<Float> run = new java.util.ArrayList<Float>();
+        com.codename1.ui.geom.PathIterator it = shape.getPathIterator();
+        float[] k = new float[6];
+        float startX = 0;
+        float startY = 0;
+        float lastX = 0;
+        float lastY = 0;
+        while (!it.isDone()) {
+            int type = it.currentSegment(k);
+            if (type == com.codename1.ui.geom.PathIterator.SEG_MOVETO) {
+                endRun(out, run, close, startX, startY);
+                startX = k[0];
+                startY = k[1];
+                lastX = k[0];
+                lastY = k[1];
+                run.add(Float.valueOf(lastX));
+                run.add(Float.valueOf(lastY));
+            } else if (type == com.codename1.ui.geom.PathIterator.SEG_LINETO) {
+                lastX = k[0];
+                lastY = k[1];
+                run.add(Float.valueOf(lastX));
+                run.add(Float.valueOf(lastY));
+            } else if (type == com.codename1.ui.geom.PathIterator.SEG_QUADTO) {
+                for (int i = 1; i <= CURVE_PIECES; i++) {
+                    float t = i / (float) CURVE_PIECES;
+                    float u = 1 - t;
+                    run.add(Float.valueOf(u * u * lastX + 2 * u * t * k[0] + t * t * k[2]));
+                    run.add(Float.valueOf(u * u * lastY + 2 * u * t * k[1] + t * t * k[3]));
+                }
+                lastX = k[2];
+                lastY = k[3];
+            } else if (type == com.codename1.ui.geom.PathIterator.SEG_CUBICTO) {
+                for (int i = 1; i <= CURVE_PIECES; i++) {
+                    float t = i / (float) CURVE_PIECES;
+                    float u = 1 - t;
+                    run.add(Float.valueOf(u * u * u * lastX + 3 * u * u * t * k[0] + 3 * u * t * t * k[2]
+                            + t * t * t * k[4]));
+                    run.add(Float.valueOf(u * u * u * lastY + 3 * u * u * t * k[1] + 3 * u * t * t * k[3]
+                            + t * t * t * k[5]));
+                }
+                lastX = k[4];
+                lastY = k[5];
+            } else {
+                run.add(Float.valueOf(startX));
+                run.add(Float.valueOf(startY));
+                lastX = startX;
+                lastY = startY;
+            }
+            it.next();
+        }
+        endRun(out, run, close, startX, startY);
+        return out;
+    }
+
+    private static final int CURVE_PIECES = 16;
+
+    private static void endRun(java.util.List<float[]> out, java.util.List<Float> run, boolean close, float startX,
+                               float startY) {
+        if (run.size() >= 4) {
+            if (close) {
+                // A fill closes every run, whether the path said so or not.
+                run.add(Float.valueOf(startX));
+                run.add(Float.valueOf(startY));
+            }
+            float[] pts = new float[run.size()];
+            for (int i = 0; i < pts.length; i++) {
+                pts[i] = run.get(i).floatValue();
+            }
+            out.add(pts);
+        }
+        run.clear();
+    }
+
+    @Override
+    public void fillShape(Object graphics, com.codename1.ui.geom.Shape shape) {
+        if (!isShapeSupported(graphics) || shape == null) {
+            return;
+        }
+        int[][] rows = (int[][]) graphics;
+        java.util.List<float[]> runs = flatten(shape, true);
+        boolean evenOdd = shape.getPathIterator().getWindingRule()
+                == com.codename1.ui.geom.PathIterator.WIND_EVEN_ODD;
+        for (int row = 0; row < rows.length; row++) {
+            float y = row + 0.5f;
+            // Where the outline crosses the middle of this row of pixels,
+            // and which way it was going.
+            java.util.List<float[]> crossings = new java.util.ArrayList<float[]>();
+            for (float[] pts : runs) {
+                for (int i = 0; i + 3 < pts.length; i += 2) {
+                    float ya = pts[i + 1];
+                    float yb = pts[i + 3];
+                    if ((ya <= y) == (yb <= y)) {
+                        continue;
+                    }
+                    float x = pts[i] + (pts[i + 2] - pts[i]) * (y - ya) / (yb - ya);
+                    crossings.add(new float[] {x, yb > ya ? 1 : -1});
+                }
+            }
+            java.util.Collections.sort(crossings, new java.util.Comparator<float[]>() {
+                @Override
+                public int compare(float[] a, float[] b) {
+                    return Float.compare(a[0], b[0]);
+                }
+            });
+            int winding = 0;
+            for (int i = 0; i + 1 < crossings.size(); i++) {
+                winding += (int) crossings.get(i)[1];
+                boolean inside = evenOdd ? (i % 2) == 0 : winding != 0;
+                if (inside) {
+                    int from = (int) Math.ceil(crossings.get(i)[0] - 0.5f);
+                    int to = (int) Math.ceil(crossings.get(i + 1)[0] - 0.5f);
+                    if (to > from) {
+                        span(graphics, from, row, to - from, 1);
+                    }
+                }
+            }
+        }
+    }
+
+    @Override
+    public void drawShape(Object graphics, com.codename1.ui.geom.Shape shape, com.codename1.ui.Stroke stroke) {
+        if (!isShapeSupported(graphics) || shape == null) {
+            return;
+        }
+        for (float[] pts : flatten(shape, false)) {
+            for (int i = 0; i + 3 < pts.length; i += 2) {
+                line(graphics, (int) Math.floor(pts[i]), (int) Math.floor(pts[i + 1]), (int) Math.floor(pts[i + 2]),
+                        (int) Math.floor(pts[i + 3]));
+            }
+        }
+    }
+
     /// Counts encoded images handed to [#createImage(byte[], int, int)], so a
     /// test can tell a header-only bounds probe from a full decode.
     public static int encodedDecodes;
