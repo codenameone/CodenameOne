@@ -377,3 +377,4 @@ maven/dart-transpiler/src/test/resources/golden/m2demo/expected/DemoPage.java | 
 maven/dart-transpiler/src/test/resources/golden/m2demo/expected/FlutterRegistry.java | Transpiler golden fixture: expected generated output, compared byte for byte
 maven/dart-transpiler/src/test/resources/golden/m2demo/expected/MainLib.java | Transpiler golden fixture: expected generated output, compared byte for byte
 maven/dart-transpiler/src/test/resources/golden/m2demo/expected/_DemoPageState.java | Transpiler golden fixture: expected generated output, compared byte for byte
+scripts/backend-mvc/src/main/resources/static/htmx-2.0.11.min.js | Unmodified htmx 2.0.11 distribution, Zero-Clause BSD license in scripts/backend-mvc/HTMX-LICENSE.txt
