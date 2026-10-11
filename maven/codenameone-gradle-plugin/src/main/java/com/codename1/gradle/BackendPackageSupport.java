@@ -92,6 +92,8 @@ final class BackendPackageSupport {
             t.getTestClasspath().from(test.getCompileClasspath());
             org.gradle.api.tasks.TaskProvider<org.gradle.api.tasks.compile.JavaCompile> testCompile =
                     project.getTasks().named(test.getCompileJavaTaskName(), org.gradle.api.tasks.compile.JavaCompile.class);
+            t.getTestCompilerOptions().set(testCompile.map(c -> c.getOptions().getAllCompilerArgs()));
+            t.getTestAnnotationProcessorPath().from(testCompile.map(c -> c.getOptions().getAnnotationProcessorPath()));
             t.getTestJavaSource().set(testCompile.map(c -> c.getSourceCompatibility()));
             t.getTestJavaTarget().set(testCompile.map(c -> c.getTargetCompatibility()));
             t.getTestJavaRelease().set(testCompile.flatMap(c -> c.getOptions().getRelease()).map(String::valueOf));
@@ -122,6 +124,15 @@ final class BackendPackageSupport {
         });
     }
 
+    private static List<String> withProcessors(List<String> arguments, ConfigurableFileCollection processors) {
+        List<String> options = new ArrayList<String>(arguments);
+        if (!processors.isEmpty()) {
+            options.add("-processorpath");
+            options.add(processors.getAsPath());
+        }
+        return options;
+    }
+
     private static void configure(PackageTask t, Project project, ProjectLayout layout, SourceSet main,
                                   CodenameOneExtension ext, Configuration runtime) {
         AppSupport.common(t, project, layout, ext, project.provider(Collections::<String, String>emptyMap));
@@ -147,6 +158,8 @@ final class BackendPackageSupport {
                 project.getTasks().named(main.getCompileJavaTaskName(), org.gradle.api.tasks.compile.JavaCompile.class);
         t.getJavaSource().set(compile.map(c -> c.getSourceCompatibility()));
         t.getJavaTarget().set(compile.map(c -> c.getTargetCompatibility()));
+        t.getCompilerOptions().set(compile.map(c -> c.getOptions().getAllCompilerArgs()));
+        t.getAnnotationProcessorPath().from(compile.map(c -> c.getOptions().getAnnotationProcessorPath()));
         t.getJavaRelease().set(compile.flatMap(c -> c.getOptions().getRelease()).map(String::valueOf));
         t.getJdk().set(project.getProviders().gradleProperty("cn1.backend.jdk").orElse(
                 compile.flatMap(c -> c.getJavaCompiler())
@@ -202,6 +215,8 @@ final class BackendPackageSupport {
         @Input public abstract Property<String> getJavaSource();
         @Input public abstract Property<String> getJavaTarget();
         @Input @Optional public abstract Property<String> getJavaRelease();
+        @Input public abstract ListProperty<String> getCompilerOptions();
+        @Classpath public abstract ConfigurableFileCollection getAnnotationProcessorPath();
 
         /// The encoding compileJava reads the sources in; the packager recompiles
         /// the same sources and must read them the same way.
@@ -259,6 +274,7 @@ final class BackendPackageSupport {
             File processed = resources.hasNext() ? resources.next() : layout.resourcesOutputDir();
             BackendPackager packager = packager(host, layout, toolchain, processed);
             try {
+                packager.compilerOptions(withProcessors(getCompilerOptions().get(), getAnnotationProcessorPath()));
                 packager.javaLevel(getJavaSource().get(), getJavaTarget().get(), getJavaRelease().getOrNull());
                 packager.mainClass(getMainClass().getOrNull()).output(getBinary().get().getAsFile())
                         .target(getTarget().getOrNull()).jdk(getJdk().getOrNull(), null).cflags(getCflags().getOrNull())
@@ -380,6 +396,8 @@ final class BackendPackageSupport {
         @Input public abstract Property<String> getTestJavaSource();
         @Input public abstract Property<String> getTestJavaTarget();
         @Input @Optional public abstract Property<String> getTestJavaRelease();
+        @Input public abstract ListProperty<String> getTestCompilerOptions();
+        @Classpath public abstract ConfigurableFileCollection getTestAnnotationProcessorPath();
 
         @InputFiles
         @PathSensitive(PathSensitivity.RELATIVE)
@@ -411,6 +429,7 @@ final class BackendPackageSupport {
             com.codename1.maven.BackendTestPackager p = new GradleBackendTestPackager(host, layout, toolchain,
                     processed, roots, testResources, testClasspath);
             p.strict(getStrict().get());
+            p.testCompilerOptions(withProcessors(getTestCompilerOptions().get(), getTestAnnotationProcessorPath()));
             p.testJavaLevel(getTestJavaSource().get(), getTestJavaTarget().get(), getTestJavaRelease().getOrNull());
             return p;
         }

@@ -131,9 +131,8 @@ public class BackendPackageMojo extends AbstractMojo {
     /**
      * The JDK 8 this goal used to require.
      *
-     * Kept, and still honoured, because projects and CI jobs are setting it. It is
-     * no longer a requirement: with neither this nor cn1.backend.jdk set, the JDK
-     * running Maven is what compiles and translates.
+     * Honoured for Java 8 applications and tests. Modern source levels use the
+     * JDK running Maven unless cn1.backend.jdk explicitly selects another JDK.
      */
     @Parameter(property = "cn1.backend.jdk8", defaultValue = "${env.JDK_8_HOME}")
     private String jdk8Home;
@@ -226,6 +225,7 @@ public class BackendPackageMojo extends AbstractMojo {
         packager.javaLevel(compilerOption(project, userProperties, "source", false),
                 compilerOption(project, userProperties, "target", false),
                 compilerOption(project, userProperties, "release", false));
+        packager.compilerOptions(compilerOptions(project, userProperties, false));
     }
 
     static void configureTestJavaLevel(BackendTestPackager packager, MavenProject project,
@@ -237,18 +237,38 @@ public class BackendPackageMojo extends AbstractMojo {
         if (target == null) target = compilerOption(project, userProperties, "target", true);
         if (release == null) release = compilerOption(project, userProperties, "release", true);
         packager.testJavaLevel(source, target, release);
+        packager.testCompilerOptions(compilerOptions(project, userProperties, true));
     }
 
-    static String compilerOption(MavenProject project, java.util.Properties userProperties,
-            String name, boolean tests) {
-        String goal = tests ? "testCompile" : "compile";
+    static List<String> compilerOptions(MavenProject project, java.util.Properties userProperties, boolean tests) {
+        List<String> options = new java.util.ArrayList<String>();
+        Xpp3Dom configuration = compilerConfiguration(project, tests);
+        if (configuration != null && configuration.getChild("compilerArgs") != null) {
+            for (Xpp3Dom arg : configuration.getChild("compilerArgs").getChildren()) {
+                if (arg.getValue() != null) options.add(arg.getValue());
+            }
+        }
+        if (Boolean.parseBoolean(compilerOption(project, userProperties, "enablePreview", tests))
+                && !options.contains("--enable-preview")) options.add("--enable-preview");
+        String proc = compilerOption(project, userProperties, "proc", tests);
+        if (proc != null) options.add("-proc:" + proc);
+        return options;
+    }
+
+    private static Xpp3Dom compilerConfiguration(MavenProject project, boolean tests) {
         Plugin compiler = compilerPlugin(project);
-        Xpp3Dom configuration = compilerExecutionConfiguration(compiler, goal);
+        Xpp3Dom configuration = compilerExecutionConfiguration(compiler, tests ? "testCompile" : "compile");
         if (compiler != null && compiler.getConfiguration() instanceof Xpp3Dom) {
             Xpp3Dom defaults = new Xpp3Dom((Xpp3Dom) compiler.getConfiguration());
             configuration = configuration == null ? defaults
                     : Xpp3Dom.mergeXpp3Dom(new Xpp3Dom(configuration), defaults);
         }
+        return configuration;
+    }
+
+    static String compilerOption(MavenProject project, java.util.Properties userProperties,
+            String name, boolean tests) {
+        Xpp3Dom configuration = compilerConfiguration(project, tests);
         if (configuration != null) {
             Xpp3Dom option = configuration.getChild(name);
             if (option != null && option.getValue() != null) {

@@ -110,6 +110,12 @@ public class BackendPackager {
     protected String applicationSource = "8";
     protected String applicationTarget = "8";
     protected String applicationRelease;
+    protected List<String> applicationCompilerOptions = new ArrayList<String>();
+
+    public BackendPackager compilerOptions(List<String> options) {
+        applicationCompilerOptions = new ArrayList<String>(options);
+        return this;
+    }
 
     /// The application's compiler settings, independent of the Java 8 runtime.
     public BackendPackager javaLevel(String source, String target, String release) {
@@ -451,7 +457,7 @@ public class BackendPackager {
         }
         List<String> dependencies = compileClasspathWithoutRuntime();
         compileSources(jdk, javaApi, classes, runtime, dependencies, "8", "8", null,
-                "compile the backend runtime");
+                "compile the backend runtime", java.util.Collections.singletonList("-proc:none"));
 
         List<String> application = new ArrayList<String>();
         for (String root : host.compileSourceRoots()) {
@@ -464,7 +470,7 @@ public class BackendPackager {
         classpath.add(classes.getAbsolutePath());
         classpath.addAll(dependencies);
         compileSources(jdk, javaApi, applicationClasses, application, classpath,
-                applicationSource, applicationTarget, applicationRelease, "compile the backend application");
+                applicationSource, applicationTarget, applicationRelease, "compile the backend application", applicationCompilerOptions);
         checkApplication(applicationClasses, javaApi, classpath);
         try {
             org.apache.commons.io.FileUtils.copyDirectory(applicationClasses, classes);
@@ -492,7 +498,12 @@ public class BackendPackager {
         }
         List<String> command = new ArrayList<String>(Arrays.asList(
                 new File(jdk, "bin/javac").getAbsolutePath(),
-                "-nowarn", "-proc:none", "-encoding", sourceEncoding()));
+                "-nowarn", "-encoding", sourceEncoding()));
+        // JDK 23+ no longer discovers classpath processors unless explicitly enabled.
+        // Keep the historical discovery behavior for application/test recompiles.
+        boolean processingConfigured = false;
+        for (String option : extraOptions) processingConfigured |= option.startsWith("-proc:");
+        if (!processingConfigured && javacMajor(jdk) >= 21) command.add("-proc:full");
         if (javaFeature(release == null ? target : release) <= 8) {
             // --release cannot be combined with a custom bootclasspath. At 8
             // the latter already enforces the runtime's API, not the host JDK's.
@@ -539,6 +550,30 @@ public class BackendPackager {
             throw new BuildExecutionException("Could not materialize backend record methods", ex);
         }
         new BytecodeCompliance(host).checkBackend(output, javaApi, dependencies);
+        try {
+            clearPreviewMarkers(output);
+        } catch (IOException ex) {
+            throw new BuildExecutionException("Could not prepare preview classes for native wiring", ex);
+        }
+    }
+
+    // These are private native-translation inputs, not the JVM build's output.
+    // After API/bootstrap validation, discard the JVM preview-loading marker so
+    // javac can read them while compiling Java 8 wiring. Keep the major version.
+    private static void clearPreviewMarkers(File directory) throws IOException {
+        File[] files = directory.listFiles();
+        if (files == null) return;
+        for (File file : files) {
+            if (file.isDirectory()) clearPreviewMarkers(file);
+            else if (file.getName().endsWith(".class")) {
+                byte[] bytes = java.nio.file.Files.readAllBytes(file.toPath());
+                if (bytes.length > 8 && bytes[4] == (byte) 255 && bytes[5] == (byte) 255) {
+                    bytes[4] = 0;
+                    bytes[5] = 0;
+                    java.nio.file.Files.write(file.toPath(), bytes);
+                }
+            }
+        }
     }
 
     /**
@@ -1024,34 +1059,16 @@ public class BackendPackager {
                 + "runtime to translate. Add it as a dependency.");
     }
 
-    /**
-     * The JDK that compiles the sources for translation and runs the translator.
-     *
-     * ANY JDK 8 OR NEWER, which for almost every project means the one already
-     * running Maven and nothing to configure. This goal used to demand a JDK 8
-     * and refuse to run without one, on the premise that a newer javac emits
-     * class files the translator cannot read. The premise was wrong: {@link
-     * #compile} passes -source 1.8 -target 1.8, so the class file version is 52
-     * whichever javac produces it, and the bootclasspath that confines the build
-     * to the server-safe surface is enforced identically -- a reference to
-     * java.nio.file still fails to compile on 8, 17, 21 and 25 alike. The cost of
-     * the premise was paid entirely by the developer, who had to install a JDK
-     * from 2014 to package a server.
-     *
-     * The two properties are tried before the running JDK so an explicit choice
-     * still wins, and cn1.backend.jdk8 is among them so the setups that were
-     * required to set it keep working.
-     *
-     * WHAT THEY SELECT IS THE TWO FORKED STEPS -- {@link #compile}'s javac and
-     * {@link #translate}'s java -- and nothing else. The router and entry point
-     * that {@link #generateControllers} produces are compiled in process by the
-     * JDK running Maven, which JSR 199 gives no way to redirect. That costs
-     * nothing today, because every JDK from 8 up emits the class file version 52
-     * the translator reads; see {@link #compile} for why it is also not worth
-     * forking, and why the error message there names Maven's own JDK.
-     */
+    /// Highest configured source/target level across the source sets we compile.
+    protected int requiredJavaFeature() throws BuildFailureException {
+        return applicationRelease == null ? Math.max(javaFeature(applicationSource), javaFeature(applicationTarget))
+                : javaFeature(applicationRelease);
+    }
+
+    /// Use the explicit JDK or the build JVM; retain the legacy override for Java 8 projects.
     File resolveJdk() throws BuildFailureException {
-        String[] configured = {jdkHome, jdk8Home};
+        // The legacy environment override only applies to Java 8 projects.
+        String[] configured = {jdkHome, requiredJavaFeature() <= 8 ? jdk8Home : null};
         for (int i = 0; i < configured.length; i++) {
             if (configured[i] != null && configured[i].length() > 0) {
                 File home = new File(configured[i]);

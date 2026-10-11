@@ -165,6 +165,21 @@ public abstract class BackendTestPackager extends BackendPackager {
     private String testTarget;
     private String testRelease;
     private boolean testJavaLevelConfigured;
+    private List<String> testCompilerOptions;
+
+    public BackendTestPackager testCompilerOptions(List<String> options) {
+        testCompilerOptions = new ArrayList<String>(options);
+        return this;
+    }
+
+    @Override
+    protected int requiredJavaFeature() throws BuildFailureException {
+        int feature = super.requiredJavaFeature();
+        if (testRelease != null) return Math.max(feature, javaFeature(testRelease));
+        if (testSource != null) feature = Math.max(feature, javaFeature(testSource));
+        if (testTarget != null) feature = Math.max(feature, javaFeature(testTarget));
+        return feature;
+    }
 
     public BackendTestPackager testJavaLevel(String source, String target, String release) {
         testJavaLevelConfigured = true;
@@ -233,12 +248,14 @@ public abstract class BackendTestPackager extends BackendPackager {
         List<String> classpath = new ArrayList<String>();
         classpath.add(classes.getAbsolutePath());
         classpath.addAll(compileClasspathWithoutRuntime());
+        List<String> options = new ArrayList<String>(testCompilerOptions == null
+                ? applicationCompilerOptions : testCompilerOptions);
+        options.addAll(Arrays.asList("-sourcepath", join(testSourceRoots(), File.pathSeparator), "-implicit:class"));
         compileSources(jdk, javaApi, testClasses, sources, classpath,
                 testSource == null ? applicationSource : testSource,
                 testTarget == null ? applicationTarget : testTarget,
                 testJavaLevelConfigured ? testRelease : applicationRelease,
-                "compile the backend tests", Arrays.asList(
-                        "-sourcepath", join(testSourceRoots(), File.pathSeparator), "-implicit:class"));
+                "compile the backend tests", options);
         checkApplication(testClasses, javaApi, classpath);
         File processed = testOutputDirectory();
         if (processed != null && processed.isDirectory()) {

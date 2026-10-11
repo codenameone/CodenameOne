@@ -157,6 +157,29 @@ class BackendPackageJavaLevelTest {
         assertEquals("8", option(project, cli, "release", false));
     }
 
+    @Test void previewAndProcessorSettingsFollowCompilerExecutions() {
+        MavenProject project = project();
+        project.getProperties().setProperty("maven.compiler.enablePreview", "true");
+        assertEquals(java.util.Collections.singletonList("--enable-preview"),
+                BackendPackageMojo.compilerOptions(project, new Properties(), false));
+        Plugin compiler = new Plugin();
+        compiler.setArtifactId("maven-compiler-plugin");
+        Xpp3Dom config = configuration("enablePreview", "false");
+        Xpp3Dom args = new Xpp3Dom("compilerArgs");
+        args.addChild(configuration("arg", "-Asetting=value").getChild("arg"));
+        config.addChild(args);
+        compiler.setConfiguration(config);
+        compiler.addExecution(execution("default-testCompile", null, "testCompile", "enablePreview", "true"));
+        project.getBuild().addPlugin(compiler);
+        project.getBuild().flushPluginMap();
+        assertEquals(java.util.Collections.singletonList("-Asetting=value"),
+                BackendPackageMojo.compilerOptions(project, new Properties(), false));
+        assertEquals(java.util.Arrays.asList("-Asetting=value", "--enable-preview"),
+                BackendPackageMojo.compilerOptions(project, new Properties(), true));
+        config.addChild(configuration("proc", "none").getChild("proc"));
+        assertTrue(BackendPackageMojo.compilerOptions(project, new Properties(), false).contains("-proc:none"));
+    }
+
     private static PluginExecution execution(String id, String phase, String goal, String name, String value) {
         PluginExecution execution = new PluginExecution();
         execution.setId(id); execution.setPhase(phase); execution.addGoal(goal);

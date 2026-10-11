@@ -66,6 +66,75 @@ class BackendJavaLevelTest {
         compileRecord(dir, "25");
     }
 
+    @Test void modernSourcesIgnoreLegacyJdkOverride(@TempDir Path dir) throws Exception {
+        File oldJdk = Files.createDirectories(dir.resolve("legacy/bin")).getParent().toFile();
+        Files.write(new File(oldJdk, "bin/javac").toPath(), new byte[0]);
+        BackendPackager baseline = new BackendPackager(TestProjectHost.empty());
+        File running = baseline.resolveJdk();
+        BackendTestPackager packager = new BackendTestPackager(TestProjectHost.empty()) {
+            protected java.util.List<String> testSourceRoots() { return Collections.emptyList(); }
+            protected File testOutputDirectory() { return null; }
+        };
+        packager.jdk(null, oldJdk.toString());
+        packager.javaLevel(null, null, "17");
+        assertEquals(running, packager.resolveJdk());
+        packager.javaLevel(null, null, "8");
+        packager.testJavaLevel(null, null, "25");
+        assertEquals(running, packager.resolveJdk());
+        packager.jdk(oldJdk.toString(), null);
+        assertEquals(oldJdk, packager.resolveJdk(), "an explicit JDK choice still wins");
+    }
+
+    @Test void previewSourcesAndJava8Wiring(@TempDir Path dir) throws Exception {
+        File jdk = jdk("25");
+        Path source = Files.createDirectories(dir.resolve("src"));
+        Files.write(source.resolve("Preview.java"), ("public class Preview {"
+                + " public static int value(int input) { if(input instanceof int result) return result; return 0; } }").getBytes("UTF-8"));
+        BackendPackager packager = new BackendPackager(host(dir, source));
+        packager.javaLevel(null, null, "25").compilerOptions(Collections.singletonList("--enable-preview"));
+        File classes = Files.createDirectory(dir.resolve("classes")).toFile();
+        Path runtime = Files.createDirectory(dir.resolve("runtime"));
+        Files.write(runtime.resolve("Library.java"), "public class Library {}".getBytes("UTF-8"));
+        packager.compile(jdk, api(dir), runtime.toFile(), classes);
+        assertEquals(52, major(classes.toPath().resolve("Library.class")));
+        assertEquals(69, major(classes.toPath().resolve("Preview.class")));
+        try (JavaSourceCompiler.CompilerScope ignored = JavaSourceCompiler.useJdk(jdk)) {
+            JavaSourceCompiler.compile(Collections.singletonMap("Wiring",
+                    "public class Wiring { public static int value() {return Preview.value(42);} }"),
+                    classes, Collections.singletonList(classes));
+        }
+        assertEquals(52, major(classes.toPath().resolve("Wiring.class")));
+    }
+
+    @Test void discoversClasspathProcessorsOnModernJavac(@TempDir Path dir) throws Exception {
+        File jdk = jdk("25");
+        Path processor = dir.resolve("Generate.java");
+        Files.write(processor, ("import javax.annotation.processing.*; import javax.lang.model.element.*;"
+                + " @SupportedAnnotationTypes(\"*\") @SupportedSourceVersion(javax.lang.model.SourceVersion.RELEASE_8)"
+                + " public class Generate extends AbstractProcessor { boolean done;"
+                + " public boolean process(java.util.Set<? extends TypeElement> a, RoundEnvironment r) {"
+                + " if (!done) {done=true; try { java.io.Writer w=processingEnv.getFiler().createSourceFile(\"Generated\").openWriter();"
+                + " w.write(\"public class Generated { public static int value() {return 42;} }\"); w.close();"
+                + " } catch(java.io.IOException ex) {throw new RuntimeException(ex);} } return false; } }").getBytes("UTF-8"));
+        Path processors = Files.createDirectory(dir.resolve("processors"));
+        run(jdk, "javac", "-proc:none", "-d", processors.toString(), processor.toString());
+        Path service = processors.resolve("META-INF/services/javax.annotation.processing.Processor");
+        Files.createDirectories(service.getParent());
+        Files.write(service, "Generate".getBytes("UTF-8"));
+        Path source = dir.resolve("UsesGenerated.java");
+        Files.write(source, "public class UsesGenerated { int value() {return Generated.value();} }".getBytes("UTF-8"));
+        BackendPackager packager = new BackendPackager(host(dir, dir));
+        File output = Files.createDirectory(dir.resolve("out")).toFile();
+        File nativeApi = api(dir);
+        packager.compileSources(jdk, nativeApi, output, Collections.singletonList(source.toString()),
+                Collections.singletonList(processors.toString()), "25", "25", "25", "compile with processor");
+        assertTrue(new File(output, "Generated.class").isFile());
+        File disabled = Files.createDirectory(dir.resolve("disabled")).toFile();
+        assertThrows(BuildExecutionException.class, () -> packager.compileSources(jdk, nativeApi, disabled,
+                Collections.singletonList(source.toString()), Collections.singletonList(processors.toString()),
+                "25", "25", "25", "compile without processor", Collections.singletonList("-proc:none")));
+    }
+
     private void compileRecord(Path dir, String release) throws Exception {
         File jdk = jdk(release);
         File api = api(dir);

@@ -151,7 +151,8 @@ no TLS, and what it does need is exactly what a translated binary is good at.
   `compileJava.options.release` to the corresponding value in Gradle. Use a JDK
   that supports the selected level. Maven defaults to its own JDK; Gradle uses
   `compileJava`'s Java toolchain. `cn1.backend.jdk` can select a different JDK
-  (`-D` for Maven, `-P` for Gradle).
+  (`-D` for Maven, `-P` for Gradle). The legacy `JDK_8_HOME` override applies
+  only when application and test sources both target Java 8.
   The backend libraries and generated wiring remain at Java 8 independently of
   the application's language level. Records, pattern matching for `instanceof`,
   and switch expressions can be used by application code. A newer language level
@@ -160,6 +161,9 @@ no TLS, and what it does need is exactly what a translated binary is good at.
   bootstrap the native translator doesn't implement and fails packaging; use
   `instanceof` branches for native code instead. Compiled tests likewise honor Maven's
   `testSource`/`testTarget`/`testRelease` and Gradle's `compileTestJava` settings.
+  Compiler arguments, including `--enable-preview`, are passed to application
+  and test recompilation. Classpath annotation processors run during those
+  compilations unless disabled with the compiler's `proc` setting.
 * A virtual thread parks on sockets and on nothing else. A PostgreSQL or MySQL
   query, a `Web` call and a TLS handshake all park it, and its host serves other
   connections meanwhile. SQLite, file access, resolving a host name and
