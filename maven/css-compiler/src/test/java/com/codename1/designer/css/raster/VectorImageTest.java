@@ -999,4 +999,35 @@ class VectorImageTest {
                 100, 100);
         assertEquals(0xffff0000, shown.getRGB(70, 20), "drawn past the box");
     }
+
+    @Test
+    void aTransformDeclaredInAStyleMovesTheElement() throws Exception {
+        BufferedImage img = paint("<style>.moved { transform: matrix(1,0,0,1,50,0); }</style>"
+                + "<rect class=\"moved\" width=\"20\" height=\"20\" fill=\"#ff0000\"/>"
+                + "<rect y=\"40\" width=\"20\" height=\"20\" fill=\"#00ff00\" transform=\"translate(0 30)\""
+                + " style=\"transform: translate(60px, 10px) rotate(0.5turn)\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(60, 10), "moved by the rule");
+        assertEquals(0, alpha(img, 10, 10));
+        // Turned half way about the origin and then moved: the rectangle
+        // at (0..20, 40..60) lands on (40..60, -50..-30), off the image.
+        assertEquals(0, alpha(img, 10, 80), "the property replaces the attribute");
+        assertEquals(0, alpha(img, 10, 50));
+    }
+
+    @Test
+    void whatIsInsideALinkIsDrawn() throws Exception {
+        BufferedImage img = paint("<a href=\"https://example.com\" fill=\"#ff0000\">"
+                + "<rect width=\"50\" height=\"50\"/></a>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(25, 25));
+    }
+
+    @Test
+    void aPercentageStrokeWidthIsAShareOfTheDiagonal() throws Exception {
+        // 10% of a 100 by 100 viewport is 10; of 200 by 100 it is 15.8.
+        VectorImage wide = read("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 200 100\">"
+                + "<line x1=\"0\" y1=\"50\" x2=\"200\" y2=\"50\" stroke=\"#ff0000\" stroke-width=\"10%\"/></svg>");
+        BufferedImage img = wide.paint(200, 100);
+        assertEquals(0xffff0000, img.getRGB(100, 44), "inside a stroke 15.8 wide");
+        assertEquals(0, alpha(img, 100, 40), "and outside it");
+    }
 }

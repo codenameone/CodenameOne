@@ -289,7 +289,9 @@ public final class SVGParser {
             if (ev != XMLStreamConstants.START_ELEMENT) continue;
 
             String name = r.getLocalName();
-            if ("g".equals(name)) {
+            // A link is a group as far as drawing goes: what is inside it
+            // is drawn, and only following it is left out.
+            if ("g".equals(name) || "a".equals(name)) {
                 SVGGroup g = new SVGGroup();
                 applyCommon(g, attrs(r));
                 parent.addChild(g);
@@ -407,6 +409,11 @@ public final class SVGParser {
      * symbols a {@code <use>} draws -- is read like any other content into a
      * group that is never part of the drawing, and registered by id.
      */
+    // What `<defs>` sets for itself, a fill say, is not kept for the
+    // elements in it. They are only ever drawn through a `<use>`, and an
+    // element drawn that way inherits from the `<use>` and what that is in,
+    // never from where it was defined: `<defs fill="red">` does not make a
+    // shape under it red when it is used, in a browser either.
     private void readDefs(XMLStreamReader r, SVGDocument doc) throws XMLStreamException {
         SVGGroup held = new SVGGroup();
         readChildren(r, held, doc);
@@ -1080,6 +1087,17 @@ public final class SVGParser {
             SVGTransform t = TransformParser.parse(tr);
             if (t != null) n.setTransform(t);
         }
+        // A transform declared as a property, in the style attribute or by
+        // a rule of the stylesheet, which is folded into it. It replaces
+        // the attribute, as any property does the attribute of its name.
+        String declared = declaredValue(a, "transform");
+        if (declared != null) {
+            try {
+                n.setTransform(TransformParser.parseCss(declared));
+            } catch (RuntimeException e) {
+                // Not a transform this reads: the attribute stands.
+            }
+        }
         Map<String, String> pres = new HashMap<String, String>();
         for (Map.Entry<String, String> e : a.entrySet()) {
             String k = e.getKey();
@@ -1102,6 +1120,31 @@ public final class SVGParser {
             }
         }
         n.setStyle(StyleParser.parse(pres, a.get("style")));
+        // A percentage stroke width is that share of the viewport's
+        // diagonal, evened out between its sides, and not that many units.
+        String strokeWidth = mergedValue(a, "stroke-width");
+        if (strokeWidth != null && strokeWidth.trim().endsWith("%") && n.getStyle() != null
+                && n.getStyle().getStrokeWidth() != null) {
+            double diagonal = Math.sqrt((viewportWidth * (double) viewportWidth
+                    + viewportHeight * (double) viewportHeight) / 2);
+            n.getStyle().setStrokeWidth(Float.valueOf((float) (n.getStyle().getStrokeWidth().floatValue() / 100 * diagonal)));
+        }
+    }
+
+    /** What the style attribute, with the stylesheet's rules folded in, declares for a property; null when it does not. */
+    private static String declaredValue(Map<String, String> attrs, String key) {
+        String style = attrs.get("style");
+        String found = null;
+        if (style != null) {
+            for (String decl : style.split(";")) {
+                int colon = decl.indexOf(':');
+                if (colon <= 0) continue;
+                if (decl.substring(0, colon).trim().equals(key)) {
+                    found = decl.substring(colon + 1).trim();
+                }
+            }
+        }
+        return found;
     }
 
     private Map<String, String> attrs(XMLStreamReader r) {
