@@ -58,6 +58,8 @@ compare the two builds on one machine; they aren't phone timings.
 The Flutter Gallery's demos, rendered by Flutter on the left and by Codename One
 on the right from the same Dart source:
 
+image::img/flutter-gallery-home.png[The Flutter Gallery home screen rendered by Flutter and by Codename One]
+
 image::img/flutter-gallery-card.png[The Cards demo rendered by Flutter and by Codename One]
 
 image::img/flutter-gallery-text-field.png[The Text fields demo rendered by Flutter and by Codename One]
