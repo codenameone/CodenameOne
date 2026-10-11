@@ -536,6 +536,55 @@ public class ControlLookTest {
         assertTrue(slider.prefHeight(-1) < tall);
     }
 
+    /// A theme that says nothing of a slider's thumb draws the filled part
+    /// of the track and stops: a slider with nothing to take hold of. The
+    /// layer draws the thumb then, round and centred where the filled part
+    /// ends, so moving the value changes pixels on both sides of both
+    /// places, which a track alone does only between them.
+    @Test
+    public void aSliderHasAThumbWhereTheThemeDrawsNone() {
+        HeadlessImplementation.rasterImages = true;
+        HeadlessImplementation.pixelImages = true;
+        try {
+            Slider slider = new Slider(0, 100, 30);
+            new Scene(new StackPane(slider), 300, 100);
+            double high = slider.prefHeight(-1);
+            assertTrue("room for the thumb: " + high, high >= 20);
+            slider.resize(200, high);
+            slider.layout();
+            Component c = slider.cn1Native();
+            int w = c.getWidth();
+            int h = c.getHeight();
+            int[] low = raster(slider);
+            slider.setValue(70);
+            int[] far = raster(slider);
+            int before = 0;
+            int after = 0;
+            int top = h;
+            int bottom = -1;
+            for (int y = 0; y < h; y++) {
+                for (int x = 0; x < w; x++) {
+                    if (low[y * w + x] == far[y * w + x]) {
+                        continue;
+                    }
+                    if (x < w * 30 / 100 - 2) {
+                        before++;
+                        top = Math.min(top, y);
+                        bottom = Math.max(bottom, y);
+                    } else if (x > w * 70 / 100 + 2) {
+                        after++;
+                    }
+                }
+            }
+            assertTrue("a thumb left of the lower value: " + before, before >= 20);
+            assertTrue("a thumb right of the higher value: " + after, after >= 20);
+            assertTrue("the thumb is round, not a slice of the track: " + top + ".." + bottom, bottom - top >= 10);
+        } finally {
+            HeadlessImplementation.rasterImages = false;
+            HeadlessImplementation.pixelImages = false;
+        }
+    }
+
     /// The native check box has two looks; the third state gets a dash of
     /// its own, and loses it when the box is determined again.
     @Test

@@ -30,6 +30,8 @@ import com.codename1.fxcompat.runtime.FxObject;
 import com.codename1.fxcompat.runtime.Renderer;
 import com.codename1.fxcompat.runtime.Units;
 import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.Graphics;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
@@ -142,9 +144,146 @@ public class Slider extends Control {
         pseudoClassStateChanged(HORIZONTAL, true);
     }
 
+    /// The native slider with the thumb many themes leave out.
+    ///
+    /// A Codename One slider is a progress bar that can be dragged. A
+    /// theme that says nothing more draws the filled part and the rest
+    /// and no thumb at all, and the desktop themes draw a white knob with
+    /// no edge, which is not there on a white scene. A slider with
+    /// nothing to take hold of does not read as one, so where the theme's
+    /// own thumb cannot be seen this draws a round one, in the color of
+    /// the filled part, as the Swing layer's slider does. A theme whose
+    /// thumb is an image, casts a shadow or stands out from the theme's
+    /// own form is left as it is.
+    private static final class Track extends com.codename1.ui.Slider {
+
+        private static final int THUMB = 16;
+        private static final int TOUCH_THUMB = 24;
+
+        /// The diameter of the thumb this draws, in device pixels.
+        static int thumbSize() {
+            boolean touch = Display.isInitialized() && Display.getInstance().isTouchScreenDevice()
+                    && !Display.getInstance().isDesktop();
+            return Math.max(3, Units.toPixels(touch ? TOUCH_THUMB : THUMB));
+        }
+
+        private float constant(String name) {
+            String value = getUIManager().getThemeConstant(name, null);
+            if (value == null) {
+                return 0;
+            }
+            try {
+                return Float.parseFloat(value.trim());
+            } catch (NumberFormatException notANumber) {
+                return 0;
+            }
+        }
+
+        /// Whether the theme draws a thumb that can be told from what is
+        /// around it.
+        private boolean themeThumbShows() {
+            if (getThumbImage() != null) {
+                return true;
+            }
+            // The thumb a theme describes with constants is drawn on a
+            // horizontal slider only.
+            if (isVertical() || !(constant("sliderTrackThicknessMM") > 0)) {
+                return false;
+            }
+            if (constant("sliderThumbShadowSizeMM") > 0) {
+                return true;
+            }
+            int thumb = getUIManager().getComponentStyle(getUIID()).getFgColor();
+            int surface = getUIManager().getComponentStyle("Form").getBgColor();
+            int apart = Math.abs(((thumb >> 16) & 0xff) - ((surface >> 16) & 0xff))
+                    + Math.abs(((thumb >> 8) & 0xff) - ((surface >> 8) & 0xff))
+                    + Math.abs((thumb & 0xff) - (surface & 0xff));
+            // A scene is white unless it says otherwise, a shade or two
+            // from a light theme's form: a knob has to be well clear of
+            // the form to be clear of the scene as well.
+            return apart >= 96;
+        }
+
+        @Override
+        public void paint(Graphics g) {
+            super.paint(g);
+            if (isInfinite() || !isEditable() || themeThumbShows()) {
+                return;
+            }
+            int w = getWidth();
+            int h = getHeight();
+            int range = getMaxValue() - getMinValue();
+            float f = range <= 0 ? 0 : (getProgress() - getMinValue()) / (float) range;
+            f = Math.max(0, Math.min(1, f));
+            boolean vertical = isVertical();
+            int d = thumbSize();
+            // Large enough to cover a knob of the theme's that cannot be seen.
+            float knob = constant("sliderThumbWidthMM");
+            if (!vertical && knob > 0) {
+                d = Math.max(d, Display.getInstance().convertToPixels(knob) + 2);
+            }
+            d = Math.max(1, Math.min(d, Math.min(w, h)));
+            // The thumb's centre is where the filled part ends, kept half
+            // a thumb from either end.
+            int cx;
+            int cy;
+            if (vertical) {
+                cx = getX() + w / 2;
+                cy = getY() + Math.max(d / 2, Math.min(h - (d + 1) / 2, h - Math.round(f * h)));
+            } else {
+                cx = getX() + Math.max(d / 2, Math.min(w - (d + 1) / 2, Math.round(f * w)));
+                cy = getY() + h / 2;
+            }
+            Style full = getUIManager().getComponentStyle(getUIID() + "Full");
+            int ink = getUIManager().getComponentStyle("Label").getFgColor();
+            int surface = getUIManager().getComponentStyle("Form").getBgColor();
+            // The color the theme fills the track with; a theme that fills
+            // it with an image has none to give, and the thumb is then a
+            // shade of the text color.
+            int color = (full.getBgTransparency() & 0xff) != 0 && full.getBorder() == null
+                    ? full.getBgColor() : mix(surface, ink, 3);
+            if (!isEnabled()) {
+                color = mix(surface, ink, 1);
+            }
+            int before = g.getColor();
+            boolean smooth = g.isAntiAliased();
+            if (g.isAntiAliasingSupported()) {
+                g.setAntiAliased(true);
+            }
+            // An outline in the color behind keeps the thumb apart from
+            // the track on either side of it.
+            g.setColor(surface);
+            g.fillArc(cx - d / 2 - 1, cy - d / 2 - 1, d + 2, d + 2, 0, 360);
+            g.setColor(color);
+            g.fillArc(cx - d / 2, cy - d / 2, d, d, 0, 360);
+            if (g.isAntiAliasingSupported()) {
+                g.setAntiAliased(smooth);
+            }
+            g.setColor(before);
+        }
+
+        /// `a` with `quarters` quarters of `b` mixed in.
+        private static int mix(int a, int b, int quarters) {
+            int r = (((a >> 16) & 0xff) * (4 - quarters) + ((b >> 16) & 0xff) * quarters) / 4;
+            int gr = (((a >> 8) & 0xff) * (4 - quarters) + ((b >> 8) & 0xff) * quarters) / 4;
+            int bl = ((a & 0xff) * (4 - quarters) + (b & 0xff) * quarters) / 4;
+            return (r << 16) | (gr << 8) | bl;
+        }
+    }
+
+    /// The least a slider is across its track: the thumb, with a pixel of
+    /// outline and one to spare on either side. A theme's own slider can
+    /// ask for less than the thumb that is drawn on it.
+    private double across() {
+        Insets in = getInsets();
+        double thumb = Units.toLogical(Track.thumbSize()) + 4;
+        return getOrientation() == Orientation.VERTICAL ? in.getLeft() + thumb + in.getRight()
+                : in.getTop() + thumb + in.getBottom();
+    }
+
     @Override
     protected Component cn1CreateNative() {
-        com.codename1.ui.Slider s = new com.codename1.ui.Slider();
+        com.codename1.ui.Slider s = new Track();
         s.setMinValue(0);
         s.setMaxValue(STEPS);
         s.setEditable(true);
@@ -374,7 +513,7 @@ public class Slider extends Control {
     @Override
     protected double computePrefWidth(double height) {
         if (getOrientation() == Orientation.VERTICAL) {
-            return super.computePrefWidth(height) + tickBand();
+            return Math.max(super.computePrefWidth(height), across()) + tickBand();
         }
         Insets in = getInsets();
         return in.getLeft() + 140 + in.getRight();
@@ -383,7 +522,7 @@ public class Slider extends Control {
     @Override
     protected double computePrefHeight(double width) {
         if (getOrientation() != Orientation.VERTICAL) {
-            return super.computePrefHeight(width) + tickBand();
+            return Math.max(super.computePrefHeight(width), across()) + tickBand();
         }
         Insets in = getInsets();
         return in.getTop() + 140 + in.getBottom();
