@@ -96,7 +96,12 @@ final class BackendPackageSupport {
             t.getTestJavaTarget().set(testCompile.map(c -> c.getTargetCompatibility()));
             t.getTestJavaRelease().set(testCompile.flatMap(c -> c.getOptions().getRelease()).map(String::valueOf));
             t.getJdk().set(project.getProviders().gradleProperty("cn1.backend.jdk").orElse(
-                    testCompile.flatMap(c -> c.getJavaCompiler())
+                    project.getTasks().named(main.getCompileJavaTaskName(), org.gradle.api.tasks.compile.JavaCompile.class)
+                            .flatMap(c -> c.getJavaCompiler())
+                            .zip(testCompile.flatMap(c -> c.getJavaCompiler()), (mainCompiler, testCompiler) ->
+                                    mainCompiler.getMetadata().getLanguageVersion().asInt()
+                                            >= testCompiler.getMetadata().getLanguageVersion().asInt()
+                                            ? mainCompiler : testCompiler)
                             .map(c -> c.getMetadata().getInstallationPath().getAsFile().getAbsolutePath())));
             t.getTestSources().from(test.getJava().getSrcDirs());
             // What test annotation processors generated, as configure() adds the

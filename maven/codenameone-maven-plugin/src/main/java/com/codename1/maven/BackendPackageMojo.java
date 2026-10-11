@@ -272,7 +272,15 @@ public class BackendPackageMojo extends AbstractMojo {
                 "process-test-resources", "test-compile");
         int lastPhase = phases.indexOf("testCompile".equals(goal) ? "test-compile" : "compile");
         org.apache.maven.model.PluginExecution selected = null;
-        int selectedPhase = -1;
+        // Maven binds default-compile/default-testCompile even when no execution
+        // with that ID appears in the POM. An explicit binding replaces it.
+        int selectedPhase = lastPhase;
+        for (org.apache.maven.model.PluginExecution execution : compiler.getExecutions()) {
+            if (("default-" + goal).equals(execution.getId())) {
+                selectedPhase = -1;
+                break;
+            }
+        }
         for (org.apache.maven.model.PluginExecution execution : compiler.getExecutions()) {
             boolean isDefault = ("default-" + goal).equals(execution.getId());
             if (!isDefault && !execution.getGoals().contains(goal)) continue;

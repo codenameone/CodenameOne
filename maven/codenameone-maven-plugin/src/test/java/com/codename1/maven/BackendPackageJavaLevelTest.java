@@ -108,6 +108,29 @@ class BackendPackageJavaLevelTest {
         assertEquals("25", option(project, new Properties(), "target", false));
     }
 
+    @Test void impliedLifecycleDefaultsRunAfterEarlyCustomExecutions() {
+        for (boolean tests : new boolean[] {false, true}) {
+            MavenProject project = project();
+            Plugin compiler = new Plugin();
+            compiler.setGroupId("org.apache.maven.plugins");
+            compiler.setArtifactId("maven-compiler-plugin");
+            String goal = tests ? "testCompile" : "compile";
+            String option = tests ? "testRelease" : "release";
+            compiler.setConfiguration(configuration(option, "17"));
+            compiler.addExecution(execution("early", "generate-sources", goal, option, "8"));
+            project.getBuild().addPlugin(compiler);
+            assertEquals("17", option(project, new Properties(), option, tests));
+
+            PluginExecution defaultExecution = execution("default-" + goal, "none", goal, option, "25");
+            compiler.addExecution(defaultExecution);
+            assertEquals("8", option(project, new Properties(), option, tests));
+            defaultExecution.setPhase("validate");
+            assertEquals("8", option(project, new Properties(), option, tests));
+            defaultExecution.setPhase("process-sources");
+            assertEquals("25", option(project, new Properties(), option, tests));
+        }
+    }
+
     private static PluginExecution execution(String id, String phase, String goal, String name, String value) {
         PluginExecution execution = new PluginExecution();
         execution.setId(id); execution.setPhase(phase); execution.addGoal(goal);

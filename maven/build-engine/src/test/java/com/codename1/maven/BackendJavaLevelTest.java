@@ -156,6 +156,22 @@ class BackendJavaLevelTest {
         assertEquals(expected, run(jdk, "java", "-cp", output.toString(), "RecordSemantics"));
     }
 
+    @Test void floatingRecordsCanonicalizeNaNPayloadsAndPreserveSignedZero(@TempDir Path dir) throws Exception {
+        File jdk = jdk("17");
+        Path source = dir.resolve("FloatingRecords.java");
+        try (InputStream in = getClass().getResourceAsStream("/backend/FloatingRecords.java")) {
+            Files.copy(in, source);
+        }
+        Path runner = dir.resolve("RunFloatingRecords.java");
+        Files.write(runner, ("public class RunFloatingRecords { public static void main(String[] args) {"
+                + " example.FloatingRecords.verify(); System.out.println(\"FLOATING_RECORDS_OK\"); } }").getBytes("UTF-8"));
+        File output = Files.createDirectory(dir.resolve("out")).toFile();
+        run(jdk, "javac", "--release", "17", "-d", output.toString(), source.toString(), runner.toString());
+        String expected = run(jdk, "java", "-cp", output.toString(), "RunFloatingRecords");
+        BackendRecordMethods.rewrite(output);
+        assertEquals(expected, run(jdk, "java", "-cp", output.toString(), "RunFloatingRecords"));
+    }
+
     @Test void rejectsPatternSwitchBeforeTranslation(@TempDir Path dir) throws Exception {
         File jdk = jdk("25");
         Path source = dir.resolve("PatternSwitch.java");

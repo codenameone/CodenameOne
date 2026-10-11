@@ -39,8 +39,8 @@ import java.nio.file.Files;
 
 /// Materializes javac's ObjectMethods bootstrap as ordinary methods. The native
 /// runtime does not execute java.lang.runtime.ObjectMethods. Explicit user
-/// implementations are preserved; component order and boxed equality implement
-/// record semantics, including arrays, NaN and signed zero.
+/// implementations are preserved; floating-point bits are canonicalized explicitly
+/// because the native wrappers preserve NaN payloads.
 final class BackendRecordMethods implements Opcodes {
     private BackendRecordMethods() { }
 
@@ -62,6 +62,9 @@ final class BackendRecordMethods implements Opcodes {
         new ClassReader(bytes).accept(node, 0);
         if ((node.access & ACC_RECORD) == 0 || node.recordComponents == null) return bytes;
         boolean changed = false;
+        boolean needsBits = false;
+        String floatBits = uniqueMethodName(node, "cn1$recordFloatBits");
+        String doubleBits = uniqueMethodName(node, "cn1$recordDoubleBits");
         for (MethodNode method : node.methods) {
             boolean generated = false;
             for (AbstractInsnNode instruction : method.instructions) {
@@ -80,23 +83,40 @@ final class BackendRecordMethods implements Opcodes {
             method.tryCatchBlocks.clear();
             if (method.localVariables != null) method.localVariables.clear();
             method.visitCode();
-            if (method.name.equals("equals")) equals(node, method);
-            else if (method.name.equals("hashCode")) hashCode(node, method);
-            else toString(node, method);
-            method.visitMaxs(5, method.name.equals("equals") ? 2 : 1);
+            if (method.name.equals("equals")) {
+                equals(node, method, floatBits, doubleBits);
+                needsBits = true;
+            } else if (method.name.equals("hashCode")) {
+                hashCode(node, method, floatBits, doubleBits);
+                needsBits = true;
+            } else toString(node, method);
+            method.visitMaxs(8, method.name.equals("equals") ? 2 : 1);
             method.visitEnd();
             changed = true;
         }
         if (!changed) return bytes;
+        if (needsBits) {
+            boolean hasFloat = false, hasDouble = false;
+            for (RecordComponentNode field : node.recordComponents) {
+                hasFloat |= "F".equals(field.descriptor);
+                hasDouble |= "D".equals(field.descriptor);
+            }
+            if (hasFloat) addCanonicalBits(node, floatBits, false);
+            if (hasDouble) addCanonicalBits(node, doubleBits, true);
+        }
         ClassWriter writer = new ClassWriter(0);
         node.accept(writer);
         return writer.toByteArray();
     }
 
-    private static void component(ClassNode node, MethodVisitor mv, RecordComponentNode field, int local) {
+    private static void loadField(ClassNode node, MethodVisitor mv, RecordComponentNode field, int local) {
         mv.visitVarInsn(ALOAD, local);
         if (local != 0) mv.visitTypeInsn(CHECKCAST, node.name);
         mv.visitFieldInsn(GETFIELD, node.name, field.name, field.descriptor);
+    }
+
+    private static void component(ClassNode node, MethodVisitor mv, RecordComponentNode field, int local) {
+        loadField(node, mv, field, local);
         Type type = Type.getType(field.descriptor);
         String wrapper;
         switch (type.getSort()) {
@@ -114,16 +134,27 @@ final class BackendRecordMethods implements Opcodes {
         mv.visitMethodInsn(INVOKESTATIC, owner, "valueOf", "(" + field.descriptor + ")L" + owner + ";", false);
     }
 
-    private static void equals(ClassNode node, MethodVisitor mv) {
+    private static void equals(ClassNode node, MethodVisitor mv, String floatBits, String doubleBits) {
         Label no = new Label();
         mv.visitVarInsn(ALOAD, 1);
         mv.visitTypeInsn(INSTANCEOF, node.name);
         mv.visitJumpInsn(IFEQ, no);
         for (RecordComponentNode field : node.recordComponents) {
-            component(node, mv, field, 0);
-            component(node, mv, field, 1);
-            mv.visitMethodInsn(INVOKESTATIC, "java/util/Objects", "equals", "(Ljava/lang/Object;Ljava/lang/Object;)Z", false);
-            mv.visitJumpInsn(IFEQ, no);
+            if ("F".equals(field.descriptor) || "D".equals(field.descriptor)) {
+                canonicalBits(node, mv, field, 0, floatBits, doubleBits);
+                canonicalBits(node, mv, field, 1, floatBits, doubleBits);
+                if ("D".equals(field.descriptor)) {
+                    mv.visitInsn(LCMP);
+                    mv.visitJumpInsn(IFNE, no);
+                } else {
+                    mv.visitJumpInsn(IF_ICMPNE, no);
+                }
+            } else {
+                component(node, mv, field, 0);
+                component(node, mv, field, 1);
+                mv.visitMethodInsn(INVOKESTATIC, "java/util/Objects", "equals", "(Ljava/lang/Object;Ljava/lang/Object;)Z", false);
+                mv.visitJumpInsn(IFEQ, no);
+            }
         }
         mv.visitInsn(ICONST_1);
         mv.visitInsn(IRETURN);
@@ -133,7 +164,7 @@ final class BackendRecordMethods implements Opcodes {
         mv.visitInsn(IRETURN);
     }
 
-    private static void hashCode(ClassNode node, MethodVisitor mv) {
+    private static void hashCode(ClassNode node, MethodVisitor mv, String floatBits, String doubleBits) {
         mv.visitInsn(ICONST_0);
         for (RecordComponentNode field : node.recordComponents) {
             mv.visitIntInsn(BIPUSH, 31);
@@ -147,6 +178,15 @@ final class BackendRecordMethods implements Opcodes {
                 mv.visitIntInsn(BIPUSH, 6);
                 mv.visitInsn(IMUL);
                 mv.visitInsn(ISUB);
+            } else if ("F".equals(field.descriptor) || "D".equals(field.descriptor)) {
+                canonicalBits(node, mv, field, 0, floatBits, doubleBits);
+                if ("D".equals(field.descriptor)) {
+                    mv.visitInsn(DUP2);
+                    mv.visitIntInsn(BIPUSH, 32);
+                    mv.visitInsn(LUSHR);
+                    mv.visitInsn(LXOR);
+                    mv.visitInsn(L2I);
+                }
             } else {
                 component(node, mv, field, 0);
                 mv.visitMethodInsn(INVOKESTATIC, "java/util/Objects", "hashCode", "(Ljava/lang/Object;)I", false);
@@ -154,6 +194,50 @@ final class BackendRecordMethods implements Opcodes {
             mv.visitInsn(IADD);
         }
         mv.visitInsn(IRETURN);
+    }
+
+    private static String uniqueMethodName(ClassNode node, String base) {
+        String name = base;
+        int suffix = 0;
+        for (int i = 0; i < node.methods.size(); i++) {
+            if (node.methods.get(i).name.equals(name)) {
+                name = base + ++suffix;
+                i = -1;
+            }
+        }
+        return name;
+    }
+
+    private static void canonicalBits(ClassNode node, MethodVisitor mv, RecordComponentNode field,
+            int local, String floatBits, String doubleBits) {
+        loadField(node, mv, field, local);
+        boolean isDouble = "D".equals(field.descriptor);
+        mv.visitMethodInsn(INVOKESTATIC, node.name, isDouble ? doubleBits : floatBits,
+                isDouble ? "(D)J" : "(F)I", false);
+    }
+
+    private static void addCanonicalBits(ClassNode node, String name, boolean isDouble) {
+        MethodNode mv = new MethodNode(ACC_PRIVATE | ACC_STATIC | ACC_SYNTHETIC, name,
+                isDouble ? "(D)J" : "(F)I", null, null);
+        mv.visitCode();
+        mv.visitVarInsn(isDouble ? DLOAD : FLOAD, 0);
+        mv.visitVarInsn(isDouble ? DLOAD : FLOAD, 0);
+        mv.visitInsn(isDouble ? DCMPL : FCMPL);
+        Label notNaN = new Label();
+        mv.visitJumpInsn(IFEQ, notNaN);
+        // Do not delegate NaN handling to native Float/Double bit conversions.
+        if (isDouble) mv.visitLdcInsn(0x7ff8000000000000L);
+        else mv.visitLdcInsn(0x7fc00000);
+        mv.visitInsn(isDouble ? LRETURN : IRETURN);
+        mv.visitLabel(notNaN);
+        mv.visitFrame(F_SAME, 0, null, 0, null);
+        mv.visitVarInsn(isDouble ? DLOAD : FLOAD, 0);
+        mv.visitMethodInsn(INVOKESTATIC, isDouble ? "java/lang/Double" : "java/lang/Float",
+                isDouble ? "doubleToLongBits" : "floatToIntBits", isDouble ? "(D)J" : "(F)I", false);
+        mv.visitInsn(isDouble ? LRETURN : IRETURN);
+        mv.visitMaxs(isDouble ? 4 : 2, isDouble ? 2 : 1);
+        mv.visitEnd();
+        node.methods.add(mv);
     }
 
     private static void toString(ClassNode node, MethodVisitor mv) {
