@@ -79,6 +79,21 @@ namespace Spike
         public Vec2 to;
     }
 
+    // No Equals and no GetHashCode of its own: what a struct gets from
+    // ValueType, which compares each field with that field's Equals.
+    public struct Reading
+    {
+        public float level;
+        public double fine;
+        public int tag;
+    }
+
+    // A field of a type argument that nothing assigns.
+    public class Slot<T>
+    {
+        public T held;
+    }
+
     public class Holder
     {
         public Vec2 position;
@@ -1671,6 +1686,196 @@ namespace Spike
                 + got + through["f"] + " " + Outcome(() => new Dictionary<string, int>((IDictionary<string, int>)null)));
         }
 
+        // float.Equals is not ==: NaN equals NaN and zero equals negative
+        // zero, and a struct that leaves equality to ValueType compares its
+        // fields that way, so one holding a NaN is still a key that is found.
+        private static void StructEquality()
+        {
+            Section("struct equality");
+            Reading nan = new Reading();
+            nan.level = float.NaN;
+            nan.fine = 1.5;
+            nan.tag = 1;
+            Reading same = nan;
+            Reading zero = new Reading();
+            Reading negative = new Reading();
+            negative.level = -0f;
+            negative.fine = -0.0;
+            Log("nan " + nan.Equals(same) + (nan.GetHashCode() == same.GetHashCode()) + " zero " + zero.Equals(negative)
+                + (zero.GetHashCode() == negative.GetHashCode()) + " prim " + (nan.level == same.level)
+                + nan.level.Equals(same.level));
+            Reading fineNan = zero;
+            fineNan.fine = double.NaN;
+            Reading fineSame = fineNan;
+            Reading other = nan;
+            other.tag = 2;
+            Reading number = nan;
+            number.level = 3f;
+            Reading wide = fineNan;
+            wide.fine = 2.0;
+            Log("double nan " + fineNan.Equals(fineSame) + " differ " + nan.Equals(other) + nan.Equals(number)
+                + number.Equals(nan) + fineNan.Equals(wide) + wide.Equals(fineNan) + nan.Equals(zero));
+            Dictionary<Reading, string> byReading = new Dictionary<Reading, string>();
+            byReading[nan] = "nan";
+            byReading[zero] = "zero";
+            byReading[same] = "nan again";
+            byReading[negative] = "zero again";
+            byReading[fineNan] = "fine";
+            Log("keys " + byReading.Count + byReading.ContainsKey(same) + byReading.ContainsKey(negative)
+                + byReading.ContainsKey(number) + byReading.ContainsKey(fineSame) + " " + byReading[nan] + "/"
+                + byReading[negative] + "/" + byReading[fineSame]);
+        }
+
+        // A struct handed to a delegate is the delegate's own, whoever calls
+        // it: generic library code that walks a list or an array, or the
+        // invocation list of a multicast delegate. What the lambda does to
+        // its parameter stays in the lambda, and what it does to the
+        // collection does not change the value it was handed.
+        private static void StructsThroughDelegates()
+        {
+            Section("structs through delegates");
+            List<Vec2> points = new List<Vec2>();
+            points.Add(new Vec2(1, 2));
+            points.Add(new Vec2(3, 4));
+            int far = points.Where(p => { p.x += 10; return p.x > 10; }).Count();
+            Func<Vec2, Vec2> grow = p => { p.Scale(2); return p; };
+            string grown = "";
+            foreach (Vec2 g in points.Select(grow))
+            {
+                grown += g;
+            }
+            Log("list where " + far + " select " + grown + " kept " + points[0] + points[1]);
+
+            Vec2[] cells = new Vec2[] { new Vec2(1, 2), new Vec2(3, 4) };
+            bool any = cells.Any(p => { p.y = 77; return false; });
+            Log("array any " + any + " kept " + cells[0] + cells[1]);
+
+            // The lambda writes the array while it still reads its argument.
+            string seen = "";
+            foreach (float x in cells.Select(p => { cells[0].x = 50; cells[1] = new Vec2(60, 0); return p.x; }))
+            {
+                seen += (int)x + " ";
+            }
+            Log("array select saw " + seen + "now " + cells[0] + cells[1]);
+
+            // A list made from an array has the values, not the elements.
+            List<Vec2> taken = new List<Vec2>(cells);
+            List<Vec2> listed = cells.ToList();
+            cells[0].x = -1;
+            cells[1] = new Vec2(-2, -2);
+            Log("taken " + taken[0] + taken[1] + " listed " + listed[0] + listed[1] + " cells " + cells[0] + cells[1]);
+
+            Action<Vec2> first = p => { p.x = 9; Log("first " + p); };
+            Action<Vec2> second = p => Log("second " + p);
+            Action<Vec2> each = first + second;
+            each(cells[0]);
+            each(new Vec2(5, 5));
+            Log("after " + cells[0]);
+        }
+
+        // Erased library code carries a struct as an object, and a missing
+        // one as null. What comes back out is a value all the same: the
+        // default of an empty query is a struct with every field zero, and a
+        // tuple copied is copied all the way down, since a struct inside a
+        // struct is part of it.
+        private static void ErasedStructValues()
+        {
+            Section("erased struct values");
+            List<Vec2> none = new List<Vec2>();
+            Vec2 first = none.FirstOrDefault();
+            Vec2 last = none.LastOrDefault();
+            Vec2 found = none.FirstOrDefault(p => p.x > 5);
+            first.x = 3;
+            Log("defaults " + first + last + found + none.FirstOrDefault() + none.FirstOrDefault().SqrMagnitude);
+            List<Segment> lines = new List<Segment>();
+            Segment line = lines.LastOrDefault();
+            line.to.y = 2;
+            Log("nested default " + line.from + line.to + lines.FirstOrDefault(s => s.to.x > 0).to);
+            Dictionary<string, Vec2> places = new Dictionary<string, Vec2>();
+            Vec2 missing = new Vec2(9, 9);
+            bool got = places.TryGetValue("nowhere", out missing);
+            Log("missing " + got + missing);
+
+            (Vec2, int) pair = (new Vec2(1, 2), 3);
+            (Vec2, int) copy = pair;
+            copy.Item1.x = 50;
+            copy.Item2 = 4;
+            Log("tuple " + pair.Item1 + pair.Item2 + " copy " + copy.Item1 + copy.Item2);
+            (int, Vec2, Segment) triple = (1, new Vec2(3, 4), new Segment());
+            (int, Vec2, Segment) other = triple;
+            other.Item2.Scale(2);
+            other.Item3.to.x = 8;
+            Log("triple " + triple.Item2 + triple.Item3.to + " copy " + other.Item2 + other.Item3.to);
+            ((Vec2, int), int) outer = (pair, 5);
+            ((Vec2, int), int) inner = outer;
+            inner.Item1.Item1.y = 60;
+            Log("tuple in tuple " + outer.Item1.Item1 + " copy " + inner.Item1.Item1 + " source " + pair.Item1);
+            (Vec2, int)[] pairs = new (Vec2, int)[2];
+            pairs[0] = pair;
+            pairs[1] = pairs[0];
+            pairs[1].Item1.y = 70;
+            List<(Vec2, int)> kept = new List<(Vec2, int)>();
+            kept.Add(pair);
+            (Vec2, int) back = kept[0];
+            back.Item1.x = 90;
+            Log("tuple array " + pairs[0].Item1 + pairs[1].Item1 + " list " + kept[0].Item1 + back.Item1 + " source "
+                + pair.Item1);
+            (Vec2, int) blank = default((Vec2, int));
+            Log("blank " + blank.Item1 + blank.Item2 + new List<(Vec2, int)>().FirstOrDefault().Item1);
+            blank.Item1.y = 7;
+            blank.Item2 += 2;
+            Log("blank written " + blank.Item1 + blank.Item2);
+            Slot<Vec2> slot = new Slot<Vec2>();
+            slot.held.x = 4;
+            Log("generic default " + Nothing<int>() + Nothing<Vec2>() + (Nothing<string>() == null) + Nothing<bool>()
+                + (int)new Slot<float>().held + new Slot<long>().held + slot.held);
+            KeyValuePair<string, Vec2> entry = new KeyValuePair<string, Vec2>("a", new Vec2(1, 1));
+            KeyValuePair<string, Vec2> same = entry;
+            Vec2 held = same.Value;
+            held.x = 5;
+            Log("pair " + entry.Value + same.Value + held);
+        }
+
+        private static T Nothing<T>()
+        {
+            return default(T);
+        }
+
+        // The angle of a point on an axis depends on which zero it has: a
+        // negative zero is below the axis, or left of it.
+        private static string Angle(double y, double x)
+        {
+            double a = Math.Atan2(y, x);
+            if (!(a >= 0) && !(a < 0))
+            {
+                return "nan";
+            }
+            if (a == 0)
+            {
+                return 1 / a < 0 ? "-0" : "0";
+            }
+            return "" + (int)Math.Round(a * 1000000);
+        }
+
+        private static void Angles()
+        {
+            Section("angles");
+            double[] values = new double[] { 0.0, -0.0, 1, -1, double.NaN, double.PositiveInfinity,
+                double.NegativeInfinity, 2.5 };
+            for (int y = 0; y < values.Length; y++)
+            {
+                string row = "";
+                for (int x = 0; x < values.Length; x++)
+                {
+                    row += Angle(values[y], values[x]) + " ";
+                }
+                Log("atan2 " + row);
+            }
+            float zero = 0f;
+            float below = (float)Math.Atan2(-zero, -1f);
+            Log("float " + (int)(below * 1000) + " " + (int)((float)Math.Atan2(zero, -zero) * 1000));
+        }
+
         private static void StaticInit()
         {
             Section("static init");
@@ -1697,6 +1902,10 @@ namespace Spike
             Dictionaries();
             EnumMethods();
             BaseLibrary();
+            StructEquality();
+            StructsThroughDelegates();
+            ErasedStructValues();
+            Angles();
             StaticInit();
             Console.WriteLine("done");
         }

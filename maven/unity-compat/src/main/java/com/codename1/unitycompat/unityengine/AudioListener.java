@@ -24,11 +24,12 @@ package com.codename1.unitycompat.unityengine;
 
 /// `UnityEngine.AudioListener`: where the scene is heard from. Sound here
 /// is not placed in space, so the listener itself does nothing; its static
-/// `volume` scales every sound that starts after it is set.
+/// `volume` scales every sound that starts after it is set, and its static
+/// `pause` holds every sound and every source's clock until it is cleared.
+/// There is no `AudioSource.ignoreListenerPause` here, so no sound is
+/// exempt: one played for a pause menu waits for the pause to end.
 @SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
 public final class AudioListener extends Behaviour {
-    private static boolean paused;
-
     @Override
     public Component $new() {
         return new AudioListener();
@@ -42,12 +43,12 @@ public final class AudioListener extends Behaviour {
         AudioSource.listenerVolume = value < 0f ? 0f : value > 1f ? 1f : value;
     }
 
-    /// Kept and reported back.
     public static boolean get_pause() {
-        return paused;
+        return AudioSource.listenerPaused();
     }
 
+    /// The state lives with the sources, whose clock it stops.
     public static void set_pause(boolean value) {
-        paused = value;
+        AudioSource.listenerPause(value);
     }
 }

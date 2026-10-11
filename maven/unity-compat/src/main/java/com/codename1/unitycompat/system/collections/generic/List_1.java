@@ -24,6 +24,7 @@ package com.codename1.unitycompat.system.collections.generic;
 
 import com.codename1.unitycompat.system.ArgumentNullException;
 import com.codename1.unitycompat.system.ArgumentOutOfRangeException;
+import com.codename1.unitycompat.system.ArrayView;
 import com.codename1.unitycompat.system.Interop;
 import com.codename1.unitycompat.system.InvalidOperationException;
 import com.codename1.unitycompat.system.NotSupportedException;
@@ -150,14 +151,17 @@ public class List_1 implements ICollection_1 {
         }
         // Disposed as `foreach` would: an iterator's `finally` blocks run
         // from there, also when the walk ends early because it threw.
+        // The view of an array of structs has copied each already.
+        boolean copied = values instanceof ArrayView && ((ArrayView) values).$copiesStructs();
         IEnumerator_1 e = values.GetEnumerator();
         try {
             while (e.MoveNext()) {
                 // A struct is copied on its way in: what walks an array
-                // hands out the array's own element, which `a[0].x = 1`
-                // changes in place, and .NET's list has a value of its own.
+                // whose elements it could not be told are structs hands
+                // out the array's own element, which `a[0].x = 1` changes
+                // in place, and .NET's list has a value of its own.
                 Object v = e.get_Current();
-                Add(v instanceof Struct ? ((Struct) v).$copyValue() : v);
+                Add(!copied && v instanceof Struct ? ((Struct) v).$copyValue() : v);
             }
         } finally {
             e.Dispose();

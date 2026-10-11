@@ -237,6 +237,47 @@ public final class Interop {
         throw new InvalidCastException();
     }
 
+    // ------------------------------------------------- out of erased code
+
+    // What a type argument that is a primitive comes back as from erased
+    // code: `list[i]` of a `List<int>`, the `Item2` of a tuple. The value is
+    // boxed there, and where erased code had a `default(T)` to give -- a
+    // tuple's item nobody assigned, what a generic method of a script answers
+    // when it has nothing -- it is a null, since that code cannot know that
+    // its T is an `int`. The caller does, and reads the null as zero here.
+
+    public static boolean orDefaultBoolean(Object o) {
+        return o != null && ((Boolean) o).booleanValue();
+    }
+
+    public static char orDefaultChar(Object o) {
+        return o == null ? (char) 0 : ((Character) o).charValue();
+    }
+
+    public static byte orDefaultByte(Object o) {
+        return o == null ? (byte) 0 : ((Byte) o).byteValue();
+    }
+
+    public static short orDefaultShort(Object o) {
+        return o == null ? (short) 0 : ((Short) o).shortValue();
+    }
+
+    public static int orDefaultInt(Object o) {
+        return o == null ? 0 : ((Integer) o).intValue();
+    }
+
+    public static long orDefaultLong(Object o) {
+        return o == null ? 0L : ((Long) o).longValue();
+    }
+
+    public static float orDefaultFloat(Object o) {
+        return o == null ? 0f : ((Float) o).floatValue();
+    }
+
+    public static double orDefaultDouble(Object o) {
+        return o == null ? 0d : ((Double) o).doubleValue();
+    }
+
     // -------------------------------------------------------------- unsigned
 
     public static int compareUnsigned(int a, int b) {

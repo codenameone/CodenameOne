@@ -241,6 +241,7 @@ public final class Translator implements Opcodes {
 
         emitMessageHooks(cw, type, name);
         emitScriptSupport(cw, type, name, superName);
+        emitSerializableSupport(cw, type, name);
         if (struct) {
             emitStructMembers(cw, type, name, objectVirtuals);
         }
@@ -491,13 +492,30 @@ public final class Translator implements Opcodes {
                         mv.visitJumpInsn(IFNE, no);
                         break;
                     case Val.R4:
-                        mv.visitInsn(FCMPL);
-                        mv.visitJumpInsn(IFNE, no);
+                    case Val.R8: {
+                        // `ValueType.Equals` compares a field with the
+                        // field's own `Equals`, and `float.Equals` is not
+                        // `==`: NaN equals NaN, or a struct holding one
+                        // would not equal itself and could never be found
+                        // again as a dictionary key. Zero and negative zero
+                        // are equal either way. The comparison says "equal"
+                        // for every pair but one with a NaN in it, so the
+                        // two extra tests run only for those: the fields
+                        // are equal after all when neither equals itself.
+                        boolean wide = names.kind(f.type) == Val.R8;
+                        Label same = new Label();
+                        mv.visitInsn(wide ? DCMPL : FCMPL);
+                        mv.visitJumpInsn(IFEQ, same);
+                        for (int side = 0; side < 3; side += 2) {
+                            mv.visitVarInsn(ALOAD, side);
+                            mv.visitFieldInsn(GETFIELD, name, fieldName, d);
+                            mv.visitInsn(wide ? DUP2 : DUP);
+                            mv.visitInsn(wide ? DCMPL : FCMPL);
+                            mv.visitJumpInsn(IFEQ, no);
+                        }
+                        mv.visitLabel(same);
                         break;
-                    case Val.R8:
-                        mv.visitInsn(DCMPL);
-                        mv.visitJumpInsn(IFNE, no);
-                        break;
+                    }
                     default:
                         mv.visitMethodInsn(INVOKESTATIC, Names.INTEROP, "areEqual",
                                 "(Ljava/lang/Object;Ljava/lang/Object;)Z", false);
@@ -516,6 +534,10 @@ public final class Translator implements Opcodes {
         if (!objectVirtuals[2]) {
             mv = cw.visitMethod(ACC_PUBLIC, "hashCode", "()I", null, null);
             mv.visitCode();
+            // Equal values have to hash alike, and the conversion to an
+            // integer below gives the two zeros one hash and every NaN
+            // another (it answers 0 for a NaN), which is what `equals`
+            // above calls equal.
             Jvm.pushInt(mv, 17);
             for (FieldDef f : fields) {
                 Jvm.pushInt(mv, 31);
@@ -691,9 +713,11 @@ public final class Translator implements Opcodes {
     ///   of an object already in the scene and for `AddComponent`.
     /// - `$copyFrom(source)` copies the serialized fields from another
     ///   instance, which is what `Instantiate` means by a copy. A struct is
-    ///   copied, an array is duplicated, and a reference to a Unity object
-    ///   is passed through the runtime, which redirects one that points
-    ///   into the tree being copied to the copy. A field of a type Unity
+    ///   copied, an array is duplicated, a serializable class is copied
+    ///   field by field (see [#emitSerializableSupport]), and a reference
+    ///   to a Unity object is passed through the runtime, which redirects
+    ///   one that points into the tree being copied to the copy. A field
+    ///   of a type Unity
     ///   does not serialize -- a dictionary, a delegate -- is left as the
     ///   constructor set it, as Unity leaves it.
     /// - `$invoke(name)` calls a method without parameters by its name, for
@@ -708,13 +732,8 @@ public final class Translator implements Opcodes {
             return;
         }
         String component = Names.RUNTIME + "unityengine/Component";
-        String runtime = Names.RUNTIME + "unityengine/UnityRuntime";
         String why = "copying the script " + full;
-        boolean hasConstructor = false;
-        for (MethodDef m : type.methods) {
-            hasConstructor |= ".ctor".equals(m.name) && m.sig.params.length == 0;
-        }
-        if (!type.isAbstract() && hasConstructor) {
+        if (!type.isAbstract() && hasDefaultConstructor(type)) {
             MethodVisitor mv = cw.visitMethod(ACC_PUBLIC, "$new", "()L" + component + ";", null, null);
             mv.visitCode();
             mv.visitTypeInsn(NEW, name);
@@ -735,86 +754,7 @@ public final class Translator implements Opcodes {
         mv.visitVarInsn(ALOAD, 1);
         mv.visitTypeInsn(CHECKCAST, name);
         mv.visitVarInsn(ASTORE, 2);
-        for (FieldDef f : type.fields) {
-            if (!isSerialized(type, f)) {
-                continue;
-            }
-            String fieldName = Names.sanitize(f.name);
-            String descriptor = names.descriptor(f.type);
-            CilType t = f.type;
-            String helper = null;
-            boolean structArray = false;
-            if (names.isStruct(t)) {
-                String c = names.classRef(t);
-                mv.visitVarInsn(ALOAD, 0);
-                mv.visitVarInsn(ALOAD, 2);
-                mv.visitFieldInsn(GETFIELD, name, fieldName, descriptor);
-                mv.visitMethodInsn(INVOKEVIRTUAL, c, "$copy", "()L" + c + ";", false);
-                mv.visitFieldInsn(PUTFIELD, name, fieldName, descriptor);
-                continue;
-            } else if (names.kind(t) != Val.REF || t.kind == CilType.Kind.STRING) {
-                helper = "";
-            } else if (t.kind == CilType.Kind.SZARRAY) {
-                helper = "$copyArray";
-                structArray = names.isStruct(t.element);
-            } else if (t.kind == CilType.Kind.GENERICINST) {
-                String definition = t.element.typeName();
-                if ("System.Collections.Generic.List`1".equals(definition)) {
-                    helper = "$copyList";
-                }
-            } else if (t.kind == CilType.Kind.CLASS) {
-                if (universe.derivesFrom(t.name, "UnityEngine.Object")) {
-                    helper = "$remap";
-                } else {
-                    TypeDef def = universe.find(t.name);
-                    // Unity copies a serializable class field by field;
-                    // here the two scripts share the one object.
-                    helper = def != null && (def.flags & TYPE_SERIALIZABLE) != 0 ? "" : null;
-                }
-            }
-            if (helper == null) {
-                continue;
-            }
-            mv.visitVarInsn(ALOAD, 0);
-            mv.visitVarInsn(ALOAD, 2);
-            mv.visitFieldInsn(GETFIELD, name, fieldName, descriptor);
-            if (helper.length() > 0) {
-                String helperDescriptor = "(Ljava/lang/Object;)Ljava/lang/Object;";
-                index.requireMethod(runtime, helper, helperDescriptor, why);
-                mv.visitMethodInsn(INVOKESTATIC, runtime, helper, helperDescriptor, false);
-                mv.visitTypeInsn(CHECKCAST, descriptor.startsWith("[") ? descriptor
-                        : descriptor.substring(1, descriptor.length() - 1));
-            }
-            mv.visitFieldInsn(PUTFIELD, name, fieldName, descriptor);
-            if (structArray) {
-                // The array is new but still holds the source's structs.
-                String c = names.classRef(t.element);
-                Label loop = new Label();
-                Label end = new Label();
-                mv.visitVarInsn(ALOAD, 0);
-                mv.visitFieldInsn(GETFIELD, name, fieldName, descriptor);
-                mv.visitVarInsn(ASTORE, 3);
-                mv.visitVarInsn(ALOAD, 3);
-                mv.visitJumpInsn(IFNULL, end);
-                mv.visitInsn(ICONST_0);
-                mv.visitVarInsn(ISTORE, 4);
-                mv.visitLabel(loop);
-                mv.visitVarInsn(ILOAD, 4);
-                mv.visitVarInsn(ALOAD, 3);
-                mv.visitInsn(ARRAYLENGTH);
-                mv.visitJumpInsn(IF_ICMPGE, end);
-                mv.visitVarInsn(ALOAD, 3);
-                mv.visitVarInsn(ILOAD, 4);
-                mv.visitVarInsn(ALOAD, 3);
-                mv.visitVarInsn(ILOAD, 4);
-                mv.visitInsn(AALOAD);
-                mv.visitMethodInsn(INVOKEVIRTUAL, c, "$copy", "()L" + c + ";", false);
-                mv.visitInsn(AASTORE);
-                mv.visitIincInsn(4, 1);
-                mv.visitJumpInsn(GOTO, loop);
-                mv.visitLabel(end);
-            }
-        }
+        emitSerializedCopies(mv, type, name, 2, -1, why);
         mv.visitInsn(RETURN);
         mv.visitMaxs(0, 0);
         mv.visitEnd();
@@ -845,6 +785,263 @@ public final class Translator implements Opcodes {
         mv.visitInsn(IRETURN);
         mv.visitMaxs(0, 0);
         mv.visitEnd();
+    }
+
+    /// How many serializable classes inside one another a copy follows
+    /// before it leaves a field null. Unity's serializer stops at ten
+    /// levels too, which is what ends a class that holds one of its own
+    /// kind and, here, a cycle of them: without a limit that is a stack
+    /// overflow, and on a device no exception.
+    private static final int SERIALIZED_DEPTH = 10;
+
+    private static final String LIST = Names.RUNTIME + "system/collections/generic/List_1";
+
+    /// Whether a class gets a `$copySerialized`: a `[Serializable]` class
+    /// of the application's own that is not a Unity object. The classes the
+    /// C# compiler writes for lambdas are marked serializable as well and
+    /// are named with a `<`; nothing can declare a field of one.
+    private boolean copiesSerialized(TypeDef def) {
+        return def != null && (def.flags & TYPE_SERIALIZABLE) != 0 && !def.isInterface() && !def.isValueType()
+                && !def.isEnum() && !def.isDelegate() && def.genericParamCount == 0 && def.name.indexOf('<') < 0
+                && names.isTranslated(def.fullName())
+                && !universe.derivesFrom(def.fullName(), "UnityEngine.Object");
+    }
+
+    private static boolean hasDefaultConstructor(TypeDef def) {
+        for (MethodDef m : def.methods) {
+            if (".ctor".equals(m.name) && m.sig.params.length == 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// The class of a field Unity serializes inline, as part of the object
+    /// that holds it, and that `Instantiate` therefore gives each copy an
+    /// instance of its own; or null. An abstract class cannot be made, and
+    /// neither can one without a constructor that takes nothing, since
+    /// there is no reflection to make it with: a field of either is shared
+    /// by the copy, as every such field once was.
+    private TypeDef inlineClass(CilType t) {
+        if (t == null || t.kind != CilType.Kind.CLASS) {
+            return null;
+        }
+        TypeDef def = universe.find(t.name);
+        return copiesSerialized(def) && !def.isAbstract() && hasDefaultConstructor(def) ? def : null;
+    }
+
+    /// What `Instantiate` needs of a `[Serializable]` class that is not a
+    /// Unity object. Unity writes such a class into the object whose field
+    /// holds it, by value, so a copy of that object has an instance of its
+    /// own and changing one does not change the other. With no reflection
+    /// to walk the fields, the copy is written out here:
+    ///
+    /// - `$copySerialized(source, depth)` copies the serialized fields its
+    ///   class declares, after its base class has copied its own if that is
+    ///   serializable too. The descriptor names the class, so one in a
+    ///   derived class is another method and not an override.
+    /// - `$instantiate(source, depth)` makes the copy: null for null, and
+    ///   an instance of the class the *field* was declared as, whatever
+    ///   the source was, which is as much of it as Unity writes.
+    private void emitSerializableSupport(ClassWriter cw, TypeDef type, String name) {
+        if (!copiesSerialized(type)) {
+            return;
+        }
+        String self = "L" + name + ";";
+        MethodVisitor mv = cw.visitMethod(ACC_PUBLIC, "$copySerialized", "(" + self + "I)V", null, null);
+        mv.visitCode();
+        TypeDef base = type.baseType == null ? null : universe.definitionOf(type.baseType);
+        if (copiesSerialized(base)) {
+            String b = names.classRef(type.baseType);
+            mv.visitVarInsn(ALOAD, 0);
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitVarInsn(ILOAD, 2);
+            mv.visitMethodInsn(INVOKESPECIAL, b, "$copySerialized", "(L" + b + ";I)V", false);
+        }
+        emitSerializedCopies(mv, type, name, 1, 2, "copying the serializable class " + type.fullName());
+        mv.visitInsn(RETURN);
+        mv.visitMaxs(0, 0);
+        mv.visitEnd();
+
+        if (type.isAbstract() || !hasDefaultConstructor(type)) {
+            return;
+        }
+        mv = cw.visitMethod(ACC_PUBLIC | ACC_STATIC, "$instantiate", "(" + self + "I)" + self, null, null);
+        mv.visitCode();
+        Label none = new Label();
+        mv.visitVarInsn(ALOAD, 0);
+        mv.visitJumpInsn(IFNULL, none);
+        mv.visitVarInsn(ILOAD, 1);
+        mv.visitJumpInsn(IFLE, none);
+        mv.visitTypeInsn(NEW, name);
+        mv.visitInsn(DUP);
+        mv.visitMethodInsn(INVOKESPECIAL, name, "<init>", "()V", false);
+        mv.visitInsn(DUP);
+        mv.visitVarInsn(ALOAD, 0);
+        mv.visitVarInsn(ILOAD, 1);
+        mv.visitInsn(ICONST_1);
+        mv.visitInsn(ISUB);
+        mv.visitMethodInsn(INVOKEVIRTUAL, name, "$copySerialized", "(" + self + "I)V", false);
+        mv.visitInsn(ARETURN);
+        mv.visitLabel(none);
+        mv.visitInsn(ACONST_NULL);
+        mv.visitInsn(ARETURN);
+        mv.visitMaxs(0, 0);
+        mv.visitEnd();
+    }
+
+    /// Stack: a value of the class `def`, or null. Leaves its copy.
+    private void instantiateSerialized(MethodVisitor mv, TypeDef def, int depthSlot) {
+        String c = names.className(def.fullName());
+        if (depthSlot < 0) {
+            Jvm.pushInt(mv, SERIALIZED_DEPTH);
+        } else {
+            mv.visitVarInsn(ILOAD, depthSlot);
+        }
+        mv.visitMethodInsn(INVOKESTATIC, c, "$instantiate", "(L" + c + ";I)L" + c + ";", false);
+    }
+
+    /// Copies each serialized field `type` declares from the object in
+    /// local `source` into `this`, for a script's `$copyFrom` and for a
+    /// serializable class's `$copySerialized`. `depthSlot` is the local
+    /// that counts the levels left, or negative in a script, where the
+    /// count starts. Locals 3 and 4 are scratch.
+    private void emitSerializedCopies(MethodVisitor mv, TypeDef type, String name, int source, int depthSlot,
+            String why) {
+        String runtime = Names.RUNTIME + "unityengine/UnityRuntime";
+        for (FieldDef f : type.fields) {
+            if (!isSerialized(type, f)) {
+                continue;
+            }
+            String fieldName = Names.sanitize(f.name);
+            String descriptor = names.descriptor(f.type);
+            CilType t = f.type;
+            String helper = null;
+            boolean structArray = false;
+            // The class of the elements, when each needs a copy of its own.
+            TypeDef elements = null;
+            if (names.isStruct(t)) {
+                String c = names.classRef(t);
+                mv.visitVarInsn(ALOAD, 0);
+                mv.visitVarInsn(ALOAD, source);
+                mv.visitFieldInsn(GETFIELD, name, fieldName, descriptor);
+                mv.visitMethodInsn(INVOKEVIRTUAL, c, "$copy", "()L" + c + ";", false);
+                mv.visitFieldInsn(PUTFIELD, name, fieldName, descriptor);
+                continue;
+            } else if (names.kind(t) != Val.REF || t.kind == CilType.Kind.STRING) {
+                helper = "";
+            } else if (t.kind == CilType.Kind.SZARRAY) {
+                helper = "$copyArray";
+                structArray = names.isStruct(t.element);
+                elements = inlineClass(t.element);
+            } else if (t.kind == CilType.Kind.GENERICINST) {
+                String definition = t.element.typeName();
+                if ("System.Collections.Generic.List`1".equals(definition)) {
+                    helper = "$copyList";
+                    elements = t.args.length == 1 ? inlineClass(t.args[0]) : null;
+                }
+            } else if (t.kind == CilType.Kind.CLASS) {
+                if (universe.derivesFrom(t.name, "UnityEngine.Object")) {
+                    helper = "$remap";
+                } else {
+                    TypeDef def = universe.find(t.name);
+                    TypeDef inline = inlineClass(t);
+                    if (inline != null) {
+                        // By value, as Unity serializes it: the copy gets
+                        // an object of its own. Sharing the source's meant
+                        // that damage dealt to one enemy's `Stats` was
+                        // dealt to the enemy it was instantiated from and
+                        // to every other copy of it.
+                        mv.visitVarInsn(ALOAD, 0);
+                        mv.visitVarInsn(ALOAD, source);
+                        mv.visitFieldInsn(GETFIELD, name, fieldName, descriptor);
+                        instantiateSerialized(mv, inline, depthSlot);
+                        mv.visitFieldInsn(PUTFIELD, name, fieldName, descriptor);
+                        continue;
+                    }
+                    // A serializable class that cannot be made here: see
+                    // inlineClass. The two objects share the one instance.
+                    helper = def != null && (def.flags & TYPE_SERIALIZABLE) != 0 ? "" : null;
+                }
+            }
+            if (helper == null) {
+                continue;
+            }
+            mv.visitVarInsn(ALOAD, 0);
+            mv.visitVarInsn(ALOAD, source);
+            mv.visitFieldInsn(GETFIELD, name, fieldName, descriptor);
+            if (helper.length() > 0) {
+                String helperDescriptor = "(Ljava/lang/Object;)Ljava/lang/Object;";
+                index.requireMethod(runtime, helper, helperDescriptor, why);
+                mv.visitMethodInsn(INVOKESTATIC, runtime, helper, helperDescriptor, false);
+                mv.visitTypeInsn(CHECKCAST, descriptor.startsWith("[") ? descriptor
+                        : descriptor.substring(1, descriptor.length() - 1));
+            }
+            mv.visitFieldInsn(PUTFIELD, name, fieldName, descriptor);
+            if (structArray || (elements != null && t.kind == CilType.Kind.SZARRAY)) {
+                // The array is new but still holds the source's elements.
+                String c = names.classRef(t.element);
+                Label loop = new Label();
+                Label end = new Label();
+                mv.visitVarInsn(ALOAD, 0);
+                mv.visitFieldInsn(GETFIELD, name, fieldName, descriptor);
+                mv.visitVarInsn(ASTORE, 3);
+                mv.visitVarInsn(ALOAD, 3);
+                mv.visitJumpInsn(IFNULL, end);
+                mv.visitInsn(ICONST_0);
+                mv.visitVarInsn(ISTORE, 4);
+                mv.visitLabel(loop);
+                mv.visitVarInsn(ILOAD, 4);
+                mv.visitVarInsn(ALOAD, 3);
+                mv.visitInsn(ARRAYLENGTH);
+                mv.visitJumpInsn(IF_ICMPGE, end);
+                mv.visitVarInsn(ALOAD, 3);
+                mv.visitVarInsn(ILOAD, 4);
+                mv.visitVarInsn(ALOAD, 3);
+                mv.visitVarInsn(ILOAD, 4);
+                mv.visitInsn(AALOAD);
+                if (structArray) {
+                    mv.visitMethodInsn(INVOKEVIRTUAL, c, "$copy", "()L" + c + ";", false);
+                } else {
+                    instantiateSerialized(mv, elements, depthSlot);
+                }
+                mv.visitInsn(AASTORE);
+                mv.visitIincInsn(4, 1);
+                mv.visitJumpInsn(GOTO, loop);
+                mv.visitLabel(end);
+            } else if (elements != null) {
+                // And so does the new list.
+                String c = names.className(elements.fullName());
+                index.requireMethod(LIST, "get_Count", "()I", why);
+                index.requireMethod(LIST, "get_Item", "(I)Ljava/lang/Object;", why);
+                index.requireMethod(LIST, "set_Item", "(ILjava/lang/Object;)V", why);
+                Label loop = new Label();
+                Label end = new Label();
+                mv.visitVarInsn(ALOAD, 0);
+                mv.visitFieldInsn(GETFIELD, name, fieldName, descriptor);
+                mv.visitVarInsn(ASTORE, 3);
+                mv.visitVarInsn(ALOAD, 3);
+                mv.visitJumpInsn(IFNULL, end);
+                mv.visitInsn(ICONST_0);
+                mv.visitVarInsn(ISTORE, 4);
+                mv.visitLabel(loop);
+                mv.visitVarInsn(ILOAD, 4);
+                mv.visitVarInsn(ALOAD, 3);
+                mv.visitMethodInsn(INVOKEVIRTUAL, LIST, "get_Count", "()I", false);
+                mv.visitJumpInsn(IF_ICMPGE, end);
+                mv.visitVarInsn(ALOAD, 3);
+                mv.visitVarInsn(ILOAD, 4);
+                mv.visitVarInsn(ALOAD, 3);
+                mv.visitVarInsn(ILOAD, 4);
+                mv.visitMethodInsn(INVOKEVIRTUAL, LIST, "get_Item", "(I)Ljava/lang/Object;", false);
+                mv.visitTypeInsn(CHECKCAST, c);
+                instantiateSerialized(mv, elements, depthSlot);
+                mv.visitMethodInsn(INVOKEVIRTUAL, LIST, "set_Item", "(ILjava/lang/Object;)V", false);
+                mv.visitIincInsn(4, 1);
+                mv.visitJumpInsn(GOTO, loop);
+                mv.visitLabel(end);
+            }
+        }
     }
 
     // ----------------------------------------------------- copy elimination
@@ -999,6 +1196,22 @@ public final class Translator implements Opcodes {
                     if (names.norm(tp).isPrimitive()) {
                         Jvm.unbox(mv, names, tp);
                     } else {
+                        // A struct goes through as the object it is, with
+                        // no copy, and that is the whole of the protocol
+                        // rather than a gap in it. The target makes its own
+                        // copy on entry of any struct parameter it writes
+                        // or takes the address of (MethodTranslator's
+                        // emitEntry), and copies one it keeps, so it cannot
+                        // change the caller's. And nobody can change the
+                        // argument under the target: translated code copies
+                        // a struct it passes as a `T` unless it just made
+                        // it, a list or a dictionary replaces an element
+                        // and never writes into one, and an array of
+                        // structs, whose elements are written in place,
+                        // reaches erased code only through an ArrayView
+                        // that copies. A copy here would be a second one on
+                        // each of those paths, for every element of every
+                        // query, every frame.
                         mv.visitTypeInsn(CHECKCAST, names.classRef(tp));
                     }
                 }

@@ -55,10 +55,17 @@ public final class ValueTuple_3 implements Struct {
         return $copy();
     }
 
+    /// An item that is a struct is part of this value, so it is copied with
+    /// it: the two tuples would otherwise share one object, and
+    /// `copy.Item1.x = 1` would change both.
     public void $assign(ValueTuple_3 other) {
-        Item1 = other.Item1;
-        Item2 = other.Item2;
-        Item3 = other.Item3;
+        Item1 = own(other.Item1);
+        Item2 = own(other.Item2);
+        Item3 = own(other.Item3);
+    }
+
+    private static Object own(Object item) {
+        return item instanceof Struct ? ((Struct) item).$copyValue() : item;
     }
 
     @Override

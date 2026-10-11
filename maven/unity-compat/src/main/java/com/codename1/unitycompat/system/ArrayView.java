@@ -30,14 +30,42 @@ import com.codename1.unitycompat.system.collections.generic.IEnumerator_1;
 /// such a type -- `keys.Any(...)`, `new List<int>(numbers)` -- because a
 /// JVM array implements nothing. The view reads the array it was made
 /// from, so a change to an element shows through, as it would on .NET.
+///
+/// What it hands out is a value, though, never the array's own element: a
+/// struct is copied on the way out, as a primitive is boxed. An array of
+/// structs is the one collection here whose elements are written in place,
+/// and the code on the other side of the interface is erased -- it passes
+/// what it is given to a delegate, or keeps it in a list, without knowing
+/// what it is. Handing it the element itself let `cells.ToList()` share
+/// its values with the array, and let a lambda that writes the array
+/// change the argument it was still reading.
 @SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
 public final class ArrayView implements IEnumerable_1 {
     private final Object array;
     private final int length;
+    private final boolean structs;
 
-    private ArrayView(Object array, int length) {
+    private ArrayView(Object array, int length, boolean structs) {
         this.array = array;
         this.length = length;
+        this.structs = structs;
+    }
+
+    /// The view of a one-dimensional array the translator knows to hold
+    /// structs, or null for null. Only the translator can know: there is
+    /// no reflection to ask an array what its elements are, and an
+    /// `object[]` may hold boxed structs that are not to be copied.
+    public static ArrayView $ofStructs(Object array) {
+        if (array instanceof Object[]) {
+            return new ArrayView(array, ((Object[]) array).length, true);
+        }
+        return $of(array);
+    }
+
+    /// Whether every struct this view hands out is already a copy, so that
+    /// a collection filling itself from it need not make another.
+    public boolean $copiesStructs() {
+        return structs;
     }
 
     /// The view of an array, or null for null.
@@ -71,7 +99,7 @@ public final class ArrayView implements IEnumerable_1 {
         } else {
             throw new InvalidCastException();
         }
-        return new ArrayView(array, n);
+        return new ArrayView(array, n, false);
     }
 
     public int get_Count() {
@@ -89,6 +117,9 @@ public final class ArrayView implements IEnumerable_1 {
         }
         if (array instanceof MdArray) {
             return ((MdArray) array).boxed(i);
+        }
+        if (structs) {
+            return ((Struct) ((Object[]) array)[i]).$copyValue();
         }
         if (array instanceof Object[]) {
             return ((Object[]) array)[i];

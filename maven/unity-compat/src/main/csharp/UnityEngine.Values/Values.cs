@@ -706,9 +706,15 @@ namespace UnityEngine
             return to * t + from * (1f - t);
         }
 
+        // The tolerance is relative, a millionth of the larger value, so that
+        // it means the same at 1000 as at 1. That leaves nothing at zero,
+        // and the floor that covers it is a few of the smallest floats and
+        // no more: a fixed floor a game could see -- a hundred-thousandth,
+        // say -- would call 0 and 0.000001 the same, and a script that
+        // waits for a value to arrive at zero would stop short of it.
         public static bool Approximately(float a, float b)
         {
-            return Abs(b - a) < Max(1e-6f * Max(Abs(a), Abs(b)), 1e-5f);
+            return Abs(b - a) < Max(1e-6f * Max(Abs(a), Abs(b)), Epsilon * 8f);
         }
     }
 

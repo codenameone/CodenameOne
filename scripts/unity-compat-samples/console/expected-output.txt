@@ -148,6 +148,42 @@ trim 61 33 a axy xya 11130[]
 digits 11000111110000101100 370 4915445 False0 Format Argument
 copies 43 32 3/17 (100,200)(100,200)(700,200) 0 ArgumentNull
 dictionary copy a1d4e5f6 4TrueTrue16 ArgumentNull
+== struct equality
+nan TrueTrue zero TrueTrue prim FalseTrue
+double nan True differ FalseFalseFalseFalseFalseFalse
+keys 3TrueTrueFalseTrue nan again/zero again/fine
+== structs through delegates
+list where 2 select (200,400)(600,800) kept (100,200)(300,400)
+array any False kept (100,200)(300,400)
+array select saw 1 60 now (5000,200)(6000,0)
+taken (5000,200)(6000,0) listed (5000,200)(6000,0) cells (-100,200)(-200,-200)
+first (900,200)
+second (-100,200)
+first (900,500)
+second (500,500)
+after (-100,200)
+== erased struct values
+defaults (300,0)(0,0)(0,0)(0,0)0
+nested default (0,0)(0,200)(0,0)
+missing False(0,0)
+tuple (100,200)3 copy (5000,200)4
+triple (300,400)(0,0) copy (600,800)(800,0)
+tuple in tuple (100,200) copy (100,6000) source (100,200)
+tuple array (100,200)(100,7000) list (100,200)(9000,200) source (100,200)
+blank (0,0)0(0,0)
+blank written (0,700)2
+generic default 0(0,0)TrueFalse00(400,0)
+pair (100,100)(100,100)(500,100)
+== angles
+atan2 0 3141593 0 3141593 nan 0 3141593 0 
+atan2 -0 -3141593 -0 -3141593 nan -0 -3141593 -0 
+atan2 1570796 1570796 785398 2356194 nan 0 3141593 380506 
+atan2 -1570796 -1570796 -785398 -2356194 nan -0 -3141593 -380506 
+atan2 nan nan nan nan nan nan nan nan 
+atan2 1570796 1570796 1570796 1570796 nan 785398 2356194 1570796 
+atan2 -1570796 -1570796 -1570796 -1570796 nan -785398 -2356194 -1570796 
+atan2 1570796 1570796 1190290 1951303 nan 0 3141593 785398 
+float -3141 3141
 == static init
 before
 Order.cctor

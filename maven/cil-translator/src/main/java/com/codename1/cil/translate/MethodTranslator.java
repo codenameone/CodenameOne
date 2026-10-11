@@ -778,10 +778,17 @@ final class MethodTranslator implements Opcodes {
         if (Names.isTypeVariable(declared)) {
             CilType s = names.norm(substituted);
             if (s.isPrimitive()) {
-                unbox(s);
+                // Unboxed by the runtime, which reads a null as zero: see
+                // defaultIfNull, whose case this is for a primitive.
+                invoke(INVOKESTATIC, Names.INTEROP, "orDefault" + Jvm.unboxSuffix(s),
+                        "(Ljava/lang/Object;)" + names.descriptor(s), false);
+                maskIfUnsignedByte(s);
                 return Val.of(names.kind(s), s);
             }
             if (!Names.isTypeVariable(s) && s.kind != CilType.Kind.OBJECT) {
+                if (names.isStruct(s)) {
+                    defaultIfNull(s);
+                }
                 typeInsn(CHECKCAST, names.classRef(s));
             }
             return Val.ref(s, Val.HEAP);
@@ -797,6 +804,23 @@ final class MethodTranslator implements Opcodes {
             return Val.of(names.kind(d), d);
         }
         return Val.ref(substituted, structOwn);
+    }
+
+    /// `default(T)` where T is a struct, for the erased value on the stack.
+    /// Erased code cannot make one: it has no class to construct, there is
+    /// no reflection to construct it with, and so its `default(T)` -- what
+    /// `FirstOrDefault` answers for an empty sequence, a tuple's item that
+    /// was never assigned -- is a null. A struct is never null, so a null
+    /// in the place of one can only be that default, and here, where the
+    /// type is known, it becomes a value with every field zero. The same
+    /// reading `out TValue` gets in `genericByReference`.
+    private void defaultIfNull(CilType struct) {
+        Label present = new Label();
+        mv.visitInsn(DUP);
+        mv.visitJumpInsn(IFNONNULL, present);
+        mv.visitInsn(POP);
+        newStruct(struct);
+        mv.visitLabel(present);
     }
 
     /// A member declared to return `T[]` -- `List<T>.ToArray()`,
@@ -1815,8 +1839,34 @@ final class MethodTranslator implements Opcodes {
         String name = Names.sanitize(ref.name);
         String descriptor = names.descriptor(ref.type);
         host.index.requireField(c, name, descriptor, where());
+        CilType substituted = ref.type.substitute(typeArgsOf(ref.declaringType), null);
+        if (!isStatic && Names.isTypeVariable(ref.type) && names.isStruct(names.norm(substituted))) {
+            // An item of a tuple nobody assigned, say. Reading it has to
+            // answer a struct (see defaultIfNull), and it has to be one the
+            // field then holds: `t.Item1.x = 1` reads the item to write
+            // into it, and a default made for the occasion and dropped
+            // would take the write with it.
+            CilType s = names.norm(substituted);
+            Label present = new Label();
+            Label done = new Label();
+            mv.visitInsn(DUP);
+            mv.visitFieldInsn(GETFIELD, c, name, descriptor);
+            mv.visitInsn(DUP);
+            mv.visitJumpInsn(IFNONNULL, present);
+            mv.visitInsn(POP);
+            newStruct(s);
+            mv.visitInsn(DUP_X1);
+            mv.visitFieldInsn(PUTFIELD, c, name, descriptor);
+            mv.visitJumpInsn(GOTO, done);
+            mv.visitLabel(present);
+            mv.visitInsn(SWAP);
+            mv.visitInsn(POP);
+            mv.visitLabel(done);
+            typeInsn(CHECKCAST, names.classRef(s));
+            return Val.ref(s, Val.HEAP);
+        }
         mv.visitFieldInsn(isStatic ? GETSTATIC : GETFIELD, c, name, descriptor);
-        return fromErased(ref.type, ref.type.substitute(typeArgsOf(ref.declaringType), null), Val.HEAP);
+        return fromErased(ref.type, substituted, Val.HEAP);
     }
 
     private void putField(FieldRef ref, boolean isStatic, Val value) {
@@ -1969,10 +2019,22 @@ final class MethodTranslator implements Opcodes {
             case FIX_FIELD_BYREF:
                 fieldByReference(v);
                 break;
-            case FIX_ARRAY_VIEW:
-                invoke(INVOKESTATIC, Names.RUNTIME + "system/ArrayView", "$of",
+            case FIX_ARRAY_VIEW: {
+                // An array of structs is the one collection whose elements
+                // change in place (`a[0].x = 1` writes into the object the
+                // array holds), so its view hands out copies, as boxing an
+                // element does on .NET. The erased code behind the
+                // interface -- LINQ, a list's constructor -- passes what it
+                // is given straight on to a delegate or into a list, and
+                // would otherwise give away the element itself. The element
+                // type is known here and nowhere at run time, which is why
+                // it is said in the name of the factory: no other array
+                // pays for a test.
+                boolean structs = v.type.kind == CilType.Kind.SZARRAY && names.isStruct(v.type.element);
+                invoke(INVOKESTATIC, Names.RUNTIME + "system/ArrayView", structs ? "$ofStructs" : "$of",
                         "(Ljava/lang/Object;)L" + Names.RUNTIME + "system/ArrayView;", false);
                 break;
+            }
             case FIX_GENERIC_BYREF:
                 genericByReference(type);
                 break;

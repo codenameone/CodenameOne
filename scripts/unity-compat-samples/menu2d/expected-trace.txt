@@ -82,8 +82,27 @@ audio frame=100 seek beep 40
 voice 3 frames on: 65ms playing=True
 tick, frame 104 clicks=1 selected=True
 voice 9 frames on: 100ms playing=False
+audio frame=112 play beep
+listener paused at 33ms playing=True
+audio frame=114 listener paused
 frame 120 objects=17 Ledge=1 drawn=9 text="hard" text="Best: 1 Hard"
+still paused=True at 33ms playing=True
+audio frame=130 listener resumed
+resumed 2 frames: 67ms playing=True
 tick, frame 135 clicks=1 selected=True
+resumed 6 frames: 100ms playing=False
+audio frame=138 play beep
+audio frame=140 looping beep on
+looping: 17ms playing=True
+loop off: 17ms playing=True
+audio frame=151 looping beep off
+loop off 2 frames: 50ms playing=True
+loop off 6 frames: 100ms playing=False
+audio frame=158 listener paused
+audio frame=158 play beep
+played while paused: 0ms playing=True
+audio frame=164 listener resumed
+and 2 frames after: 33ms playing=True
 tick, frame 166 clicks=1 selected=True
 frame 180 objects=17 Ledge=1 drawn=9 text="hard" text="Best: 1 Hard"
 bounce 2 on Floor at y=-220 frame 186

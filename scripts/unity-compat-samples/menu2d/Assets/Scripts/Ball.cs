@@ -100,5 +100,78 @@ public class Ball : MonoBehaviour
             Debug.Log("voice " + since + " frames on: " + Mathf.RoundToInt(source.time * 1000f) + "ms playing="
                 + source.isPlaying);
         }
+        Listener(since);
+        Loop(since);
+    }
+
+    private string Voice()
+    {
+        return Mathf.RoundToInt(source.time * 1000f) + "ms playing=" + source.isPlaying;
+    }
+
+    // A pause menu: AudioListener.pause holds every voice where it is. The
+    // clip is six frames long and the pause sixteen, so a clock that went on
+    // would have ended it; and a Play issued during a pause has played
+    // nothing when the pause ends.
+    private void Listener(int since)
+    {
+        if (since == 12)
+        {
+            source.pitch = 1f;
+            source.Play();
+        }
+        else if (since == 14)
+        {
+            AudioListener.pause = true;
+            Debug.Log("listener paused at " + Voice());
+        }
+        else if (since == 30)
+        {
+            Debug.Log("still paused=" + AudioListener.pause + " at " + Voice());
+            AudioListener.pause = false;
+        }
+        else if (since == 32 || since == 36)
+        {
+            Debug.Log("resumed " + (since - 30) + " frames: " + Voice());
+        }
+        else if (since == 58)
+        {
+            AudioListener.pause = true;
+            source.Play();
+        }
+        else if (since == 64)
+        {
+            Debug.Log("played while paused: " + Voice());
+            AudioListener.pause = false;
+        }
+        else if (since == 66)
+        {
+            Debug.Log("and 2 frames after: " + Voice());
+        }
+    }
+
+    // `loop` changed on a voice that is playing: turned on, the clip goes
+    // round; turned off in its third round, it plays that round out, and is
+    // not over at once for being two clips past its end.
+    private void Loop(int since)
+    {
+        if (since == 38)
+        {
+            source.Play();
+        }
+        else if (since == 40)
+        {
+            source.loop = true;
+        }
+        else if (since == 51)
+        {
+            Debug.Log("looping: " + Voice());
+            source.loop = false;
+            Debug.Log("loop off: " + Voice());
+        }
+        else if (since == 53 || since == 57)
+        {
+            Debug.Log("loop off " + (since - 51) + " frames: " + Voice());
+        }
     }
 }

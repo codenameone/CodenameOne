@@ -135,7 +135,11 @@ jobs:
           info="$(tar -xzOf - pack-info.txt <"$PACK")"
           echo "$info"
           echo "$info" | grep -qx "cn1.version=$version"
-          tar -tzf - <"$PACK" | grep -q '^target/unity/state.txt$'
+          # The listing goes to a variable first: grep -q stops reading at its
+          # first match, and tar, still writing, then fails the pipeline with
+          # "write error" under pipefail -- on some runs and not on others.
+          entries="$(tar -tzf - <"$PACK")"
+          grep -qx 'target/unity/state.txt' <<<"$entries"
           if [ "${{ steps.pack.outputs.cache-hit }}" = "true" ]; then
             echo "Unity gallery prebuilt: cache HIT; nothing was built."
           else

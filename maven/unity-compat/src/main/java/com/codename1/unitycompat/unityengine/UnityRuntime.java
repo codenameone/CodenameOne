@@ -170,6 +170,10 @@ public final class UnityRuntime {
     private static int sceneToLoad = -1;
     private static int[] sortingLayers = new int[0];
     private static float accumulator;
+    /// How many physics steps have begun since the engine was reset. A
+    /// coroutine waiting for `WaitForFixedUpdate` is held to a step by this
+    /// number, as one waiting for the next frame is by `Time.frameCount`.
+    private static int fixedSteps;
     private static boolean running;
     private static boolean listsDirty;
     private static final DrawList drawList = new DrawList();
@@ -228,6 +232,7 @@ public final class UnityRuntime {
         sceneToLoad = -1;
         sortingLayers = new int[0];
         accumulator = 0f;
+        fixedSteps = 0;
         running = false;
         listsDirty = false;
         mouseObject = null;
@@ -1108,6 +1113,20 @@ public final class UnityRuntime {
         }
         copy.name = source.name + "(Clone)";
         Transform t = copy.transform;
+        if (position == null && (!hasParent || worldSpace)) {
+            // The copy is a root holding the LOCAL values of what it was
+            // copied from, which are that object's place in the world only
+            // when it has no parent. Unity puts a copy made with no parent,
+            // or with `instantiateInWorldSpace`, where the original is in
+            // the world: position and rotation. The scale is left as the
+            // local scale that was copied -- a root's scale is its own, and
+            // nothing documents a copy taking on the scale of a parent it
+            // does not have. `SetParent` below then keeps what the root
+            // shows, as it does for any object given a parent.
+            Transform from = source.transform;
+            t.setWorldRotation(from.$worldTurn());
+            t.setWorldPosition(from.$worldX(), from.$worldY(), from.$worldZ());
+        }
         if (hasParent && parent != null) {
             t.SetParent(parent, position == null && worldSpace);
         }
@@ -1315,6 +1334,7 @@ public final class UnityRuntime {
         float fixed = Time.fixedDeltaTime;
         while (accumulator >= fixed) {
             accumulator -= fixed;
+            fixedSteps++;
             Time.fixedTime += fixed;
             // A step is `fixed` seconds of game time, which the scale
             // stretched out of this much real time. No step runs at a scale
@@ -1703,6 +1723,14 @@ public final class UnityRuntime {
         // alone: the end of the frame a coroutine was started in is the one
         // `WaitForEndOfFrame` means.
         c.notBefore = Time.frameCount + 1;
+        // The same for the fixed phase. `WaitForFixedUpdate` is the end of
+        // the NEXT physics step: yielded from `FixedUpdate`, or from a
+        // collision message, it would otherwise be answered by the pass of
+        // the very step it was yielded in, and whatever follows the yield
+        // would run twice in one step. A step that has not begun yet has a
+        // greater number whether or not one is running now, so there is one
+        // rule for a yield from `Update` too.
+        c.notBeforeFixed = fixedSteps + 1;
         if (yielded instanceof WaitForSeconds) {
             c.resumeAt = Time.time + ((WaitForSeconds) yielded).seconds;
         } else if (yielded instanceof Coroutine) {
@@ -1735,7 +1763,8 @@ public final class UnityRuntime {
                 continue;
             }
             if (c.phase != phase || (c.waitingFor != null && !c.waitingFor.done) || Time.time < c.resumeAt
-                    || (phase == 0 && Time.frameCount < c.notBefore)) {
+                    || (phase == 0 && Time.frameCount < c.notBefore)
+                    || (phase == 1 && fixedSteps < c.notBeforeFixed)) {
                 continue;
             }
             advance(c);

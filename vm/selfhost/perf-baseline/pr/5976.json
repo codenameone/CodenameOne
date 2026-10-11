@@ -83,6 +83,26 @@
     }
    }
   },
+  "windows-arm64@armv8-64-bit-family-8-model-d49-microsoft-corporation": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.975,
+      "time": 1.107,
+      "tolerance": {
+       "memory": 0.35
+      }
+     },
+     "memory": 1.256,
+     "reason": "Rebaseline hello RAM on Windows arm64 (Family 8 Model D49) from three complete five-round runs of this pull request: 38041699392 at 6f60a5cc92 (run median 1.147x), 38052037363 at bbeda29aaa (1.256x) and 38096615804 at 1a18fdf9e9 (1.363x, which failed at +39.8% against the 0.975x row's 35% tolerance). Two master controls on the same model passed: 38112530964 at 9911cc8e5d (0.89x) and 38037327137 at 8cc51a3a1 (0.91x). The workload is not the same on the two sides: hello is the screenshot suite, and this pull request adds eight Unity gallery scenes to it, with the Unity runtime and the translated gallery in the binary. ParparVM's peak is 1284-1481 MB in this pull request's runs against 1107-1304 MB on master, about 8% at the median, and that part is attributed to the added scenes; it was not broken down further. The rest of the ratio's movement is the JDK 25 arm, whose peak is either about 1000 MB or 1400-2000 MB for the same suite: the failing run drew the low value in five rounds of five, the previous run in three, master in none and two. The last commit changed no code this benchmark's VM compiles differently, only Unity runtime Java, so the step from 1.256x to 1.363x is read as that draw and not as a change. The baseline moves to the pooled run median with the tolerance the tool derives. Time is unchanged.",
+     "runs": 3,
+     "time": 1.107,
+     "tolerance": {
+      "memory": 0.35
+     }
+    }
+   }
+  },
   "windows-x64@amd64-family-25-model-17-authenticamd": {
    "translator": {
     "all": {
@@ -99,6 +119,28 @@
      "time": 0.697,
      "tolerance": {
       "time": 0.25
+     }
+    }
+   }
+  },
+  "windows-x64@amd64-family-26-model-2-authenticamd": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.749,
+      "time": 1.41,
+      "tolerance": {
+       "memory": 0.3,
+       "time": 0.5
+      }
+     },
+     "memory": 0.857,
+     "reason": "Rebaseline hello RAM on Windows x64 (AMD64 Family 26 Model 2) from two complete five-round runs of this pull request on that model: 38041699392 at 6f60a5cc92 (run median 0.734x, passed) and 38096615804 at 1a18fdf9e9 (0.979x, which failed at +30.7% against the 0.749x row's 30% tolerance; that row came from two runs). No run of master has landed on this model, so there is no same-model control; master's two recent runs were on Family 25 Model 1 and measured 0.95x and 0.76x, as far apart as these two. hello is the screenshot suite, to which this pull request adds eight Unity gallery scenes, so some of ParparVM's peak is this pull request's own added workload; both of these runs include it, and one passed. Per round the failing run ranges 0.71-1.23x: ParparVM's peak stays at 1155-1380 MB while the JDK 25 arm swings from 1076 to 1785 MB for the same suite, and the rounds above 0.98x are the ones where the JDK arm drew its low value. The commit between the two runs changed no code this benchmark's VM compiles differently. No regression in the VM is claimed and none is ruled out by two runs. The baseline moves to the pooled run median with the tolerance the tool derives. Time is unchanged.",
+     "runs": 2,
+     "time": 1.41,
+     "tolerance": {
+      "memory": 0.3,
+      "time": 0.5
      }
     }
    }

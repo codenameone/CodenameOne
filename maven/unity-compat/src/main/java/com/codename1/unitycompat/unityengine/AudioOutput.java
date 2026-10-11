@@ -47,4 +47,17 @@ public interface AudioOutput {
     /// in seconds from the start: what a script's `source.time = t` asks
     /// for. A voice that has ended is not there to move.
     void seek(int voice, float seconds);
+
+    /// Makes a voice that is playing or paused repeat its clip from now
+    /// on, or play the round it is in to the end and stop. The voice goes
+    /// on from where it is: this is `source.loop = value` on a source
+    /// that is heard, and a restart would be heard too.
+    void loop(int voice, boolean loop);
+
+    /// `AudioListener.pause`. While held nothing sounds: every voice
+    /// stops where it is, one that is started or unpaused meanwhile
+    /// waits, and the release lets each go on from its place -- except
+    /// those paused by themselves with [#pause(int, boolean)], which stay
+    /// paused until that is undone.
+    void hold(boolean held);
 }

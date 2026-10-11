@@ -63,7 +63,11 @@ public final class Enumerable {
         return ((Boolean) o).booleanValue();
     }
 
-    /// What `default(T)` is for the class a type argument travelled as.
+    /// What `default(T)` is for the class a type argument travelled as. A
+    /// struct's is null on purpose: nothing here can construct a class it
+    /// was only handed, and the translated caller, which knows the type,
+    /// reads a null where a struct was due as that struct with every field
+    /// zero.
     private static Object zero(Class type) {
         if (type == Integer.class) {
             return Integer.valueOf(0);

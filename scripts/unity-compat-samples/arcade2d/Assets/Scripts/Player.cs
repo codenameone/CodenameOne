@@ -21,6 +21,7 @@
  * need additional information or have any questions.
  */
 using System.Collections.Generic;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -43,6 +44,7 @@ public class Player : MonoBehaviour
 
     private float angle;
     private int fired;
+    private int steps;
 
     private void OnEnable()
     {
@@ -55,7 +57,38 @@ public class Player : MonoBehaviour
         Debug.Log("player start bonus=" + bonus.Length + ":" + bonus[1] + " words=" + words.Count + ":" + words[1]
             + " tints=" + tints.Length + " shot=" + shot.name + " label=" + label.text + " muzzle at "
             + Cm(muzzle.position.x) + "," + Cm(muzzle.position.y));
+        Probe.Check();
+        // Approximately is relative: beside zero it allows a few of the
+        // smallest floats and no more. And an angle keeps the side of the
+        // axis a negative zero says it is on.
+        Debug.Log("mathf approximately " + Mathf.Approximately(0f, 0.000001f) + Mathf.Approximately(0f, 0f)
+            + Mathf.Approximately(0f, Mathf.Epsilon) + Mathf.Approximately(1f, 1.0000001f)
+            + Mathf.Approximately(1000f, 1000.0001f) + Mathf.Approximately(1f, 1.00001f)
+            + " atan2 " + Cm(Mathf.Atan2(-0f, -1f)) + "," + Cm(Mathf.Atan2(0f, -1f)) + "," + Cm(Mathf.Atan2(0f, -0f)));
+        Probe.Poses();
+        StartCoroutine(AfterStep("start"));
         Invoke("Ready", 0.25f);
+    }
+
+    // WaitForFixedUpdate is the end of the NEXT physics step. Asked for from
+    // FixedUpdate that is the step after the one running, and never the same
+    // one twice; asked for from Start it is the first step there is.
+    private void FixedUpdate()
+    {
+        steps++;
+        if (steps == 1)
+        {
+            StartCoroutine(AfterStep("fixed"));
+        }
+    }
+
+    private IEnumerator AfterStep(string from)
+    {
+        int asked = steps;
+        yield return new WaitForFixedUpdate();
+        int first = steps;
+        yield return new WaitForFixedUpdate();
+        Debug.Log("after step from " + from + " asked in " + asked + " resumed in " + first + " then " + steps);
     }
 
     private void Ready()

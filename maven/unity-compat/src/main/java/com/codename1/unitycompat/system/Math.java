@@ -144,7 +144,8 @@ public final class Math {
     private static final double SQRT3 = 1.7320508075688772;
 
     public static double Atan(double v) {
-        if (v != v) {
+        if (v != v || v == 0) {
+            // Zero keeps its sign, which the sum below would lose.
             return v;
         }
         if (v < 0) {
@@ -171,13 +172,30 @@ public final class Math {
         if (x != x || y != y) {
             return 0.0 / 0.0;
         }
-        if (x > 0) {
-            return Atan(y / x);
+        // A zero has a sign, and it says which side of the axis the point is
+        // on: (-0, -1) is just below the negative x axis, at -pi and not pi,
+        // and (0, -0) is at pi. No comparison can tell the two zeros apart
+        // and the device class libraries have no way to read the bits of a
+        // double, but dividing by one does: 1 / -0 is negative infinity.
+        boolean below = y < 0 || (y == 0 && 1 / y < 0);
+        boolean left = x < 0 || (x == 0 && 1 / x < 0);
+        double angle;
+        if (y == 0) {
+            angle = left ? PI : 0;
+        } else if (x == 0) {
+            angle = PI / 2;
+        } else {
+            double ay = below ? -y : y;
+            double ax = left ? -x : x;
+            if (ay == 1.0 / 0.0 && ax == 1.0 / 0.0) {
+                // Infinity over infinity is not a number; the diagonal is
+                // what the function is defined to answer.
+                angle = left ? 3 * PI / 4 : PI / 4;
+            } else {
+                angle = left ? PI - Atan(ay / ax) : Atan(ay / ax);
+            }
         }
-        if (x < 0) {
-            return y >= 0 ? Atan(y / x) + PI : Atan(y / x) - PI;
-        }
-        return y > 0 ? PI / 2 : y < 0 ? -PI / 2 : 0;
+        return below ? -angle : angle;
     }
 
     public static double Asin(double v) {

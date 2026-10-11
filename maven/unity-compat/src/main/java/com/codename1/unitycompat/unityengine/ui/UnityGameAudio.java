@@ -52,6 +52,10 @@ public final class UnityGameAudio implements AudioOutput {
     /// A voice to its `Media`, for those still playing.
     private final HashMap playing = new HashMap();
     private final HashMap looping = new HashMap();
+    /// The voices paused by themselves, which a release leaves paused.
+    private final HashMap paused = new HashMap();
+    /// `AudioListener.pause`: nothing sounds until it is released.
+    private boolean held;
 
     private static String mime(String resource) {
         // By hand and case insensitively: a file name is not prose, and
@@ -92,7 +96,11 @@ public final class UnityGameAudio implements AudioOutput {
                 looping.put(key, Boolean.TRUE);
             }
             media.setVolume(percent(volume));
-            media.play();
+            // Started while everything is held, it is ready and waits for
+            // the release.
+            if (!held) {
+                media.play();
+            }
         } catch (IOException e) {
             Log.e(e);
         }
@@ -100,6 +108,7 @@ public final class UnityGameAudio implements AudioOutput {
 
     /// A clip that ran to its end: release it, or start it again.
     private void ended(Integer key, AudioClip clip, float volume) {
+        paused.remove(key);
         Object media = playing.remove(key);
         if (media instanceof Media) {
             ((Media) media).cleanup();
@@ -118,6 +127,7 @@ public final class UnityGameAudio implements AudioOutput {
     public void stop(int voice) {
         Integer key = Integer.valueOf(voice);
         looping.remove(key);
+        paused.remove(key);
         Object media = playing.remove(key);
         if (media instanceof Media) {
             ((Media) media).cleanup();
@@ -126,9 +136,58 @@ public final class UnityGameAudio implements AudioOutput {
 
     @Override
     public void pause(int voice, boolean paused) {
-        Object media = playing.get(Integer.valueOf(voice));
+        Integer key = Integer.valueOf(voice);
+        Object media = playing.get(key);
         if (media instanceof Media) {
             if (paused) {
+                this.paused.put(key, Boolean.TRUE);
+            } else {
+                this.paused.remove(key);
+            }
+            // Held, the voice is silent already and stays so; what was
+            // asked is remembered for the release.
+            if (held) {
+                return;
+            }
+            if (paused) {
+                ((Media) media).pause();
+            } else {
+                ((Media) media).play();
+            }
+        }
+    }
+
+    /// Looping is done here, by starting the clip again when it ends, so
+    /// changing it on a live voice is changing what its end will do: the
+    /// sound itself is not touched. A voice that has already ended on the
+    /// device is not brought back.
+    @Override
+    public void loop(int voice, boolean loop) {
+        Integer key = Integer.valueOf(voice);
+        if (!playing.containsKey(key)) {
+            return;
+        }
+        if (loop) {
+            looping.put(key, Boolean.TRUE);
+        } else {
+            looping.remove(key);
+        }
+    }
+
+    @Override
+    public void hold(boolean held) {
+        if (this.held == held) {
+            return;
+        }
+        this.held = held;
+        ArrayList voices = new ArrayList(playing.keySet());
+        for (int i = 0; i < voices.size(); i++) { // NOPMD ForLoopCanBeForeach
+            Object key = voices.get(i);
+            Object media = playing.get(key);
+            if (!(media instanceof Media) || paused.containsKey(key)) {
+                continue;
+            }
+            if (held) {
                 ((Media) media).pause();
             } else {
                 ((Media) media).play();

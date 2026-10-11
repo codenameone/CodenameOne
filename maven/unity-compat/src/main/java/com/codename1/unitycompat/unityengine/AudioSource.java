@@ -36,7 +36,9 @@ import java.util.ArrayList;
 ///
 /// Every start is also recorded in a log a test or a trace can read, in
 /// the order it happened, and so is every move of the voice within its
-/// clip, as `seek clip milliseconds`.
+/// clip, as `seek clip milliseconds`, every change of `loop` that reaches a
+/// playing voice, as `looping clip on` or `off`, and the listener's pause,
+/// as `listener paused` and `listener resumed`.
 @SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
 public final class AudioSource extends Behaviour {
     private static AudioOutput output;
@@ -44,6 +46,12 @@ public final class AudioSource extends Behaviour {
     private static final ArrayList log = new ArrayList();
     private static boolean logging;
     static float listenerVolume = 1f;
+    /// `AudioListener.pause`, and the two numbers that make it stand still
+    /// for every source at once: when it began, and how long the pauses
+    /// before it lasted in all. See [#now()].
+    private static boolean listenerPaused;
+    private static float listenerPausedAt;
+    private static float listenerPausedFor;
 
     AudioClip clip;
     float volume = 1f;
@@ -65,6 +73,50 @@ public final class AudioSource extends Behaviour {
     /// Installs what makes the sound, or null for silence.
     public static void $output(AudioOutput o) {
         output = o;
+        // An output that arrives in the middle of a pause -- a view shown
+        // again behind a pause menu -- must not sound what starts on it.
+        if (o != null && listenerPaused) {
+            o.hold(true);
+        }
+    }
+
+    /// The clock every source counts on: the game's unscaled one, less the
+    /// time `AudioListener.pause` was set. While the listener is paused it
+    /// does not move, so no clip runs out, `time` stands still and a `Play`
+    /// issued meanwhile has played nothing when the pause ends; afterwards
+    /// every voice is where it was. It is the account a source's own
+    /// `Pause` keeps in `pausedAt`, kept once for all of them, and since
+    /// `pausedAt` is read off this clock the two pauses add up by
+    /// themselves.
+    private static float now() {
+        return (listenerPaused ? listenerPausedAt : Time.unscaledTime) - listenerPausedFor;
+    }
+
+    static boolean listenerPaused() {
+        return listenerPaused;
+    }
+
+    /// `AudioListener.pause`. Unity pauses everything that is heard, the
+    /// one-shots too, which no source refers to once they have started; so
+    /// the sound is held by the output as a whole, which knows its voices,
+    /// and not voice by voice from here. The sources themselves need no
+    /// visit: they read [#now()].
+    static void listenerPause(boolean value) {
+        if (value == listenerPaused) {
+            return;
+        }
+        if (value) {
+            listenerPausedAt = Time.unscaledTime;
+        } else {
+            listenerPausedFor += Time.unscaledTime - listenerPausedAt;
+        }
+        listenerPaused = value;
+        if (logging) {
+            log.add(value ? "listener paused" : "listener resumed");
+        }
+        if (output != null) {
+            output.hold(value);
+        }
     }
 
     /// Starts or stops the recording of plays, and forgets those recorded.
@@ -87,6 +139,14 @@ public final class AudioSource extends Behaviour {
     static void resetAll() {
         log.clear();
         listenerVolume = 1f;
+        // The clock starts again with the game's, and an output the
+        // project before left held is released for the next one.
+        if (listenerPaused && output != null) {
+            output.hold(false);
+        }
+        listenerPaused = false;
+        listenerPausedAt = 0f;
+        listenerPausedFor = 0f;
     }
 
     /// What a scene file sets.
@@ -176,7 +236,7 @@ public final class AudioSource extends Behaviour {
     public void set_pitch(float value) {
         if (playing && clip != null) {
             startedFrom = position();
-            startedAt = paused ? pausedAt : Time.unscaledTime;
+            startedAt = paused ? pausedAt : now();
         }
         pitch = value;
     }
@@ -185,7 +245,36 @@ public final class AudioSource extends Behaviour {
         return loop;
     }
 
+    /// On a playing voice the change has to reach two accounts, or they
+    /// part: turned on, the device let the clip end while `isPlaying` said
+    /// true for ever; turned off, the device went on repeating a clip the
+    /// script had been told was over.
+    ///
+    /// The account kept here is closed under the old rule first and
+    /// reopened at the place in the clip the voice has reached. Without
+    /// that, a clip on its third round that stops looping would be three
+    /// lengths past its end and over at once, where Unity plays the round
+    /// it is in to its end. The output is told to change the voice it
+    /// has, not to start another, so nothing is heard to restart.
     public void set_loop(boolean value) {
+        if (value == loop) {
+            return;
+        }
+        if (playing && clip != null) {
+            expire();
+            if (playing) {
+                startedFrom = get_time();
+                startedAt = paused ? pausedAt : now();
+                loop = value;
+                if (logging) {
+                    log.add("looping " + clip.name + (value ? " on" : " off"));
+                }
+                if (output != null) {
+                    output.loop(voice, value);
+                }
+                return;
+            }
+        }
         loop = value;
     }
 
@@ -215,24 +304,30 @@ public final class AudioSource extends Behaviour {
         if (!playing || paused) {
             return false;
         }
-        if (loop) {
-            return true;
+        expire();
+        return playing;
+    }
+
+    /// Ends a voice that does not loop and has reached the end of its
+    /// clip, as of now or of the moment it was paused.
+    private void expire() {
+        if (!playing || loop) {
+            return;
         }
         // What is left of the clip from where the voice last started, was
         // moved to or changed speed, at the speed it has now.
         float speed = pitch < 0f ? -pitch : pitch;
-        if (clip == null || !(Time.unscaledTime - startedAt < (clip.get_length() - startedFrom) // NOPMD LogicInversion
-                / (speed > 0f ? speed : 1f))) {
+        if (clip == null || !((paused ? pausedAt : now()) - startedAt // NOPMD LogicInversion
+                < (clip.get_length() - startedFrom) / (speed > 0f ? speed : 1f))) {
             playing = false;
         }
-        return playing;
     }
 
     /// Where the voice is in its clip, in seconds, before it is wrapped
     /// for a loop or held to the clip: the place it was last known to be,
     /// and the time since then at the speed the pitch sets.
     private float position() {
-        return startedFrom + ((paused ? pausedAt : Time.unscaledTime) - startedAt) * pitch;
+        return startedFrom + ((paused ? pausedAt : now()) - startedAt) * pitch;
     }
 
     public float get_time() {
@@ -263,7 +358,7 @@ public final class AudioSource extends Behaviour {
         float length = clip.get_length();
         float at = value < 0f || value != value ? 0f : value > length ? length : value; // NOPMD ComparisonWithNaN
         startedFrom = at;
-        startedAt = paused ? pausedAt : Time.unscaledTime;
+        startedAt = paused ? pausedAt : now();
         if (logging) {
             log.add("seek " + clip.name + " " + (int) (at * 1000f + 0.5f));
         }
@@ -287,7 +382,7 @@ public final class AudioSource extends Behaviour {
         playing = true;
         paused = false;
         startedFrom = 0f;
-        startedAt = Time.unscaledTime;
+        startedAt = now();
         record(loop ? "loop" : "play", clip);
         if (output != null) {
             output.play(voice, clip, level(1f), pitch, loop);
@@ -311,7 +406,7 @@ public final class AudioSource extends Behaviour {
     public void Pause() {
         if (playing && !paused) {
             paused = true;
-            pausedAt = Time.unscaledTime;
+            pausedAt = now();
             if (output != null) {
                 output.pause(voice, true);
             }
@@ -321,7 +416,7 @@ public final class AudioSource extends Behaviour {
     public void UnPause() {
         if (playing && paused) {
             paused = false;
-            startedAt += Time.unscaledTime - pausedAt;
+            startedAt += now() - pausedAt;
             if (output != null) {
                 output.pause(voice, false);
             }

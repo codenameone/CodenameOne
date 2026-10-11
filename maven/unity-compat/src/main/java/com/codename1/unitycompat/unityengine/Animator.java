@@ -215,34 +215,55 @@ public final class Animator extends Behaviour {
         time = target < 0 ? 0f : normalized * controller.length(target);
     }
 
+    /// What every `Play` comes to. Unity documents one method,
+    /// `Play(state, layer = -1, normalizedTime = float.NegativeInfinity)`,
+    /// and says of the time left out: a state that is already playing goes
+    /// on from where it is, and any other starts at its beginning. So a
+    /// script that calls `Play("Run")` in every `Update` -- a common way to
+    /// drive an animator without parameters -- animates; entered at zero on
+    /// each call it stood on its first frame for good.
+    ///
+    /// `keep` is that left-out time. It is a flag rather than the infinity
+    /// itself so that the short forms do not hand a float constant through
+    /// a call for the long one to compare with, which ParparVM does not do
+    /// reliably. A state a transition is still bringing in counts as
+    /// playing too: it continues, and so does the transition.
+    private void play(int target, boolean keep, float normalizedTime) {
+        if (target < 0 || (keep && (target == state || target == next))) {
+            return;
+        }
+        enter(target, normalizedTime > 0f ? normalizedTime : 0f);
+    }
+
+    /// Whether a script passed the time Unity's own default is, by name.
+    /// Negative infinity is the one negative number that doubling leaves as
+    /// it was, which asks it without comparing against a float constant.
+    private static boolean left(float normalizedTime) {
+        return normalizedTime < 0f && normalizedTime * 2f == normalizedTime;
+    }
+
     public void Play(String stateName) {
-        Play(stateName, 0, 0f);
+        play(controller == null ? -1 : controller.state(stateName), true, 0f);
     }
 
     public void Play(String stateName, int layer) {
-        Play(stateName, layer, 0f);
+        play(controller == null ? -1 : controller.state(stateName), true, 0f);
     }
 
     public void Play(String stateName, int layer, float normalizedTime) {
-        int target = controller == null ? -1 : controller.state(stateName);
-        if (target >= 0) {
-            enter(target, normalizedTime > 0f ? normalizedTime : 0f);
-        }
+        play(controller == null ? -1 : controller.state(stateName), left(normalizedTime), normalizedTime);
     }
 
     public void Play(int stateNameHash) {
-        Play(stateNameHash, 0, 0f);
+        play(controller == null ? -1 : controller.state(stateNameHash), true, 0f);
     }
 
     public void Play(int stateNameHash, int layer) {
-        Play(stateNameHash, layer, 0f);
+        play(controller == null ? -1 : controller.state(stateNameHash), true, 0f);
     }
 
     public void Play(int stateNameHash, int layer, float normalizedTime) {
-        int target = controller == null ? -1 : controller.state(stateNameHash);
-        if (target >= 0) {
-            enter(target, normalizedTime > 0f ? normalizedTime : 0f);
-        }
+        play(controller == null ? -1 : controller.state(stateNameHash), left(normalizedTime), normalizedTime);
     }
 
     public void CrossFade(String stateName, float normalizedTransitionDuration) {

@@ -106,6 +106,31 @@ public class Hero : MonoBehaviour
             state = now;
             hurtFrames = 0;
         }
+        if (state == "Run")
+        {
+            // Play of the state that is playing, asked in every frame and in
+            // each of its forms, leaves it running: the steps the Run clip
+            // counts and the sprites it shows are what they were without
+            // these calls. Entered anew each time it would stand on its
+            // first frame.
+            if (Time.frameCount % 3 == 0)
+            {
+                animator.Play("Run");
+            }
+            else if (Time.frameCount % 3 == 1)
+            {
+                animator.Play(Animator.StringToHash("Run"), 0);
+            }
+            else
+            {
+                animator.Play("Run", 0, float.NegativeInfinity);
+            }
+            if (Time.frameCount == 59 || Time.frameCount == 62)
+            {
+                Debug.Log("frame " + Time.frameCount + " run at " + Cm(info.normalizedTime) + " sprite="
+                    + shown.sprite.name);
+            }
+        }
         if (state == "Hurt")
         {
             // The clip's curves: the tint dips to red and the hat, a child, is squashed; then both come back.
