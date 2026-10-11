@@ -242,7 +242,7 @@ public class BackendPackageMojo extends AbstractMojo {
     static String compilerOption(MavenProject project, java.util.Properties userProperties,
             String name, boolean tests) {
         String goal = tests ? "testCompile" : "compile";
-        Plugin compiler = project.getPlugin("org.apache.maven.plugins:maven-compiler-plugin");
+        Plugin compiler = compilerPlugin(project);
         Xpp3Dom configuration = compilerExecutionConfiguration(compiler, goal);
         if (compiler != null && compiler.getConfiguration() instanceof Xpp3Dom) {
             Xpp3Dom defaults = new Xpp3Dom((Xpp3Dom) compiler.getConfiguration());
@@ -260,6 +260,19 @@ public class BackendPackageMojo extends AbstractMojo {
             }
         }
         return property(project, userProperties, "maven.compiler." + name);
+    }
+
+    private static Plugin compilerPlugin(MavenProject project) {
+        Plugin compiler = project.getPlugin("org.apache.maven.plugins:maven-compiler-plugin");
+        if (compiler == null && project.getPluginManagement() != null) {
+            // Lifecycle-bound plugins can be configured solely in pluginManagement.
+            for (Plugin managed : project.getPluginManagement().getPlugins()) {
+                if ("org.apache.maven.plugins:maven-compiler-plugin".equals(managed.getKey())) {
+                    return managed;
+                }
+            }
+        }
+        return compiler;
     }
 
     private static Xpp3Dom compilerExecutionConfiguration(Plugin compiler, String goal) {
@@ -324,7 +337,7 @@ public class BackendPackageMojo extends AbstractMojo {
     /// [#sourceEncoding] for any module; the backend-test goal compiles the same
     /// sources and has to read them the same way.
     static String sourceEncodingOf(MavenProject project) {
-        Plugin compiler = project.getPlugin("org.apache.maven.plugins:maven-compiler-plugin");
+        Plugin compiler = compilerPlugin(project);
         if (compiler != null && compiler.getConfiguration() instanceof Xpp3Dom) {
             Xpp3Dom encoding = ((Xpp3Dom) compiler.getConfiguration()).getChild("encoding");
             if (encoding != null && encoding.getValue() != null) {

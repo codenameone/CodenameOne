@@ -131,6 +131,32 @@ class BackendPackageJavaLevelTest {
         }
     }
 
+    @Test void readsLifecycleCompilerSettingsFromPluginManagement() {
+        MavenProject project = project();
+        Plugin compiler = new Plugin();
+        compiler.setArtifactId("maven-compiler-plugin");
+        Xpp3Dom config = configuration("release", "${backend.java}");
+        config.addChild(configuration("encoding", "UTF-16").getChild("encoding"));
+        compiler.setConfiguration(config);
+        compiler.addExecution(execution("default-testCompile", null, "testCompile", "testRelease", "25"));
+        org.apache.maven.model.PluginManagement management = new org.apache.maven.model.PluginManagement();
+        management.addPlugin(compiler);
+        project.getBuild().setPluginManagement(management);
+        project.getProperties().setProperty("backend.java", "17");
+        assertEquals("17", option(project, new Properties(), "release", false));
+        assertEquals("25", option(project, new Properties(), "testRelease", true));
+        assertEquals("UTF-16", BackendPackageMojo.sourceEncodingOf(project));
+        Properties cli = new Properties();
+        cli.setProperty("backend.java", "25");
+        assertEquals("25", option(project, cli, "release", false));
+        Plugin active = new Plugin();
+        active.setArtifactId("maven-compiler-plugin");
+        active.setConfiguration(configuration("release", "8"));
+        project.getBuild().addPlugin(active);
+        project.getBuild().flushPluginMap();
+        assertEquals("8", option(project, cli, "release", false));
+    }
+
     private static PluginExecution execution(String id, String phase, String goal, String name, String value) {
         PluginExecution execution = new PluginExecution();
         execution.setId(id); execution.setPhase(phase); execution.addGoal(goal);

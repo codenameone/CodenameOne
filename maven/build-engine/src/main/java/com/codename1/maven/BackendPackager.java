@@ -784,7 +784,8 @@ public class BackendPackager {
         } catch (IOException ex) {
             throw new BuildExecutionException("Could not materialize dependency record methods", ex);
         }
-        new BytecodeCompliance(host).checkBackendBootstraps(staged);
+        // Dependency bootstrap validation belongs after the translator's
+        // reachability pass: unused library methods need not be translatable.
         return inputs;
     }
 

@@ -49,6 +49,33 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class BytecodeComplianceTest {
     @Test
+    void backendComplianceUsesTheFirstClasspathDefinition(@TempDir Path dir) throws Exception {
+        Path output = Files.createDirectories(dir.resolve("output"));
+        Path api = Files.createDirectories(dir.resolve("api"));
+        Path first = Files.createDirectories(dir.resolve("first"));
+        Path second = Files.createDirectories(dir.resolve("second"));
+        writeJavaLangObject(api);
+        writeApiClass(first, "dep/Helper", "first", "()V");
+        writeApiClass(second, "dep/Helper", "second", "()V");
+        Path firstJar = dir.resolve("first.jar"), secondJar = dir.resolve("second.jar");
+        writeJar(firstJar, new JarEntryBytes("dep/Helper.class", Files.readAllBytes(first.resolve("dep/Helper.class"))));
+        writeJar(secondJar, new JarEntryBytes("dep/Helper.class", Files.readAllBytes(second.resolve("dep/Helper.class"))));
+        BytecodeCompliance compliance = new BytecodeCompliance(TestProjectHost.empty());
+        for (Path a : java.util.Arrays.asList(first, firstJar)) {
+            for (Path b : java.util.Arrays.asList(second, secondJar)) {
+                writeClass(output, "app/Caller", "dep/Helper", "first", "()V");
+                compliance.checkBackend(output.toFile(), api.toFile(), java.util.Arrays.asList(a.toFile(), b.toFile()));
+                writeClass(output, "app/Caller", "dep/Helper", "second", "()V");
+                compliance.checkBackend(output.toFile(), api.toFile(), java.util.Arrays.asList(b.toFile(), a.toFile()));
+            }
+        }
+        // Application output precedes dependencies too.
+        writeApiClass(output, "dep/Helper", "application", "()V");
+        writeClass(output, "app/Caller", "dep/Helper", "application", "()V");
+        compliance.checkBackend(output.toFile(), api.toFile(), java.util.Arrays.asList(firstJar.toFile(), second.toFile()));
+    }
+
+    @Test
     void detectsForbiddenMethodReferenceWithSourceDetails(@TempDir Path tempDir) throws Exception {
         Path outputDir = tempDir.resolve("classes");
         Files.createDirectories(outputDir);

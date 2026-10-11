@@ -361,8 +361,9 @@ public class BytecodeCompliance {
         }
     }
 
-    /// Both application classes and staged dependencies must use bootstraps the
-    /// native translator implements. Record ObjectMethods must be lowered first.
+    /// Application classes must use bootstraps the native translator implements.
+    /// Dependencies are checked by the translator after dead-code elimination.
+    /// Record ObjectMethods must be lowered first.
     public void checkBackendBootstraps(File output) throws BuildExecutionException {
         List<File> files = new ArrayList<File>();
         collectClassFiles(output, files);
@@ -1014,7 +1015,9 @@ public class BytecodeCompliance {
     private Map<String, ClassMetadata> buildClassIndexWithOutput(File outputDir, List<File> dependencyJars) throws BuildExecutionException {
         Map<String, ClassMetadata> index = buildClassIndex(Collections.singletonList(outputDir));
         Map<String, ClassMetadata> dependencyIndex = buildClassIndex(dependencyJars);
-        index.putAll(dependencyIndex);
+        for (Map.Entry<String, ClassMetadata> entry : dependencyIndex.entrySet()) {
+            index.putIfAbsent(entry.getKey(), entry.getValue());
+        }
         return index;
     }
 
@@ -1033,7 +1036,7 @@ public class BytecodeCompliance {
                         try {
                             ClassMetadata metadata = readClassMetadata(inputStream, classFile.getAbsolutePath());
                             if (metadata != null) {
-                                index.put(metadata.name, metadata);
+                                index.putIfAbsent(metadata.name, metadata);
                             }
                         } finally {
                             inputStream.close();
@@ -1088,13 +1091,13 @@ public class BytecodeCompliance {
                     }
                     ClassMetadata metadata = readClassMetadata(new ByteArrayInputStream(bytes), sourcePrefix + "!" + entryName);
                     if (metadata != null) {
-                        index.put(metadata.name, metadata);
+                        index.putIfAbsent(metadata.name, metadata);
                     }
                     if (relocated) {
                         ClassMetadata moved = readClassMetadata(new ByteArrayInputStream(AndroidRemapper.remap(bytes)),
                                 sourcePrefix + "!" + entryName);
                         if (moved != null) {
-                            index.put(moved.name, moved);
+                            index.putIfAbsent(moved.name, moved);
                         }
                     }
                 } else if (isClassArchiveName(entryName)) {

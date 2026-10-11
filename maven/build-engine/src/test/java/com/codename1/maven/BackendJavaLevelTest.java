@@ -185,9 +185,9 @@ class BackendJavaLevelTest {
         assertTrue(error.getMessage().contains("SwitchBootstraps.typeSwitch"), error.getMessage());
         File staged = Files.createDirectory(dir.resolve("staged")).toFile();
         File natives = Files.createDirectory(dir.resolve("natives")).toFile();
-        error = assertThrows(BuildExecutionException.class, () -> packager.prepareDependencyClasses(
+        // A dependency may contain dead unsupported methods: defer to translator reachability.
+        assertEquals(Collections.singletonList(staged.toString()), packager.prepareDependencyClasses(
                 Collections.singletonList(classes.toString()), staged, natives));
-        assertTrue(error.getMessage().contains("SwitchBootstraps.typeSwitch"), error.getMessage());
     }
 
     @Test void permitsLambdaAndStringConcatenationBootstraps(@TempDir Path dir) throws Exception {
