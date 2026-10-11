@@ -25,16 +25,21 @@ package com.codename1.flutter.material;
 
 import com.codename1.flutter.BuildContext;
 import com.codename1.flutter.Color;
+import com.codename1.flutter.CrossAxisAlignment;
 import com.codename1.flutter.MainAxisAlignment;
 import com.codename1.flutter.StatelessWidget;
 import com.codename1.flutter.TextStyle;
 import com.codename1.flutter.Widget;
 import com.codename1.flutter.EdgeInsets;
 import com.codename1.flutter.EdgeInsetsGeometry;
+import com.codename1.flutter.widgets.ColoredBox;
+import com.codename1.flutter.widgets.Column;
 import com.codename1.flutter.widgets.DefaultTextStyle;
+import com.codename1.flutter.widgets.Expanded;
 import com.codename1.flutter.widgets.Padding;
 import com.codename1.flutter.widgets.Row;
 import com.codename1.flutter.widgets.SingleChildScrollView;
+import com.codename1.flutter.widgets.SizedBox;
 
 import dart.core.DartList;
 import dart.runtime.Funcs;
@@ -42,8 +47,11 @@ import dart.runtime.Funcs;
 /**
  * A horizontal row of tabs — Flutter's {@code TabBar}. Renders the {@code tabs}
  * as an evenly-spaced (or, when {@code isScrollable}, horizontally scrollable)
- * {@link Row}. Selection tinting, the sliding indicator and gesture-driven tab
- * switching via the {@link TabController} are deferred; the labels render.
+ * {@link Row}, each stacked over a bottom indicator strip -- Flutter's default
+ * {@code UnderlineTabIndicator} at {@code TabBarIndicatorSize.tab}, painted
+ * only under the selected tab. Gesture-driven tab switching via the
+ * {@link TabController} is deferred; selecting a tab still only happens
+ * through the controller changing out from under a rebuild.
  */
 public class TabBar extends StatelessWidget {
 
@@ -55,7 +63,12 @@ public class TabBar extends StatelessWidget {
     private TextStyle labelStyle;
     private EdgeInsetsGeometry labelPadding;
     private TextStyle unselectedLabelStyle;
+    private Color indicatorColor;
+    private Double indicatorWeight;
     private Funcs.VoidFunc1<Long> onTap;
+
+    /** Flutter's default {@code TabBar.indicatorWeight}: 2 logical pixels. */
+    private static final double DEFAULT_INDICATOR_WEIGHT_LP = 2.0;
 
     public void tabs(DartList<Widget> v) {
         this.tabs = v;
@@ -70,9 +83,11 @@ public class TabBar extends StatelessWidget {
     }
 
     public void indicatorColor(Color v) {
+        this.indicatorColor = v;
     }
 
     public void indicatorWeight(double v) {
+        this.indicatorWeight = v;
     }
 
     public void indicatorPadding(Object v) {
@@ -133,7 +148,7 @@ public class TabBar extends StatelessWidget {
         // overflow; a fixed one shares the width between them.
         row.mainAxisAlignment(isScrollable
                 ? MainAxisAlignment.start : MainAxisAlignment.spaceBetween);
-        row.children(styledTabs());
+        row.children(styledTabs(context));
         Widget content = row;
         if (isScrollable) {
             SingleChildScrollView sv = new SingleChildScrollView();
@@ -157,7 +172,8 @@ public class TabBar extends StatelessWidget {
     private static final double DEFAULT_LABEL_H_PADDING_LP = 16;
 
     /**
-     * The tabs, each padded and coloured the way Flutter's TabBar does it.
+     * The tabs, each padded, coloured and indicator-stacked the way Flutter's
+     * TabBar does it.
      *
      * <p>Flutter pads every tab with {@code labelPadding} and styles it through
      * the surrounding text style: {@code labelStyle}/{@code labelColor} for the
@@ -167,7 +183,7 @@ public class TabBar extends StatelessWidget {
      * painted them in the default ink on a bar whose whole point was that they
      * are white.</p>
      */
-    private DartList<Widget> styledTabs() {
+    private DartList<Widget> styledTabs(BuildContext context) {
         DartList<Widget> out = new DartList<Widget>();
         if (tabs == null) {
             return out;
@@ -175,6 +191,16 @@ public class TabBar extends StatelessWidget {
         long selected = controller == null ? 0 : controller.index();
         EdgeInsetsGeometry pad = labelPadding != null ? labelPadding
                 : EdgeInsets.symmetric(DEFAULT_LABEL_H_PADDING_LP, 0);
+        // TabBar's real resolution (tab_bar.dart _TabBarState): a WIDGET-stated
+        // labelColor with no unselectedLabelColor of its own fades to it at
+        // alpha 0xB2 (~70%) -- the legacy shortcut kept for callers that only
+        // ever set one colour, which is exactly what the gallery's colors demo
+        // does (labelColor: colorScheme.onPrimary, no unselectedLabelColor).
+        // An explicit unselectedLabelColor always wins outright.
+        Color unselectedInk = unselectedLabelColor != null ? unselectedLabelColor
+                : (labelColor != null ? labelColor.withAlpha(0xB2) : null);
+        Color resolvedIndicatorColor = resolvedIndicatorColor(context);
+        double weight = indicatorWeight != null ? indicatorWeight : DEFAULT_INDICATOR_WEIGHT_LP;
         for (int i = 0; i < tabs.size(); i++) {
             Widget tab = tabs.get(i);
             if (tab == null) {
@@ -183,8 +209,7 @@ public class TabBar extends StatelessWidget {
             boolean isSelected = i == selected;
             TextStyle base = isSelected ? labelStyle
                     : (unselectedLabelStyle != null ? unselectedLabelStyle : labelStyle);
-            Color ink = isSelected ? labelColor
-                    : (unselectedLabelColor != null ? unselectedLabelColor : labelColor);
+            Color ink = isSelected ? labelColor : unselectedInk;
             Widget styled = tab;
             if (base != null || ink != null) {
                 TextStyle style = new TextStyle();
@@ -199,8 +224,55 @@ public class TabBar extends StatelessWidget {
             Padding p = new Padding();
             p.padding(pad);
             p.child(styled);
-            out.add(p);
+            out.add(indicated(p, isSelected, resolvedIndicatorColor, weight));
         }
         return out;
+    }
+
+    /**
+     * {@code indicatorColor}: the bar's own, then {@code ThemeData.indicatorColor}
+     * -- Flutter also checks an ambient {@code TabBarTheme} between the two,
+     * which this runtime does not yet thread onto {@link ThemeData} (its
+     * constructor still holds {@code tabBarTheme} opaquely).
+     */
+    private Color resolvedIndicatorColor(BuildContext context) {
+        if (indicatorColor != null) {
+            return indicatorColor;
+        }
+        try {
+            return Theme.of(context).indicatorColor();
+        } catch (Throwable noTheme) {
+            return new Color(0xFFFFFFFFL);
+        }
+    }
+
+    /**
+     * Stacks {@code label} over a bottom indicator strip -- Flutter's default
+     * {@code UnderlineTabIndicator} at {@code TabBarIndicatorSize.tab}: a
+     * {@code weight}-tall bar the full width of the tab's own cell, painted
+     * only for the selected tab. An unselected tab still reserves the SAME
+     * strip height, transparent, so the row's baseline does not jump between
+     * tabs. {@link Expanded} absorbs the label's share of the column so the
+     * whole stack still fits the bar's fixed {@link #TAB_HEIGHT_LP}, the way
+     * Flutter paints the indicator inside its own PreferredSize rather than
+     * growing the bar by it.
+     */
+    private Widget indicated(Widget label, boolean isSelected, Color indicatorColor, double weight) {
+        Column col = new Column();
+        col.crossAxisAlignment(CrossAxisAlignment.stretch);
+        Expanded content = new Expanded();
+        content.child(label);
+        SizedBox bar = new SizedBox();
+        bar.height(weight);
+        if (isSelected) {
+            ColoredBox cb = new ColoredBox();
+            cb.color(indicatorColor);
+            bar.child(cb);
+        }
+        DartList<Widget> kids = new DartList<Widget>();
+        kids.add(content);
+        kids.add(bar);
+        col.children(kids);
+        return col;
     }
 }

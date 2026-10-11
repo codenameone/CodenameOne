@@ -27,7 +27,9 @@ import com.codename1.flutter.Color;
 import com.codename1.flutter.EdgeInsets;
 import com.codename1.flutter.TextStyle;
 import com.codename1.flutter.Widget;
+import com.codename1.flutter.widgets.Column;
 import com.codename1.flutter.widgets.DefaultTextStyle;
+import com.codename1.flutter.widgets.Expanded;
 import com.codename1.flutter.widgets.Padding;
 import com.codename1.flutter.widgets.Row;
 import com.codename1.flutter.widgets.SingleChildScrollView;
@@ -62,6 +64,23 @@ class TabBarLabelTest {
         return (Row) inner;
     }
 
+    /**
+     * Each Row child is now a {@code Column} stacking the padded label over
+     * the indicator strip (an {@link Expanded} holding the {@link Padding},
+     * then a {@code SizedBox}) -- see {@link TabBarIndicatorTest} for the
+     * strip itself. This unwraps back down to that {@link Padding}.
+     */
+    private static Padding paddingOf(Widget tabCell) {
+        assertTrue(tabCell instanceof Column, "expected a Column tab cell, got " + tabCell);
+        DartList<Widget> cellKids = ((Column) tabCell).getChildren();
+        assertEquals(2, cellKids.size(), "expected [label, indicator strip]");
+        Widget content = cellKids.get(0);
+        assertTrue(content instanceof Expanded, "expected the label wrapped in Expanded, got " + content);
+        Widget padded = ((Expanded) content).getChild();
+        assertTrue(padded instanceof Padding, "tab is not padded: " + padded);
+        return (Padding) padded;
+    }
+
     private static TabBar barWithThreeTabs() {
         TabBar bar = new TabBar();
         DartList<Widget> tabs = new DartList<Widget>();
@@ -81,8 +100,7 @@ class TabBarLabelTest {
         DartList<Widget> kids = rowOf(bar).getChildren();
         assertEquals(3, kids.size());
         for (int i = 0; i < kids.size(); i++) {
-            assertTrue(kids.get(i) instanceof Padding, "tab " + i + " is not padded");
-            EdgeInsets p = (EdgeInsets) ((Padding) kids.get(i)).getPadding();
+            EdgeInsets p = (EdgeInsets) paddingOf(kids.get(i)).getPadding();
             assertEquals(32.0, p.left(), 0.001);
             assertEquals(32.0, p.right(), 0.001);
         }
@@ -92,7 +110,7 @@ class TabBarLabelTest {
     void aBarThatNamesNoPaddingStillGetsFluttersDefault() {
         // Flutter's kTabLabelPadding is EdgeInsets.symmetric(horizontal: 16).
         DartList<Widget> kids = rowOf(barWithThreeTabs()).getChildren();
-        EdgeInsets p = (EdgeInsets) ((Padding) kids.get(0)).getPadding();
+        EdgeInsets p = (EdgeInsets) paddingOf(kids.get(0)).getPadding();
         assertEquals(16.0, p.left(), 0.001);
         assertEquals(16.0, p.right(), 0.001);
     }
@@ -111,8 +129,8 @@ class TabBarLabelTest {
         assertEquals(rest.value(), inkOf(kids.get(2)));
     }
 
-    private static long inkOf(Widget padded) {
-        Widget child = ((Padding) padded).getChild();
+    private static long inkOf(Widget tabCell) {
+        Widget child = paddingOf(tabCell).getChild();
         assertTrue(child instanceof DefaultTextStyle, "the tab was not styled: " + child);
         TextStyle s = ((DefaultTextStyle) child).getStyle();
         assertNotNull(s, "no style on the tab");

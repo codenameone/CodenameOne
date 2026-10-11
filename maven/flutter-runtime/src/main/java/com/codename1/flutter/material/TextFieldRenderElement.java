@@ -379,7 +379,7 @@ public class TextFieldRenderElement extends RenderElement {
      * answer, which this used. Material 3 resolves a text field's style through
      * {@code _m3InputStyle}, and that is {@code textTheme.bodyLarge}.</p>
      */
-    private com.codename1.flutter.TextStyle inputStyle() {
+    com.codename1.flutter.TextStyle inputStyle() {
         com.codename1.flutter.TextStyle style = new com.codename1.flutter.TextStyle();
         try {
             ThemeData theme = Theme.of(this);
@@ -389,8 +389,21 @@ public class TextFieldRenderElement extends RenderElement {
         } catch (Throwable noTheme) {
             // a field outside any theme still has to render
         }
-        return textField().getStyle() == null ? style
+        com.codename1.flutter.TextStyle resolved = textField().getStyle() == null ? style
                 : style.merge(textField().getStyle());
+        if (!textField().isEnabled()) {
+            // InputDecorator._getActiveColor (Material 2): once decoration.enabled
+            // is false every ink the field owns -- label, hint, input text and
+            // border -- recolours to themeData.disabledColor, OVER whatever the
+            // field's own style asked for. The gallery's second "Email" field on
+            // the text-field demo states enabled: false and no colour of its own,
+            // so this is the only thing that greys it; nothing read isEnabled()
+            // here before.
+            com.codename1.flutter.TextStyle disabled = new com.codename1.flutter.TextStyle();
+            disabled.color(resolvedDisabledColor());
+            resolved = resolved.merge(disabled);
+        }
+        return resolved;
     }
 
     /**
@@ -402,7 +415,7 @@ public class TextFieldRenderElement extends RenderElement {
      * a placeholder that keeps the INPUT's colour is white on every row of
      * Crane's search form, where the input colour is white.</p>
      */
-    private com.codename1.flutter.TextStyle hintStyle(InputDecoration d) {
+    com.codename1.flutter.TextStyle hintStyle(InputDecoration d) {
         // A LABEL is not a placeholder, and they part company on colour.
         //
         // One string reaches the component either way -- Codename One shows one piece of
@@ -417,7 +430,13 @@ public class TextFieldRenderElement extends RenderElement {
         try {
             ThemeData theme = Theme.of(this);
             style = style.merge(inputStyle());
-            if (isLabel && theme.colorScheme() != null
+            if (!textField().isEnabled()) {
+                // _getActiveColor checks isFocused, THEN decoration.enabled,
+                // before it ever asks whether this is a label or a hint -- a
+                // disabled field's placeholder/label dims the same grey either
+                // way, and wins over both branches below.
+                tint = resolvedDisabledColor();
+            } else if (isLabel && theme.colorScheme() != null
                     && theme.colorScheme().onSurfaceVariant() != null) {
                 tint = theme.colorScheme().onSurfaceVariant();
             } else {
@@ -453,6 +472,29 @@ public class TextFieldRenderElement extends RenderElement {
                         ? 0xB3FFFFFFL : 0x61000000L);
     }
 
+    /// Flutter's ThemeData default when the theme names no disabledColor:
+    /// black38 on a light theme, white30 on a dark one -- dimmer than
+    /// hintColor's white70, which is the SAME alpha fraction InputDecorator
+    /// composites every ink of a disabled field with.
+    static com.codename1.flutter.Color defaultDisabledColor(
+            com.codename1.flutter.Brightness brightness) {
+        return new com.codename1.flutter.Color(
+                brightness == com.codename1.flutter.Brightness.dark
+                        ? 0x4DFFFFFFL : 0x61000000L);
+    }
+
+    /// {@code ThemeData.disabledColor}, or its default for the ambient
+    /// brightness when the theme names none (or there is no theme at all).
+    com.codename1.flutter.Color resolvedDisabledColor() {
+        try {
+            ThemeData theme = Theme.of(this);
+            com.codename1.flutter.Color c = theme.disabledColor();
+            return c != null ? c : defaultDisabledColor(theme.brightness());
+        } catch (Throwable noTheme) {
+            return defaultDisabledColor(null);
+        }
+    }
+
     /**
      * Flutter's {@code InputDecoration.applyDefaults}: every field the widget
      * leaves unset falls back to the ambient inputDecorationTheme.
@@ -480,6 +522,23 @@ public class TextFieldRenderElement extends RenderElement {
         return themed == null ? null : themed.getFillColor();
     }
 
+    /**
+     * A disabled field's fill, washed lighter -- InputDecorator resolves
+     * {@code fillColor} through a {@code MaterialStateProperty} that includes
+     * {@code disabled}, so the fill fades the same fraction the border and
+     * label do (measured enabled (242,242,242) against disabled (245,245,245)
+     * on the gallery's text-field demo). Modelled as {@code fill} blended
+     * UNDER white at {@code disabledColor}'s own alpha, rather than
+     * reproducing Flutter's own default fillColor {@code MaterialStateColor}.
+     */
+    static com.codename1.flutter.Color washDisabledFill(com.codename1.flutter.Color fill,
+            com.codename1.flutter.Color disabledColor) {
+        com.codename1.flutter.Color wash = new com.codename1.flutter.Color(0xFFFFFFL)
+                .withAlpha(disabledColor.alpha());
+        return com.codename1.flutter.Color.alphaBlend(wash,
+                new com.codename1.flutter.Color(0xFF000000L | (fill.rgb() & 0xFFFFFFL)));
+    }
+
     /** The content padding, the decoration's before the theme's. */
     static com.codename1.flutter.EdgeInsetsGeometry resolvePadding(InputDecoration d,
             InputDecorationThemeData themed) {
@@ -501,7 +560,7 @@ public class TextFieldRenderElement extends RenderElement {
     /** One style's size, weight and colour onto one Codename One style. */
     /// What a translucent ink is composited over: the field's own fill when it has an
     /// opaque one, else the surface the page is painted on.
-    private int backdropRgb() {
+    int backdropRgb() {
         try {
             com.codename1.flutter.Color fill =
                     resolveFill(textField().getDecoration(), inputDecorationTheme());
@@ -607,6 +666,9 @@ public class TextFieldRenderElement extends RenderElement {
                 }
             }
             if (fill != null) {
+                if (!textField().isEnabled()) {
+                    fill = washDisabledFill(fill, resolvedDisabledColor());
+                }
                 all.setBgColor(fill.rgb());
                 all.setBgTransparency(255);
             }
@@ -697,14 +759,17 @@ public class TextFieldRenderElement extends RenderElement {
 
     /// The default underline's colour: onSurface at 38%, composited onto what it is drawn
     /// over, because a Codename One border colour carries no alpha.
-    private int underlineRgb() {
-        // Whatever the decoration's own border side states, then BLACK.
-        //
-        // Not onSurface at 38%: Flutter's default BorderSide is opaque black,
-        // and an InputDecorator recolours it only when the field is focused,
-        // disabled or in error. Fading it made every resting underline in the
-        // app a mid grey where the reference draws a black rule -- measured
-        // (150,150,150) against (0,0,0) on the text-field demo.
+    int underlineRgb() {
+        // Whatever the decoration's own border side states, then BLACK --
+        // UNLESS the field is disabled, which IS one of the three states that
+        // comment used to carve out and never implement: Flutter's default
+        // BorderSide is opaque black, and an InputDecorator recolours it only
+        // when the field is focused, disabled or in error. Fading it
+        // unconditionally made every RESTING underline in the app a mid grey
+        // where the reference draws a black rule -- measured (150,150,150)
+        // against (0,0,0) on the text-field demo -- so the fade belongs only
+        // on the disabled branch, composited here because a Codename One
+        // border colour carries no alpha of its own.
         InputDecoration d = textField().getDecoration();
         com.codename1.flutter.BorderSide side = sideOf(d == null ? null : d.getBorder());
         if (side == null) {
@@ -717,6 +782,10 @@ public class TextFieldRenderElement extends RenderElement {
         }
         if (side != null && side.color() != null) {
             return side.color().rgb();
+        }
+        if (!textField().isEnabled()) {
+            return com.codename1.flutter.Color.alphaBlend(resolvedDisabledColor(),
+                    new com.codename1.flutter.Color(0xFF000000L | (backdropRgb() & 0xFFFFFFL))).rgb();
         }
         return 0x000000;
     }

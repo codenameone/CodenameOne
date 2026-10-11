@@ -346,11 +346,30 @@ public class ButtonRenderElement extends RenderElement {
         // button is still enabled by default, so a disabled-ink pass in there
         // returned early every time and the bottom row of the button demo
         // stayed the same purple as the top row.
-        try {
-            applyDisabledInk(b, Theme.of(this).colorScheme());
-        } catch (Exception noTheme) {
-            // an unthemed button keeps its base look
+        //
+        // Skipped when the widget's OWN style already names a foreground: that
+        // colour was computed by the composer from the button's enabled state
+        // already (CupertinoButton resolves placeholderText once onPressed is
+        // null, per CupertinoTheme, not Material's ColorScheme), so fading it
+        // AGAIN toward onSurface here repainted a disabled Cupertino button in
+        // Material ink instead of its own theme's grey.
+        if (explicitForeground() == null) {
+            try {
+                applyDisabledInk(b, Theme.of(this).colorScheme());
+            } catch (Exception noTheme) {
+                // an unthemed button keeps its base look
+            }
         }
+    }
+
+    /** The widget's own {@code ButtonStyle.foregroundColor}, or null when it names none. */
+    private com.codename1.flutter.Color explicitForeground() {
+        Widget w = widget();
+        if (!(w instanceof ButtonBase)) {
+            return null;
+        }
+        ButtonStyle st = ((ButtonBase) w).getStyle();
+        return st == null ? null : st.getForegroundColor();
     }
 
     private void style(Button b) {
@@ -378,12 +397,22 @@ public class ButtonRenderElement extends RenderElement {
                 // solid block of accent where the reference has a tinted card. The
                 // dialog demo's SHOW DIALOG is the clearest case: solid purple against
                 // the reference's lavender with purple lettering.
+                //
+                // A styleFrom() that NAMES a colour wins over the role's own --
+                // ButtonStyle.foregroundColor/backgroundColor were held on the widget
+                // and never read, so CupertinoButton.filled, which composes onto this
+                // branch and states both explicitly, kept coming out Material purple
+                // instead of its CupertinoTheme fill.
+                ButtonStyle st = ((ButtonBase) w).getStyle();
                 all.setPadding(vpad, vpad, hpad, hpad);
-                all.setFgColor(cs.primary().rgb());
-                all.setBorder(RoundBorder.create()
+                all.setFgColor(styled(st == null ? null : st.getForegroundColor(), cs.primary()).rgb());
+                RoundBorder border = RoundBorder.create()
                         .rectangle(true)
-                        .color(cs.surfaceContainerLow().rgb())
-                        .shadowOpacity(40));
+                        .color(styled(st == null ? null : st.getBackgroundColor(), cs.surfaceContainerLow()).rgb());
+                if (!isElevationZero(st)) {
+                    border = border.shadowOpacity(40);
+                }
+                all.setBorder(border);
                 clearBackground(all);
             } else if (w instanceof OutlinedButton) {
                 all.setPadding(vpad, vpad, hpad, hpad);
@@ -396,8 +425,9 @@ public class ButtonRenderElement extends RenderElement {
                         .strokeOpacity(160));
                 clearBackground(all);
             } else if (w instanceof TextButton) {
+                ButtonStyle st = ((ButtonBase) w).getStyle();
                 all.setPadding(vpad, vpad, hpad / 2, hpad / 2);
-                all.setFgColor(cs.primary().rgb());
+                all.setFgColor(styled(st == null ? null : st.getForegroundColor(), cs.primary()).rgb());
                 all.setBorder(Border.createEmpty());
                 clearBackground(all);
             } else {
@@ -475,6 +505,17 @@ public class ButtonRenderElement extends RenderElement {
         all.setBgTransparency(0);
         all.setBgImage(null);
         all.setBackgroundType(com.codename1.ui.plaf.Style.BACKGROUND_NONE);
+    }
+
+    /** {@code named}, or the role's own default when the style asked for none. */
+    private static com.codename1.flutter.Color styled(com.codename1.flutter.Color named,
+            com.codename1.flutter.Color roleDefault) {
+        return named != null ? named : roleDefault;
+    }
+
+    /** Whether a style's elevation is explicitly 0 -- Flutter's cue to drop the shadow. */
+    private static boolean isElevationZero(ButtonStyle st) {
+        return st != null && st.getElevation() != null && st.getElevation().doubleValue() == 0.0;
     }
 
     /** Flutter's {@code kMinInteractiveDimension}. */
@@ -594,25 +635,34 @@ public class ButtonRenderElement extends RenderElement {
         return tl == null ? 0 : tl.x();
     }
 
-    /** Paints the button with the radius its style asked for, in its role's colours. */
+    /**
+     * Paints the button with the radius its style asked for, in its role's
+     * colours -- overridden by the style's own foreground/background when it
+     * names one, the same precedence {@link #style} gives the un-shaped
+     * branches. {@code CupertinoButton.filled} is the caller: it is the only
+     * widget in this runtime that states a shape, and the shape-named path
+     * used to repaint it straight back to Material purple regardless.
+     */
     private void applyRequestedShape(Button b, com.codename1.ui.plaf.Style all,
             ColorScheme cs, Widget w, double radiusLp, int vpad, int hpad) {
         all.setPadding(vpad, vpad, hpad, hpad);
+        ButtonStyle st = w instanceof ButtonBase ? ((ButtonBase) w).getStyle() : null;
+        com.codename1.flutter.Color fg = styled(st == null ? null : st.getForegroundColor(), cs.primary());
         com.codename1.ui.plaf.RoundRectBorder border =
                 com.codename1.ui.plaf.RoundRectBorder.create()
                         .useCache(false)
                         .cornerRadius(Dp.mm(radiusLp));
         if (w instanceof OutlinedButton) {
-            all.setFgColor(cs.primary().rgb());
-            border = border.stroke(Dp.mm(0.3), true).strokeColor(cs.primary().rgb())
+            all.setFgColor(fg.rgb());
+            border = border.stroke(Dp.mm(0.3), true).strokeColor(fg.rgb())
                     .strokeOpacity(160);
             clearBackground(all);
         } else if (w instanceof TextButton) {
-            all.setFgColor(cs.primary().rgb());
+            all.setFgColor(fg.rgb());
             clearBackground(all);
         } else {
-            all.setFgColor(cs.primary().rgb());
-            all.setBgColor(cs.surfaceContainerLow().rgb());
+            all.setFgColor(fg.rgb());
+            all.setBgColor(styled(st == null ? null : st.getBackgroundColor(), cs.surfaceContainerLow()).rgb());
             all.setBgTransparency(255);
         }
         all.setBorder(border);

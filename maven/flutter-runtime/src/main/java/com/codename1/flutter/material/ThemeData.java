@@ -240,6 +240,18 @@ public class ThemeData {
     public Color hintColor() { return hintColor; }
     public Color disabledColor() { return disabledColor; }
     public Color shadowColor() { return shadowColor; }
+
+    /**
+     * {@code TabBar}'s default indicator colour when neither the bar nor a
+     * {@code TabBarTheme} names one. Flutter's {@code ThemeData()} factory
+     * defaults it to plain white -- a known surprise (a TabBar's underline is
+     * white out of the box, independent of the theme's primary/seed colour)
+     * precisely so an un-themed bar sitting on a coloured AppBar still shows a
+     * visible indicator.
+     */
+    public Color indicatorColor() {
+        return indicatorColor != null ? indicatorColor : new Color(0xFFFFFFFFL);
+    }
     /**
      * The ambient icon style, never null.
      *

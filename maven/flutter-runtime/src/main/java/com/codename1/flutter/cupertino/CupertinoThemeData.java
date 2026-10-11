@@ -73,6 +73,16 @@ public class CupertinoThemeData {
         return primaryColor != null ? primaryColor : CupertinoColors.systemBlue;
     }
 
+    /**
+     * The foreground Flutter paints on top of {@link #primaryColor()} --
+     * {@code CupertinoButton.filled}'s label and, for an unfilled button, the
+     * disabled-state fallback is a separate color entirely (placeholderText).
+     * Flutter's {@code CupertinoThemeData} default is opaque white.
+     */
+    public Color primaryContrastingColor() {
+        return primaryContrastingColor != null ? primaryContrastingColor : CupertinoColors.white;
+    }
+
     public Color scaffoldBackgroundColor() {
         return scaffoldBackgroundColor != null ? scaffoldBackgroundColor : CupertinoColors.systemBackground;
     }

@@ -44,4 +44,20 @@ public final class CupertinoColors {
     public static final CupertinoDynamicColor destructiveRed = new CupertinoDynamicColor(0xFFFF3B30L);
     public static final CupertinoDynamicColor white = new CupertinoDynamicColor(0xFFFFFFFFL);
     public static final CupertinoDynamicColor black = new CupertinoDynamicColor(0xFF000000L);
+
+    /**
+     * {@code CupertinoColors.placeholderText}: the light-mode value of
+     * {@code Color(0x4D3C3C43)} (black at 30% opacity) flattened over white --
+     * {@code CupertinoButton}'s disabled, unfilled foreground. Measured
+     * against the gallery's cupertino-buttons reference: (197,197,199).
+     */
+    public static final CupertinoDynamicColor placeholderText = new CupertinoDynamicColor(0xFFC5C5C7L);
+
+    /**
+     * {@code CupertinoColors.quaternarySystemFill}: the light-mode value of
+     * {@code Color(0x1E787880)} (a translucent system grey) flattened over
+     * white -- {@code CupertinoButton.filled}'s disabled background. Measured
+     * against the gallery's cupertino-buttons reference: (239,239,240).
+     */
+    public static final CupertinoDynamicColor quaternarySystemFill = new CupertinoDynamicColor(0xFFEFEFF0L);
 }
