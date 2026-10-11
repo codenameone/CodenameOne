@@ -289,11 +289,18 @@ final class LabelEngine {
         } else {
             perGlyph = drawsCharByChar(text);
             if (perGlyph) {
+                // Each glyph's share of the name as it is drawn, not its width
+                // on its own. A stretch of the name is drawn as one string,
+                // which a font with kerning or fractional advances sets
+                // narrower than its letters add up to singly; laid out by the
+                // single widths, every stretch stopped short of the next one
+                // and a name that turned a corner read "Bro adway".
                 int len = text.length();
                 widths = new int[len];
                 textW = 0;
                 for (int i = 0; i < len; i++) {
-                    widths[i] = font.charWidth(text.charAt(i));
+                    int upTo = i == len - 1 ? font.stringWidth(text) : font.stringWidth(text.substring(0, i + 1));
+                    widths[i] = Math.max(0, upTo - textW);
                     textW += widths[i];
                 }
             } else {
