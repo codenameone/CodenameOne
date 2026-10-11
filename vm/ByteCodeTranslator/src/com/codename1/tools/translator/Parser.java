@@ -1939,7 +1939,7 @@ public class Parser extends ClassVisitor {
         if (!m.isEliminated() && m.isMethodUsedByNative(nativeSources, cls)) {
             return true;
         }
-        List<BytecodeMethod> callers = dependencyGraph.getCallers(m.getLookupSignature());
+        java.util.Collection<BytecodeMethod> callers = dependencyGraph.getCallers(m.getLookupSignature());
         for (BytecodeMethod caller : callers) {
             if(caller.isEliminated() || caller == m) {
                 continue;
