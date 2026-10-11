@@ -34,6 +34,7 @@ import com.codename1.svg.transcoder.model.SVGLine;
 import com.codename1.svg.transcoder.model.SVGLinearGradient;
 import com.codename1.svg.transcoder.model.SVGNode;
 import com.codename1.svg.transcoder.model.SVGPath;
+import com.codename1.svg.transcoder.model.SVGPattern;
 import com.codename1.svg.transcoder.model.SVGPolyline;
 import com.codename1.svg.transcoder.model.SVGRadialGradient;
 import com.codename1.svg.transcoder.model.SVGRect;
@@ -79,8 +80,8 @@ import java.util.List;
 ///
 /// Nothing here is shared with the class the transcoders generate, which
 /// draws through the framework at runtime, so the two can differ: this
-/// follows `<use>` references and `fill-rule`, which that class does not
-/// draw.
+/// follows `<use>` references and `fill-rule`, tiles a `<pattern>` and
+/// sees through a `<mask>`, none of which that class draws.
 ///
 /// An animated file is painted at rest: the values its elements are written
 /// with, before any animation has moved them. A Lottie file is painted the
@@ -198,6 +199,10 @@ public final class VectorImage {
         int w = (int) Math.max(1, Math.min(maxSide, Math.ceil(width * k)));
         int h = (int) Math.max(1, Math.min(maxSide, Math.ceil(height * k)));
         BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        SVGStyle root = doc.getStyle();
+        if (root != null && root.isDisplayNone()) {
+            return out;
+        }
         Graphics2D g = out.createGraphics();
         try {
             Pixels.hints(g);
@@ -228,6 +233,16 @@ public final class VectorImage {
             }
         } finally {
             g.dispose();
+        }
+        // The opacity of the root element is not something its children
+        // inherit: it fades the finished drawing, once and as a whole.
+        float opacity = root == null || root.getOpacity() == null ? 1f : clamp(root.getOpacity().floatValue());
+        if (opacity < 1f) {
+            int[] px = out.getRGB(0, 0, w, h, null, 0, w);
+            for (int i = 0; i < px.length; i++) {
+                px[i] = (Math.round((px[i] >>> 24) * opacity) << 24) | (px[i] & 0xffffff);
+            }
+            out.setRGB(0, 0, w, h, px, 0, w);
         }
         return out;
     }
@@ -305,7 +320,8 @@ public final class VectorImage {
     /// coordinates of the element it masks. Each pixel of the element then
     /// keeps the share of its opacity that the mask's pixel there is light
     /// and opaque, or for an alpha mask just opaque. Where the mask paints
-    /// nothing, nothing of the element is left.
+    /// nothing, and everywhere outside its region, nothing of the element
+    /// is left.
     private void applyMask(BufferedImage layer, SVGClipPath mask, SVGNode node, Graphics2D g, int w, int h) {
         BufferedImage seen = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
         Graphics2D mg = seen.createGraphics();
@@ -317,9 +333,22 @@ public final class VectorImage {
             if (t != null) {
                 mg.transform(new AffineTransform(t.a, t.b, t.c, t.d, t.e, t.f));
             }
+            // The mask covers a region and no more: outside it nothing of
+            // the element shows, whatever the mask's content would paint
+            // there. The region is in fractions of the element's bounding
+            // box unless it says otherwise, and for an element with no box
+            // to measure that leaves no region to keep to.
+            Rectangle2D box = boundsOf(node);
+            if (mask.isRegionUserSpace()) {
+                mg.clip(new Rectangle2D.Double(mask.getRegionX(), mask.getRegionY(),
+                        mask.getRegionWidth(), mask.getRegionHeight()));
+            } else if (box != null && !box.isEmpty()) {
+                mg.clip(new Rectangle2D.Double(box.getX() + mask.getRegionX() * box.getWidth(),
+                        box.getY() + mask.getRegionY() * box.getHeight(),
+                        mask.getRegionWidth() * box.getWidth(), mask.getRegionHeight() * box.getHeight()));
+            }
             boolean measurable = true;
             if (mask.isObjectBoundingBox()) {
-                Rectangle2D box = boundsOf(node);
                 measurable = box != null && !box.isEmpty();
                 if (measurable) {
                     mg.transform(new AffineTransform(box.getWidth(), 0, 0, box.getHeight(), box.getX(), box.getY()));
@@ -515,7 +544,8 @@ public final class VectorImage {
     /// were written there.
     private void paintUse(Graphics2D g, SVGUse use, SVGStyle style, int w, int h) {
         SVGNode target = use.getHref() == null ? null : doc.getDefinitions().get(use.getHref());
-        if (target == null || target instanceof SVGClipPath || target instanceof SVGLinearGradient
+        if (target == null || target instanceof SVGClipPath || target instanceof SVGPattern
+                || target instanceof SVGLinearGradient
                 || target instanceof SVGRadialGradient) {
             return;
         }
@@ -526,29 +556,69 @@ public final class VectorImage {
         }
         useDepth++;
         try {
-            g.translate(use.getX(), use.getY());
-            if (target instanceof SVGSymbol) {
-                SVGSymbol symbol = (SVGSymbol) target;
-                if (symbol.getViewBoxWidth() > 0 && symbol.getViewBoxHeight() > 0
-                        && use.getWidth() > 0 && use.getHeight() > 0) {
-                    double s = Math.min(use.getWidth() / symbol.getViewBoxWidth(),
-                            use.getHeight() / symbol.getViewBoxHeight());
-                    g.translate((use.getWidth() - symbol.getViewBoxWidth() * s) / 2,
-                            (use.getHeight() - symbol.getViewBoxHeight() * s) / 2);
-                    g.scale(s, s);
-                    g.translate(-symbol.getViewBoxX(), -symbol.getViewBoxY());
-                }
-            }
+            g.transform(placing(use, target));
             paintNode(g, target, style, w, h);
         } finally {
             useDepth--;
         }
     }
 
+    /// Where a `<use>` puts the element it draws: at its offset, and a
+    /// symbol with a view box fitted into the size the `<use>` gives.
+    private static AffineTransform placing(SVGUse use, SVGNode target) {
+        AffineTransform at = AffineTransform.getTranslateInstance(use.getX(), use.getY());
+        if (target instanceof SVGSymbol) {
+            SVGSymbol symbol = (SVGSymbol) target;
+            if (symbol.getViewBoxWidth() > 0 && symbol.getViewBoxHeight() > 0
+                    && use.getWidth() > 0 && use.getHeight() > 0) {
+                double s = Math.min(use.getWidth() / symbol.getViewBoxWidth(),
+                        use.getHeight() / symbol.getViewBoxHeight());
+                at.translate((use.getWidth() - symbol.getViewBoxWidth() * s) / 2,
+                        (use.getHeight() - symbol.getViewBoxHeight() * s) / 2);
+                at.scale(s, s);
+                at.translate(-symbol.getViewBoxX(), -symbol.getViewBoxY());
+            }
+        }
+        return at;
+    }
+
     /// The box around the shapes of `node`, in its own coordinates, or null
     /// when it has none that can be measured.
-    private static Rectangle2D boundsOf(SVGNode node) {
+    private Rectangle2D boundsOf(SVGNode node) {
+        return boundsOf(node, 0);
+    }
+
+    private Rectangle2D boundsOf(SVGNode node, int depth) {
         if (node.getStyle() != null && node.getStyle().isDisplayNone()) {
+            return null;
+        }
+        if (node instanceof SVGImage) {
+            SVGImage image = (SVGImage) node;
+            return image.getWidth() > 0 && image.getHeight() > 0
+                    ? new Rectangle2D.Double(image.getX(), image.getY(), image.getWidth(), image.getHeight()) : null;
+        }
+        if (node instanceof SVGText) {
+            Shape glyphs = textOutline((SVGText) node, new java.awt.font.FontRenderContext(null, true, true));
+            return glyphs == null ? null : glyphs.getBounds2D();
+        }
+        if (node instanceof SVGUse) {
+            SVGUse use = (SVGUse) node;
+            SVGNode target = use.getHref() == null ? null : doc.getDefinitions().get(use.getHref());
+            if (target == null || depth >= MAX_USE_DEPTH) {
+                return null;
+            }
+            Rectangle2D box = boundsOf(target, depth + 1);
+            if (box == null) {
+                return null;
+            }
+            AffineTransform at = placing(use, target);
+            SVGTransform t = target.getTransform();
+            if (t != null) {
+                at.concatenate(new AffineTransform(t.a, t.b, t.c, t.d, t.e, t.f));
+            }
+            return at.createTransformedShape(box).getBounds2D();
+        }
+        if (node instanceof SVGClipPath || node instanceof SVGPattern) {
             return null;
         }
         if (!(node instanceof SVGGroup)) {
@@ -560,7 +630,7 @@ public final class VectorImage {
             if (child instanceof SVGClipPath) {
                 continue;
             }
-            Rectangle2D box = boundsOf(child);
+            Rectangle2D box = boundsOf(child, depth);
             if (box == null) {
                 continue;
             }
@@ -761,11 +831,17 @@ public final class VectorImage {
     }
 
     private void fillAndStroke(Graphics2D g, Shape shape, SVGStyle style) {
+        fillAndStroke(g, shape, style, true);
+    }
+
+    /// Fills `shape` and then strokes it. `ruled` is whether `fill-rule`
+    /// applies, which it does not to the outlines of text.
+    private void fillAndStroke(Graphics2D g, Shape shape, SVGStyle style, boolean ruled) {
         SVGPaint fill = style.getFill() == null ? SVGPaint.BLACK : style.getFill();
         if (!fill.isNone()) {
             float a = style.getFillOpacity() == null ? 1f : clamp(style.getFillOpacity().floatValue());
             Shape filled = shape;
-            if (shape instanceof Path2D && Boolean.TRUE.equals(style.getFillEvenOdd())) {
+            if (ruled && shape instanceof Path2D && Boolean.TRUE.equals(style.getFillEvenOdd())) {
                 // `fill-rule: evenodd`: a subpath inside another is a hole.
                 Path2D holes = new Path2D.Double(shape);
                 holes.setWindingRule(Path2D.WIND_EVEN_ODD);
@@ -820,7 +896,12 @@ public final class VectorImage {
         }
         Paint p;
         if (paint.isReference()) {
-            p = gradient(doc.getDefinitions().get(paint.getReference()), boundsOf.getBounds2D());
+            SVGNode def = doc.getDefinitions().get(paint.getReference());
+            if (def instanceof SVGPattern) {
+                paintPattern(g, (SVGPattern) def, alpha, area, boundsOf.getBounds2D());
+                return;
+            }
+            p = gradient(def, boundsOf.getBounds2D());
             if (p == null) {
                 return;
             }
@@ -838,7 +919,9 @@ public final class VectorImage {
     }
 
     private Paint gradient(SVGNode def, Rectangle2D bounds) {
-        List<SVGGradientStop> stops = stopsOf(def, 0);
+        def = resolved(def);
+        List<SVGGradientStop> stops = def instanceof SVGLinearGradient ? ((SVGLinearGradient) def).getStops()
+                : def instanceof SVGRadialGradient ? ((SVGRadialGradient) def).getStops() : null;
         if (stops == null || stops.isEmpty()) {
             // Not a gradient, or one with nothing in it: SVG paints nothing.
             return null;
@@ -939,26 +1022,245 @@ public final class VectorImage {
                 rg.getFy() == null ? rg.getCy() : rg.getFy().floatValue());
     }
 
-    /// The stops of a gradient, taken from the one it refers to when it has
-    /// none of its own.
-    private List<SVGGradientStop> stopsOf(SVGNode def, int depth) {
-        List<SVGGradientStop> stops;
-        String href;
+    /// The elements `def` takes what it leaves out from, itself first: the
+    /// one its `href` names, the one that one names, and so on. They are
+    /// patterns when `pattern` is set and gradients otherwise; the chain
+    /// ends at anything else, and at an element it has already passed.
+    private List<SVGNode> chainOf(SVGNode def, boolean pattern) {
+        List<SVGNode> chain = new ArrayList<SVGNode>();
+        SVGNode at = def;
+        while (at != null && chain.size() < 8 && !chain.contains(at)) {
+            String href;
+            if (pattern && at instanceof SVGPattern) {
+                href = ((SVGPattern) at).getHref();
+            } else if (!pattern && at instanceof SVGLinearGradient) {
+                href = ((SVGLinearGradient) at).getHref();
+            } else if (!pattern && at instanceof SVGRadialGradient) {
+                href = ((SVGRadialGradient) at).getHref();
+            } else {
+                break;
+            }
+            chain.add(at);
+            at = href == null ? null : doc.getDefinitions().get(href.startsWith("#") ? href.substring(1) : href);
+        }
+        return chain;
+    }
+
+    /// The first element of `chain` that is a `type` and wrote `attribute`
+    /// itself, or null.
+    private static <T extends SVGNode> T giver(List<SVGNode> chain, String attribute, Class<T> type) {
+        for (SVGNode node : chain) {
+            if (type.isInstance(node) && node.isGiven(attribute)) {
+                return type.cast(node);
+            }
+        }
+        return null;
+    }
+
+    /// A gradient with everything it leaves to the one its `href` names
+    /// filled in: not only the stops but where it runs, what that is
+    /// measured in and its transform. Where it runs is taken only from a
+    /// gradient of its own kind, since a line has no radius to give a
+    /// circle. Anything that refers to nothing is answered as it is.
+    private SVGNode resolved(SVGNode def) {
+        List<SVGNode> chain = chainOf(def, false);
+        if (chain.size() < 2) {
+            return def;
+        }
+        boolean userSpace = false;
+        SVGTransform transform = null;
+        List<SVGGradientStop> stops = null;
+        boolean unitsFound = false;
+        for (SVGNode node : chain) {
+            boolean linear = node instanceof SVGLinearGradient;
+            if (!unitsFound && node.isGiven("gradientUnits")) {
+                unitsFound = true;
+                userSpace = linear ? ((SVGLinearGradient) node).isUserSpace()
+                        : ((SVGRadialGradient) node).isUserSpace();
+            }
+            if (transform == null) {
+                transform = linear ? ((SVGLinearGradient) node).getGradientTransform()
+                        : ((SVGRadialGradient) node).getGradientTransform();
+            }
+            List<SVGGradientStop> own = linear ? ((SVGLinearGradient) node).getStops()
+                    : ((SVGRadialGradient) node).getStops();
+            if (stops == null && !own.isEmpty()) {
+                stops = own;
+            }
+        }
         if (def instanceof SVGLinearGradient) {
-            stops = ((SVGLinearGradient) def).getStops();
-            href = ((SVGLinearGradient) def).getHref();
-        } else if (def instanceof SVGRadialGradient) {
-            stops = ((SVGRadialGradient) def).getStops();
-            href = ((SVGRadialGradient) def).getHref();
-        } else {
-            return null;
+            SVGLinearGradient out = new SVGLinearGradient();
+            SVGLinearGradient from = giver(chain, "x1", SVGLinearGradient.class);
+            if (from != null) {
+                out.setX1(from.getX1());
+            }
+            from = giver(chain, "y1", SVGLinearGradient.class);
+            if (from != null) {
+                out.setY1(from.getY1());
+            }
+            from = giver(chain, "x2", SVGLinearGradient.class);
+            if (from != null) {
+                out.setX2(from.getX2());
+            }
+            from = giver(chain, "y2", SVGLinearGradient.class);
+            if (from != null) {
+                out.setY2(from.getY2());
+            }
+            out.setUserSpace(userSpace);
+            out.setGradientTransform(transform);
+            if (stops != null) {
+                out.getStops().addAll(stops);
+            }
+            return out;
         }
-        if (stops.isEmpty() && href != null && depth < 8) {
-            String id = href.startsWith("#") ? href.substring(1) : href;
-            List<SVGGradientStop> inherited = stopsOf(doc.getDefinitions().get(id), depth + 1);
-            return inherited == null ? stops : inherited;
+        SVGRadialGradient out = new SVGRadialGradient();
+        SVGRadialGradient from = giver(chain, "cx", SVGRadialGradient.class);
+        if (from != null) {
+            out.setCx(from.getCx());
         }
-        return stops;
+        from = giver(chain, "cy", SVGRadialGradient.class);
+        if (from != null) {
+            out.setCy(from.getCy());
+        }
+        from = giver(chain, "r", SVGRadialGradient.class);
+        if (from != null) {
+            out.setR(from.getR());
+        }
+        from = giver(chain, "fx", SVGRadialGradient.class);
+        if (from != null) {
+            out.setFx(from.getFx());
+        }
+        from = giver(chain, "fy", SVGRadialGradient.class);
+        if (from != null) {
+            out.setFy(from.getFy());
+        }
+        out.setUserSpace(userSpace);
+        out.setGradientTransform(transform);
+        if (stops != null) {
+            out.getStops().addAll(stops);
+        }
+        return out;
+    }
+
+    private static final int MAX_TILE_SIDE = 2048;
+
+    /// Fills `area` with the tile of a pattern, laid side by side from the
+    /// tile's own corner.
+    ///
+    /// The tile is painted once, at the size it has on the image, and then
+    /// repeated. Its content is cut off at its edges. A pattern with no
+    /// size, or measured against a box that has none, paints nothing.
+    private void paintPattern(Graphics2D g, SVGPattern def, float alpha, Shape area, Rectangle2D bounds) {
+        List<SVGNode> chain = chainOf(def, true);
+        if (chain.isEmpty() || useDepth >= MAX_USE_DEPTH) {
+            return;
+        }
+        SVGPattern units = giver(chain, "patternUnits", SVGPattern.class);
+        boolean userSpace = units != null && units.isUserSpace();
+        SVGPattern px = giver(chain, "x", SVGPattern.class);
+        SVGPattern py = giver(chain, "y", SVGPattern.class);
+        SVGPattern pw = giver(chain, "width", SVGPattern.class);
+        SVGPattern ph = giver(chain, "height", SVGPattern.class);
+        double x = px == null ? 0 : px.getX();
+        double y = py == null ? 0 : py.getY();
+        double tw = pw == null ? 0 : pw.getWidth();
+        double th = ph == null ? 0 : ph.getHeight();
+        boolean boxed = bounds.getWidth() > 0 && bounds.getHeight() > 0;
+        if (!userSpace) {
+            if (!boxed) {
+                return;
+            }
+            x = bounds.getX() + x * bounds.getWidth();
+            y = bounds.getY() + y * bounds.getHeight();
+            tw *= bounds.getWidth();
+            th *= bounds.getHeight();
+        }
+        if (!(tw > 0) || !(th > 0)) {
+            return;
+        }
+        SVGPattern turned = giver(chain, "patternTransform", SVGPattern.class);
+        SVGTransform t = turned == null ? null : turned.getPatternTransform();
+        AffineTransform pt = t == null ? new AffineTransform() : new AffineTransform(t.a, t.b, t.c, t.d, t.e, t.f);
+        AffineTransform back;
+        try {
+            back = pt.createInverse();
+        } catch (java.awt.geom.NoninvertibleTransformException ex) {
+            return;
+        }
+        SVGPattern content = def;
+        for (SVGNode node : chain) {
+            if (!((SVGPattern) node).getChildren().isEmpty()) {
+                content = (SVGPattern) node;
+                break;
+            }
+        }
+        // As many pixels as the tile covers on the image, so that it is
+        // not drawn small and stretched.
+        AffineTransform device = new AffineTransform(g.getTransform());
+        device.concatenate(pt);
+        double sx = Math.hypot(device.getScaleX(), device.getShearY());
+        double sy = Math.hypot(device.getShearX(), device.getScaleY());
+        int iw = (int) Math.max(1, Math.min(MAX_TILE_SIDE, Math.ceil(tw * sx)));
+        int ih = (int) Math.max(1, Math.min(MAX_TILE_SIDE, Math.ceil(th * sy)));
+        BufferedImage tile = new BufferedImage(iw, ih, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D tg = tile.createGraphics();
+        useDepth++;
+        try {
+            Pixels.hints(tg);
+            tg.scale(iw / tw, ih / th);
+            SVGPattern boxGiver = giver(chain, "viewBox", SVGPattern.class);
+            SVGPattern contentUnits = giver(chain, "patternContentUnits", SVGPattern.class);
+            boolean drawn = true;
+            if (boxGiver != null && boxGiver.getViewBoxWidth() > 0 && boxGiver.getViewBoxHeight() > 0) {
+                SVGPattern fit = giver(chain, "preserveAspectRatio", SVGPattern.class);
+                String par = fit == null || fit.getPreserveAspectRatio() == null ? ""
+                        : fit.getPreserveAspectRatio().trim();
+                double vw = boxGiver.getViewBoxWidth();
+                double vh = boxGiver.getViewBoxHeight();
+                double fx = tw / vw;
+                double fy = th / vh;
+                double ox = 0;
+                double oy = 0;
+                if (!par.startsWith("none")) {
+                    double s = par.endsWith("slice") ? Math.max(fx, fy) : Math.min(fx, fy);
+                    double freeX = tw - vw * s;
+                    double freeY = th - vh * s;
+                    ox = par.startsWith("xMin") ? 0 : (par.startsWith("xMax") ? freeX : freeX / 2);
+                    oy = par.indexOf("YMin") >= 0 ? 0 : (par.indexOf("YMax") >= 0 ? freeY : freeY / 2);
+                    fx = s;
+                    fy = s;
+                }
+                tg.translate(ox, oy);
+                tg.scale(fx, fy);
+                tg.translate(-boxGiver.getViewBoxX(), -boxGiver.getViewBoxY());
+            } else if (contentUnits != null && contentUnits.isContentObjectBoundingBox()) {
+                drawn = boxed;
+                if (drawn) {
+                    tg.scale(bounds.getWidth(), bounds.getHeight());
+                }
+            }
+            if (drawn) {
+                for (SVGNode child : content.getChildren()) {
+                    paintNode(tg, child, content.getStyle(), iw, ih);
+                }
+            }
+        } finally {
+            useDepth--;
+            tg.dispose();
+        }
+        AffineTransform savedTransform = g.getTransform();
+        java.awt.Composite saved = g.getComposite();
+        Paint savedPaint = g.getPaint();
+        try {
+            g.transform(pt);
+            g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, Math.min(1f, alpha)));
+            g.setPaint(new java.awt.TexturePaint(tile, new Rectangle2D.Double(x, y, tw, th)));
+            g.fill(back.createTransformedShape(area));
+        } finally {
+            g.setPaint(savedPaint);
+            g.setComposite(saved);
+            g.setTransform(savedTransform);
+        }
     }
 
     private static Point2D point(double x, double y, boolean userSpace, Rectangle2D bounds) {
@@ -967,18 +1269,25 @@ public final class VectorImage {
     }
 
     private void paintText(Graphics2D g, SVGText text, SVGStyle style) {
+        Shape outline = textOutline(text, g.getFontRenderContext());
+        if (outline != null) {
+            // Filled and then stroked like any other shape: text with no
+            // fill and a stroke is an outline, not nothing.
+            fillAndStroke(g, outline, style, false);
+        }
+    }
+
+    /// The outlines of the glyphs of a `<text>`, where it puts them, or
+    /// null when it has no text.
+    private static Shape textOutline(SVGText text, java.awt.font.FontRenderContext context) {
         String content = text.getContent();
         if (content == null || content.length() == 0) {
-            return;
-        }
-        SVGPaint fill = style.getFill() == null ? SVGPaint.BLACK : style.getFill();
-        if (fill.isNone()) {
-            return;
+            return null;
         }
         float size = text.getFontSize() > 0 ? text.getFontSize() : 12f;
         int fontStyle = (text.isBold() ? Font.BOLD : 0) | (text.isItalic() ? Font.ITALIC : 0);
         Font font = new Font(familyOf(text.getFontFamily()), fontStyle, 1).deriveFont(size);
-        java.awt.font.GlyphVector glyphs = font.createGlyphVector(g.getFontRenderContext(), content);
+        java.awt.font.GlyphVector glyphs = font.createGlyphVector(context, content);
         double advance = glyphs.getLogicalBounds().getWidth();
         double x = text.getX();
         if (text.getAnchor() == SVGText.Anchor.MIDDLE) {
@@ -986,9 +1295,7 @@ public final class VectorImage {
         } else if (text.getAnchor() == SVGText.Anchor.END) {
             x -= advance;
         }
-        Shape outline = glyphs.getOutline((float) x, text.getY());
-        float a = style.getFillOpacity() == null ? 1f : clamp(style.getFillOpacity().floatValue());
-        paintWith(g, fill, a, outline, outline);
+        return glyphs.getOutline((float) x, text.getY());
     }
 
     /// The font family a `font-family` list comes to: the first name in it

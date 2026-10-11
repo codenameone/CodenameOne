@@ -43,6 +43,31 @@ public final class SVGClipPath extends SVGGroup {
     public boolean isAlphaMask() { return alphaMask; }
     public void setAlphaMask(boolean alphaMask) { this.alphaMask = alphaMask; }
 
+    private boolean regionUserSpace;
+    private float regionX = -0.1f;
+    private float regionY = -0.1f;
+    private float regionWidth = 1.2f;
+    private float regionHeight = 1.2f;
+
+    /// Whether the region of a mask is in the coordinates of the element it
+    /// masks (`maskUnits="userSpaceOnUse"`) and not in fractions of that
+    /// element's bounding box, which is what it is when nothing says.
+    public boolean isRegionUserSpace() { return regionUserSpace; }
+    public void setRegionUserSpace(boolean regionUserSpace) { this.regionUserSpace = regionUserSpace; }
+
+    /// The region of a mask, outside which nothing of the masked element
+    /// shows. Left alone it is the bounding box and a tenth more each way.
+    public float getRegionX() { return regionX; }
+    public float getRegionY() { return regionY; }
+    public float getRegionWidth() { return regionWidth; }
+    public float getRegionHeight() { return regionHeight; }
+    public void setRegion(float x, float y, float width, float height) {
+        this.regionX = x;
+        this.regionY = y;
+        this.regionWidth = width;
+        this.regionHeight = height;
+    }
+
     /// Whether the outline is given in fractions of the bounding box of the
     /// element it clips (`clipPathUnits="objectBoundingBox"`).
     public boolean isObjectBoundingBox() { return objectBoundingBox; }

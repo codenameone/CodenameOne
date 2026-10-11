@@ -116,7 +116,11 @@ public final class CssImportDependencies {
             text = withoutComments(text);
             // An image or a font the stylesheet names from outside the
             // directory is compiled into the theme just as an import is.
-            Matcher asset = URL.matcher(text);
+            // The `url()` of an import is not one of these. It is left to
+            // the pass below, which knows that `base.css?v=1` names
+            // `base.css`: taken here as written it would be a file that is
+            // never there, and a missing file makes every build stale.
+            Matcher asset = URL.matcher(IMPORT.matcher(text).replaceAll("@import "));
             while (asset.find()) {
                 // A quoted name may hold a parenthesis of its own.
                 String name = asset.group(1) != null ? asset.group(1)

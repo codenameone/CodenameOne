@@ -89,6 +89,24 @@ class CssImportDependenciesTest {
     }
 
     @Test
+    void anImportWrittenAsAUrlWithAQueryIsNotAMissingImage(@TempDir Path tmp) throws Exception {
+        File dir = tmp.toFile();
+        File css = new File(dir, "css");
+        write(new File(css, "theme.css"), "@import url(\"../shared/base.css?v=1\");\n"
+                + "@import url(../shared/more.css?v=1);\n");
+        File base = write(new File(dir, "shared/base.css"), "A { color: red; }\n");
+        File more = write(new File(dir, "shared/more.css"), "B { color: red; }\n");
+
+        Set<File> found = CssImportDependencies.outside(css);
+
+        assertEquals(2, found.size(), found.toString());
+        assertTrue(found.contains(base.getCanonicalFile()));
+        assertTrue(found.contains(more.getCanonicalFile()));
+        assertTrue(CssImportDependencies.lastModified(css) < Long.MAX_VALUE,
+                "nothing is missing, so the theme is not stale for ever");
+    }
+
+    @Test
     void aCommentDelimiterInsideAStringHidesNothingAfterIt(@TempDir Path tmp) throws Exception {
         File dir = tmp.toFile();
         File css = new File(dir, "css");

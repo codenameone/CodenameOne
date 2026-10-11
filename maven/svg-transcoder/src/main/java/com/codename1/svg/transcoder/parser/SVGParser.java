@@ -309,6 +309,12 @@ public final class SVGParser {
             } else if ("radialGradient".equals(name)) {
                 SVGRadialGradient rg = readRadialGradient(r);
                 if (rg.getId() != null) doc.getDefinitions().put(rg.getId(), rg);
+            } else if ("pattern".equals(name)) {
+                // Read for a renderer that can tile one. The class the
+                // transcoder generates does not paint with it.
+                SVGPattern pattern = readPattern(r, doc);
+                if (pattern.getId() != null) doc.getDefinitions().put(pattern.getId(), pattern);
+                indexById(pattern, doc);
             } else if ("clipPath".equals(name) || "mask".equals(name)) {
                 // Many SVGs declare clipPath outside <defs>. Accept both --
                 // we don't render the clipPath inline, just register it as
@@ -390,8 +396,88 @@ public final class SVGParser {
         cp.setMask(mask);
         cp.setAlphaMask(mask && "alpha".equals(mergedValue(a, "mask-type")));
         cp.setObjectBoundingBox("objectBoundingBox".equals(a.get(mask ? "maskContentUnits" : "clipPathUnits")));
+        if (mask) {
+            boolean user = "userSpaceOnUse".equals(a.get("maskUnits"));
+            cp.setRegionUserSpace(user);
+            cp.setRegion(regionSide(a.get("x"), -0.1f, user, doc.getViewBoxWidth()),
+                    regionSide(a.get("y"), -0.1f, user, doc.getViewBoxHeight()),
+                    regionSide(a.get("width"), 1.2f, user, doc.getViewBoxWidth()),
+                    regionSide(a.get("height"), 1.2f, user, doc.getViewBoxHeight()));
+        }
         readChildren(r, cp, doc);
         return cp;
+    }
+
+    /**
+     * One side of a mask's region. Left out it is the fraction given, which
+     * in the masked element's own coordinates is that share of the drawing;
+     * a percentage is a share of the drawing there too, and of the bounding
+     * box otherwise.
+     */
+    private float regionSide(String value, float fraction, boolean userSpace, float whole) {
+        if (value == null) return userSpace ? fraction * whole : fraction;
+        try {
+            float v = parseGradCoord(value);
+            return userSpace && value.trim().endsWith("%") ? v * whole : v;
+        } catch (RuntimeException e) {
+            return userSpace ? fraction * whole : fraction;
+        }
+    }
+
+    private SVGPattern readPattern(XMLStreamReader r, SVGDocument doc) throws XMLStreamException {
+        SVGPattern p = new SVGPattern();
+        Map<String, String> a = attrs(r);
+        applyCommon(p, a);
+        // The pattern's transform is its patternTransform, not one to draw
+        // its content through a second time.
+        p.setTransform(null);
+        boolean user = "userSpaceOnUse".equals(a.get("patternUnits"));
+        if (a.containsKey("patternUnits")) { p.markGiven("patternUnits"); p.setUserSpace(user); }
+        if (a.containsKey("x")) { p.markGiven("x"); p.setX(patternSide(a.get("x"), user, doc.getViewBoxWidth())); }
+        if (a.containsKey("y")) { p.markGiven("y"); p.setY(patternSide(a.get("y"), user, doc.getViewBoxHeight())); }
+        if (a.containsKey("width")) {
+            p.markGiven("width");
+            p.setWidth(patternSide(a.get("width"), user, doc.getViewBoxWidth()));
+        }
+        if (a.containsKey("height")) {
+            p.markGiven("height");
+            p.setHeight(patternSide(a.get("height"), user, doc.getViewBoxHeight()));
+        }
+        if (a.containsKey("patternContentUnits")) {
+            p.markGiven("patternContentUnits");
+            p.setContentObjectBoundingBox("objectBoundingBox".equals(a.get("patternContentUnits")));
+        }
+        if (a.get("patternTransform") != null) {
+            p.markGiven("patternTransform");
+            p.setPatternTransform(TransformParser.parse(a.get("patternTransform")));
+        }
+        String vb = a.get("viewBox");
+        if (vb != null) {
+            NumberParser np = new NumberParser(vb);
+            try {
+                p.setViewBox(np.nextFloat(), np.nextFloat(), np.nextFloat(), np.nextFloat());
+                p.markGiven("viewBox");
+            } catch (RuntimeException e) {
+                // no view box
+            }
+        }
+        if (a.containsKey("preserveAspectRatio")) {
+            p.markGiven("preserveAspectRatio");
+            p.setPreserveAspectRatio(a.get("preserveAspectRatio"));
+        }
+        String href = a.get("href");
+        if (href != null && href.trim().startsWith("#")) p.setHref(href.trim().substring(1));
+        readChildren(r, p, doc);
+        return p;
+    }
+
+    private float patternSide(String value, boolean userSpace, float whole) {
+        try {
+            float v = parseGradCoord(value);
+            return userSpace && value.trim().endsWith("%") ? v * whole : v;
+        } catch (RuntimeException e) {
+            return 0f;
+        }
     }
 
     private SVGRect readRect(XMLStreamReader r) {
@@ -527,10 +613,15 @@ public final class SVGParser {
         SVGLinearGradient g = new SVGLinearGradient();
         Map<String, String> a = attrs(r);
         g.setId(a.get("id"));
+        if (a.containsKey("x1")) g.markGiven("x1");
         if (a.containsKey("x1")) g.setX1(parseGradCoord(a.get("x1")));
+        if (a.containsKey("y1")) g.markGiven("y1");
         if (a.containsKey("y1")) g.setY1(parseGradCoord(a.get("y1")));
+        if (a.containsKey("x2")) g.markGiven("x2");
         if (a.containsKey("x2")) g.setX2(parseGradCoord(a.get("x2")));
+        if (a.containsKey("y2")) g.markGiven("y2");
         if (a.containsKey("y2")) g.setY2(parseGradCoord(a.get("y2")));
+        if (a.containsKey("gradientUnits")) g.markGiven("gradientUnits");
         if ("userSpaceOnUse".equals(a.get("gradientUnits"))) g.setUserSpace(true);
         if (a.get("gradientTransform") != null) g.setGradientTransform(TransformParser.parse(a.get("gradientTransform")));
         String href = a.get("href");
@@ -544,12 +635,18 @@ public final class SVGParser {
         SVGRadialGradient g = new SVGRadialGradient();
         Map<String, String> a = attrs(r);
         g.setId(a.get("id"));
+        if (a.containsKey("cx")) g.markGiven("cx");
         if (a.containsKey("cx")) g.setCx(parseGradCoord(a.get("cx")));
+        if (a.containsKey("cy")) g.markGiven("cy");
         if (a.containsKey("cy")) g.setCy(parseGradCoord(a.get("cy")));
+        if (a.containsKey("r")) g.markGiven("r");
         if (a.containsKey("r")) g.setR(parseGradCoord(a.get("r")));
+        if (a.containsKey("fx")) g.markGiven("fx");
         if (a.containsKey("fx")) g.setFx(Float.valueOf(parseGradCoord(a.get("fx"))));
+        if (a.containsKey("fy")) g.markGiven("fy");
         if (a.containsKey("fy")) g.setFy(Float.valueOf(parseGradCoord(a.get("fy"))));
         if (a.get("gradientTransform") != null) g.setGradientTransform(TransformParser.parse(a.get("gradientTransform")));
+        if (a.containsKey("gradientUnits")) g.markGiven("gradientUnits");
         if ("userSpaceOnUse".equals(a.get("gradientUnits"))) g.setUserSpace(true);
         String href = a.get("href");
         if (href == null) href = a.get("xlink:href");

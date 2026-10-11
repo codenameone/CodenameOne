@@ -395,6 +395,103 @@ class VectorImageTest {
     }
 
     @Test
+    void aPatternTilesTheShapeItFills() throws Exception {
+        BufferedImage img = paint("<defs><pattern id=\"p\" width=\"20\" height=\"20\" patternUnits=\"userSpaceOnUse\">"
+                + "<rect width=\"10\" height=\"20\" fill=\"#ff0000\"/></pattern></defs>"
+                + "<rect width=\"100\" height=\"100\" fill=\"url(#p)\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(5, 50), "the painted half of the first tile");
+        assertEquals(0, alpha(img, 15, 50), "and its empty half");
+        assertEquals(0xffff0000, img.getRGB(45, 50), "the third tile is the same");
+        assertEquals(0, alpha(img, 55, 50));
+
+        BufferedImage boxed = paint("<defs><pattern id=\"p\" width=\"0.5\" height=\"1\""
+                + " patternContentUnits=\"objectBoundingBox\">"
+                + "<rect width=\"0.25\" height=\"1\" fill=\"#ff0000\"/></pattern></defs>"
+                + "<rect x=\"20\" width=\"80\" height=\"100\" fill=\"url(#p)\"/>", 100, 100);
+        assertEquals(0xffff0000, boxed.getRGB(30, 50), "a tile is half the box wide and starts at its corner");
+        assertEquals(0, alpha(boxed, 50, 50));
+        assertEquals(0xffff0000, boxed.getRGB(70, 50));
+        assertEquals(0, alpha(boxed, 10, 50), "nothing outside the shape");
+
+        BufferedImage derived = paint("<defs><pattern id=\"base\" width=\"20\" height=\"20\""
+                + " patternUnits=\"userSpaceOnUse\"><rect width=\"10\" height=\"20\" fill=\"#ff0000\"/></pattern>"
+                + "<pattern id=\"p\" href=\"#base\" patternTransform=\"translate(10 0)\"/></defs>"
+                + "<rect width=\"100\" height=\"100\" fill=\"url(#p)\"/>", 100, 100);
+        assertEquals(0, alpha(derived, 5, 50), "the tile and its content come from the pattern referred to, moved");
+        assertEquals(0xffff0000, derived.getRGB(15, 50));
+    }
+
+    @Test
+    void aMaskReachesNoFurtherThanItsRegion() throws Exception {
+        String white = "<rect width=\"100\" height=\"100\" fill=\"#ffffff\"/></mask>";
+        String red = "<rect width=\"100\" height=\"100\" fill=\"#ff0000\" mask=\"url(#m)\"/>";
+        BufferedImage user = paint("<mask id=\"m\" maskUnits=\"userSpaceOnUse\" x=\"0\" y=\"0\" width=\"50\""
+                + " height=\"100\">" + white + red, 100, 100);
+        assertEquals(0xffff0000, user.getRGB(20, 50));
+        assertEquals(0, alpha(user, 80, 50), "the mask's content is white there, but its region has ended");
+
+        BufferedImage boxed = paint("<mask id=\"m\" x=\"0.5\" y=\"0\" width=\"0.5\" height=\"1\">" + white
+                + "<rect x=\"20\" width=\"80\" height=\"100\" fill=\"#ff0000\" mask=\"url(#m)\"/>", 100, 100);
+        assertEquals(0, alpha(boxed, 40, 50), "in fractions of the masked element's box by default");
+        assertEquals(0xffff0000, boxed.getRGB(80, 50));
+
+        BufferedImage open = paint("<mask id=\"m\">" + white + red, 100, 100);
+        assertEquals(0xffff0000, open.getRGB(2, 2), "left alone the region is wider than the element");
+    }
+
+    @Test
+    void aGradientTakesWhatItLeavesOutFromTheOneItRefersTo() throws Exception {
+        BufferedImage img = paint("<defs><linearGradient id=\"base\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"100\""
+                + " gradientUnits=\"userSpaceOnUse\"><stop offset=\"0\" stop-color=\"#00ff00\"/></linearGradient>"
+                + "<linearGradient id=\"g\" href=\"#base\"><stop offset=\"0\" stop-color=\"#ff0000\"/>"
+                + "<stop offset=\"1\" stop-color=\"#0000ff\"/></linearGradient></defs>"
+                + "<rect width=\"100\" height=\"100\" fill=\"url(#g)\"/>", 100, 100);
+        int top = img.getRGB(50, 5);
+        int bottom = img.getRGB(50, 95);
+        assertTrue(((top >> 16) & 0xff) > 200 && (bottom & 0xff) > 200, "its own stops, run top to bottom");
+        assertEquals(img.getRGB(5, 50), img.getRGB(95, 50), "and not left to right, which is where one runs by default");
+
+        BufferedImage radial = paint("<defs><radialGradient id=\"base\" cx=\"0\" cy=\"0\" r=\"100\""
+                + " gradientUnits=\"userSpaceOnUse\"/>"
+                + "<radialGradient id=\"g\" href=\"#base\"><stop offset=\"0\" stop-color=\"#ff0000\"/>"
+                + "<stop offset=\"1\" stop-color=\"#0000ff\"/></radialGradient></defs>"
+                + "<rect width=\"100\" height=\"100\" fill=\"url(#g)\"/>", 100, 100);
+        assertTrue(((radial.getRGB(3, 3) >> 16) & 0xff) > 200, "the centre is the corner the base puts it in");
+        assertTrue((radial.getRGB(70, 70) & 0xff) > 200);
+    }
+
+    @Test
+    void textIsStrokedAsWellAsFilled() throws Exception {
+        String text = "<text x=\"5\" y=\"80\" font-size=\"90\" font-weight=\"bold\" font-family=\"sans-serif\"";
+        BufferedImage outlined = paint(text + " fill=\"none\" stroke=\"#ff0000\" stroke-width=\"2\">I</text>", 100, 100);
+        BufferedImage filled = paint(text + " fill=\"#ff0000\">I</text>", 100, 100);
+        int ink = 0;
+        int hollow = 0;
+        for (int y = 0; y < 100; y++) {
+            for (int x = 0; x < 100; x++) {
+                if (alpha(outlined, x, y) > 128) {
+                    ink++;
+                } else if (alpha(filled, x, y) == 255) {
+                    hollow++;
+                }
+            }
+        }
+        assertTrue(ink > 50, "text with a stroke and no fill is its outline");
+        assertTrue(hollow > 50, "and the inside of the letter stays empty");
+    }
+
+    @Test
+    void theOpacityOfTheRootFadesTheWholeDrawing() throws Exception {
+        String svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" opacity=\"0.5\">"
+                + "<rect width=\"100\" height=\"100\" fill=\"#ff0000\"/>"
+                + "<rect width=\"50\" height=\"100\" fill=\"#ff0000\"/></svg>";
+        BufferedImage img = VectorImage.readSvg(new ByteArrayInputStream(svg.getBytes(StandardCharsets.UTF_8)))
+                .paint(100, 100);
+        assertEquals(128, alpha(img, 75, 50), 1);
+        assertEquals(128, alpha(img, 25, 50), 1, "once for the whole, not once for each shape");
+    }
+
+    @Test
     void aUseThatNamesItselfDrawsNothingAndEnds() throws Exception {
         BufferedImage img = paint("<g id=\"loop\"><use href=\"#loop\"/></g>", 20, 20);
         assertEquals(0, alpha(img, 10, 10));
