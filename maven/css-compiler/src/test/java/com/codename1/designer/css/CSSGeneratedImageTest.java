@@ -271,6 +271,25 @@ class CSSGeneratedImageTest {
     }
 
     @Test
+    void anSvgWithNoSizeOfItsOwnIsAsLargeAsTheBox(@TempDir Path dir) throws Exception {
+        // Neither a size nor a view box: the drawing is laid over the box
+        // as it is written, not squeezed into one pixel and repeated. The
+        // box starts at (2, 2).
+        File svg = new File(dir.toFile(), "img/bare.svg");
+        svg.getParentFile().mkdirs();
+        Files.write(svg.toPath(), ("<svg xmlns=\"http://www.w3.org/2000/svg\">"
+                + "<rect x=\"200\" y=\"40\" width=\"60\" height=\"30\" fill=\"#ff0000\"/></svg>")
+                .getBytes(StandardCharsets.UTF_8));
+        Compiled c = compile(dir, "Banner { width: 50%; height: 10%; background-color: #ffffff;"
+                + " background-image: url(img/bare.svg); box-shadow: 0 0 4px black; }");
+        BufferedImage img = stored(c.res, "Banner_1.png", Display.DENSITY_HD);
+
+        assertEquals(0xffff0000, img.getRGB(2 + 230, 2 + 55), "the rectangle, where the file puts it");
+        assertEquals(0xffffffff, img.getRGB(2 + 100, 2 + 55), "and nothing where it puts nothing");
+        assertEquals(0xffffffff, img.getRGB(2 + 230, 2 + 20));
+    }
+
+    @Test
     void anSvgKeepsItsShapeInATileOfAnotherShape(@TempDir Path dir) throws Exception {
         // A square drawing in a 320 by 100 tile is 100 by 100 in the middle
         // of it, as a browser fits one. The box starts at (2, 2).

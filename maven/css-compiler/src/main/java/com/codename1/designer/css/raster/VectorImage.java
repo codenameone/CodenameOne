@@ -150,15 +150,31 @@ public final class VectorImage {
 
     // A file that gives only a view box is the size of that box: the
     // parser fills in a side the root element leaves open, in the shape of
-    // the view box. The 1 below is for a file with neither.
-    /// The width the file asks for, in CSS pixels. At least 1.
-    public double getWidth() {
-        return doc.getWidth() > 0 ? doc.getWidth() : 1;
+    // the view box. A file with neither has no size of its own on that
+    // side, and is as large as whatever it is put in: a background's
+    // positioning area, which is for the caller to give. With nothing to
+    // be put in it is the 300 by 150 a browser falls back to.
+    private static final double DEFAULT_WIDTH = 300;
+    private static final double DEFAULT_HEIGHT = 150;
+
+    /// Whether the file says how wide it is, itself or through its view box.
+    public boolean hasWidth() {
+        return doc.getWidth() > 0;
     }
 
-    /// The height the file asks for, in CSS pixels. At least 1.
+    /// Whether the file says how high it is, itself or through its view box.
+    public boolean hasHeight() {
+        return doc.getHeight() > 0;
+    }
+
+    /// The width the file asks for, in CSS pixels; 300 when [#hasWidth] is false.
+    public double getWidth() {
+        return doc.getWidth() > 0 ? doc.getWidth() : DEFAULT_WIDTH;
+    }
+
+    /// The height the file asks for, in CSS pixels; 150 when [#hasHeight] is false.
     public double getHeight() {
-        return doc.getHeight() > 0 ? doc.getHeight() : 1;
+        return doc.getHeight() > 0 ? doc.getHeight() : DEFAULT_HEIGHT;
     }
 
     /// Paints the file into a viewport of `width` by `height` CSS pixels.
@@ -193,6 +209,7 @@ public final class VectorImage {
         try {
             Pixels.hints(g);
             g.scale(k, k);
+            AffineTransform view = new AffineTransform();
             if (scales) {
                 double vw = doc.getViewBoxWidth() > 0 ? doc.getViewBoxWidth() : getWidth();
                 double vh = doc.getViewBoxHeight() > 0 ? doc.getViewBoxHeight() : getHeight();
@@ -210,12 +227,18 @@ public final class VectorImage {
                     sx = s;
                     sy = s;
                 }
-                g.translate(tx, ty);
-                g.scale(sx, sy);
-                g.translate(-doc.getViewBoxX(), -doc.getViewBoxY());
+                view.translate(tx, ty);
+                view.scale(sx, sy);
+                view.translate(-doc.getViewBoxX(), -doc.getViewBoxY());
             }
-            for (SVGNode child : doc.getChildren()) {
-                paintNode(g, child, doc.getStyle(), w, h);
+            SVGGroup framed = rootEffects(view, width, height);
+            if (framed != null) {
+                paintNode(g, framed, doc.getStyle(), w, h);
+            } else {
+                g.transform(view);
+                for (SVGNode child : doc.getChildren()) {
+                    paintNode(g, child, doc.getStyle(), w, h);
+                }
             }
         } finally {
             g.dispose();
@@ -231,6 +254,53 @@ public final class VectorImage {
             out.setRGB(0, 0, w, h, px, 0, w);
         }
         return out;
+    }
+
+    /// The drawing as one group carrying what the root element does to it
+    /// as a whole: its `transform`, `clip-path`, `mask` and `filter`. None
+    /// of them is inherited, so handing the root's style down to its
+    /// children applies none of them. Null when the root asks for none.
+    ///
+    /// They belong to the root element and not to what is inside it, so
+    /// they are worked out in the viewport's coordinates, before the view
+    /// box is fitted. The root is the one element of the file that is a
+    /// box on the page, which is why its transform turns about the middle
+    /// of the viewport, where a transform on anything inside turns about
+    /// the origin.
+    private SVGGroup rootEffects(AffineTransform view, double width, double height) {
+        SVGStyle root = doc.getStyle();
+        SVGTransform turned = doc.getTransform();
+        boolean styled = root != null
+                && (root.getClipPathRef() != null || root.getMaskRef() != null || root.getFilterRef() != null);
+        if (!styled && (turned == null || turned.isIdentity())) {
+            return null;
+        }
+        SVGGroup inner = new SVGGroup();
+        double[] m = new double[6];
+        view.getMatrix(m);
+        inner.setTransform(new SVGTransform((float) m[0], (float) m[1], (float) m[2], (float) m[3],
+                (float) m[4], (float) m[5]));
+        for (SVGNode child : doc.getChildren()) {
+            inner.addChild(child);
+        }
+        SVGGroup outer = new SVGGroup();
+        outer.addChild(inner);
+        if (styled) {
+            SVGStyle effects = new SVGStyle();
+            effects.setClipPathRef(root.getClipPathRef());
+            effects.setMaskRef(root.getMaskRef());
+            effects.setFilterRef(root.getFilterRef());
+            outer.setStyle(effects);
+        }
+        if (turned != null && !turned.isIdentity()) {
+            AffineTransform about = AffineTransform.getTranslateInstance(width / 2, height / 2);
+            about.concatenate(new AffineTransform(turned.a, turned.b, turned.c, turned.d, turned.e, turned.f));
+            about.translate(-width / 2, -height / 2);
+            about.getMatrix(m);
+            outer.setTransform(new SVGTransform((float) m[0], (float) m[1], (float) m[2], (float) m[3],
+                    (float) m[4], (float) m[5]));
+        }
+        return outer;
     }
 
     /// Paints the file into a viewport of `width` by `height` pixels.
@@ -1037,11 +1107,12 @@ public final class VectorImage {
         SVGTransform own = clip.getTransform();
         addOutlines(all, clip, own == null ? new AffineTransform()
                         : new AffineTransform(own.a, own.b, own.c, own.d, own.e, own.f),
-                clip.getStyle() == null ? null : clip.getStyle().getClipEvenOdd());
+                clip.getStyle() == null ? null : clip.getStyle().getClipEvenOdd(), 0);
         return all;
     }
 
-    private void addOutlines(java.awt.geom.Area all, SVGGroup group, AffineTransform at, Boolean evenOdd) {
+    private void addOutlines(java.awt.geom.Area all, SVGGroup group, AffineTransform at, Boolean evenOdd,
+            int depth) {
         for (SVGNode child : group.getChildren()) {
             AffineTransform childAt = new AffineTransform(at);
             SVGTransform t = child.getTransform();
@@ -1050,8 +1121,20 @@ public final class VectorImage {
             }
             Boolean rule = child.getStyle() != null && child.getStyle().getClipEvenOdd() != null
                     ? child.getStyle().getClipEvenOdd() : evenOdd;
-            if (child instanceof SVGGroup) {
-                addOutlines(all, (SVGGroup) child, childAt, rule);
+            if (child instanceof SVGUse) {
+                // A clip path made of a shape defined elsewhere: the shape
+                // is cut out where the `<use>` puts it.
+                SVGUse use = (SVGUse) child;
+                SVGNode target = use.getHref() == null ? null : doc.getDefinitions().get(use.getHref());
+                if (target == null || target instanceof SVGClipPath || depth >= MAX_USE_DEPTH) {
+                    continue;
+                }
+                childAt.concatenate(placing(use, target));
+                SVGGroup one = new SVGGroup();
+                one.addChild(target);
+                addOutlines(all, one, childAt, rule, depth + 1);
+            } else if (child instanceof SVGGroup) {
+                addOutlines(all, (SVGGroup) child, childAt, rule, depth + 1);
             } else {
                 Shape shape = outline(child);
                 if (shape != null) {
@@ -1342,17 +1425,41 @@ public final class VectorImage {
             return null;
         }
         // Java2D wants strictly increasing fractions. Stops that share an
-        // offset are a hard edge, kept as the smallest step a float holds.
+        // offset are a hard edge, kept as the smallest step a float holds:
+        // each is put just after the one before it, and where that runs
+        // past the end -- stops sharing the offset 1 -- the last is the end
+        // and the ones before it are moved down instead. It is the last of
+        // them the gradient goes on in past its end, so it cannot be the
+        // one that is dropped.
+        //
+        // The colours between two stops are mixed channel by channel with
+        // the alpha as one more channel, not multiplied by it first. That
+        // is how an SVG gradient is defined and how a browser paints one --
+        // only a CSS gradient is mixed premultiplied -- so red fading to
+        // `transparent`, which is transparent black, darkens on the way
+        // here as it does there.
+        float[] placed = new float[stops.size()];
+        float before = -1f;
+        for (int i = 0; i < placed.length; i++) {
+            float offset = clamp(stops.get(i).getOffset());
+            placed[i] = offset <= before ? Math.nextUp(before) : offset;
+            before = placed[i];
+        }
+        float after = Math.nextUp(1f);
+        for (int i = placed.length - 1; i >= 0 && placed[i] >= after; i--) {
+            placed[i] = Math.max(0f, Math.nextDown(after));
+            after = placed[i];
+        }
         List<Float> fractions = new ArrayList<Float>();
         List<Color> colors = new ArrayList<Color>();
         float last = -1f;
-        for (SVGGradientStop stop : stops) {
-            float offset = clamp(stop.getOffset());
+        for (int i = 0; i < placed.length; i++) {
+            SVGGradientStop stop = stops.get(i);
+            float offset = placed[i];
             if (offset <= last) {
-                offset = Math.nextUp(last);
-            }
-            if (offset > 1f) {
-                break;
+                // More stops on one offset than there are floats to tell
+                // them apart; never in a file anyone wrote.
+                continue;
             }
             int alpha = Math.round(255f * clamp(stop.getOpacity()));
             int rgb = stop.getColor();
@@ -1636,6 +1743,11 @@ public final class VectorImage {
         useDepth++;
         try {
             Pixels.hints(tg);
+            // What a pattern holds is drawn from the corner of its tile:
+            // the tile's `x` and `y` say where the tiles are laid, and what
+            // is in them moves along. A rectangle at 20 in a tile at 20 is
+            // 20 inside the tile, in a browser as here, so the tile is not
+            // shifted back by its own position.
             tg.scale(iw / tw, ih / th);
             SVGPattern boxGiver = giver(chain, "viewBox", SVGPattern.class);
             SVGPattern contentUnits = giver(chain, "patternContentUnits", SVGPattern.class);

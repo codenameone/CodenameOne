@@ -104,6 +104,26 @@ public final class SVGParser {
     /** Counts the start tags passed, which is how an element is told apart between the two passes. */
     private static final class CountingReader extends StreamReaderDelegate {
         int started;
+        /**
+         * Whether white space is kept, for each element that is open: its
+         * own {@code xml:space} or, without one, that of the element it is in.
+         */
+        private final List<Boolean> spaces = new ArrayList<Boolean>();
+
+        boolean preservesSpace() {
+            return !spaces.isEmpty() && spaces.get(spaces.size() - 1).booleanValue();
+        }
+
+        private void track(int ev) {
+            if (ev == XMLStreamConstants.START_ELEMENT) {
+                started++;
+                String own = getAttributeValue("http://www.w3.org/XML/1998/namespace", "space");
+                spaces.add(own == null ? Boolean.valueOf(preservesSpace())
+                        : Boolean.valueOf("preserve".equals(own.trim())));
+            } else if (ev == XMLStreamConstants.END_ELEMENT && !spaces.isEmpty()) {
+                spaces.remove(spaces.size() - 1);
+            }
+        }
 
         CountingReader(XMLStreamReader r) {
             super(r);
@@ -112,14 +132,14 @@ public final class SVGParser {
         @Override
         public int next() throws XMLStreamException {
             int ev = super.next();
-            if (ev == XMLStreamConstants.START_ELEMENT) started++;
+            track(ev);
             return ev;
         }
 
         @Override
         public int nextTag() throws XMLStreamException {
             int ev = super.nextTag();
-            if (ev == XMLStreamConstants.START_ELEMENT) started++;
+            track(ev);
             return ev;
         }
     }
@@ -761,7 +781,7 @@ public final class SVGParser {
         readTextContent(r, content, t, null);
         t.setContent(content.toString());
         List<SVGText.Run> runs = t.getRuns();
-        if (!runs.isEmpty()) {
+        if (!runs.isEmpty() && !textSpaceKept) {
             SVGText.Run last = runs.get(runs.size() - 1);
             if (last.getText().endsWith(" ")) {
                 last.setText(last.getText().substring(0, last.getText().length() - 1));
@@ -772,6 +792,8 @@ public final class SVGParser {
 
     /** Whether the text read so far ends in white space, or has not begun: more of it is then dropped. */
     private boolean textSpaceBefore;
+    /** Whether the text last read was under {@code xml:space="preserve"}, which keeps a space at its end. */
+    private boolean textSpaceKept;
     /** Whether the span being read has still to hand its position to a run. */
     private boolean spanUnplaced;
 
@@ -786,12 +808,17 @@ public final class SVGParser {
                 String raw = r.getText();
                 out.append(raw);
                 // White space as a browser shows it: any run of it one
-                // space, and none at the start of the text.
+                // space, and none at the start of the text. Under
+                // xml:space="preserve", its own or an ancestor's, every
+                // character of it is kept instead, as a space each: text
+                // lined up with spaces stays lined up.
+                boolean kept = reader != null && reader.preservesSpace();
+                textSpaceKept = kept;
                 StringBuilder shown = new StringBuilder();
                 for (int i = 0; i < raw.length(); i++) {
                     char c = raw.charAt(i);
                     boolean space = c == ' ' || c == '\t' || c == '\n' || c == '\r';
-                    if (space && textSpaceBefore) continue;
+                    if (space && textSpaceBefore && !kept) continue;
                     shown.append(space ? ' ' : c);
                     textSpaceBefore = space;
                 }

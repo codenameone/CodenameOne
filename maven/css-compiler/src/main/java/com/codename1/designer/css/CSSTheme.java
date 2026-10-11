@@ -5142,6 +5142,24 @@ public class CSSTheme {
                 // for an enormous size costs no more than its tile.
                 double[] tile = BackgroundImagePainter.tileSize(vector.getWidth(), vector.getHeight(), layer,
                         boxWidth, boxHeight);
+                if (!vector.hasWidth() || !vector.hasHeight()) {
+                    // A file that does not say how large it is has no shape
+                    // either: a side it leaves open is the side of the box
+                    // it is put in, and made to cover or to fit, it is the
+                    // box. Only a side the rule gives stays as given.
+                    tile = new double[] {vector.hasWidth() ? vector.getWidth() : boxWidth,
+                        vector.hasHeight() ? vector.getHeight() : boxHeight};
+                    if (explicit != null) {
+                        if (explicit[0] >= 0) {
+                            tile[0] = explicit[0];
+                        }
+                        if (explicit[1] >= 0) {
+                            tile[1] = explicit[1];
+                        }
+                    } else if (size != BackgroundImage.Size.AUTO) {
+                        tile = new double[] {boxWidth, boxHeight};
+                    }
+                }
                 if (!(tile[0] > 0) || !(tile[1] > 0) || Double.isInfinite(tile[0]) || Double.isInfinite(tile[1])) {
                     tile = new double[] {vector.getWidth(), vector.getHeight()};
                 }

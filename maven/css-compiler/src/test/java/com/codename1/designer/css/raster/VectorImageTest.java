@@ -23,6 +23,7 @@
 package com.codename1.designer.css.raster;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.awt.image.BufferedImage;
@@ -903,5 +904,68 @@ class VectorImageTest {
         assertEquals(0xff00ff00, img.getRGB(37, 50), "a prefix, on a type");
         assertEquals(0xff0000ff, img.getRGB(62, 50), "one word of a list");
         assertEquals(0xff000000, img.getRGB(87, 50), "another value is not selected");
+    }
+
+    @Test
+    void whatTheRootElementDoesToTheDrawingIsDoneToAllOfIt() throws Exception {
+        String open = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\" viewBox=\"0 0 100 100\"";
+        String square = "<rect width=\"40\" height=\"40\" fill=\"#ff0000\"/></svg>";
+        BufferedImage moved = read(open + " transform=\"translate(50 0)\">" + square).paint(100, 100);
+        assertEquals(0xffff0000, moved.getRGB(70, 20), "moved by the root's transform");
+        assertEquals(0, alpha(moved, 20, 20));
+
+        BufferedImage turned = read(open + " transform=\"rotate(180)\">" + square).paint(100, 100);
+        assertEquals(0xffff0000, turned.getRGB(80, 80), "turned about the middle of the viewport");
+        assertEquals(0, alpha(turned, 20, 20));
+
+        BufferedImage cut = read(open + " clip-path=\"url(#c)\"><defs><clipPath id=\"c\">"
+                + "<rect width=\"20\" height=\"100\"/></clipPath></defs>" + square).paint(100, 100);
+        assertEquals(0xffff0000, cut.getRGB(10, 20), "inside the root's clip path");
+        assertEquals(0, alpha(cut, 30, 20), "outside it");
+    }
+
+    @Test
+    void theLastOfTheStopsAtTheEndIsTheColourPastIt() throws Exception {
+        BufferedImage img = paint("<defs><linearGradient id=\"g\" gradientUnits=\"userSpaceOnUse\" x1=\"0\" x2=\"50\">"
+                + "<stop offset=\"0\" stop-color=\"#ff0000\"/><stop offset=\"1\" stop-color=\"#ff0000\"/>"
+                + "<stop offset=\"1\" stop-color=\"#0000ff\"/></linearGradient></defs>"
+                + "<rect width=\"100\" height=\"100\" fill=\"url(#g)\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(25, 50), "before the end");
+        // The two stops are one float apart, which leaves a trace of the first.
+        int past = img.getRGB(75, 50);
+        assertTrue((past & 0xff) >= 250 && ((past >> 16) & 0xff) <= 5, "past the end, the stop written last");
+    }
+
+    @Test
+    void aClipPathCanBeMadeOfAShapeDefinedElsewhere() throws Exception {
+        BufferedImage img = paint("<defs><rect id=\"s\" width=\"30\" height=\"100\"/>"
+                + "<clipPath id=\"c\"><use href=\"#s\" x=\"50\"/></clipPath></defs>"
+                + "<rect width=\"100\" height=\"100\" fill=\"#ff0000\" clip-path=\"url(#c)\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(65, 50), "where the use puts the shape");
+        assertEquals(0, alpha(img, 20, 50));
+        assertEquals(0, alpha(img, 90, 50));
+    }
+
+    @Test
+    void preservedWhiteSpaceIsNotCollapsed() throws Exception {
+        String font = " font-family=\"monospace\" font-size=\"10\"";
+        BufferedImage collapsed = paint("<text x=\"5\" y=\"30\"" + font + ">I     I</text>", 100, 100);
+        BufferedImage kept = paint("<g xml:space=\"preserve\"><text x=\"5\" y=\"30\"" + font
+                + ">I     I</text></g>", 100, 100);
+        BufferedImage back = paint("<g xml:space=\"preserve\"><text xml:space=\"default\" x=\"5\" y=\"30\"" + font
+                + ">I     I</text></g>", 100, 100);
+        assertTrue(inkRight(kept) > inkRight(collapsed) + 10, "five spaces are wider than one");
+        assertEquals(inkRight(collapsed), inkRight(back), "an element can turn it off again");
+    }
+
+    @Test
+    void aFileWithNoSizeSaysSo() throws Exception {
+        VectorImage bare = read("<svg xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"9\" height=\"9\"/></svg>");
+        assertFalse(bare.hasWidth());
+        assertFalse(bare.hasHeight());
+        assertEquals(300.0, bare.getWidth(), 0.001);
+        assertEquals(150.0, bare.getHeight(), 0.001);
+        VectorImage boxed = read("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 8 4\"/>");
+        assertTrue(boxed.hasWidth() && boxed.hasHeight(), "a view box is a size");
     }
 }
