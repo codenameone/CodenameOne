@@ -238,7 +238,8 @@ final class BackendSupport {
         compile.getInputs().files(project.fileTree(layout.projectDir(), tree -> {
             tree.include("application.properties", "application-*.properties",
                     "src/main/resources/application.properties",
-                    "src/main/resources/application-*.properties");
+                    "src/main/resources/application-*.properties",
+                    "src/main/resources/templates/**/*.html", "src/main/resources/static/**");
         })).withPropertyName("cn1BackendSettings")
                 .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE);
     }

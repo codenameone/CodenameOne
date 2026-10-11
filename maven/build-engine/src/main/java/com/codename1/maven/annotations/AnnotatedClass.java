@@ -43,6 +43,7 @@ public final class AnnotatedClass {
 
     private final String internalName;
     private String sourceFile;
+    private String signature;
     private final String superInternalName;
     private final List<String> interfaceInternalNames;
     private final int access;
@@ -132,6 +133,11 @@ public final class AnnotatedClass {
     }
 
     void setSourceName(String sourceName) { this.sourceName = sourceName; }
+
+    /// The class generic signature, including type parameters and inherited arguments.
+    public String getSignature() { return signature; }
+
+    void setSignature(String signature) { this.signature = signature; }
 
     void setSourceFile(String sourceFile) { this.sourceFile = sourceFile; }
     private boolean accessible = true;

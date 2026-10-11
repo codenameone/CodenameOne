@@ -31,6 +31,8 @@
     </properties>
 
     <dependencies>
+        <!-- Build-only HTML parsing; never linked into backend applications. -->
+        <dependency><groupId>org.jsoup</groupId><artifactId>jsoup</artifactId><version>1.17.2</version></dependency>
         <!-- FIRST, before any port. Maven orders the test classpath by declaration,
              and codenameone-android brings the Android platform jar, whose junit.*
              classes are "Stub!" throwing stubs. Declared after it, JUnit 4 resolved to

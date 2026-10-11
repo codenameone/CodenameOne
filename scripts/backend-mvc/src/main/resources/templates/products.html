@@ -1,0 +1,11 @@
+<!-- cn1:model products java.util.List<example.Product> -->
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head}"></head><body><header th:replace="~{layout :: header}"></header>
+<main id="workspace" th:fragment="catalog">
+<div class="title"><div><h1>Products</h1><p>A small inventory, served directly from Java.</p></div><a class="button" href="/products/new" hx-get="/products/new" hx-target="#workspace" hx-swap="outerHTML">Add product</a></div>
+<table><thead><tr><th>Name</th><th>Quantity</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+<tr th:each="product : ${products}"><td th:text="${product.name}">Notebook</td><td th:text="${product.quantity}">12</td><td th:text="${product.active ? 'Active' : 'Inactive'}">Active</td>
+<td class="actions"><a th:href="@{/products/{id}(id=${product.id})}" th:attr="hx-get=@{/products/{id}(id=${product.id})}" hx-target="#workspace" hx-swap="outerHTML">Edit</a>
+<form method="post" th:action="@{/products/{id}/delete(id=${product.id})}" th:attr="hx-post=@{/products/{id}/delete(id=${product.id})}" hx-target="#workspace" hx-swap="outerHTML"><button class="quiet" type="submit">Delete</button></form></td></tr>
+</tbody></table><p th:if="${products.empty}">No products yet. Add your first one.</p>
+</main></body></html>

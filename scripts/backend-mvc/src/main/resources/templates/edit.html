@@ -1,0 +1,12 @@
+<!-- cn1:model form example.ProductForm -->
+<!-- cn1:model action java.lang.String -->
+<!-- cn1:model heading java.lang.String -->
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head}"></head><body><header th:replace="~{layout :: header}"></header>
+<main id="workspace" th:fragment="editor"><h1 th:text="${heading}">Add product</h1>
+<form method="post" th:action="${action}" th:object="${form}" th:attr="hx-post=${action}" hx-target="#workspace" hx-swap="outerHTML" novalidate>
+<label for="name">Name</label><input th:field="*{name}" autocomplete="off"><p class="error" th:errors="*{name}"></p>
+<label for="quantity">Quantity</label><input th:field="*{quantity}" inputmode="numeric"><p class="error" th:errors="*{quantity}"></p>
+<label class="check"><input type="checkbox" th:field="*{active}"> Active</label>
+<div class="actions"><button type="submit">Save product</button><a href="/products" hx-get="/products" hx-target="#workspace" hx-swap="outerHTML">Cancel</a></div>
+</form></main></body></html>
