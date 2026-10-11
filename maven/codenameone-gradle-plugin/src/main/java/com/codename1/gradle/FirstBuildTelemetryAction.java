@@ -105,6 +105,7 @@ public abstract class FirstBuildTelemetryAction implements FlowAction<FirstBuild
     /// whole environment would make every variable a configuration cache input.
     private static final String[] ENV = {
         FirstBuildTelemetry.OPT_OUT_ENV, FirstBuildTelemetry.LAUNCHER_ENV,
+        "CI", "GITHUB_ACTIONS", "TF_BUILD", "JENKINS_URL",
         "IDEA_INITIAL_DIRECTORY", "TERMINAL_EMULATOR", "ECLIPSE_HOME",
         "TERM_PROGRAM", "VSCODE_PID", "VSCODE_IPC_HOOK_CLI"
     };

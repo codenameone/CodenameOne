@@ -103,6 +103,13 @@ public final class FirstBuildTelemetry {
         if (!isBlank(env.get(LAUNCHER_ENV))) {
             return null;
         }
+        if (isContinuousIntegration(env)) {
+            // A CI server building a generated project is not a developer's first
+            // build. Codename One's own CI builds Initializr projects on every push,
+            // and with the plugin reporting it filled the funnel with them: 180
+            // builds of one test project in a day, against a handful of real ones.
+            return null;
+        }
         String url = endpoint.trim();
         if (!url.startsWith("https://") && !url.startsWith("http://")) {
             return null;
@@ -196,6 +203,18 @@ public final class FirstBuildTelemetry {
         } catch (SecurityException ex) {
             return null;
         }
+    }
+
+    /// Whether the build runs on a CI server. `CI` is set by GitHub Actions, GitLab,
+    /// CircleCI, Travis, Bitbucket, Azure Pipelines (as `TF_BUILD`) and most others;
+    /// Jenkins sets `JENKINS_URL`.
+    static boolean isContinuousIntegration(Map<String, String> env) {
+        String ci = trim(env.get("CI"));
+        if (ci != null && !ci.isEmpty() && !"false".equalsIgnoreCase(ci) && !"0".equals(ci)) {
+            return true;
+        }
+        return !isBlank(env.get("TF_BUILD")) || !isBlank(env.get("JENKINS_URL"))
+                || !isBlank(env.get("GITHUB_ACTIONS"));
     }
 
     /// Reports that the build started, without waiting for the request: a slow or
