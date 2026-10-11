@@ -129,7 +129,11 @@ class ShapedElevatedButtonShadowTest {
         assertTrue(s.getBorder() instanceof RoundRectBorder,
                 "a BeveledRectangleBorder shape routes through RoundRectBorder");
         RoundRectBorder border = (RoundRectBorder) s.getBorder();
-        assertEquals(40, border.getShadowOpacity(), "elevation: 8 must still cast a shadow");
+        // Scaled by elevation via ElevationShadow, the same mapping Card and FabRenderElement
+        // use, rather than a flat opacity regardless of how high the style's own elevation
+        // asks for: min(255, round(20 + 8 * 15)) = 140.
+        assertEquals(140, border.getShadowOpacity(), "elevation: 8 must cast a shadow "
+                + "stronger than Material's elevation-1 default, not a flat constant");
 
         // The actual regression: paintBorderBackground's createTargetComponentImage
         // subtracts this SAME pixel amount from BOTH the fill's width and height before

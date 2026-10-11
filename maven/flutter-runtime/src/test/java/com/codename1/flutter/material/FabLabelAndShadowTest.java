@@ -100,31 +100,50 @@ class FabLabelAndShadowTest {
     // Drop shadow: stripped only for a DOCKED fab (Reply's centerDocked
     // compose button sits in a notched bar that already shades it); a
     // floating one -- the "Back" chip, positioned by StudyWrapper itself,
-    // never by a Scaffold fab slot -- keeps whatever shadow its border carries.
+    // never by a Scaffold fab slot -- casts its OWN elevation shadow via
+    // FabRenderElement.applyElevationShadow, regardless of what the
+    // theme's own border carries.
     // ------------------------------------------------------------------
 
     private static RoundBorder shadowedPillBorder() {
         return RoundBorder.create().rectangle(true).shadowOpacity(40);
     }
 
+    /**
+     * What {@code CN1FlutterMaterialTheme.res}'s "FloatingActionButton" UIID border
+     * actually carries, measured directly off the resource: a border with {@code
+     * shadowOpacity} 0. Codename One's own {@code
+     * com.codename1.components.FloatingActionButton} component class supplies its
+     * own non-zero shadow from {@code styleChanged()}, and the theme was authored
+     * leaning on that -- but {@code FabRenderElement} uses a plain {@code Button}
+     * instead (see its {@code createComponent}'s comment on why), so nothing ever
+     * did, and the gallery's floating "Back" chip (Shrine's login, Reply's inbox)
+     * cast no shadow at all. A {@code RoundBorder} reproduces the same zero-shadow
+     * starting point this headless suite's bare UIManager leaves a FAB with.
+     */
+    private static RoundBorder zeroShadowPillBorder() {
+        return RoundBorder.create().rectangle(true).shadowOpacity(0);
+    }
+
     @Test
-    void aFloatingFabKeepsItsBordersShadow() {
+    void aFloatingFabCastsItsOwnShadowEvenWhenItsThemeBorderHasNone() {
         FabRenderElement el = mountFab(new Text("Back"));
         Component c = el.component();
         // Component.getAllStyles() is a write-only proxy (its setters fan out
         // to the real per-state styles, but its OWN getters stay blank) -- the
         // write lands correctly, and getUnselectedStyle() is where to read it
         // back, exactly as FabRenderElement.stripBorderShadowIfDocked() does.
-        c.getAllStyles().setBorder(shadowedPillBorder());
+        c.getAllStyles().setBorder(zeroShadowPillBorder());
 
-        // Re-runs the same style pass createComponent used, now that the
-        // border actually carries a shadow -- what the real packaged theme's
-        // "FloatingActionButton" UIID border carries and this headless
-        // environment's bare UIManager does not.
+        // Re-runs the same style pass createComponent used, starting from the
+        // SAME shadowless border the real packaged theme supplies.
         el.updateComponent(c);
 
-        assertEquals(40, ((RoundBorder) c.getUnselectedStyle().getBorder()).getShadowOpacity(),
-                "a floating FAB is never inside a Scaffold's fab slot here, so it is not docked");
+        // No elevation: stated on this widget, so FabRenderElement falls back to
+        // Material 3's default FAB elevation (6) -- ElevationShadow.opacity(6).
+        assertEquals(110, ((RoundBorder) c.getUnselectedStyle().getBorder()).getShadowOpacity(),
+                "an undocked FAB must cast its own elevation shadow, not rely on the "
+                        + "theme's border already carrying one");
     }
 
     @Test

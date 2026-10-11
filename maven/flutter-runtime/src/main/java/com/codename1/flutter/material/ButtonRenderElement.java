@@ -345,19 +345,6 @@ public class ButtonRenderElement extends RenderElement {
         // style first: the material icon glyph derives its color from the
         // button's foreground style
         style(b);
-        String label = consumedLabel();
-        char glyph = consumedIconChar();
-        b.setText(label == null ? "" : label);
-        applyLabelFont(b);
-        if (glyph != 0) {
-            try {
-                FontImage.setMaterialIcon(b, glyph, Dp.mm(iconSizeLp()));
-            } catch (Exception err) {
-                // missing icon font: layout still reserves the box
-            }
-        } else {
-            b.setIcon(null);
-        }
         b.setEnabled(onPressed() != null);
         // AFTER setEnabled, not inside style(): style() runs first, when the
         // button is still enabled by default, so a disabled-ink pass in there
@@ -376,6 +363,32 @@ public class ButtonRenderElement extends RenderElement {
             } catch (Exception noTheme) {
                 // an unthemed button keeps its base look
             }
+        }
+        // BEFORE the glyph is created, not after: FontImage.setMaterialIcon (below)
+        // bakes a SEPARATE disabled-state icon only when the button's disabled style
+        // already differs from its unselected one at the moment it is called (see its
+        // own per-channel comparison). setEnabled/applyDisabledInk above is what makes
+        // that style actually differ -- running the icon creation first always found
+        // the two equal (disabled still wore the same ink as enabled) and kept
+        // reusing the one enabled-coloured image for every state, so a disabled
+        // TextButton.icon's glyph -- the Text Button demo's "+" -- stayed the full
+        // enabled purple no matter the button's state, while its TEXT label (read
+        // live from the Style at paint time, never baked) faded correctly. Flutter
+        // paints both the icon and the label of a disabled button in the same
+        // onSurface-38% foreground (ButtonStyleButton.defaultStyleOf resolves one
+        // foregroundColor for the whole button, text and icon alike).
+        String label = consumedLabel();
+        char glyph = consumedIconChar();
+        b.setText(label == null ? "" : label);
+        applyLabelFont(b);
+        if (glyph != 0) {
+            try {
+                FontImage.setMaterialIcon(b, glyph, Dp.mm(iconSizeLp()));
+            } catch (Exception err) {
+                // missing icon font: layout still reserves the box
+            }
+        } else {
+            b.setIcon(null);
         }
     }
 
@@ -478,7 +491,15 @@ public class ButtonRenderElement extends RenderElement {
                         .rectangle(true)
                         .color(styled(st == null ? null : st.getBackgroundColor(), cs.surfaceContainerLow()).rgb());
                 if (!isElevationZero(st)) {
-                    border = border.shadowOpacity(40);
+                    // Scaled by elevation, the same ElevationShadow mapping every other
+                    // elevated surface in this runtime uses (Card, the shaped branch
+                    // below) -- a flat shadowOpacity(40) regardless of elevation used to
+                    // leave an elevation-8 button (Shrine's "NEXT", which actually takes
+                    // the SHAPED branch below, not this one) wearing the same faint
+                    // shadow as Material 3's elevation-1 resting default.
+                    double elevation = resolvedElevation(st);
+                    border = border.shadowOpacity(ElevationShadow.opacity(elevation))
+                            .shadowSpread(Math.round(ElevationShadow.spreadMm(elevation)), true);
                 }
                 all.setBorder(border);
                 clearBackground(all);
@@ -585,6 +606,15 @@ public class ButtonRenderElement extends RenderElement {
     /** Whether a style's elevation is explicitly 0 -- Flutter's cue to drop the shadow. */
     private static boolean isElevationZero(ButtonStyle st) {
         return st != null && st.getElevation() != null && st.getElevation().doubleValue() == 0.0;
+    }
+
+    /**
+     * {@code st.getElevation()}, or Material 3's ElevatedButton resting default (1) when
+     * the style names none -- the same fallback {@link CardRenderElement} applies for an
+     * unstated {@code Card.elevation}.
+     */
+    private static double resolvedElevation(ButtonStyle st) {
+        return st != null && st.getElevation() != null ? st.getElevation().doubleValue() : 1;
     }
 
     /**
@@ -760,6 +790,7 @@ public class ButtonRenderElement extends RenderElement {
         int[] shapedPad = resolvedPadding(st, vpad, hpad);
         all.setPadding(shapedPad[0], shapedPad[1], shapedPad[2], shapedPad[3]);
         com.codename1.flutter.Color fg = styled(st == null ? null : st.getForegroundColor(), cs.primary());
+        double elevation = resolvedElevation(st);
         com.codename1.ui.plaf.RoundRectBorder border =
                 com.codename1.ui.plaf.RoundRectBorder.create()
                         .useCache(false)
@@ -785,13 +816,20 @@ public class ButtonRenderElement extends RenderElement {
                         // out independently, at the button's own correct, un-shrunk bounds)
                         // reading as if it had been pushed out from under it. The float (mm)
                         // overload stores its argument directly with no such re-reading, so
-                        // stating ONE explicit millimetre here -- a visible spread, matching
-                        // the order of magnitude #style's own un-shaped ElevatedButton branch
-                        // already gets from RoundBorder's correctly single-converted 2mm
-                        // default -- fixes the growth to linear without touching the shared
-                        // class, same as CupertinoButton.filled already pins its own shape
-                        // parameters locally rather than relying on a border's defaults.
-                        .shadowSpread(1f);
+                        // stating an explicit millimetre value here -- via the SAME
+                        // ElevationShadow mapping every other elevated surface in this runtime
+                        // uses -- fixes the growth to linear without touching the shared class,
+                        // same as CupertinoButton.filled already pins its own shape parameters
+                        // locally rather than relying on a border's defaults. A flat 1mm here
+                        // regardless of elevation used to leave Shrine's elevation-8 "NEXT" with
+                        // the same faint spread as any other elevated button; ElevationShadow's
+                        // own floor is exactly that prior flat value, so nothing below it
+                        // regresses, and elevation 8 now reads as its capped 1.8mm (see
+                        // ElevationShadow.spreadMm's own comment on why the cap is lower than
+                        // RoundRectBorder's danger zone: this button's own capsule padding is
+                        // the tighter budget, and theShadowsSpreadNeverOutgrowsTheButtonsOwnPadding
+                        // enforces it).
+                        .shadowSpread(ElevationShadow.spreadMm(elevation));
         if (w instanceof OutlinedButton) {
             all.setFgColor(fg.rgb());
             border = border.stroke(Dp.mm(0.3), true).strokeColor(fg.rgb())
@@ -812,9 +850,13 @@ public class ButtonRenderElement extends RenderElement {
             // ElevatedButton.styleFrom(elevation: 8, shape: BeveledRectangleBorder(...))
             // -- RoundRectBorder defaults shadowOpacity to 0, so leaving this unset
             // (as the shape-named path always had) painted its "NEXT" button flat
-            // where the reference casts a clear drop shadow.
+            // where the reference casts a clear drop shadow. A flat shadowOpacity(40)
+            // here then left it only FAINTLY shadowed regardless of its stated
+            // elevation: 8 -- ElevationShadow.opacity scales with elevation instead,
+            // close to that same 40 at elevation 1 (35) and much stronger at Shrine's
+            // 8 (min(255, round(20 + 8 * 15)) = 140).
             if (!isElevationZero(st)) {
-                border = border.shadowOpacity(40);
+                border = border.shadowOpacity(ElevationShadow.opacity(elevation));
             }
         }
         all.setBorder(border);

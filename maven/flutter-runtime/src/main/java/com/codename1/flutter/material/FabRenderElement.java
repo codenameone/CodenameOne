@@ -218,6 +218,51 @@ public class FabRenderElement extends RenderElement {
         setGlyph(c);
     }
 
+    /** Material 3's default floating action button elevation. */
+    private static final double FAB_ELEVATION_DEFAULT = 6;
+
+    /**
+     * Gives the FAB's border a shadow scaled by elevation -- the same
+     * {@link ElevationShadow} mapping {@link CardRenderElement} and
+     * {@link ButtonRenderElement} use.
+     *
+     * <p>The packaged theme's own "FloatingActionButton" UIID border ships with
+     * {@code shadowOpacity} 0 (measured directly off {@code
+     * CN1FlutterMaterialTheme.res}): Codename One's own {@code
+     * com.codename1.components.FloatingActionButton} component class sets its
+     * own non-zero shadow from {@code styleChanged()}, and the theme's border
+     * was authored to lean on that -- but this element deliberately uses a
+     * plain {@code Button} instead (see {@link #createComponent}'s comment on
+     * why), so nothing ever supplied one. That is why the gallery's floating
+     * "Back" chip (Shrine's login, Reply's inbox) cast no shadow at all despite
+     * {@link #stripBorderShadowIfDocked} already correctly leaving an undocked
+     * FAB's shadow alone -- there was never a shadow there to leave alone.</p>
+     *
+     * <p>Both border types this element's own shape code can produce are
+     * handled, read the same way {@link #stripBorderShadowIfDocked} does (from
+     * {@code c.getUnselectedStyle()}, never the {@code getAllStyles()} proxy
+     * whose own getters are blank). Runs BEFORE {@link
+     * #stripBorderShadowIfDocked}, which still zeroes this back out for a
+     * docked FAB.</p>
+     */
+    private void applyElevationShadow(Component c) {
+        Double stated = fab().getElevation();
+        double elevation = stated != null ? stated.doubleValue() : FAB_ELEVATION_DEFAULT;
+        if (elevation <= 0) {
+            return;
+        }
+        int opacity = ElevationShadow.opacity(elevation);
+        float spreadMm = ElevationShadow.spreadMm(elevation);
+        com.codename1.ui.plaf.Border b = c.getUnselectedStyle().getBorder();
+        if (b instanceof com.codename1.ui.plaf.RoundBorder) {
+            c.getAllStyles().setBorder(((com.codename1.ui.plaf.RoundBorder) b)
+                    .shadowOpacity(opacity).shadowSpread(Math.round(spreadMm), true));
+        } else if (b instanceof com.codename1.ui.plaf.RoundRectBorder) {
+            c.getAllStyles().setBorder(((com.codename1.ui.plaf.RoundRectBorder) b)
+                    .shadowOpacity(opacity).shadowSpread(spreadMm));
+        }
+    }
+
     /**
      * Removes the drop shadow a Codename One round border draws for itself, for a
      * DOCKED floating action button only.
@@ -330,12 +375,18 @@ public class FabRenderElement extends RenderElement {
                 ((com.codename1.ui.Button) c).setGap((int) Math.round(
                         com.codename1.flutter.rendering.Dp.px(EXTENDED_ICON_LABEL_SPACING_LP)));
             }
-            com.codename1.ui.plaf.Border b = all.getBorder();
+            // Read from getUnselectedStyle(), never from the getAllStyles() proxy `all`:
+            // its OWN getBorder() always answers null (see stripBorderShadowIfDocked's
+            // javadoc on the same trap), so this test -- and the label==null one right
+            // below, which had the identical bug -- always missed, and an extended FAB
+            // whose theme border happened to be a RoundBorder never became a pill.
+            com.codename1.ui.plaf.Border b = c.getUnselectedStyle().getBorder();
             if (b instanceof com.codename1.ui.plaf.RoundBorder) {
                 all.setBorder(((com.codename1.ui.plaf.RoundBorder) b).rectangle(true));
             }
         }
-        if (label == null && !(all.getBorder() instanceof com.codename1.ui.plaf.RoundRectBorder)) {
+        if (label == null
+                && !(c.getUnselectedStyle().getBorder() instanceof com.codename1.ui.plaf.RoundRectBorder)) {
             // A Material 3 FAB is a ROUNDED SQUARE -- a 16 logical pixel corner
             // radius -- not the disc Material 2 used. Codename One's own
             // FloatingActionButton takes its shape from its theme entry, so a
@@ -347,6 +398,7 @@ public class FabRenderElement extends RenderElement {
                     .strokeOpacity(0)
                     .shadowOpacity(0));
         }
+        applyElevationShadow(c);
         stripBorderShadowIfDocked(c);
         com.codename1.flutter.Color bg = fab().getBackgroundColor();
         com.codename1.flutter.Color fgDefault = null;

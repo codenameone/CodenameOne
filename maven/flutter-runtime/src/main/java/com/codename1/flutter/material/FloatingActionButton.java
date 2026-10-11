@@ -106,6 +106,11 @@ public class FloatingActionButton extends Widget {
         return foregroundColor;
     }
 
+    /** The widget's own {@code elevation:}, or null when it states none. */
+    public Double getElevation() {
+        return elevation;
+    }
+
     /**
      * {@code FloatingActionButton.extended}: a pill-shaped FAB carrying a label
      * and, usually, a leading glyph.

@@ -126,9 +126,13 @@ public class CardRenderElement extends SingleChildRenderElement {
                     .useCache(true)
                     .cornerRadius(Dp.mm(CORNER_LP));
             if (elevation > 0) {
+                // ElevationShadow.spreadMm floors at 1mm -- this card's own default
+                // elevation (1) used to compute 0.25 + 1 * 0.25 = 0.5mm here, which left
+                // the gallery's Cards demo with no visible shadow at all; see that
+                // method's comment for the pixel evidence.
                 border = border
-                        .shadowOpacity(Math.min(255, (int) Math.round(20 + elevation * 15)))
-                        .shadowSpread((float) Math.min(3, 0.25f + elevation * 0.25f))
+                        .shadowOpacity(ElevationShadow.opacity(elevation))
+                        .shadowSpread(ElevationShadow.spreadMm(elevation))
                         .shadowY(1);
             }
             face.getAllStyles().setBgColor(bg);
