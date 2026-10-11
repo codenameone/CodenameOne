@@ -324,8 +324,16 @@ final class LayoutSupport {
     /// what may be larger than it would like without being told to grow,
     /// a text field or a slider: a control with no one right size loses
     /// nothing a reader misses, and a label loses letters.
+    ///
+    /// A page in a browser is such a display on a desktop as well: it is
+    /// as wide as the browser made it, and no window there takes the size
+    /// its content asks for.
     static boolean growersGiveFirst() {
-        return com.codename1.ui.Display.isInitialized() && !com.codename1.ui.Display.getInstance().isDesktop();
+        if (!com.codename1.ui.Display.isInitialized()) {
+            return false;
+        }
+        com.codename1.ui.Display d = com.codename1.ui.Display.getInstance();
+        return !d.isDesktop() || "HTML5".equals(d.getPlatformName());
     }
 
     /// Fits the areas of a box to the length it has: grows the children

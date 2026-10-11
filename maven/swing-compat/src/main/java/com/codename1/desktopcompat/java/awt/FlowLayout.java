@@ -208,8 +208,13 @@ public class FlowLayout implements LayoutManager {
     }
 
     private static boolean followsItsWidth(Container target) {
-        return target.isDisplayable() && com.codename1.ui.Display.isInitialized()
-                && !com.codename1.ui.Display.getInstance().isDesktop();
+        if (!target.isDisplayable() || !com.codename1.ui.Display.isInitialized()) {
+            return false;
+        }
+        // A page in a browser is as wide as the browser made it, on a
+        // desktop too: no window there takes the size its content asks for.
+        com.codename1.ui.Display d = com.codename1.ui.Display.getInstance();
+        return !d.isDesktop() || "HTML5".equals(d.getPlatformName());
     }
 
     @Override
