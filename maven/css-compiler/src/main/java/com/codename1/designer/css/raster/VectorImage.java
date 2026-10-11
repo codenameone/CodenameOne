@@ -648,7 +648,9 @@ public final class VectorImage {
                 // size shows nothing.
                 SVGViewport port = (SVGViewport) node;
                 if (port.getWidth() > 0 && port.getHeight() > 0) {
-                    g.clip(new Rectangle2D.Double(port.getX(), port.getY(), port.getWidth(), port.getHeight()));
+                    if (!port.isOverflowVisible()) {
+                        g.clip(new Rectangle2D.Double(port.getX(), port.getY(), port.getWidth(), port.getHeight()));
+                    }
                     g.transform(layout(port));
                     for (SVGNode child : port.getContent().getChildren()) {
                         paintNode(g, child, style, w, h);
@@ -905,8 +907,23 @@ public final class VectorImage {
         if (!(clip instanceof SVGClipPath)) {
             return null;
         }
-        Shape outline = clipOutline((SVGClipPath) clip);
-        if (((SVGClipPath) clip).isObjectBoundingBox()) {
+        // A clip path that is clipped itself, or that holds a shape that
+        // is, asks for another one from in here. One that comes back to
+        // itself that way would never end, and clips nothing.
+        if (clipDepth >= MAX_USE_DEPTH) {
+            return null;
+        }
+        clipDepth++;
+        try {
+            return clipShape(node, (SVGClipPath) clip);
+        } finally {
+            clipDepth--;
+        }
+    }
+
+    private Shape clipShape(SVGNode node, SVGClipPath clip) {
+        Shape outline = clipOutline(clip);
+        if (clip.isObjectBoundingBox()) {
             // In fractions of the box around what is clipped. With no box
             // to measure, nothing is inside it.
             Rectangle2D box = boundsOf(node);
@@ -914,8 +931,22 @@ public final class VectorImage {
                     : new AffineTransform(box.getWidth(), 0, 0, box.getHeight(), box.getX(), box.getY())
                             .createTransformedShape(outline);
         }
+        // A `clip-path` on the clip path itself: only what is inside both
+        // is kept.
+        String again = clip.getStyle() == null ? null : clip.getStyle().getClipPathRef();
+        if (again != null) {
+            Shape outer = clipShape(node, again);
+            if (outer != null) {
+                java.awt.geom.Area both = new java.awt.geom.Area(outline);
+                both.intersect(new java.awt.geom.Area(outer));
+                outline = both;
+            }
+        }
         return outline;
     }
+
+    /// How many clip paths deep the one being worked out is.
+    private int clipDepth;
 
     /// Draws the element a `<use>` names, at the offset it gives. What the
     /// element does not set for itself it takes from the `<use>`, as if it
@@ -1138,9 +1169,18 @@ public final class VectorImage {
             } else {
                 Shape shape = outline(child);
                 if (shape != null) {
-                    Path2D.Double ruled = new Path2D.Double(childAt.createTransformedShape(shape));
+                    Path2D.Double ruled = new Path2D.Double(shape);
                     ruled.setWindingRule(Boolean.TRUE.equals(rule) ? Path2D.WIND_EVEN_ODD : Path2D.WIND_NON_ZERO);
-                    all.add(new java.awt.geom.Area(ruled));
+                    java.awt.geom.Area part = new java.awt.geom.Area(ruled);
+                    // A shape of a clip path can be clipped in its turn, in
+                    // its own coordinates: only that much of it is added.
+                    String own = child.getStyle() == null ? null : child.getStyle().getClipPathRef();
+                    Shape cut = own == null ? null : clipShape(child, own);
+                    if (cut != null) {
+                        part.intersect(new java.awt.geom.Area(cut));
+                    }
+                    part.transform(childAt);
+                    all.add(part);
                 }
             }
         }

@@ -760,7 +760,10 @@ public class CSSWatcher implements Runnable {
         // not there, so the ones that are missing are left out. With none
         // there at all the list is kept whole, for the compiler to say so.
         // A library with a prefixed theme and no ordinary one is not in the
-        // list to begin with, and is only compiled by the build.
+        // list to begin with, and is only compiled by the build. That is
+        // how live reload has always found a prefixed theme's inputs: the
+        // simulator is handed the ordinary theme's list and nothing else,
+        // and renames it here.
         return themePrefix.length() > 0 && present.length() > 0 ? present.toString() : all.toString();
     }
 

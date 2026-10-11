@@ -43,6 +43,12 @@ public final class SVGViewport extends SVGNode {
     private float viewBoxWidth;
     private float viewBoxHeight;
     private String preserveAspectRatio;
+    private boolean overflowVisible;
+
+    /// Whether what reaches past the box is still drawn
+    /// (`overflow="visible"`); it is cut off otherwise.
+    public boolean isOverflowVisible() { return overflowVisible; }
+    public void setOverflowVisible(boolean v) { this.overflowVisible = v; }
 
     /// What is drawn in the box.
     public SVGGroup getContent() { return content; }

@@ -191,4 +191,21 @@ class CssImportDependenciesTest {
         assertEquals(1700000000000L, CssImportDependencies.lastModified(css));
         assertEquals(0L, CssImportDependencies.lastModified(new File(dir, "missing")));
     }
+
+    @Test
+    void anOutsideMultiImageDirectoryIsAsNewAsItsImages(@TempDir Path tmp) throws Exception {
+        File dir = tmp.toFile();
+        File css = new File(dir, "css");
+        write(new File(css, "theme.css"), "Label { background-image: url(../shared/icon.png); }\n");
+        File multi = new File(dir, "shared/icon.png");
+        File high = write(new File(multi, "high.png"), "x");
+        File medium = write(new File(multi, "medium.png"), "x");
+        assertTrue(high.setLastModified(1700000000000L));
+        assertTrue(medium.setLastModified(1600000000000L));
+        assertTrue(multi.setLastModified(1500000000000L));
+
+        // There, so not the time that means a file is missing and that
+        // would compile the theme again on every build.
+        assertEquals(1700000000000L, CssImportDependencies.lastModified(css));
+    }
 }

@@ -968,4 +968,35 @@ class VectorImageTest {
         VectorImage boxed = read("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 8 4\"/>");
         assertTrue(boxed.hasWidth() && boxed.hasHeight(), "a view box is a size");
     }
+
+    @Test
+    void aShapeOfAClipPathIsClippedInItsTurn() throws Exception {
+        String defs = "<defs><clipPath id=\"half\"><rect width=\"50\" height=\"100\"/></clipPath>"
+                + "<clipPath id=\"c\"><rect width=\"100\" height=\"100\" clip-path=\"url(#half)\"/></clipPath>"
+                + "<clipPath id=\"top\" clip-path=\"url(#half)\"><rect width=\"100\" height=\"50\"/></clipPath>"
+                + "<clipPath id=\"loop\" clip-path=\"url(#loop)\"><rect width=\"100\" height=\"100\"/></clipPath></defs>";
+        BufferedImage img = paint(defs + "<rect width=\"100\" height=\"100\" fill=\"#ff0000\" clip-path=\"url(#c)\"/>",
+                100, 100);
+        assertEquals(0xffff0000, img.getRGB(25, 50));
+        assertEquals(0, alpha(img, 75, 50), "cut off by the clip on the clip path's own shape");
+
+        BufferedImage both = paint(defs + "<rect width=\"100\" height=\"100\" fill=\"#ff0000\""
+                + " clip-path=\"url(#top)\"/>", 100, 100);
+        assertEquals(0xffff0000, both.getRGB(25, 25));
+        assertEquals(0, alpha(both, 75, 25), "cut off by the clip on the clip path");
+        assertEquals(0, alpha(both, 25, 75));
+
+        paint(defs + "<rect width=\"100\" height=\"100\" fill=\"#ff0000\" clip-path=\"url(#loop)\"/>", 100, 100);
+    }
+
+    @Test
+    void aNestedViewportShowsWhatOverflowsItWhenItSaysSo() throws Exception {
+        String inside = "<rect width=\"80\" height=\"20\" fill=\"#ff0000\"/></svg>";
+        BufferedImage cut = paint("<svg x=\"10\" y=\"10\" width=\"40\" height=\"40\">" + inside, 100, 100);
+        assertEquals(0xffff0000, cut.getRGB(30, 20));
+        assertEquals(0, alpha(cut, 70, 20), "cut off at the box by default");
+        BufferedImage shown = paint("<svg x=\"10\" y=\"10\" width=\"40\" height=\"40\" overflow=\"visible\">" + inside,
+                100, 100);
+        assertEquals(0xffff0000, shown.getRGB(70, 20), "drawn past the box");
+    }
 }

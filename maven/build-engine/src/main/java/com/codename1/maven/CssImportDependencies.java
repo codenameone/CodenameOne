@@ -227,13 +227,33 @@ public final class CssImportDependencies {
     /// When one of them does not exist the answer is the largest time there
     /// is, which makes any existing output stale: the compile then runs and
     /// reports the missing file, instead of an old theme being kept.
+    ///
+    /// A directory is there, and is not a missing file: a `url()` may name
+    /// a multi-image directory, one image per density. It is as new as the
+    /// newest thing in it, and as itself, which is what changes when one of
+    /// its images is deleted.
     public static long lastModified(File cssDir) {
         long newest = 0;
         for (File f : outside(cssDir)) {
+            if (f.isDirectory()) {
+                newest = Math.max(newest, newestIn(f));
+                continue;
+            }
             if (!f.isFile()) {
                 return Long.MAX_VALUE;
             }
             newest = Math.max(newest, f.lastModified());
+        }
+        return newest;
+    }
+
+    private static long newestIn(File dir) {
+        long newest = dir.lastModified();
+        File[] children = dir.listFiles();
+        if (children != null) {
+            for (File child : children) {
+                newest = Math.max(newest, child.isDirectory() ? newestIn(child) : child.lastModified());
+            }
         }
         return newest;
     }

@@ -438,6 +438,8 @@ public final class SVGParser {
         v.setWidth(viewportSide(a.get("width"), 1f, viewportWidth));
         v.setHeight(viewportSide(a.get("height"), 1f, viewportHeight));
         v.setPreserveAspectRatio(a.get("preserveAspectRatio"));
+        String overflow = mergedValue(a, "overflow");
+        v.setOverflowVisible(overflow != null && ("visible".equals(overflow.trim()) || "auto".equals(overflow.trim())));
         String vb = a.get("viewBox");
         if (vb != null) {
             NumberParser np = new NumberParser(vb);
