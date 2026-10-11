@@ -85,7 +85,10 @@ public final class SVGPaint {
         return new SVGPaint(false, 0, r, fallback);
     }
 
-    /** "url(#foo)" -> "foo"; returns null otherwise. */
+    /**
+     * "url(#foo)" -> "foo"; returns null otherwise. The fragment may be
+     * quoted, as in {@code url('#foo')} or {@code url("#foo")}.
+     */
     public static String stripUrl(String s) {
         if (s == null) return null;
         String t = s.trim();
@@ -93,6 +96,12 @@ public final class SVGPaint {
         int close = t.indexOf(')', 4);
         if (close < 0) return null;
         String inside = t.substring(4, close).trim();
+        if (inside.length() >= 2) {
+            char q = inside.charAt(0);
+            if ((q == '"' || q == '\'') && inside.charAt(inside.length() - 1) == q) {
+                inside = inside.substring(1, inside.length() - 1).trim();
+            }
+        }
         if (inside.startsWith("#")) inside = inside.substring(1);
         return inside;
     }

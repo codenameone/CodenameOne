@@ -79,14 +79,21 @@ if [ -z "$JAR" ] || [ ! -f "$JAR" ]; then
 fi
 log "Using CSS compiler jar: $JAR"
 
-git show "$BASE_REF:$BASE_CSS" > "$WORK/baseline.css"
+# Every stylesheet compiled here is a copy under target/, one directory below the files
+# it was written beside, so a relative `@import` in it is re-pointed one level up. This
+# is cat_part in scripts/build-native-themes.sh; change both together.
+repoint_imports() {
+  sed -E "s#(@import[[:space:]]+(url\\([[:space:]]*)?[\"']?)([^\"'()/:;[:space:]][^\"'():;[:space:]]*)([\"');[:space:]])#\\1../\\3\\4#g"
+}
+
+git show "$BASE_REF:$BASE_CSS" | repoint_imports > "$WORK/baseline.css"
 log "Baseline: $BASE_REF:$BASE_CSS"
 java -Djava.awt.headless=true -jar "$JAR" -no-raster -native-theme-units -input "$WORK/baseline.css" -output "$WORK/baseline.res" >/dev/null
 
 # The split side is whatever the build script would feed the compiler today.
-cat native-themes/ios-modern/common.css > "$WORK/split.css"
+repoint_imports < native-themes/ios-modern/common.css > "$WORK/split.css"
 printf '\n' >> "$WORK/split.css"
-cat native-themes/ios-modern/gen26.css >> "$WORK/split.css"
+repoint_imports < native-themes/ios-modern/gen26.css >> "$WORK/split.css"
 java -Djava.awt.headless=true -jar "$JAR" -no-raster -native-theme-units -input "$WORK/split.css" -output "$WORK/split.res" >/dev/null
 
 if cmp -s "$WORK/baseline.res" "$WORK/split.res"; then

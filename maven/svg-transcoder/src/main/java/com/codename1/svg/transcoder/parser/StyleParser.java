@@ -70,9 +70,9 @@ public final class StyleParser {
         out.setMarkerStart(toMarker(merged.get("marker-start"), all));
         out.setMarkerMid(toMarker(merged.get("marker-mid"), all));
         out.setMarkerEnd(toMarker(merged.get("marker-end"), all));
-        out.setFillOpacity(toFloat(merged.get("fill-opacity")));
-        out.setStrokeOpacity(toFloat(merged.get("stroke-opacity")));
-        out.setOpacity(toFloat(merged.get("opacity")));
+        out.setFillOpacity(toAlpha(merged.get("fill-opacity")));
+        out.setStrokeOpacity(toAlpha(merged.get("stroke-opacity")));
+        out.setOpacity(toAlpha(merged.get("opacity")));
         out.setStrokeWidth(toFloat(merged.get("stroke-width")));
 
         String cap = merged.get("stroke-linecap");
@@ -175,6 +175,19 @@ public final class StyleParser {
         System.arraycopy(lengths, 0, doubled, 0, lengths.length);
         System.arraycopy(lengths, 0, doubled, lengths.length, lengths.length);
         return doubled;
+    }
+
+    /**
+     * An opacity, which is written as a number from 0 to 1 or as a
+     * percentage: {@code 50%} is {@code 0.5}, not the fifty that reading it
+     * as a plain number gives and that is then clamped to fully opaque.
+     */
+    static Float toAlpha(String s) {
+        Float v = toFloat(s);
+        if (v != null && s.trim().endsWith("%")) {
+            return Float.valueOf(v.floatValue() / 100f);
+        }
+        return v;
     }
 
     private static Float toFloat(String s) {

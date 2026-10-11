@@ -856,4 +856,52 @@ class VectorImageTest {
         assertEquals(0xffff0000, img.getRGB(50, 50));
         assertEquals(0, alpha(img, 5, 5));
     }
+
+    @Test
+    void aTransformOnAClipPathMovesTheRegionItCuts() throws Exception {
+        BufferedImage img = paint("<defs><clipPath id=\"c\" transform=\"translate(50 0)\">"
+                + "<rect width=\"40\" height=\"100\"/></clipPath></defs>"
+                + "<rect width=\"100\" height=\"100\" fill=\"#ff0000\" clip-path=\"url(#c)\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(70, 50), "inside the moved region");
+        assertEquals(0, alpha(img, 20, 50), "where the region was written");
+    }
+
+    @Test
+    void anOpacityWrittenAsAPercentageIsAFraction() throws Exception {
+        BufferedImage img = paint("<rect width=\"30\" height=\"90\" fill=\"#ff0000\" opacity=\"50%\"/>"
+                + "<rect x=\"30\" width=\"30\" height=\"90\" fill=\"#ff0000\" fill-opacity=\"50%\"/>"
+                + "<rect x=\"70\" width=\"30\" height=\"80\" fill=\"none\" stroke=\"#ff0000\" stroke-width=\"20\""
+                + " stroke-opacity=\"50%\"/>"
+                + "<defs><linearGradient id=\"g\"><stop offset=\"0\" stop-color=\"#ff0000\" stop-opacity=\"50%\"/>"
+                + "</linearGradient></defs><rect y=\"95\" width=\"50\" height=\"5\" fill=\"url(#g)\"/>", 100, 100);
+        assertEquals(128, alpha(img, 15, 45), 2, "opacity");
+        assertEquals(128, alpha(img, 45, 45), 2, "fill-opacity");
+        assertEquals(128, alpha(img, 65, 45), 2, "stroke-opacity");
+        assertEquals(128, alpha(img, 25, 97), 2, "stop-opacity");
+    }
+
+    @Test
+    void aQuotedFragmentNamesTheSamePaintServer() throws Exception {
+        BufferedImage img = paint("<defs><linearGradient id=\"g\"><stop offset=\"0\" stop-color=\"#00ff00\"/>"
+                + "</linearGradient></defs>"
+                + "<rect width=\"50\" height=\"100\" fill=\"url('#g')\"/>"
+                + "<rect x=\"50\" width=\"50\" height=\"100\" fill=\"url(&quot;#g&quot;)\"/>", 100, 100);
+        assertEquals(0xff00ff00, img.getRGB(25, 50), "single quotes");
+        assertEquals(0xff00ff00, img.getRGB(75, 50), "double quotes");
+    }
+
+    @Test
+    void anEmbeddedRuleSelectsByAttribute() throws Exception {
+        BufferedImage img = paint("<style>[data-role=\"accent\"] { fill: #ff0000; }"
+                + " rect[data-kind^='pri'], [data-flag] { fill: #00ff00; }"
+                + " [data-tags~=b] { fill: #0000ff; }</style>"
+                + "<rect width=\"25\" height=\"100\" data-role=\"accent\"/>"
+                + "<rect x=\"25\" width=\"25\" height=\"100\" data-kind=\"primary\"/>"
+                + "<rect x=\"50\" width=\"25\" height=\"100\" data-tags=\"a b c\"/>"
+                + "<rect x=\"75\" width=\"25\" height=\"100\" data-role=\"other\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(12, 50), "an exact value");
+        assertEquals(0xff00ff00, img.getRGB(37, 50), "a prefix, on a type");
+        assertEquals(0xff0000ff, img.getRGB(62, 50), "one word of a list");
+        assertEquals(0xff000000, img.getRGB(87, 50), "another value is not selected");
+    }
 }

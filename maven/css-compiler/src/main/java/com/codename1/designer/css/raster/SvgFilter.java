@@ -240,7 +240,7 @@ final class SvgFilter {
             return offset(input(p, "in", last, source, linear), number(p, "dx", 0), number(p, "dy", 0));
         }
         if ("feFlood".equals(name)) {
-            return flood(p.get("flood-color"), (float) number(p, "flood-opacity", 1), linear);
+            return flood(p.get("flood-color"), alpha(p, "flood-opacity"), linear);
         }
         if ("feColorMatrix".equals(name)) {
             return colorMatrix(p, input(p, "in", last, source, linear));
@@ -269,7 +269,7 @@ final class SvgFilter {
             double sdx = sd.length > 0 ? sd[0] : 2;
             double sdy = sd.length > 1 ? sd[1] : sdx;
             Plane shadow = offset(blur(alphaOf(in), sdx * ux, sdy * uy), number(p, "dx", 2), number(p, "dy", 2));
-            Plane colour = flood(p.get("flood-color"), (float) number(p, "flood-opacity", 1), linear);
+            Plane colour = flood(p.get("flood-color"), alpha(p, "flood-opacity"), linear);
             for (int i = 0; i < w * h; i++) {
                 float a = shadow.a[i];
                 shadow.r[i] = colour.r[i] * a;
@@ -1125,6 +1125,13 @@ final class SvgFilter {
 
     private float height(Plane in, int x, int y) {
         return in.a[Math.max(0, Math.min(h - 1, y)) * w + Math.max(0, Math.min(w - 1, x))];
+    }
+
+    /// An opacity attribute, 1 when it is not given. `50%` is a half.
+    private static float alpha(Primitive p, String attribute) {
+        String value = p.get(attribute);
+        double v = number(p, attribute, 1);
+        return (float) (value != null && value.trim().endsWith("%") ? v / 100 : v);
     }
 
     private static double number(Primitive p, String attribute, double fallback) {

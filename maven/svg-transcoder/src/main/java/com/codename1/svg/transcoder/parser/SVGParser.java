@@ -140,8 +140,13 @@ public final class SVGParser {
             }
             if (ev != XMLStreamConstants.START_ELEMENT) continue;
             StyleSheet.Element parent = open.isEmpty() ? null : open.get(open.size() - 1);
+            // Every attribute, for a selector that tests one: [data-role="accent"].
+            Map<String, String> given = new HashMap<String, String>();
+            for (int i = 0; i < r.getAttributeCount(); i++) {
+                given.put(r.getAttributeLocalName(i), r.getAttributeValue(i));
+            }
             StyleSheet.Element el = new StyleSheet.Element(r.getLocalName(),
-                    r.getAttributeValue(null, "id"), r.getAttributeValue(null, "class"), parent);
+                    r.getAttributeValue(null, "id"), r.getAttributeValue(null, "class"), parent, given);
             elements.add(el);
             if (!"style".equals(el.name)) {
                 open.add(el);
@@ -491,9 +496,11 @@ public final class SVGParser {
         SVGClipPath cp = new SVGClipPath();
         Map<String, String> a = attrs(r);
         // What it sets is what its children inherit: a clip-rule for a
-        // clip path, a fill for a mask. Its transform is not read.
+        // clip path, a fill for a mask. A clip path may also be transformed
+        // as a whole, which moves the region it cuts; a mask takes no
+        // transform.
         applyCommon(cp, a);
-        cp.setTransform(null);
+        if (mask) cp.setTransform(null);
         cp.setMask(mask);
         cp.setAlphaMask(mask && "alpha".equals(mergedValue(a, "mask-type")));
         cp.setObjectBoundingBox("objectBoundingBox".equals(a.get(mask ? "maskContentUnits" : "clipPathUnits")));
@@ -976,7 +983,8 @@ public final class SVGParser {
             }
             String so = mergedValue(a, "stop-opacity");
             if (so != null) {
-                try { stop.setOpacity(NumberParser.parseFloat(so)); } catch (RuntimeException e) { /* keep default */ }
+                Float alpha = StyleParser.toAlpha(so);
+                if (alpha != null) stop.setOpacity(alpha.floatValue());
             } else if (s.getFillOpacity() != null) {
                 stop.setOpacity(s.getFillOpacity());
             }

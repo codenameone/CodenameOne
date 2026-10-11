@@ -158,6 +158,20 @@ theme_parts() {
   esac
 }
 
+# A part's relative `@import` names a file beside THAT PART, and the compiler resolves an
+# import against the directory of the file it is reading -- which, for a theme, is the
+# concatenated copy under <theme>/target/. So the parts are not copied verbatim: each
+# relative import is re-pointed from the part's own directory, given here as the prefix
+# that leads back to it from target/. An absolute path or a URL with a scheme is left as
+# written, and so is every `url()` of an image, which the compiler finds from the theme's
+# res/ directory rather than from the stylesheet.
+#
+# scripts/verify-native-theme-split.sh concatenates the same parts and carries the same
+# expression; change both together.
+cat_part() {
+  sed -E "s#(@import[[:space:]]+(url\\([[:space:]]*)?[\"']?)([^\"'()/:;[:space:]][^\"'():;[:space:]]*)([\"');[:space:]])#\\1$2\\3\\4#g" "$1"
+}
+
 compile_theme() {
   local jar="$1" name="$2" basename="$3"
   local out="$OUT_DIR/$basename"
@@ -184,7 +198,7 @@ compile_theme() {
     # a file nobody edited. Comments are inert here -- the dark-mode rewriter
     # uses indexOfOutsideComments and skips them.
     printf '/* ===== native-themes/%s ===== */\n' "$part" >> "$css"
-    cat "$CSS_SRC_ROOT/$part" >> "$css"
+    cat_part "$CSS_SRC_ROOT/$part" "../../$(dirname "$part")/" >> "$css"
     printf '\n' >> "$css"
   done < <(theme_parts "$name")
   log "Compiling $name -> $out"

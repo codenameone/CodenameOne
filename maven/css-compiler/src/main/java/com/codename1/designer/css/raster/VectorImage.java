@@ -1033,7 +1033,10 @@ public final class VectorImage {
     /// another is a hole in the clip.
     private Shape clipOutline(SVGClipPath clip) {
         java.awt.geom.Area all = new java.awt.geom.Area();
-        addOutlines(all, clip, new AffineTransform(),
+        // A transform on the clip path itself moves all of its children.
+        SVGTransform own = clip.getTransform();
+        addOutlines(all, clip, own == null ? new AffineTransform()
+                        : new AffineTransform(own.a, own.b, own.c, own.d, own.e, own.f),
                 clip.getStyle() == null ? null : clip.getStyle().getClipEvenOdd());
         return all;
     }
