@@ -151,9 +151,13 @@ public class PhoneVerification {
             throw new ResponseStatusException(429, "Too many wrong codes. Ask for a new one");
         }
         String expected = pending.codeHash;
-        // Counted before the comparison, and by the database: two guesses sent
-        // at once each take a guess, whichever is answered first.
-        codes.countGuess(username);
+        // Taken before the comparison, and by the database, which also holds
+        // the limit: the count read above is what it was when this request
+        // arrived, and any number of requests arriving together all read the
+        // same one. Only a request that is given a guess has its code looked at.
+        if (!codes.takeGuess(username, MAX_ATTEMPTS)) {
+            throw new ResponseStatusException(429, "Too many wrong codes. Ask for a new one");
+        }
         String typed = code == null ? "" : code.trim();
         if (!Crypto.equalsConstantTime(hash(username, typed).getBytes("UTF-8"),
                 expected.getBytes("UTF-8"))) {

@@ -344,7 +344,8 @@ class PaymentsTest {
         mvc.perform(People.asRider(get("/api/rides/" + id), rider))
                 .andExpect(jsonPath("$.paymentStatus").value("PENDING"));
 
-        db.execute("UPDATE wl_ride SET updated_at = 1 WHERE id = ?", new Object[] {id});
+        db.execute("UPDATE wl_ride SET updated_at = ? WHERE id = ?",
+                new Object[] {Long.valueOf(System.currentTimeMillis() - 5L * 60L * 1000L), id});
         rides.settleLeftBehind();
         mvc.perform(People.asRider(get("/api/rides/" + id), rider))
                 .andExpect(jsonPath("$.paymentStatus").value("PAID"));
@@ -355,6 +356,77 @@ class PaymentsTest {
         // And once: a second pass finds nothing left to settle.
         rides.settleLeftBehind();
         assertEquals(total, Trips.number(Trips.receipt(mvc, rider, id), "total"));
+        Trips.offline(mvc, driver);
+    }
+
+    @Test
+    void aChargeNobodyCanVouchForIsLeftPendingAndAskedForAgain() throws Exception {
+        // Prague.
+        String rider = People.rider(accounts, "prg-rider");
+        String driver = People.driver(accounts, "prg-driver");
+        String card = (String) Trips.addCard(mvc, rider, Trips.NO_ANSWER_WHEN_CHARGED).get("id");
+        Trips.online(mvc, driver, 50.0755, 14.4378);
+        Map done = Trips.complete(mvc, rider, driver, Trips.ride(50.0755, 14.4378, 50.0855,
+                14.4478, "\"paymentMethodId\":\"" + card + "\""));
+        String id = (String) done.get("id");
+        long total = Trips.number(done, "fareCents") + Trips.number(done, "serviceFee");
+
+        // The processor failed without saying whether it took the money: not
+        // paid, and not failed either.
+        assertEquals("COMPLETED", done.get("state"));
+        assertEquals("PENDING", done.get("paymentStatus"));
+        db.execute("UPDATE wl_ride SET updated_at = ? WHERE id = ?",
+                new Object[] {Long.valueOf(System.currentTimeMillis() - 5L * 60L * 1000L), id});
+        rides.settleLeftBehind();
+        mvc.perform(People.asRider(get("/api/rides/" + id), rider))
+                .andExpect(jsonPath("$.paymentStatus").value("PENDING"));
+
+        // The processor answers again, and the same ride is asked about.
+        db.execute("UPDATE wl_payment_method SET token = 'sim_pm_recovered' WHERE id = ?",
+                new Object[] {card});
+        rides.settleLeftBehind();
+        mvc.perform(People.asRider(get("/api/rides/" + id), rider))
+                .andExpect(jsonPath("$.paymentStatus").value("PAID"));
+        assertEquals(total, Trips.number(Trips.receipt(mvc, rider, id), "total"));
+        Trips.offline(mvc, driver);
+    }
+
+    @Test
+    void aTipNobodyCanVouchForStaysOnTheRideUntilItIsAskedForAgain() throws Exception {
+        // Vienna.
+        String rider = People.rider(accounts, "vie-rider");
+        String driver = People.driver(accounts, "vie-driver");
+        String card = (String) Trips.addCard(mvc, rider, Trips.VISA).get("id");
+        Trips.online(mvc, driver, 48.2082, 16.3738);
+        String id = (String) Trips.complete(mvc, rider, driver, People.ride(48.2082, 16.3738,
+                48.2182, 16.3838)).get("id");
+
+        // The processor stops answering, and a tip is asked for.
+        db.execute("UPDATE wl_payment_method SET token = 'sim_pm_fault_now' WHERE id = ?",
+                new Object[] {card});
+        assertEquals(502, Trips.statusOf(mvc, People.asRider(Trips.body(
+                post("/api/rides/" + id + "/tip"), "{\"amount\":300}"), rider)));
+        // It may have been charged, so it stays on the ride, which cannot be
+        // refunded around it, and cannot be swapped for another amount.
+        assertEquals(300L, Trips.number(Trips.receipt(mvc, rider, id), "tip"));
+        mvc.perform(admin(Trips.body(post("/api/admin/rides/" + id + "/refund"),
+                        "{\"reason\":\"Too soon\"}")))
+                .andExpect(status().isConflict());
+        mvc.perform(People.asRider(Trips.body(post("/api/rides/" + id + "/tip"),
+                        "{\"amount\":500}"), rider))
+                .andExpect(status().isConflict());
+
+        // Asked for again with the same amount once the processor is back.
+        db.execute("UPDATE wl_payment_method SET token = 'sim_pm_recovered' WHERE id = ?",
+                new Object[] {card});
+        mvc.perform(People.asRider(Trips.body(post("/api/rides/" + id + "/tip"),
+                        "{\"amount\":300}"), rider))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tip").value(300));
+        mvc.perform(admin(Trips.body(post("/api/admin/rides/" + id + "/refund"),
+                        "{\"reason\":\"Now\"}")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("refunded"));
         Trips.offline(mvc, driver);
     }
 

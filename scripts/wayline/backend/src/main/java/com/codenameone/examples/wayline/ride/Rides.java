@@ -191,7 +191,7 @@ public class Rides {
     /// Asks for a ride and offers it to the nearest driver straight away.
     public RideDto request(String rider, RideRequestDto request) throws IOException {
         validate(request);
-        String id = open(rider, request);
+        String id = attempt(() -> open(rider, request));
         live.rideChanged(id, RideStates.REQUESTED, rider, "", "");
         search(id);
         return read(id, rider);
@@ -199,6 +199,11 @@ public class Rides {
 
     @Transactional
     private String open(String rider, RideRequestDto request) throws IOException {
+        // Before anything is read: two requests from one rider take turns
+        // here, so the second looks for a ride under way only once the first
+        // has committed its own. Without it both look, both find none, and
+        // the rider has two rides.
+        profiles.hold(rider);
         Profile profile = profiles.find(rider);
         if (profile == null || !profile.phoneVerified) {
             throw new ResponseStatusException(403, "Verify your phone number before you ride");
@@ -367,6 +372,10 @@ public class Rides {
     /// to have been left behind. Longer than any charge takes.
     private static final long UNSETTLED_MILLIS = 2L * 60L * 1000L;
 
+    /// How long a completed ride's charge goes on being asked for. Short of
+    /// the day a processor remembers the key a charge was first sent under.
+    private static final long RETRY_MILLIS = 23L * 60L * 60L * 1000L;
+
     /// Finishes the payment of rides that completed and were never settled.
     ///
     /// Completing a ride commits before the card is charged, and what came of
@@ -376,9 +385,17 @@ public class Rides {
     /// having completed. This does. Settling is safe to repeat -- see
     /// [Payments#settle] -- so a ride whose card was charged just before the
     /// server stopped is recorded as paid and not charged again.
+    ///
+    /// A ride whose charge failed without the processor saying whether it took
+    /// the money is left pending too, and is asked about again here, every
+    /// minute for [#RETRY_MILLIS]. After that it stays pending and is not asked
+    /// about: the key that makes asking twice safe is kept by a processor for a
+    /// day, and a charge sent under it later than that is a second charge. What
+    /// became of such a ride is for a person to find in the processor's records.
     @Scheduled(fixedDelay = 60000, initialDelay = 30000, lock = "wayline-settlement")
     public void settleLeftBehind() throws IOException {
-        List<Ride> unsettled = unsettled(System.currentTimeMillis() - UNSETTLED_MILLIS);
+        long now = System.currentTimeMillis();
+        List<Ride> unsettled = unsettled(now - RETRY_MILLIS, now - UNSETTLED_MILLIS);
         Exception failed = null;
         for (int iter = 0; iter < unsettled.size(); iter++) {
             Ride ride = unsettled.get(iter);
@@ -399,8 +416,8 @@ public class Rides {
     }
 
     @Transactional(readOnly = true)
-    private List<Ride> unsettled(long before) {
-        return rides.unsettled(before, 50);
+    private List<Ride> unsettled(long after, long before) {
+        return rides.unsettled(after, before, 50);
     }
 
     @Transactional
@@ -483,29 +500,60 @@ public class Rides {
 
     /// Offers a waiting ride to the nearest driver who has not passed on it.
     /// Does nothing when nobody is in reach; [#tick] tries again.
+    ///
+    /// In two transactions: one that chooses a driver and one that makes the
+    /// offer. Choosing reads who is free, and two rides asked for together
+    /// each read the same driver as free; the second transaction is where
+    /// they take turns over that driver, and it has to open with that -- see
+    /// [#offer].
     void search(String id) throws IOException {
-        tell(attempt(() -> offer(id)));
+        String[] chosen = new String[1];
+        Change change = attempt(() -> choose(id, chosen));
+        if (chosen[0] != null) {
+            change = attempt(() -> offer(id, chosen[0]));
+        }
+        tell(change);
     }
 
-    /// The transaction of [#search]: what it changed, or null for nothing.
+    /// Gives up on a ride that has waited too long, or names the driver to
+    /// offer it to in `chosen`. Returns what it changed, or null for nothing.
     @Transactional
-    private Change offer(String id) throws IOException {
+    private Change choose(String id, String[] chosen) throws IOException {
+        chosen[0] = null;
         Ride ride = rides.find(id);
         if (ride == null || !RideStates.REQUESTED.equals(ride.state)) {
             return null;
         }
         long now = System.currentTimeMillis();
-        String rider = ride.rider;
         if (now > ride.searchUntil) {
             return tryMove(id, RideStates.NO_DRIVERS, "", null, null, null)
-                    ? new Change(id, RideStates.NO_DRIVERS, rider, "", "", null) : null;
+                    ? new Change(id, RideStates.NO_DRIVERS, ride.rider, "", "", null) : null;
         }
-        String driver = matcher.pick(ride, now - ride.requestedAt);
-        if (driver == null) {
+        chosen[0] = matcher.pick(ride, now - ride.requestedAt);
+        return null;
+    }
+
+    /// Offers a ride to the driver chosen for it, unless they were given
+    /// another in the meantime. Returns what it changed, or null for nothing,
+    /// in which case [#tick] looks again.
+    ///
+    /// The driver is held before anything is read, so two rides that chose
+    /// the same driver come through here one after the other, and the second
+    /// reads the offer the first one committed. The update of the ride cannot
+    /// do this on its own: it is conditional on its own ride's row, and each
+    /// of the two has a row of its own.
+    @Transactional
+    private Change offer(String id, String driver) throws IOException {
+        if (!drivers.hold(driver) || rides.activeForDriver(driver) != null) {
             return null;
         }
+        Ride ride = rides.find(id);
+        if (ride == null || !RideStates.REQUESTED.equals(ride.state)) {
+            return null;
+        }
+        long now = System.currentTimeMillis();
         return tryMove(id, RideStates.OFFERED, "", null, driver, Long.valueOf(now + offerMillis))
-                ? new Change(id, RideStates.OFFERED, rider, driver, "", null) : null;
+                ? new Change(id, RideStates.OFFERED, ride.rider, driver, "", null) : null;
     }
 
     /// Takes back the offers nobody answered and looks again for every ride

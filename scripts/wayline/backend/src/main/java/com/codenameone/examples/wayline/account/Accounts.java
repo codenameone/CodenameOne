@@ -237,6 +237,14 @@ public class Accounts {
         if (!admin && username.equals(by)) {
             throw new ResponseStatusException(400, "You cannot withdraw your own admin role");
         }
+        // Not from under a rider. The role is read on every request, so a
+        // driver who lost it mid-ride could no longer arrive, start, complete
+        // or cancel, and the trip would sit there until somebody noticed. The
+        // admin ends the ride first, or waits for it to end.
+        if (!driver && cleanup.drivesRideUnderWay(username)) {
+            throw new ResponseStatusException(409,
+                    "That driver is on a ride. Withdraw the role when it has ended");
+        }
         users.updateUser(User.withUserDetails(signIn).roles(roles(driver, admin)).build());
         // The role and the approval go together, whichever way it was given:
         // being approved is what lets a driver go on line.

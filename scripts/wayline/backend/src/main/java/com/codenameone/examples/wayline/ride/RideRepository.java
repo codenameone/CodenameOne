@@ -193,13 +193,14 @@ public class RideRepository {
                 .executeUpdate();
     }
 
-    /// Completed rides whose payment has been pending since before `before`,
-    /// oldest first.
-    public List<Ride> unsettled(long before, int limit) {
+    /// Completed rides whose payment has been pending since before `before`
+    /// and no longer than since `after`, newest first.
+    public List<Ride> unsettled(long after, long before, int limit) {
         return session.createQuery("select r from Ride r where r.state = 'COMPLETED' "
                 + "and r.paymentStatus = 'PENDING' and r.updatedAt < :before "
-                + "order by r.updatedAt", Ride.class).setParameter("before", Long.valueOf(before))
-                .limit(limit).list();
+                + "and r.updatedAt > :after order by r.updatedAt desc", Ride.class)
+                .setParameter("before", Long.valueOf(before))
+                .setParameter("after", Long.valueOf(after)).limit(limit).list();
     }
 
     /// Records how the charge for a ride came out. A statement of its own and

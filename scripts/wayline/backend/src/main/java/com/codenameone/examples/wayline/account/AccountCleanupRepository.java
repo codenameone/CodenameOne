@@ -39,6 +39,9 @@ public class AccountCleanupRepository {
     private static final String[] UNDER_WAY = {"REQUESTED", "OFFERED", "ACCEPTED", "ARRIVED",
         "IN_PROGRESS"};
 
+    /// The states of a ride a driver has taken and has yet to finish.
+    private static final String[] TAKEN = {"ACCEPTED", "ARRIVED", "IN_PROGRESS"};
+
     private final Session session;
 
     public AccountCleanupRepository(Session session) {
@@ -52,6 +55,15 @@ public class AccountCleanupRepository {
                 + "(r.rider = :username or r.driver = :username) and r.state in :states",
                 Long.class).setParameter("username", username)
                 .setParameter("states", UNDER_WAY).first();
+        return rides != null && rides.longValue() > 0L;
+    }
+
+    /// Whether the account is driving a ride it has taken and not finished. An
+    /// offer it has not answered is not one.
+    public boolean drivesRideUnderWay(String username) {
+        Long rides = session.createQuery("select count(r) from Ride r where "
+                + "r.driver = :username and r.state in :states", Long.class)
+                .setParameter("username", username).setParameter("states", TAKEN).first();
         return rides != null && rides.longValue() > 0L;
     }
 

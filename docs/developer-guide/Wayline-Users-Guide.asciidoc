@@ -83,6 +83,10 @@ Cards are simulated, and three numbers behave in three ways:
 
 | `4000 0000 0000 0341`
 | Accepted when added, then declined when a ride is charged.
+
+| `4000 0000 0000 0119`
+| Accepted when added, then every charge fails without an answer, so the ride's
+payment stays pending.
 |===
 
 Any expiry date in the future and any security code work with them.

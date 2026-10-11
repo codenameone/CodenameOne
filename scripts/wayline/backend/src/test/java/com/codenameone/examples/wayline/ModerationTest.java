@@ -164,4 +164,30 @@ class ModerationTest {
                 .andExpect(jsonPath("$.events[0].action").value("cancel_ride"))
                 .andExpect(jsonPath("$.events[0].reason").value("Reported as a prank"));
     }
+
+    @Test
+    void aDriverKeepsTheRoleUntilTheRideTheyAreOnHasEnded() throws Exception {
+        // Tallinn.
+        String rider = People.rider(accounts, "tll-rider");
+        String driver = People.driver(accounts, "tll-driver");
+        Trips.online(mvc, driver, 59.4370, 24.7536);
+        String id = (String) Trips.json(mvc, People.asRider(Trips.body(post("/api/rides"),
+                People.ride(59.4370, 24.7536, 59.4470, 24.7636)), rider)).get("id");
+        mvc.perform(People.asDriver(post("/api/driver/offers/" + id + "/accept"), driver))
+                .andExpect(status().isOk());
+
+        // Withdrawn now, the driver could do nothing more for this rider.
+        mvc.perform(admin(Trips.body(post("/api/admin/users/" + driver + "/roles"),
+                        "{\"driver\":false,\"admin\":false}")))
+                .andExpect(status().isConflict());
+        mvc.perform(People.asDriver(post("/api/driver/rides/" + id + "/arrived"), driver))
+                .andExpect(status().isOk());
+
+        mvc.perform(admin(Trips.body(post("/api/admin/rides/" + id + "/cancel"),
+                        "{\"reason\":\"Driver is leaving\"}")))
+                .andExpect(status().isOk());
+        mvc.perform(admin(Trips.body(post("/api/admin/users/" + driver + "/roles"),
+                        "{\"driver\":false,\"admin\":false}")))
+                .andExpect(status().isOk());
+    }
 }

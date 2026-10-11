@@ -42,6 +42,8 @@ final class Trips {
     static final String DECLINED = "4000000000000002";
     /// Saved without complaint, and refused when it is charged.
     static final String FAILS_WHEN_CHARGED = "4000000000000341";
+    /// Saved without complaint, and charging it fails without an answer.
+    static final String NO_ANSWER_WHEN_CHARGED = "4000000000000119";
 
     private Trips() {
     }

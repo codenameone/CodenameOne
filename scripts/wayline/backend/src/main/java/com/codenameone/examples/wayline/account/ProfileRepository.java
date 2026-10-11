@@ -50,6 +50,20 @@ public class ProfileRepository {
         return session.find(Profile.class, username);
     }
 
+    /// Makes the rest of the transaction wait its turn behind any other that
+    /// holds the same account: the row is written, to the value it has, and a
+    /// written row is kept by its writer until it commits. For a check and an
+    /// insert that must not be interleaved with the same pair made for the same
+    /// account. Call it before anything is read, so that what is read afterwards
+    /// is what the transaction before this one left.
+    ///
+    /// @return false when the account has no profile
+    public boolean hold(String username) {
+        return session.createQuery("update Profile p set p.createdAt = p.createdAt "
+                + "where p.username = :username").setParameter("username", username)
+                .executeUpdate() == 1;
+    }
+
     /// Every profile, newest first.
     public List<Profile> all() {
         return session.query(Profile.class).orderBy("createdAt", false)

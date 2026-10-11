@@ -308,7 +308,8 @@ public class Payments {
 
     // --------------------------------------------------------------- charges
 
-    /// Settles a ride that has just completed and returns [#PAID] or [#FAILED].
+    /// Settles a ride that has just completed and returns [#PAID], [#FAILED],
+    /// or [#PENDING] when nobody can say yet.
     /// A ride is settled once: its payment is keyed by the ride, and a ride
     /// completes once. Called with no transaction open, since the card is
     /// charged here; what came of the charge is then written in one.
@@ -317,6 +318,14 @@ public class Payments {
     /// short is finished later: the charge carries the ride as its key, so
     /// the processor answers a second request with the first one's charge, and
     /// a payment already written is the answer without asking anyone.
+    ///
+    /// Only a card the processor refused is a payment that failed. Any other
+    /// failure -- the processor not reached, its answer lost on the way back --
+    /// says nothing about whether the card was charged, so nothing is written
+    /// and the ride stays pending for `Rides.settleLeftBehind` to ask again
+    /// under the same key. Written down as failed, a charge that did go through
+    /// would never be looked for, and the rider would have paid for a ride
+    /// that says they did not.
     public String settle(Ride ride) throws IOException {
         Payment kept = payment(ride.id);
         if (kept != null) {
@@ -329,12 +338,16 @@ public class Payments {
             try {
                 reference = charge("ride-" + ride.id, ride.rider, ride.methodId, amount,
                         ride.currency, "Wayline ride");
-            } catch (IOException declined) {
+            } catch (PaymentDeclinedException declined) {
                 // The ride and the amount, never the card.
                 System.err.println("payment for ride " + ride.id + " failed: "
                         + declined.getMessage());
                 status = FAILED;
                 reference = "";
+            } catch (IOException unknown) {
+                System.err.println("payment for ride " + ride.id + " is not known yet: "
+                        + unknown.getMessage());
+                return PENDING;
             }
         }
         keepPayment(ride.id, amount, ride.currency, status, reference);
@@ -360,6 +373,13 @@ public class Payments {
 
     /// Tips the driver of a completed ride, once. Charged to the method the
     /// ride was paid with; a cash ride's tip is recorded as given in cash.
+    ///
+    /// The tip is taken off the ride again only when the card was refused. A
+    /// charge that failed any other way may have gone through, so the tip
+    /// stays on the ride with no charge recorded for it: the rider is told to
+    /// try again, and trying again with the same amount asks the processor
+    /// under the same key, which answers with the first charge if there was
+    /// one. Until then the ride cannot be refunded -- see [#claimRefund].
     public ReceiptDto tip(String rider, String rideId, long amountCents) throws IOException {
         Ride ride = claimTip(rider, rideId, amountCents);
         if (!CASH.equals(ride.methodId)) {
@@ -367,12 +387,11 @@ public class Payments {
             try {
                 reference = charge("tip-" + rideId, rider, ride.methodId, amountCents,
                         ride.currency, "Wayline tip");
-            } catch (IOException declined) {
+            } catch (PaymentDeclinedException declined) {
                 releaseTip(rideId);
-                if (declined instanceof PaymentDeclinedException) {
-                    throw new ResponseStatusException(402, declined.getMessage());
-                }
-                throw unavailable("tip", declined);
+                throw new ResponseStatusException(402, declined.getMessage());
+            } catch (IOException unknown) {
+                throw unavailable("tip", unknown);
             }
             keepTip(rideId, reference);
         }
@@ -394,10 +413,22 @@ public class Payments {
         }
         // Claimed before the charge: of two requests, one changes the row and
         // only that one charges.
-        if (!repository.claimTip(rideId, rider, amountCents)) {
+        if (!repository.claimTip(rideId, rider, amountCents) && !tipLeftUnknown(ride, amountCents)) {
             throw new ResponseStatusException(409, "That ride cannot be tipped now");
         }
         return ride;
+    }
+
+    /// Whether the ride already carries this very tip with no charge recorded
+    /// for it: one whose charge was asked for and never answered. Asking again
+    /// is safe only for the same amount, the key being the ride's.
+    private boolean tipLeftUnknown(Ride ride, long amountCents) {
+        if (ride.tipCents != amountCents || CASH.equals(ride.methodId)
+                || !PAID.equals(ride.paymentStatus)) {
+            return false;
+        }
+        Payment payment = repository.payment(ride.id);
+        return payment != null && (payment.tipRef == null || payment.tipRef.length() == 0);
     }
 
     @Transactional

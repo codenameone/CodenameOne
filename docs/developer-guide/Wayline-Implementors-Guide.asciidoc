@@ -257,6 +257,9 @@ Three things about that chain are worth knowing before changing it:
   caller is and not what they may do. The chain reads the account's roles from
   the database on every request, so a role an admin withdraws and a block an
   admin places take effect on the next request, not when the token expires.
+  For that reason `Accounts.setRoles` answers 409 when asked to withdraw the
+  driver role from a driver who is on a ride: without the role they couldn't
+  finish or cancel it. The admin cancels the ride first, or waits.
 * The application to drive is under `/api/driving`, not `/api/driver`, on
   purpose: someone who isn't a driver yet has to reach it.
 * The app hides the screens a role can't use. That's a courtesy. The chain is
@@ -353,13 +356,27 @@ back an offer that has lapsed, and require that nobody gets the ride.
 
 Three other places use the same pattern. `RideRepository.rate` gives a ride
 its stars only where it has none, so a ride rated twice is rated once.
-`PhoneCodeRepository.countGuess` has the database add one to the count of
-wrong codes with `session.increment`, so two guesses sent together each use
-one up. `PaymentRepository.claimTip` and `claimRefund` claim a tip and a refund
+`PhoneCodeRepository.takeGuess` has the database add one to the count of
+wrong codes only while the count is under the limit, so of any number of
+guesses sent together only as many as are left are looked at. `PaymentRepository.claimTip` and `claimRefund` claim a tip and a refund
 the same way before the payment provider is asked for anything, so of two
 requests only one charges or refunds. Both claims update the ride's row, so a
 refund that arrives while a tip is still being charged sees the tip and answers
-409 until the charge has been recorded or given up. A payout has no single row to claim, so
+409 until the charge has been recorded or given up.
+
+A conditional update settles a race over one row. Two races here are over a
+row that doesn't exist yet: a rider asking for two rides at once, and two rides
+choosing the same free driver. Each transaction reads, finds nothing in its
+way, and inserts or updates a row of its own. `Rides.open` and `Rides.offer`
+therefore start by writing the rider's profile row, or the driver's state row,
+to the value it already has (`ProfileRepository.hold`, `DriverRepository.hold`).
+The database keeps a written row for its writer until the transaction commits,
+so the second transaction waits there and then reads what the first one left.
+The write has to be the transaction's first statement: a transaction that reads
+first may go on seeing the database as it was at that read. That's why choosing
+a driver and offering them the ride are two transactions.
+
+A payout has no single row to claim, so
 `Earnings.cashOut` commits the payout, reads the balance again, and takes its
 own row back when the balance has gone below zero.
 
@@ -820,6 +837,16 @@ finds such rides once they are two minutes old, and settles them. Because the
 charge is keyed by the ride, a card that was already charged isn't charged
 again.
 
+A charge can also fail without saying whether the card was charged: the
+provider wasn't reached, or its answer was lost. Only a `PaymentDeclinedException`
+is recorded as a failed payment. Any other failure leaves the ride pending, and
+the same pass asks again every minute for 23 hours, which is inside the day a
+provider keeps a charge's key. After that the ride stays pending for a person
+to look up. A tip works the same way: a declined card takes the tip off the
+ride, and any other failure leaves it there with no charge recorded, so the
+rider can send the same tip again under the same key. The ride can't be
+refunded until then.
+
 Two implementations come with the sample:
 
 * `SimulatedPayments` is used when no key is configured. It accepts any card
@@ -979,7 +1006,8 @@ These are in `PhoneVerification` and `SecurityConfig`:
 * A code is good for five minutes, `CODE_SECONDS`.
 * Five wrong entries, `MAX_ATTEMPTS`, spend the code, and the user asks for
   another. The count is one statement in the database,
-  `PhoneCodeRepository.countGuess`, so guesses sent together are each counted.
+  `PhoneCodeRepository.takeGuess`, which also applies the limit, so guesses
+  sent together can't get past it.
 * Another code for the same account within 30 seconds, `RESEND_SECONDS`, is
   answered 429.
 * `SecurityConfig` allows `/api/account/phone/**` ten requests in ten minutes

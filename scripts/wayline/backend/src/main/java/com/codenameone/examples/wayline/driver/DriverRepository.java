@@ -132,6 +132,16 @@ public class DriverRepository {
         return query.list();
     }
 
+    /// Makes the rest of the transaction wait its turn behind any other that
+    /// holds the same driver, as [ProfileRepository#hold] does for an account.
+    ///
+    /// @return false for a driver who has no state
+    public boolean hold(String username) {
+        return session.createQuery("update DriverState d set d.lastSeen = d.lastSeen "
+                + "where d.username = :username").setParameter("username", username)
+                .executeUpdate() == 1;
+    }
+
     /// Counts a rating toward a driver's. Arithmetic done by the database, so
     /// two ratings arriving together are both counted. False for a driver who
     /// has no state to count it in.

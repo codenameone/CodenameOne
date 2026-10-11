@@ -48,10 +48,15 @@ public class PhoneCodeRepository {
         session.remove(code);
     }
 
-    /// Counts one guess against an account's code. The database does the sum,
-    /// so two guesses sent at once each take one; nothing is read and written
-    /// back. Answers false when the account has no code to guess at.
-    public boolean countGuess(String username) {
-        return session.increment(PhoneCode.class, username, "attempts", 1L);
+    /// Takes one of the guesses an account's code allows. The database does
+    /// the sum and applies the limit in the same statement, so of any number of
+    /// guesses sent at once only as many as are left are let through; nothing
+    /// is read and written back. Answers false when none is left, or when the
+    /// account has no code to guess at.
+    public boolean takeGuess(String username, int most) {
+        return session.createQuery("update PhoneCode c set c.attempts = c.attempts + 1 "
+                + "where c.username = :username and c.attempts < :most")
+                .setParameter("username", username).setParameter("most", Integer.valueOf(most))
+                .executeUpdate() == 1;
     }
 }

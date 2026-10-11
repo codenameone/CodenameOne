@@ -174,14 +174,22 @@ public final class LiveChannel {
             return;
         }
         connected = false;
-        generation++;
+        final int waiting = ++generation;
         if (socket != null) {
             socket.close();
             socket = null;
         }
         // 1, 2, 4 ... 32 seconds, and then every 32.
         int delay = 1000 << Math.min(attempts++, 5);
-        CN.setTimeout(delay, () -> CN.callSerially(LiveChannel::connect));
+        // Only if nothing has happened to the channel in the meantime. Stopped
+        // and started again during the wait, it has a connection of its own
+        // by now, and connecting here as well would take that one's place:
+        // its callbacks would go unheard and its socket would be left open.
+        CN.setTimeout(delay, () -> CN.callSerially(() -> {
+            if (waiting == generation) {
+                connect();
+            }
+        }));
     }
 
     private static void frame(String text, int mine) {

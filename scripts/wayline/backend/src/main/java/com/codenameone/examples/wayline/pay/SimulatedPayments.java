@@ -40,13 +40,18 @@ import java.io.IOException;
 /// - `4000 0000 0000 0002` is declined when it is added.
 /// - `4000 0000 0000 0341` is accepted and then declined when it is charged,
 ///   which is how a payment that fails at the end of a ride is tried out.
+/// - `4000 0000 0000 0119` is accepted and then cannot be charged at all: the
+///   processor fails without saying whether it took the money, which is how
+///   a payment nobody can vouch for is tried out.
 ///
 /// The card number is read here, in this method, and goes no further: the
 /// brand and the last four digits are all that is returned or stored.
 public class SimulatedPayments implements PaymentProvider {
     static final String DECLINED_NUMBER = "4000000000000002";
     static final String FAILS_LATER_NUMBER = "4000000000000341";
+    static final String FAULTY_NUMBER = "4000000000000119";
     private static final String FAILING_TOKEN = "sim_pm_fail_";
+    private static final String FAULTY_TOKEN = "sim_pm_fault_";
 
     @Override
     public String name() {
@@ -95,7 +100,8 @@ public class SimulatedPayments implements PaymentProvider {
         card.last4 = number.substring(number.length() - 4);
         card.expMonth = typed.expMonth;
         card.expYear = year;
-        card.token = (FAILS_LATER_NUMBER.equals(number) ? FAILING_TOKEN : "sim_pm_") + Ids.next();
+        card.token = (FAILS_LATER_NUMBER.equals(number) ? FAILING_TOKEN
+                : FAULTY_NUMBER.equals(number) ? FAULTY_TOKEN : "sim_pm_") + Ids.next();
         return card;
     }
 
@@ -104,6 +110,9 @@ public class SimulatedPayments implements PaymentProvider {
             String currency, String description) throws IOException {
         if (token.startsWith(FAILING_TOKEN)) {
             throw new PaymentDeclinedException("Your card was declined");
+        }
+        if (token.startsWith(FAULTY_TOKEN)) {
+            throw new IOException("The simulated processor did not answer");
         }
         return "sim_ch_" + key;
     }
