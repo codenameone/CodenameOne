@@ -86,6 +86,29 @@ static CN1Font* cn1MakeFont(const char* family, int weight, int italic, int pixe
     pango_font_description_set_weight(f->desc, weight);
     pango_font_description_set_style(f->desc, italic ? PANGO_STYLE_ITALIC : PANGO_STYLE_NORMAL);
     pango_font_description_set_absolute_size(f->desc, pixelSize * PANGO_SCALE);
+    /*
+     * A weight under regular is kept only when the family has a face near it.
+     * Pango answers with the nearest face it has, and for a family with no Light
+     * that is its ExtraLight when it has one (DejaVu Sans does): the titles and
+     * buttons a theme styles with native:MainLight came out as hairlines that read
+     * as disabled. Regular is what the other ports fall back to.
+     */
+    if (weight < PANGO_WEIGHT_NORMAL) {
+        PangoFont* loaded = pango_context_load_font(cn1LinuxPangoContext(), f->desc);
+        int near = 0;
+        if (loaded != 0) {
+            PangoFontDescription* actual = pango_font_describe(loaded);
+            if (actual != 0) {
+                int delta = (int) pango_font_description_get_weight(actual) - weight;
+                near = delta > -75 && delta < 75;
+                pango_font_description_free(actual);
+            }
+            g_object_unref(loaded);
+        }
+        if (!near) {
+            pango_font_description_set_weight(f->desc, PANGO_WEIGHT_NORMAL);
+        }
+    }
     f->pixelSize = pixelSize;
     cn1FontMetrics(f);
     return f;
