@@ -410,7 +410,8 @@ final class Deflate {
             if (++count < maxCount && curlen == nextlen) { //NOPMD AssignmentInOperand
                 continue;
             } else if (count < minCount) {
-                blTree[curlen * 2] += count;
+                // At most HEAP_SIZE code lengths are counted, well below Short.MAX_VALUE.
+                blTree[curlen * 2] = (short) (blTree[curlen * 2] + count);
             } else if (curlen != 0) {
                 if (curlen != prevlen) {
                     blTree[curlen * 2]++;
@@ -632,7 +633,7 @@ final class Deflate {
 
         if ((lastLit & 0x1fff) == 0 && level > 2) {
             // Compute an upper bound for the compressed length
-            int outLength = lastLit * 8;
+            long outLength = (long) lastLit * 8;
             int inLength = strStart - blockStart;
             int dcode;
             for (dcode = 0; dcode < D_CODES; dcode++) {

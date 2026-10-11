@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 import java.io.*;
 import java.util.*;
 import java.util.zip.*;
@@ -89,7 +111,18 @@ public class ZipApiApp {
                 while (!i.finished()) {
                     int n = i.inflate(buf);
                     decoded.write(buf, 0, n);
-                    if (i.needsDictionary()) i.setDictionary(dictionary);
+                    if (i.needsDictionary()) {
+                        int expected = i.getAdler();
+                        boolean rejected = false;
+                        try {
+                            i.setDictionary(new byte[] {1, 2, 3});
+                        } catch (IllegalArgumentException wrong) {
+                            rejected = true;
+                        }
+                        require(rejected && i.needsDictionary() && i.getAdler() == expected,
+                                "wrong dictionary preserves retry state");
+                        i.setDictionary(dictionary);
+                    }
                 }
                 require(Arrays.equals(dictionaryData, decoded.toByteArray()), "dictionary raw=" + raw);
             } finally {
@@ -340,9 +373,89 @@ public class ZipApiApp {
         }
         require(truncated, "truncated ZIP header");
     }
+    static void compatibilityRegressions(boolean customRuntime) throws Exception {
+        byte[] data = "flushed payload".getBytes("UTF-8");
+        // JDK 8 itself loops indefinitely with buffers smaller than the flush marker.
+        for (int size = customRuntime ? 1 : 8; size <= 8; size++) {
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            Deflater def = new Deflater();
+            try (DeflaterOutputStream out = new DeflaterOutputStream(bytes, def, size, true)) {
+                out.flush();
+                out.write(data);
+                out.flush();
+                out.flush();
+                out.write(data);
+            } finally {
+                def.end();
+            }
+            require(bytes.size() < 200, "tiny flush buffer stays bounded");
+            byte[] twice = new byte[data.length * 2];
+            System.arraycopy(data, 0, twice, 0, data.length);
+            System.arraycopy(data, 0, twice, data.length, data.length);
+            require(Arrays.equals(twice, readAll(new InflaterInputStream(
+                    new ByteArrayInputStream(bytes.toByteArray())))), "tiny buffer sync flush");
+            bytes.reset();
+            try (GZIPOutputStream out = new GZIPOutputStream(bytes, size, true)) {
+                out.write(data);
+                out.flush();
+                out.flush();
+            }
+            require(Arrays.equals(data, readAll(new GZIPInputStream(
+                    new ByteArrayInputStream(bytes.toByteArray())))), "tiny gzip sync flush");
+        }
+        ByteArrayOutputStream member = new ByteArrayOutputStream();
+        try (GZIPOutputStream out = new GZIPOutputStream(member)) { out.write(data); }
+        for (byte[] tail : new byte[][] { {42}, {31}, {31, -117}, {31, -117, 0, 0, 0, 0, 0, 0, 0, 0} }) {
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            bytes.write(member.toByteArray());
+            bytes.write(tail);
+            require(Arrays.equals(data, readAll(new GZIPInputStream(
+                    new ByteArrayInputStream(bytes.toByteArray())))), "gzip trailing bytes");
+        }
+        boolean badHeader = false;
+        try { new GZIPInputStream(new ByteArrayInputStream(new byte[] {42})); }
+        catch (IOException expected) { badHeader = true; }
+        require(badHeader, "first gzip header remains strict");
+
+        for (String name : new String[] {"\u00e9", "\ud800", "\udc00"}) {
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            try (ZipArchiveOutputStream out = new ZipArchiveOutputStream(bytes,
+                    java.nio.charset.Charset.forName("US-ASCII"))) {
+                boolean rejected = false;
+                try { out.putNextEntry(entry(name)); }
+                catch (IOException expected) { rejected = true; }
+                require(rejected, "lossy ZIP encoding rejected");
+                out.putNextEntry(entry("?"));
+                out.closeEntry();
+            }
+        }
+        try (ZipArchiveOutputStream out = new ZipArchiveOutputStream(new ByteArrayOutputStream())) {
+            boolean rejected = false;
+            try { out.putNextEntry(entry("\ud800")); }
+            catch (IOException expected) { rejected = true; }
+            require(rejected, "malformed UTF-8 surrogate rejected");
+            out.putNextEntry(entry("unicode-\ud83d\ude00"));
+            out.closeEntry();
+        }
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        ZipEntry future = entry("future");
+        future.setExtra(new byte[] {0x55, 0x54, 5, 0, 1, 0, 0, 0, 0, 0x34, 0x12, 1, 0, 42});
+        future.setTime(2208988800000L); // 2040-01-01, outside signed 32-bit UT time.
+        try (ZipArchiveOutputStream out = new ZipArchiveOutputStream(bytes)) {
+            out.putNextEntry(future);
+            out.closeEntry();
+        }
+        try (ZipInputStream in = new ZipInputStream(new ByteArrayInputStream(bytes.toByteArray()))) {
+            ZipEntry restored = in.getNextEntry();
+            require(restored.getTime() == future.getTime(), "stale UT timestamp removed");
+            require(Arrays.equals(restored.getExtra(), new byte[] {0x34, 0x12, 1, 0, 42}),
+                    "unrelated extra preserved");
+        }
+    }
     public static void main(String[] args) throws Exception {
         byte[] data = payload();
         checksums();
+        compatibilityRegressions(args.length > 1);
         compression(data);
         gzip(data, args[0]);
         archive(data, args[0]);

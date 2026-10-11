@@ -219,24 +219,7 @@ the central directory.
 
 [source,java]
 ----
-try (ZipArchiveOutputStream zip = new ZipArchiveOutputStream(destination)) {
-    ZipEntry directory = new ZipEntry("project/");
-    directory.setTime(0);
-    zip.putNextEntry(directory, 0755);
-    zip.closeEntry();
-
-    ZipEntry launcher = new ZipEntry("project/run.sh");
-    launcher.setTime(0);
-    zip.putNextEntry(launcher, 0755);
-    try (InputStream source = openLauncher()) {
-        byte[] buffer = new byte[8192];
-        int count;
-        while ((count = source.read(buffer)) != -1) {
-            zip.write(buffer, 0, count);
-        }
-    }
-    zip.closeEntry();
-}
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/ZipDownload.java[tag=backend-zip-download,indent=0]
 ----
 
 The permission argument accepts `0000` through `0777`. The writer infers a
@@ -250,14 +233,7 @@ It serves a small, fixed project at `http://127.0.0.1:8099/project.zip`:
 
 [source,bash]
 ----
-export CN1_BACKEND_DEMO=demo/zipdownload
-export CN1_BACKEND_STANDALONE_DEMO=1
-export JDK_8_HOME=/path/to/jdk8
-export JAVA_HOME="$JDK_8_HOME"
-export PATH="$JAVA_HOME/bin:$PATH"
-cd vm/backend
-./build.sh ZipDownload com.demo /tmp/zipdownload
-/tmp/zipdownload
+include::../demos/common/src/main/snippets/developer-guide/backend-zip-download.sh[tag=backend-zip-download,indent=0]
 ----
 
 The same binary can generate a file without starting HTTP:
@@ -265,18 +241,32 @@ The same binary can generate a file without starting HTTP:
 `project/run.sh`. The JVM version can be run with
 `CN1_BACKEND_DEMO=demo/zipdownload ./run-javase.sh com.demo.ZipDownload`.
 
-The HTTP example buffers only its fixed literals. `HttpServer.Response` currently
-accepts a byte array or an already-open file descriptor; it has no streaming
-output callback. ZIP generation itself streams to any `OutputStream`, but this
-change does not add HTTP streaming or cancellation notifications during archive
-generation. For large downloads, generate to an application-owned file and use
-the existing file response lifecycle; the application must manage deletion of
-that file. Do not collect arbitrary project contents in a byte array.
+`HttpServer.Response.stream` invokes the writer when it sends the response. Open
+sources inside this callback and close them with try-with-resources. HEAD and
+statuses without a body do not invoke it, so they do not open sources. Closing
+the supplied output flushes it without closing the connection. The server ends
+the response only after the callback returns successfully.
+
+Generation uses the serving worker and fixed transport buffers: 16 KiB for
+HTTP/1, plus a 16 KiB receive buffer and a 16 KiB native chunk for HTTP/2. It
+creates no archive-sized byte array, temporary file, or producer thread.
+HTTP/1.1 uses chunked framing, HTTP/1.0 closes the connection after the body,
+and native HTTP/2 respects the client's flow-control window. A slow client
+holds the serving worker until it grants credit or the socket deadline expires;
+other streams on that HTTP/2 connection wait while the callback runs.
+
+A disconnected client, HTTP/2 reset, or socket timeout makes output writes throw
+`IOException`. Let that exception propagate so source cleanup runs and archive
+generation stops. Cancellation is detected on output I/O; a callback doing
+lengthy computation or waiting on its own source must bound that work itself.
+A callback failure aborts the response rather than emitting a success terminator.
+The local JVM transport supports HTTP/1; test HTTP/2 with the packaged backend.
 
 ==== Format limits and ownership
 
 * The default name/comment encoding is UTF-8, with the ZIP UTF-8 flag set.
-  Charset constructors also accept encodings available in the runtime.
+  Charset constructors also accept encodings available in the runtime. Names and
+  comments that cannot be encoded without replacement are rejected.
 * Files may be empty. Directories are explicit entries ending in `/`.
   Duplicate entry names and empty entry names are rejected.
 * `DEFLATED` entries stream with data descriptors. `STORED` entries require a

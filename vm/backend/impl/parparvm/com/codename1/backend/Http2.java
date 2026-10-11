@@ -228,6 +228,32 @@ public final class Http2 {
         return true;
     }
 
+    /// Starts a response with one bounded chunk supplied at a time by the server.
+    public boolean respondStream(int streamId, int status, String contentType, List headers)
+            throws IOException {
+        int rc = respondStreamImpl(session, streamId, String.valueOf(status), headerBytes(contentType, headers));
+        if (rc == OVER_BODY_BUDGET) {
+            return false;
+        }
+        if (rc != 0) {
+            throw new IOException("Could not start HTTP/2 streamed response");
+        }
+        return true;
+    }
+
+    /// Supplies the next chunk after the previous one has drained.
+    public void streamChunk(int streamId, byte[] bytes, int length, boolean end) throws IOException {
+        checkRange(bytes, 0, length);
+        if (length > 16384 || streamChunkImpl(session, streamId, bytes, length, end) != 0) {
+            throw new IOException("HTTP/2 streamed response closed or not drained");
+        }
+    }
+
+    /// Unsent bytes, or -1 if the stream has closed or been reset.
+    public int streamPending(int streamId) {
+        return streamPendingImpl(session, streamId);
+    }
+
     /// Runs the session's output side and returns the bytes to put on the wire.
     /// Empty when there is nothing pending.
     public byte[] drain() throws IOException {
@@ -353,6 +379,10 @@ public final class Http2 {
     private static native void setMaxBodyBytesImpl(long limit);
 
     private static native void setMaxFileBodiesImpl(int limit);
+
+    private static native int respondStreamImpl(long session, int streamId, String status, byte[] headers);
+    private static native int streamChunkImpl(long session, int streamId, byte[] bytes, int length, boolean end);
+    private static native int streamPendingImpl(long session, int streamId);
 
     private static native int respondImpl(long session, int streamId, String status,
                                           byte[] headerLines, byte[] body);

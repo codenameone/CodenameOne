@@ -140,3 +140,21 @@ The latter also supports `--check`.
 JavaAPI ZIP classes on HotSpot, and a locally translated ParparVM executable.
 It uses the JDK ZIP reader and system `unzip` as independent readers, checks Unix
 mode bits after extraction, and compares contents and metadata across runtimes.
+
+`HttpServer.Response.stream` connects ZIP generation directly to HTTP/1 and
+native HTTP/2 without buffering the archive. `BackendZipStreamingTest` downloads
+64 MiB with a 32 MiB JVM heap, verifies framing and source cleanup, and cancels a
+1 GiB producer before it finishes. The socket harness also exercises native
+HTTP/2 flow control and stream resets:
+
+```sh
+# Run the ZipTestServer fixture on a chosen local port, then:
+python3 vm/backend/tests/zip-streaming.py 18199 /tmp/zip-artifacts --http2
+```
+
+The fixture source directory is
+`vm/tests/src/test/resources/com/codename1/tools/translator/zipserver`; set
+`CN1_BACKEND_DEMO` to its absolute path and `CN1_BACKEND_STANDALONE_DEMO=1`
+when invoking `build.sh ZipTestServer com.demo /tmp/zip-test-server` or
+`package.sh ZipTestServer com.demo glibc-arm64`. Pass the listening port as the
+binary's first argument. Native packaging and GraalVM validation are local only.

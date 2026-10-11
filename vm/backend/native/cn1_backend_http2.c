@@ -111,6 +111,8 @@ typedef struct CN1H2Body {
     int64_t fileOffset;
     size_t length;
     size_t offset;
+    int streaming;
+    int finished;
     struct CN1H2Body* next;
 } CN1H2Body;
 
@@ -280,7 +282,7 @@ static void cn1H2FreeBody(CN1H2Body* body) {
        file body holds no buffer and was never charged. */
     if(body->data != NULL) {
         atomic_fetch_sub_explicit(&cn1H2PendingBodyBytes,
-                (long)body->length, memory_order_relaxed);
+                (long)(body->streaming ? 16384 : body->length), memory_order_relaxed);
     }
     if(body->fd >= 0) {
         atomic_fetch_sub_explicit(&cn1H2OpenFileBodies, 1, memory_order_relaxed);
@@ -1236,6 +1238,9 @@ static ssize_t cn1H2ReadBody(nghttp2_session* session, int32_t streamId, uint8_t
         *dataFlags |= NGHTTP2_DATA_FLAG_EOF;
         return 0;
     }
+    if(body->streaming && body->offset == body->length && !body->finished) {
+        return NGHTTP2_ERR_DEFERRED;
+    }
     remaining = body->length - body->offset;
     if(remaining > length) {
         remaining = length;
@@ -1279,7 +1284,7 @@ static ssize_t cn1H2ReadBody(nghttp2_session* session, int32_t streamId, uint8_t
            admitted the next one. The whole allocation is released in
            cn1H2FreeBody, which is the moment the memory actually goes away. */
     }
-    if(body->offset >= body->length) {
+    if(body->offset >= body->length && (!body->streaming || body->finished)) {
         *dataFlags |= NGHTTP2_DATA_FLAG_EOF;
         cn1H2ReleaseBody(s, body);
     }
@@ -1467,7 +1472,7 @@ JAVA_INT com_codename1_backend_Http2_respondImpl___long_int_java_lang_String_byt
             free(headerCopy);
             return -2;
         }
-        pending = (CN1H2Body*)malloc(sizeof(CN1H2Body));
+        pending = (CN1H2Body*)calloc(1, sizeof(CN1H2Body));
         if(pending != NULL) {
             pending->data = (unsigned char*)malloc((size_t)arr->length);
             if(pending->data == NULL) {
@@ -1543,7 +1548,7 @@ JAVA_INT com_codename1_backend_Http2_respondFileImpl___long_int_java_lang_String
     }
 
     cn1H2ReleaseBodyForStream(s, streamId);
-    pending = (CN1H2Body*)malloc(sizeof(CN1H2Body));
+    pending = (CN1H2Body*)calloc(1, sizeof(CN1H2Body));
     if(pending == NULL) {
         close(fd);
         free(statusCopy);
@@ -1577,6 +1582,77 @@ JAVA_INT com_codename1_backend_Http2_respondFileImpl___long_int_java_lang_String
     free(statusCopy);
     free(headerCopy);
     return rc == 0 ? 0 : -1;
+}
+
+/* One reusable chunk per generated response. No callback enters Java from nghttp2. */
+JAVA_INT com_codename1_backend_Http2_respondStreamImpl___long_int_java_lang_String_byte_1ARRAY_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_INT streamId, JAVA_OBJECT status, JAVA_OBJECT headers) {
+    CN1H2Session* s = (CN1H2Session*)(intptr_t)handle;
+    CN1H2Body* body;
+    nghttp2_nv nva[CN1_H2_MAX_HEADERS + 1];
+    nghttp2_data_provider provider;
+    char* statusCopy = NULL;
+    char* headerCopy = NULL;
+    long count;
+    int rc;
+    if(s == NULL) return -1;
+    count = cn1H2BuildHeaders(threadStateData, status, headers, nva, &statusCopy, &headerCopy);
+    if(count < 0) return -1;
+    if(!cn1H2ReserveBodyBytes(16384)) {
+        free(statusCopy);
+        free(headerCopy);
+        return -2;
+    }
+    body = (CN1H2Body*)calloc(1, sizeof(CN1H2Body));
+    if(body != NULL) body->data = (unsigned char*)malloc(16384);
+    if(body == NULL || body->data == NULL) {
+        free(body);
+        atomic_fetch_sub_explicit(&cn1H2PendingBodyBytes, 16384, memory_order_relaxed);
+        free(statusCopy);
+        free(headerCopy);
+        return -1;
+    }
+    body->streamId = streamId;
+    body->fd = -1;
+    body->streaming = 1;
+    body->next = s->bodies;
+    s->bodies = body;
+    provider.source.ptr = body;
+    provider.read_callback = cn1H2ReadBody;
+    rc = nghttp2_submit_response(s->session, streamId, nva, (size_t)count, &provider);
+    if(rc != 0) cn1H2ReleaseBody(s, body);
+    free(statusCopy);
+    free(headerCopy);
+    return rc == 0 ? 0 : -1;
+}
+
+static CN1H2Body* cn1H2StreamingBody(CN1H2Session* s, int32_t streamId) {
+    CN1H2Body* body;
+    if(s == NULL) return NULL;
+    for(body = s->bodies; body != NULL; body = body->next) {
+        if(body->streamId == streamId && body->streaming) return body;
+    }
+    return NULL;
+}
+
+JAVA_INT com_codename1_backend_Http2_streamChunkImpl___long_int_byte_1ARRAY_int_boolean_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_INT streamId, JAVA_OBJECT bytes, JAVA_INT length, JAVA_BOOLEAN end) {
+    CN1H2Session* s = (CN1H2Session*)(intptr_t)handle;
+    CN1H2Body* body = cn1H2StreamingBody(s, streamId);
+    if(body == NULL || body->finished || body->offset != body->length
+            || bytes == JAVA_NULL || length < 0 || length > 16384
+            || length > ((JAVA_ARRAY)bytes)->length) return -1;
+    if(length > 0) memcpy(body->data, CN1_ARRAY_DATA(bytes), (size_t)length);
+    body->length = (size_t)length;
+    body->offset = 0;
+    body->finished = end != JAVA_FALSE;
+    /* A consumed chunk may have exactly exhausted the peer window before the
+       provider was called again to defer; resume is only needed when deferred. */
+    nghttp2_session_resume_data(s->session, streamId);
+    return 0;
+}
+
+JAVA_INT com_codename1_backend_Http2_streamPendingImpl___long_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_INT streamId) {
+    CN1H2Body* body = cn1H2StreamingBody((CN1H2Session*)(intptr_t)handle, streamId);
+    return body == NULL ? -1 : (JAVA_INT)(body->length - body->offset);
 }
 
 JAVA_BOOLEAN com_codename1_backend_Http2_wantsMoreImpl___long_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {

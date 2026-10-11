@@ -23,6 +23,7 @@
 package com.codename1.backend;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -1230,6 +1231,17 @@ public final class HttpServer {
         }
     }
 
+    /// Generates a response on the serving worker, with bounded transport buffering.
+    /// Open sources inside writeTo and close them with try-with-resources. The server
+    /// invokes this only for responses that carry a body, never for HEAD or a bodiless
+    /// status. Capture request values in the handler; do not retain the Request or output.
+    /// A disconnect, reset or socket timeout makes writes throw IOException; let it
+    /// propagate so generation stops and source cleanup runs. No temporary files or
+    /// producer threads are created. Closing output flushes it, but not the connection.
+    public interface BodyWriter {
+        void writeTo(OutputStream output) throws IOException;
+    }
+
     /// What a handler returns.
     public static final class Response {
         // Not final because Request.respond hands back ONE Response per connection,
@@ -1248,6 +1260,7 @@ public final class HttpServer {
         /// Serialised into the connection buffer at write time; see jsonValue.
         Object deferredJson;
         boolean hasDeferredJson;
+        BodyWriter bodyWriter;
 
         /// Drops what this response pointed at, once it has been written.
         ///
@@ -1258,6 +1271,7 @@ public final class HttpServer {
         void releaseRetained() {
             this.deferredJson = null;
             this.hasDeferredJson = false;
+            this.bodyWriter = null;
             this.body = EMPTY_BODY;
             this.extraHeaders = null;
         }
@@ -1297,6 +1311,7 @@ public final class HttpServer {
             this.extraHeaders = extraHeaders;
             this.deferredJson = null;
             this.hasDeferredJson = false;
+            this.bodyWriter = null;
         }
 
         public Response(int status, String contentType, byte[] body) {
@@ -1337,7 +1352,21 @@ public final class HttpServer {
                     fileLength, headers);
             copy.deferredJson = deferredJson;
             copy.hasDeferredJson = hasDeferredJson;
+            copy.bodyWriter = bodyWriter;
             return copy;
+        }
+
+        /// A response generated as it is downloaded. Its length is unknown: HTTP/1.1
+        /// uses chunked framing, HTTP/1.0 closes after the body, and HTTP/2 uses DATA
+        /// frames with flow control. A generation failure aborts the response; headers
+        /// have already been sent, so it cannot be replaced with a successful error body.
+        public static Response stream(int status, String contentType, BodyWriter writer) {
+            if (writer == null) {
+                throw new NullPointerException("writer");
+            }
+            Response response = new Response(status, contentType, EMPTY_BODY);
+            response.bodyWriter = writer;
+            return response;
         }
 
         /// A response whose body is a file. The server sends it with sendfile where
@@ -6060,7 +6089,11 @@ public final class HttpServer {
                 // Read before the write: writing releases what the Response held.
                 int status = response.status;
                 try {
-                    writeResponse(conn, fd, session, response, keepAlive, headOnly);
+                    boolean http11 = !"HTTP/1.0".equals(request.getVersion());
+                    if (response.bodyWriter != null && !http11) {
+                        keepAlive = false;
+                    }
+                    writeResponse(conn, fd, session, response, keepAlive, headOnly, http11);
                     sentStatus = status;
                     if (conn.stripe >= 0) {
                         servedStripes[conn.stripe]++;      // single writer: this host
@@ -6514,7 +6547,22 @@ public final class HttpServer {
                     // The same rule as HTTP/1: a 204, 304 or 1xx carries no body, so
                     // a DATA frame must not follow the headers here either.
                     boolean noBody = headOnly || statusForbidsBody(response.status);
-                    if (response.fileFd >= 0 && !noBody
+                    if (response.bodyWriter != null && !noBody) {
+                        if (!h2.respondStream(stream.getId(), response.status, contentType, extra)) {
+                            h2.respond(stream.getId(), 503, "text/plain", refusalHeaders(), null);
+                            fallbackStatus = 503;
+                        } else {
+                            flushHttp2(fd, session, h2);
+                            ResponseOutput output = new ResponseOutput(fd, session, false, h2, stream.getId()); //NOPMD CloseResource - complete flushes on success; failure must abort and the connection owns the socket.
+                            try {
+                                response.bodyWriter.writeTo(output);
+                                output.complete();
+                            } catch (StreamCancelledException cancelled) {
+                                // RST_STREAM cancels this producer, not other streams on the connection.
+                                handlerError = cancelled;
+                            }
+                        }
+                    } else if (response.fileFd >= 0 && !noBody
                             && Http2.pendingBodyFiles() >= MAX_OPEN_H2_FILES) {
                         // BEFORE submitting, not after. The turn check below stops
                         // this session, but every other session wakes on a control
@@ -6583,7 +6631,7 @@ public final class HttpServer {
                         // close is worse than the leak it was meant to fix, because
                         // the number is reusable the instant the first close returns
                         // and the second one then lands on whatever took it.
-                        if (headOnly && !statusForbidsLength(response.status)) {
+                        if (headOnly && response.bodyWriter == null && !statusForbidsLength(response.status)) {
                             long described;
                             if (response.fileFd >= 0) {
                                 described = response.fileLength;
@@ -7441,7 +7489,7 @@ public final class HttpServer {
                 conn.bodySink.reset();
                 Json.write(refused.deferredJson, conn.bodySink);
             }
-            writeResponse(conn, fd, session, refused, false, false);
+            writeResponse(conn, fd, session, refused, false, false, true);
             conn.writtenStatus = status;
         } catch (IOException err) {
             // The peer is already gone; there is nowhere to report this.
@@ -8528,9 +8576,9 @@ public final class HttpServer {
     /// deferred JSON body and the two early returns that write a small body in one
     /// syscall are all in front of it.
     private void writeResponse(Conn conn, int fd, long session, Response response,
-            boolean keepAlive, boolean headOnly) throws IOException {
+            boolean keepAlive, boolean headOnly, boolean http11) throws IOException {
         try {
-            writeHeadAndBody(conn, fd, session, response, keepAlive, headOnly);
+            writeHeadAndBody(conn, fd, session, response, keepAlive, headOnly, http11);
         } finally {
             if (response.fileFd >= 0) {
                 StaticFiles.closeFile(response.fileFd);
@@ -8539,7 +8587,7 @@ public final class HttpServer {
     }
 
     private void writeHeadAndBody(Conn conn, int fd, long session, Response response,
-            boolean keepAlive, boolean headOnly) throws IOException {
+            boolean keepAlive, boolean headOnly, boolean http11) throws IOException {
         // A deferred JSON body was rendered before this was called -- see the
         // caller -- into a second reusable buffer rather than the head's, because
         // Content-Length has to be written before it and the head is not built yet.
@@ -8553,7 +8601,9 @@ public final class HttpServer {
                 : (deferred != null ? deferredLength : response.body.length);
         // HEAD is not the only thing that suppresses a body; see statusForbidsBody.
         boolean noBody = headOnly || statusForbidsBody(response.status);
-        boolean noLength = statusForbidsLength(response.status);
+        boolean streamed = response.bodyWriter != null;
+        boolean chunked = streamed && http11 && !noBody;
+        boolean noLength = statusForbidsLength(response.status) || (streamed && (headOnly || !noBody));
         // A HEAD and a bodiless STATUS are suppressed for different reasons and
         // must advertise different lengths. HEAD describes the representation it
         // is not sending, so it keeps the real figure. A 205 has no
@@ -8628,6 +8678,9 @@ public final class HttpServer {
             }
             conn.put(keepAlive ? "\r\nConnection: keep-alive" : "\r\nConnection: close");
         }
+        if (chunked) {
+            conn.put("\r\nTransfer-Encoding: chunked");
+        }
         if (response.extraHeaders != null) {
             java.util.Iterator it = response.extraHeaders.keySet().iterator();
             while (it.hasNext()) {
@@ -8669,6 +8722,16 @@ public final class HttpServer {
             conn.put(H_END, 0, H_END.length);
         } else {
             conn.put("\r\n\r\n");
+        }
+
+        if (streamed) {
+            writeTo(fd, session, conn.out, 0, conn.outLength);
+            if (!noBody) {
+                ResponseOutput output = new ResponseOutput(fd, session, chunked, null, 0); //NOPMD CloseResource - complete flushes on success; failure must abort and the connection owns the socket.
+                response.bodyWriter.writeTo(output);
+                output.complete();
+            }
+            return;
         }
 
         // Head and body in ONE write when the body is small and already in memory.
@@ -8717,6 +8780,146 @@ public final class HttpServer {
         }
         if (!noBody && response.body.length > 0) {
             writeTo(fd, session, response.body, 0, response.body.length);
+        }
+    }
+
+    private static final class StreamCancelledException extends IOException {
+        StreamCancelledException() {
+            super("HTTP/2 download cancelled");
+        }
+    }
+
+    private final class ResponseOutput extends OutputStream {
+        private final int fd;
+        private final int streamId;
+        private final long session;
+        private final boolean chunked;
+        private final Http2 h2;
+        private final byte[] buffer = new byte[16384];
+        private final byte[] incoming;
+        private int count;
+        private boolean closed;
+        private boolean failed;
+
+        ResponseOutput(int fd, long session, boolean chunked, Http2 h2, int streamId) {
+            this.fd = fd;
+            this.session = session;
+            this.chunked = chunked;
+            this.h2 = h2;
+            this.streamId = streamId;
+            incoming = h2 == null ? null : new byte[16384];
+        }
+
+        private void checkOpen() throws IOException {
+            if (closed || failed) {
+                throw new IOException("Response output closed or failed");
+            }
+        }
+
+        @Override
+        public void write(int value) throws IOException {
+            checkOpen();
+            buffer[count++] = (byte) value;
+            if (count == buffer.length) {
+                flush();
+            }
+        }
+
+        @Override
+        public void write(byte[] data, int offset, int length) throws IOException {
+            checkOpen();
+            if (data == null) {
+                throw new NullPointerException();
+            }
+            if (offset < 0 || length < 0 || offset > data.length - length) {
+                throw new IndexOutOfBoundsException();
+            }
+            while (length > 0) {
+                int n = Math.min(length, buffer.length - count);
+                System.arraycopy(data, offset, buffer, count, n);
+                count += n;
+                offset += n;
+                length -= n;
+                if (count == buffer.length) {
+                    flush();
+                }
+            }
+        }
+
+        @Override
+        public void flush() throws IOException {
+            checkOpen();
+            try {
+                if (count > 0) {
+                    if (h2 != null) {
+                        h2.streamChunk(streamId, buffer, count, false);
+                        drainChunk();
+                    } else {
+                        if (chunked) {
+                            byte[] size = asciiBytes(Integer.toHexString(count) + "\r\n");
+                            HttpServer.this.writeTo(fd, session, size, 0, size.length);
+                        }
+                        HttpServer.this.writeTo(fd, session, buffer, 0, count);
+                        if (chunked) {
+                            byte[] end = asciiBytes("\r\n");
+                            HttpServer.this.writeTo(fd, session, end, 0, end.length);
+                        }
+                    }
+                    count = 0;
+                }
+            } catch (IOException error) {
+                failed = true;
+                throw error;
+            }
+        }
+
+        private void drainChunk() throws IOException {
+            for (;;) {
+                flushHttp2(fd, session, h2);
+                int pending = h2.streamPending(streamId);
+                if (pending < 0) {
+                    throw new StreamCancelledException();
+                }
+                if (pending == 0) {
+                    return;
+                }
+                // The peer controls the window. Read its WINDOW_UPDATE or reset;
+                // socket deadlines also bound a peer that stops granting credit.
+                int n = readFrom(fd, session, incoming, 0, incoming.length);
+                if (n <= 0) {
+                    throw new IOException("HTTP/2 connection closed");
+                }
+                h2.receive(incoming, 0, n);
+            }
+        }
+
+        @Override
+        public void close() throws IOException {
+            if (!closed) {
+                try {
+                    if (!failed) {
+                        flush();
+                    }
+                } finally {
+                    closed = true;
+                }
+            }
+        }
+
+        void complete() throws IOException {
+            if (failed) {
+                throw new IOException("Response output failed");
+            }
+            if (!closed) {
+                close();
+            }
+            if (h2 != null) {
+                h2.streamChunk(streamId, buffer, 0, true);
+                flushHttp2(fd, session, h2);
+            } else if (chunked) {
+                byte[] end = asciiBytes("0\r\n\r\n");
+                HttpServer.this.writeTo(fd, session, end, 0, end.length);
+            }
         }
     }
 

@@ -44,7 +44,8 @@ for source in sorted((ROOT / 'vm/JavaAPI/src/java/util/zip').glob('*.java')):
                 params = ', '.join(t+' arg'+str(i) for i,t in enumerate(line[start+1:end].split(', ')) if t)
                 line = line[:start+1] + params + line[end:]
         lines.append(line)
-    text = '\n'.join(lines) + '\n'
+    header = (ROOT / 'CodenameOne/src/com/codename1/impl/SharedWithBackend.java').read_text().split('*/', 1)[0] + '*/\n'
+    text = header + '\n'.join(lines) + '\n'
     target = ROOT / 'Ports/CLDC11/src/java/util/zip' / source.name
     if args.check:
         if not target.exists() or target.read_text() != text:
