@@ -325,7 +325,20 @@ public final class SVGParser {
                         // no view box
                     }
                 }
-                readChildren(r, symbol, doc);
+                // What is inside measures its percentages against the
+                // symbol's own view box, as inside a nested `<svg>`.
+                float outerWidth = viewportWidth;
+                float outerHeight = viewportHeight;
+                if (symbol.getViewBoxWidth() > 0 && symbol.getViewBoxHeight() > 0) {
+                    viewportWidth = symbol.getViewBoxWidth();
+                    viewportHeight = symbol.getViewBoxHeight();
+                }
+                try {
+                    readChildren(r, symbol, doc);
+                } finally {
+                    viewportWidth = outerWidth;
+                    viewportHeight = outerHeight;
+                }
                 if (symbol.getId() != null) doc.getDefinitions().put(symbol.getId(), symbol);
                 indexById(symbol, doc);
             } else if ("rect".equals(name)) {
@@ -762,8 +775,13 @@ public final class SVGParser {
         SVGText t = new SVGText();
         Map<String, String> a = attrs(r);
         applyCommon(t, a);
-        t.setX(lengthX(a.get("x")));
-        t.setY(lengthY(a.get("y")));
+        // Each may be a list, one for each character: the first is where
+        // the text starts and the rest are kept for the ones after it.
+        glyphLists = new float[][] {lengths(a.get("x"), true), lengths(a.get("y"), false),
+            lengths(a.get("dx"), true), lengths(a.get("dy"), false)};
+        glyphIndex = 0;
+        t.setX(glyphLists[0].length > 0 ? glyphLists[0][0] : 0f);
+        t.setY(glyphLists[1].length > 0 ? glyphLists[1][0] : 0f);
         String anchor = mergedValue(a, "text-anchor");
         if (anchor != null) {
             String norm = anchor.trim().toLowerCase();
@@ -808,6 +826,30 @@ public final class SVGParser {
     private boolean textSpaceBefore;
     /** Whether the text last read was under {@code xml:space="preserve"}, which keeps a space at its end. */
     private boolean textSpaceKept;
+    /**
+     * The x, y, dx and dy lists of the text or span being read, which place
+     * its characters one by one, and how many of its characters have been
+     * read. Only what comes after the first of each list is taken from
+     * here: the first is where the text or the span itself starts.
+     */
+    private float[][] glyphLists = new float[4][0];
+    private int glyphIndex;
+
+    /** A list of lengths; empty when there is none or it cannot be read. */
+    private float[] lengths(String value, boolean horizontal) {
+        if (value == null || value.trim().isEmpty()) return new float[0];
+        String[] parts = value.trim().split("[\\s,]+");
+        float[] out = new float[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            try {
+                out[i] = horizontal ? lengthX(parts[i]) : lengthY(parts[i]);
+            } catch (RuntimeException e) {
+                return java.util.Arrays.copyOf(out, i);
+            }
+        }
+        return out;
+    }
+
     /** Whether the span being read has still to hand its position to a run. */
     private boolean spanUnplaced;
 
@@ -837,6 +879,18 @@ public final class SVGParser {
                     textSpaceBefore = space;
                 }
                 if (shown.length() == 0) continue;
+                // Characters a list places are each a run of their own,
+                // begun where the list says; the rest follow the last. The
+                // first character is not one of them: it is where the text
+                // or the span starts, which is placed already.
+                int listed = 0;
+                for (float[] list : glyphLists) listed = Math.max(listed, list.length);
+                int from = glyphIndex;
+                glyphIndex += shown.length();
+                int head = 0;
+                while (head < shown.length() && (from + head < 1 || from + head >= listed)) head++;
+                String rest = shown.substring(head);
+                shown.setLength(head);
                 SVGText.Run run = new SVGText.Run();
                 run.setText(shown.toString());
                 if (span != null) {
@@ -854,7 +908,25 @@ public final class SVGParser {
                         spanUnplaced = false;
                     }
                 }
-                text.getRuns().add(run);
+                if (shown.length() > 0) text.getRuns().add(run);
+                SVGText.Run placed = null;
+                for (int i = 0; i < rest.length(); i++) {
+                    int at = from + head + i;
+                    if (at < listed || placed == null) {
+                        placed = new SVGText.Run();
+                        placed.setStyle(run.getStyle());
+                        placed.setFontFamily(run.getFontFamily());
+                        placed.setFontSize(run.getFontSize());
+                        placed.setBold(run.getBold());
+                        placed.setItalic(run.getItalic());
+                        if (at < glyphLists[0].length) placed.setX(Float.valueOf(glyphLists[0][at]));
+                        if (at < glyphLists[1].length) placed.setY(Float.valueOf(glyphLists[1][at]));
+                        if (at < glyphLists[2].length) placed.setDx(glyphLists[2][at]);
+                        if (at < glyphLists[3].length) placed.setDy(glyphLists[3][at]);
+                        text.getRuns().add(placed);
+                    }
+                    placed.setText(placed.getText() + rest.charAt(i));
+                }
             } else if (ev == XMLStreamConstants.START_ELEMENT) {
                 // tspan / textPath / etc.
                 Map<String, String> a = attrs(r);
@@ -879,6 +951,13 @@ public final class SVGParser {
                 }
                 if (a.get("x") != null) child.setX(firstLength(a.get("x"), true));
                 if (a.get("y") != null) child.setY(firstLength(a.get("y"), false));
+                if (a.get("x") != null || a.get("y") != null || a.get("dx") != null || a.get("dy") != null) {
+                    // A span that places itself places its characters by
+                    // its own lists from here on.
+                    glyphLists = new float[][] {lengths(a.get("x"), true), lengths(a.get("y"), false),
+                        lengths(a.get("dx"), true), lengths(a.get("dy"), false)};
+                    glyphIndex = 0;
+                }
                 Float dx = a.get("dx") == null ? null : firstLength(a.get("dx"), true);
                 Float dy = a.get("dy") == null ? null : firstLength(a.get("dy"), false);
                 if (dx != null) child.setDx(child.getDx() + dx.floatValue());

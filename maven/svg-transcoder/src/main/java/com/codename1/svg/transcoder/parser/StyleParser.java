@@ -54,6 +54,8 @@ public final class StyleParser {
         SVGStyle out = new SVGStyle();
         out.setFill(toPaint(merged.get("fill")));
         out.setStroke(toPaint(merged.get("stroke")));
+        out.setFillContext(toContext(merged.get("fill")));
+        out.setStrokeContext(toContext(merged.get("stroke")));
         out.setFillCurrent(ColorParser.isCurrentColor(merged.get("fill")));
         out.setStrokeCurrent(ColorParser.isCurrentColor(merged.get("stroke")));
         String color = merged.get("color");
@@ -132,11 +134,19 @@ public final class StyleParser {
         return ref == null ? ("none".equals(v.trim()) ? "" : null) : ref;
     }
 
+    /** "fill" for {@code context-fill}, "stroke" for {@code context-stroke}, null for anything else. */
+    private static String toContext(String value) {
+        if (value == null) return null;
+        String v = value.trim();
+        return "context-fill".equals(v) ? "fill" : "context-stroke".equals(v) ? "stroke" : null;
+    }
+
     private static SVGPaint toPaint(String value) {
         if (value == null) return null;
         String v = value.trim();
         if (v.isEmpty()) return null;
         if (ColorParser.isNone(v)) return SVGPaint.NONE;
+        if (toContext(v) != null) return null; // left unset; SVGStyle.getFillContext / getStrokeContext say which
         if (ColorParser.isCurrentColor(v)) return null; // left unset; SVGStyle.isFillCurrent / isStrokeCurrent say it was written
         SVGPaint ref = SVGPaint.setReference(v);
         if (ref != null) return ref;

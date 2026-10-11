@@ -340,6 +340,15 @@ public final class VectorImage {
         if (style.isStrokeCurrent()) {
             style.setStroke(SVGPaint.ofColor(current));
         }
+        // `context-fill` and `context-stroke` are the fill and the stroke
+        // of the element a marker is drawn on, so that one arrowhead takes
+        // the colour of every line it ends. Anywhere else they are nothing.
+        if (style.getFillContext() != null) {
+            style.setFill("fill".equals(style.getFillContext()) ? contextFill : contextStroke);
+        }
+        if (style.getStrokeContext() != null) {
+            style.setStroke("fill".equals(style.getStrokeContext()) ? contextFill : contextStroke);
+        }
         float opacity = style.getOpacity() == null ? 1f : clamp(style.getOpacity().floatValue());
         if (opacity <= 0f) {
             return;
@@ -393,7 +402,14 @@ public final class VectorImage {
                                 style.getFillOpacity(), node, device, w, h) : null;
                 BufferedImage strokePaint = SvgFilter.reads(filter, "StrokePaint")
                         ? flooded(style.getStroke(), style.getStrokeOpacity(), node, device, w, h) : null;
-                SvgFilter.apply(layer, filter, boundsOf(node), device, fillPaint, strokePaint);
+                SvgFilter.apply(layer, filter, boundsOf(node), device, fillPaint, strokePaint,
+                        new SvgFilter.Pictures() {
+                            @Override
+                            public BufferedImage picture(SVGFilter.Primitive p, Rectangle2D area,
+                                    AffineTransform toPixels, int pw, int ph) {
+                                return filterPicture(p, area, toPixels, pw, ph);
+                            }
+                        });
                 Shape outline = clipRef == null ? null : clipShape(node, clipRef);
                 if (outline != null) {
                     BufferedImage cut = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
@@ -561,6 +577,53 @@ public final class VectorImage {
         }
     }
 
+    /// What an `feImage` shows: a picture, fitted into the effect's area
+    /// like an `<image>`, or an element of the file, drawn like a `<use>`
+    /// of it. Null when it names neither.
+    private BufferedImage filterPicture(SVGFilter.Primitive p, Rectangle2D area, AffineTransform toPixels,
+            int w, int h) {
+        String href = p.get("href");
+        if (href == null || href.trim().length() == 0 || useDepth >= MAX_USE_DEPTH) {
+            return null;
+        }
+        href = href.trim();
+        BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = out.createGraphics();
+        useDepth++;
+        try {
+            Pixels.hints(g);
+            g.setTransform(toPixels);
+            if (href.charAt(0) == '#') {
+                SVGNode target = doc.getDefinitions().get(href.substring(1));
+                if (target == null || target instanceof SVGFilter) {
+                    return null;
+                }
+                // Where the effect says, when it says: left out, the
+                // element stays where it was drawn.
+                if (p.get("x") != null || p.get("y") != null) {
+                    g.translate(p.get("x") != null ? area.getX() : 0, p.get("y") != null ? area.getY() : 0);
+                }
+                paintNode(g, target, new SVGStyle(), w, h);
+                return out;
+            }
+            SVGImage image = new SVGImage();
+            image.setHref(href);
+            image.setX((float) area.getX());
+            image.setY((float) area.getY());
+            image.setWidth((float) area.getWidth());
+            image.setHeight((float) area.getHeight());
+            image.setPreserveAspectRatio(p.get("preserveAspectRatio"));
+            if (loadPicture(image) == null) {
+                return null;
+            }
+            paintImage(g, image);
+            return out;
+        } finally {
+            useDepth--;
+            g.dispose();
+        }
+    }
+
     /// The pixels of the picture an `<image>` names, or null. A `data:`
     /// address is decoded; any other is a file beside this one. An SVG is
     /// painted at the size of the box it goes in.
@@ -708,6 +771,11 @@ public final class VectorImage {
     /// bends, half way between the two directions. An arc is drawn as a
     /// few curves, and the points where those meet count as points of the
     /// line.
+    /// What `context-fill` and `context-stroke` stand for: the paints of
+    /// the element whose markers are being drawn, and `none` outside one.
+    private SVGPaint contextFill = SVGPaint.NONE;
+    private SVGPaint contextStroke = SVGPaint.NONE;
+
     private void paintMarkers(Graphics2D g, Shape shape, SVGStyle style, int w, int h) {
         SVGMarker start = markerOf(style.getMarkerStart());
         SVGMarker mid = markerOf(style.getMarkerMid());
@@ -715,6 +783,20 @@ public final class VectorImage {
         if (start == null && mid == null && end == null) {
             return;
         }
+        SVGPaint outerFill = contextFill;
+        SVGPaint outerStroke = contextStroke;
+        contextFill = style.getFill() == null ? SVGPaint.BLACK : style.getFill();
+        contextStroke = style.getStroke() == null ? SVGPaint.NONE : style.getStroke();
+        try {
+            paintMarkers(g, shape, style, start, mid, end, w, h);
+        } finally {
+            contextFill = outerFill;
+            contextStroke = outerStroke;
+        }
+    }
+
+    private void paintMarkers(Graphics2D g, Shape shape, SVGStyle style, SVGMarker start, SVGMarker mid,
+            SVGMarker end, int w, int h) {
         // Each point: where it is, the way the line comes in and the way
         // it leaves, either of which a point at an end does not have.
         List<double[]> points = new ArrayList<double[]>();

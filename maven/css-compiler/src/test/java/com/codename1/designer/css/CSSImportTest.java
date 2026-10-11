@@ -146,4 +146,20 @@ class CSSImportTest {
         IOException ex = assertThrows(IOException.class, () -> CSSTheme.load(root.toURI().toURL()));
         assertTrue(ex.getMessage().contains("only local files can be imported"), ex.getMessage());
     }
+
+    @Test
+    void aMultiImageDirectoryAndItsImagesAreAssets(@TempDir Path tmp) throws Exception {
+        File dir = tmp.toFile();
+        File root = write(new File(dir, "theme.css"), "A { background-image: url(img/icon.png); }\n");
+        File multi = new File(dir, "img/icon.png");
+        File medium = write(new File(multi, "medium.png"), "x");
+        File high = write(new File(multi, "high.png"), "x");
+
+        // The directory, for an image added or removed, and each image,
+        // for one that is edited: that moves no time but its own.
+        Set<File> assets = CssImports.assets(root);
+        assertTrue(assets.contains(multi.getCanonicalFile()), assets.toString());
+        assertTrue(assets.contains(medium.getCanonicalFile()), assets.toString());
+        assertTrue(assets.contains(high.getCanonicalFile()), assets.toString());
+    }
 }

@@ -48,9 +48,25 @@ import java.util.Map;
 /// multiplied in. Lengths are those of the filtered element: a blur of 2 on
 /// an element drawn at three times its size is a blur of 6 pixels.
 ///
-/// `feImage` is not read; its result is empty, as is the page behind the
-/// element as an input, which no browser gives a filter either.
+/// The page behind the element is empty as an input, which no browser gives
+/// a filter either. The picture an `feImage` names is painted by whoever
+/// runs the filter, which is who knows where the file is.
 final class SvgFilter {
+    /// Paints what an `feImage` names.
+    interface Pictures {
+        /// The picture of `p`, as an image `w` by `h` of the region's
+        /// pixels, or null when it names none that can be read.
+        ///
+        /// #### Parameters
+        ///
+        /// - `area`: where the effect puts it, in the element's coordinates
+        ///
+        /// - `toPixels`: from those coordinates to the pixels of the image
+        BufferedImage picture(Primitive p, Rectangle2D area, AffineTransform toPixels, int w, int h);
+    }
+
+    private Pictures pictures;
+
     /// One image in the chain: four planes, colour multiplied by opacity.
     private static final class Plane {
         final float[] r;
@@ -129,6 +145,13 @@ final class SvgFilter {
     /// - `strokePaint`: the same of its stroke
     static void apply(BufferedImage layer, SVGFilter filter, Rectangle2D box, AffineTransform device,
             BufferedImage fillPaint, BufferedImage strokePaint) {
+        apply(layer, filter, box, device, fillPaint, strokePaint, null);
+    }
+
+    /// As above, with `pictures` to paint what an `feImage` names; without
+    /// it such an effect is empty.
+    static void apply(BufferedImage layer, SVGFilter filter, Rectangle2D box, AffineTransform device,
+            BufferedImage fillPaint, BufferedImage strokePaint, Pictures pictures) {
         int lw = layer.getWidth();
         int lh = layer.getHeight();
         boolean boxed = box != null && box.getWidth() > 0 && box.getHeight() > 0;
@@ -151,6 +174,7 @@ final class SvgFilter {
             at.concatenate(device);
             SvgFilter f = new SvgFilter(px.width, px.height, at, boxed ? box : null,
                     filter.isPrimitiveObjectBoundingBox());
+            f.pictures = pictures;
             Plane source = plane(all, lw, px);
             f.fillPaint = fillPaint == null ? null : plane(fillPaint.getRGB(0, 0, lw, lh, null, 0, lw), lw, px);
             f.strokePaint = strokePaint == null ? null
@@ -299,7 +323,29 @@ final class SvgFilter {
         if ("feDiffuseLighting".equals(name) || "feSpecularLighting".equals(name)) {
             return lighting(p, input(p, "in", last, source, linear), linear, "feSpecularLighting".equals(name));
         }
+        if ("feImage".equals(name) && pictures != null) {
+            Rectangle2D area = area(p);
+            BufferedImage picture = area == null ? null : pictures.picture(p, area, at, w, h);
+            if (picture != null) {
+                return in(plane(picture.getRGB(0, 0, w, h, null, 0, w), w, new Rectangle(0, 0, w, h)), linear);
+            }
+        }
         return new Plane(w, h, linear);
+    }
+
+    /// Where an effect paints, in the element's coordinates: the sides it
+    /// gives, and those of the filter's region for the ones it leaves out.
+    /// Null when the region cannot be taken back to those coordinates.
+    private Rectangle2D area(Primitive p) {
+        AffineTransform back;
+        try {
+            back = at.createInverse();
+        } catch (NoninvertibleTransformException ex) {
+            return null;
+        }
+        Rectangle2D all = back.createTransformedShape(new Rectangle2D.Double(0, 0, w, h)).getBounds2D();
+        return new Rectangle2D.Double(side(p, "x", all.getX(), true, false), side(p, "y", all.getY(), false, false),
+                side(p, "width", all.getWidth(), true, true), side(p, "height", all.getHeight(), false, true));
     }
 
     /// The image an effect reads: the result before it, one that was given

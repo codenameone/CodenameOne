@@ -72,6 +72,8 @@ public final class SVGStyle {
     public void setClipEvenOdd(Boolean v) { this.clipEvenOdd = v; }
 
     private Integer color;
+    private String fillContext;
+    private String strokeContext;
     private boolean fillCurrent;
     private boolean strokeCurrent;
     private String filterRef;
@@ -87,6 +89,16 @@ public final class SVGStyle {
      * left unset, as it always was; a renderer that knows the colour puts
      * it in.
      */
+    /**
+     * What the fill is taken from when it is {@code context-fill} or
+     * {@code context-stroke}: "fill" or "stroke" of the element a marker is
+     * drawn on. Null when it is neither; the fill itself is then left unset.
+     */
+    public String getFillContext() { return fillContext; }
+    public void setFillContext(String v) { this.fillContext = v; }
+    /** The same for the stroke; see {@link #getFillContext()}. */
+    public String getStrokeContext() { return strokeContext; }
+    public void setStrokeContext(String v) { this.strokeContext = v; }
     public boolean isFillCurrent() { return fillCurrent; }
     public void setFillCurrent(boolean v) { this.fillCurrent = v; }
     /** Whether the stroke is {@code currentColor}; see {@link #isFillCurrent()}. */
@@ -151,10 +163,12 @@ public final class SVGStyle {
         if (fill == null) {
             fill = parent.fill;
             fillCurrent = fillCurrent || parent.fillCurrent;
+            if (fillContext == null && !fillCurrent) fillContext = parent.fillContext;
         }
         if (stroke == null) {
             stroke = parent.stroke;
             strokeCurrent = strokeCurrent || parent.strokeCurrent;
+            if (strokeContext == null && !strokeCurrent) strokeContext = parent.strokeContext;
         }
         if (color == null) color = parent.color;
         if (clipEvenOdd == null) clipEvenOdd = parent.clipEvenOdd;

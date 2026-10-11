@@ -138,6 +138,22 @@ public final class CssImports {
                     File file = new File(dir, url);
                     if (file.isFile() || !file.exists()) {
                         found.add(file);
+                    } else if (file.isDirectory()) {
+                        // A multi-image: a directory of one image per
+                        // density. It is listed, for an image added to it
+                        // or taken away, which moves its own time, and so
+                        // is each image, for one that is edited, which
+                        // moves only that image's.
+                        found.add(file);
+                        File[] images = file.listFiles();
+                        if (images != null) {
+                            java.util.Arrays.sort(images);
+                            for (File image : images) {
+                                if (image.isFile()) {
+                                    found.add(image);
+                                }
+                            }
+                        }
                     }
                 }
                 return url;

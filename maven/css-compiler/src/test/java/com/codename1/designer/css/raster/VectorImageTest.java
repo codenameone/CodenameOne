@@ -1130,4 +1130,56 @@ class VectorImageTest {
         assertTrue(alpha(slanted, 62, 62) > 20, "along the diagonal");
         assertTrue(alpha(slanted, 62, 38) < 5, "not across it");
     }
+
+    @Test
+    void aListOfPositionsPlacesTheCharactersOneByOne() throws Exception {
+        String font = " font-family=\"monospace\" font-size=\"10\" fill=\"#ff0000\"";
+        BufferedImage flowing = paint("<text x=\"5\" y=\"30\"" + font + ">II</text>", 100, 100);
+        BufferedImage listed = paint("<text x=\"5 70\" y=\"30\"" + font + ">II</text>", 100, 100);
+        assertTrue(inkRight(flowing) < 30, "side by side");
+        assertTrue(inkRight(listed) > 70, "the second where the list puts it");
+    }
+
+    @Test
+    void aSymbolsPercentagesAreOfItsOwnViewBox() throws Exception {
+        // All of a 10 by 10 view box, fitted into the left half: not all of
+        // the 100 by 100 drawing squeezed into it.
+        BufferedImage img = paint("<symbol id=\"s\" viewBox=\"0 0 10 10\"><rect width=\"100%\" height=\"50%\""
+                + " fill=\"#ff0000\"/></symbol><use href=\"#s\" width=\"50\" height=\"50\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(25, 12));
+        assertEquals(0, alpha(img, 25, 37), "half the symbol's height, not all of it");
+    }
+
+    @Test
+    void aMarkerCanTakeThePaintsOfTheLineItIsOn() throws Exception {
+        BufferedImage img = paint("<defs><marker id=\"m\" markerWidth=\"20\" markerHeight=\"20\" refX=\"10\" refY=\"10\""
+                + " markerUnits=\"userSpaceOnUse\"><rect width=\"20\" height=\"20\" fill=\"context-stroke\"/></marker></defs>"
+                + "<line x1=\"20\" y1=\"50\" x2=\"80\" y2=\"50\" stroke=\"#00ff00\" stroke-width=\"2\" marker-end=\"url(#m)\"/>",
+                100, 100);
+        assertEquals(0xff00ff00, img.getRGB(85, 45), "the marker, in the stroke of its line");
+    }
+
+    @Test
+    void aFilterCanBringInAPicture(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tmp) throws Exception {
+        java.nio.file.Files.write(tmp.resolve("green.svg"), ("<svg xmlns=\"http://www.w3.org/2000/svg\""
+                + " viewBox=\"0 0 10 10\"><rect width=\"10\" height=\"10\" fill=\"#00ff00\"/></svg>")
+                .getBytes(StandardCharsets.UTF_8));
+        java.nio.file.Path main = tmp.resolve("main.svg");
+        java.nio.file.Files.write(main, ("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\">"
+                + "<defs><rect id=\"dot\" x=\"60\" y=\"60\" width=\"20\" height=\"20\" fill=\"#0000ff\"/>"
+                + "<filter id=\"f\" filterUnits=\"userSpaceOnUse\" x=\"0\" y=\"0\" width=\"100\" height=\"100\""
+                + " color-interpolation-filters=\"sRGB\">"
+                + "<feImage href=\"green.svg\" x=\"0\" y=\"0\" width=\"40\" height=\"40\" result=\"a\"/>"
+                + "<feImage href=\"#dot\" result=\"b\"/>"
+                + "<feMerge><feMergeNode in=\"a\"/><feMergeNode in=\"b\"/></feMerge></filter></defs>"
+                + "<rect width=\"100\" height=\"100\" fill=\"#ff0000\" filter=\"url(#f)\"/></svg>")
+                .getBytes(StandardCharsets.UTF_8));
+        BufferedImage img;
+        try (java.io.InputStream in = java.nio.file.Files.newInputStream(main)) {
+            img = VectorImage.readSvg(in, main.toUri().toURL()).paint(100, 100);
+        }
+        assertEquals(0xff00ff00, img.getRGB(20, 20), "the file, in the area the effect gives");
+        assertEquals(0xff0000ff, img.getRGB(70, 70), "the element, where it is drawn");
+        assertEquals(0, alpha(img, 50, 50), "and nothing of what was filtered");
+    }
 }
