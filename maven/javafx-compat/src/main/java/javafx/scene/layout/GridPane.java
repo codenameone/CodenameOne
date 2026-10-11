@@ -545,6 +545,9 @@ public class GridPane extends Pane {
         final boolean[] fixedPref;
         final boolean[] fixedMin;
         final Priority[] grow;
+        /// Whether something in the track may be larger than it would
+        /// like: a field, a slider. Such a track has no one right size.
+        final boolean[] elastic;
         double gap;
 
         Tracks(int n) {
@@ -553,6 +556,7 @@ public class GridPane extends Pane {
             max = new double[n];
             share = new double[n];
             fixedPref = new boolean[n];
+            elastic = new boolean[n];
             fixedMin = new boolean[n];
             grow = new Priority[n];
         }
@@ -668,7 +672,11 @@ public class GridPane extends Pane {
             double given = column || widths == null ? -1
                     : range(widths, index(child, true), last(child, true, columns), widthGap);
             t.min[from] = Math.max(t.min[from], areaSize(child, column, true, given));
-            t.pref[from] = Math.max(t.pref[from], areaSize(child, column, false, given));
+            double liked = areaSize(child, column, false, given);
+            t.pref[from] = Math.max(t.pref[from], liked);
+            if ((column ? child.maxWidth(-1) : child.maxHeight(-1)) > liked + 1) {
+                t.elastic[from] = true;
+            }
             if (!column && valignment(child, from) == VPos.BASELINE) {
                 if (onBaseline == null) {
                     onBaseline = new ArrayList<List<Node>>();
@@ -781,7 +789,21 @@ public class GridPane extends Pane {
             for (int i = 0; i < n; i++) {
                 limits[i] = t.share[i] >= 0 ? Double.NaN : t.min[i];
             }
-            LayoutSupport.distribute(this, sizes, limits, extra);
+            double missing = extra;
+            if (LayoutSupport.growersGiveFirst()) {
+                // On a phone the tracks told to grow give way before the
+                // others; see LayoutSupport.growersGiveFirst.
+                for (int pass = 0; pass < 3; pass++) {
+                    Priority wanted = pass == 0 ? Priority.ALWAYS : Priority.SOMETIMES;
+                    double[] some = new double[n];
+                    for (int i = 0; i < n; i++) {
+                        boolean gives = pass < 2 ? t.grow[i] == wanted : t.elastic[i];
+                        some[i] = gives ? limits[i] : Double.NaN;
+                    }
+                    missing = LayoutSupport.distribute(this, sizes, some, missing);
+                }
+            }
+            LayoutSupport.distribute(this, sizes, limits, missing);
         } else if (extra > 0) {
             double remaining = extra;
             for (int pass = 0; pass < 2; pass++) {

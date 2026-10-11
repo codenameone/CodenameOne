@@ -256,6 +256,86 @@ public class NarrowScreenTest {
         assertTrue(content.getScrollDimension().getHeight() > content.getHeight());
     }
 
+    /// A form whose fields ask for more columns than the screen has: the
+    /// field, told to take whatever room there is, is what gives way, and
+    /// the label before it keeps every letter. The field had its preferred
+    /// width for a minimum, so the label lost all that was missing and
+    /// read "P..." beside a field with room to spare.
+    @Test
+    public void aLabelKeepsItsTextBesideAFieldWiderThanTheScreen() {
+        javafx.scene.layout.GridPane grid = new javafx.scene.layout.GridPane();
+        grid.setHgap(8);
+        javafx.scene.control.Label label = new javafx.scene.control.Label("Password:");
+        javafx.scene.control.TextField field = new javafx.scene.control.TextField("secret");
+        field.setPrefColumnCount(200);
+        grid.add(label, 0, 0);
+        grid.add(field, 1, 0);
+        javafx.scene.layout.GridPane.setHgrow(field, javafx.scene.layout.Priority.ALWAYS);
+        javafx.scene.control.Label boxed = new javafx.scene.control.Label("Planet:");
+        javafx.scene.control.TextField inBox = new javafx.scene.control.TextField("Earth");
+        inBox.setPrefColumnCount(200);
+        javafx.scene.layout.HBox.setHgrow(inBox, javafx.scene.layout.Priority.ALWAYS);
+        // And a field nothing told to grow: it has no one right width
+        // either, where the label beside it has exactly one.
+        javafx.scene.layout.GridPane plain = new javafx.scene.layout.GridPane();
+        javafx.scene.control.Label owner = new javafx.scene.control.Label("Owner:");
+        javafx.scene.control.TextField named = new javafx.scene.control.TextField("Ada");
+        named.setPrefColumnCount(200);
+        plain.add(owner, 0, 0);
+        plain.add(named, 1, 0);
+        javafx.scene.layout.VBox root = new javafx.scene.layout.VBox(grid, new javafx.scene.layout.HBox(8, boxed, inBox),
+                plain);
+        Container content = shown(root);
+        assertTrue("wider than the screen", field.prefWidth(-1) > content.getWidth());
+        assertFalse(content.isScrollableX());
+        assertEquals(label.prefWidth(-1), label.getWidth(), 0.5);
+        assertEquals(boxed.prefWidth(-1), boxed.getWidth(), 0.5);
+        assertEquals(owner.prefWidth(-1), owner.getWidth(), 0.5);
+        assertEquals(content.getWidth(), named.getBoundsInParent().getMaxX(), 1);
+        assertEquals(content.getWidth(), field.getBoundsInParent().getMaxX(), 1);
+        assertEquals(content.getWidth(), inBox.getBoundsInParent().getMaxX(), 1);
+    }
+
+    /// Three buttons under a theme that puts a wide margin beside the text
+    /// of a button, as the themes of phones do: together wider than the
+    /// screen, though their words would fit it twice. Each gives up
+    /// padding, and no letter.
+    @Test
+    public void buttonsTooWideForTheScreenGiveUpPaddingBeforeLetters() {
+        java.util.Hashtable<String, Object> theme = new java.util.Hashtable<String, Object>();
+        theme.put("Button.padding", "10,10,160,160");
+        theme.put("Button.padUnit", new byte[] {0, 0, 0, 0});
+        com.codename1.ui.plaf.UIManager.getInstance().addThemeProps(theme);
+        try {
+            javafx.scene.control.Button[] buttons = {new javafx.scene.control.Button("Disabled"),
+                new javafx.scene.control.Button("Cancel"), new javafx.scene.control.Button("OK")};
+            javafx.scene.layout.HBox row = new javafx.scene.layout.HBox(8, buttons);
+            Container content = shown(new javafx.scene.layout.VBox(row));
+            double asked = row.prefWidth(-1);
+            assertTrue("wider than the screen: " + asked, asked > content.getWidth());
+            assertFalse(content.isScrollableX());
+            for (int i = 0; i < buttons.length; i++) {
+                com.codename1.ui.Label n = (com.codename1.ui.Label) buttons[i].cn1Native();
+                com.codename1.ui.plaf.Style s = n.getUnselectedStyle();
+                int room = n.getWidth() - s.getHorizontalPadding();
+                assertTrue(n.getText() + " has " + room + " for its text",
+                        room >= s.getFont().stringWidth(n.getText()));
+                // Shares of the missing width are whole pixels; what is
+                // left of it after the last share is under one each.
+                assertTrue("inside the screen: " + buttons[i].getBoundsInParent(),
+                        buttons[i].getBoundsInParent().getMaxX() <= content.getWidth() + buttons.length);
+            }
+            // What they ask for is what they asked before giving anything up.
+            content.getComponentForm().revalidate();
+            assertEquals(asked, row.prefWidth(-1), 0.5);
+        } finally {
+            // The theme is the display's, and the classes after this one
+            // draw their controls with it.
+            com.codename1.ui.plaf.UIManager.getInstance().setThemeProps(
+                    new java.util.Hashtable<String, Object>());
+        }
+    }
+
     /// To learn whether a scene has to scroll it is laid out in the pane
     /// first, and then at its minimum. Done on every pass, that moved
     /// every node twice each time, each move asked for another pass, and

@@ -485,7 +485,12 @@ public class ControlLookTest {
         assertTrue("the label shrank: " + label.getWidth(), label.getWidth() < pref);
         assertTrue("the button after it is still in view",
                 ok.getBoundsInParent().getMaxX() <= width + 0.01);
-        assertEquals(ok.prefWidth(-1), ok.getWidth(), 0.01);
+        // The button gives up padding of its theme with the label, and
+        // none of its text.
+        com.codename1.ui.Label n = (com.codename1.ui.Label) ok.cn1Native();
+        com.codename1.ui.plaf.Style style = n.getUnselectedStyle();
+        assertTrue(Units.toPixels(ok.getWidth()) - style.getHorizontalPadding()
+                >= style.getFont().stringWidth("OK"));
     }
 
     // ---------------------------------------------- what the native lacks

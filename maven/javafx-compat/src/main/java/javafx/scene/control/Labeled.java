@@ -99,6 +99,10 @@ public abstract class Labeled extends Control {
     private final BooleanProperty mnemonicParsing = new FxBoolean(this, "mnemonicParsing", false, TEXT);
     private Node graphicChild;
     private boolean paddedForGraphic;
+    private int shedLeft;
+    private int shedRight;
+    private int keptLeft = -1;
+    private int keptRight = -1;
 
     {
         ChangeListener<Object> shown = new ChangeListener<Object>() {
@@ -278,6 +282,10 @@ public abstract class Labeled extends Control {
     protected Dimension cn1NativePreferredSize() {
         Dimension d = super.cn1NativePreferredSize();
         Component c = cn1NativeIfCreated();
+        if (c != null && shed(c) > 0) {
+            // Padding given up to a width too narrow is still asked for.
+            d = new Dimension(d.getWidth() + shedLeft + shedRight, d.getHeight());
+        }
         if (paddedForGraphic && c != null) {
             Style s = c.getUnselectedStyle();
             return new Dimension(Math.max(d.getWidth(), s.getHorizontalPadding()),
@@ -295,6 +303,74 @@ public abstract class Labeled extends Control {
         return d;
     }
 
+    /// What the native label gave up of its padding, in device pixels;
+    /// nothing once something else has set its padding since.
+    private int shed(Component c) {
+        if (shedLeft + shedRight > 0) {
+            Style s = c.getUnselectedStyle();
+            if (s.getPaddingLeftNoRTL() != keptLeft || s.getPaddingRightNoRTL() != keptRight) {
+                shedLeft = 0;
+                shedRight = 0;
+            }
+        }
+        return shedLeft + shedRight;
+    }
+
+    /// Whether the control is one that gives up padding: a native label
+    /// with padding of its theme, and no graphic whose room is kept in it.
+    private boolean sheds(Component c, Node graphic) {
+        return c instanceof com.codename1.ui.Label && graphic == null && !paddedForGraphic && !cn1BareText()
+                && !ownsGraphic();
+    }
+
+    /// The least of its padding a control keeps on a side: a quarter.
+    private static int kept(int full) {
+        return full / 4;
+    }
+
+    /// Takes the width a control is short of from the padding beside its
+    /// text before the text is cut.
+    ///
+    /// A JavaFX button has a few pixels beside its text, and one too
+    /// narrow can only lose letters. A theme of a phone puts a quarter of
+    /// an inch there, so three buttons in a row are wider than the display
+    /// with every word in full, and squeezed the way JavaFX squeezes them
+    /// they read "DISA...", "CA..." and "O" between empty margins wide
+    /// enough for all of it. The preferred size keeps counting the whole
+    /// padding, so what a pane hands the control does not move with this.
+    private void fitPadding(Component c, Node graphic) {
+        if (!sheds(c, graphic) || c.getWidth() <= 0) {
+            return;
+        }
+        shed(c);
+        Style s = c.getUnselectedStyle();
+        int fullLeft = s.getPaddingLeftNoRTL() + shedLeft;
+        int fullRight = s.getPaddingRightNoRTL() + shedRight;
+        int missing = cn1NativePreferredSize().getWidth() - c.getWidth();
+        int left = 0;
+        int right = 0;
+        if (missing > 0) {
+            int most = fullLeft - kept(fullLeft) + fullRight - kept(fullRight);
+            int give = Math.min(missing, most);
+            left = Math.min(fullLeft - kept(fullLeft), (give + 1) / 2);
+            right = Math.min(fullRight - kept(fullRight), give - left);
+            left = Math.min(fullLeft - kept(fullLeft), give - right);
+        }
+        if (left == shedLeft && right == shedRight) {
+            return;
+        }
+        int top = s.getPaddingTop();
+        int bottom = s.getPaddingBottom();
+        Style all = com.codename1.fxcompat.runtime.PeerPaint.allStyles(c);
+        all.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
+        all.setPadding(top, bottom, fullLeft - left, fullRight - right);
+        shedLeft = left;
+        shedRight = right;
+        keptLeft = fullLeft - left;
+        keptRight = fullRight - right;
+        c.setShouldCalcPreferredSize(true);
+    }
+
     /// Places the graphic beside the text the native label draws, where
     /// the content display puts it.
     @Override
@@ -302,6 +378,7 @@ public abstract class Labeled extends Control {
         super.layoutChildren();
         Node g = shownGraphic();
         Component c = cn1NativeIfCreated();
+        fitPadding(c, g);
         if (g == null || g.getParent() != this || !(c instanceof com.codename1.ui.Label)) {
             return;
         }
@@ -380,11 +457,20 @@ public abstract class Labeled extends Control {
         com.codename1.ui.Label label = (com.codename1.ui.Label) c;
         com.codename1.ui.Font f = label.getUnselectedStyle().getFont();
         String t = label.getText();
-        if (f == null || t == null || t.length() == 0 || !label.isEndsWith3Points()) {
-            return pref;
+        // Before any of the text goes, the padding beside it does.
+        int padding = 0;
+        if (sheds(c, shownGraphic())) {
+            shed(c);
+            Style s = c.getUnselectedStyle();
+            int left = s.getPaddingLeftNoRTL() + shedLeft;
+            int right = s.getPaddingRightNoRTL() + shedRight;
+            padding = left - kept(left) + right - kept(right);
         }
-        int spare = f.stringWidth(t) - f.stringWidth(ELLIPSIS);
-        return spare > 0 ? Math.max(0, pref - Units.toLogical(spare)) : pref;
+        if (f == null || t == null || t.length() == 0 || !label.isEndsWith3Points()) {
+            return Math.max(0, pref - Units.toLogical(padding));
+        }
+        int spare = Math.max(0, f.stringWidth(t) - f.stringWidth(ELLIPSIS));
+        return Math.max(0, pref - Units.toLogical(spare + padding));
     }
 
     private static final String ELLIPSIS = "...";

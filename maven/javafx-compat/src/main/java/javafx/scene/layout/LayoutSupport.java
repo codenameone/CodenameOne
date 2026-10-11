@@ -310,6 +310,24 @@ final class LayoutSupport {
         return available;
     }
 
+    /// Whether missing space is taken first from what was told to grow.
+    ///
+    /// JavaFX takes it from every area in equal shares, and on a desktop so
+    /// does this: a window there opens at the size its content asks for,
+    /// and is too small only when somebody made it so. A phone gives every
+    /// scene a width a desktop window is never opened at, about two
+    /// hundred logical pixels, and equal shares there cut the labels of a
+    /// form short while the field beside each, told to take whatever room
+    /// there is, stays wider than its content. What was told to grow is
+    /// what the application said can change size, so on a display that
+    /// decides the width it is also what gives way first. After it comes
+    /// what may be larger than it would like without being told to grow,
+    /// a text field or a slider: a control with no one right size loses
+    /// nothing a reader misses, and a label loses letters.
+    static boolean growersGiveFirst() {
+        return com.codename1.ui.Display.isInitialized() && !com.codename1.ui.Display.getInstance().isDesktop();
+    }
+
     /// Fits the areas of a box to the length it has: grows the children
     /// that always grow, then those that sometimes do, or shrinks them
     /// all towards their minimum. Returns the length used, gaps included.
@@ -323,6 +341,26 @@ final class LayoutSupport {
         double remaining = extra;
         if (extra < 0) {
             double[] limits = areaSizes(pane, children, horizontal, marginKey, cross, true);
+            if (growersGiveFirst()) {
+                for (int pass = 0; pass < 3; pass++) {
+                    Priority wanted = pass == 0 ? Priority.ALWAYS : Priority.SOMETIMES;
+                    double[] some = new double[limits.length];
+                    for (int i = 0; i < some.length; i++) {
+                        Node child = children.get(i);
+                        boolean gives;
+                        if (pass < 2) {
+                            gives = priority(child, growKey) == wanted;
+                        } else {
+                            Insets m = insets(child, marginKey);
+                            double most = horizontal ? pane.computeChildMaxAreaWidth(child, m, cross)
+                                    : pane.computeChildMaxAreaHeight(child, m, cross);
+                            gives = most > sizes[i] + 1;
+                        }
+                        some[i] = gives ? limits[i] : Double.NaN;
+                    }
+                    remaining = distribute(pane, sizes, some, remaining);
+                }
+            }
             remaining = distribute(pane, sizes, limits, remaining);
         } else {
             for (int pass = 0; pass < 2; pass++) {

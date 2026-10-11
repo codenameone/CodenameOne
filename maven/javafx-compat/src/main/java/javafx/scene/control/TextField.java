@@ -121,6 +121,27 @@ public class TextField extends TextInputControl {
         return Double.MAX_VALUE;
     }
 
+    /// A field is as narrow as its padding and room for one letter, as a
+    /// JavaFX field is as narrow as its padding: the columns are what it
+    /// would like, not what it needs. With the preferred width for a
+    /// minimum a field was the one rigid thing in a row too narrow for it,
+    /// and the label before it gave up every pixel that was missing -- a
+    /// form on a phone read "N...", "P..." beside fields with room to spare.
+    @Override
+    protected double computeMinWidth(double height) {
+        double pref = computePrefWidth(height);
+        Component c = cn1NativeIfCreated();
+        if (!(c instanceof com.codename1.ui.TextField)) {
+            return pref;
+        }
+        com.codename1.ui.plaf.Style s = c.getUnselectedStyle();
+        com.codename1.ui.Font f = s.getFont();
+        int least = s.getHorizontalPadding() + (f == null ? 0 : f.charWidth('W'));
+        javafx.geometry.Insets in = getInsets();
+        return Math.min(pref, in.getLeft() + snapSizeX(com.codename1.fxcompat.runtime.Units.toLogical(least))
+                + in.getRight());
+    }
+
     /// Returns the text as a character sequence.
     public CharSequence getCharacters() {
         String t = getText();
