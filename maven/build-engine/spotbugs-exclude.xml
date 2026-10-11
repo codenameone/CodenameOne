@@ -291,4 +291,12 @@
         <Class name="com.codename1.maven.AndroidProjectImporter$Result" />
         <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
     </Match>
+    <!--
+    FlutterProjectImporter.Result likewise: the Maven goal logs appName and
+    appVersion (from pubspec.yaml) in the other module.
+    -->
+    <Match>
+        <Class name="com.codename1.maven.FlutterProjectImporter$Result" />
+        <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
+    </Match>
 </FindBugsFilter>
