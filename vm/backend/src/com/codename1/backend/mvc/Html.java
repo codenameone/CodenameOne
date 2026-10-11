@@ -24,7 +24,11 @@ package com.codename1.backend.mvc;
 
 import com.codename1.backend.ByteSink;
 import com.codename1.backend.HttpServer;
+import com.codename1.backend.Json;
 import com.codename1.backend.security.CsrfToken;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /// Primitives called by generated views; no template evaluation occurs here.
 public final class Html {
@@ -136,7 +140,7 @@ public final class Html {
                 && !"dialog".equalsIgnoreCase(value)) {
             throw new IllegalArgumentException(
                     "GET submit-method overrides are not supported with CSRF tokens; use a separate"
-                        + " GET form");
+                            + " GET form");
         }
         return value;
     }
@@ -152,14 +156,14 @@ public final class Html {
         return value;
     }
 
-    /// Preserve parameter filtering while keeping CSRF tokens out of htmx GET URLs.
-    public static String htmxParameters(Model model, boolean get, String parameters) {
+    /// Preserve parameter filtering while keeping CSRF tokens out of htmx GET and DELETE URLs.
+    public static String htmxParameters(Model model, boolean urlParameters, String parameters) {
         String filter =
                 parameters == null || parameters.length() == 0 || "unset".equals(parameters)
                         ? "*"
                         : parameters;
         CsrfToken token = (CsrfToken) model.getAttribute("_csrf");
-        if (!get || token == null || "none".equals(filter)) {
+        if (!urlParameters || token == null || "none".equals(filter)) {
             return filter;
         }
         String name = token.getParameterName();
@@ -195,6 +199,32 @@ public final class Html {
             return "not " + result + (result.length() == 0 ? "" : ",") + name;
         }
         return result.length() == 0 ? "none" : result.toString();
+    }
+
+    /// htmx headers work for standalone controls and methods that serialize fields in URLs.
+    public static String htmxHeaders(Model model, boolean mutation, String headers) {
+        CsrfToken token = (CsrfToken) model.getAttribute("_csrf");
+        if (!mutation || token == null) {
+            return headers;
+        }
+        Map<String, Object> merged = new LinkedHashMap<String, Object>();
+        if (headers != null && !headers.trim().isEmpty() && !"unset".equals(headers)) {
+            try {
+                Map<?, ?> authored = Json.parseObject(headers);
+                for (Map.Entry<?, ?> entry : authored.entrySet()) {
+                    String name = String.valueOf(entry.getKey());
+                    if (!name.equalsIgnoreCase(token.getHeaderName())) {
+                        merged.put(name, entry.getValue());
+                    }
+                }
+            } catch (java.io.IOException error) {
+                throw new IllegalArgumentException(
+                        "Mutating htmx controls require JSON hx-headers with CSRF protection",
+                        error);
+            }
+        }
+        merged.put(token.getHeaderName(), token.getToken());
+        return Json.write(merged);
     }
 
     public static void booleanAttribute(ByteSink out, String name, Object value) {

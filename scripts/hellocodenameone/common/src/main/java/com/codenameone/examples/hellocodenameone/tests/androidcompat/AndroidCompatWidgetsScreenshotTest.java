@@ -23,6 +23,8 @@
 package com.codenameone.examples.hellocodenameone.tests.androidcompat;
 
 import android.app.Activity;
+import android.view.View;
+import android.view.ViewGroup;
 import com.example.droid.WidgetsActivity;
 
 /// The framework widgets: compound buttons, a switch, progress, seek and rating bars, in a scroll view.
@@ -33,6 +35,20 @@ public class AndroidCompatWidgetsScreenshotTest extends AndroidCompatScreenshotT
 
     @Override
     protected void prepare(Activity activity) {
-        hideIndeterminateProgress(activity.getWindow().getDecorView());
+        View root = activity.getWindow().getDecorView();
+        hideIndeterminateProgress(root);
+        hideScrollIndicators(root);
+    }
+
+    // Scroll indicator fading depends on frame timing; this fixture captures widget appearance.
+    private static void hideScrollIndicators(View root) {
+        root.setVerticalScrollBarEnabled(false);
+        root.setHorizontalScrollBarEnabled(false);
+        if (root instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) root;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                hideScrollIndicators(group.getChildAt(i));
+            }
+        }
     }
 }

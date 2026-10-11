@@ -50,7 +50,9 @@ classes or interfaces. A missing property or undeclared model name fails the bui
 file and source position. At runtime, a referenced model must be present and have
 the declared type. A present null renders as empty text; property navigation
 propagates null. Numeric comparisons require non-null operands. Fragments only
-require model names they read. Collection loops check element types before access.
+require model names they read. Loops accept collections and object or primitive
+arrays, and check element types before access. Null collections and arrays produce
+no rows.
 
 Supported directives:
 
@@ -136,16 +138,20 @@ provide response-header helpers.
 
 The existing security chain remains responsible for CSRF enforcement. The model
 contains `_csrf`, whose type is declared automatically. Unsafe forms include a
-hidden CSRF token when one is available; htmx serializes it with the other fields.
-Form `action`, submit-control `formaction`, mutating htmx URLs (`hx-post`,
+hidden CSRF token when one is available for native POST submissions. Mutating
+htmx controls also send the configured CSRF header, including standalone controls
+outside forms. Authored `hx-headers` must be a JSON object on these controls;
+other headers are preserved, and the configured token header takes precedence.
+Form `action`, submit-control `formaction`, htmx URLs (`hx-get`, `hx-post`,
 `hx-put`, `hx-patch`, `hx-delete`), and static base URLs must be local
 absolute paths such as `/products/save`, or empty to use the current document.
 This applies to static and dynamic form destinations, including controls in fragments,
 to prevent submissions from disclosing the generated token to another origin.
-For `hx-get`, generated `hx-params` filtering excludes the CSRF parameter while
+This includes read requests because htmx inherits headers from ancestor elements.
+For `hx-get` and `hx-delete`, generated `hx-params` filtering excludes the CSRF parameter while
 preserving the token for a native POST fallback. Explicit parameter allow lists
 and exclusion lists are retained; included fragments receive their parent's
-original parameter filter, so nested POST requests don't inherit the GET-only
+original parameter filter, so nested POST requests don't inherit the URL parameter
 CSRF exclusion. The configured CSRF parameter name is used.
 When a CSRF token is available, submit controls can't override the native method
 with GET or an invalid value that defaults to GET. This restriction also applies

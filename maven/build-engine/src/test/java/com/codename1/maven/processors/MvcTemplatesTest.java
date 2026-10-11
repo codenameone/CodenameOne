@@ -2504,6 +2504,200 @@ public class MvcTemplatesTest {
         }
     }
 
+    @Test
+    public void htmxMutationsUseHeadersAndDeleteExcludesUrlTokens() throws Exception {
+        setup();
+        template(
+                "mutations",
+                "<!-- cn1:model url java.lang.String --><div"
+                    + " hx-headers='{\"X-Inherited\":\"keep\"}'><button id=\"post\""
+                    + " hx-post=\"/save\" hx-params=\"none\""
+                    + " hx-headers='{\"X-Auth\":\"keep\",\"x-csrf-token\":\"stale\"}'>Post</button><input"
+                    + " id=\"put\" type=\"button\" value=\"Put\" data-hx-put=\"/save\"><div"
+                    + " id=\"patch\" hx-patch=\"/save\">Patch</div><button id=\"delete\""
+                    + " data-hx-delete=\"/save\">Delete</button><form id=\"deleteForm\""
+                    + " method=\"post\" action=\"/save\" hx-delete=\"/save\"><input name=\"title\""
+                    + " value=\"Keep\"><button>Delete form</button></form><button id=\"dynamic\""
+                    + " th:attr=\"hx-delete=${url}\">Dynamic</button><div hx-post=\"/save\"><button"
+                    + " id=\"nestedGet\" hx-get=\"/preview\">Get</button></div></div>");
+        template("scriptHeaders", "<button hx-post=\"/save\" hx-headers=\"js:({})\">Save</button>");
+        template(
+                "externalGet",
+                "<form hx-post=\"/save\"><button"
+                    + " hx-get=\"https://external.test/\">Get</button></form>");
+        compile();
+        Model model = csrfModel().addAttribute("url", "/save");
+        org.jsoup.nodes.Document html = org.jsoup.Jsoup.parse(render("mutations", model));
+        for (String id : Arrays.asList("post", "put", "patch", "delete", "deleteForm", "dynamic")) {
+            Map headers =
+                    com.codename1.backend.Json.parseObject(
+                            html.getElementById(id).attr("hx-headers"));
+            assertEquals(id, "secret", headers.get("X-CSRF-TOKEN"));
+            assertFalse(headers.containsKey("x-csrf-token"));
+        }
+        assertEquals(
+                "keep",
+                com.codename1.backend.Json.parseObject(
+                                html.getElementById("post").attr("hx-headers"))
+                        .get("X-Auth"));
+        assertEquals("none", html.getElementById("post").attr("hx-params"));
+        for (String id : Arrays.asList("delete", "deleteForm", "dynamic", "nestedGet"))
+            assertEquals(id, "not _csrf", html.getElementById(id).attr("hx-params"));
+        assertEquals("secret", html.select("#deleteForm input[name=_csrf]").val());
+        html = org.jsoup.Jsoup.parse(render("mutations", model.addAttribute("url", null)));
+        assertFalse(html.getElementById("dynamic").hasAttr("hx-headers"));
+        for (String view : Arrays.asList("scriptHeaders", "externalGet")) {
+            try {
+                render(view, model);
+                fail("Accepted " + view);
+            } catch (IllegalArgumentException expected) {
+                assertNotNull(expected.getMessage());
+            }
+        }
+        assertTrue(render("scriptHeaders", new Model()).contains("js:({})"));
+        Model custom =
+                new Model()
+                        .addAttribute("url", "/save")
+                        .addAttribute(
+                                "_csrf",
+                                new com.codename1.backend.security.DefaultCsrfToken(
+                                        "X-Custom", "token", "a\"<&"));
+        html = org.jsoup.Jsoup.parse(render("mutations", custom));
+        assertEquals(
+                "a\"<&",
+                com.codename1.backend.Json.parseObject(
+                                html.getElementById("delete").attr("hx-headers"))
+                        .get("X-Custom"));
+        assertEquals("not token", html.getElementById("delete").attr("hx-params"));
+        for (String params : Arrays.asList("*", "none", "title,_csrf", "not title", "_csrf")) {
+            String filtered =
+                    com.codename1.backend.mvc.Html.htmxParameters(csrfModel(), true, params);
+            assertEquals(
+                    params.equals("*")
+                            ? "not _csrf"
+                            : params.equals("title,_csrf")
+                                    ? "title"
+                                    : params.equals("not title") ? "not title,_csrf" : "none",
+                    filtered);
+        }
+    }
+
+    @Test
+    public void implicitOptionTextIsEvaluatedAndStringifiedOnce() throws Exception {
+        setup();
+        fixtureSources(
+                Collections.singletonMap(
+                        "sample.Label",
+                        "package sample; public class Label { public int reads; public int strings;"
+                            + " public Object getValue() { reads++; return new Object() { public"
+                            + " String toString() { return ++strings == 1 ? \" A  & B \" :"
+                            + " \"Different\"; } }; } }"));
+        template(
+                "once",
+                DECL
+                        + "<!-- cn1:model label sample.Label -->"
+                        + "<select th:object=\"${product}\" th:field=\"*{name}\">"
+                        + "<option th:text=\"${label.value}\"></option></select>");
+        compile();
+        Object label = loader.loadClass("sample.Label").newInstance();
+        org.jsoup.nodes.Element option =
+                org.jsoup.Jsoup.parse(
+                                render(
+                                        "once",
+                                        new Model()
+                                                .addAttribute("product", product("A & B", 0))
+                                                .addAttribute("label", label)))
+                        .select("option")
+                        .first();
+        assertTrue(option.hasAttr("selected"));
+        assertEquals("A & B", option.text());
+        assertEquals(1, label.getClass().getField("reads").getInt(label));
+        assertEquals(1, label.getClass().getField("strings").getInt(label));
+    }
+
+    @Test
+    public void primitiveArraysCompileAndRenderWithIterationStatus() throws Exception {
+        setup();
+        String[] types = {"boolean", "byte", "short", "int", "long", "char", "float", "double"};
+        Object[] arrays = {
+            new boolean[] {true, false},
+            new byte[] {1, 2},
+            new short[] {1, 2},
+            new int[] {1, 2},
+            new long[] {1, 2},
+            new char[] {'a', 'b'},
+            new float[] {1, 2},
+            new double[] {1, 2}
+        };
+        fixtureSources(
+                Collections.singletonMap(
+                        "sample.Numbers",
+                        "package sample; public class Numbers {"
+                                + " public int[] getValues() { return new int[]{3, 4}; } }"));
+        for (String type : types)
+            template(
+                    type + "Array",
+                    "<!-- cn1:model values "
+                            + type
+                            + "[] --><p th:each=\"value, status : ${values}\""
+                            + " th:attr=\"data-index=${status.index},data-last=${status.last}\""
+                            + " th:text=\"${value}\"></p>");
+        template(
+                "getter",
+                "<!-- cn1:model numbers sample.Numbers --><p th:each=\"n : ${numbers.values}\""
+                    + " th:text=\"${n}\"></p>");
+        compile();
+        for (int i = 0; i < types.length; i++) {
+            org.jsoup.select.Elements rows =
+                    org.jsoup.Jsoup.parse(
+                                    render(
+                                            types[i] + "Array",
+                                            new Model().addAttribute("values", arrays[i])))
+                            .select("p");
+            assertEquals(types[i], 2, rows.size());
+            for (int j = 0; j < 2; j++) {
+                assertEquals(
+                        String.valueOf(java.lang.reflect.Array.get(arrays[i], j)),
+                        rows.get(j).text());
+                assertEquals(String.valueOf(j), rows.get(j).attr("data-index"));
+                assertEquals(String.valueOf(j == 1), rows.get(j).attr("data-last"));
+            }
+            assertTrue(
+                    org.jsoup.Jsoup.parse(
+                                    render(
+                                            types[i] + "Array",
+                                            new Model().addAttribute("values", null)))
+                            .select("p")
+                            .isEmpty());
+            assertTrue(
+                    org.jsoup.Jsoup.parse(
+                                    render(
+                                            types[i] + "Array",
+                                            new Model()
+                                                    .addAttribute(
+                                                            "values",
+                                                            java.lang.reflect.Array.newInstance(
+                                                                    arrays[i]
+                                                                            .getClass()
+                                                                            .getComponentType(),
+                                                                    0))))
+                            .select("p")
+                            .isEmpty());
+        }
+        assertEquals(
+                "3 4",
+                org.jsoup.Jsoup.parse(
+                                render(
+                                        "getter",
+                                        new Model()
+                                                .addAttribute(
+                                                        "numbers",
+                                                        loader.loadClass("sample.Numbers")
+                                                                .newInstance())))
+                        .body()
+                        .text());
+    }
+
     private static volatile int benchmarkSink;
 
     @Test

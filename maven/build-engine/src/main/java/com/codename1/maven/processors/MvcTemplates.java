@@ -213,6 +213,7 @@ final class MvcTemplates {
     }
 
     private String checkType(String type) {
+        if (type.matches("(boolean|byte|short|int|long|char|float|double)(\\[\\])+")) return type;
         // Only named reference types and generic arguments: declarations are not Java snippets.
         if (!type.matches("[A-Za-z_$][A-Za-z0-9_$.]*(\\s*<.*>)?(\\[\\])*")
                 || type.matches(".*[^A-Za-z0-9_$.,<>\\[\\] ].*"))
@@ -398,7 +399,7 @@ final class MvcTemplates {
                 if (!name.matches("[A-Za-z][A-Za-z0-9_]*"))
                     throw new IllegalArgumentException("Invalid iteration variable");
             MvcExpression.Value list = expression(each.substring(colon + 1), env, form);
-            String itemType = MvcExpression.element(list.type),
+            String itemType = MvcExpression.box(MvcExpression.element(list.type)),
                     listVar = "list" + sequence++,
                     itemVar = "item" + sequence++;
             out.append(list.type)
@@ -547,6 +548,7 @@ final class MvcTemplates {
                         "action",
                         "formaction",
                         "href",
+                        "hx-get",
                         "hx-post",
                         "hx-put",
                         "hx-patch",
@@ -560,10 +562,10 @@ final class MvcTemplates {
                             "java.lang.String",
                             "java.lang.Object value",
                             "if (value == null) return null; String url = Html.string(value); if"
-                                + " (!url.isEmpty()) { try { Html.localLocation(url); } catch"
-                                + " (IllegalArgumentException error) { throw new"
-                                + " IllegalArgumentException(\"Form action, htmx mutation and base"
-                                + " URLs must be a local absolute path\"); } } return url;",
+                                    + " (!url.isEmpty()) { try { Html.localLocation(url); } catch"
+                                    + " (IllegalArgumentException error) { throw new"
+                                    + " IllegalArgumentException(\"Form action, htmx and base"
+                                    + " URLs must be a local absolute path\"); } } return url;",
                             code);
             if (value == null) out.append(checked).append(";\n");
             else dynamic.put(attribute, new MvcExpression.Value(checked, "java.lang.String"));
@@ -690,6 +692,7 @@ final class MvcTemplates {
             } else if (!tag.equals("textarea"))
                 throw new IllegalArgumentException("th:field requires input, select or textarea");
         }
+        String optionText = null;
         if (tag.equals("option") && select != null) {
             MvcExpression.Value candidate = dynamic.get("value");
             if (candidate == null) {
@@ -700,9 +703,17 @@ final class MvcTemplates {
                             e.hasAttr("th:text")
                                     ? expression(e.attr("th:text"), env, form)
                                     : new MvcExpression.Value(q(e.wholeText()), "java.lang.String");
+                    optionText = "optionText" + sequence++;
+                    out.append("String ")
+                            .append(optionText)
+                            .append(" = ")
+                            .append(HTML)
+                            .append("string(")
+                            .append(text.code)
+                            .append(");\n");
                     candidate =
                             new MvcExpression.Value(
-                                    HTML + "optionValue(" + text.code + ")", "java.lang.String");
+                                    HTML + "optionValue(" + optionText + ")", "java.lang.String");
                 }
             }
             dynamic.put(
@@ -710,7 +721,7 @@ final class MvcTemplates {
                     new MvcExpression.Value(
                             HTML + "checked(" + select + ", " + candidate.code + ")", "boolean"));
         }
-        // Keep the author's inherited filter separate from the GET-only security exclusion.
+        // Keep the author's inherited filter separate from the URL parameter security exclusion.
         // Included fragments receive that original filter too, so POST descendants retain it.
         String paramsLocal = env.get("@hxParams").code;
         MvcExpression.Value ownParams = dynamic.get("hx-params");
@@ -730,17 +741,37 @@ final class MvcTemplates {
             env.put("@hxParams", new MvcExpression.Value(paramsLocal, "java.lang.String"));
         }
         MvcExpression.Value get = dynamic.get("hx-get");
+        MvcExpression.Value delete = dynamic.get("hx-delete");
         if (get != null || e.hasAttr("hx-get") || !unsafeHtmx(e, dynamic).equals("false")) {
             String isGet =
                     get != null ? get.code + " != null" : Boolean.toString(e.hasAttr("hx-get"));
+            String isDelete =
+                    delete != null
+                            ? delete.code + " != null"
+                            : Boolean.toString(e.hasAttr("hx-delete"));
             dynamic.put(
                     "hx-params",
                     new MvcExpression.Value(
-                            HTML + "htmxParameters(model, " + isGet + ", " + paramsLocal + ")",
+                            HTML
+                                    + "htmxParameters(model, "
+                                    + isGet
+                                    + " || "
+                                    + isDelete
+                                    + ", "
+                                    + paramsLocal
+                                    + ")",
+                            "java.lang.String"));
+        }
+        String unsafeHtmx = unsafeHtmx(e, dynamic);
+        if (!unsafeHtmx.equals("false")) {
+            String headers = e.hasAttr("hx-headers") ? q(e.attr("hx-headers")) : "null";
+            dynamic.put(
+                    "hx-headers",
+                    new MvcExpression.Value(
+                            HTML + "htmxHeaders(model, " + unsafeHtmx + ", " + headers + ")",
                             "java.lang.String"));
         }
         cacheAttributes(dynamic, snapshots, out);
-        String unsafeHtmx = unsafeHtmx(e, dynamic);
         if (!block && !tag.equals("form")) {
             MvcExpression.Value method = dynamic.get("formmethod");
             boolean submitControl = tag.equals("button") || tag.equals("input");
@@ -798,7 +829,10 @@ final class MvcTemplates {
         else if (e.hasAttr("th:text"))
             out.append(HTML)
                     .append("text(out, ")
-                    .append(expression(e.attr("th:text"), env, form).code)
+                    .append(
+                            optionText != null
+                                    ? optionText
+                                    : expression(e.attr("th:text"), env, form).code)
                     .append(");\n");
         else if (e.hasAttr("th:errors")) {
             String errorField = field(e.attr("th:errors"), form);
