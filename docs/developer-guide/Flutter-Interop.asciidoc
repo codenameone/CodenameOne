@@ -60,7 +60,7 @@ on the right from the same Dart source:
 
 image::img/flutter-gallery-home.png[The Flutter Gallery home screen rendered by Flutter and by Codename One]
 
-image::img/flutter-gallery-card.png[The Cards demo rendered by Flutter and by Codename One]
+image::img/flutter-gallery-card.jpg[The Cards demo rendered by Flutter and by Codename One]
 
 image::img/flutter-gallery-text-field.png[The Text fields demo rendered by Flutter and by Codename One]
 
@@ -69,6 +69,12 @@ image::img/flutter-gallery-bottom-navigation.png[The Bottom navigation demo rend
 image::img/flutter-gallery-colors.png[The Colors demo rendered by Flutter and by Codename One]
 
 image::img/flutter-gallery-button.png[The Text button demo rendered by Flutter and by Codename One]
+
+image::img/flutter-gallery-cupertino-buttons.png[The Cupertino buttons demo rendered by Flutter and by Codename One]
+
+image::img/flutter-gallery-shrine.png[The Shrine study's login screen rendered by Flutter and by Codename One]
+
+image::img/flutter-gallery-reply.png[The Reply study's inbox rendered by Flutter and by Codename One]
 
 The Codename One side is a real Codename One component tree, not a picture of
 one: it uses the theme, the event dispatch thread, the accessibility tree and
