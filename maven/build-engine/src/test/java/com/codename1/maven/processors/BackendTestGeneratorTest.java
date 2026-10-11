@@ -923,6 +923,34 @@ public class BackendTestGeneratorTest {
         }
     }
 
+    @Test
+    public void mvcTestContextServesCompiledViewsAndEmbeddedAssets() throws Exception {
+        File project = tmp.newFolder();
+        File template = new File(project, "src/main/resources/templates/page.html");
+        template.getParentFile().mkdirs();
+        Files.write(template.toPath(), "<p>Hello MVC</p>".getBytes("UTF-8"));
+        File asset = new File(project, "src/main/resources/static/test.txt");
+        asset.getParentFile().mkdirs();
+        Files.write(asset.toPath(), "embedded".getBytes("UTF-8"));
+        File classes = mainBuild(Collections.singletonMap("com.example.Pages", MAIN
+                + "@Controller public class Pages { @GetMapping(\"/page\") public String page(){return \"page\";} }"), project);
+        Map<String,String> sources = new LinkedHashMap<String,String>();
+        sources.put("com.example.PagesTest", "package com.example; "
+                + "import com.codename1.backend.annotations.*; import com.codename1.backend.test.*; "
+                + "import static com.codename1.backend.test.MockMvcRequestBuilders.*; "
+                + "import static com.codename1.backend.test.MockMvcResultMatchers.*; "
+                + "@BackendTest public class PagesTest { @Autowired MockMvc mvc; "
+                + "@org.junit.jupiter.api.Test public void works() throws Exception { "
+                + "mvc.perform(get(\"/page\")).andExpect(status().isOk()).andExpect(content().string(\"<html><head></head><body><p>Hello MVC</p></body></html>\")); "
+                + "mvc.perform(get(\"/static/test.txt\")).andExpect(status().isOk()).andExpect(content().string(\"embedded\")); } }");
+        File tests = testBuild(classes, sources);
+        URLClassLoader loader = new URLClassLoader(new URL[]{tests.toURI().toURL(), classes.toURI().toURL()},getClass().getClassLoader());
+        TestContext context = (TestContext)loader.loadClass("com.example.PagesTestCn1TestContext").newInstance();
+        Object test = loader.loadClass("com.example.PagesTest").newInstance();
+        context.inject(test,TestContexts.acquire(context));
+        invoke(test,"works");
+    }
+
     private static void invoke(Object test, String name) throws Exception {
         java.lang.reflect.Method m = test.getClass().getDeclaredMethod(name);
         m.setAccessible(true);
@@ -942,6 +970,10 @@ public class BackendTestGeneratorTest {
     /// Compiles and processes the application the way process-annotations does,
     /// wiring record included.
     private File mainBuild(Map<String, String> sources) throws Exception {
+        return mainBuild(sources, tmp.newFolder());
+    }
+
+    private File mainBuild(Map<String, String> sources, File project) throws Exception {
         File classes = tmp.newFolder();
         JavaSourceCompiler.compile(sources, classes, classpath());
         Map<String, AnnotatedClass> index = ClassScanner.scan(classes);
@@ -950,7 +982,7 @@ public class BackendTestGeneratorTest {
             cp.add(f.getAbsolutePath());
         }
         ProcessorContext ctx = new ProcessorContext(classes, tmp.newFolder(), index,
-                new SystemStreamLog(), tmp.newFolder(), new Properties(), null,
+                new SystemStreamLog(), project, new Properties(), null,
                 Collections.<String>emptyList(), "UTF-8", cp);
         BackendBeanAnnotationProcessor beans = new BackendBeanAnnotationProcessor();
         RestControllerAnnotationProcessor proc = new RestControllerAnnotationProcessor();

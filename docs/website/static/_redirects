@@ -1124,6 +1124,8 @@
 /files/uber-book/* https://download.codenameone.com/files/uber-book/:splat 302
 /files/kitchensink/* https://download.codenameone.com/files/kitchensink/:splat 302
 /files/Themes/* https://download.codenameone.com/files/Themes/:splat 302
+# Compatibility for released Settings versions that omitted the cn1libs directory.
+/files/:library.cn1lib https://github.com/codenameone/CodenameOneLibs/raw/refs/heads/master/cn1libs/:library.cn1lib 302
 
 /tag/* /tags/:splat/ 301
 /author/* /blog/ 301

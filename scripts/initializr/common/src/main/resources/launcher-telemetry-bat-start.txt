@@ -18,6 +18,9 @@ REM Opt out in PowerShell:      $Env:CN1_TELEMETRY = "0"
 set "CN1_PROJECT_ID=__CN1_PROJECT_ID__"
 set "CN1_MIN_JAVA=__CN1_MIN_JAVA__"
 if not defined CN1_EVENTS_URL set "CN1_EVENTS_URL=https://cloud.codenameone.com/api/v2/funnel/initializr-event"
+REM Maven reports IDE builds itself (cn1.telemetry.* in pom.xml); this tells it the
+REM launcher is already reporting this one, so it is counted once.
+set "CN1_LAUNCHER=1"
 set "CN1_TARGET=%CMD%"
 set "CN1_JAVA=none"
 set "CN1_JAVA_EXE=java"

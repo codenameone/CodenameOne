@@ -40,10 +40,18 @@
  *       blank band at the bottom);
  *     - a Dialog is drawn over its form, tinted, not over a blank page (#5910);
  *     - a mouse drag scrolls the content (the move events never reached the app);
+ *     - a click on a string Picker puts its native <select> on the page, opens the list where
+ *       the browser can, and a choice made there reaches the Picker (it failed with "Option is
+ *       not defined"; also run on the phone);
+ *     - the arrow keys move a ComboBox popup's selection and Escape closes it (Bootstrap
+ *       cancelled those keys on the accessibility tree's listbox element);
  *   phone (Chromium with touch emulation):
  *     - a swipe scrolls the content (#5912: it did nothing at all);
  *     - a tap on the hamburger opens the side menu, and a tap on a button fires it (#5912);
  *     - with the side menu open, none of the form's DOM text floats over the menu's shade.
+ *   iOS user agent (Chromium presenting itself as an iPhone):
+ *     - a tap and a mouse click each fire a button (every press threw "document is not
+ *       defined" in a branch only an iOS user agent takes).
  *
  * Usage:
  *   node scripts/test-javascript-composited-rendering.mjs <bundle-dir> [artifacts-dir]
@@ -96,15 +104,15 @@ function check(ok, label, detail) {
   if (!ok) failures.push(label);
 }
 
-async function boot(page, logs) {
+async function boot(page, logs, query = '', firstText = 'hello world') {
   page.on('console', (m) => logs.push(`${m.type()}: ${m.text()}`));
   page.on('pageerror', (e) => logs.push(`pageerror: ${e.message}`));
-  await page.goto(url);
+  await page.goto(url + query);
   await page.waitForFunction(() => window.cn1Started, null, { timeout: bootTimeout });
   // The first form paints over a few frames after the lifecycle reports it started.
   // Case-insensitive: the Android theme a phone user agent gets upper-cases button labels.
-  await page.waitForFunction(() => Array.from(document.querySelectorAll('#cn1-text-layer span'))
-    .some((s) => s.textContent.trim().toLowerCase() === 'hello world'), null, { timeout: bootTimeout });
+  await page.waitForFunction((t) => Array.from(document.querySelectorAll('#cn1-text-layer span'))
+    .some((s) => s.textContent.trim().toLowerCase() === t), firstText, { timeout: bootTimeout });
   await page.waitForTimeout(1500);
 }
 
@@ -174,6 +182,125 @@ async function bandContent(page, png, band) {
   }, { a: png.toString('base64'), band });
 }
 
+// A string Picker takes the port's native path unless the application forces the lightweight
+// popup, and that path built its <select> with "new Option(...)" evaluated in the worker, where
+// there is no DOM: every such Picker answered a click with "Option is not defined" and never
+// opened. The click here is a real one, and the choice is made on the <select> the way a
+// browser reports one, with a change event.
+async function picker(name, page, press) {
+  const logs = [];
+  await page.addInitScript(() => {
+    window.__cn1ShowPicker = [];
+    const original = HTMLSelectElement.prototype.showPicker;
+    if (original) {
+      HTMLSelectElement.prototype.showPicker = function() {
+        try {
+          original.call(this);
+          window.__cn1ShowPicker.push('opened');
+        } catch (e) {
+          window.__cn1ShowPicker.push(String(e));
+          throw e;
+        }
+      };
+    }
+  });
+  await boot(page, logs, '?screen=picker', 'picked nothing');
+  const face = await span(page, 'One');
+  check(!!face, `${name}: the Picker shows its value`);
+  if (face) {
+    await press(Math.round(face.x), Math.round(face.y));
+    const select = page.locator('select.cn1-string-picker');
+    let shown = true;
+    try {
+      await select.waitFor({ state: 'attached', timeout: 10000 });
+    } catch (err) {
+      shown = false;
+    }
+    const failed = logs.filter((l) => /is not defined|Exception/.test(l));
+    check(shown, `${name}: a click on a string Picker puts its <select> on the page`,
+      failed.length ? failed[0].slice(0, 200) : '');
+    if (shown) {
+      const options = await select.locator('option').allTextContents();
+      check(options.join(',') === 'One,Two,Three', `${name}: the <select> lists the Picker's strings`, options.join(','));
+      check(await select.inputValue() === '0', `${name}: the <select> starts on the Picker's value`);
+      // Browsers without showPicker() leave the list one more click away; where it exists it
+      // has to succeed, since the click that asked for it is still a live gesture.
+      const opened = await page.evaluate(() => ({ has: 'showPicker' in HTMLSelectElement.prototype, calls: window.__cn1ShowPicker }));
+      check(!opened.has || (opened.calls.length === 1 && opened.calls[0] === 'opened'),
+        `${name}: the list opens on the first click`, opened.has ? JSON.stringify(opened.calls) : 'no showPicker() in this browser');
+      await select.selectOption({ label: 'Two' });
+      let chosen = true;
+      try {
+        await page.waitForFunction(() => Array.from(document.querySelectorAll('#cn1-text-layer span'))
+          .some((s) => s.textContent.trim().toLowerCase() === 'picked two'), null, { timeout: 10000 });
+      } catch (err) {
+        chosen = false;
+      }
+      check(chosen, `${name}: choosing an option sets the Picker's value`);
+      await page.waitForTimeout(500);
+      check(await select.count() === 0, `${name}: the <select> is removed once a choice is made`);
+    }
+  }
+  await page.screenshot({ path: path.join(outDir, `${name}-picker.png`) });
+  const errors = logs.filter((l) => /is not defined|Exception/.test(l));
+  check(errors.length === 0, `${name}: the Picker raises no error`, errors.length ? errors[0].slice(0, 200) : '');
+  fs.writeFileSync(path.join(outDir, `${name}-picker-console.txt`), logs.join('\n'));
+}
+
+// The keyboard in a list. The accessibility tree mirrors a Codename One list as an element
+// with the role "listbox" and focuses it, and Bootstrap, which the page loads, cancels Up,
+// Down, Escape and Space on every element with that role: the keys stopped at the document, so
+// the arrows did not move a ComboBox popup's selection and Escape did not close it.
+async function comboKeys(name, page) {
+  const logs = [];
+  await boot(page, logs, '?screen=combo', 'chose nothing');
+  const waitText = async (text) => {
+    try {
+      await page.waitForFunction((t) => Array.from(document.querySelectorAll('#cn1-text-layer span'))
+        .some((s) => s.textContent.trim().toLowerCase() === t), text, { timeout: 10000 });
+      return true;
+    } catch (err) {
+      return false;
+    }
+  };
+  const face = await span(page, 'Alpha');
+  check(!!face, `${name}: the ComboBox shows its value`);
+  if (face) {
+    const closed = await page.screenshot();
+    const band = [Math.ceil(face.bottom) + 30, 440];
+    await page.mouse.click(face.x, face.y);
+    await page.waitForTimeout(1500);
+    await page.keyboard.press('ArrowDown');
+    await page.waitForTimeout(300);
+    await page.keyboard.press('ArrowDown');
+    await page.waitForTimeout(300);
+    await page.keyboard.press('Enter');
+    check(await waitText('chose gamma'), `${name}: the arrow keys move a ComboBox popup's selection`,
+      logs.filter((l) => /Exception/.test(l)).slice(0, 1).join(''));
+    await page.waitForTimeout(1000);
+    const reopenAt = await span(page, 'Gamma');
+    if (reopenAt) {
+      await page.mouse.click(reopenAt.x, reopenAt.y);
+      await page.waitForTimeout(1500);
+      const open = await page.screenshot({ path: path.join(outDir, `${name}-combo-open.png`) });
+      const opened = await diffFraction(page, closed, open, band);
+      check(opened > 0.02, `${name}: a click opens the ComboBox popup`, `${(opened * 100).toFixed(2)}% changed`);
+      await page.keyboard.press('ArrowDown');
+      await page.waitForTimeout(300);
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(1500);
+      const after = await page.screenshot({ path: path.join(outDir, `${name}-combo-escaped.png`) });
+      const left = await diffFraction(page, closed, after, band);
+      check(left < 0.01, `${name}: Escape closes a ComboBox popup`, `${(left * 100).toFixed(2)}% of the popup's area still differs`);
+      const kept = await span(page, 'Chose Gamma');
+      check(!!kept, `${name}: Escape leaves the ComboBox's value alone`);
+    } else {
+      check(false, `${name}: the ComboBox shows the chosen value`);
+    }
+  }
+  fs.writeFileSync(path.join(outDir, `${name}-combo-console.txt`), logs.join('\n'));
+}
+
 async function desktop(name, browserType) {
   const browser = await browserType.launch();
   try {
@@ -241,6 +368,55 @@ async function desktop(name, browserType) {
       const moved = await diffFraction(page, a, b, [Math.floor(title.bottom) + 20, 440]);
       check(moved > 0.05, `${name}: a mouse drag scrolls the content`, `${(moved * 100).toFixed(2)}% changed`);
       fs.writeFileSync(path.join(outDir, `${name}-drag-console.txt`), logs.join('\n'));
+      await page.close();
+    }
+    {
+      const page = await browser.newPage({ viewport: { width: 1000, height: 450 } });
+      await picker(name, page, (x, y) => page.mouse.click(x, y));
+      await page.close();
+    }
+    {
+      const page = await browser.newPage({ viewport: { width: 1000, height: 450 } });
+      await comboKeys(name, page);
+      await page.close();
+    }
+  } finally {
+    await browser.close();
+  }
+}
+
+// An iPhone or iPad is told apart by its user agent, and the branches that takes are ones no
+// other device runs. One of them asked the document a question on every pointer press, from
+// the worker, which has no document: the press threw "document is not defined" and nothing on
+// the page could be tapped or clicked. Chromium wearing an iPhone's user agent takes the same
+// branches, which is enough to catch that; it says nothing about Safari's own behaviour.
+async function iosUserAgent() {
+  const browser = await chromium.launch();
+  try {
+    const context = await browser.newContext({ ...devices['iPhone 13'] });
+    const inputs = [
+      ['a tap', (page, x, y) => page.touchscreen.tap(x, y)],
+      // A trackpad or mouse attached to an iPad, and "Request Desktop Website" in reverse.
+      ['a mouse click', (page, x, y) => page.mouse.click(x, y)]
+    ];
+    for (const [what, press] of inputs) {
+      const logs = [];
+      const page = await context.newPage();
+      await boot(page, logs);
+      const vp = page.viewportSize();
+      const before = await canvasPixels(page, [[6, vp.height - 6]]);
+      const button = await span(page, 'Hello World');
+      await press(page, Math.round(button.x), Math.round(button.y));
+      await page.waitForTimeout(2500);
+      const slug = what.replace(/[^a-z]+/g, '-');
+      await page.screenshot({ path: path.join(outDir, `ios-user-agent-${slug}.png`) });
+      const after = await canvasPixels(page, [[6, vp.height - 6]]);
+      const errors = logs.filter((l) => /is not defined|Exception/.test(l));
+      check(luminance(after[0]) < luminance(before[0]) - 15 && after[0][3] === 255,
+        `iOS user agent: ${what} on a button fires it`,
+        `corner luminance ${Math.round(luminance(before[0]))} -> ${Math.round(luminance(after[0]))}`);
+      check(errors.length === 0, `iOS user agent: ${what} raises no error`, errors.length ? errors[0].slice(0, 200) : '');
+      fs.writeFileSync(path.join(outDir, `ios-user-agent-${slug}-console.txt`), logs.join('\n'));
       await page.close();
     }
   } finally {
@@ -346,6 +522,11 @@ async function phone() {
       fs.writeFileSync(path.join(outDir, 'phone-cancel-console.txt'), logs.join('\n'));
       await page.close();
     }
+    {
+      const page = await context.newPage();
+      await picker('phone', page, (x, y) => page.touchscreen.tap(x, y));
+      await page.close();
+    }
   } finally {
     await browser.close();
   }
@@ -358,6 +539,7 @@ try {
     await desktop(name, types[name]);
   }
   await phone();
+  await iosUserAgent();
 } catch (err) {
   check(false, 'the run completed', err && err.stack ? err.stack : String(err));
 } finally {

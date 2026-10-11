@@ -1783,7 +1783,7 @@ public class CodenameOneSettings extends Lifecycle {
         Display.getInstance().startThread(() -> {
             try {
                 ConnectionRequest req = new ConnectionRequest();
-                req.setUrl("https://www.codenameone.com/files/" + encodeUrlPath(descriptor.fileName()));
+                req.setUrl("https://www.codenameone.com/files/cn1libs/" + encodeUrlPath(descriptor.fileName()));
                 req.setPost(false);
                 NetworkManager.getInstance().addToQueueAndWait(req);
                 if (req.getResponseCode() >= 400 || req.getResponseData() == null) {

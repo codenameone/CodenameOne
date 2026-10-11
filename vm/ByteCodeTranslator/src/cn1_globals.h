@@ -1733,10 +1733,21 @@ struct CN1StackBuffer {
     int initialBytes;
 };
 
+// Native lock scopes are linked only while held and unwound before Java longjmp.
+// The owner references keep the allocation containing each lock word live.
+struct CN1BuilderAccess {
+    struct CN1BuilderAccess* previous;
+    struct ThreadLocalData* thread;
+    JAVA_OBJECT firstOwner, secondOwner;
+    JAVA_LONG* firstLock;
+    JAVA_LONG* secondLock;
+};
+
 // indicates a try/catch block currently in frame
 struct TryBlock {
     jmp_buf destination;
     struct CN1StackBuffer* nativeBuffers;
+    struct CN1BuilderAccess* builderAccess;
     
     // -1 for all exceptions
     JAVA_INT exceptionClass;
@@ -1988,6 +1999,7 @@ struct ThreadLocalData {
     JAVA_OBJECT currentThreadObject;
     struct TryBlock* blocks;
     struct CN1StackBuffer* nativeBuffers;
+    struct CN1BuilderAccess* builderAccess;
     int tryBlockOffset;
     JAVA_OBJECT exception;
     
@@ -3168,6 +3180,7 @@ extern struct ThreadLocalData* getThreadLocalData();
 #define BEGIN_TRY(classId, destinationJump) {\
         threadStateData->blocks[threadStateData->tryBlockOffset].monitor = 0; \
         threadStateData->blocks[threadStateData->tryBlockOffset].nativeBuffers = threadStateData->nativeBuffers; \
+        threadStateData->blocks[threadStateData->tryBlockOffset].builderAccess = threadStateData->builderAccess; \
         threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass = classId; \
         memcpy(threadStateData->blocks[threadStateData->tryBlockOffset].destination, destinationJump, sizeof(jmp_buf)); \
         threadStateData->tryBlockOffset++; \
@@ -4357,6 +4370,29 @@ static inline JAVA_INT cn1InlTableNext(JAVA_LONG metadata, JAVA_INT from, JAVA_I
     for(JAVA_INT i = from; i < capacity; i++) if(slots[i] < 0) return i;
     return -1;
 }
+
+/* Private buffer locks never acquire a Java object monitor. Keep the common
+ * stack-builder path to a single branch: expanding monitor setup here made the
+ * append intrinsics too large to inline even when the builder was stack-local. */
+extern void cn1BuilderAccessEnter(CODENAME_ONE_THREAD_STATE, struct CN1BuilderAccess* access,
+        JAVA_OBJECT first, JAVA_LONG* firstLock, JAVA_OBJECT second, JAVA_LONG* secondLock);
+extern void cn1BuilderAccessLeave(struct CN1BuilderAccess* access);
+extern void cn1BuilderAccessUnwind(struct ThreadLocalData* thread, struct CN1BuilderAccess* until);
+static inline void cn1BuilderAccessEnd(struct CN1BuilderAccess* access) {
+    if(access->thread != NULL) cn1BuilderAccessLeave(access);
+}
+#define CN1_BUILDER_ACCESS_PAIR(name, first, second) \
+    struct CN1BuilderAccess name __attribute__((cleanup(cn1BuilderAccessEnd))); \
+    name.thread = NULL; \
+    JAVA_OBJECT name##First = (first), name##Second = (second); \
+    if(name##First == JAVA_NULL) { THROW_NULL_POINTER_EXCEPTION(); } \
+    else if(CN1_OBJ_HEAPPOS(name##First) != CN1_GC_STACK_BUILDER \
+            || (name##Second != JAVA_NULL && CN1_OBJ_HEAPPOS(name##Second) != CN1_GC_STACK_BUILDER)) \
+        cn1BuilderAccessEnter(threadStateData, &name, name##First, \
+            &((struct obj__java_lang_StringBuilder*)name##First)->java_lang_StringBuilder_cn1AccessOwner, \
+            name##Second, name##Second == JAVA_NULL ? NULL : \
+            &((struct obj__java_lang_StringBuilder*)name##Second)->java_lang_StringBuilder_cn1AccessOwner)
+#define CN1_BUILDER_ACCESS(name, builder) CN1_BUILDER_ACCESS_PAIR(name, builder, JAVA_NULL)
 
 // Untraced, exclusively owned primitive storage; growth preserves existing bytes.
 extern JAVA_LONG cn1PrimitiveBlockResize(JAVA_LONG block, JAVA_INT bytes);

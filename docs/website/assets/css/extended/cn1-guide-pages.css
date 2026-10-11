@@ -77,3 +77,41 @@
   .cn1-guide-sidebar, .cn1-guide-tools, .cn1-guide-pagination, .cn1-guide-toc, .cn1-guide-topic-index { display: none; }
   .cn1-guide-layout { display: block; }
 }
+
+/* The reference belongs to the page flow, including long literal hint values. */
+.cn1-build-hints table.tableblock {
+  display: table;
+  table-layout: fixed;
+  width: 100%;
+  max-height: none;
+  overflow: visible;
+}
+.cn1-build-hints table.tableblock :is(th, td) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.cn1-build-hints table.tableblock code { white-space: normal; overflow-wrap: anywhere; }
+
+/* Stack each hint's fields on narrow screens instead of scrolling sideways. */
+@media (max-width: 720px) {
+  .cn1-build-hints table.tableblock,
+  .cn1-build-hints table.tableblock :is(tbody, tr, td) { display: block; width: 100%; }
+  .cn1-build-hints table.tableblock colgroup { display: none; }
+  .cn1-build-hints table.tableblock caption { display: block; text-align: left; }
+  .cn1-build-hints table.tableblock thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    clip-path: inset(50%);
+    overflow: hidden;
+  }
+  .cn1-build-hints table.tableblock tr { padding: .75rem 0; border-bottom: 1px solid var(--cn1-border); }
+  .cn1-build-hints table.tableblock td { border: 0; padding: .25rem .5rem; }
+  .cn1-build-hints table.tableblock td::before { font-weight: 600; margin-right: .5rem; }
+  .cn1-build-hints table.tableblock td:nth-child(1)::before { content: "Name:"; }
+  .cn1-build-hints table.tableblock td:nth-child(2)::before { content: "Type:"; }
+  .cn1-build-hints table.tableblock td:nth-child(3)::before { content: "Default:"; }
+  .cn1-build-hints table.tableblock td:nth-child(4)::before { content: "Annotation:"; }
+  .cn1-build-hints table.tableblock td:nth-child(5)::before { content: "Description:"; }
+  .cn1-build-hints table.tableblock td p { display: inline; }
+}

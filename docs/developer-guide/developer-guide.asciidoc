@@ -123,6 +123,8 @@ include::Backend.asciidoc[]
 
 include::Backend-Web.asciidoc[]
 
+include::Backend-Views.asciidoc[]
+
 include::Backend-Beans.asciidoc[]
 
 include::Backend-Testing.asciidoc[]
@@ -232,6 +234,8 @@ include::On-Device-Debugging.asciidoc[]
 include::On-Device-Debugging-Android.asciidoc[]
 
 = Build, sign and ship
+
+include::Build-Hints.asciidoc[]
 
 include::signing.asciidoc[]
 
