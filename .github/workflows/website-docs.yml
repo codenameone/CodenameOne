@@ -189,6 +189,9 @@ jobs:
       - name: Check redirect rule ordering
         run: python3 scripts/website/test_redirect_order.py
 
+      - name: Test website search index
+        run: python3 scripts/website/test_search_index.py
+
       - name: Test developer guide chapter generation
         run: ruby scripts/website/test_generate_developer_guide.rb
 
@@ -422,6 +425,7 @@ jobs:
             --base-url "http://127.0.0.1:${PORT}" \
             --redirects-file docs/website/public/_redirects \
             --skip-auto-cases
+          node scripts/website/test_search.mjs "http://127.0.0.1:${PORT}"
 
       - name: Validate internal links and images
         uses: lycheeverse/lychee-action@v2

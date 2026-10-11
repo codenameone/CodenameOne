@@ -142,12 +142,17 @@ static inline JAVA_BOOLEAN cn1InlListAdd(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT 
 
 #ifdef CN1_HAVE_SB_INTRINSICS
 
+// Heap builders take the protected native path. Keep lock scopes out of these
+// small inline bodies so escape-proven stack builders retain their fast path.
+
 static inline JAVA_OBJECT cn1InlSbAppendChar(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT sb, JAVA_CHAR c) {
+    if(__builtin_expect(sb == JAVA_NULL || CN1_OBJ_HEAPPOS(sb) != CN1_GC_STACK_BUILDER, 0))
+        return java_lang_StringBuilder_append___char_R_java_lang_StringBuilder(threadStateData, sb, c);
     CN1_KEEP_NATIVE_OWNER(bufferOwner, sb);
     struct obj__java_lang_StringBuilder* t = (struct obj__java_lang_StringBuilder*)sb;
     JAVA_INT count = t->java_lang_StringBuilder_count;
     void* data = (void*)(uintptr_t)t->java_lang_StringBuilder_cn1Storage;
-    if(__builtin_expect(count < t->java_lang_StringBuilder_capacity && (c <= 255 || t->java_lang_StringBuilder_wide), 1)) {
+    if(__builtin_expect(count >= 0 && count < t->java_lang_StringBuilder_capacity && (c <= 255 || t->java_lang_StringBuilder_wide), 1)) {
         if(!t->java_lang_StringBuilder_wide) ((JAVA_ARRAY_BYTE*)data)[count] = (JAVA_ARRAY_BYTE)c;
         else ((JAVA_ARRAY_CHAR*)data)[count] = c;
         t->java_lang_StringBuilder_count = count + 1;
@@ -157,13 +162,15 @@ static inline JAVA_OBJECT cn1InlSbAppendChar(CODENAME_ONE_THREAD_STATE, JAVA_OBJ
 }
 
 static inline JAVA_OBJECT cn1InlSbAppendInt(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT sb, JAVA_INT v) {
+    if(__builtin_expect(sb == JAVA_NULL || CN1_OBJ_HEAPPOS(sb) != CN1_GC_STACK_BUILDER, 0))
+        return java_lang_StringBuilder_append___int_R_java_lang_StringBuilder(threadStateData, sb, v);
     CN1_KEEP_NATIVE_OWNER(bufferOwner, sb);
     struct obj__java_lang_StringBuilder* t = (struct obj__java_lang_StringBuilder*)sb;
     JAVA_INT count = t->java_lang_StringBuilder_count;
     void* data = (void*)(uintptr_t)t->java_lang_StringBuilder_cn1Storage;
     // positive with guaranteed headroom stays inline; negatives and
     // tight-capacity builders take the out-of-line path (INT_MIN etc.)
-    if(__builtin_expect(v >= 0 && count + 11 <= t->java_lang_StringBuilder_capacity, 1)) {
+    if(__builtin_expect(v >= 0 && count >= 0 && count <= t->java_lang_StringBuilder_capacity - 11, 1)) {
         JAVA_ARRAY_CHAR* d = (JAVA_ARRAY_CHAR*)data;
         char tmp[11]; int n = 0;
         JAVA_INT q = v;
@@ -195,42 +202,13 @@ static inline JAVA_OBJECT cn1InlSbAppendInt(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
  * byte[] source, long, does not fit) goes to the out-of-line native, which was
  * already the fallback here and is the source of truth for all of them -- so
  * narrowing can only move work off this path, never change its answer. */
-/* THE CONSTRUCTOR'S OWN RESIZE NEVER ALLOCATES, SO IT SHOULD NOT BE A CALL.
- *
- * `new StringBuilder()` is `resizeBuffer(INITIAL_CAPACITY=16, false)`, and a
- * StringBuilder carries __cn1InlineStorage[16] inside the object -- so 16 narrow
- * bytes fit exactly, with nothing to allocate and nothing to copy. It was still
- * an out-of-line native carrying a keepalive fence and a dozen branches, and the
- * growth that follows is a SECOND trip through the same native: two calls per
- * builder, 32M of them in the stringBuilding benchmark. A dense profile put
- * resizeBuffer + resizeBufferImpl at 17% of mutator time with memmove another
- * 9.8%; HotSpot's constructor is an inlined `new byte[16]`.
- *
- * Only the case that allocates nothing is inlined here. A fresh builder has
- * cn1Storage == 0 (the object is zeroed), so that test alone separates the
- * constructor from every later growth, and the stack-builder scope -- whose
- * inline bytes live in a CN1StackBuffer rather than the object -- is excluded
- * explicitly. Everything else, growth included, goes to the native, which stays
- * the source of truth.
- */
+/* Inline only the allocation-free construction of an escape-proven stack
+ * builder. Heap construction and later growth use the protected native path. */
 static inline JAVA_BOOLEAN cn1InlSbResize(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT builder,
                                           JAVA_INT capacity, JAVA_BOOLEAN wide) {
+    if(__builtin_expect(builder == JAVA_NULL || CN1_OBJ_HEAPPOS(builder) != CN1_GC_STACK_BUILDER, 0))
+        return java_lang_StringBuilder_resizeBufferImpl___int_boolean_R_boolean(threadStateData, builder, capacity, wide);
     struct obj__java_lang_StringBuilder* t = (struct obj__java_lang_StringBuilder*)builder;
-    /* CAPACITY IS PART OF THE RESULT. This path used to install the storage and
-     * return without recording the capacity, so `new StringBuilder().capacity()`
-     * answered 0 on a heap builder where the JDK answers 16 -- measured, by a probe
-     * whose stack-builder arm (which went to the native) answered 16. It stayed
-     * invisible because growth recovers from capacity 0, at the cost of an extra
-     * growth trip on every heap builder's first append. */
-    if(__builtin_expect(!wide
-            && t->java_lang_StringBuilder_cn1Storage == 0
-            && capacity >= 0
-            && capacity <= (JAVA_INT)sizeof(t->__cn1InlineStorage)
-            && CN1_OBJ_HEAPPOS(t) != CN1_GC_STACK_BUILDER, 1)) {
-        t->java_lang_StringBuilder_cn1Storage = (JAVA_LONG)(uintptr_t)t->__cn1InlineStorage;
-        t->java_lang_StringBuilder_capacity = capacity;
-        return JAVA_TRUE;
-    }
     /* An ESCAPE-PROVEN builder arrives with its storage already installed -- NEW
      * points cn1Storage at the CN1StackBuffer's data -- so its constructor's resize
      * allocates nothing and copies nothing either: the native's own bytes <=
@@ -238,8 +216,7 @@ static inline JAVA_BOOLEAN cn1InlSbResize(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT
      * capacity. Doing that here takes the call off every stack builder's
      * construction, which the profile put at ~375 of ~3200 stringBuilding samples. */
     if(__builtin_expect(!wide
-            && capacity >= 0
-            && CN1_OBJ_HEAPPOS(t) == CN1_GC_STACK_BUILDER, 1)) {
+            && capacity >= 0, 1)) {
         struct CN1StackBuffer* scope;
         memcpy(&scope, t->__cn1InlineStorage, sizeof(scope));
         if(t->java_lang_StringBuilder_cn1Storage == (JAVA_LONG)(uintptr_t)scope->initialData
@@ -253,7 +230,10 @@ static inline JAVA_BOOLEAN cn1InlSbResize(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT
             threadStateData, builder, capacity, wide);
 }
 
-static inline JAVA_OBJECT cn1InlSbAppendStr(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT sb, JAVA_OBJECT str) {
+// Keep this small stack-only copy inline even after the heap dispatch check.
+static inline __attribute__((always_inline)) JAVA_OBJECT cn1InlSbAppendStr(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT sb, JAVA_OBJECT str) {
+    if(__builtin_expect(sb == JAVA_NULL || CN1_OBJ_HEAPPOS(sb) != CN1_GC_STACK_BUILDER, 0))
+        return java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, sb, str);
     CN1_KEEP_NATIVE_OWNER(bufferOwner, sb);
     CN1_KEEP_NATIVE_OWNER(stringOwner, str);
     if(__builtin_expect(str != JAVA_NULL, 1)) {
@@ -268,7 +248,7 @@ static inline JAVA_OBJECT cn1InlSbAppendStr(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
             JAVA_INT len = s->java_lang_String_count;
             JAVA_INT count = t->java_lang_StringBuilder_count;
             if(__builtin_expect((unsigned)len <= 8u
-                    && count + len <= t->java_lang_StringBuilder_capacity, 1)) {
+                    && count >= 0 && count <= t->java_lang_StringBuilder_capacity - len, 1)) {
                 cn1SmallCopy((JAVA_ARRAY_BYTE*)(uintptr_t)t->java_lang_StringBuilder_cn1Storage + count,
                        (char*)str + ((sizeof(struct obj__java_lang_String) + 7) & ~(size_t)7),
                        (size_t)len);
@@ -286,6 +266,8 @@ static inline JAVA_OBJECT cn1InlSbAppendStr(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
 // parentCls==0 guard keeps a signal-stopped scan from tracing the body).
 // Mirrors the out-of-line native, which stays the fallback + source of truth.
 static inline JAVA_OBJECT cn1InlSbToString(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT sb) {
+    if(__builtin_expect(sb == JAVA_NULL || CN1_OBJ_HEAPPOS(sb) != CN1_GC_STACK_BUILDER, 0))
+        return java_lang_StringBuilder_toString___R_java_lang_String(threadStateData, sb);
     CN1_KEEP_NATIVE_OWNER(bufferOwner, sb);
 #ifndef CN1_DISABLE_BIBOP
     struct obj__java_lang_StringBuilder* t = (struct obj__java_lang_StringBuilder*)sb;
@@ -296,7 +278,7 @@ static inline JAVA_OBJECT cn1InlSbToString(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
         cn1InitStringTwin();
         // No array header: the characters follow the fields, the coder is the twin.
         size_t total = off + (size_t)count;
-        if(total <= CN1_BIBOP_MAX_OBJECT) {
+        if(count >= 0 && count <= t->java_lang_StringBuilder_capacity && total <= CN1_BIBOP_MAX_OBJECT) {
             JAVA_OBJECT result = cn1BibopFastAllocNoZero(threadStateData, (int)total, &class__java_lang_String_i8, CN1_BIBOP_CIDX(total));
             if(result != JAVA_NULL) {
                 cn1SmallCopy((char*)result + off, source, (size_t)count);
