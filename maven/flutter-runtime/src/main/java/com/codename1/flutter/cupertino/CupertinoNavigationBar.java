@@ -56,8 +56,21 @@ public class CupertinoNavigationBar extends StatelessWidget {
      * gallery does — an unset Cupertino bar would inherit it and stop looking
      * like iOS at all. Naming both colours here keeps that resolution from ever
      * running.</p>
+     *
+     * <p>The background is Flutter's OWN {@code _kDefaultNavBarBackgroundColor}
+     * (packages/flutter/lib/src/cupertino/nav_bar.dart): {@code 0xF0F9F9F9}, alpha
+     * {@code 0xF0} (240/255, about 94%) -- a TRANSLUCENT fill over whatever sits
+     * behind the bar, not an opaque one.
+     * {@link com.codename1.flutter.material.ThemeDataAdapter#paintColor}
+     * already carries a colour's alpha into {@code setBgTransparency}, so the only
+     * change needed here was the constant: a fully opaque {@code 0xFFF9F9F9} painted
+     * a flat (249,249,249) band that read as a visibly grey strip against the
+     * gallery's white demo card, where Flutter's bar -- translucent over that same
+     * white card -- composites to effectively (255,255,255), indistinguishable
+     * from the content under it. Measured on the cupertino-buttons demo's "Buttons"
+     * title bar: reference (255,255,255), this runtime (249,249,249) opaque.</p>
      */
-    private static final long BAR_BACKGROUND = 0xFFF9F9F9L;
+    private static final long BAR_BACKGROUND = 0xF0F9F9F9L;
     private static final long BAR_FOREGROUND = 0xFF000000L;
     /** CupertinoTheme's navTitleTextStyle: 17pt semibold label. */
     private static final double TITLE_SIZE = 17;

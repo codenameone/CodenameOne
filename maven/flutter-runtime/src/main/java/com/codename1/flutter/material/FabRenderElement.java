@@ -96,6 +96,84 @@ public class FabRenderElement extends RenderElement {
         return null;
     }
 
+    /** The {@code TextStyle} of the labelled Text child, or null when it states none. */
+    private com.codename1.flutter.TextStyle labelTextStyle() {
+        if (!fab().isExtended()) {
+            return null;
+        }
+        com.codename1.flutter.Widget w = fab().getChild();
+        for (int depth = 0; w != null && depth < 6; depth++) {
+            if (w instanceof com.codename1.flutter.widgets.Text) {
+                return ((com.codename1.flutter.widgets.Text) w).getStyle();
+            }
+            if (!(w instanceof com.codename1.flutter.widgets.HasChild)) {
+                return null;
+            }
+            w = ((com.codename1.flutter.widgets.HasChild) w).getChild();
+        }
+        return null;
+    }
+
+    /**
+     * Material 3's extended-FAB label default: {@code textTheme.labelLarge}, 14
+     * logical pixels at {@code FontWeight.w500}
+     * (packages/flutter/lib/src/material/floating_action_button.dart --
+     * {@code extendedTextStyle ?? theme.textTheme.labelLarge}; see this
+     * runtime's own default in {@link Typography}'s {@code labelLarge}).
+     */
+    private static final double LABEL_SIZE_LP = 14;
+
+    /**
+     * Sizes an extended FAB's label from the Text child's OWN style, falling back to
+     * {@link #LABEL_SIZE_LP}/w500 when it states none.
+     *
+     * <p>The label's string was consumed by {@link #labelText()}, but the
+     * {@code TextStyle} that came with it -- the gallery's "Back" chip states
+     * {@code textTheme.labelLarge!.apply(color: ...)} -- was discarded along with the
+     * rest of the Text widget, so the button wore the "FloatingActionButton" UIID's
+     * native default instead: several times too large next to the reference. Sizing
+     * follows the same face-then-size resolution {@code TextRenderElement} uses for an
+     * ordinary Text, so a gallery study naming its own font family gets it here too.</p>
+     */
+    private void applyLabelFont(Component c, String label) {
+        if (label == null || !(c instanceof com.codename1.ui.Button)) {
+            return;
+        }
+        com.codename1.flutter.TextStyle ts = labelTextStyle();
+        double sizeLp = ts != null && ts.getFontSize() != null
+                ? ts.getFontSize().doubleValue() : LABEL_SIZE_LP;
+        com.codename1.flutter.FontWeight weight =
+                ts != null && ts.getFontWeight() != null
+                        ? ts.getFontWeight() : com.codename1.flutter.FontWeight.w500;
+        com.codename1.ui.Font named = com.codename1.flutter.fonts.FontResolver.resolve(
+                ts == null ? null : ts.getFontFamily(), weight, false);
+        // A resolved face already carries its weight; synthesising bold on top of a
+        // bold file doubles it, the same guard TextRenderElement applies.
+        boolean weighted = named != null;
+        com.codename1.ui.Font base = named;
+        if (base == null) {
+            base = com.codename1.flutter.fonts.FontResolver.platformFace(weight, false);
+            weighted = base != null;
+        }
+        if (base == null) {
+            base = c.getUnselectedStyle().getFont();
+        }
+        if (base == null) {
+            base = com.codename1.ui.Font.getDefaultFont();
+        }
+        if (base == null) {
+            return;
+        }
+        float sizePx = (float) com.codename1.flutter.rendering.Dp.px(sizeLp);
+        int style = !weighted && weight.isBold()
+                ? com.codename1.ui.Font.STYLE_BOLD : com.codename1.ui.Font.STYLE_PLAIN;
+        try {
+            c.getAllStyles().setFont(base.derive(sizePx, style));
+        } catch (Exception err) {
+            // a font that cannot derive keeps whatever size the UIID carries
+        }
+    }
+
     @Override
     protected Component createComponent() {
         // A plain Button wearing the FAB's UIID, in BOTH forms.
@@ -141,23 +219,39 @@ public class FabRenderElement extends RenderElement {
     }
 
     /**
-     * Removes the drop shadow a Codename One round border draws for itself.
+     * Removes the drop shadow a Codename One round border draws for itself, for a
+     * DOCKED floating action button only.
      *
-     * <p>The button's elevation belongs to the Material surface under it, which is what
-     * Flutter shades and what a notched bar already accounts for. A border that also
-     * draws one produces a second, harder ring that does not match anything -- most
-     * obviously on the reply study's FAB, where it sits in the bar's notch and the ring
-     * reads as a smudge around the cut-out rather than as lift.</p>
+     * <p>A docked button's elevation belongs to the Material surface under it, which is
+     * what Flutter shades and what a notched bar already accounts for -- Reply's compose
+     * button (centerDocked) casts no shadow of its own in the reference, and a border
+     * that draws one anyway produces a second, harder ring that reads as a smudge around
+     * the bar's cut-out rather than as lift. This used to run UNCONDITIONALLY, for every
+     * FAB regardless of docking, which also stripped the shadow off Shrine's and Reply's
+     * floating "Back" chip -- a plain {@code FloatingActionButton.extended} the gallery
+     * positions itself (StudyWrapper's own Align/Padding, not a Scaffold fab slot), which
+     * the reference shows with a clear soft shadow beneath it, like any other floating,
+     * undocked FAB.</p>
      *
      * <p>Both round borders are handled, and only the shadow is touched: the theme still
-     * owns the shape and the stroke.</p>
+     * owns the shape and the stroke. Read from {@code c.getUnselectedStyle()}, never from
+     * {@link Component#getAllStyles()} -- that proxy's setters fan out to the four real
+     * per-state styles, but its OWN getters stay the blank {@code Style} it was created
+     * with (see its javadoc: "the getters for this style will be meaningless"), so a read
+     * through it is always null and silently no-ops. The write goes back out through the
+     * proxy, which is the one direction it works, so the zeroed shadow reaches every state
+     * in a single call.</p>
      */
-    private static void stripBorderShadow(com.codename1.ui.plaf.Style all) {
-        com.codename1.ui.plaf.Border b = all.getBorder();
+    private void stripBorderShadowIfDocked(Component c) {
+        FloatingActionButtonLocation where = ScaffoldRenderElement.fabLocationOf(this);
+        if (where == null || where.name().indexOf("Docked") < 0) {
+            return;
+        }
+        com.codename1.ui.plaf.Border b = c.getUnselectedStyle().getBorder();
         if (b instanceof com.codename1.ui.plaf.RoundBorder) {
-            all.setBorder(((com.codename1.ui.plaf.RoundBorder) b).shadowOpacity(0));
+            c.getAllStyles().setBorder(((com.codename1.ui.plaf.RoundBorder) b).shadowOpacity(0));
         } else if (b instanceof com.codename1.ui.plaf.RoundRectBorder) {
-            all.setBorder(((com.codename1.ui.plaf.RoundRectBorder) b).shadowOpacity(0));
+            c.getAllStyles().setBorder(((com.codename1.ui.plaf.RoundRectBorder) b).shadowOpacity(0));
         }
     }
 
@@ -185,6 +279,7 @@ public class FabRenderElement extends RenderElement {
         if (c instanceof com.codename1.ui.Button) {
             ((com.codename1.ui.Button) c).setText(label == null ? "" : label);
         }
+        applyLabelFont(c, label);
         com.codename1.ui.plaf.Style all = c.getAllStyles();
         // No margin. A Codename One button carries one from its theme, and it
         // insets the surface INSIDE the box this element lays out, so a FAB
@@ -215,7 +310,7 @@ public class FabRenderElement extends RenderElement {
                     .strokeOpacity(0)
                     .shadowOpacity(0));
         }
-        stripBorderShadow(all);
+        stripBorderShadowIfDocked(c);
         com.codename1.flutter.Color bg = fab().getBackgroundColor();
         com.codename1.flutter.Color fgDefault = null;
         if (bg == null) {

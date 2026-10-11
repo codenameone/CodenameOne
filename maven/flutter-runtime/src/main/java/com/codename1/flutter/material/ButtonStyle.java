@@ -52,6 +52,7 @@ public class ButtonStyle {
     private Object alignment;
     private Object tapTargetSize;
     private Object visualDensity;
+    private Double minimumSize;
 
     /**
      * Builds a ButtonStyle from the flat overrides. Parameter order matches the
@@ -103,5 +104,22 @@ public class ButtonStyle {
     /** The requested outline shape, or null when the role's default applies. */
     public Object getShape() {
         return shape;
+    }
+
+    /**
+     * A SQUARE minimum interactive size in logical pixels, or null when the role's own
+     * default applies. Not part of {@link #styleFrom} (Flutter's own real
+     * {@code minimumSize} is a {@code Size}, width and height separately, and no caller
+     * in this runtime needs an asymmetric one) -- CupertinoButton sets it directly on the
+     * built style, after composing onto {@link ElevatedButton}/{@link TextButton}, for
+     * Flutter's {@code kMinInteractiveDimensionCupertino} (44).
+     */
+    public Double getMinimumSize() {
+        return minimumSize;
+    }
+
+    /** @see #getMinimumSize() */
+    public void minimumSize(Double v) {
+        this.minimumSize = v;
     }
 }

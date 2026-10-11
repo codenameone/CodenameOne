@@ -159,6 +159,65 @@ class CupertinoButtonThemeTest {
         assertEquals(8.0, ((BorderRadius) radius).topLeft().x(), 0.001);
     }
 
+    // ------------------------------------------------------------------
+    // Size: _kButtonPadding / _kBackgroundButtonPadding, actionTextStyle,
+    // kMinInteractiveDimensionCupertino -- see CupertinoButton's own class
+    // comment for the Flutter source each one matches.
+    // ------------------------------------------------------------------
+
+    @Test
+    void unfilledPadsSixteenOnEverySide() {
+        CupertinoButton b = new CupertinoButton();
+        b.onPressed(() -> { });
+        b.child(new Text("Button"));
+
+        ButtonStyle st = styleOf(b.build(bareContext()));
+        com.codename1.flutter.EdgeInsets pad = st.getPadding();
+        assertEquals(16.0, pad.top(), 0.001);
+        assertEquals(16.0, pad.bottom(), 0.001);
+        assertEquals(16.0, pad.left(), 0.001);
+        assertEquals(16.0, pad.right(), 0.001);
+        assertEquals(17.0, st.getTextStyle().getFontSize(), 0.001, "actionTextStyle is 17pt");
+        assertEquals(44.0, st.getMinimumSize(), 0.001, "kMinInteractiveDimensionCupertino");
+    }
+
+    @Test
+    void filledPadsSixtyFourHorizontalFourteenVertical() {
+        CupertinoButton b = CupertinoButton.filled(null, () -> { }, new Text("With Background"));
+
+        ButtonStyle st = styleOf(b.build(bareContext()));
+        com.codename1.flutter.EdgeInsets pad = st.getPadding();
+        assertEquals(14.0, pad.top(), 0.001);
+        assertEquals(14.0, pad.bottom(), 0.001);
+        assertEquals(64.0, pad.left(), 0.001);
+        assertEquals(64.0, pad.right(), 0.001);
+        assertEquals(17.0, st.getTextStyle().getFontSize(), 0.001, "actionTextStyle is 17pt");
+        assertEquals(44.0, st.getMinimumSize(), 0.001, "kMinInteractiveDimensionCupertino");
+    }
+
+    @Test
+    void anExplicitPaddingOverridesTheFlutterDefault() {
+        CupertinoButton b = new CupertinoButton();
+        b.onPressed(() -> { });
+        b.child(new Text("Button"));
+        com.codename1.flutter.EdgeInsets custom = com.codename1.flutter.EdgeInsets.all(4);
+        b.padding(custom);
+
+        ButtonStyle st = styleOf(b.build(bareContext()));
+        assertEquals(4.0, st.getPadding().top(), 0.001);
+    }
+
+    @Test
+    void anExplicitMinSizeOverridesTheFlutterDefault() {
+        CupertinoButton b = new CupertinoButton();
+        b.onPressed(() -> { });
+        b.child(new Text("Button"));
+        b.minSize(30.0);
+
+        ButtonStyle st = styleOf(b.build(bareContext()));
+        assertEquals(30.0, st.getMinimumSize(), 0.001);
+    }
+
     @Test
     void filledDisabledFillsWithQuaternarySystemFillButKeepsTheContrastText() {
         // Flutter's build(): backgroundColor != null -> foreground is ALWAYS

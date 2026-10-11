@@ -673,6 +673,22 @@ public class TextFieldRenderElement extends RenderElement {
                 all.setBgTransparency(255);
             }
         }
+        // Content padding, BEFORE border selection: the self-painting branch below
+        // returns early, and this used to sit at the very end of the method, so a
+        // field with a border class this runtime does not know (Shrine's
+        // CutCornersBorder) never reached it at all. Shrine's theme states
+        // contentPadding: EdgeInsets.symmetric(vertical: 20, horizontal: 16), and
+        // every one of its fields takes the self-painting branch -- so none of
+        // them ever got it, and both "Username" and "Password" measured about
+        // 80% of the reference's height.
+        com.codename1.flutter.EdgeInsets pad = insetsOf(resolvePadding(d, themed));
+        if (pad != null) {
+            all.setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
+            all.setPadding((int) Math.round(com.codename1.flutter.rendering.Dp.px(pad.top())),
+                    (int) Math.round(com.codename1.flutter.rendering.Dp.px(pad.bottom())),
+                    (int) Math.round(com.codename1.flutter.rendering.Dp.px(pad.left())),
+                    (int) Math.round(com.codename1.flutter.rendering.Dp.px(pad.right())));
+        }
         // Which border, through the same fallbacks Flutter uses: the field's own, then the
         // theme's enabled border, then the theme's border.
         Object stated = d.getBorder();
@@ -746,14 +762,6 @@ public class TextFieldRenderElement extends RenderElement {
         if (rest != null) {
             target.getSelectedStyle().setBorder(rest);
             target.getPressedStyle().setBorder(rest);
-        }
-        com.codename1.flutter.EdgeInsets pad = insetsOf(resolvePadding(d, themed));
-        if (pad != null) {
-            all.setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
-            all.setPadding((int) Math.round(com.codename1.flutter.rendering.Dp.px(pad.top())),
-                    (int) Math.round(com.codename1.flutter.rendering.Dp.px(pad.bottom())),
-                    (int) Math.round(com.codename1.flutter.rendering.Dp.px(pad.left())),
-                    (int) Math.round(com.codename1.flutter.rendering.Dp.px(pad.right())));
         }
     }
 

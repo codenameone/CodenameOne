@@ -119,4 +119,42 @@ class TextClampTest {
                 Double.POSITIVE_INFINITY);
         assertEquals(lines("a…"), out);
     }
+
+    // ------------------------------------------------------------------
+    // paragraphEndsAfter: a maxLines cut landing exactly on a PARAGRAPH boundary
+    // (wrap()'s own \n handling) is not marked -- nothing was clipped OUT OF the
+    // kept line itself, which is what Flutter's ellipsis means. Reply's
+    // "Package shipped!" preview is this exactly: email.message is three
+    // paragraphs, maxLines: 1 keeps only the first, and the reference shows it
+    // bare. See wrap()'s own javadoc for how the marker list is built.
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("a cut at a paragraph boundary is NOT marked")
+    void paragraphBoundaryCutIsUnmarked() {
+        List<Boolean> ends = Arrays.asList(Boolean.TRUE, Boolean.FALSE, Boolean.FALSE);
+        List<String> out = TextRenderElement.clamp(
+                lines("one", "two", "three"), Long.valueOf(1), true, TEN_PER_CHAR, 100, ends);
+        assertEquals(lines("one"), out, "a complete paragraph is shown bare, no ellipsis");
+    }
+
+    @Test
+    @DisplayName("a mid-paragraph width cut is still marked")
+    void midParagraphCutIsStillMarked() {
+        List<Boolean> ends = Arrays.asList(Boolean.FALSE, Boolean.FALSE, Boolean.FALSE);
+        List<String> out = TextRenderElement.clamp(
+                lines("one", "two", "three"), Long.valueOf(1), true, TEN_PER_CHAR, 100, ends);
+        assertEquals(1, out.size());
+        assertTrue(out.get(0).endsWith("\u2026"));
+    }
+
+    @Test
+    @DisplayName("a null paragraphEndsAfter behaves exactly like the five-arg overload")
+    void nullMarkerListMatchesTheOldOverload() {
+        List<String> withNull = TextRenderElement.clamp(
+                lines("one", "two", "three"), Long.valueOf(2), true, TEN_PER_CHAR, 100, null);
+        List<String> old = TextRenderElement.clamp(
+                lines("one", "two", "three"), Long.valueOf(2), true, TEN_PER_CHAR, 100);
+        assertEquals(old, withNull);
+    }
 }

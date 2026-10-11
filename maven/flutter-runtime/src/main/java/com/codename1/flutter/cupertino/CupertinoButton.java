@@ -56,17 +56,35 @@ import dart.runtime.Funcs;
  * {@code CupertinoColors.placeholderText} instead. Elevation is pinned to 0:
  * Flutter's CupertinoButton never casts a shadow, unlike the Material
  * {@link ElevatedButton} it is composed onto here.</p>
+ *
+ * <p>Size follows the same source, {@code _kButtonPadding}/{@code
+ * _kBackgroundButtonPadding} and {@code kMinInteractiveDimensionCupertino} (44,
+ * square), and the label's font is {@code CupertinoTheme.of(context).textTheme
+ * .actionTextStyle} (17 logical pixels) -- composed onto the Material button
+ * through {@link ButtonStyle}'s padding/textStyle/minimumSize, which a plain
+ * Material button never states and so never sees.</p>
  */
 public class CupertinoButton extends StatelessWidget {
 
     /** Flutter's default {@code CupertinoButton.borderRadius}: 8 logical pixels. */
     private static final double DEFAULT_RADIUS_LP = 8;
 
+    /** {@code _kButtonPadding}: the unfilled form's default, on every side. */
+    private static final double DEFAULT_PADDING_LP = 16;
+    /** {@code _kBackgroundButtonPadding}.horizontal. */
+    private static final double FILLED_PADDING_H_LP = 64;
+    /** {@code _kBackgroundButtonPadding}.vertical. */
+    private static final double FILLED_PADDING_V_LP = 14;
+    /** {@code kMinInteractiveDimensionCupertino}: every Cupertino control's floor. */
+    private static final double MIN_INTERACTIVE_LP = 44;
+
     private Funcs.VoidFunc0 onPressed;
     private Widget child;
     private boolean filled;
     private Color color;
     private Color disabledColor;
+    private com.codename1.flutter.EdgeInsetsGeometry padding;
+    private Double minSize;
 
     public void onPressed(Funcs.VoidFunc0 v) {
         this.onPressed = v;
@@ -77,6 +95,8 @@ public class CupertinoButton extends StatelessWidget {
     }
 
     public void padding(Object v) {
+        this.padding = v instanceof com.codename1.flutter.EdgeInsetsGeometry
+                ? (com.codename1.flutter.EdgeInsetsGeometry) v : null;
     }
 
     /** An explicit fill (filled) / tint (unfilled) overriding the theme's primaryColor. */
@@ -90,6 +110,7 @@ public class CupertinoButton extends StatelessWidget {
     }
 
     public void minSize(double v) {
+        this.minSize = v;
     }
 
     public void pressedOpacity(double v) {
@@ -118,6 +139,11 @@ public class CupertinoButton extends StatelessWidget {
     public Widget build(BuildContext context) {
         CupertinoThemeData theme = CupertinoTheme.of(context);
         boolean enabled = onPressed != null;
+        // CupertinoButton.build: Text(..., style: CupertinoTheme.of(context)
+        // .textTheme.actionTextStyle). Composed through ButtonStyle.textStyle, which
+        // ButtonRenderElement.applyLabelFont reads -- every OTHER button's style
+        // states none, so this is the only path that ever sees it.
+        com.codename1.flutter.TextStyle actionStyle = theme.textTheme().actionTextStyle();
         ButtonBase b;
         ButtonStyle style;
         if (filled) {
@@ -127,8 +153,8 @@ public class CupertinoButton extends StatelessWidget {
             Color bg = enabled ? theme.primaryColor()
                     : (disabledColor != null ? disabledColor : CupertinoColors.quaternarySystemFill);
             b = new ElevatedButton();
-            style = ElevatedButton.styleFrom(theme.primaryContrastingColor(), bg, null, 0.0, null,
-                    null, null, filledShape(), null, null, null);
+            style = ElevatedButton.styleFrom(theme.primaryContrastingColor(), bg, null, 0.0,
+                    actionStyle, filledPadding(), null, filledShape(), null, null, null);
         } else {
             // An explicit `color` on the UNFILLED constructor would, in real
             // Flutter, also paint a background (backgroundColor resolves from
@@ -138,12 +164,31 @@ public class CupertinoButton extends StatelessWidget {
             Color fg = enabled ? (color != null ? color : theme.primaryColor())
                     : CupertinoColors.placeholderText;
             b = new TextButton();
-            style = TextButton.styleFrom(fg, null, null, 0.0, null, null, null, null, null, null, null);
+            style = TextButton.styleFrom(fg, null, null, 0.0, actionStyle, plainPadding(),
+                    null, null, null, null, null);
         }
+        // kMinInteractiveDimensionCupertino: not a styleFrom() parameter (Flutter's
+        // minimumSize is per-axis and nothing else in this runtime needs one), so it
+        // goes directly on the built style -- ButtonRenderElement.performLayout reads it.
+        style.minimumSize(minSize != null ? minSize : MIN_INTERACTIVE_LP);
         b.style(style);
         b.onPressed(onPressed);
         b.child(child);
         return b;
+    }
+
+    /** The caller's own padding when it is a plain (non-directional) one, or {@code _kButtonPadding}. */
+    private com.codename1.flutter.EdgeInsets plainPadding() {
+        return padding instanceof com.codename1.flutter.EdgeInsets
+                ? (com.codename1.flutter.EdgeInsets) padding
+                : com.codename1.flutter.EdgeInsets.all(DEFAULT_PADDING_LP);
+    }
+
+    /** The caller's own padding when stated, or {@code _kBackgroundButtonPadding}. */
+    private com.codename1.flutter.EdgeInsets filledPadding() {
+        return padding instanceof com.codename1.flutter.EdgeInsets
+                ? (com.codename1.flutter.EdgeInsets) padding
+                : com.codename1.flutter.EdgeInsets.symmetric(FILLED_PADDING_H_LP, FILLED_PADDING_V_LP);
     }
 
     /** {@code BorderRadius.circular(8)}, matching the un-stated {@code borderRadius}. */

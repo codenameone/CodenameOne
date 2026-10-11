@@ -220,19 +220,20 @@ public class TextRenderElement extends RenderElement {
             return constraints.smallest();
         }
         final double spacing = l.spacingPx;
+        List<Boolean> paragraphEndsAfter = new ArrayList<Boolean>();
         List<String> lines = wrap(data(), new Funcs.Func1<String, Double>() {
             @Override
             public Double call(String s) {
                 return spacedWidth(f, s, spacing);
             }
-        }, constraints.maxWidth());
+        }, constraints.maxWidth(), paragraphEndsAfter);
         lines = clamp(lines, effectiveMaxLines(), ellipsize(),
                 new Funcs.Func1<String, Double>() {
                     @Override
                     public Double call(String s) {
                         return spacedWidth(f, s, spacing);
                     }
-                }, constraints.maxWidth());
+                }, constraints.maxWidth(), paragraphEndsAfter);
         if (!isDryPass()) {
             // Only a real pass may hand the painter its lines; see isDryPass().
             l.lines = lines;
@@ -273,9 +274,35 @@ public class TextRenderElement extends RenderElement {
      * rendered its whole body instead, which does not look like a bug so much
      * as a different design: the Reply study's inbox showed every message in
      * full and pushed the rest of the list off the screen.</p>
+     *
+     * <p>Test-only overload: no {@code paragraphEndsAfter}, so a cut always marks
+     * the kept line, matching every existing caller and every test in
+     * {@code TextClampTest}, none of which wraps a multi-paragraph source.</p>
      */
     static List<String> clamp(List<String> lines, Long maxLines, boolean ellipsis,
                               Funcs.Func1<String, Double> measure, double maxWidth) {
+        return clamp(lines, maxLines, ellipsis, measure, maxWidth, null);
+    }
+
+    /**
+     * {@link #clamp(List, Long, boolean, Funcs.Func1, double)}, additionally told
+     * -- by {@code paragraphEndsAfter}, {@link #wrap}'s own parallel output --
+     * which kept lines end a PARAGRAPH (an explicit {@code \n} in the source)
+     * rather than being cut mid-line by the width.
+     *
+     * <p>Flutter's {@code TextOverflow.ellipsis} marks text CLIPPED OUT OF the
+     * last visible line; it does not retroactively flag a line that ended
+     * cleanly on its own just because a LATER paragraph never got shown. Reply's
+     * "Package shipped!" preview is exactly this: {@code email.message} is three
+     * paragraphs ("Cucumber Mask Facial has shipped.\n\n...", ...), the preview
+     * states {@code maxLines: 1}, and the reference shows the first paragraph
+     * bare -- no "\u2026" -- because nothing was cut OUT OF it. This runtime added
+     * the marker unconditionally whenever ANY line was discarded, so a preview
+     * whose first paragraph happened to fit on its own still grew one.</p>
+     */
+    static List<String> clamp(List<String> lines, Long maxLines, boolean ellipsis,
+                              Funcs.Func1<String, Double> measure, double maxWidth,
+                              List<Boolean> paragraphEndsAfter) {
         if (maxLines == null || maxLines.longValue() <= 0
                 || lines.size() <= maxLines.longValue()) {
             return lines;
@@ -283,6 +310,10 @@ public class TextRenderElement extends RenderElement {
         int keep = (int) maxLines.longValue();
         List<String> out = new ArrayList<String>(lines.subList(0, keep));
         if (!ellipsis) {
+            return out;
+        }
+        if (paragraphEndsAfter != null && keep - 1 < paragraphEndsAfter.size()
+                && Boolean.TRUE.equals(paragraphEndsAfter.get(keep - 1))) {
             return out;
         }
         // The last kept line has to make room for the ellipsis, and the text
@@ -385,41 +416,70 @@ public class TextRenderElement extends RenderElement {
      * wider than the line is hard-broken at the character level. Embedded
      * {@code \n} always breaks. An unbounded {@code maxWidth} yields the
      * paragraphs unwrapped.
+     *
+     * <p>Test-only overload: no {@code paragraphEndsAfter} out-list, matching
+     * every existing caller and every test in {@code TextWrapTest}.</p>
      */
     public static List<String> wrap(String text, Funcs.Func1<String, Double> measure, double maxWidth) {
+        return wrap(text, measure, maxWidth, null);
+    }
+
+    /**
+     * {@link #wrap(String, Funcs.Func1, double)}, additionally appending to
+     * {@code paragraphEndsAfter} -- when it is non-null -- one entry per
+     * returned line: {@code TRUE} when an explicit {@code \n} in the source
+     * follows that line (a complete paragraph, not a mid-line width cut) AND
+     * more text follows it; {@code FALSE} otherwise (a soft-wrapped
+     * continuation of the SAME paragraph, or the very last line of the text).
+     * {@link #clamp(List, Long, boolean, Funcs.Func1, double, List)} reads it to
+     * tell a paragraph boundary a {@code maxLines} limit simply never reached
+     * apart from a line genuinely cut short by the width.
+     */
+    static List<String> wrap(String text, Funcs.Func1<String, Double> measure, double maxWidth,
+            List<Boolean> paragraphEndsAfter) {
         List<String> out = new ArrayList<String>();
         if (text == null) {
             text = "";
         }
-        for (String paragraph : split(text, '\n')) {
+        List<String> paragraphs = split(text, '\n');
+        for (int pi = 0; pi < paragraphs.size(); pi++) {
+            String paragraph = paragraphs.get(pi);
+            int before = out.size();
             if (maxWidth == Double.POSITIVE_INFINITY || measure.call(paragraph) <= maxWidth) {
                 out.add(paragraph);
-                continue;
-            }
-            StringBuilder line = new StringBuilder();
-            for (String word : split(paragraph, ' ')) {
-                String candidate = line.length() == 0 ? word : line + " " + word;
-                if (measure.call(candidate) <= maxWidth || line.length() == 0 && word.length() == 0) {
-                    line.setLength(0);
-                    line.append(candidate);
-                    continue;
-                }
-                if (line.length() > 0) {
-                    out.add(line.toString());
-                    line.setLength(0);
-                }
-                // the word alone: hard-break it if even alone it overflows
-                while (measure.call(word) > maxWidth && word.length() > 1) {
-                    int cut = word.length() - 1;
-                    while (cut > 1 && measure.call(word.substring(0, cut)) > maxWidth) {
-                        cut--;
+            } else {
+                StringBuilder line = new StringBuilder();
+                for (String word : split(paragraph, ' ')) {
+                    String candidate = line.length() == 0 ? word : line + " " + word;
+                    if (measure.call(candidate) <= maxWidth || line.length() == 0 && word.length() == 0) {
+                        line.setLength(0);
+                        line.append(candidate);
+                        continue;
                     }
-                    out.add(word.substring(0, cut));
-                    word = word.substring(cut);
+                    if (line.length() > 0) {
+                        out.add(line.toString());
+                        line.setLength(0);
+                    }
+                    // the word alone: hard-break it if even alone it overflows
+                    while (measure.call(word) > maxWidth && word.length() > 1) {
+                        int cut = word.length() - 1;
+                        while (cut > 1 && measure.call(word.substring(0, cut)) > maxWidth) {
+                            cut--;
+                        }
+                        out.add(word.substring(0, cut));
+                        word = word.substring(cut);
+                    }
+                    line.append(word);
                 }
-                line.append(word);
+                out.add(line.toString());
             }
-            out.add(line.toString());
+            if (paragraphEndsAfter != null) {
+                boolean moreFollows = pi < paragraphs.size() - 1;
+                for (int i = before; i < out.size() - 1; i++) {
+                    paragraphEndsAfter.add(Boolean.FALSE);
+                }
+                paragraphEndsAfter.add(moreFollows ? Boolean.TRUE : Boolean.FALSE);
+            }
         }
         return out;
     }

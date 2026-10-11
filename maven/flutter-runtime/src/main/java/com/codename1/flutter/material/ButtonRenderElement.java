@@ -196,6 +196,22 @@ public class ButtonRenderElement extends RenderElement {
      * warning), or null when the content is an icon or absent.
      */
     /// The colour the consumed Text asked for, or null when it asked for none.
+    ///
+    /// NOT consulted for family/size/weight/letterSpacing -- a button label is
+    /// always painted in the "Flutter*Button" UIID's own baked-in font. Flutter
+    /// resolves it from `ButtonStyle.textStyle ?? theme.textTheme.labelLarge`,
+    /// which Shrine customises (GoogleFonts.rubikTextTheme, labelLarge at
+    /// fontWeight.w500 with a small positive letterSpacing) -- CANCEL and NEXT
+    /// both leave their own Text.style with no font of its own, so they fall
+    /// through to it and come out in Rubik Medium with visible tracking, where
+    /// this runtime paints the UIID's plain default. Reproducing that needs an
+    /// ambient Theme.textTheme -> button-label font resolution this runtime does
+    /// not have (the font-weight half could follow FabRenderElement.applyLabelFont's
+    /// FontResolver chain; CN1's Button has no letterSpacing of its own the way
+    /// WrappedLabel does -- see TextRenderElement -- so that half needs either a
+    /// custom-painted label or a Button extension, not a style tweak), and it is
+    /// an APP-WIDE resolution path with no screenshot coverage beyond Shrine to
+    /// verify it against, so it is left alone here rather than guessed at.
     private com.codename1.flutter.Color consumedLabelColor() {
         Widget c = contentWidget();
         if (!(c instanceof Text)) {
@@ -332,6 +348,7 @@ public class ButtonRenderElement extends RenderElement {
         String label = consumedLabel();
         char glyph = consumedIconChar();
         b.setText(label == null ? "" : label);
+        applyLabelFont(b);
         if (glyph != 0) {
             try {
                 FontImage.setMaterialIcon(b, glyph, Dp.mm(iconSizeLp()));
@@ -372,6 +389,56 @@ public class ButtonRenderElement extends RenderElement {
         return st == null ? null : st.getForegroundColor();
     }
 
+    /**
+     * Sizes the label from the widget's OWN {@code ButtonStyle.textStyle}, the same
+     * FontResolver chain {@code FabRenderElement.applyLabelFont} uses for a FAB's label.
+     *
+     * <p>{@code ButtonStyle.textStyle} was held opaquely and never read.
+     * CupertinoButton is the only caller that ever states one -- Flutter's
+     * {@code CupertinoButton.build} paints its label in
+     * {@code CupertinoTheme.of(context).textTheme.actionTextStyle} (17 logical pixels,
+     * packages/flutter/lib/src/cupertino/button.dart), composed here onto
+     * {@link TextButton}/{@link ElevatedButton} along with the colour and shape --
+     * so every OTHER button, whose style states no textStyle of its own, is untouched
+     * and keeps the "Flutter*Button" UIID's own baked-in font exactly as before.</p>
+     */
+    private void applyLabelFont(Button b) {
+        Widget w = widget();
+        ButtonStyle st = w instanceof ButtonBase ? ((ButtonBase) w).getStyle() : null;
+        com.codename1.flutter.TextStyle ts = st == null ? null : st.getTextStyle();
+        if (ts == null || ts.getFontSize() == null) {
+            return;
+        }
+        com.codename1.flutter.FontWeight weight = ts.getFontWeight();
+        com.codename1.ui.Font named = com.codename1.flutter.fonts.FontResolver.resolve(
+                ts.getFontFamily(), weight, false);
+        // A resolved face already carries its weight; synthesising bold on top of a
+        // bold file doubles it, the same guard TextRenderElement applies.
+        boolean weighted = named != null;
+        com.codename1.ui.Font base = named;
+        if (base == null) {
+            base = com.codename1.flutter.fonts.FontResolver.platformFace(weight, false);
+            weighted = base != null;
+        }
+        if (base == null) {
+            base = b.getUnselectedStyle().getFont();
+        }
+        if (base == null) {
+            base = com.codename1.ui.Font.getDefaultFont();
+        }
+        if (base == null) {
+            return;
+        }
+        float sizePx = (float) Dp.px(ts.getFontSize().doubleValue());
+        int fontStyle = !weighted && weight != null && weight.isBold()
+                ? com.codename1.ui.Font.STYLE_BOLD : com.codename1.ui.Font.STYLE_PLAIN;
+        try {
+            b.getAllStyles().setFont(base.derive(sizePx, fontStyle));
+        } catch (Exception err) {
+            // a font that cannot derive keeps whatever size the UIID carries
+        }
+    }
+
     private void style(Button b) {
         try {
             ColorScheme cs = Theme.of(this).colorScheme();
@@ -404,7 +471,8 @@ public class ButtonRenderElement extends RenderElement {
                 // branch and states both explicitly, kept coming out Material purple
                 // instead of its CupertinoTheme fill.
                 ButtonStyle st = ((ButtonBase) w).getStyle();
-                all.setPadding(vpad, vpad, hpad, hpad);
+                int[] elevatedPad = resolvedPadding(st, vpad, hpad);
+                all.setPadding(elevatedPad[0], elevatedPad[1], elevatedPad[2], elevatedPad[3]);
                 all.setFgColor(styled(st == null ? null : st.getForegroundColor(), cs.primary()).rgb());
                 RoundBorder border = RoundBorder.create()
                         .rectangle(true)
@@ -426,7 +494,8 @@ public class ButtonRenderElement extends RenderElement {
                 clearBackground(all);
             } else if (w instanceof TextButton) {
                 ButtonStyle st = ((ButtonBase) w).getStyle();
-                all.setPadding(vpad, vpad, hpad / 2, hpad / 2);
+                int[] textPad = resolvedPadding(st, vpad, hpad / 2);
+                all.setPadding(textPad[0], textPad[1], textPad[2], textPad[3]);
                 all.setFgColor(styled(st == null ? null : st.getForegroundColor(), cs.primary()).rgb());
                 all.setBorder(Border.createEmpty());
                 clearBackground(all);
@@ -518,6 +587,35 @@ public class ButtonRenderElement extends RenderElement {
         return st != null && st.getElevation() != null && st.getElevation().doubleValue() == 0.0;
     }
 
+    /**
+     * {@code st.getPadding()} in device pixels, as {top, bottom, left, right} -- or the
+     * role's own {@code defaultV}/{@code defaultH} (full value on every side, the same
+     * convention every un-shaped branch already used) when the style states none.
+     *
+     * <p>{@code ButtonStyle.padding} was held opaquely and never read, so CupertinoButton
+     * -- the only caller that ever states one, Material's own {@code styleFrom} call
+     * sites in this gallery never do -- composed onto a Material button role's capsule
+     * padding (24lp/10lp, or TextButton's halved 12lp/10lp) instead of Flutter's own
+     * {@code _kButtonPadding} (16 on every side) / {@code _kBackgroundButtonPadding} (64
+     * horizontal, 14 vertical). An explicit padding REPLACES the role's own outright --
+     * TextButton's horizontal halving is a Material convention for an UNSTATED padding,
+     * not something a stated one is still subject to.</p>
+     *
+     * <p>Only the top/left are read: every padding this runtime actually produces
+     * (the Material role defaults above, Cupertino's two) is symmetric per axis, so a
+     * truly asymmetric {@code EdgeInsets} is approximated rather than widening every
+     * caller to four separate values for a case that does not arise here.</p>
+     */
+    private static int[] resolvedPadding(ButtonStyle st, int defaultV, int defaultH) {
+        com.codename1.flutter.EdgeInsets p = st == null ? null : st.getPadding();
+        if (p == null) {
+            return new int[] {defaultV, defaultV, defaultH, defaultH};
+        }
+        int v = (int) Math.round(Dp.px(p.top()));
+        int h = (int) Math.round(Dp.px(p.left()));
+        return new int[] {v, v, h, h};
+    }
+
     /** Flutter's {@code kMinInteractiveDimension}. */
     private static final double MIN_INTERACTIVE_LP = 48;
 
@@ -599,9 +697,21 @@ public class ButtonRenderElement extends RenderElement {
             w = Math.max(w, Dp.px(MIN_INTERACTIVE_LP));
             h = Math.max(h, Dp.px(MIN_INTERACTIVE_LP));
         } else {
-            // Material 3's button minimum is 64x40, not the 36 of the 2018 spec.
-            w = Math.max(w, Dp.px(64));
-            h = Math.max(h, Dp.px(40));
+            // A style that names its OWN minimum size wins over the role's --
+            // CupertinoButton pins kMinInteractiveDimensionCupertino (44, square),
+            // not Material 3's 64x40. Nothing else in this runtime states one, so
+            // every other button keeps the role default exactly as before.
+            Widget w0 = widget();
+            ButtonStyle st = w0 instanceof ButtonBase ? ((ButtonBase) w0).getStyle() : null;
+            Double minSquare = st == null ? null : st.getMinimumSize();
+            if (minSquare != null) {
+                w = Math.max(w, Dp.px(minSquare.doubleValue()));
+                h = Math.max(h, Dp.px(minSquare.doubleValue()));
+            } else {
+                // Material 3's button minimum is 64x40, not the 36 of the 2018 spec.
+                w = Math.max(w, Dp.px(64));
+                h = Math.max(h, Dp.px(40));
+            }
         }
         return constraints.constrain(new Size(w, h));
     }
@@ -639,14 +749,16 @@ public class ButtonRenderElement extends RenderElement {
      * Paints the button with the radius its style asked for, in its role's
      * colours -- overridden by the style's own foreground/background when it
      * names one, the same precedence {@link #style} gives the un-shaped
-     * branches. {@code CupertinoButton.filled} is the caller: it is the only
-     * widget in this runtime that states a shape, and the shape-named path
-     * used to repaint it straight back to Material purple regardless.
+     * branches. Two callers state a shape: {@code CupertinoButton.filled}
+     * (elevation pinned to 0 -- Flutter's CupertinoButton never casts a
+     * shadow) and Shrine's login buttons, whose {@code BeveledRectangleBorder}
+     * is what routes them here in the first place.
      */
     private void applyRequestedShape(Button b, com.codename1.ui.plaf.Style all,
             ColorScheme cs, Widget w, double radiusLp, int vpad, int hpad) {
-        all.setPadding(vpad, vpad, hpad, hpad);
         ButtonStyle st = w instanceof ButtonBase ? ((ButtonBase) w).getStyle() : null;
+        int[] shapedPad = resolvedPadding(st, vpad, hpad);
+        all.setPadding(shapedPad[0], shapedPad[1], shapedPad[2], shapedPad[3]);
         com.codename1.flutter.Color fg = styled(st == null ? null : st.getForegroundColor(), cs.primary());
         com.codename1.ui.plaf.RoundRectBorder border =
                 com.codename1.ui.plaf.RoundRectBorder.create()
@@ -664,6 +776,18 @@ public class ButtonRenderElement extends RenderElement {
             all.setFgColor(fg.rgb());
             all.setBgColor(styled(st == null ? null : st.getBackgroundColor(), cs.surfaceContainerLow()).rgb());
             all.setBgTransparency(255);
+            // Elevation, the same rule #style's own un-shaped ElevatedButton branch
+            // applies: Flutter resolves each ButtonStyle property independently
+            // (style ?? theme ?? defaults), so a style that names a SHAPE but no
+            // elevation of its own still falls through to the default (non-zero)
+            // rather than losing its shadow. Shrine's login states both:
+            // ElevatedButton.styleFrom(elevation: 8, shape: BeveledRectangleBorder(...))
+            // -- RoundRectBorder defaults shadowOpacity to 0, so leaving this unset
+            // (as the shape-named path always had) painted its "NEXT" button flat
+            // where the reference casts a clear drop shadow.
+            if (!isElevationZero(st)) {
+                border = border.shadowOpacity(40);
+            }
         }
         all.setBorder(border);
     }
