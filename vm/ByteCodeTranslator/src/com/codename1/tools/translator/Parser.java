@@ -489,6 +489,10 @@ public class Parser extends ClassVisitor {
         LocalReceiverTypes.clear();
         cn1SubclassIndex = null;
         cn1SubclassIndexSize = -1;
+        // A later translation in this process can parse exactly as many classes.
+        calleeClassIndex = null;
+        calleeClassIndexSource = null;
+        calleeClassIndexSize = -1;
         nativeSources = null;
         classes.clear();
         // classes is cleared in place (same List reference), so the name index's
@@ -3140,24 +3144,98 @@ public class Parser extends ClassVisitor {
     /// Do all of these callees keep `this` to themselves? The precise form of the
     /// receiver check: only the methods a site ACTUALLY invokes on the tracked object
     /// matter, not every method the class happens to declare.
-    static boolean calleesKeepThis(List<String> calls, Map<String, Boolean> memo) {
+    ///
+    /// `allocated` is the class the tracked object was created as. The object's class
+    /// is known exactly -- the walk follows the result of one NEW -- and that is the
+    /// class a virtual call dispatches on, whatever type the call site names.
+    static boolean calleesKeepThis(String allocated, List<String> calls, Map<String, Boolean> memo) {
         for (int i = 0; i < calls.size(); i++) {
-            String key = calls.get(i);
-            Boolean cached = memo.get(key);
-            if (cached == null) {
-                cached = Boolean.valueOf(calleeIsSafe(key));
-                memo.put(key, cached);
-            }
-            if (!cached.booleanValue()) {
+            if (!calleeIsSafe(allocated, calls.get(i), memo)) {
                 return false;
             }
         }
         return true;
     }
 
-    /// owner.name+desc -> does that one method keep `this`? A callee that cannot be
-    /// resolved in this closed world answers NO: an unknown body is an unchecked body.
-    static boolean calleeIsSafe(String key) {
+    /// Mangled class name -> class, for the closed world as it stands. Rebuilt when the
+    /// list is replaced or changes size; resolving a callee used to mangle every class
+    /// name once per question.
+    private static Map<String, ByteCodeClass> calleeClassIndex;
+    private static List<ByteCodeClass> calleeClassIndexSource;
+    private static int calleeClassIndexSize = -1;
+
+    private static ByteCodeClass calleeClass(String mangled) {
+        if (calleeClassIndex == null || calleeClassIndexSource != classes
+                || calleeClassIndexSize != classes.size()) {
+            Map<String, ByteCodeClass> idx = new HashMap<String, ByteCodeClass>();
+            for (ByteCodeClass c : classes) {
+                String k = IteratorEscape.mangle(c.getClsName());
+                // The first one wins, as it did when this was a scan of the list.
+                if (!idx.containsKey(k)) {
+                    idx.put(k, c);
+                }
+            }
+            calleeClassIndex = idx;
+            calleeClassIndexSource = classes;
+            calleeClassIndexSize = classes.size();
+        }
+        return calleeClassIndex.get(mangled);
+    }
+
+    private static BytecodeMethod declaredMethod(ByteCodeClass c, String name, String desc) {
+        for (BytecodeMethod m : c.getMethods()) {
+            if (m.getMethodName().equals(name) && desc.equals(m.getDesc())) {
+                return m;
+            }
+        }
+        return null;
+    }
+
+    /// owner.name+desc -> does the method that call RUNS keep `this`? A callee that
+    /// cannot be resolved in this closed world answers NO: an unknown body is an
+    /// unchecked body.
+    ///
+    /// THREE WAYS THIS USED TO ANSWER YES FOR A METHOD THAT PUBLISHES `this`, each of
+    /// them "the body was never looked at":
+    ///
+    ///   1. A NATIVE callee. It has no instructions, so the walk over them found no
+    ///      escape and said SAFE. `Thread.start()` is native and hands its receiver to
+    ///      a new thread: `Thread t = new Thread(r); t.start();` was therefore proved
+    ///      frame-local and the Thread retired at frame exit, while it was running.
+    ///      The collector then swept the Thread, its finalizer released the thread's
+    ///      native record and shadow stack, and the next root scan of that live thread
+    ///      read unmapped memory. What a native does with its receiver cannot be read
+    ///      from bytecode, so it answers NO.
+    ///   2. An ABSTRACT callee, for the same reason: `Runnable r = new Task(); r.run()`
+    ///      names Runnable.run, which has no body, while Task.run is what executes. A
+    ///      virtual call is resolved from the allocated class upwards instead, and so
+    ///      is an override of a method the call site names in a superclass.
+    ///   3. A callee that calls ANOTHER method on `this`. The walk allows the tracked
+    ///      value as a receiver "because that callee is checked on its own", and for a
+    ///      callee's own callees nothing did. `void begin() { register(); }` was SAFE
+    ///      whatever register() did. The check is now the whole closure.
+    ///
+    /// A cycle in that closure is assumed safe while it is being walked, which is sound
+    /// because the answer is a conjunction over everything reachable: one unsafe
+    /// method anywhere fails the question that was asked, and `memo` lives for that
+    /// one question only.
+    static boolean calleeIsSafe(String allocated, String key, Map<String, Boolean> memo) {
+        Boolean cached = memo.get(key);
+        if (cached != null) {
+            return cached.booleanValue();
+        }
+        memo.put(key, Boolean.TRUE);
+        boolean r = calleeIsSafeUncached(allocated, key, memo);
+        memo.put(key, Boolean.valueOf(r));
+        return r;
+    }
+
+    private static boolean calleeIsSafeUncached(String allocated, String key,
+            Map<String, Boolean> memo) {
+        boolean special = key.startsWith(IteratorEscape.SPECIAL_CALL);
+        if (special) {
+            key = key.substring(IteratorEscape.SPECIAL_CALL.length());
+        }
         int dot = key.indexOf('.');
         if (dot < 0) {
             return false;
@@ -3177,18 +3255,38 @@ public class Parser extends ClassVisitor {
             name = "__INIT__";
         }
         String desc = rest.substring(paren);
-        for (ByteCodeClass c : classes) {
-            if (!IteratorEscape.mangle(c.getClsName()).equals(owner)) {
-                continue;
-            }
-            for (BytecodeMethod m : c.getMethods()) {
-                if (m.getMethodName().equals(name) && desc.equals(m.getDesc())) {
-                    return IteratorEscape.thisEscapes(m) == IteratorEscape.SAFE;
-                }
-            }
-            return false;   // class found, method not -- inherited or synthetic
+        ByteCodeClass ownerCls = calleeClass(owner);
+        if (ownerCls == null) {
+            return false;       // not in this closed world
         }
-        return false;       // not in this closed world
+        BytecodeMethod target = declaredMethod(ownerCls, name, desc);
+        // A private method is never overridden, and newer class files call one with
+        // INVOKEVIRTUAL; a subclass may declare an unrelated method of the same name.
+        if (!special && (target == null || !target.isPrivate())) {
+            target = null;
+            ByteCodeClass c = calleeClass(IteratorEscape.mangle(allocated));
+            // Bounded: a malformed hierarchy must not hang the build.
+            for (int depth = 0; c != null && depth < 64; depth++) {
+                target = declaredMethod(c, name, desc);
+                if (target != null) {
+                    break;
+                }
+                String base = c.getBaseClass();
+                c = base == null ? null : calleeClass(IteratorEscape.mangle(base));
+            }
+        }
+        if (target == null) {
+            return false;       // inherited past what is known here, or synthetic
+        }
+        if (target.isNative() || target.isAbstract()) {
+            return false;       // no body to check
+        }
+        if (IteratorEscape.thisEscapes(target) != IteratorEscape.SAFE) {
+            return false;
+        }
+        // Copied before recursing: the list belongs to the walk that just ran.
+        List<String> nested = new ArrayList<String>(IteratorEscape.receiverCalls);
+        return calleesKeepThis(allocated, nested, memo);
     }
 
     static void iteratorStackCensus() {

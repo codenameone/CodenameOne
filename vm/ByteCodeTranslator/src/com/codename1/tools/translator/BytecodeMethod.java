@@ -4708,7 +4708,8 @@ public class BytecodeMethod implements SignatureSet {
             }
             java.util.List<String> calls =
                     new java.util.ArrayList<String>(IteratorEscape.receiverCalls);
-            if (!Parser.calleesKeepThis(calls, new java.util.HashMap<String, Boolean>())) {
+            if (!Parser.calleesKeepThis(ti.getTypeName(), calls,
+                    new java.util.HashMap<String, Boolean>())) {
                 continue;
             }
             if (retireCandidates == null) {
@@ -4802,7 +4803,8 @@ public class BytecodeMethod implements SignatureSet {
             }
             java.util.List<String> calls =
                     new java.util.ArrayList<String>(IteratorEscape.receiverCalls);
-            if (!Parser.calleesKeepThis(calls, new java.util.HashMap<String, Boolean>())) {
+            if (!Parser.calleesKeepThis(ti.getTypeName(), calls,
+                    new java.util.HashMap<String, Boolean>())) {
                 continue;
             }
             if (frameless) {

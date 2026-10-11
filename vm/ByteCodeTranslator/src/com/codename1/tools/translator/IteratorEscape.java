@@ -75,8 +75,14 @@ class IteratorEscape {
 
     /// Callees invoked ON the tracked reference during the last walk, as
     /// owner.name+desc. Valid only immediately after a walk, exactly like lastReason.
-    /// A site is only retirable if none of these leaks `this`.
+    /// A site is only retirable if none of these leaks `this`. An entry that starts
+    /// with SPECIAL_CALL was an INVOKESPECIAL, whose target is the named method itself
+    /// rather than whatever the receiver's class overrides it with.
     static final java.util.List<String> receiverCalls = new java.util.ArrayList<String>();
+
+    /// Prefix of a receiverCalls entry recorded from an INVOKESPECIAL. Not a character
+    /// an internal class name can start with.
+    static final String SPECIAL_CALL = "!";
 
     /// The local the last walk followed, or -1 if the value never reached one. Valid
     /// only immediately after a walk. Frame-exit retirement needs it: the object to
@@ -92,6 +98,15 @@ class IteratorEscape {
     static int thisEscapes(BytecodeMethod m) {
         if (m.isStatic()) {
             return SAFE;   // no `this` to leak
+        }
+        if (m.isNative()) {
+            // No instructions is not "no escape". A native can publish its receiver --
+            // Thread.start() hands it to another thread -- and nothing here can read
+            // what it does, so the walk below would answer SAFE for an empty body.
+            lastReason = "native method";
+            receiverCalls.clear();
+            lastTrackedLocal = -1;
+            return UNKNOWN;
         }
         return walk(m, true, null, true);
     }
@@ -436,7 +451,12 @@ class IteratorEscape {
                 if (hasReceiver) {
                     int ridx = sp - 1 - argCount;
                     if (ridx >= 0 && stack[ridx]) {
-                        receiverCalls.add(inv.getOwner() + "." + inv.getName() + inv.getDesc());
+                        // INVOKESPECIAL names its target exactly (a constructor, a
+                        // super call); every other receiver call dispatches on the
+                        // object's own class. The marker keeps that apart for
+                        // Parser.calleeIsSafe, which must check the method that RUNS.
+                        receiverCalls.add((op == Opcodes.INVOKESPECIAL ? SPECIAL_CALL : "")
+                                + inv.getOwner() + "." + inv.getName() + inv.getDesc());
                     }
                 }
                 sp = Math.max(0, sp - argCount - (hasReceiver ? 1 : 0));
