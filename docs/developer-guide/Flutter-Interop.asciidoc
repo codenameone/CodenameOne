@@ -22,13 +22,13 @@ build, and once by Codename One. Both builds are measured on the same machine,
 in interleaved rounds, on every change to the project. Lower is better
 throughout.
 
-image::img/flutter-bench-install.svg[Installed size of the Flutter Gallery, Codename One against Flutter, per platform]
+image::img/flutter-bench-install.svg["Installed size of the Flutter Gallery per platform: Codename One against Flutter"]
 
-image::img/flutter-bench-code.svg[Executable code of the Flutter Gallery, Codename One against Flutter, per platform]
+image::img/flutter-bench-code.svg["Executable code of the Flutter Gallery per platform: Codename One against Flutter"]
 
-image::img/flutter-bench-cold-start.svg[Cold start to the first frame, Codename One against Flutter, per platform]
+image::img/flutter-bench-cold-start.svg["Cold start to the first frame per platform: Codename One against Flutter"]
 
-image::img/flutter-bench-idle-memory.svg[Memory at rest, Codename One against Flutter, per platform]
+image::img/flutter-bench-idle-memory.svg["Memory at rest per platform: Codename One against Flutter"]
 
 The comparison is tilted *toward* Flutter. The application is Flutter's own
 showcase, written by the Flutter team in Flutter's idioms, and Codename One
