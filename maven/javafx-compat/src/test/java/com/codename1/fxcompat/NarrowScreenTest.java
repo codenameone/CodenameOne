@@ -225,6 +225,37 @@ public class NarrowScreenTest {
         assertEquals(wide, plain.getWidth(), 1);
     }
 
+    /// A flow of tiles is as tall as its width makes it. Asked how tall it
+    /// has to be with no width named, it answers for the width it would
+    /// like -- one row -- and a scene judged by that fits any screen. In
+    /// the screen's width the tiles are many rows, taller than the pane,
+    /// and the pane that centres them put the first rows above its top
+    /// and the last below its bottom, neither in reach. The minimum is
+    /// asked for the width the scene gets, and the pane scrolls.
+    @Test
+    public void aFlowTallerThanTheFormInItsWidthStartsAtTheTopAndScrolls() {
+        int w = Display.getInstance().getDisplayWidth();
+        int h = Display.getInstance().getDisplayHeight();
+        javafx.scene.layout.FlowPane flow = new javafx.scene.layout.FlowPane();
+        // One row at the width it would like.
+        flow.setPrefWrapLength(100000);
+        int tile = w / 3;
+        int tiles = 3 * (h / tile + 2);
+        for (int i = 0; i < tiles; i++) {
+            flow.getChildren().add(new Rectangle(tile - 1, tile));
+        }
+        javafx.scene.layout.StackPane root = new javafx.scene.layout.StackPane(flow);
+        assertTrue(root.minHeight(-1) < h);
+        Container content = shown(root);
+        assertTrue("taller than the form in its width", root.minHeight(content.getWidth()) > content.getHeight());
+        assertFalse(content.isScrollableX());
+        assertTrue(content.isScrollableY());
+        assertEquals(content.getWidth(), root.getWidth(), 0.01);
+        assertEquals(root.minHeight(content.getWidth()), root.getHeight(), 1);
+        assertEquals("the first row is at the top", 0, flow.getBoundsInParent().getMinY(), 0.01);
+        assertTrue(content.getScrollDimension().getHeight() > content.getHeight());
+    }
+
     /// To learn whether a scene has to scroll it is laid out in the pane
     /// first, and then at its minimum. Done on every pass, that moved
     /// every node twice each time, each move asked for another pass, and

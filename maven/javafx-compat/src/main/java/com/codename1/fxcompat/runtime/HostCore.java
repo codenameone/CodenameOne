@@ -33,6 +33,7 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.Layout;
 
 import javafx.geometry.Bounds;
+import javafx.geometry.Orientation;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 
@@ -105,7 +106,7 @@ final class HostCore {
             if (w <= 0 || h <= 0) {
                 return;
             }
-            Dimension least = least();
+            Dimension least = least(w, h);
             boolean overX = least.getWidth() > w;
             boolean overY = least.getHeight() > h;
             if (triedWidth == w && triedHeight == h && triedLeastWidth == least.getWidth()
@@ -164,14 +165,29 @@ final class HostCore {
                 return new Dimension(0, 0);
             }
             Dimension preferred = rootPeer.getPreferredSize();
-            Dimension least = least();
+            // What scrolls is what was laid out: the minimum for the size
+            // the pane has, once it has one, and before that for the size
+            // the scene would like.
+            boolean sized = parent.getWidth() > 0 && parent.getHeight() > 0;
+            Dimension least = least(sized ? parent.getWidth() : preferred.getWidth(),
+                    sized ? parent.getHeight() : preferred.getHeight());
             return new Dimension(Math.max(preferred.getWidth(), least.getWidth()),
                     Math.max(preferred.getHeight(), least.getHeight()));
         }
     }
 
-    /// The smallest the scene can be laid out at, in device pixels.
-    private Dimension least() {
+    /// The smallest the scene can be laid out at in a pane of the given
+    /// size, in device pixels.
+    ///
+    /// A root with a content bias has no one minimum: how tall a flow of
+    /// tiles has to be depends on how wide it is. Asked with no width it
+    /// answers for the width it would like, a desktop window's, where the
+    /// tiles are one row; in a phone's width they are four, and the scene
+    /// that "fits" is laid out past the top and the bottom of the pane with
+    /// neither end in reach. So the minimum along the biased axis is asked
+    /// for the length the root gets along the other: the pane's, or the
+    /// root's own minimum where that is larger and the pane scrolls.
+    private Dimension least(int paneWidth, int paneHeight) {
         Parent root = scene == null ? null : scene.getRoot();
         if (root == null) {
             return new Dimension(0, 0);
@@ -179,8 +195,14 @@ final class HostCore {
         double w;
         double h;
         if (root.isResizable()) {
-            w = root.minWidth(-1);
-            h = root.minHeight(-1);
+            Orientation bias = root.getContentBias();
+            if (bias == Orientation.VERTICAL) {
+                h = root.minHeight(-1);
+                w = root.minWidth(Math.max(h, Units.toLogical(paneHeight)));
+            } else {
+                w = root.minWidth(-1);
+                h = root.minHeight(bias == Orientation.HORIZONTAL ? Math.max(w, Units.toLogical(paneWidth)) : -1);
+            }
         } else {
             Bounds bounds = root.getLayoutBounds();
             w = bounds.getMaxX();
