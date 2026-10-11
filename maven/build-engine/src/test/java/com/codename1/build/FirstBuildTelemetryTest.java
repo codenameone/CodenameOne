@@ -80,6 +80,16 @@ class FirstBuildTelemetryTest {
     }
 
     @Test
+    void aCiServerIsNotADeveloper() {
+        assertNull(FirstBuildTelemetry.start(URL, ID, "run", env("CI", "true"), props()));
+        assertNull(FirstBuildTelemetry.start(URL, ID, "run", env("GITHUB_ACTIONS", "true"), props()));
+        assertNull(FirstBuildTelemetry.start(URL, ID, "run", env("TF_BUILD", "True"), props()));
+        assertNull(FirstBuildTelemetry.start(URL, ID, "run", env("JENKINS_URL", "https://ci.example/"), props()));
+        assertNotNull(FirstBuildTelemetry.start(URL, ID, "run", env("CI", "false"), props()));
+        assertNotNull(FirstBuildTelemetry.start(URL, ID, "run", env("CI", ""), props()));
+    }
+
+    @Test
     void aBuildTheLauncherStartedIsLeftToTheLauncher() {
         assertNull(FirstBuildTelemetry.start(URL, ID, "run", env("CN1_LAUNCHER", "1"), props()));
     }
