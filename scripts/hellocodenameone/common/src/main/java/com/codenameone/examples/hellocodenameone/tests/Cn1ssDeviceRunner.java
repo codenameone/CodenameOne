@@ -630,7 +630,6 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new VPNDetectionAPITest(),
             new CallDetectionAPITest(),
             new DeviceInputApiTest(),
-            new LocalNotificationOverrideTest(),
             new Base64NativePerformanceTest(),
             new AccessibilityTest(),
             new FileSystemStorageOpenInputStreamMissingTest(),
@@ -678,6 +677,11 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new DesktopCompatFxFxmlScreenshotTest(),
             new DesktopCompatFxPanesScreenshotTest(),
             new DesktopCompatFxAlertScreenshotTest(),
+            // After every test that shows a dialog. It asks for the notification
+            // permission, and on iOS the system alert nobody answers leaves the
+            // application inactive for the rest of the run: Display.isMinimized()
+            // is then true and Dialog refuses to show anything at all.
+            new LocalNotificationOverrideTest(),
             // Desktop integration demo. Placed LAST on purpose: it shows a Toolbar with text
             // and a populated list, which warms the font cache / shifts suite timing, and the
             // earlier graphics screenshot tests (DrawString, DrawStringDecorated, inscribed

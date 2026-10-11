@@ -130,7 +130,8 @@ public abstract class DesktopCompatDialogScreenshotTest extends BaseTest {
                     return;
                 }
                 if (waitedMs >= APPEAR_BUDGET_MS) {
-                    failure = "the dialog was not on screen after " + waitedMs + "ms (showing=" + showing() + ")";
+                    failure = "the dialog was not on screen after " + waitedMs + "ms (showing=" + showing()
+                            + ", minimized=" + Display.getInstance().isMinimized() + ")";
                     // Let the asking strand go, or it blocks the suite.
                     answer();
                     return;
