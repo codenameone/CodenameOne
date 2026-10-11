@@ -76,7 +76,7 @@ public class GeneratorModel {
     /// dependency's classes, and passes over the module that is neither. A
     /// full-stack template ([Template#isFullStack()]) is built that way, and is
     /// neither offered nor generated for a release before this one.
-    static final String FULL_STACK_SINCE = "7.0.276";
+    static final String FULL_STACK_SINCE = "7.0.277";
 
     /// The brand colour of the full-stack template as it ships: the `--brand` its
     /// theme.css declares, which is what the UI paints the icon with when no other
