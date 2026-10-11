@@ -257,6 +257,27 @@ class CN1CSSCLIEndToEndTest {
     }
 
     @Test
+    void aMergedBuildEndsWhenADirectoryLinksBackToItself(@TempDir Path tmp) throws Exception {
+        File dir = tmp.toFile();
+        File app = write(new File(dir, "app/theme.css"),
+                "Badge { background-image: url(img/a.png); cn1-source-dpi: 160; }\n");
+        png(new File(dir, "app/img/a.png"), 8, 6, 0xff336699);
+        try {
+            Files.createSymbolicLink(new File(dir, "app/img/again").toPath(), new File(dir, "app").toPath());
+        } catch (UnsupportedOperationException | java.io.IOException ex) {
+            org.junit.jupiter.api.Assumptions.assumeTrue(false, "no symbolic links here");
+        }
+        File merged = new File(dir, "work/theme.css.merged");
+        File res = new File(dir, "work/theme.res");
+
+        int status = org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(java.time.Duration.ofSeconds(60),
+                () -> CN1CSSCLI.run(new String[]{"-input", app.getPath(),
+                    "-output", res.getPath(), "-merge", merged.getPath()}));
+        assertEquals(0, status, stderr());
+        assertEquals(8, open(res).getImage("a.png").getWidth());
+    }
+
+    @Test
     void anEditToAnImageAloneRecompilesAMergedBuild(@TempDir Path tmp) throws Exception {
         File dir = tmp.toFile();
         File app = write(new File(dir, "app/theme.css"),

@@ -247,6 +247,11 @@ public final class SVGParser {
         if (doc.getHeight() == 0) doc.setHeight(doc.getViewBoxHeight());
         viewportWidth = doc.getViewBoxWidth();
         viewportHeight = doc.getViewBoxHeight();
+        fontFamily = null;
+        fontSize = null;
+        fontBold = null;
+        fontItalic = null;
+        enterFont(a);
     }
 
     /** A horizontal length: a percentage is that share of the viewport's width. */
@@ -284,6 +289,81 @@ public final class SVGParser {
         }
     }
 
+    /**
+     * Whether the element just opened is one to draw: it asks for no
+     * extension, there being none, and when it names languages one of them
+     * is English, which is the language an image is taken to be drawn in.
+     */
+    private static boolean conditionsHold(XMLStreamReader r) {
+        String extensions = r.getAttributeValue(null, "requiredExtensions");
+        if (extensions != null && !extensions.trim().isEmpty()) return false;
+        String languages = r.getAttributeValue(null, "systemLanguage");
+        if (languages == null) return true;
+        for (String language : languages.split(",")) {
+            String l = language.trim();
+            if (l.equalsIgnoreCase("en") || l.regionMatches(true, 0, "en-", 0, 3)) return true;
+        }
+        return false;
+    }
+
+    /** The font an element with none of its own takes from what it is in; null where nothing sets one. */
+    private String fontFamily;
+    private Float fontSize;
+    private Boolean fontBold;
+    private Boolean fontItalic;
+
+    /** Takes in the font properties of a container; what is returned undoes it with {@link #leaveFont}. */
+    private Object[] enterFont(Map<String, String> a) {
+        Object[] saved = {fontFamily, fontSize, fontBold, fontItalic};
+        String family = mergedValue(a, "font-family");
+        if (family != null) fontFamily = family.trim();
+        Float size = fontSizeOf(mergedValue(a, "font-size"));
+        if (size != null) fontSize = size;
+        Boolean bold = boldOf(mergedValue(a, "font-weight"));
+        if (bold != null) fontBold = bold;
+        Boolean italic = italicOf(mergedValue(a, "font-style"));
+        if (italic != null) fontItalic = italic;
+        return saved;
+    }
+
+    private void leaveFont(Object[] saved) {
+        fontFamily = (String) saved[0];
+        fontSize = (Float) saved[1];
+        fontBold = (Boolean) saved[2];
+        fontItalic = (Boolean) saved[3];
+    }
+
+    /** A font size, a relative one taken against the size around it; null when there is none to read. */
+    private Float fontSizeOf(String size) {
+        if (size == null) return null;
+        try {
+            float given = NumberParser.parseFloat(size);
+            String unit = size.trim();
+            float around = fontSize != null ? fontSize.floatValue() : 12f;
+            if (unit.endsWith("%")) return Float.valueOf(given / 100 * around);
+            if (unit.endsWith("rem")) return Float.valueOf(given * 16f);
+            if (unit.endsWith("em")) return Float.valueOf(given * around);
+            if (unit.endsWith("ex")) return Float.valueOf(given * around / 2);
+            return Float.valueOf(given);
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static Boolean boldOf(String weight) {
+        if (weight == null) return null;
+        String w = weight.trim();
+        if ("inherit".equals(w)) return null;
+        return Boolean.valueOf("bold".equals(w) || "bolder".equals(w) || isNumericGte(w, 600));
+    }
+
+    private static Boolean italicOf(String style) {
+        if (style == null) return null;
+        String s = style.trim();
+        if ("inherit".equals(s)) return null;
+        return Boolean.valueOf("italic".equals(s) || "oblique".equals(s));
+    }
+
     private void readChildren(XMLStreamReader r, SVGGroup parent, SVGDocument doc) throws XMLStreamException {
         while (r.hasNext()) {
             int ev = r.next();
@@ -291,13 +371,33 @@ public final class SVGParser {
             if (ev != XMLStreamConstants.START_ELEMENT) continue;
 
             String name = r.getLocalName();
+            if (!conditionsHold(r)) {
+                // Asks for something this is not: an extension, or another
+                // language. It is as if it were not written.
+                skip(r);
+                continue;
+            }
             // A link is a group as far as drawing goes: what is inside it
-            // is drawn, and only following it is left out.
-            if ("g".equals(name) || "a".equals(name)) {
+            // is drawn, and only following it is left out. So is a
+            // `<switch>`, of which only the first child that can be drawn
+            // is: the ones that cannot have been passed over above, or are
+            // of a kind that is not read at all.
+            if ("g".equals(name) || "a".equals(name) || "switch".equals(name)) {
                 SVGGroup g = new SVGGroup();
-                applyCommon(g, attrs(r));
+                Map<String, String> ga = attrs(r);
+                applyCommon(g, ga);
                 parent.addChild(g);
-                readChildren(r, g, doc);
+                Object[] font = enterFont(ga);
+                try {
+                    readChildren(r, g, doc);
+                } finally {
+                    leaveFont(font);
+                }
+                if ("switch".equals(name)) {
+                    while (g.getChildren().size() > 1) {
+                        g.getChildren().remove(g.getChildren().size() - 1);
+                    }
+                }
             } else if ("svg".equals(name)) {
                 // Read for a renderer that can lay one out. The class the
                 // transcoder generates does not draw it.
@@ -333,9 +433,11 @@ public final class SVGParser {
                     viewportWidth = symbol.getViewBoxWidth();
                     viewportHeight = symbol.getViewBoxHeight();
                 }
+                Object[] font = enterFont(sa);
                 try {
                     readChildren(r, symbol, doc);
                 } finally {
+                    leaveFont(font);
                     viewportWidth = outerWidth;
                     viewportHeight = outerHeight;
                 }
@@ -476,9 +578,11 @@ public final class SVGParser {
         float outerHeight = viewportHeight;
         viewportWidth = v.getViewBoxWidth() > 0 ? v.getViewBoxWidth() : v.getWidth();
         viewportHeight = v.getViewBoxHeight() > 0 ? v.getViewBoxHeight() : v.getHeight();
+        Object[] font = enterFont(a);
         try {
             readChildren(r, v.getContent(), doc);
         } finally {
+            leaveFont(font);
             viewportWidth = outerWidth;
             viewportHeight = outerHeight;
         }
@@ -629,7 +733,28 @@ public final class SVGParser {
         String space = mergedValue(a, "color-interpolation-filters");
         f.setSrgb(space != null && "sRGB".equalsIgnoreCase(space.trim()));
         readPrimitives(r, f.getPrimitives());
+        // A percentage in the area of an effect is a share of the viewport
+        // the filter is written in, or of the element's box when the
+        // effects are measured in that. It is worked out here, where the
+        // viewport is known, into the number it stands for.
+        for (SVGFilter.Primitive p : f.getPrimitives()) {
+            resolveShare(p, "x", viewportWidth, f.isPrimitiveObjectBoundingBox());
+            resolveShare(p, "width", viewportWidth, f.isPrimitiveObjectBoundingBox());
+            resolveShare(p, "y", viewportHeight, f.isPrimitiveObjectBoundingBox());
+            resolveShare(p, "height", viewportHeight, f.isPrimitiveObjectBoundingBox());
+        }
         return f;
+    }
+
+    private static void resolveShare(SVGFilter.Primitive p, String attribute, float whole, boolean box) {
+        String value = p.get(attribute);
+        if (value == null || !value.trim().endsWith("%")) return;
+        try {
+            float share = Float.parseFloat(value.trim().substring(0, value.trim().length() - 1)) / 100f;
+            p.set(attribute, String.valueOf(box ? share : share * whole));
+        } catch (RuntimeException e) {
+            // Not a number: left for the reader of it to pass over.
+        }
     }
 
     private void readPrimitives(XMLStreamReader r, List<SVGFilter.Primitive> into) throws XMLStreamException {
@@ -792,9 +917,22 @@ public final class SVGParser {
         if (family != null) {
             t.setFontFamily(family.trim());
         }
-        String size = mergedValue(a, "font-size");
-        if (size != null) {
-            try { t.setFontSize(NumberParser.parseFloat(size)); } catch (RuntimeException ignored) { /* default 0 */ }
+        // What the text does not say of its font, it has from the group,
+        // the nested drawing or the root it is in: `<g font-size="24">`
+        // sizes every text inside it.
+        if (family == null && fontFamily != null) {
+            t.setFontFamily(fontFamily);
+        }
+        Float sized = fontSizeOf(mergedValue(a, "font-size"));
+        if (sized == null) sized = fontSize;
+        if (sized != null) {
+            t.setFontSize(sized.floatValue());
+        }
+        if (mergedValue(a, "font-weight") == null && fontBold != null) {
+            t.setBold(fontBold.booleanValue());
+        }
+        if (mergedValue(a, "font-style") == null && fontItalic != null) {
+            t.setItalic(fontItalic.booleanValue());
         }
         String weight = mergedValue(a, "font-weight");
         if (weight != null) {
@@ -1036,14 +1174,15 @@ public final class SVGParser {
         SVGLinearGradient g = new SVGLinearGradient();
         Map<String, String> a = attrs(r);
         g.setId(a.get("id"));
+        boolean user = "userSpaceOnUse".equals(a.get("gradientUnits"));
         if (a.containsKey("x1")) g.markGiven("x1");
-        if (a.containsKey("x1")) g.setX1(parseGradCoord(a.get("x1")));
+        if (a.containsKey("x1")) g.setX1(gradCoord(a.get("x1"), user, viewportWidth));
         if (a.containsKey("y1")) g.markGiven("y1");
-        if (a.containsKey("y1")) g.setY1(parseGradCoord(a.get("y1")));
+        if (a.containsKey("y1")) g.setY1(gradCoord(a.get("y1"), user, viewportHeight));
         if (a.containsKey("x2")) g.markGiven("x2");
-        if (a.containsKey("x2")) g.setX2(parseGradCoord(a.get("x2")));
+        if (a.containsKey("x2")) g.setX2(gradCoord(a.get("x2"), user, viewportWidth));
         if (a.containsKey("y2")) g.markGiven("y2");
-        if (a.containsKey("y2")) g.setY2(parseGradCoord(a.get("y2")));
+        if (a.containsKey("y2")) g.setY2(gradCoord(a.get("y2"), user, viewportHeight));
         if (a.containsKey("spreadMethod")) {
             g.markGiven("spreadMethod");
             g.setSpreadMethod(a.get("spreadMethod").trim());
@@ -1062,16 +1201,17 @@ public final class SVGParser {
         SVGRadialGradient g = new SVGRadialGradient();
         Map<String, String> a = attrs(r);
         g.setId(a.get("id"));
+        boolean user = "userSpaceOnUse".equals(a.get("gradientUnits"));
         if (a.containsKey("cx")) g.markGiven("cx");
-        if (a.containsKey("cx")) g.setCx(parseGradCoord(a.get("cx")));
+        if (a.containsKey("cx")) g.setCx(gradCoord(a.get("cx"), user, viewportWidth));
         if (a.containsKey("cy")) g.markGiven("cy");
-        if (a.containsKey("cy")) g.setCy(parseGradCoord(a.get("cy")));
+        if (a.containsKey("cy")) g.setCy(gradCoord(a.get("cy"), user, viewportHeight));
         if (a.containsKey("r")) g.markGiven("r");
-        if (a.containsKey("r")) g.setR(parseGradCoord(a.get("r")));
+        if (a.containsKey("r")) g.setR(gradCoord(a.get("r"), user, (float) diagonal()));
         if (a.containsKey("fx")) g.markGiven("fx");
-        if (a.containsKey("fx")) g.setFx(Float.valueOf(parseGradCoord(a.get("fx"))));
+        if (a.containsKey("fx")) g.setFx(Float.valueOf(gradCoord(a.get("fx"), user, viewportWidth)));
         if (a.containsKey("fy")) g.markGiven("fy");
-        if (a.containsKey("fy")) g.setFy(Float.valueOf(parseGradCoord(a.get("fy"))));
+        if (a.containsKey("fy")) g.setFy(Float.valueOf(gradCoord(a.get("fy"), user, viewportHeight)));
         if (a.get("gradientTransform") != null) g.setGradientTransform(TransformParser.parse(a.get("gradientTransform")));
         if (a.containsKey("spreadMethod")) {
             g.markGiven("spreadMethod");
@@ -1084,6 +1224,16 @@ public final class SVGParser {
         if (href != null && href.startsWith("#")) g.setHref(href.substring(1));
         readGradientStops(r, g.getStops());
         return g;
+    }
+
+    /**
+     * A coordinate of a gradient. A percentage is a fraction of the box
+     * around what is painted, and in a gradient laid out in user space that
+     * share of the viewport: {@code x2="100%"} is its far side, not 1.
+     */
+    private float gradCoord(String value, boolean userSpace, float whole) {
+        float v = parseGradCoord(value);
+        return userSpace && value != null && value.trim().endsWith("%") ? v * whole : v;
     }
 
     private float parseGradCoord(String s) {

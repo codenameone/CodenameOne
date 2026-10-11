@@ -49,6 +49,9 @@ public final class SVGFilter extends SVGNode {
         /// The value of an attribute or, where the element has both, of the
         /// style property of that name; null when it has neither.
         public String get(String attribute) { return attributes.get(attribute); }
+        /// Replaces what an attribute says, for a reader that has worked
+        /// out what it stands for.
+        public void set(String attribute, String value) { attributes.put(attribute, value); }
         public List<Primitive> getChildren() { return children; }
     }
 

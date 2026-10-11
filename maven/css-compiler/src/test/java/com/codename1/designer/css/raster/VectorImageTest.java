@@ -1182,4 +1182,68 @@ class VectorImageTest {
         assertEquals(0xff0000ff, img.getRGB(70, 70), "the element, where it is drawn");
         assertEquals(0, alpha(img, 50, 50), "and nothing of what was filtered");
     }
+
+    @Test
+    void aPercentageInAUserSpaceGradientIsAShareOfTheViewport() throws Exception {
+        // From red at the left edge to blue at the right, not blue from
+        // one unit in.
+        BufferedImage img = paint("<defs><linearGradient id=\"g\" gradientUnits=\"userSpaceOnUse\" x1=\"0%\""
+                + " x2=\"100%\"><stop offset=\"0\" stop-color=\"#ff0000\"/><stop offset=\"1\" stop-color=\"#0000ff\"/>"
+                + "</linearGradient></defs><rect width=\"100\" height=\"100\" fill=\"url(#g)\"/>", 100, 100);
+        int near = img.getRGB(10, 50);
+        assertTrue(((near >> 16) & 0xff) > 200, "still red near the start, was " + Integer.toHexString(near));
+    }
+
+    @Test
+    void textTakesItsFontFromWhatItIsIn() throws Exception {
+        String text = "<text x=\"5\" y=\"60\">MMM</text>";
+        BufferedImage plain = paint(text, 100, 100);
+        BufferedImage sized = paint("<g font-size=\"30\" font-family=\"monospace\"><g>" + text + "</g></g>", 100, 100);
+        BufferedImage own = paint("<text x=\"5\" y=\"60\" font-size=\"30\" font-family=\"monospace\">MMM</text>",
+                100, 100);
+        assertTrue(inkRight(sized) > inkRight(plain) + 10, "larger than the default");
+        assertEquals(inkRight(own), inkRight(sized), "as if the text said it itself");
+        BufferedImage after = paint("<g font-size=\"30\"/>" + text, 100, 100);
+        assertEquals(inkRight(plain), inkRight(after), "and only inside the group");
+    }
+
+    @Test
+    void aSwitchDrawsTheFirstOfItsChildrenThatCanBe() throws Exception {
+        BufferedImage img = paint("<switch><rect requiredExtensions=\"http://example.com/ext\" width=\"100\""
+                + " height=\"100\" fill=\"#0000ff\"/><rect systemLanguage=\"xx\" width=\"100\" height=\"100\""
+                + " fill=\"#0000ff\"/><rect width=\"50\" height=\"100\" fill=\"#ff0000\"/>"
+                + "<rect width=\"100\" height=\"100\" fill=\"#00ff00\"/></switch>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(25, 50), "the first that asks for nothing it cannot have");
+        assertEquals(0, alpha(img, 75, 50), "and none after it");
+    }
+
+    @Test
+    void aPercentageAreaOfAnEffectIsAShareOfTheViewport() throws Exception {
+        BufferedImage img = paint("<defs><filter id=\"f\" filterUnits=\"userSpaceOnUse\" x=\"0\" y=\"0\" width=\"100\""
+                + " height=\"100\" color-interpolation-filters=\"sRGB\">"
+                + "<feFlood x=\"50%\" width=\"50%\" flood-color=\"#00ff00\"/></filter></defs>"
+                + "<rect width=\"100\" height=\"100\" fill=\"#ff0000\" filter=\"url(#f)\"/>", 100, 100);
+        assertEquals(0xff00ff00, img.getRGB(75, 50), "the right half");
+        assertEquals(0, alpha(img, 25, 50), "and not the left");
+    }
+
+    @Test
+    void anElementOfAnotherFileHasABoxToMeasure(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tmp)
+            throws Exception {
+        java.nio.file.Files.write(tmp.resolve("sprite.svg"), ("<svg xmlns=\"http://www.w3.org/2000/svg\">"
+                + "<rect id=\"icon\" width=\"40\" height=\"40\" fill=\"#ff0000\"/></svg>")
+                .getBytes(StandardCharsets.UTF_8));
+        java.nio.file.Path main = tmp.resolve("main.svg");
+        // Clipped to the left half of its own box, which is 40 wide.
+        java.nio.file.Files.write(main, ("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\">"
+                + "<defs><clipPath id=\"c\" clipPathUnits=\"objectBoundingBox\"><rect width=\"0.5\" height=\"1\"/>"
+                + "</clipPath></defs><use href=\"sprite.svg#icon\" clip-path=\"url(#c)\"/></svg>")
+                .getBytes(StandardCharsets.UTF_8));
+        BufferedImage img;
+        try (java.io.InputStream in = java.nio.file.Files.newInputStream(main)) {
+            img = VectorImage.readSvg(in, main.toUri().toURL()).paint(100, 100);
+        }
+        assertEquals(0xffff0000, img.getRGB(10, 20), "the left half of the element");
+        assertEquals(0, alpha(img, 30, 20), "the right half, cut off");
+    }
 }

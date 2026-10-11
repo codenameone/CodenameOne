@@ -1168,11 +1168,19 @@ public final class VectorImage {
         }
         if (node instanceof SVGUse) {
             SVGUse use = (SVGUse) node;
-            SVGNode target = use.getHref() == null ? null : doc.getDefinitions().get(use.getHref());
+            String href = use.getHref();
+            SVGNode target = href == null ? null : doc.getDefinitions().get(href);
+            // An element of another file is measured by that file, as it
+            // is drawn by it.
+            VectorImage owner = this;
+            if (target == null && href != null && href.indexOf('#') > 0) {
+                owner = beside(href.substring(0, href.indexOf('#')));
+                target = owner == null ? null : owner.doc.getDefinitions().get(href.substring(href.indexOf('#') + 1));
+            }
             if (target == null || depth >= MAX_USE_DEPTH) {
                 return null;
             }
-            Rectangle2D box = boundsOf(target, depth + 1);
+            Rectangle2D box = owner.boundsOf(target, depth + 1);
             if (box == null) {
                 return null;
             }

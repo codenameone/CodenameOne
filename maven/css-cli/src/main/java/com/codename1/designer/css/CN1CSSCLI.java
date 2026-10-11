@@ -619,6 +619,25 @@ public class CN1CSSCLI {
         dir.delete();
     }
     private static void syncDirectories(File srcDir, File destDir) throws IOException {
+        syncDirectories(srcDir, destDir, new HashSet<File>());
+    }
+
+    /// `seen` holds the directories being copied, by where they really
+    /// are. One that is come to again is reached through a link back to
+    /// itself or to something it is in, and following it would copy the
+    /// same files a level deeper each time, without end.
+    private static void syncDirectories(File srcDir, File destDir, Set<File> seen) throws IOException {
+        if (!seen.add(srcDir.getCanonicalFile())) {
+            return;
+        }
+        try {
+            syncSeen(srcDir, destDir, seen);
+        } finally {
+            seen.remove(srcDir.getCanonicalFile());
+        }
+    }
+
+    private static void syncSeen(File srcDir, File destDir, Set<File> seen) throws IOException {
         File canonicalSrc = srcDir.getCanonicalFile();
         File canonicalDest = destDir.getCanonicalFile();
         
@@ -648,11 +667,11 @@ public class CN1CSSCLI {
                 
                 if (child.isDirectory()) {
                     if (destChild.isDirectory()) {
-                        syncDirectories(child, destChild);
+                        syncDirectories(child, destChild, seen);
                     } else {
                         destChild.delete();
                         destChild.mkdir();
-                        syncDirectories(child, destChild);
+                        syncDirectories(child, destChild, seen);
                     }
                 } else {
                     if (destChild.isDirectory()) {
@@ -670,7 +689,7 @@ public class CN1CSSCLI {
                 
                 if (child.isDirectory()) {
                     destChild.mkdir();
-                    syncDirectories(child, destChild);
+                    syncDirectories(child, destChild, seen);
                 } else {
                     Files.copy(child.toPath(), destChild.toPath(), StandardCopyOption.REPLACE_EXISTING);
                 }
