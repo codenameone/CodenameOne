@@ -298,6 +298,19 @@ class CN1CSSCLIEndToEndTest {
     }
 
     @Test
+    void anImageNamedWithAQueryDoesNotCompile(@TempDir Path tmp) throws Exception {
+        // Which is why nothing tracks the file behind such an address: no
+        // theme is built from one.
+        File dir = tmp.toFile();
+        File css = write(new File(dir, "theme.css"),
+                "Badge { background-image: url(img/a.png?v=1); cn1-source-dpi: 160; }\n");
+        png(new File(dir, "img/a.png"), 8, 6, 0xff336699);
+        assertEquals(CN1CSSCLI.EXIT_COMPILE_FAILED, CN1CSSCLI.run(new String[] {
+            "-input", css.getPath(), "-output", new File(dir, "theme.res").getPath()}));
+        assertTrue(stderr().contains("query"), stderr());
+    }
+
+    @Test
     void anImportIsCompiledAndAnEditToItRecompiles(@TempDir Path tmp) throws Exception {
         File common = mavenProject(tmp.toFile());
         File css = write(new File(common, "src/main/css/theme.css"),
@@ -601,6 +614,50 @@ class CN1CSSCLIEndToEndTest {
             watcher.join(20000);
             assertFalse(watcher.isAlive(), "watch mode ends when the parent's socket closes");
             assertEquals(0, status[0]);
+        } finally {
+            parent.close();
+        }
+    }
+
+    @Test
+    void aFailedRecompileInWatchModeIsNotAReload(@TempDir Path tmp) throws Exception {
+        File dir = tmp.toFile();
+        final File css = write(new File(dir, "theme.css"), "Label { color: #000001; }\n");
+        final File res = new File(dir, "theme.res");
+
+        ServerSocket parent = new ServerSocket(0);
+        try {
+            System.setProperty("parent.port", String.valueOf(parent.getLocalPort()));
+            Thread watcher = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    CN1CSSCLI.run(new String[]{"-input", css.getPath(), "-output", res.getPath(), "-watch"});
+                }
+            }, "css-watch-under-test");
+            watcher.start();
+            Socket child = parent.accept();
+            awaitStdout("CSS file successfully compiled.");
+
+            // The theme file changes and the compile fails: what a failure
+            // halfway through writing it looks like from outside.
+            assertTrue(res.setLastModified(res.lastModified() + 60000));
+            write(css, "@import \"gone.css\";\nLabel { color: #000002; }\n");
+            assertTrue(css.setLastModified(System.currentTimeMillis() + 5000));
+            long deadline = System.nanoTime() + 60L * 1000 * 1000 * 1000;
+            while (!stderr().contains("CSS compile failed: ")) {
+                assertTrue(System.nanoTime() < deadline, "timed out waiting for the failure:\n" + stdout());
+                Thread.sleep(100);
+            }
+            assertFalse(stdout().contains(CN1CSSCLI.REFRESH_SIGNAL), "nothing to reload after a failure");
+
+            write(css, "Label { color: #000003; }\n");
+            assertTrue(css.setLastModified(System.currentTimeMillis() + 10000));
+            awaitStdout(CN1CSSCLI.REFRESH_SIGNAL);
+            assertEquals("3", theme(res).get("Label.fgColor"));
+
+            child.close();
+            watcher.join(20000);
+            assertFalse(watcher.isAlive());
         } finally {
             parent.close();
         }

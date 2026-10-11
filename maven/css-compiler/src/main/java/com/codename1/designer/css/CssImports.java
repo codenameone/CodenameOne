@@ -129,9 +129,11 @@ public final class CssImports {
             public String rewrite(String url) {
                 // The name is taken as written. One with a query or a
                 // fragment after it (`icon.png?v=2`) is not looked for under
-                // the shorter name: the compiler opens images and fonts as
-                // files and refuses such a url, so no theme is ever built
-                // from one and none can go stale.
+                // the shorter name: the compiler turns the address of an
+                // image or a font into a file and stops on one with a query
+                // ("URI has a query component"), as it always has, so no
+                // theme is ever built from one and none can go stale. An
+                // import is different, see where one is resolved.
                 if (isRelativeUrl(url)) {
                     File file = new File(dir, url);
                     if (file.isFile() || !file.exists()) {

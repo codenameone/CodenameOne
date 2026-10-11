@@ -516,6 +516,7 @@ public class CN1CSSCLI {
             // while the compile is running then shows up as a change on the
             // next poll instead of being absorbed into the baseline.
             PollingFileWatcher watcher = new PollingFileWatcher(watchedFiles(options), 1000);
+            boolean failed = false;
             try {
                 if (compileOnce(options) && first) {
                     System.out.println("CSS file successfully compiled.  " + options.outputFile);
@@ -524,15 +525,22 @@ public class CN1CSSCLI {
                 // A stylesheet that does not compile is the normal state of one
                 // being edited. Report it and keep watching.
                 report(t);
+                failed = true;
             }
-            long now = options.outputFile.lastModified();
-            if (!first && now != reported) {
-                // Whoever wrote it: a build running beside the simulator can get
-                // there first, and the theme on screen is stale either way.
-                System.out.println(REFRESH_SIGNAL);
-                System.out.flush();
+            // Not after a failure: one that struck while the theme was being
+            // written leaves a file that cannot be loaded. What was last
+            // reported is left as it was, so the compile that does succeed
+            // is announced even when it writes nothing new.
+            if (!failed) {
+                long now = options.outputFile.lastModified();
+                if (!first && now != reported) {
+                    // Whoever wrote it: a build running beside the simulator can
+                    // get there first, and the theme on screen is stale either way.
+                    System.out.println(REFRESH_SIGNAL);
+                    System.out.flush();
+                }
+                reported = now;
             }
-            reported = now;
             first = false;
             try {
                 watcher.poll();

@@ -29,6 +29,7 @@ import com.codename1.svg.transcoder.model.SVGDocument;
 import com.codename1.svg.transcoder.model.SVGEllipse;
 import com.codename1.svg.transcoder.model.SVGGradientStop;
 import com.codename1.svg.transcoder.model.SVGGroup;
+import com.codename1.svg.transcoder.model.SVGImage;
 import com.codename1.svg.transcoder.model.SVGLine;
 import com.codename1.svg.transcoder.model.SVGLinearGradient;
 import com.codename1.svg.transcoder.model.SVGNode;
@@ -93,6 +94,15 @@ public final class VectorImage {
     /// by one thread at a time, which `paint` sees to.
     private int useDepth;
 
+    /// Where the file is, for the pictures it names beside itself; null
+    /// when it was not read from anywhere that has a beside.
+    private java.net.URL base;
+    /// How many files deep this one is: a picture inside an SVG can be an
+    /// SVG with pictures of its own, and one that names itself would never
+    /// end.
+    private int fileDepth;
+    private static final int MAX_FILE_DEPTH = 4;
+
     private VectorImage(SVGDocument doc, boolean scales) {
         this.doc = doc;
         this.scales = scales;
@@ -100,8 +110,16 @@ public final class VectorImage {
 
     /// Reads an SVG document.
     public static VectorImage readSvg(InputStream in) throws IOException {
+        return readSvg(in, null);
+    }
+
+    /// Reads an SVG document that is at `base`, which is what the pictures
+    /// it names with a relative address are found against.
+    public static VectorImage readSvg(InputStream in, java.net.URL base) throws IOException {
         SVGDocument doc = new SVGParser().parse(in);
-        return new VectorImage(doc, doc.isViewBoxDeclared());
+        VectorImage image = new VectorImage(doc, doc.isViewBoxDeclared());
+        image.base = base;
+        return image;
     }
 
     /// Reads a Lottie animation.
@@ -238,7 +256,14 @@ public final class VectorImage {
         if (opacity <= 0f) {
             return;
         }
-        if (opacity < 1f) {
+        SVGClipPath mask = null;
+        if (own != null && own.getMaskRef() != null && useDepth < MAX_USE_DEPTH) {
+            SVGNode def = doc.getDefinitions().get(own.getMaskRef());
+            if (def instanceof SVGClipPath && ((SVGClipPath) def).isMask()) {
+                mask = (SVGClipPath) def;
+            }
+        }
+        if (opacity < 1f || mask != null) {
             // An element that is not opaque is painted whole on a layer of
             // its own, and the layer is laid down once at that opacity.
             // Fading its parts one by one would let them show through each
@@ -256,6 +281,9 @@ public final class VectorImage {
             } finally {
                 lg.dispose();
             }
+            if (mask != null) {
+                applyMask(layer, mask, node, g, w, h);
+            }
             AffineTransform at = g.getTransform();
             java.awt.Composite composite = g.getComposite();
             try {
@@ -269,6 +297,162 @@ public final class VectorImage {
             return;
         }
         paintOpaque(g, node, style, w, h);
+    }
+
+    /// Lets through as much of `layer`, which holds `node`, as `mask` says.
+    ///
+    /// The mask's content is painted on a layer of its own, in the
+    /// coordinates of the element it masks. Each pixel of the element then
+    /// keeps the share of its opacity that the mask's pixel there is light
+    /// and opaque, or for an alpha mask just opaque. Where the mask paints
+    /// nothing, nothing of the element is left.
+    private void applyMask(BufferedImage layer, SVGClipPath mask, SVGNode node, Graphics2D g, int w, int h) {
+        BufferedImage seen = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D mg = seen.createGraphics();
+        useDepth++;
+        try {
+            Pixels.hints(mg);
+            mg.setTransform(g.getTransform());
+            SVGTransform t = node.getTransform();
+            if (t != null) {
+                mg.transform(new AffineTransform(t.a, t.b, t.c, t.d, t.e, t.f));
+            }
+            boolean measurable = true;
+            if (mask.isObjectBoundingBox()) {
+                Rectangle2D box = boundsOf(node);
+                measurable = box != null && !box.isEmpty();
+                if (measurable) {
+                    mg.transform(new AffineTransform(box.getWidth(), 0, 0, box.getHeight(), box.getX(), box.getY()));
+                }
+            }
+            if (measurable) {
+                for (SVGNode child : mask.getChildren()) {
+                    paintNode(mg, child, mask.getStyle(), w, h);
+                }
+            }
+        } finally {
+            useDepth--;
+            mg.dispose();
+        }
+        int[] kept = layer.getRGB(0, 0, w, h, null, 0, w);
+        int[] through = seen.getRGB(0, 0, w, h, null, 0, w);
+        for (int i = 0; i < kept.length; i++) {
+            int a = kept[i] >>> 24;
+            if (a == 0) {
+                continue;
+            }
+            int m = through[i];
+            float share = (m >>> 24) / 255f;
+            if (!mask.isAlphaMask()) {
+                share *= (0.2126f * ((m >> 16) & 0xff) + 0.7152f * ((m >> 8) & 0xff) + 0.0722f * (m & 0xff)) / 255f;
+            }
+            kept[i] = (Math.round(a * share) << 24) | (kept[i] & 0xffffff);
+        }
+        layer.setRGB(0, 0, w, h, kept, 0, w);
+    }
+
+    /// Draws the picture an `<image>` names into the box it gives, fitted
+    /// the way its `preserveAspectRatio` says. One that cannot be found or
+    /// read leaves its box empty, as it does in a browser.
+    private void paintImage(Graphics2D g, SVGImage image) {
+        BufferedImage picture = loadPicture(image);
+        if (picture == null) {
+            return;
+        }
+        double bw = image.getWidth() > 0 ? image.getWidth() : picture.getWidth();
+        double bh = image.getHeight() > 0 ? image.getHeight() : picture.getHeight();
+        String par = image.getPreserveAspectRatio() == null ? "" : image.getPreserveAspectRatio().trim();
+        double sx = bw / picture.getWidth();
+        double sy = bh / picture.getHeight();
+        double tx = 0;
+        double ty = 0;
+        if (!par.startsWith("none")) {
+            double s = par.endsWith("slice") ? Math.max(sx, sy) : Math.min(sx, sy);
+            double freeX = bw - picture.getWidth() * s;
+            double freeY = bh - picture.getHeight() * s;
+            tx = par.startsWith("xMin") ? 0 : (par.startsWith("xMax") ? freeX : freeX / 2);
+            ty = par.indexOf("YMin") >= 0 ? 0 : (par.indexOf("YMax") >= 0 ? freeY : freeY / 2);
+            sx = s;
+            sy = s;
+        }
+        Shape savedClip = g.getClip();
+        Object savedHint = g.getRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION);
+        try {
+            g.clip(new Rectangle2D.Double(image.getX(), image.getY(), bw, bh));
+            g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+                    java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+            AffineTransform at = new AffineTransform();
+            at.translate(image.getX() + tx, image.getY() + ty);
+            at.scale(sx, sy);
+            g.drawImage(picture, at, null);
+        } finally {
+            g.setClip(savedClip);
+            if (savedHint != null) {
+                g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, savedHint);
+            }
+        }
+    }
+
+    /// The pixels of the picture an `<image>` names, or null. A `data:`
+    /// address is decoded; any other is a file beside this one. An SVG is
+    /// painted at the size of the box it goes in.
+    private BufferedImage loadPicture(SVGImage image) {
+        String href = image.getHref();
+        if (href == null || href.length() == 0 || fileDepth >= MAX_FILE_DEPTH) {
+            return null;
+        }
+        try {
+            byte[] data;
+            boolean svg;
+            java.net.URL at = null;
+            if (href.regionMatches(true, 0, "data:", 0, 5)) {
+                int comma = href.indexOf(',');
+                if (comma < 0) {
+                    return null;
+                }
+                String kind = href.substring(5, comma);
+                svg = kind.regionMatches(true, 0, "image/svg", 0, 9);
+                String payload = href.substring(comma + 1);
+                if (kind.length() >= 7 && kind.regionMatches(true, kind.length() - 7, ";base64", 0, 7)) {
+                    data = java.util.Base64.getMimeDecoder().decode(payload);
+                } else {
+                    data = java.net.URLDecoder.decode(payload.replace("+", "%2B"), "UTF-8")
+                            .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                }
+            } else {
+                // Only a file: an image baked into a theme is not something
+                // to fetch from a server named inside a picture.
+                if (base == null || href.indexOf(':') >= 0) {
+                    return null;
+                }
+                at = new java.net.URL(base, href);
+                if (!"file".equals(at.getProtocol())) {
+                    return null;
+                }
+                String path = at.getPath();
+                svg = path.length() >= 4 && path.regionMatches(true, path.length() - 4, ".svg", 0, 4);
+                java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+                try (InputStream in = at.openStream()) {
+                    byte[] chunk = new byte[8192];
+                    for (int n = in.read(chunk); n >= 0; n = in.read(chunk)) {
+                        bytes.write(chunk, 0, n);
+                    }
+                }
+                data = bytes.toByteArray();
+            }
+            if (!svg) {
+                return javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(data));
+            }
+            VectorImage inner = readSvg(new java.io.ByteArrayInputStream(data), at);
+            inner.fileDepth = fileDepth + 1;
+            double pw = image.getWidth() > 0 ? image.getWidth() : inner.getWidth();
+            double ph = image.getHeight() > 0 ? image.getHeight() : inner.getHeight();
+            return inner.paint(pw, ph, 4096);
+        } catch (IOException ex) {
+            return null;
+        } catch (RuntimeException ex) {
+            return null;
+        }
     }
 
     /// Paints `node` with everything but its own opacity.
@@ -310,6 +494,8 @@ public final class VectorImage {
             } else if (Boolean.FALSE.equals(style.getVisible())) {
                 // Hidden, which unlike `display: none` a child may undo.
                 return;
+            } else if (node instanceof SVGImage) {
+                paintImage(g, (SVGImage) node);
             } else if (node instanceof SVGText) {
                 paintText(g, (SVGText) node, style);
             } else {
@@ -791,7 +977,7 @@ public final class VectorImage {
         }
         float size = text.getFontSize() > 0 ? text.getFontSize() : 12f;
         int fontStyle = (text.isBold() ? Font.BOLD : 0) | (text.isItalic() ? Font.ITALIC : 0);
-        Font font = new Font(Font.SANS_SERIF, fontStyle, 1).deriveFont(size);
+        Font font = new Font(familyOf(text.getFontFamily()), fontStyle, 1).deriveFont(size);
         java.awt.font.GlyphVector glyphs = font.createGlyphVector(g.getFontRenderContext(), content);
         double advance = glyphs.getLogicalBounds().getWidth();
         double x = text.getX();
@@ -803,6 +989,46 @@ public final class VectorImage {
         Shape outline = glyphs.getOutline((float) x, text.getY());
         float a = style.getFillOpacity() == null ? 1f : clamp(style.getFillOpacity().floatValue());
         paintWith(g, fill, a, outline, outline);
+    }
+
+    /// The font family a `font-family` list comes to: the first name in it
+    /// that is a generic family or a font this machine has, and sans-serif
+    /// when there is none.
+    private static String familyOf(String families) {
+        if (families == null) {
+            return Font.SANS_SERIF;
+        }
+        for (String part : families.split(",")) {
+            String name = part.trim();
+            if (name.length() >= 2 && (name.charAt(0) == '"' || name.charAt(0) == '\'')) {
+                name = name.substring(1, name.length() - 1).trim();
+            }
+            if (name.length() == 0) {
+                continue;
+            }
+            if ("serif".equalsIgnoreCase(name)) {
+                return Font.SERIF;
+            }
+            if ("sans-serif".equalsIgnoreCase(name) || "system-ui".equalsIgnoreCase(name)) {
+                return Font.SANS_SERIF;
+            }
+            if ("monospace".equalsIgnoreCase(name)) {
+                return Font.MONOSPACED;
+            }
+            for (String have : InstalledFonts.NAMES) {
+                if (have.equalsIgnoreCase(name)) {
+                    return have;
+                }
+            }
+        }
+        return Font.SANS_SERIF;
+    }
+
+    /// The font families of this machine, asked for once and only when an
+    /// SVG names one.
+    private static final class InstalledFonts {
+        static final String[] NAMES = java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment()
+                .getAvailableFontFamilyNames();
     }
 
     private static float clamp(float v) {

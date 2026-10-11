@@ -4099,6 +4099,11 @@ public class CSSTheme {
             case LexicalUnit.SAC_REAL:
                 return numericValue(value);
             case LexicalUnit.SAC_POINT:
+                // No 96/72 here, on purpose. A `pt` in a Codename One
+                // stylesheet is a density independent pixel, not a CSS
+                // point: the page the browser used to draw was handed this
+                // same number as `px`, so a border of 72pt has always come
+                // out narrower than one of 1in.
                 return numericValue(value) * density / 160.0;
             case LexicalUnit.SAC_MILLIMETER:
                 return numericValue(value) * density / 160.0 * CSS_PX_PER_MM;
@@ -4240,7 +4245,7 @@ public class CSSTheme {
             InputStream in = imgURL.openStream();
             try {
                 String path = imgURL.getPath();
-                return endsWithIgnoreCase(path, ".svg") ? VectorImage.readSvg(in) : VectorImage.readLottie(in);
+                return endsWithIgnoreCase(path, ".svg") ? VectorImage.readSvg(in, imgURL) : VectorImage.readLottie(in);
             } finally {
                 in.close();
             }

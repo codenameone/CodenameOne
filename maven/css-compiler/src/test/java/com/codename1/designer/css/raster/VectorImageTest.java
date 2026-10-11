@@ -314,6 +314,87 @@ class VectorImageTest {
     }
 
     @Test
+    void anEmbeddedPictureIsDrawnInItsBox() throws Exception {
+        BufferedImage dot = new BufferedImage(2, 2, BufferedImage.TYPE_INT_ARGB);
+        for (int i = 0; i < 4; i++) {
+            dot.setRGB(i % 2, i / 2, 0xff00ff00);
+        }
+        java.io.ByteArrayOutputStream png = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(dot, "png", png);
+        String data = "data:image/png;base64," + java.util.Base64.getEncoder().encodeToString(png.toByteArray());
+        BufferedImage img = paint("<image x=\"20\" y=\"20\" width=\"40\" height=\"60\" preserveAspectRatio=\"none\""
+                + " href=\"" + data + "\"/>"
+                + "<image x=\"70\" y=\"0\" width=\"20\" height=\"40\" href=\"" + data + "\"/>", 100, 100);
+        assertEquals(0xff00ff00, img.getRGB(40, 50), "stretched over its box");
+        assertEquals(0xff00ff00, img.getRGB(25, 75));
+        assertEquals(0, alpha(img, 10, 50), "and nowhere else");
+        assertEquals(0xff00ff00, img.getRGB(80, 20), "kept square in the middle of a taller box");
+        assertEquals(0, alpha(img, 80, 4), "with the room above it left empty");
+    }
+
+    @Test
+    void aPictureBesideTheFileIsFoundFromWhereTheFileIs(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tmp)
+            throws Exception {
+        BufferedImage dot = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+        dot.setRGB(0, 0, 0xffff0000);
+        javax.imageio.ImageIO.write(dot, "png", tmp.resolve("dot.png").toFile());
+        java.nio.file.Files.write(tmp.resolve("inner.svg"), ("<svg xmlns=\"http://www.w3.org/2000/svg\""
+                + " viewBox=\"0 0 10 10\"><image width=\"10\" height=\"10\" href=\"dot.png\"/>"
+                + "<image width=\"10\" height=\"10\" href=\"inner.svg\"/></svg>").getBytes(StandardCharsets.UTF_8));
+        String svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\" viewBox=\"0 0 100 100\">"
+                + "<image width=\"50\" height=\"100\" href=\"dot.png\"/>"
+                + "<image x=\"50\" width=\"50\" height=\"100\" href=\"inner.svg\"/>"
+                + "<image width=\"100\" height=\"100\" href=\"missing.png\"/></svg>";
+        VectorImage image = VectorImage.readSvg(new ByteArrayInputStream(svg.getBytes(StandardCharsets.UTF_8)),
+                tmp.resolve("outer.svg").toUri().toURL());
+        BufferedImage img = image.paint(100, 100);
+        assertEquals(0xffff0000, img.getRGB(25, 50), "a bitmap beside the file");
+        assertEquals(0xffff0000, img.getRGB(75, 50), "through an SVG beside it, which names itself and still ends");
+    }
+
+    @Test
+    void aMaskLetsThroughWhatItsContentIsLightAndOpaqueOver() throws Exception {
+        String red = "<rect width=\"100\" height=\"100\" fill=\"#ff0000\" mask=\"url(#m)\"/>";
+        BufferedImage img = paint("<mask id=\"m\"><rect width=\"40\" height=\"100\" fill=\"#ffffff\"/>"
+                + "<rect x=\"40\" width=\"30\" height=\"100\" fill=\"#000000\"/></mask>" + red, 100, 100);
+        assertEquals(0xffff0000, img.getRGB(20, 50), "white lets everything through");
+        assertEquals(0, alpha(img, 55, 50), "black lets nothing through");
+        assertEquals(0, alpha(img, 85, 50), "and so does where the mask paints nothing");
+
+        BufferedImage byAlpha = paint("<mask id=\"m\" mask-type=\"alpha\">"
+                + "<rect width=\"50\" height=\"100\" fill=\"#000000\"/></mask>" + red, 100, 100);
+        assertEquals(0xffff0000, byAlpha.getRGB(20, 50), "an alpha mask goes by opacity alone");
+        assertEquals(0, alpha(byAlpha, 80, 50));
+
+        BufferedImage boxed = paint("<mask id=\"m\" maskContentUnits=\"objectBoundingBox\">"
+                + "<rect width=\"0.5\" height=\"1\" fill=\"#ffffff\"/></mask>"
+                + "<rect x=\"20\" y=\"20\" width=\"60\" height=\"60\" fill=\"#ff0000\" mask=\"url(#m)\"/>", 100, 100);
+        assertEquals(0xffff0000, boxed.getRGB(35, 50));
+        assertEquals(0, alpha(boxed, 65, 50));
+    }
+
+    @Test
+    void textIsSetInTheFamilyItAsksFor() throws Exception {
+        String text = "<text x=\"5\" y=\"60\" font-size=\"40\" fill=\"#000000\" font-family=";
+        BufferedImage mono = paint(text + "\"NoSuchFontAnywhere, monospace\">ii</text>", 100, 100);
+        BufferedImage sans = paint(text + "\"sans-serif\">ii</text>", 100, 100);
+        BufferedImage fallback = paint(text + "\"NoSuchFontAnywhere\">ii</text>", 100, 100);
+        assertTrue(inkRight(mono) > inkRight(sans), "two narrow letters are wider apart in a monospaced font");
+        assertEquals(inkRight(sans), inkRight(fallback), "a family nobody has falls back to sans-serif");
+    }
+
+    private static int inkRight(BufferedImage img) {
+        for (int x = img.getWidth() - 1; x >= 0; x--) {
+            for (int y = 0; y < img.getHeight(); y++) {
+                if ((img.getRGB(x, y) >>> 24) > 128) {
+                    return x;
+                }
+            }
+        }
+        return -1;
+    }
+
+    @Test
     void aUseThatNamesItselfDrawsNothingAndEnds() throws Exception {
         BufferedImage img = paint("<g id=\"loop\"><use href=\"#loop\"/></g>", 20, 20);
         assertEquals(0, alpha(img, 10, 10));

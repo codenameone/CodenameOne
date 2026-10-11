@@ -295,6 +295,11 @@ public final class SVGParser {
                 SVGPath path = readPath(r);
                 parent.addChild(path);
                 readNestedAnimations(r, path);
+            } else if ("image".equals(name)) {
+                // Read for a renderer that can load one. The class the
+                // transcoder generates does not draw it.
+                parent.addChild(readImage(r));
+                consumeUntilEnd(r);
             } else if ("text".equals(name)) {
                 SVGText text = readText(r);
                 parent.addChild(text);
@@ -308,7 +313,7 @@ public final class SVGParser {
                 // Many SVGs declare clipPath outside <defs>. Accept both --
                 // we don't render the clipPath inline, just register it as
                 // a definition for later clip-path="url(#id)" lookup.
-                SVGClipPath cp = readClipPath(r, doc);
+                SVGClipPath cp = readClipPath(r, doc, "mask".equals(name));
                 if (cp.getId() != null) doc.getDefinitions().put(cp.getId(), cp);
             } else if ("animate".equals(name) || "animateTransform".equals(name) || "set".equals(name)) {
                 SVGAnimation an = readAnimation(r, name);
@@ -364,11 +369,27 @@ public final class SVGParser {
         return use;
     }
 
-    private SVGClipPath readClipPath(XMLStreamReader r, SVGDocument doc) throws XMLStreamException {
+    private SVGImage readImage(XMLStreamReader r) {
+        SVGImage image = new SVGImage();
+        Map<String, String> a = attrs(r);
+        applyCommon(image, a);
+        String href = a.get("href");
+        if (href != null) image.setHref(href.trim());
+        image.setX(NumberParser.parseFloat(a.get("x")));
+        image.setY(NumberParser.parseFloat(a.get("y")));
+        image.setWidth(lengthOrZero(a.get("width")));
+        image.setHeight(lengthOrZero(a.get("height")));
+        image.setPreserveAspectRatio(a.get("preserveAspectRatio"));
+        return image;
+    }
+
+    private SVGClipPath readClipPath(XMLStreamReader r, SVGDocument doc, boolean mask) throws XMLStreamException {
         SVGClipPath cp = new SVGClipPath();
         Map<String, String> a = attrs(r);
         cp.setId(a.get("id"));
-        cp.setObjectBoundingBox("objectBoundingBox".equals(a.get("clipPathUnits")));
+        cp.setMask(mask);
+        cp.setAlphaMask(mask && "alpha".equals(mergedValue(a, "mask-type")));
+        cp.setObjectBoundingBox("objectBoundingBox".equals(a.get(mask ? "maskContentUnits" : "clipPathUnits")));
         readChildren(r, cp, doc);
         return cp;
     }
@@ -652,7 +673,7 @@ public final class SVGParser {
                     || "stroke-linejoin".equals(k) || "stroke-miterlimit".equals(k)
                     || "clip-path".equals(k) || "fill-rule".equals(k)
                     || "stroke-dasharray".equals(k) || "stroke-dashoffset".equals(k)
-                    || "display".equals(k) || "visibility".equals(k)) {
+                    || "display".equals(k) || "visibility".equals(k) || "mask".equals(k)) {
                 pres.put(k, e.getValue());
             }
         }

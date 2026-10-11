@@ -52,6 +52,7 @@ public final class SVGStyle {
     private Boolean fillEvenOdd;
     private float[] strokeDashArray;
     private boolean displayNone;
+    private String maskRef;
     private Boolean visible;
     private Float strokeDashOffset;
 
@@ -95,6 +96,9 @@ public final class SVGStyle {
     /** The visibility of the element; null when it does not say. A hidden element's children may still be visible. */
     public Boolean getVisible() { return visible; }
     public void setVisible(Boolean v) { this.visible = v; }
+    /** The id of the mask the element is seen through, or null. Not inherited. */
+    public String getMaskRef() { return maskRef; }
+    public void setMaskRef(String maskRef) { this.maskRef = maskRef; }
     public SVGStyle inherit(SVGStyle parent) {
         if (parent == null) return this;
         if (fill == null) fill = parent.fill;

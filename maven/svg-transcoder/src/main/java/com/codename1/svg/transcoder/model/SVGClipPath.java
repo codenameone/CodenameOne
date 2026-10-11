@@ -29,6 +29,19 @@ package com.codename1.svg.transcoder.model;
 /// implementation -- they are silently flattened to the first child shape.
 public final class SVGClipPath extends SVGGroup {
     private boolean objectBoundingBox;
+    private boolean mask;
+    private boolean alphaMask;
+
+    /// Whether this was written as a `<mask>`: its content is painted and
+    /// decides how much of the masked element shows, where a clip path only
+    /// lends its outline.
+    public boolean isMask() { return mask; }
+    public void setMask(boolean mask) { this.mask = mask; }
+
+    /// Whether a mask goes by the opacity of its content (`mask-type:
+    /// alpha`) and not by how light it is.
+    public boolean isAlphaMask() { return alphaMask; }
+    public void setAlphaMask(boolean alphaMask) { this.alphaMask = alphaMask; }
 
     /// Whether the outline is given in fractions of the bounding box of the
     /// element it clips (`clipPathUnits="objectBoundingBox"`).

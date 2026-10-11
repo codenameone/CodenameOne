@@ -78,6 +78,10 @@ public final class StyleParser {
         if (fillRule != null) {
             out.setFillEvenOdd(Boolean.valueOf("evenodd".equals(fillRule.trim())));
         }
+        String mask = merged.get("mask");
+        if (mask != null) {
+            out.setMaskRef(SVGPaint.stripUrl(mask));
+        }
         String display = merged.get("display");
         out.setDisplayNone(display != null && "none".equals(display.trim()));
         String visibility = merged.get("visibility");
