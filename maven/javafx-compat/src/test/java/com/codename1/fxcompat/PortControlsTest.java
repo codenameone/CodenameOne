@@ -452,6 +452,17 @@ public class PortControlsTest {
         java.util.Hashtable<String, Object> theme = new java.util.Hashtable<String, Object>();
         theme.put("Button.hover#fgColor", "ff0000");
         com.codename1.ui.plaf.UIManager.getInstance().addThemeProps(theme);
+        try {
+            aHoveredButtonUnderTheTheme();
+        } finally {
+            // The theme is the display's, and the classes after this one
+            // draw their controls with it.
+            com.codename1.ui.plaf.UIManager.getInstance().setThemeProps(
+                    new java.util.Hashtable<String, Object>());
+        }
+    }
+
+    private void aHoveredButtonUnderTheTheme() {
         Pane root = new Pane();
         Button b = new Button("Click me");
         b.setFont(javafx.scene.text.Font.font(21));

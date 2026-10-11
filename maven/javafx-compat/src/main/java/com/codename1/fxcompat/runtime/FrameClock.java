@@ -137,6 +137,9 @@ public final class FrameClock {
         PULSES.clear();
         unregister();
         manual = false;
+        // Manual time starts over too: what a frame shows depends on the
+        // time it is given, and a test must not inherit the last one's.
+        manualNanos = 0;
     }
 
     /// Moves the clock to the form on screen when it is not there

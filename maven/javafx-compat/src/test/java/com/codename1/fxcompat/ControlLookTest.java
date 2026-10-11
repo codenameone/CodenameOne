@@ -547,6 +547,10 @@ public class ControlLookTest {
             new Scene(new StackPane(box), 300, 100);
             box.resize(box.prefWidth(-1), box.prefHeight(-1));
             box.layout();
+            // Red, since the headless display draws the glyph of a themed
+            // box as a block of the theme's colour: a dash of that colour
+            // would be lost in it whenever an earlier class left a theme.
+            box.setTextFill(javafx.scene.paint.Color.RED);
             int[] empty = raster(box);
             box.setIndeterminate(true);
             int[] dashed = raster(box);
