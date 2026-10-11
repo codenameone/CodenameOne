@@ -141,6 +141,7 @@ public class BytecodeMethod implements SignatureSet {
     private String desc;
     private boolean eliminated;
     private boolean bodyCulled;
+    private String unsupportedBootstrap;
     private boolean barebone;
     private boolean disableDebugInfo;
     private boolean disableNullAndArrayBoundsChecks;
@@ -1761,6 +1762,18 @@ public class BytecodeMethod implements SignatureSet {
                     }
                 }
             }
+        }
+    }
+
+    void unsupportedBootstrap(String bootstrap) {
+        if (unsupportedBootstrap == null) unsupportedBootstrap = bootstrap;
+    }
+
+    void verifySupportedBootstraps() {
+        if (!eliminated && unsupportedBootstrap != null) {
+            throw new IllegalArgumentException("Unsupported native bytecode bootstrap in "
+                    + clsName + "." + methodName + getSignature() + ": " + unsupportedBootstrap
+                    + ". Rewrite the unsupported construct before native packaging.");
         }
     }
 
