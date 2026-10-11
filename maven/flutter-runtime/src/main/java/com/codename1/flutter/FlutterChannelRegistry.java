@@ -26,7 +26,12 @@ package com.codename1.flutter;
 import com.codename1.flutter.platform.EventChannel;
 import com.codename1.flutter.platform.MethodChannel;
 
+import dart.core.DartList;
+import dart.core.DartMap;
+
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -84,5 +89,42 @@ public final class FlutterChannelRegistry {
     /** The stream handler registered for {@code channel}, or {@code null} if none. */
     public static EventChannel.StreamHandler streamHandler(String channel) {
         return STREAM_HANDLERS.get(channel);
+    }
+
+    /// A value the Java side hands to Dart, in the types transpiled Dart code
+    /// uses: Dart's `int` is a Java `Long` and its `double` a `Double`, and its
+    /// lists and maps are `DartList`/`DartMap`. Flutter's codec does this
+    /// conversion on the real platform channel; here nothing is serialized, so
+    /// without it a Java handler answering `result.success(87)` -- an `Integer`,
+    /// what ported Kotlin `Int` code produces -- reached Dart code expecting a
+    /// `Long`, and a plain `java.util.List` reached code calling Dart list
+    /// methods. On iOS a cast is unchecked (ParparVM), so that is a native crash,
+    /// not an exception. Lists and maps are converted recursively; every other
+    /// value, including `null`, `String`, `Boolean` and the Dart types themselves,
+    /// passes through unchanged.
+    public static Object toDart(Object value) {
+        if (value instanceof Integer || value instanceof Short || value instanceof Byte) {
+            return Long.valueOf(((Number) value).longValue());
+        }
+        if (value instanceof Float) {
+            return Double.valueOf(((Float) value).doubleValue());
+        }
+        if (value instanceof List && !(value instanceof DartList)) {
+            DartList<Object> out = new DartList<Object>();
+            for (Object e : (List<?>) value) {
+                out.add(toDart(e));
+            }
+            return out;
+        }
+        if (value instanceof Map && !(value instanceof DartMap)) {
+            DartMap<Object, Object> out = new DartMap<Object, Object>();
+            Iterator<? extends Map.Entry<?, ?>> it = ((Map<?, ?>) value).entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry<?, ?> e = it.next();
+                out.put(toDart(e.getKey()), toDart(e.getValue()));
+            }
+            return out;
+        }
+        return value;
     }
 }

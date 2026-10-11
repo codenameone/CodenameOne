@@ -100,7 +100,7 @@ public final class MethodChannel {
                                     return;
                                 }
                                 replied[0] = true;
-                                completer.complete(result);
+                                completer.complete(FlutterChannelRegistry.toDart(result));
                             }
 
                             @Override
@@ -112,7 +112,7 @@ public final class MethodChannel {
                                 PlatformException e = new PlatformException();
                                 e.code(errorCode);
                                 e.message(errorMessage);
-                                e.details(errorDetails);
+                                e.details(FlutterChannelRegistry.toDart(errorDetails));
                                 completer.completeError(e);
                             }
 

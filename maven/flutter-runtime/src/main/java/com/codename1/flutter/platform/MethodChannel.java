@@ -88,7 +88,7 @@ public final class MethodChannel {
                     return;
                 }
                 try {
-                    h.onMethodCall(new MethodCall(method, arguments), r);
+                    h.onMethodCall(new MethodCall(method, FlutterChannelRegistry.toDart(arguments)), r);
                 } catch (Throwable t) {
                     r.error("error", t.getMessage(), null);
                 }

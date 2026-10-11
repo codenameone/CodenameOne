@@ -70,6 +70,36 @@ public class MethodChannelTest {
         assertEquals("hello world", Await.await$(f));
     }
 
+    /// Java values reach Dart in Dart's types: an Integer (what ported Kotlin
+    /// `Int` code answers with) as a Long, a java.util.List as a DartList with
+    /// its elements converted too. See FlutterChannelRegistry.toDart.
+    @Test
+    @Timeout(value = 10, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+    public void javaValuesReachDartInDartTypes() {
+        String channel = "test/channel/" + System.nanoTime();
+        new com.codename1.flutter.platform.MethodChannel(channel).setMethodCallHandler(
+                new com.codename1.flutter.platform.MethodChannel.MethodCallHandler() {
+                    @Override
+                    public void onMethodCall(com.codename1.flutter.platform.MethodCall call,
+                            com.codename1.flutter.platform.MethodChannel.Result result) {
+                        if ("level".equals(call.method())) {
+                            result.success(Integer.valueOf(87));
+                        } else {
+                            java.util.List<Object> l = new java.util.ArrayList<Object>();
+                            l.add(Integer.valueOf(1));
+                            l.add(Float.valueOf(2.5f));
+                            result.success(l);
+                        }
+                    }
+                });
+        MethodChannel dart = new MethodChannel(channel);
+        assertEquals(Long.valueOf(87), Await.await$(dart.invokeMethod("level", null)));
+        Object list = Await.await$(dart.invokeMethod("list", null));
+        assertTrue(list instanceof dart.core.DartList, "a Java List must arrive as a DartList");
+        assertEquals(Long.valueOf(1), ((java.util.List<?>) list).get(0));
+        assertEquals(Double.valueOf(2.5), ((java.util.List<?>) list).get(1));
+    }
+
     @Test
     @Timeout(value = 10, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
     public void javaErrorReplyBecomesAPlatformException() {

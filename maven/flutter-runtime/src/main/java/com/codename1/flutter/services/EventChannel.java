@@ -117,7 +117,7 @@ public final class EventChannel {
         private final class SinkImpl implements com.codename1.flutter.platform.EventChannel.EventSink {
             @Override
             public void success(Object event) {
-                emit(event);
+                emit(FlutterChannelRegistry.toDart(event));
             }
 
             @Override
@@ -125,7 +125,7 @@ public final class EventChannel {
                 PlatformException e = new PlatformException();
                 e.code(errorCode);
                 e.message(errorMessage);
-                e.details(errorDetails);
+                e.details(FlutterChannelRegistry.toDart(errorDetails));
                 emitError(e);
             }
 
