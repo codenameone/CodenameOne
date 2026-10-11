@@ -36,6 +36,7 @@ import com.codename1.desktopcompat.java.awt.Dimension;
 import com.codename1.desktopcompat.java.awt.Font;
 import com.codename1.desktopcompat.java.awt.Insets;
 import com.codename1.desktopcompat.javax.swing.border.Border;
+import com.codename1.desktopcompat.rt.LafTheme;
 import com.codename1.desktopcompat.rt.ScrollDelegate;
 import org.junit.After;
 import org.junit.Test;
@@ -54,6 +55,11 @@ public class UIManagerTest extends KernelTestBase {
             UIManager.put(KEYS[i], null);
         }
         UIManager.setLookAndFeel((LookAndFeel) null);
+        // Selecting a look and feel lays a palette over the theme of the
+        // one display every class shares, and taking the look and feel
+        // away does not lift it: the classes after this one drew a radio
+        // button whose dot had the colour of its field.
+        LafTheme.reset();
         ScrollDelegate.setBarThickness(-1);
     }
 
