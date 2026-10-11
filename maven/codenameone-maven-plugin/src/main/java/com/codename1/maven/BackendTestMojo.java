@@ -61,11 +61,17 @@ public class BackendTestMojo extends AbstractMojo {
     @Parameter(defaultValue = "${project}", readonly = true, required = true)
     private MavenProject project;
 
+    @Parameter(defaultValue = "${session}", readonly = true, required = true)
+    private org.apache.maven.execution.MavenSession session;
+
     @Parameter(defaultValue = "${localRepository}", readonly = true, required = true)
     private ArtifactRepository localRepository;
 
     @Component
     private RepositorySystem repositorySystem;
+
+    @Component
+    private org.eclipse.aether.RepositorySystem processorRepositorySystem;
 
     @Parameter(property = "cn1.backend.compiledTests", defaultValue = "false")
     private boolean enabled;
@@ -130,7 +136,7 @@ public class BackendTestMojo extends AbstractMojo {
         }
     }
 
-    private BackendTestPackager packager() {
+    private BackendTestPackager packager() throws MojoExecutionException {
         final SurefireSelection selection = SurefireSelection.of(project, testSelection);
         BackendTestPackager p = new BackendTestPackager(
                 new MavenModuleHost(project, MavenLog.of(getLog()))) {
@@ -205,6 +211,13 @@ public class BackendTestMojo extends AbstractMojo {
         };
         p.strict(strict).timeoutSeconds(timeoutSeconds);
         p.jdk(jdkHome, jdk8Home).cflags(cflags);
+        java.util.Properties userProperties = session == null ? new java.util.Properties() : session.getUserProperties();
+        BackendPackageMojo.configureJavaLevel(p, project, userProperties);
+        BackendPackageMojo.configureTestJavaLevel(p, project, userProperties);
+        p.compilerOptions(BackendPackageMojo.resolvedCompilerOptions(project, userProperties, false,
+                processorRepositorySystem, session == null ? null : session.getRepositorySession()));
+        p.testCompilerOptions(BackendPackageMojo.resolvedCompilerOptions(project, userProperties, true,
+                processorRepositorySystem, session == null ? null : session.getRepositorySession()));
         return p;
     }
 }

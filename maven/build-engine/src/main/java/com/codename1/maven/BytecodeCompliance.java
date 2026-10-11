@@ -95,6 +95,8 @@ public class BytecodeCompliance {
 
     private List<File> siblingClassRoots = Collections.emptyList();
 
+    private boolean backendCheck;
+
     private Set<String> pendingProjectClasses = Collections.emptySet();
 
     /// A check of the project `host` describes.
@@ -329,6 +331,84 @@ public class BytecodeCompliance {
 
         writeComplianceSuccess("Completed compliance check on " + host.finalName(), rewrittenClassCount);
         getLog().info("Invocation rewrite summary: classes rewritten=" + invocationRewriteSummary.rewrittenClasses + ", callsites rewritten=" + invocationRewriteSummary.rewrittenCallsites);
+    }
+
+    /// Checks freshly compiled backend application/test classes against the native
+    /// JavaAPI, not the client runtime or host JDK. Never skips or consults the
+    /// client's success marker. Backend bytecode retains its configured version.
+    public void checkBackend(File output, File javaApi, List<File> dependencies)
+            throws BuildExecutionException {
+        checkBackendBootstraps(output);
+        complianceOutputFile = new File(output.getParentFile(), output.getName() + "-compliance.txt");
+        Map<String, ClassMetadata> allowed = buildClassIndex(Collections.singletonList(javaApi));
+        Map<String, ClassMetadata> project = buildClassIndexWithOutput(output, dependencies);
+        // A dependency must not replace a native Java platform class during checks.
+        for (String name : new ArrayList<String>(project.keySet())) {
+            if (allowed.containsKey(name)) {
+                project.remove(name);
+            }
+        }
+        List<Violation> violations;
+        backendCheck = true;
+        try {
+            violations = scanProjectClasses(output, allowed, project);
+        } finally {
+            backendCheck = false;
+        }
+        if (!violations.isEmpty()) {
+            writeComplianceReport(violations, output, dependencies, 0);
+            throw new BuildFailureException(buildFailureSummary(violations));
+        }
+    }
+
+    /// Application classes must use bootstraps the native translator implements.
+    /// Dependencies are checked by the translator after dead-code elimination.
+    /// Record ObjectMethods must be lowered first.
+    public void checkBackendBootstraps(File output) throws BuildExecutionException {
+        List<File> files = new ArrayList<File>();
+        collectClassFiles(output, files);
+        final List<String> unsupported = new ArrayList<String>();
+        for (final File file : files) {
+            try (InputStream input = new BufferedInputStream(new FileInputStream(file))) {
+                new ClassReader(input).accept(new ClassVisitor(Opcodes.ASM9) {
+                    @Override
+                    public MethodVisitor visitMethod(int access, final String name, final String descriptor,
+                            String signature, String[] exceptions) {
+                        return new MethodVisitor(Opcodes.ASM9) {
+                            @Override
+                            public void visitInvokeDynamicInsn(String invokedName, String invokedDescriptor,
+                                    org.objectweb.asm.Handle bootstrap, Object... arguments) {
+                                String owner = bootstrap.getOwner();
+                                String method = bootstrap.getName();
+                                boolean supported = bootstrap.getTag() == Opcodes.H_INVOKESTATIC
+                                        && !bootstrap.isInterface()
+                                        && (("java/lang/invoke/StringConcatFactory".equals(owner)
+                                                && ("makeConcat".equals(method) || "makeConcatWithConstants".equals(method)))
+                                            || ("java/lang/invoke/LambdaMetafactory".equals(owner)
+                                                && ("metafactory".equals(method) || "altMetafactory".equals(method))));
+                                if (!supported) unsupported.add(file + " in " + name + descriptor
+                                        + ": " + owner + "." + method);
+                            }
+
+                            @Override
+                            public void visitLdcInsn(Object value) {
+                                if (value instanceof org.objectweb.asm.ConstantDynamic) {
+                                    unsupported.add(file + " in " + name + descriptor
+                                            + ": dynamic constant " + ((org.objectweb.asm.ConstantDynamic) value).getName());
+                                }
+                            }
+                        };
+                    }
+                }, ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+            } catch (IOException ex) {
+                throw new BuildExecutionException("Could not check native bootstraps in " + file, ex);
+            }
+        }
+        if (!unsupported.isEmpty()) {
+            throw new BuildFailureException("Unsupported native bytecode bootstrap(s): " + unsupported
+                    + ". The native translator supports lambda and string-concatenation bootstraps; "
+                    + "rewrite the unsupported construct before native packaging.");
+        }
     }
 
     private boolean shouldSkipComplianceCheck() {
@@ -935,7 +1015,9 @@ public class BytecodeCompliance {
     private Map<String, ClassMetadata> buildClassIndexWithOutput(File outputDir, List<File> dependencyJars) throws BuildExecutionException {
         Map<String, ClassMetadata> index = buildClassIndex(Collections.singletonList(outputDir));
         Map<String, ClassMetadata> dependencyIndex = buildClassIndex(dependencyJars);
-        index.putAll(dependencyIndex);
+        for (Map.Entry<String, ClassMetadata> entry : dependencyIndex.entrySet()) {
+            index.putIfAbsent(entry.getKey(), entry.getValue());
+        }
         return index;
     }
 
@@ -954,7 +1036,7 @@ public class BytecodeCompliance {
                         try {
                             ClassMetadata metadata = readClassMetadata(inputStream, classFile.getAbsolutePath());
                             if (metadata != null) {
-                                index.put(metadata.name, metadata);
+                                index.putIfAbsent(metadata.name, metadata);
                             }
                         } finally {
                             inputStream.close();
@@ -1009,13 +1091,13 @@ public class BytecodeCompliance {
                     }
                     ClassMetadata metadata = readClassMetadata(new ByteArrayInputStream(bytes), sourcePrefix + "!" + entryName);
                     if (metadata != null) {
-                        index.put(metadata.name, metadata);
+                        index.putIfAbsent(metadata.name, metadata);
                     }
                     if (relocated) {
                         ClassMetadata moved = readClassMetadata(new ByteArrayInputStream(AndroidRemapper.remap(bytes)),
                                 sourcePrefix + "!" + entryName);
                         if (moved != null) {
-                            index.put(moved.name, moved);
+                            index.putIfAbsent(moved.name, moved);
                         }
                     }
                 } else if (isClassArchiveName(entryName)) {
@@ -1246,20 +1328,84 @@ public class BytecodeCompliance {
         @Override
         public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
             className = name;
+            if (backendCheck) {
+                if (superName != null) checkTypeReference(name, "<class>", superName);
+                if (interfaces != null) for (String iface : interfaces) checkTypeReference(name, "<class>", iface);
+            }
+        }
+
+        @Override
+        public FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
+            if (backendCheck) checkDescriptor(name, descriptor);
+            return null;
+        }
+
+        private void checkDescriptor(String member, String descriptor) {
+            Type type = Type.getType(descriptor);
+            if (type.getSort() == Type.METHOD) {
+                for (Type argument : type.getArgumentTypes()) checkDescriptor(member, argument.getDescriptor());
+                checkDescriptor(member, type.getReturnType().getDescriptor());
+            } else if (type.getSort() == Type.ARRAY) {
+                checkDescriptor(member, type.getElementType().getDescriptor());
+            } else if (type.getSort() == Type.OBJECT) {
+                checkTypeReference(className, member, type.getInternalName());
+            }
+        }
+
+        private void checkHandle(String member, org.objectweb.asm.Handle handle) {
+            if (handle.getTag() <= Opcodes.H_PUTSTATIC) {
+                checkFieldReference(className, member, handle.getOwner(), handle.getName(), handle.getDesc());
+            } else {
+                checkMethodReference(className, member, handle.getOwner(), handle.getName(), handle.getDesc());
+            }
+            checkDescriptor(member, handle.getDesc());
         }
 
         @Override
         public MethodVisitor visitMethod(int access, final String name, final String descriptor, String signature, String[] exceptions) {
             final String sourceMethod = name + descriptor;
+            if (backendCheck) {
+                checkDescriptor(sourceMethod, descriptor);
+                if (exceptions != null) for (String exception : exceptions) checkTypeReference(className, sourceMethod, exception);
+            }
             return new MethodVisitor(Opcodes.ASM9) {
+                @Override
+                public void visitLdcInsn(Object value) {
+                    if (!backendCheck) return;
+                    if (value instanceof Type) checkDescriptor(sourceMethod, ((Type) value).getDescriptor());
+                    if (value instanceof org.objectweb.asm.Handle) checkHandle(sourceMethod, (org.objectweb.asm.Handle) value);
+                }
+
+                @Override
+                public void visitInvokeDynamicInsn(String name, String descriptor, org.objectweb.asm.Handle bootstrap, Object... args) {
+                    if (!backendCheck) return;
+                    checkDescriptor(sourceMethod, descriptor);
+                    for (Object arg : args) {
+                        if (arg instanceof org.objectweb.asm.Handle) checkHandle(sourceMethod, (org.objectweb.asm.Handle) arg);
+                        if (arg instanceof Type) checkDescriptor(sourceMethod, ((Type) arg).getDescriptor());
+                    }
+                }
+
+                @Override
+                public void visitMultiANewArrayInsn(String descriptor, int dimensions) {
+                    if (backendCheck) checkDescriptor(sourceMethod, descriptor);
+                }
+
+                @Override
+                public void visitTryCatchBlock(org.objectweb.asm.Label start, org.objectweb.asm.Label end, org.objectweb.asm.Label handler, String type) {
+                    if (backendCheck && type != null) checkTypeReference(className, sourceMethod, type);
+                }
+
                 @Override
                 public void visitMethodInsn(int opcode, String owner, String memberName, String memberDescriptor, boolean isInterface) {
                     checkMethodReference(className, sourceMethod, owner, memberName, memberDescriptor);
+                    if (backendCheck) checkDescriptor(sourceMethod, memberDescriptor);
                 }
 
                 @Override
                 public void visitFieldInsn(int opcode, String owner, String memberName, String memberDescriptor) {
                     checkFieldReference(className, sourceMethod, owner, memberName, memberDescriptor);
+                    if (backendCheck) checkDescriptor(sourceMethod, memberDescriptor);
                 }
 
                 @Override
@@ -1285,6 +1431,7 @@ public class BytecodeCompliance {
 
         private void checkTypeReference(String sourceClass, String sourceMethod, String owner) {
             if (isArrayDescriptor(owner)) {
+                if (backendCheck) checkDescriptor(sourceMethod, owner);
                 return;
             }
             if (isInternalRewriteHelper(owner)) {
