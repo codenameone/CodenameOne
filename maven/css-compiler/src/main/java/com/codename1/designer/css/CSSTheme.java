@@ -181,6 +181,7 @@ public class CSSTheme {
                 if ("linear-gradient".equals(fn)
                         || "radial-gradient".equals(fn)
                         || "conic-gradient".equals(fn)
+                        || "repeating-conic-gradient".equals(fn)
                         || "repeating-linear-gradient".equals(fn)
                         || "repeating-radial-gradient".equals(fn)) {
                     return true;
@@ -304,7 +305,9 @@ public class CSSTheme {
                         parseRadialGradientExtended(background, false);
                     }
                 } else if ("conic-gradient".equals(fn)) {
-                    parseConicGradient(background);
+                    parseConicGradient(background, false);
+                } else if ("repeating-conic-gradient".equals(fn)) {
+                    parseConicGradient(background, true);
                 } else if ("repeating-linear-gradient".equals(fn)) {
                     parseLinearGradientExtended(background, true);
                 } else if ("repeating-radial-gradient".equals(fn)) {
@@ -395,7 +398,9 @@ public class CSSTheme {
             } else if ("repeating-radial-gradient".equals(fn)) {
                 g.parseRadialGradientExtended(background, true);
             } else if ("conic-gradient".equals(fn)) {
-                g.parseConicGradient(background);
+                g.parseConicGradient(background, false);
+            } else if ("repeating-conic-gradient".equals(fn)) {
+                g.parseConicGradient(background, true);
             }
             Gradient d = g.extendedDescriptor;
             if (!g.valid || d == null) {
@@ -687,7 +692,9 @@ public class CSSTheme {
             this.valid = true;
         }
 
-        private void parseConicGradient(ScaledUnit background) {
+        /// `repeating` is `repeating-conic-gradient`: the stops are gone
+        /// round again past the last of them, up to the full turn.
+        private void parseConicGradient(ScaledUnit background, boolean repeating) {
             ScaledUnit p = (ScaledUnit) background.getParameters();
             if (p == null) { reason = "Empty conic-gradient parameters"; return; }
             float fromAngle = 0f;
@@ -733,6 +740,7 @@ public class CSSTheme {
             }
             ConicGradient cg = new ConicGradient(st.colors, st.positions);
             cg.setRelativeCenterX(cx).setRelativeCenterY(cy).setFromAngleDegrees(fromAngle);
+            cg.setCycleMethod(repeating ? Gradient.CYCLE_REPEAT : Gradient.CYCLE_NONE);
             extendedDescriptor = cg;
             this.type = Style.BACKGROUND_GRADIENT_CONIC;
             this.bgTransparency = (byte) 0xff;
@@ -8363,6 +8371,7 @@ public class CSSTheme {
                                 case "linear-gradient" :
                                 case "radial-gradient" :
                                 case "conic-gradient" :
+                                case "repeating-conic-gradient" :
                                 case "repeating-linear-gradient" :
                                 case "repeating-radial-gradient" :
                                     style.put("background", value);

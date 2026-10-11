@@ -81,6 +81,13 @@ public final class CssImportDependencies {
     /// `text` with every string emptied that is not the argument of a
     /// `url()`. What is left of one is its two quotes.
     static String withoutLooseStrings(String text) {
+        return withoutLooseStrings(text, false);
+    }
+
+    /// As above, and with `imports` a string that follows `@import` is kept
+    /// as well, being the file the import names. Any other is still emptied:
+    /// `font-family: "@import 'x.css'"` is a font name and imports nothing.
+    static String withoutLooseStrings(String text, boolean imports) {
         StringBuilder out = new StringBuilder(text.length());
         int len = text.length();
         int i = 0;
@@ -103,6 +110,9 @@ public final class CssImportDependencies {
             }
             boolean argument = before >= 4 && out.substring(before - 4, before).equalsIgnoreCase("url(")
                     && (before == 4 || !Character.isLetterOrDigit(out.charAt(before - 5)));
+            if (!argument && imports && before >= 7) {
+                argument = out.substring(before - 7, before).equalsIgnoreCase("@import");
+            }
             if (argument) {
                 out.append(text, i, end);
             } else {
@@ -167,7 +177,7 @@ public final class CssImportDependencies {
                     out.add(file);
                 }
             }
-            Matcher m = IMPORT.matcher(text);
+            Matcher m = IMPORT.matcher(withoutLooseStrings(text, true));
             while (m.find()) {
                 // A quoted name is taken whole, spaces included; a bare one
                 // ends at the first space.

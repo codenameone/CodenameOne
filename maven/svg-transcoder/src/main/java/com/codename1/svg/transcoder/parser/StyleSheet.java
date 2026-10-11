@@ -143,6 +143,37 @@ final class StyleSheet {
         return rules.isEmpty();
     }
 
+    /**
+     * Whether a media query list takes in an image painted for a screen:
+     * nothing at all, {@code all} or {@code screen}, with or without
+     * {@code only}, and the opposite after {@code not}. A query that only
+     * tests a feature, {@code (min-width: 100px)}, is taken to hold, there
+     * being no window to measure.
+     */
+    static boolean mediaMatches(String media) {
+        if (media == null || media.trim().isEmpty()) return true;
+        for (String query : media.split(",")) {
+            String q = query.trim();
+            boolean not = false;
+            if (q.regionMatches(true, 0, "only", 0, 4) && q.length() > 4 && isSpace(q.charAt(4))) {
+                q = q.substring(4).trim();
+            } else if (q.regionMatches(true, 0, "not", 0, 3) && q.length() > 3 && isSpace(q.charAt(3))) {
+                not = true;
+                q = q.substring(3).trim();
+            }
+            int end = 0;
+            while (end < q.length() && isIdentChar(q.charAt(end))) end++;
+            String type = q.substring(0, end);
+            boolean ours = type.isEmpty() || "all".equalsIgnoreCase(type) || "screen".equalsIgnoreCase(type);
+            if (ours != not) return true;
+        }
+        return false;
+    }
+
+    private static boolean isSpace(char c) {
+        return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f';
+    }
+
     /** Adds the rules of one {@code <style>} element. */
     void add(String css) {
         String text = stripComments(css);
@@ -158,7 +189,13 @@ final class StyleSheet {
                     pos = pos + text.substring(pos, open).indexOf(';') + 1;
                     continue;
                 }
-                pos = endOfBlock(text, open);
+                int end = endOfBlock(text, open);
+                if (prelude.regionMatches(true, 0, "@media", 0, 6) && mediaMatches(prelude.substring(6))) {
+                    // The rules of a medium an image is drawn for are rules
+                    // like any other; those of another are passed over.
+                    add(text.substring(open + 1, Math.max(open + 1, end - 1)));
+                }
+                pos = end;
                 continue;
             }
             int close = text.indexOf('}', open);

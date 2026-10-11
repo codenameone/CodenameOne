@@ -208,4 +208,16 @@ class CssImportDependenciesTest {
         // would compile the theme again on every build.
         assertEquals(1700000000000L, CssImportDependencies.lastModified(css));
     }
+
+    @Test
+    void anImportWrittenInsideAStringImportsNothing(@TempDir Path tmp) throws Exception {
+        File dir = tmp.toFile();
+        File css = new File(dir, "css");
+        write(new File(css, "theme.css"), "@import \"../real.css\";\n"
+                + "A { font-family: \"@import '../ghost.css'\"; }\n");
+        File real = write(new File(dir, "real.css"), "B { color: red; }\n");
+
+        assertEquals(java.util.Collections.singleton(real.getCanonicalFile()), CssImportDependencies.outside(css));
+        assertTrue(CssImportDependencies.lastModified(css) < Long.MAX_VALUE);
+    }
 }

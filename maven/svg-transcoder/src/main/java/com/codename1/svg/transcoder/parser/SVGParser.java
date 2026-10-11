@@ -173,7 +173,9 @@ public final class SVGParser {
                 continue;
             }
             String type = r.getAttributeValue(null, "type");
-            boolean css = type == null || type.trim().isEmpty() || "text/css".equalsIgnoreCase(type.trim());
+            // A sheet for another medium, print say, is not one of an image's.
+            boolean css = (type == null || type.trim().isEmpty() || "text/css".equalsIgnoreCase(type.trim()))
+                    && StyleSheet.mediaMatches(r.getAttributeValue(null, "media"));
             StringBuilder text = new StringBuilder();
             int depth = 1;
             while (r.hasNext() && depth > 0) {

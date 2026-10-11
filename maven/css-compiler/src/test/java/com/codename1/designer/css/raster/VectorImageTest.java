@@ -1030,4 +1030,19 @@ class VectorImageTest {
         assertEquals(0xffff0000, img.getRGB(100, 44), "inside a stroke 15.8 wide");
         assertEquals(0, alpha(img, 100, 40), "and outside it");
     }
+
+    @Test
+    void aStylesheetForAnotherMediumIsNotApplied() throws Exception {
+        BufferedImage img = paint("<style media=\"print\">rect { fill: #ff0000; }</style>"
+                + "<style media=\"screen, print\">.b { fill: #00ff00; }</style>"
+                + "<style>@media print { .c { fill: #ff0000; } } @media screen { .d { fill: #0000ff; } }</style>"
+                + "<rect width=\"25\" height=\"100\"/>"
+                + "<rect class=\"b\" x=\"25\" width=\"25\" height=\"100\"/>"
+                + "<rect class=\"c\" x=\"50\" width=\"25\" height=\"100\"/>"
+                + "<rect class=\"d\" x=\"75\" width=\"25\" height=\"100\"/>", 100, 100);
+        assertEquals(0xff000000, img.getRGB(12, 50), "a print sheet colours nothing");
+        assertEquals(0xff00ff00, img.getRGB(37, 50), "a sheet for screens as well does");
+        assertEquals(0xff000000, img.getRGB(62, 50), "nor does a print block");
+        assertEquals(0xff0000ff, img.getRGB(87, 50), "a screen block does");
+    }
 }

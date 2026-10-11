@@ -668,6 +668,22 @@ class CSSGeneratedImageTest {
     }
 
     @Test
+    void aRepeatingConicGradientGoesRoundAgain(@TempDir Path dir) throws Exception {
+        // Red for an eighth of a turn and blue for the next, again and
+        // again. The box is 320 wide and starts at (2, 2); its centre is
+        // 160 across.
+        Compiled c = compile(dir, "Banner { width: 50%; height: 10%;"
+                + " background-image: repeating-conic-gradient(#ff0000 0deg, #ff0000 45deg, #0000ff 45deg,"
+                + " #0000ff 90deg); box-shadow: 0 0 4px black; }");
+        BufferedImage img = stored(c.res, "Banner_1.png", Display.DENSITY_HD);
+        int cx = 2 + 160;
+        int cy = img.getHeight() / 2;
+        assertEquals(0xffff0000, img.getRGB(cx + 15, cy - 37), "22 degrees round: the first red");
+        assertEquals(0xff0000ff, img.getRGB(cx + 37, cy - 15), "67 degrees: blue");
+        assertEquals(0xffff0000, img.getRGB(cx + 37, cy + 15), "112 degrees: red again, not the last blue");
+    }
+
+    @Test
     void aGradientCentreIsMeasuredFromTheEdgesItNames(@TempDir Path dir) throws Exception {
         // The page is 640x100, so 20px in from the right and 10px up from the
         // bottom is (620, 90).
