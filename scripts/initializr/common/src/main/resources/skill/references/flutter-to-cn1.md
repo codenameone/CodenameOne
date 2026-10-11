@@ -34,6 +34,23 @@ constructs in that screen before anyone commits to the rest.
 
 ## Wiring the build
 
+**Use the import goal when there is a Flutter project to start from.** One
+command does all of the wiring below, plus assets:
+
+```bash
+mvn cn1:import-flutter-project -Dcn1.flutter.import=/path/to/flutter_app
+```
+
+It copies `lib/` into `common/src/main/flutter`, copies every asset and font
+`pubspec.yaml` declares (including assets inside pub packages, found through
+`.dart_tool/package_config.json` or the pub cache), adds the runtime dependency,
+writes the entry class that runs the Dart `main()`, and prints which pub
+dependencies the runtime covers. Read that list: an uncovered package is the
+first suspect when a screen misbehaves. Re-run it to pick up upstream changes;
+local edits survive.
+
+To wire it by hand instead:
+
 1. Add the runtime to `common/pom.xml`. Generated projects already contain it
    commented out:
 
@@ -78,6 +95,17 @@ Useful properties:
 
    Leave both alone if you `wrap` widgets inside screens that rely on the
    native theme.
+
+## Platform code: keep the channels
+
+A Flutter app's `MethodChannel` / `EventChannel` calls compile unchanged. Port
+the platform side (Kotlin/Swift) to Java with `com.codename1.flutter.platform`,
+which mirrors `io.flutter.plugin.common` (`MethodChannel.setMethodCallHandler`
+with `onMethodCall(call, result)`, `result.success/error/notImplemented`,
+`EventChannel.setStreamHandler` with `onListen(args, sink)`). Android handler
+code mostly ports by changing imports. Java can also call Dart directly: a
+top-level function in `lib/foo.dart` is `LibFooLib.foo(...)`, and a widget class
+keeps its name with its parameters as constructor arguments, key first.
 
 ## The port loop that actually converges
 

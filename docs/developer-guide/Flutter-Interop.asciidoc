@@ -1,28 +1,288 @@
 [[flutter-interop]]
-== Running Flutter widget code
+== Running Flutter applications
 
-Codename One can compile Dart widget source into a Codename One UI at build
-time. The Dart is translated to Java, the Java is compiled by the normal
-toolchain, and the resulting widgets render through Codename One's own
-pipeline on every port the framework supports.
-
-There is no Dart VM in the application, no embedded rendering engine, and no
-platform view. A screen written as Dart widgets becomes ordinary Codename One
-components, so it inherits the theme, the event thread, the accessibility
-tree and the native build at no extra cost -- and it can sit in the same `Form` as
-hand-written Codename One code.
+Codename One builds a Flutter application from its Dart source. The Dart is
+translated to Java at build time, and the result is an ordinary Codename One
+application: no Dart VM, no embedded rendering engine and no platform view
+ship with it. It builds for every platform Codename One targets, and it comes
+out smaller, quicker to start and lighter on memory than the same application
+built by Flutter.
 
 IMPORTANT: Dart support is experimental. Most widgets render, but some callbacks
 and parameters are accepted and then ignored, and the pipeline has so far been
 verified against one large sample application. Test every interaction your
 screens depend on before shipping.
 
-Two things follow from that, and they're the reason to reach for this at all:
+[[flutter-benchmark-results]]
+=== Smaller, faster and lighter than Flutter
 
-* An existing Dart UI can be reused without adopting a second runtime, a
-  second build system or a second set of platform plugins.
-* An existing Codename One application can adopt a Dart screen without being
-  rewritten.
+The charts below come from one application, the Flutter Gallery, built both
+ways from the same Dart source: once by the Flutter toolchain's own release
+build, and once by Codename One. Both builds are measured on the same machine,
+in interleaved rounds, on every change to the project. Lower is better
+throughout.
+
+image::img/flutter-bench-install.svg[Installed size of the Flutter Gallery, Codename One against Flutter, per platform]
+
+image::img/flutter-bench-code.svg[Executable code of the Flutter Gallery, Codename One against Flutter, per platform]
+
+image::img/flutter-bench-cold-start.svg[Cold start to the first frame, Codename One against Flutter, per platform]
+
+image::img/flutter-bench-idle-memory.svg[Memory at rest, Codename One against Flutter, per platform]
+
+The comparison is tilted *toward* Flutter. The application is Flutter's own
+showcase, written by the Flutter team in Flutter's idioms, and Codename One
+runs it as it is. To do that the Codename One build carries a runtime that
+reimplements Flutter's widget, element and layout model on top of Codename One
+components, which is work an application written for Codename One never pays
+for. The same screens written directly against Codename One's own components
+would be smaller and faster again. The numbers above are what a team gets on
+the day it moves its Flutter code over, before changing a line of it.
+
+Two platforms aren't measured in full, and the charts leave them out rather than
+estimate them:
+
+* *Start-up and memory on iOS.* Flutter can't compile Dart ahead of time for
+  the simulator, so a simulator run would time Flutter's debug engine against a
+  Codename One release build. iOS sizes come from release device bundles.
+* *Start-up and memory on the web.* Timing a browser build needs a driver for
+  the browser's developer tools, which the benchmark doesn't have, so it
+  reports web sizes only.
+
+Android start-up and memory come from an emulator rather than a phone. They
+compare the two builds on one machine; they aren't phone timings.
+<<flutter-benchmark>> explains how each metric is taken.
+
+=== What it looks like
+
+The Flutter Gallery's demos, rendered by Flutter on the left and by Codename One
+on the right from the same Dart source:
+
+image::img/flutter-gallery-card.png[The Cards demo rendered by Flutter and by Codename One]
+
+image::img/flutter-gallery-text-field.png[The Text fields demo rendered by Flutter and by Codename One]
+
+image::img/flutter-gallery-bottom-navigation.png[The Bottom navigation demo rendered by Flutter and by Codename One]
+
+image::img/flutter-gallery-colors.png[The Colors demo rendered by Flutter and by Codename One]
+
+image::img/flutter-gallery-button.png[The Text button demo rendered by Flutter and by Codename One]
+
+The Codename One side is a real Codename One component tree, not a picture of
+one: it uses the theme, the event dispatch thread, the accessibility tree and
+the native build like any other Codename One screen, and it can share a `Form`
+with hand-written Codename One code.
+
+[[flutter-import]]
+=== Importing a Flutter application
+
+One command brings a Flutter project into a Codename One project:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/flutter-import.sh[tag=flutter-import-bash-001,indent=0]
+----
+
+Run it in a project generated from the Codename One archetype or
+https://start.codenameone.com[the initializr]. It does what wiring Flutter in
+by hand would take:
+
+* Copies the Dart source in `lib` into `common/src/main/flutter`.
+* Copies every asset and font `pubspec.yaml` declares, including whole asset
+  directories and the assets of the packages the application depends on, which
+  it finds through the project's `.dart_tool/package_config.json` or the pub
+  cache.
+* Adds the Flutter runtime to `common/pom.xml` and makes sure the build
+  translates the Dart.
+* Writes the application's entry class so that it runs the Dart `main()`. A
+  class that was already there is saved beside it with a `.pre-flutter-import`
+  suffix.
+* Carries the application name and version over from `pubspec.yaml`.
+
+It then lists the application's pub dependencies and says which of them
+Codename One provides. The transpiler doesn't compile a package's Dart; a
+package works when the Flutter runtime implements its API, as it does for
+`provider`, `intl`, `animations` and other common ones. A dependency listed as
+not covered is the first thing to look at if a screen misbehaves.
+
+Re-running the command later picks up changes made on the Flutter side. A file
+you edited after the earlier import is left as you edited it, and a file the
+Flutter project no longer has is removed.
+
+No Dart or Flutter SDK is needed to build the result. The transpiler is Java and
+runs as part of the normal Maven build. The command reads the pub cache only to
+find package assets, so run `flutter pub get` once in the Flutter project if it
+reports a package it can't find.
+
+=== Migrating an entire application
+
+After the import, the Dart *is* the application: the entry class calls the
+Dart `main()`, whose `runApp` mounts the widget tree as the root of a `Form`.
+Build and run it like any Codename One application, in the simulator or for a
+device.
+
+`FlutterUI.runApp` is the same call from Java, the analog of Flutter's own
+`runApp`. It installs the Material base theme, because the widget tree is
+expected to be the whole UI and to look the way its author intended:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/flutter/FlutterInteropSnippets.java[tag=flutter-interop-java-002,indent=0]
+----
+
+A port is mostly a question of how much of the Dart language and of the Flutter
+libraries the application uses. The transpiler reports what it can't handle
+rather than guessing: a construct outside the supported subset fails the build
+with a code naming the feature, so the gaps are a list to work through rather
+than a runtime surprise. At runtime, a widget that isn't implemented is
+recorded through the error inventory instead of drawing nothing.
+
+=== Migrating a single form
+
+The same build can carry Dart screens inside an application otherwise written
+in Codename One, so a migration can go one screen at a time in either
+direction.
+
+Put the Dart files under `common/src/main/flutter`; the import command does
+this, or copy them by hand. Each Dart widget class becomes a Java class of the
+same name in `com.codename1.generated.flutter`, with its parameters as
+constructor arguments in declaration order and the widget key first. A Dart
+`MyHomePage({super.key, required this.title})` is created from Java as
+`new MyHomePage(null, "Inbox")`.
+
+`FlutterUI.wrap` inflates the widget into a plain `Container`, which goes
+anywhere an ordinary component can:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/flutter/FlutterInteropSnippets.java[tag=flutter-interop-java-001,indent=0]
+----
+
+The wrapped widget is a component like any other: it takes part in the parent's
+layout, scrolls with it and is styled by the same theme. It doesn't install the
+Material base theme, so a Dart screen dropped into an existing form won't
+restyle the rest of it.
+
+[[flutter-java-dart-calls]]
+=== Calling between Java and Dart
+
+Java and Dart run in the same application, on the same thread, so calls between
+them are ordinary method calls. There are three ways to make them, and the
+first is the one a Flutter developer already knows.
+
+==== Platform channels
+
+A Flutter application talks to its platform code through `MethodChannel` and
+`EventChannel` from `package:flutter/services.dart`. Those work unchanged: the
+Dart side compiles unchanged, and the platform side, which is Kotlin or Swift in
+a Flutter project, becomes Java in the Codename One project. The Java classes
+in `com.codename1.flutter.platform` mirror Flutter's Android
+`io.flutter.plugin.common` API, so Android handler code ports by changing its
+imports.
+
+*Dart calling Java.* The Dart side invokes a method on a named channel:
+
+[source,dart]
+----
+include::../demos/common/src/main/snippets/developer-guide/flutter-channels.dart[tag=flutter-interop-dart-001,indent=0]
+----
+
+A Java handler registered under the same channel name answers it:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/flutter/FlutterInteropSnippets.java[tag=flutter-interop-java-003,indent=0]
+----
+
+`result.error(...)` reaches Dart as a `PlatformException`, and
+`result.notImplemented()`, or no handler at all, as a
+`MissingPluginException`, as on Flutter. The handler doesn't have to answer
+before it returns: keep the `Result` and complete it when the answer arrives.
+
+*Java calling Dart.* The direction reverses with the same two classes. Dart
+registers a handler on the channel:
+
+[source,dart]
+----
+include::../demos/common/src/main/snippets/developer-guide/flutter-channels.dart[tag=flutter-interop-dart-002,indent=0]
+----
+
+Java invokes it and gets the reply through a callback:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/flutter/FlutterInteropSnippets.java[tag=flutter-interop-java-004,indent=0]
+----
+
+*Events from Java to Dart.* An `EventChannel` carries a stream of events: a
+sensor reading, a download's progress, a message from a server. Java pushes
+them through the `EventSink` it receives when Dart starts listening:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/flutter/FlutterInteropSnippets.java[tag=flutter-interop-java-005,indent=0]
+----
+
+Dart listens to the stream as it would on Flutter:
+
+[source,dart]
+----
+include::../demos/common/src/main/snippets/developer-guide/flutter-channels.dart[tag=flutter-interop-dart-003,indent=0]
+----
+
+`onListen` runs when the first listener subscribes and `onCancel` when the last
+one cancels, so a sensor or a connection is only active while something is
+listening.
+
+Values cross the channel in the types each side expects, as Flutter's message
+codec does:
+
+[cols="1,1", options="header"]
+|===
+|Dart |Java
+
+|`int`
+|`Long`. An `Integer`, `Short` or `Byte` sent from Java arrives as `int`.
+
+|`double`
+|`Double`. A `Float` sent from Java arrives as `double`.
+
+|`String`, `bool`, `null`
+|`String`, `Boolean`, `null`
+
+|`List`, `Map`
+|`java.util.List`, `java.util.Map`, converted element by element
+|===
+
+Every handler runs on the event dispatch thread, and a reply is always
+delivered asynchronously, never inside the call that asked for it, as on
+Flutter.
+
+==== Calling Dart functions directly
+
+Without a channel, Java can call transpiled Dart directly. Each Dart file
+becomes a class named after it, with `Lib` appended: `lib/greeting.dart`
+becomes `LibGreetingLib`, and its top-level functions are public static methods
+of that class. Dart's `main` is renamed `main$`.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/flutter/FlutterInteropSnippets.java[tag=flutter-interop-java-006,indent=0]
+----
+
+This is the quickest way to reach Dart logic that has no UI, a parser or a
+pricing rule, from Java. Channels are the better boundary for code that a
+Flutter build must also keep running, because the Dart side doesn't change.
+
+==== Sharing state and callbacks
+
+A `ValueNotifier` or `ChangeNotifier` is an ordinary Java object on the
+Codename One side. Java code that holds one can set its value or call
+`notifyListeners()`, and every Dart widget listening to it, through
+`ValueListenableBuilder` or `AnimatedBuilder`, rebuilds.
+Callback parameters work the other way: an `onPressed` or `onChanged` that a
+Java caller passes into a Dart widget's constructor is a Java lambda, and the
+Dart code calls it.
 
 === How it fits together
 
@@ -44,25 +304,17 @@ elements reconciled against widgets -- but it doesn't reimplement Flutter's
 *rasterizer*. Painting is Codename One's, which is what makes the output a
 real Codename One component tree rather than a texture.
 
-=== Enabling it in a project
-
-Add the runtime dependency to the `common` module. Projects generated from the
-archetype already contain it, commented out:
+The goal is bound in every project generated from the archetype and does
+nothing while `src/main/flutter` doesn't exist. To wire a project by hand
+instead of importing, add the runtime dependency to the `common` module, where
+generated projects already carry it commented out:
 
 [source,xml]
 ----
 include::../demos/common/src/main/snippets/developer-guide/flutter-interop.xml[tag=flutter-interop-xml-001,indent=0]
 ----
 
-Then put Dart files under `common/src/main/flutter`. The goal is already bound
-in the generated `pom.xml` and is a silent no-op while that directory doesn't
-exist, so nothing changes for projects that don't use it.
-
-No Dart SDK is required. The transpiler is Java and runs as part of the Maven
-build; the Dart source is input, not something that gets executed.
-
-The generated package defaults to `com.codename1.generated.flutter` and the
-paths are configurable:
+The generated package and the paths are configurable:
 
 [cols="1,2", options="header"]
 |===
@@ -76,78 +328,17 @@ paths are configurable:
 `target/generated-sources/flutter`.
 
 |`cn1.flutter.package`
-|The package the generated classes are emitted into.
+|The package the generated classes are emitted into. Defaults to
+`com.codename1.generated.flutter`.
 |===
 
-=== Use case: One screen inside an existing application
-
-This is the incremental path, and the one to start with. `FlutterUI.wrap`
-inflates a widget into a plain `Container` that can be added anywhere an
-ordinary component can:
-
-[source,java]
-----
-include::../demos/common/src/main/java/com/codenameone/developerguide/flutter/FlutterInteropSnippets.java[tag=flutter-interop-java-001,indent=0]
-----
-
-The wrapped subtree is a component like any other: it participates in the
-parent's layout, scrolls with it, and is styled by the same theme. An embedded
-subtree does *not* install the Material base theme, so dropping a
-widget into an existing screen won't restyle the rest of it.
-
-That makes this the right shape for reusing a piece of design work -- a chart,
-a card, an onboarding pane -- without committing the rest of the application to
-anything.
-
-=== Use case: Porting an application wholesale
-
-When the Dart source *is* the application, `FlutterUI.runApp` mounts the tree
-as the root of a new `Form` and shows it, which is the direct analog of
-Flutter's own `runApp`:
-
-[source,java]
-----
-include::../demos/common/src/main/java/com/codenameone/developerguide/flutter/FlutterInteropSnippets.java[tag=flutter-interop-java-002,indent=0]
-----
-
-Unlike `wrap`, this path installs the Material base theme, because the widget
-tree is expected to be the whole UI and to look the way its author intended.
-
-A wholesale port is mostly a question of how much of the Dart language and of
-the Flutter libraries the application actually uses. The transpiler reports
-what it can't handle rather than guessing: a construct outside the supported
-subset fails the build with a milestone code identifying the feature, so the
-gap is a list you can work through rather than a runtime surprise.
-
-At runtime the same principle applies. Widgets that aren't implemented are
-recorded through the error inventory rather than drawing nothing,
-so a screen that's missing something says so.
-
-=== What to expect from the result
-
-The transpiled UI is a Codename One application in every respect that matters
-for shipping it: it builds for the same targets, it's signed and packaged the
-same way, and it has no additional runtime to install on the device.
-
-That last point is what the size and start-up differences come from, and it
-cuts both ways -- a Flutter application carries an engine that's good at
-what it does, while a transpiled one carries Codename One's. The benchmark
-described in <<flutter-benchmark>> measures both sides of the same application
-on each platform and publishes the result rather than asserting a direction.
-
-image::img/flutter-parity-textfields.png[The same screen rendered by Flutter and by Codename One]
-
-The screen above is the gallery's text-field demo, rendered by Flutter on the
-left and by the transpiled build on the right, from one Dart source file.
-
 [[flutter-benchmark]]
-=== Measuring it against Flutter
+=== How the numbers are measured
 
-The project keeps a benchmark that builds *one* application both ways -- the
-Flutter toolchain's own release build, and the identical Dart source
-transpiled and built by Codename One -- and measures both on the same machine.
-It lives in `scripts/flutter-bench` and runs in CI, publishing its numbers to
-the pull request and to the port status page.
+The benchmark lives in `scripts/flutter-bench`. It builds the Flutter Gallery
+both ways on each platform and measures both builds on the same machine, and
+continuous integration runs it on every change, publishing the numbers to the
+pull request and to the port status page.
 
 What it reports, per platform:
 
@@ -178,24 +369,20 @@ measured from outside so neither runtime is trusted to time itself.
 Three rules keep the numbers honest, and each exists because the obvious
 alternative produced a flattering result:
 
-* *Interleaved runs, best of N.* One run of each side, alternating. A machine
-  that gets busier halfway through then penalizes both sides equally instead
-  of whichever happened to run second, and the load average is recorded with
-  every result so a surprising ratio can be checked against it.
+* *Interleaved rounds.* One launch of each build, alternating, repeated. A
+  machine that gets busier halfway through then penalizes both builds equally
+  instead of whichever happened to run second, and start-up and memory are
+  judged round by round: the ratio is the median of the per-round ratios.
 
-* *Start-up is a bracket, not a point.* The two runtimes don't expose the
-  same event. Flutter's post-frame callback runs before that frame is
-  rasterized, while Codename One's marker fires once the form is on the
-  screen, so comparing them directly charges one runtime for rasterizing its
-  first screen and not the other. The benchmark therefore reports Flutter's
-  figure as a range and computes the ratio from the end least favorable to
-  Codename One.
+* *Start-up is a bracket where the two runtimes report different events.* On
+  the web, Flutter's earliest marker fires before its first frame is
+  rasterized while Codename One's fires once the frame is on screen, so the
+  benchmark takes Flutter's figure as a range and computes the ratio from the
+  end least favorable to Codename One.
 
 * *A platform that can't be measured says so.* iOS start-up and memory are
-  reported as not measured rather than taken from a simulator, because Dart
-  can't compile ahead-of-time for the simulator -- a simulator comparison
-  would time Flutter's debug build against a Codename One release build.
-  iOS sizes come from release device bundles, which need no signing to measure.
+  reported as not measured rather than taken from a simulator, for the reason
+  given above.
 
 To run it locally against builds you already have:
 
@@ -205,4 +392,6 @@ include::../demos/common/src/main/snippets/developer-guide/flutter-interop.sh[ta
 ----
 
 `--list` also reports which platform adapters have been exercised end to end,
-which isn't the same question as which ones exist.
+which isn't the same question as which ones exist. The charts in
+<<flutter-benchmark-results>> are rendered from the benchmark's result files by
+`scripts/flutter-bench/render_doc_charts.py`.
