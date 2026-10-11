@@ -675,6 +675,104 @@ class VectorImageTest {
     }
 
     @Test
+    void aSpanOfTextIsPutWhereItSaysAndStyledAsItSays() throws Exception {
+        String font = " font-size=\"20\" font-family=\"sans-serif\" font-weight=\"bold\"";
+        BufferedImage img = paint("<text x=\"5\" y=\"30\"" + font + " fill=\"#ff0000\">III"
+                + "<tspan x=\"5\" y=\"80\" fill=\"#0000ff\">III</tspan></text>", 100, 100);
+        int redTop = 0;
+        int blueTop = 0;
+        int redBottom = 0;
+        int blueBottom = 0;
+        for (int y = 0; y < 100; y++) {
+            for (int x = 0; x < 100; x++) {
+                int p = img.getRGB(x, y);
+                if (p == 0xffff0000) {
+                    if (y < 50) {
+                        redTop++;
+                    } else {
+                        redBottom++;
+                    }
+                } else if (p == 0xff0000ff) {
+                    if (y < 50) {
+                        blueTop++;
+                    } else {
+                        blueBottom++;
+                    }
+                }
+            }
+        }
+        assertTrue(redTop > 20 && blueBottom > 20, "the text on its line and the span on the one it gives");
+        assertEquals(0, redBottom + blueTop, "each in its own colour");
+
+        BufferedImage flowing = paint("<text x=\"5\" y=\"30\"" + font + ">II<tspan dy=\"40\">II</tspan></text>",
+                100, 100);
+        BufferedImage flat = paint("<text x=\"5\" y=\"30\"" + font + ">IIII</text>", 100, 100);
+        assertEquals(inkRight(flat), inkRight(flowing), "a span that is only moved down runs on from the text");
+        int below = 0;
+        for (int y = 50; y < 100; y++) {
+            for (int x = 0; x < 100; x++) {
+                below += alpha(flowing, x, y) > 128 ? 1 : 0;
+            }
+        }
+        assertTrue(below > 20);
+
+        BufferedImage spaced = paint("<text x=\"5\" y=\"30\"" + font + ">\n   II\n   </text>", 100, 100);
+        BufferedImage tight = paint("<text x=\"5\" y=\"30\"" + font + ">II</text>", 100, 100);
+        assertEquals(inkRight(tight), inkRight(spaced), "the white space the file is laid out with is not text");
+    }
+
+    @Test
+    void anEvenOddClipLeavesTheInnerSubpathOut() throws Exception {
+        String ring = "<path d=\"M 10 10 H 90 V 90 H 10 Z M 30 30 H 70 V 70 H 30 Z\"";
+        String red = "<rect width=\"100\" height=\"100\" fill=\"#ff0000\" clip-path=\"url(#c)\"/>";
+        BufferedImage holed = paint("<clipPath id=\"c\">" + ring + " clip-rule=\"evenodd\"/></clipPath>" + red,
+                100, 100);
+        assertEquals(0xffff0000, holed.getRGB(20, 50));
+        assertEquals(0, alpha(holed, 50, 50), "the hole");
+        BufferedImage inherited = paint("<clipPath id=\"c\" clip-rule=\"evenodd\">" + ring + "/></clipPath>" + red,
+                100, 100);
+        assertEquals(0, alpha(inherited, 50, 50), "the rule of the clip path is its children's");
+        BufferedImage solid = paint("<clipPath id=\"c\">" + ring + " fill-rule=\"evenodd\"/></clipPath>" + red,
+                100, 100);
+        assertEquals(0xffff0000, solid.getRGB(50, 50), "fill-rule says nothing about a clip");
+    }
+
+    @Test
+    void anImportantDeclarationOfTheElementBeatsOneOfARule() throws Exception {
+        BufferedImage img = paint("<style>.x { fill: #0000ff !important; } .y { fill: #0000ff; }</style>"
+                + "<rect class=\"x\" width=\"50\" height=\"100\" style=\"fill: #ff0000 !important\"/>"
+                + "<rect class=\"x\" x=\"50\" width=\"50\" height=\"50\" style=\"fill: #ff0000\"/>"
+                + "<rect class=\"y\" x=\"50\" y=\"50\" width=\"50\" height=\"50\" style=\"fill:#00ff00!important\"/>",
+                100, 100);
+        assertEquals(0xffff0000, img.getRGB(25, 50), "important on the element is the last word");
+        assertEquals(0xff0000ff, img.getRGB(75, 25), "an important rule still beats a plain declaration");
+        assertEquals(0xff00ff00, img.getRGB(75, 75));
+        BufferedImage alone = paint("<rect width=\"100\" height=\"100\" style=\"fill: #ff0000 !important\"/>", 100, 100);
+        assertEquals(0xffff0000, alone.getRGB(50, 50), "and is read with no stylesheet at all");
+    }
+
+    @Test
+    void aDotLottieArchiveShowsTheAnimationItsManifestPicks() throws Exception {
+        String shape = "{\"v\":\"5.7.0\",\"fr\":30,\"ip\":0,\"op\":30,\"w\":%d,\"h\":100,\"layers\":[]}";
+        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+        try (java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(bytes)) {
+            String[][] entries = {
+                {"animations/first.json", String.format(shape, 100)},
+                {"animations/second.json", String.format(shape, 300)},
+                {"manifest.json", "{\"animations\":[{\"id\":\"first\"},{\"id\":\"second\"}],"
+                        + "\"activeAnimationId\":\"second\"}"},
+            };
+            for (String[] entry : entries) {
+                zip.putNextEntry(new java.util.zip.ZipEntry(entry[0]));
+                zip.write(entry[1].getBytes(StandardCharsets.UTF_8));
+                zip.closeEntry();
+            }
+        }
+        VectorImage image = VectorImage.readLottie(new ByteArrayInputStream(bytes.toByteArray()));
+        assertEquals(300.0, image.getWidth(), 0.001, "the one the manifest names, not the first in the archive");
+    }
+
+    @Test
     void aUseThatNamesItselfDrawsNothingAndEnds() throws Exception {
         BufferedImage img = paint("<g id=\"loop\"><use href=\"#loop\"/></g>", 20, 20);
         assertEquals(0, alpha(img, 10, 10));

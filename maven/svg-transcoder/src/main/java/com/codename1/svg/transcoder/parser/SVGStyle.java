@@ -56,6 +56,12 @@ public final class SVGStyle {
     private Boolean visible;
     private Float strokeDashOffset;
 
+    private Boolean clipEvenOdd;
+
+    /** Whether clip-rule is evenodd; null when the element does not say. Inherited. */
+    public Boolean getClipEvenOdd() { return clipEvenOdd; }
+    public void setClipEvenOdd(Boolean v) { this.clipEvenOdd = v; }
+
     private Integer color;
     private boolean fillCurrent;
     private boolean strokeCurrent;
@@ -142,6 +148,7 @@ public final class SVGStyle {
             strokeCurrent = strokeCurrent || parent.strokeCurrent;
         }
         if (color == null) color = parent.color;
+        if (clipEvenOdd == null) clipEvenOdd = parent.clipEvenOdd;
         // "" is `none` written out, which stops a marker being inherited.
         if (markerStart == null) markerStart = parent.markerStart;
         if (markerMid == null) markerMid = parent.markerMid;

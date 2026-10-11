@@ -23,6 +23,7 @@
 package com.codename1.maven;
 
 import com.codename1.lottie.transcoder.LottieTranscoder;
+import com.codename1.lottie.transcoder.parser.DotLottie;
 import com.codename1.lottie.transcoder.parser.JsonParser;
 import com.codename1.svg.transcoder.SVGTranscoder;
 import com.codename1.svg.transcoder.SVGTranscoder.GeneratedClass;
@@ -32,11 +33,11 @@ import com.codename1.build.Log;
 
 import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
@@ -52,8 +53,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -575,34 +574,14 @@ public class SvgTranscodeRunner {
     }
 
     /**
-     * The animation of a dotLottie archive as JSON text: the first entry of
-     * its {@code animations} directory ({@code a} in the newer layout), or
-     * failing that the first JSON entry that is not the manifest. Null when
-     * the archive holds none.
+     * The animation of a dotLottie archive as JSON text: the one its manifest
+     * picks, see {@link DotLottie#animation}. Null when the archive holds
+     * none.
      */
     private static String dotLottieAnimation(File file) throws IOException {
-        String fallback = null;
-        try (ZipInputStream zip = new ZipInputStream(new FileInputStream(file))) {
-            for (ZipEntry entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
-                String name = entry.getName();
-                if (entry.isDirectory() || !name.endsWith(".json") || name.endsWith("manifest.json")) {
-                    continue;
-                }
-                ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-                byte[] chunk = new byte[8192];
-                for (int n = zip.read(chunk); n >= 0; n = zip.read(chunk)) {
-                    bytes.write(chunk, 0, n);
-                }
-                String json = new String(bytes.toByteArray(), StandardCharsets.UTF_8);
-                if (name.startsWith("animations/") || name.startsWith("a/")) {
-                    return json;
-                }
-                if (fallback == null) {
-                    fallback = json;
-                }
-            }
+        try (InputStream in = new FileInputStream(file)) {
+            return DotLottie.animation(in);
         }
-        return fallback;
     }
 
     private static void collectCss(File dir, List<File> out) {

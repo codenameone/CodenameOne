@@ -130,7 +130,7 @@ public final class VectorImage {
     /// Reads a Lottie animation.
     ///
     /// The stream is either the animation's JSON or a dotLottie archive, a
-    /// zip that holds the JSON under `animations/`.
+    /// zip of animations of which the one its manifest picks is read.
     public static VectorImage readLottie(InputStream in) throws IOException {
         java.io.BufferedInputStream buffered = new java.io.BufferedInputStream(in);
         buffered.mark(4);
@@ -140,30 +140,12 @@ public final class VectorImage {
         if (first != 'P' || second != 'K') {
             return new VectorImage(LottieParser.parse(buffered), true);
         }
-        java.util.zip.ZipInputStream zip = new java.util.zip.ZipInputStream(buffered);
-        byte[] fallback = null;
-        for (java.util.zip.ZipEntry entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
-            String name = entry.getName();
-            if (entry.isDirectory() || !name.endsWith(".json") || name.endsWith("manifest.json")) {
-                continue;
-            }
-            java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
-            byte[] chunk = new byte[8192];
-            for (int n = zip.read(chunk); n >= 0; n = zip.read(chunk)) {
-                bytes.write(chunk, 0, n);
-            }
-            if (name.startsWith("animations/") || name.startsWith("a/")) {
-                return new VectorImage(LottieParser.parse(
-                        new java.io.ByteArrayInputStream(bytes.toByteArray())), true);
-            }
-            if (fallback == null) {
-                fallback = bytes.toByteArray();
-            }
-        }
-        if (fallback == null) {
+        String json = com.codename1.lottie.transcoder.parser.DotLottie.animation(buffered);
+        if (json == null) {
             throw new IOException("the dotLottie archive holds no animation");
         }
-        return new VectorImage(LottieParser.parse(new java.io.ByteArrayInputStream(fallback)), true);
+        return new VectorImage(LottieParser.parse(new java.io.ByteArrayInputStream(
+                json.getBytes(java.nio.charset.StandardCharsets.UTF_8))), true);
     }
 
     // A file that gives only a view box is the size of that box: the
@@ -962,26 +944,33 @@ public final class VectorImage {
         return all;
     }
 
-    /// The union of the shapes of a clip path.
+    /// The union of the shapes of a clip path, each filled by the
+    /// `clip-rule` it has or inherits: with `evenodd` a subpath inside
+    /// another is a hole in the clip.
     private Shape clipOutline(SVGClipPath clip) {
-        Path2D.Double all = new Path2D.Double(Path2D.WIND_NON_ZERO);
-        addOutlines(all, clip, new AffineTransform());
+        java.awt.geom.Area all = new java.awt.geom.Area();
+        addOutlines(all, clip, new AffineTransform(),
+                clip.getStyle() == null ? null : clip.getStyle().getClipEvenOdd());
         return all;
     }
 
-    private void addOutlines(Path2D.Double all, SVGGroup group, AffineTransform at) {
+    private void addOutlines(java.awt.geom.Area all, SVGGroup group, AffineTransform at, Boolean evenOdd) {
         for (SVGNode child : group.getChildren()) {
             AffineTransform childAt = new AffineTransform(at);
             SVGTransform t = child.getTransform();
             if (t != null) {
                 childAt.concatenate(new AffineTransform(t.a, t.b, t.c, t.d, t.e, t.f));
             }
+            Boolean rule = child.getStyle() != null && child.getStyle().getClipEvenOdd() != null
+                    ? child.getStyle().getClipEvenOdd() : evenOdd;
             if (child instanceof SVGGroup) {
-                addOutlines(all, (SVGGroup) child, childAt);
+                addOutlines(all, (SVGGroup) child, childAt, rule);
             } else {
                 Shape shape = outline(child);
                 if (shape != null) {
-                    all.append(childAt.createTransformedShape(shape), false);
+                    Path2D.Double ruled = new Path2D.Double(childAt.createTransformedShape(shape));
+                    ruled.setWindingRule(Boolean.TRUE.equals(rule) ? Path2D.WIND_EVEN_ODD : Path2D.WIND_NON_ZERO);
+                    all.add(new java.awt.geom.Area(ruled));
                 }
             }
         }
@@ -1598,33 +1587,129 @@ public final class VectorImage {
     }
 
     private void paintText(Graphics2D g, SVGText text, SVGStyle style) {
-        Shape outline = textOutline(text, g.getFontRenderContext());
-        if (outline != null) {
+        List<SVGText.Run> runs = runsOf(text);
+        List<Shape> outlines = textOutlines(text, runs, g.getFontRenderContext());
+        for (int i = 0; i < runs.size(); i++) {
+            Shape outline = outlines.get(i);
+            if (outline == null) {
+                continue;
+            }
+            // A span is styled by what it sets and, for the rest, by the
+            // text it is in.
+            SVGStyle own = runs.get(i).getStyle();
+            SVGStyle runStyle = style;
+            if (own != null) {
+                if (own.isDisplayNone()) {
+                    continue;
+                }
+                runStyle = new SVGStyle();
+                runStyle.inherit(own);
+                runStyle.inherit(style);
+                int current = runStyle.getColor() == null ? 0xff000000 : runStyle.getColor().intValue();
+                if (runStyle.isFillCurrent()) {
+                    runStyle.setFill(SVGPaint.ofColor(current));
+                }
+                if (runStyle.isStrokeCurrent()) {
+                    runStyle.setStroke(SVGPaint.ofColor(current));
+                }
+            }
+            if (Boolean.FALSE.equals(runStyle.getVisible())) {
+                continue;
+            }
             // Filled and then stroked like any other shape: text with no
             // fill and a stroke is an outline, not nothing.
-            fillAndStroke(g, outline, style, false);
+            fillAndStroke(g, outline, runStyle, false);
         }
     }
 
-    /// The outlines of the glyphs of a `<text>`, where it puts them, or
-    /// null when it has no text.
+    /// The stretches of a `<text>`. One that was not read from a file has
+    /// its content as a single stretch.
+    private static List<SVGText.Run> runsOf(SVGText text) {
+        List<SVGText.Run> runs = text.getRuns();
+        if (!runs.isEmpty() || text.getContent() == null || text.getContent().length() == 0) {
+            return runs;
+        }
+        SVGText.Run whole = new SVGText.Run();
+        whole.setText(text.getContent());
+        List<SVGText.Run> one = new ArrayList<SVGText.Run>();
+        one.add(whole);
+        return one;
+    }
+
+    /// The outlines of the glyphs of each stretch of a `<text>`, where it
+    /// puts them; null for a stretch with nothing in it.
+    ///
+    /// The text runs on from one stretch to the next unless a stretch says
+    /// where it starts. `text-anchor` is about each piece that starts
+    /// somewhere of its own: that piece, with the stretches that run on
+    /// from it, begins, is centred or ends at the point given.
+    private static List<Shape> textOutlines(SVGText text, List<SVGText.Run> runs,
+            java.awt.font.FontRenderContext context) {
+        List<Shape> out = new ArrayList<Shape>();
+        double cx = text.getX();
+        double cy = text.getY();
+        int i = 0;
+        while (i < runs.size()) {
+            int end = i + 1;
+            while (end < runs.size() && runs.get(end).getX() == null && runs.get(end).getY() == null) {
+                end++;
+            }
+            SVGText.Run head = runs.get(i);
+            if (head.getX() != null) {
+                cx = head.getX().floatValue();
+            }
+            if (head.getY() != null) {
+                cy = head.getY().floatValue();
+            }
+            double startX = cx;
+            List<java.awt.font.GlyphVector> glyphs = new ArrayList<java.awt.font.GlyphVector>();
+            double[] xs = new double[end - i];
+            double[] ys = new double[end - i];
+            for (int k = i; k < end; k++) {
+                SVGText.Run run = runs.get(k);
+                cx += run.getDx();
+                cy += run.getDy();
+                float size = run.getFontSize() != null ? run.getFontSize().floatValue() : text.getFontSize();
+                if (!(size > 0)) {
+                    size = 12f;
+                }
+                boolean bold = run.getBold() != null ? run.getBold().booleanValue() : text.isBold();
+                boolean italic = run.getItalic() != null ? run.getItalic().booleanValue() : text.isItalic();
+                String family = run.getFontFamily() != null ? run.getFontFamily() : text.getFontFamily();
+                Font font = new Font(familyOf(family), (bold ? Font.BOLD : 0) | (italic ? Font.ITALIC : 0), 1)
+                        .deriveFont(size);
+                java.awt.font.GlyphVector gv = font.createGlyphVector(context, run.getText());
+                glyphs.add(gv);
+                xs[k - i] = cx;
+                ys[k - i] = cy;
+                cx += gv.getLogicalBounds().getWidth();
+            }
+            double advance = cx - startX;
+            double shift = text.getAnchor() == SVGText.Anchor.MIDDLE ? -advance / 2.0
+                    : text.getAnchor() == SVGText.Anchor.END ? -advance : 0;
+            for (int k = 0; k < glyphs.size(); k++) {
+                out.add(runs.get(i + k).getText().length() == 0 ? null
+                        : glyphs.get(k).getOutline((float) (xs[k] + shift), (float) ys[k]));
+            }
+            cx += shift;
+            i = end;
+        }
+        return out;
+    }
+
+    /// The outlines of all the glyphs of a `<text>`, or null when it has no
+    /// text.
     private static Shape textOutline(SVGText text, java.awt.font.FontRenderContext context) {
-        String content = text.getContent();
-        if (content == null || content.length() == 0) {
-            return null;
+        Path2D.Double all = null;
+        for (Shape outline : textOutlines(text, runsOf(text), context)) {
+            if (outline != null) {
+                if (all == null) {
+                    all = new Path2D.Double();
+                }
+                all.append(outline, false);
+            }
         }
-        float size = text.getFontSize() > 0 ? text.getFontSize() : 12f;
-        int fontStyle = (text.isBold() ? Font.BOLD : 0) | (text.isItalic() ? Font.ITALIC : 0);
-        Font font = new Font(familyOf(text.getFontFamily()), fontStyle, 1).deriveFont(size);
-        java.awt.font.GlyphVector glyphs = font.createGlyphVector(context, content);
-        double advance = glyphs.getLogicalBounds().getWidth();
-        double x = text.getX();
-        if (text.getAnchor() == SVGText.Anchor.MIDDLE) {
-            x -= advance / 2.0;
-        } else if (text.getAnchor() == SVGText.Anchor.END) {
-            x -= advance;
-        }
-        return glyphs.getOutline((float) x, text.getY());
+        return all;
     }
 
     /// The font family a `font-family` list comes to: the first name in it

@@ -94,6 +94,10 @@ public final class StyleParser {
         if (fillRule != null) {
             out.setFillEvenOdd(Boolean.valueOf("evenodd".equals(fillRule.trim())));
         }
+        String clipRule = merged.get("clip-rule");
+        if (clipRule != null) {
+            out.setClipEvenOdd(Boolean.valueOf("evenodd".equals(clipRule.trim())));
+        }
         String mask = merged.get("mask");
         if (mask != null) {
             out.setMaskRef(SVGPaint.stripUrl(mask));

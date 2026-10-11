@@ -2377,12 +2377,29 @@ public class CSSTheme {
         return num+unitText;
     }
 
+    /// Puts the localization bundles in the theme, and takes out the ones
+    /// that are in it and no longer among `bundles`.
+    ///
+    /// The second half is for an output that was loaded to be built on: a
+    /// bundle whose files were deleted is still in it, and would otherwise
+    /// be saved back for as long as nothing forces a build from nothing.
+    /// The compiler puts every bundle of the theme there itself, so one it
+    /// was not given is one that is gone.
     public void applyLocalizationBundles(Map<String, Map<String, Map<String, String>>> bundles) {
-        if (bundles == null || bundles.isEmpty()) {
-            return;
+        if (bundles == null) {
+            bundles = new java.util.HashMap<String, Map<String, Map<String, String>>>();
         }
         if (res == null) {
+            if (bundles.isEmpty()) {
+                return;
+            }
             res = new EditableResourcesForCSS(resourceFile);
+        }
+        for (String existing : res.getL10NResourceNames()) {
+            Map<String, Map<String, String>> kept = bundles.get(existing);
+            if (kept == null || kept.isEmpty()) {
+                res.remove(existing);
+            }
         }
         for (Map.Entry<String, Map<String, Map<String, String>>> entry : bundles.entrySet()) {
             String bundleName = entry.getKey();

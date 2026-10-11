@@ -515,6 +515,20 @@ class CN1CSSCLIEndToEndTest {
         assertEquals(0, CN1CSSCLI.run(args), stderr());
         assertFalse(stdout().contains("File has not changed since last compile."), stdout());
         assertEquals("Hi", open(res).getL10N("Messages", "").get("greeting"));
+
+        // A bundle whose files are deleted goes from the theme, though the
+        // theme is rebuilt on top of the one that held it.
+        File other = write(new File(l10n, "Other.properties"), "k=v\n");
+        assertTrue(l10n.setLastModified(built + 10000));
+        assertEquals(0, CN1CSSCLI.run(args), stderr());
+        assertTrue(Arrays.asList(open(res).getL10NResourceNames()).contains("Other"));
+        assertTrue(other.delete());
+        assertTrue(bundle.delete());
+        assertTrue(new File(l10n, "Messages_fr.properties").delete());
+        assertTrue(l10n.setLastModified(built + 20000));
+        assertEquals(0, CN1CSSCLI.run(args), stderr());
+        assertEquals(0, open(res).getL10NResourceNames().length,
+                Arrays.toString(open(res).getL10NResourceNames()));
     }
 
     @Test

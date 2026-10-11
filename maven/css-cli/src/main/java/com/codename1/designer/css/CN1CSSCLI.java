@@ -479,9 +479,9 @@ public class CN1CSSCLI {
 
         theme.createImageBorders();
         theme.updateResources();
-        if (!localizationBundles.isEmpty()) {
-            theme.applyLocalizationBundles(localizationBundles);
-        }
+        // Also with none: the output this may have been built on can
+        // hold a bundle whose files are gone.
+        theme.applyLocalizationBundles(localizationBundles);
         theme.save(outputFile);
         if (incremental && !nativeThemeMode) {
             theme.saveSelectorChecksums(cacheFile);

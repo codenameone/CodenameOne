@@ -490,7 +490,10 @@ public final class SVGParser {
     private SVGClipPath readClipPath(XMLStreamReader r, SVGDocument doc, boolean mask) throws XMLStreamException {
         SVGClipPath cp = new SVGClipPath();
         Map<String, String> a = attrs(r);
-        cp.setId(a.get("id"));
+        // What it sets is what its children inherit: a clip-rule for a
+        // clip path, a fill for a mask. Its transform is not read.
+        applyCommon(cp, a);
+        cp.setTransform(null);
         cp.setMask(mask);
         cp.setAlphaMask(mask && "alpha".equals(mergedValue(a, "mask-type")));
         cp.setObjectBoundingBox("objectBoundingBox".equals(a.get(mask ? "maskContentUnits" : "clipPathUnits")));
@@ -744,25 +747,128 @@ public final class SVGParser {
             String s = style.trim().toLowerCase();
             t.setItalic("italic".equals(s) || "oblique".equals(s));
         }
-        // Collect character data; flatten any <tspan> by recursing into its text.
+        // Collect character data. The content is every <tspan> flattened
+        // into one string; the runs keep them apart, each with what it sets.
         StringBuilder content = new StringBuilder();
-        readTextContent(r, content);
+        textSpaceBefore = true;
+        readTextContent(r, content, t, null);
         t.setContent(content.toString());
+        List<SVGText.Run> runs = t.getRuns();
+        if (!runs.isEmpty()) {
+            SVGText.Run last = runs.get(runs.size() - 1);
+            if (last.getText().endsWith(" ")) {
+                last.setText(last.getText().substring(0, last.getText().length() - 1));
+            }
+        }
         return t;
     }
 
-    private void readTextContent(XMLStreamReader r, StringBuilder out) throws XMLStreamException {
+    /** Whether the text read so far ends in white space, or has not begun: more of it is then dropped. */
+    private boolean textSpaceBefore;
+    /** Whether the span being read has still to hand its position to a run. */
+    private boolean spanUnplaced;
+
+    private void readTextContent(XMLStreamReader r, StringBuilder out, SVGText text, SVGText.Run span)
+            throws XMLStreamException {
         while (r.hasNext()) {
             int ev = r.next();
             if (ev == XMLStreamConstants.END_ELEMENT) {
                 return;
             }
             if (ev == XMLStreamConstants.CHARACTERS || ev == XMLStreamConstants.CDATA) {
-                out.append(r.getText());
+                String raw = r.getText();
+                out.append(raw);
+                // White space as a browser shows it: any run of it one
+                // space, and none at the start of the text.
+                StringBuilder shown = new StringBuilder();
+                for (int i = 0; i < raw.length(); i++) {
+                    char c = raw.charAt(i);
+                    boolean space = c == ' ' || c == '\t' || c == '\n' || c == '\r';
+                    if (space && textSpaceBefore) continue;
+                    shown.append(space ? ' ' : c);
+                    textSpaceBefore = space;
+                }
+                if (shown.length() == 0) continue;
+                SVGText.Run run = new SVGText.Run();
+                run.setText(shown.toString());
+                if (span != null) {
+                    run.setStyle(span.getStyle());
+                    run.setFontFamily(span.getFontFamily());
+                    run.setFontSize(span.getFontSize());
+                    run.setBold(span.getBold());
+                    run.setItalic(span.getItalic());
+                    if (spanUnplaced) {
+                        // A span is moved once, where its text begins.
+                        run.setX(span.getX());
+                        run.setY(span.getY());
+                        run.setDx(span.getDx());
+                        run.setDy(span.getDy());
+                        spanUnplaced = false;
+                    }
+                }
+                text.getRuns().add(run);
             } else if (ev == XMLStreamConstants.START_ELEMENT) {
-                // tspan / textPath / etc. -- flatten the textual content.
-                readTextContent(r, out);
+                // tspan / textPath / etc.
+                Map<String, String> a = attrs(r);
+                SVGText.Run child = new SVGText.Run();
+                SVGNode styled = new SVGGroup();
+                applyCommon(styled, a);
+                child.setStyle(styled.getStyle());
+                if (span != null) {
+                    if (span.getStyle() != null) child.getStyle().inherit(span.getStyle());
+                    child.setFontFamily(span.getFontFamily());
+                    child.setFontSize(span.getFontSize());
+                    child.setBold(span.getBold());
+                    child.setItalic(span.getItalic());
+                    if (spanUnplaced) {
+                        // The enclosing span has shown no text yet, so what
+                        // it was moved by moves this one.
+                        child.setX(span.getX());
+                        child.setY(span.getY());
+                        child.setDx(span.getDx());
+                        child.setDy(span.getDy());
+                    }
+                }
+                if (a.get("x") != null) child.setX(firstLength(a.get("x"), true));
+                if (a.get("y") != null) child.setY(firstLength(a.get("y"), false));
+                Float dx = a.get("dx") == null ? null : firstLength(a.get("dx"), true);
+                Float dy = a.get("dy") == null ? null : firstLength(a.get("dy"), false);
+                if (dx != null) child.setDx(child.getDx() + dx.floatValue());
+                if (dy != null) child.setDy(child.getDy() + dy.floatValue());
+                String family = mergedValue(a, "font-family");
+                if (family != null) child.setFontFamily(family.trim());
+                String size = mergedValue(a, "font-size");
+                if (size != null) {
+                    try { child.setFontSize(Float.valueOf(NumberParser.parseFloat(size))); } catch (RuntimeException ignored) { /* inherited */ }
+                }
+                String weight = mergedValue(a, "font-weight");
+                if (weight != null) {
+                    String w = weight.trim();
+                    child.setBold(Boolean.valueOf("bold".equals(w) || "bolder".equals(w) || isNumericGte(w, 600)));
+                }
+                String slant = mergedValue(a, "font-style");
+                if (slant != null) {
+                    String s = slant.trim();
+                    child.setItalic(Boolean.valueOf("italic".equals(s) || "oblique".equals(s)));
+                }
+                spanUnplaced = true;
+                readTextContent(r, out, text, child);
+                // Back in the enclosing span, which has been placed by now
+                // or handed its position on.
+                spanUnplaced = false;
             }
+        }
+    }
+
+    /** The first of a list of lengths, which is where a span starts; null when it cannot be read. */
+    private Float firstLength(String value, boolean horizontal) {
+        String v = value.trim();
+        int end = 0;
+        while (end < v.length() && v.charAt(end) != ' ' && v.charAt(end) != ',') end++;
+        try {
+            return Float.valueOf(horizontal ? lengthX(v.substring(0, end)) : lengthY(v.substring(0, end)));
+        } catch (RuntimeException e) {
+            return null;
         }
     }
 
@@ -952,7 +1058,7 @@ public final class SVGParser {
                     || "clip-path".equals(k) || "fill-rule".equals(k)
                     || "stroke-dasharray".equals(k) || "stroke-dashoffset".equals(k)
                     || "display".equals(k) || "visibility".equals(k) || "mask".equals(k)
-                    || "color".equals(k) || "filter".equals(k) || "marker".equals(k)
+                    || "color".equals(k) || "filter".equals(k) || "marker".equals(k) || "clip-rule".equals(k)
                     || "marker-start".equals(k) || "marker-mid".equals(k) || "marker-end".equals(k)) {
                 pres.put(k, e.getValue());
             }
@@ -976,9 +1082,26 @@ public final class SVGParser {
         // declaration overrides an earlier one.
         String[] sheet = sheetStyles == null || reader == null ? null
                 : sheetStyles.get(Integer.valueOf(reader.started - 1));
-        if (sheet != null) {
-            String own = m.get("style");
-            m.put("style", sheet[0] + (own == null ? "" : own + ";") + sheet[1]);
+        String own = m.get("style");
+        if (sheet != null || (own != null && own.indexOf('!') >= 0)) {
+            // The element's own declarations come after the stylesheet's,
+            // and its important ones after the stylesheet's important ones:
+            // `!important` in a style attribute beats it in a rule. The
+            // word itself is taken off, which no reader of a value expects.
+            StringBuilder normal = new StringBuilder();
+            StringBuilder important = new StringBuilder();
+            if (own != null) {
+                for (String decl : own.split(";")) {
+                    String d = decl.trim();
+                    int bang = d.lastIndexOf('!');
+                    if (bang > 0 && "important".equalsIgnoreCase(d.substring(bang + 1).trim())) {
+                        important.append(d, 0, bang).append(';');
+                    } else if (d.length() > 0) {
+                        normal.append(d).append(';');
+                    }
+                }
+            }
+            m.put("style", (sheet == null ? "" : sheet[0]) + normal + (sheet == null ? "" : sheet[1]) + important);
         }
         return m;
     }
