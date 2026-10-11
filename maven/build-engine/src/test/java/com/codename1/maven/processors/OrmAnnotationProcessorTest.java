@@ -67,9 +67,10 @@ public class OrmAnnotationProcessorTest {
     private void generatedRepository(boolean backend) throws Exception {
         File classes=tmp.newFolder();
         Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
-        sources.put("repositories.Note","package repositories; import com.codename1.annotations.*; @Entity(table=\"repository_note\") public class Note { @Id public long id; public String name; public long score; }");
+        sources.put("repositories.Note","package repositories; import com.codename1.annotations.*; @Entity(table=\"repository_note\") public class Note { @Id public long id; public String name; public long score; public boolean active; public Boolean archived; }");
         sources.put("repositories.Notes","package repositories; import com.codename1.orm.repository.*; import java.util.List; @Repository(entity=Note.class,key=Long.class) public interface Notes extends CrudRepository<Note,Long> { "
             + "List<Note> findByNameAndScoreGreaterThanOrderByScoreDescIdAsc(String name,long score,PageRequest page); "
+            + "List<Note> findByActiveTrue(); List<Note> findByArchivedFalse(); List<Note> findByNameAndScoreIn(String name,java.util.List<Long> scores); List<Note> findByScoreIn(Long[] scores); List<Note> findByNameIn(java.util.Set<String> names); "
             + "List<Note> findTop1ByNameOrderByScoreDesc(String name); long countByName(String name); boolean existsByName(String name); int deleteByName(String name); "
             + "@Lock(com.codename1.orm.session.LockMode.PESSIMISTIC_WRITE) Note findById(Long id); "
             + "@Query(\"select sum(case when e.score>=:floor then 1 else 0 end) from repositories.Note e\") Long qualified(@Param(\"floor\") long floor); "
@@ -81,9 +82,10 @@ public class OrmAnnotationProcessorTest {
         // CRUD methods are checked by javac as well as exercised against a database.
         sources.clear();
         sources.put("repositories.Check","package repositories; import com.codename1.orm.repository.*; import com.codename1.orm.session.*; public class Check { public static void run(Session s) { "
-            + "Notes repo=new NotesCn1Repository(s); s.createTables(); s.beginTransaction(); Note a=new Note(); a.name=\"same\";a.score=3;repo.insert(a);Note b=new Note();b.name=\"same\";b.score=9;repo.insert(b);s.commitTransaction(); "
+            + "Notes repo=new NotesCn1Repository(s); s.createTables(); s.beginTransaction(); Note a=new Note(); a.name=\"same\";a.score=3;a.active=true;a.archived=false;repo.insert(a);Note b=new Note();b.name=\"same\";b.score=9;repo.insert(b);s.commitTransaction(); "
             + "if(repo.count()!=2 || !repo.existsByName(\"same\") || repo.countByName(\"same\")!=2 || repo.nativeCount(\"same\")!=2) throw new AssertionError(\"counts\"); "
             + "if(repo.findByNameAndScoreGreaterThanOrderByScoreDescIdAsc(\"same\",0,new PageRequest(1,1)).get(0)!=a || repo.findTop1ByNameOrderByScoreDesc(\"same\").get(0)!=b || repo.qualified(5)!=1) throw new AssertionError(\"queries\"); "
+            + "if(repo.findByActiveTrue().get(0)!=a || repo.findByArchivedFalse().get(0)!=a || repo.findByNameAndScoreIn(\"same\",java.util.Arrays.asList(3L)).get(0)!=a || repo.findByScoreIn(new Long[]{9L}).get(0)!=b || repo.findByNameIn(java.util.Collections.singleton(\"same\")).size()!=2) throw new AssertionError(\"typed finders\"); "
             + "s.beginTransaction(); a.score=4; if(repo.revise(\"same\",11)!=2 || s.contains(a)) throw new AssertionError(\"bulk\"); s.rollbackTransaction(); "
             + "if(s.find(Note.class,a.id).score!=3) throw new AssertionError(\"rollback\"); "
             + "s.beginTransaction(); try { repo.findById(a.id); throw new AssertionError(\"SQLite should refuse row lock\"); } catch(UnsupportedOperationException expected) {} s.rollbackTransaction(); "
@@ -106,17 +108,65 @@ public class OrmAnnotationProcessorTest {
             "long findByName(String value);",
             "java.util.List<Note> findByName();",
             "java.util.List<Note> findByName(long value);",
+            "java.util.List<Note> findByNameTrue();",
+            "java.util.List<Note> findByScoreFalse();",
+            "java.util.List<Note> findByScoreIn(String[] values);",
+            "java.util.List<Note> findByScoreIn(Long[][] values);",
+            "java.util.List<Note> findByScoreIn(long[] values);",
+            "java.util.List<Note> findByScoreIn(java.util.List<String> values);",
+            "java.util.List<Note> findByNameAndScoreIn(String name,java.util.Set<String> values);",
+            "java.util.List<Note> findByScoreIn(java.util.List values);",
+            "java.util.List<Note> findByScoreIn(java.util.List<?> values);",
+            "java.util.List<Note> findByScoreIn(java.util.List<? extends Long> values);",
+            "java.util.List<Note> findByScoreIn(java.util.List<java.util.List<Long>> values);",
             "@Query(\"select e from badrepo.Note e where e.name=:name\") Note lookup(String name);",
             "@Query(\"update badrepo.Note e set e.name=:name\") int rename(@Param(\"name\") String name);",
             "@Lock(com.codename1.orm.session.LockMode.PESSIMISTIC_WRITE) Note findByName(String name);"
         }) {
             File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
-            sources.put("badrepo.Note","package badrepo; import com.codename1.annotations.*; @Entity public class Note { @Id public long id; public String name; }");
+            sources.put("badrepo.Note","package badrepo; import com.codename1.annotations.*; @Entity public class Note { @Id public long id; public String name; public long score; }");
             sources.put("badrepo.Notes","package badrepo; import com.codename1.orm.repository.*; @Repository(entity=Note.class,key=Long.class) public interface Notes extends CrudRepository<Note,Long> {"+declaration+"}");
             JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
             ProcessorContext ctx=runProcessor(classes,backendClasspath());
             assertTrue(declaration+ctx.getErrors(),ctx.hasErrors());
             assertFalse(new File(classes,"badrepo/NotesCn1Repository.class").exists());
+        }
+    }
+
+    @Test
+    public void incrementalBuildRemovesOnlyStaleGeneratedRepositories() throws Exception {
+        for (boolean backend : new boolean[]{false,true}) {
+            for (boolean deleteSource : new boolean[]{false,true}) {
+                File classes=tmp.newFolder(), sourcesDir=tmp.newFolder();
+                Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+                sources.put("incrementalrepo.Note","package incrementalrepo; import com.codename1.annotations.*; @Entity public class Note { @Id public long id; }");
+                String repository="package incrementalrepo; import com.codename1.orm.repository.*; @Repository(entity=Note.class,key=Long.class) public interface Notes extends CrudRepository<Note,Long> {}";
+                sources.put("incrementalrepo.Notes",repository);
+                sources.put("incrementalrepo.Live",repository.replace("interface Notes", "interface Live"));
+                sources.put("incrementalrepo.HandwrittenCn1Repository","package incrementalrepo; public class HandwrittenCn1Repository {}");
+                File pkg=new File(sourcesDir,"incrementalrepo");assertTrue(pkg.mkdirs());
+                for(Map.Entry<String,String> source:sources.entrySet()) {
+                    writeFile(new File(pkg,source.getKey().substring(source.getKey().lastIndexOf('.')+1)+".java"),source.getValue());
+                }
+                JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+                List<String> cp=backend?backendClasspath():Collections.<String>emptyList();
+                ProcessorContext first=runProcessor(classes,cp,Arrays.asList(sourcesDir.getAbsolutePath()));
+                assertFalse(first.getErrors().toString(),first.hasErrors());
+                File generated=new File(classes,"incrementalrepo/NotesCn1Repository.class");assertTrue(generated.isFile());
+                File handwritten=new File(classes,"incrementalrepo/HandwrittenCn1Repository.class");byte[] original=Files.readAllBytes(handwritten.toPath());
+                if(deleteSource) {
+                    assertTrue(new File(pkg,"Notes.java").delete()); // Leave its stale .class, like Maven does.
+                } else {
+                    sources.clear();sources.put("incrementalrepo.Notes",repository.replace("@Repository(entity=Note.class,key=Long.class) ",""));
+                    writeFile(new File(pkg,"Notes.java"),sources.get("incrementalrepo.Notes"));
+                    JavaSourceCompiler.compile(sources,classes,Arrays.asList(classes,testClassesDir()));
+                }
+                ProcessorContext second=runProcessor(classes,cp,Arrays.asList(sourcesDir.getAbsolutePath()));
+                assertFalse(second.getErrors().toString(),second.hasErrors());
+                assertFalse("obsolete implementation survives incremental processing",generated.exists());
+                assertTrue(new File(classes,"incrementalrepo/LiveCn1Repository.class").isFile());
+                org.junit.Assert.assertArrayEquals(original,Files.readAllBytes(handwritten.toPath()));
+            }
         }
     }
 

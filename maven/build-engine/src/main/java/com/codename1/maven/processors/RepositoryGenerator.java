@@ -187,10 +187,17 @@ final class RepositoryGenerator {
                         {"GreaterThan",">"},{"LessThan","<"},{"Not","<>"},{"Like","LIKE"},{"In","IN"},{"True","= TRUE"},{"False","= FALSE"}};
                     for (String[] operation : operations) if (term.endsWith(operation[0])) { suffix=operation[0];operator=operation[1];break; }
                     String field = field(term.substring(0, term.length() - suffix.length()));
+                    if (suffix.equals("True") || suffix.equals("False")) {
+                        OrmAnnotationProcessor.PersistedField property = property(field);
+                        if (property.dialectKind != OrmAnnotationProcessor.KIND_BOOLEAN
+                                || !domainType(property).equals("java.lang.Boolean")) {
+                            throw invalid(suffix + " requires a Boolean property with Boolean storage: " + field);
+                        }
+                    }
                     where.append("e.").append(field).append(' ').append(operator);
                     if (!suffix.equals("IsNull") && !suffix.equals("IsNotNull") && !suffix.equals("True") && !suffix.equals("False")) {
                         if (names.size() >= values) throw invalid("Missing argument for " + field);
-                        checkArgument(field, suffix, args[names.size()]);
+                        checkArgument(field, suffix, args[names.size()], method, names.size());
                         String binding = "p" + names.size(); names.add(binding);
                         where.append(" :").append(binding);
                     }
@@ -224,22 +231,60 @@ final class RepositoryGenerator {
                 : list ? "return q.list();" : "return q.first();");
         return body.append("}\n").toString();
     }
-    private void checkArgument(String field, String suffix, Type argument) {
+    private void checkArgument(String field, String suffix, Type argument, MethodInfo method, int parameter) {
+        String expected = domainType(property(field));
         if (suffix.equals("In")) {
-            String type = argument.getClassName();
-            if (!(argument.getSort() == Type.ARRAY && argument.getElementType().getSort() == Type.OBJECT)
-                    && !type.equals("java.lang.Iterable") && !type.equals("java.util.List")
-                    && !type.equals("java.util.Collection") && !type.equals("java.util.Set")) {
-                throw invalid("In requires an Iterable, Collection, List, Set or object array argument");
+            String element;
+            if (argument.getSort() == Type.ARRAY) {
+                Type component = Type.getType(argument.getDescriptor().substring(1));
+                if (component.getSort() != Type.OBJECT && component.getSort() != Type.ARRAY) {
+                    throw invalid("In requires an object array, not a primitive array: " + field);
+                }
+                element = component.getClassName();
+            } else {
+                String type = argument.getClassName();
+                if (!type.equals("java.lang.Iterable") && !type.equals("java.util.List")
+                        && !type.equals("java.util.Collection") && !type.equals("java.util.Set")) {
+                    throw invalid("In requires an Iterable, Collection, List, Set or object array argument");
+                }
+                element = collectionElement(method, parameter, argument);
             }
+            if (!expected.equals(element)) throw invalid("In elements for " + field + " must be " + expected + ", got " + element);
             return;
         }
-        for (OrmAnnotationProcessor.PersistedField property : entity.fields) if (property.fieldName.equals(field)) {
-            String expected = domainType(property);
-            if (!expected.equals(boxed(argument.getClassName()))) throw invalid("Argument for " + field + " must be " + expected);
-            if (suffix.equals("Like") && !expected.equals("java.lang.String")) throw invalid("Like requires a String property");
-            return;
+        if (!expected.equals(boxed(argument.getClassName()))) throw invalid("Argument for " + field + " must be " + expected);
+        if (suffix.equals("Like") && !expected.equals("java.lang.String")) throw invalid("Like requires a String property");
+    }
+    private static String collectionElement(MethodInfo method, int parameter, Type argument) {
+        final List<org.objectweb.asm.signature.SignatureWriter> parameters =
+                new ArrayList<org.objectweb.asm.signature.SignatureWriter>();
+        if (method.getSignature() != null) {
+            new org.objectweb.asm.signature.SignatureReader(method.getSignature()).accept(
+                    new org.objectweb.asm.signature.SignatureVisitor(org.objectweb.asm.Opcodes.ASM9) {
+                        @Override public org.objectweb.asm.signature.SignatureVisitor visitParameterType() {
+                            org.objectweb.asm.signature.SignatureWriter writer = new org.objectweb.asm.signature.SignatureWriter();
+                            parameters.add(writer);
+                            return writer;
+                        }
+                    });
         }
+        String signature = parameter < parameters.size() ? parameters.get(parameter).toString() : "";
+        String prefix = "L" + argument.getInternalName() + "<";
+        if (signature.startsWith(prefix) && signature.endsWith(">;")) {
+            String element = signature.substring(prefix.length(), signature.length() - 2);
+            // Accept only a concrete class or array; raw, wildcard, variable and
+            // nested generic element types cannot prove the mapped domain type.
+            if (element.matches("(?:L[^;<]+;|\\[+(?:L[^;<]+;|[ZBCSIJFD]))")) {
+                return Type.getType(element).getClassName();
+            }
+        }
+        throw invalid("In collections require a concrete element type matching the property (no raw or wildcard collections)");
+    }
+    private OrmAnnotationProcessor.PersistedField property(String name) {
+        for (OrmAnnotationProcessor.PersistedField property : entity.fields) {
+            if (property.fieldName.equals(name)) return property;
+        }
+        throw invalid("Unknown scalar property " + name);
     }
     private String field(String token) {
         if (token.length() == 0) throw invalid("Missing property name");

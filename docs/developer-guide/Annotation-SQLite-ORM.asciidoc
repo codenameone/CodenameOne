@@ -483,7 +483,9 @@ Derived methods support the following bounded grammar:
   Comparison suffixes are `Not`, `GreaterThan`, `GreaterThanEqual`, `LessThan`,
   `LessThanEqual`, `Like`, and `In`. No suffix means equality. `IsNull`,
   `IsNotNull`, `True`, and `False` consume no parameter. `In` takes an Iterable or
-  object array. Use `IsNull` to match NULL; equality retains SQL NULL semantics.
+  object array whose concrete element type matches the property. Raw and wildcard
+  collections are rejected at build time. `True` and `False` require Boolean
+  properties with Boolean storage. Use `IsNull` to match NULL; equality retains SQL NULL semantics.
 * Find methods can end with `OrderByScoreDescIdAsc`; every field needs an explicit
   `Asc` or `Desc`. Relationship paths and ambiguous property names containing
   grammar keywords should use `@Query` instead.

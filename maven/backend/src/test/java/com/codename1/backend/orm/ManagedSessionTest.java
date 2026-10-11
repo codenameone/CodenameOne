@@ -72,6 +72,24 @@ class ManagedSessionTest {
         s.beginTransaction();s.createQuery("delete from "+Record.class.getName()+"").executeUpdate();s.commitTransaction();
     }
 
+    @Test void nativeScalarsRejectExtraColumnsAndNonBlobArrays() throws Exception {
+        EntityManager em=manager(); Session s=em.openSession();
+        try {
+            Record row=seed(s);
+            PersistenceException width=assertThrows(PersistenceException.class,()->
+                    s.createNativeQuery("SELECT id,name FROM managed_record",Long.class).list());
+            assertTrue(width.getCause().getMessage().contains("projection width"));
+            assertEquals(Long.valueOf(row.id),s.createNativeQuery("SELECT id FROM managed_record",Long.class).first());
+            com.codename1.orm.session.JpqlQuery<Long> query=s.createNativeQuery("SELECT COUNT(*) FROM managed_record WHERE id=:id",Long.class);
+            for(Object value:new Object[]{new boolean[0],new char[0],new short[0],new int[0],new long[0],new float[0],new double[0],new String[0],new byte[0][],java.util.Collections.emptyList()}) {
+                assertThrows(IllegalArgumentException.class,()->query.setParameter("id",value));
+            }
+            assertEquals(Long.valueOf(0),query.setParameter("id",null).first());
+            assertEquals(Long.valueOf(1),query.setParameter("id",row.id).first());
+            assertArrayEquals(row.bytes,s.createNativeQuery("SELECT bytes FROM managed_record WHERE bytes=:bytes",byte[].class).setParameter("bytes",row.bytes).first());
+        } finally { s.close();em.close(); }
+    }
+
     static class Record {
         long id,version,counter;
         String name;

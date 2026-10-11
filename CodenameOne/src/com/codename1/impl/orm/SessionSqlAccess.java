@@ -143,6 +143,9 @@ public final class SessionSqlAccess implements SqlAccess {
             checkOwner();
             Cursor cursor = db.executeQuery(sql, args);
             try {
+                if (cursor.getColumnCount() != kinds.length) {
+                    throw new IOException("Unexpected SQL projection width");
+                }
                 List<Object[]> result = new ArrayList<Object[]>();
                 while (cursor.next()) {
                     Row row = cursor.getRow();

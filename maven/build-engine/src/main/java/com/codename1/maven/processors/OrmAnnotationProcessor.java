@@ -691,6 +691,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
 
     @Override
     public void finish(ProcessorContext ctx) throws ProcessingException {
+        removeStaleRepositories(ctx);
         {
             // BEFORE the emptiness check, because the entities need not be in
             // this module at all. An entity is the one class both halves of an
@@ -2328,6 +2329,23 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         if (!backend && removed && noEntities && deleteGenerated(ctx, BOOTSTRAP_BINARY)) {
             ctx.getLog().info("cn1: removed " + BOOTSTRAP_BINARY
                     + ", which registered the migrations this module no longer has");
+        }
+    }
+
+    private void removeStaleRepositories(ProcessorContext ctx) throws ProcessingException {
+        Set<String> live = new LinkedHashSet<String>();
+        for (AnnotatedClass repository : repositories) live.add(repository.getBinaryName() + "Cn1Repository");
+        for (AnnotatedClass cls : ctx.getClassIndex().values()) {
+            String name = cls.getBinaryName();
+            if (!name.endsWith("Cn1Repository") || live.contains(name)
+                    || cls.getClassAnnotation(GENERATED_DESC) == null) continue;
+            String owner = name.substring(0, name.length() - "Cn1Repository".length()).replace('.', '/');
+            if (!cls.getInterfaceInternalNames().contains(owner)) continue;
+            File output = new File(ctx.getOutputClassDir(), cls.getInternalName() + ".class");
+            if (output.isFile() && !output.delete()) {
+                throw new ProcessingException("Could not remove stale generated repository " + name + "; run a clean build");
+            }
+            ctx.getLog().info("cn1: removed " + name + ", whose repository annotation or source was removed");
         }
     }
 

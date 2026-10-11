@@ -96,7 +96,9 @@ public final class NativeQueryImpl<T> implements JpqlQuery<T> {
     }
     public JpqlQuery<T> setParameter(String name, Object value) {
         if (!names.contains(name)) throw new IllegalArgumentException("Unknown named parameter: " + name);
-        if (value instanceof Iterable || value instanceof Object[]) throw new IllegalArgumentException("Native parameters must be scalars");
+        if (value instanceof Iterable || value != null && value.getClass().isArray() && !(value instanceof byte[])) {
+            throw new IllegalArgumentException("Native parameters must be scalars or byte[] BLOBs");
+        }
         parameters.put(name, value); return this;
     }
     public JpqlQuery<T> limit(int value) {
