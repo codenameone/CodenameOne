@@ -179,6 +179,13 @@ typedef struct CN1Graphics {
     JAVA_BOOLEAN clipIsRect;
     void* clipGeom;                  /* ID2D1PathGeometry* when clip is a shape, else NULL */
     void* clipLayer;                 /* ID2D1Layer* pushed for a shape clip, else NULL     */
+    JAVA_BOOLEAN clipGeomHasRect;    /* a clipRect narrowed the shape clip: clipX/Y/W/H is
+                                      * then a rectangle the shape is ALSO cut to. False
+                                      * right after setClipShape, when clipX/Y/W/H is still
+                                      * the rectangle that was the clip before the shape
+                                      * and is not part of the clip at all */
+    JAVA_BOOLEAN clipRectPushed;     /* that rectangle was pushed under the shape's layer
+                                      * and cn1WinPopClip has to pop it as well */
     D2D1_MATRIX_3X2_F clipMaskTransform; /* world transform captured at setClipShape time;
                                       * applied to the (raw) clip geometry as the layer
                                       * maskTransform so a shape clip lands exactly where
