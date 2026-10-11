@@ -48,7 +48,11 @@ final class ElevationShadow {
      * and reaches full strength by roughly elevation 16.
      */
     static int opacity(double elevation) {
-        return Math.min(255, (int) Math.round(20 + elevation * 15));
+        // Gentle on purpose: the band sits INSIDE the border (see spreadMm), so a
+        // dark one reads as a frame around the surface rather than a shadow
+        // under it -- 20 + 15/elevation put a near-black ring round Shrine's
+        // NEXT (elevation 8) and the gallery's Back pill (elevation 6).
+        return Math.min(110, (int) Math.round(30 + elevation * 8));
     }
 
     /**
@@ -92,6 +96,11 @@ final class ElevationShadow {
      * costs little.
      */
     static float spreadMm(double elevation) {
-        return (float) Math.min(1.8, Math.max(1, 0.25 + elevation * 0.25));
+        // Fixed at the 1mm floor. Growing it with elevation (up to 1.8mm) was
+        // measured in the gallery screenshots, not just in the padding test:
+        // NEXT's fill shrank until its label sat on the border's bottom edge,
+        // and the Back pill grew a halo on every side. Elevation still darkens
+        // the band through opacity().
+        return 1f;
     }
 }

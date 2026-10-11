@@ -141,7 +141,8 @@ class FabLabelAndShadowTest {
 
         // No elevation: stated on this widget, so FabRenderElement falls back to
         // Material 3's default FAB elevation (6) -- ElevationShadow.opacity(6).
-        assertEquals(110, ((RoundBorder) c.getUnselectedStyle().getBorder()).getShadowOpacity(),
+        assertEquals(ElevationShadow.opacity(6),
+                ((RoundBorder) c.getUnselectedStyle().getBorder()).getShadowOpacity(),
                 "an undocked FAB must cast its own elevation shadow, not rely on the "
                         + "theme's border already carrying one");
     }
