@@ -164,6 +164,14 @@ final class SvgFilter {
                     box.getY() + filter.getRegionY() * box.getHeight(),
                     filter.getRegionWidth() * box.getWidth(), filter.getRegionHeight() * box.getHeight());
         }
+        if (region == null && box != null) {
+            // A region in shares of a box that has no width or no height,
+            // around a level line say, is no region: the filter cannot be
+            // worked out and the element is not drawn, which is why a
+            // browser shows no such line at all.
+            layer.setRGB(0, 0, lw, lh, new int[lw * lh], 0, lw);
+            return;
+        }
         // With no box to take a share of, the region is all there is.
         Rectangle whole = new Rectangle(0, 0, lw, lh);
         Rectangle px = region == null ? whole : device.createTransformedShape(region).getBounds().intersection(whole);

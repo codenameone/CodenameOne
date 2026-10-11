@@ -220,6 +220,11 @@ public final class SVGParser {
         applyCommon(doc, a);
         doc.setWidth(lengthOrZero(a.get("width")));
         doc.setHeight(lengthOrZero(a.get("height")));
+        // Whether each was written as a length, for a caller that sizes the
+        // drawing: one filled in below from the view box is its shape and
+        // not a size anyone asked for.
+        if (doc.getWidth() > 0) doc.markGiven("width");
+        if (doc.getHeight() > 0) doc.markGiven("height");
         doc.setPreserveAspectRatio(a.get("preserveAspectRatio"));
         String vb = a.get("viewBox");
         if (vb != null) {
@@ -667,7 +672,21 @@ public final class SVGParser {
                     regionSide(a.get("width"), 1.2f, user, viewportWidth),
                     regionSide(a.get("height"), 1.2f, user, viewportHeight));
         }
-        readChildren(r, cp, doc);
+        // What is drawn in fractions of the box around the element measures
+        // its percentages against that box, which is one by one: 50% is a
+        // half, to be scaled with the rest, not half the drawing's width.
+        float outerWidth = viewportWidth;
+        float outerHeight = viewportHeight;
+        if (cp.isObjectBoundingBox()) {
+            viewportWidth = 1f;
+            viewportHeight = 1f;
+        }
+        try {
+            readChildren(r, cp, doc);
+        } finally {
+            viewportWidth = outerWidth;
+            viewportHeight = outerHeight;
+        }
         return cp;
     }
 
@@ -826,7 +845,23 @@ public final class SVGParser {
         }
         String href = a.get("href");
         if (href != null && href.trim().startsWith("#")) p.setHref(href.trim().substring(1));
-        readChildren(r, p, doc);
+        // As for a clip path: content in fractions of the box, or in a
+        // view box of its own, measures its percentages against that.
+        float outerWidth = viewportWidth;
+        float outerHeight = viewportHeight;
+        if (p.getViewBoxWidth() > 0 && p.getViewBoxHeight() > 0) {
+            viewportWidth = p.getViewBoxWidth();
+            viewportHeight = p.getViewBoxHeight();
+        } else if (p.isContentObjectBoundingBox()) {
+            viewportWidth = 1f;
+            viewportHeight = 1f;
+        }
+        try {
+            readChildren(r, p, doc);
+        } finally {
+            viewportWidth = outerWidth;
+            viewportHeight = outerHeight;
+        }
         return p;
     }
 
@@ -1511,7 +1546,56 @@ public final class SVGParser {
             }
             m.put("style", (sheet == null ? "" : sheet[0]) + normal + (sheet == null ? "" : sheet[1]) + important);
         }
+        String shorthand = declaredValue(m, "font");
+        if (shorthand != null) {
+            // `font: italic bold 24px serif` is the four properties this
+            // reads, written as one. They are put ahead of the rest of the
+            // style, where a longhand written beside it still has the last
+            // word.
+            m.put("style", fontLonghands(shorthand) + m.get("style"));
+        }
         return m;
+    }
+
+    /** The font shorthand as the declarations it stands for; empty when it cannot be read as one. */
+    private static String fontLonghands(String value) {
+        String[] words = value.trim().split("\\s+");
+        StringBuilder out = new StringBuilder();
+        int i = 0;
+        // Before the size: the style, the variant and the weight, in any order.
+        for (; i < words.length; i++) {
+            String w = words[i];
+            if ("italic".equals(w) || "oblique".equals(w)) {
+                out.append("font-style:").append(w).append(';');
+            } else if ("bold".equals(w) || "bolder".equals(w) || "lighter".equals(w)
+                    || (w.length() == 3 && w.charAt(0) >= '1' && w.charAt(0) <= '9' && w.endsWith("00"))) {
+                out.append("font-weight:").append(w).append(';');
+            } else if (!"normal".equals(w) && !"small-caps".equals(w)) {
+                break;
+            }
+        }
+        if (i >= words.length - 1) {
+            // A size and a family are both required.
+            return "";
+        }
+        String size = words[i];
+        int slash = size.indexOf('/');
+        if (slash >= 0) size = size.substring(0, slash);
+        if (size.isEmpty() || !(Character.isDigit(size.charAt(0)) || size.charAt(0) == '.')) {
+            return "";
+        }
+        StringBuilder family = new StringBuilder();
+        for (int k = i + 1; k < words.length; k++) {
+            // A line height written apart from the size.
+            if (k == i + 1 && words[k].startsWith("/")) {
+                if (words[k].length() == 1) k++;
+                continue;
+            }
+            if (family.length() > 0) family.append(' ');
+            family.append(words[k]);
+        }
+        if (family.length() == 0) return "";
+        return out.append("font-size:").append(size).append(";font-family:").append(family).append(';').toString();
     }
 
     /** Read child elements of a shape -- currently only animation children matter. */

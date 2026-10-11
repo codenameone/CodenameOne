@@ -966,7 +966,10 @@ class VectorImageTest {
         assertEquals(300.0, bare.getWidth(), 0.001);
         assertEquals(150.0, bare.getHeight(), 0.001);
         VectorImage boxed = read("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 8 4\"/>");
-        assertTrue(boxed.hasWidth() && boxed.hasHeight(), "a view box is a size");
+        assertFalse(boxed.hasWidth() || boxed.hasHeight(), "a view box is a shape and not a size");
+        assertTrue(boxed.hasShape());
+        VectorImage one = read("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" viewBox=\"0 0 8 4\"/>");
+        assertTrue(one.hasWidth() && one.hasHeight(), "one side and a shape are both sides");
     }
 
     @Test
@@ -1291,5 +1294,37 @@ class VectorImageTest {
                 + "<rect width=\"100\" height=\"100\" fill=\"url(#g)\"/>", 100, 100);
         assertEquals(0xffff0000, img.getRGB(25, 50), "the stop's own color");
         assertEquals(0xff00ff00, img.getRGB(75, 50), "the color it is in");
+    }
+
+    @Test
+    void theFontShorthandSetsTheFontOfText() throws Exception {
+        BufferedImage longhand = paint("<text x=\"5\" y=\"60\" font-size=\"30\" font-family=\"monospace\""
+                + " font-weight=\"bold\">MMM</text>", 100, 100);
+        BufferedImage shorthand = paint("<style>text { font: bold 30px monospace; }</style>"
+                + "<text x=\"5\" y=\"60\">MMM</text>", 100, 100);
+        BufferedImage inline = paint("<text x=\"5\" y=\"60\" style=\"font: italic 700 30px/1.2 monospace\">MMM</text>",
+                100, 100);
+        assertEquals(inkRight(longhand), inkRight(shorthand));
+        assertTrue(Math.abs(inkRight(longhand) - inkRight(inline)) <= 3, "the same size, leaning");
+    }
+
+    @Test
+    void aPercentageInAClipInSharesOfTheBoxIsAShareOfTheBox() throws Exception {
+        BufferedImage img = paint("<defs><clipPath id=\"c\" clipPathUnits=\"objectBoundingBox\">"
+                + "<rect x=\"50%\" width=\"50%\" height=\"100%\"/></clipPath></defs>"
+                + "<rect x=\"20\" y=\"20\" width=\"60\" height=\"60\" fill=\"#ff0000\" clip-path=\"url(#c)\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(65, 50), "the right half of the element");
+        assertEquals(0, alpha(img, 35, 50), "and not the left");
+    }
+
+    @Test
+    void aFilterInSharesOfABoxWithNoHeightDrawsNothing() throws Exception {
+        String blur = "<defs><filter id=\"f\"><feGaussianBlur stdDeviation=\"2\"/></filter></defs>";
+        BufferedImage level = paint(blur + "<line x1=\"10\" y1=\"50\" x2=\"90\" y2=\"50\" stroke=\"#ff0000\""
+                + " stroke-width=\"6\" filter=\"url(#f)\"/>", 100, 100);
+        assertEquals(0, alpha(level, 50, 50), "a level line has no box to take a share of");
+        BufferedImage slanted = paint(blur + "<line x1=\"10\" y1=\"40\" x2=\"90\" y2=\"60\" stroke=\"#ff0000\""
+                + " stroke-width=\"6\" filter=\"url(#f)\"/>", 100, 100);
+        assertTrue(alpha(slanted, 50, 50) > 128, "one with a box is drawn");
     }
 }

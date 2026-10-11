@@ -106,6 +106,8 @@ public final class VectorImage {
     /// SVG with pictures of its own, and one that names itself would never
     /// end.
     private int fileDepth;
+    /// Whether this was read from an SVG, which may leave its size open.
+    private boolean svg;
     /// The `preserveAspectRatio` of the `<image>` this file is drawn by,
     /// which takes the place of its own; null when it is drawn by none.
     private String fitAs;
@@ -127,6 +129,7 @@ public final class VectorImage {
         SVGDocument doc = new SVGParser().parse(in);
         VectorImage image = new VectorImage(doc, doc.isViewBoxDeclared());
         image.base = base;
+        image.svg = true;
         return image;
     }
 
@@ -160,14 +163,25 @@ public final class VectorImage {
     private static final double DEFAULT_WIDTH = 300;
     private static final double DEFAULT_HEIGHT = 150;
 
-    /// Whether the file says how wide it is, itself or through its view box.
+    /// Whether the file says how wide it is: an SVG that gives a width, or
+    /// a height and a view box to work the width out from. A view box
+    /// alone is a shape and not a size; see [#hasShape]. A Lottie
+    /// animation always says.
     public boolean hasWidth() {
-        return doc.getWidth() > 0;
+        return doc.getWidth() > 0 && (!svg || doc.isGiven("width")
+                || (doc.isGiven("height") && doc.isViewBoxDeclared()));
     }
 
-    /// Whether the file says how high it is, itself or through its view box.
+    /// Whether the file says how high it is; see [#hasWidth].
     public boolean hasHeight() {
-        return doc.getHeight() > 0;
+        return doc.getHeight() > 0 && (!svg || doc.isGiven("height")
+                || (doc.isGiven("width") && doc.isViewBoxDeclared()));
+    }
+
+    /// Whether the file has a shape, a width to its height, even where it
+    /// has no size: [#getWidth] and [#getHeight] are then in that shape.
+    public boolean hasShape() {
+        return doc.getWidth() > 0 && doc.getHeight() > 0;
     }
 
     /// The width the file asks for, in CSS pixels; 300 when [#hasWidth] is false.
@@ -1908,7 +1922,10 @@ public final class VectorImage {
             // the tile's `x` and `y` say where the tiles are laid, and what
             // is in them moves along. A rectangle at 20 in a tile at 20 is
             // 20 inside the tile, in a browser as here, so the tile is not
-            // shifted back by its own position.
+            // shifted back by its own position. The specification's words,
+            // that the content is in the coordinates of the element the
+            // pattern is used on, read otherwise; what browsers draw is
+            // this, and moving a pattern's `x` moves its picture whole.
             tg.scale(iw / tw, ih / th);
             SVGPattern boxGiver = giver(chain, "viewBox", SVGPattern.class);
             SVGPattern contentUnits = giver(chain, "patternContentUnits", SVGPattern.class);

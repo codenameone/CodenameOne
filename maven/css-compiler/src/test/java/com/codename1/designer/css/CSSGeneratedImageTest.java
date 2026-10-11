@@ -290,6 +290,25 @@ class CSSGeneratedImageTest {
     }
 
     @Test
+    void anSvgWithOnlyAViewBoxIsAsLargeAsFitsInTheBox(@TempDir Path dir) throws Exception {
+        // A square with no size: as high as the box and that wide, once,
+        // not an 8 pixel tile. The box is 320 wide and starts at (2, 2).
+        File svg = new File(dir.toFile(), "img/shape.svg");
+        svg.getParentFile().mkdirs();
+        Files.write(svg.toPath(), ("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 8 8\">"
+                + "<rect width=\"8\" height=\"8\" fill=\"#ff0000\"/></svg>").getBytes(StandardCharsets.UTF_8));
+        Compiled c = compile(dir, "Banner { width: 50%; height: 10%; background-color: #ffffff;"
+                + " background-image: url(img/shape.svg); background-repeat: no-repeat;"
+                + " box-shadow: 0 0 4px black; }");
+        BufferedImage img = stored(c.res, "Banner_1.png", Display.DENSITY_HD);
+        int high = img.getHeight() - 4;
+
+        assertEquals(0xffff0000, img.getRGB(2 + high / 2, 2 + high / 2), "the square, as high as the box");
+        assertEquals(0xffff0000, img.getRGB(2 + high - 6, 2 + high - 6), "all the way down it");
+        assertEquals(0xffffffff, img.getRGB(2 + high + 20, 2 + high / 2), "and no wider than it is high");
+    }
+
+    @Test
     void anSvgKeepsItsShapeInATileOfAnotherShape(@TempDir Path dir) throws Exception {
         // A square drawing in a 320 by 100 tile is 100 by 100 in the middle
         // of it, as a browser fits one. The box starts at (2, 2).

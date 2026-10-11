@@ -5150,7 +5150,17 @@ public class CSSTheme {
                 // for an enormous size costs no more than its tile.
                 double[] tile = BackgroundImagePainter.tileSize(vector.getWidth(), vector.getHeight(), layer,
                         boxWidth, boxHeight);
-                if (!vector.hasWidth() || !vector.hasHeight()) {
+                if (vector.hasShape() && !vector.hasWidth() && !vector.hasHeight()) {
+                    // A view box and no size: a shape to keep, and nothing
+                    // to say how large. Left to itself it is as large as
+                    // fits in the box, as a browser draws one; made to
+                    // cover or fit, or given a side, the shape has already
+                    // settled the tile above.
+                    if (explicit == null && size == BackgroundImage.Size.AUTO) {
+                        double s = Math.min(boxWidth / vector.getWidth(), boxHeight / vector.getHeight());
+                        tile = new double[] {vector.getWidth() * s, vector.getHeight() * s};
+                    }
+                } else if (!vector.hasWidth() || !vector.hasHeight()) {
                     // A file that does not say how large it is has no shape
                     // either: a side it leaves open is the side of the box
                     // it is put in, and made to cover or to fit, it is the
