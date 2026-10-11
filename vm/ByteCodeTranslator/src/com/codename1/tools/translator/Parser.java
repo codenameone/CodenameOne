@@ -1577,6 +1577,15 @@ public class Parser extends ClassVisitor {
                 neliminated += rtaEliminated;
             }
 
+            // Unsupported instructions in dead library methods are harmless.
+            // Diagnose surviving methods before optimizers/code generators see
+            // the incomplete instruction stream for an unsupported bootstrap.
+            for (ByteCodeClass bc : classes) {
+                if (!bc.isEliminated()) {
+                    for (BytecodeMethod method : bc.getMethods()) method.verifySupportedBootstraps();
+                }
+            }
+
             // JavaScript-target-only suspension analysis: decide which
             // surviving methods can be emitted as plain ``function``
             // (no generator allocation / no yield*) vs which must stay
@@ -2300,7 +2309,12 @@ public class Parser extends ClassVisitor {
 
         @Override
         public void visitLdcInsn(Object cst) {
-            mtd.addLdc(cst);
+            if (cst instanceof com.codename1.tools.translator.classfile.ConstantDynamic) {
+                mtd.unsupportedBootstrap("dynamic constant "
+                        + ((com.codename1.tools.translator.classfile.ConstantDynamic) cst).getName());
+            } else {
+                mtd.addLdc(cst);
+            }
             super.visitLdcInsn(cst); 
         }
 
@@ -2320,6 +2334,10 @@ public class Parser extends ClassVisitor {
         public void visitInvokeDynamicInsn(String name, String desc, Handle bsm, Object... bsmArgs) {
             super.visitInvokeDynamicInsn(name, desc, bsm, bsmArgs);
             indyLambdas.add(null);
+            if (bsm.getTag() != Opcodes.H_INVOKESTATIC || bsm.isInterface()) {
+                mtd.unsupportedBootstrap(bsm.getOwner() + "." + bsm.getName());
+                return;
+            }
             if ("java/lang/invoke/StringConcatFactory".equals(bsm.getOwner()) &&
                 ("makeConcatWithConstants".equals(bsm.getName()) || "makeConcat".equals(bsm.getName()))) {
 
@@ -2756,6 +2774,7 @@ public class Parser extends ClassVisitor {
                 return;
             }
 
+            mtd.unsupportedBootstrap(bsm.getOwner() + "." + bsm.getName());
         }
 
         /**
