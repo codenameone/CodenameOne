@@ -132,6 +132,17 @@ public final class CssImportDependencies {
                 // ends at the first space.
                 String target = m.group(1) != null ? m.group(1) : m.group(2) != null ? m.group(2) : m.group(3);
                 File file = resolve(css, target);
+                // `base.css?v=1` is compiled as `base.css` when no file has
+                // the longer name, so that is the file to watch.
+                int query = target.indexOf('?');
+                int fragment = target.indexOf('#');
+                int suffix = query < 0 ? fragment : fragment < 0 ? query : Math.min(query, fragment);
+                if (file != null && !file.isFile() && suffix > 0) {
+                    File plain = resolve(css, target.substring(0, suffix));
+                    if (plain != null && plain.isFile()) {
+                        file = plain;
+                    }
+                }
                 if (file == null || !seen.add(file)) {
                     continue;
                 }

@@ -78,6 +78,8 @@ public final class StyleParser {
         if (fillRule != null) {
             out.setFillEvenOdd(Boolean.valueOf("evenodd".equals(fillRule.trim())));
         }
+        out.setStrokeDashArray(toDashes(merged.get("stroke-dasharray")));
+        out.setStrokeDashOffset(toFloat(merged.get("stroke-dashoffset")));
         String clipPath = merged.get("clip-path");
         if (clipPath != null) {
             String ref = SVGPaint.stripUrl(clipPath);
@@ -101,6 +103,36 @@ public final class StyleParser {
         } catch (RuntimeException e) {
             return null;
         }
+    }
+
+    /**
+     * A stroke-dasharray: empty for {@code none} and for a list that adds
+     * up to nothing, null for one that is missing or not valid. A list of
+     * an odd number of lengths is repeated to make it even.
+     */
+    private static float[] toDashes(String value) {
+        if (value == null) return null;
+        String v = value.trim();
+        if (v.isEmpty()) return null;
+        if ("none".equals(v)) return new float[0];
+        String[] parts = v.split("[\\s,]+");
+        float[] lengths = new float[parts.length];
+        float sum = 0f;
+        for (int i = 0; i < parts.length; i++) {
+            try {
+                lengths[i] = NumberParser.parseFloat(parts[i]);
+            } catch (RuntimeException e) {
+                return null;
+            }
+            if (!(lengths[i] >= 0f) || Float.isInfinite(lengths[i])) return null;
+            sum += lengths[i];
+        }
+        if (!(sum > 0f)) return new float[0];
+        if (lengths.length % 2 == 0) return lengths;
+        float[] doubled = new float[lengths.length * 2];
+        System.arraycopy(lengths, 0, doubled, 0, lengths.length);
+        System.arraycopy(lengths, 0, doubled, lengths.length, lengths.length);
+        return doubled;
     }
 
     private static Float toFloat(String s) {

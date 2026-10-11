@@ -503,6 +503,8 @@ public final class SVGParser {
         if (a.containsKey("cx")) g.setCx(parseGradCoord(a.get("cx")));
         if (a.containsKey("cy")) g.setCy(parseGradCoord(a.get("cy")));
         if (a.containsKey("r")) g.setR(parseGradCoord(a.get("r")));
+        if (a.containsKey("fx")) g.setFx(Float.valueOf(parseGradCoord(a.get("fx"))));
+        if (a.containsKey("fy")) g.setFy(Float.valueOf(parseGradCoord(a.get("fy"))));
         if ("userSpaceOnUse".equals(a.get("gradientUnits"))) g.setUserSpace(true);
         String href = a.get("href");
         if (href == null) href = a.get("xlink:href");
@@ -624,7 +626,8 @@ public final class SVGParser {
             if ("fill".equals(k) || "stroke".equals(k) || "fill-opacity".equals(k) || "stroke-opacity".equals(k)
                     || "opacity".equals(k) || "stroke-width".equals(k) || "stroke-linecap".equals(k)
                     || "stroke-linejoin".equals(k) || "stroke-miterlimit".equals(k)
-                    || "clip-path".equals(k) || "fill-rule".equals(k)) {
+                    || "clip-path".equals(k) || "fill-rule".equals(k)
+                    || "stroke-dasharray".equals(k) || "stroke-dashoffset".equals(k)) {
                 pres.put(k, e.getValue());
             }
         }

@@ -144,6 +144,13 @@ public final class CssImports {
         return found;
     }
 
+    /// Where the query or the fragment of an import's name starts, or -1.
+    private static int suffixStart(String target) {
+        int query = target.indexOf('?');
+        int fragment = target.indexOf('#');
+        return query < 0 ? fragment : fragment < 0 ? query : Math.min(query, fragment);
+    }
+
     /// Expands the imports of `text`, the contents of `current`. Every `url()`
     /// in the result is relative to the directory of `current`.
     private static String inline(File current, String text, List<File> stack, Set<File> imported)
@@ -223,6 +230,21 @@ public final class CssImports {
         File file = new File(target);
         if (!file.isAbsolute()) {
             file = new File(current.getParentFile(), target);
+        }
+        if (!file.isFile()) {
+            // `base.css?v=1`: what a browser sends the server after the
+            // name, and no part of the name of the file. A file really
+            // called that is found above, before this is tried.
+            int suffix = suffixStart(target);
+            if (suffix > 0) {
+                File plain = new File(target.substring(0, suffix));
+                if (!plain.isAbsolute()) {
+                    plain = new File(current.getParentFile(), target.substring(0, suffix));
+                }
+                if (plain.isFile()) {
+                    file = plain;
+                }
+            }
         }
         if (!file.isFile()) {
             throw new MissingImportException(

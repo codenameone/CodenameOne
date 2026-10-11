@@ -218,6 +218,44 @@ class VectorImageTest {
     }
 
     @Test
+    void aDashedStrokeLeavesItsGapsOpen() throws Exception {
+        String line = "<line x1=\"0\" y1=\"50\" x2=\"100\" y2=\"50\" stroke=\"#ff0000\" stroke-width=\"10\"";
+        BufferedImage img = paint(line + " stroke-dasharray=\"20 10\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(10, 50), "a dash");
+        assertEquals(0, alpha(img, 25, 50), "a gap");
+        assertEquals(0xffff0000, img.getRGB(40, 50), "the next dash");
+
+        BufferedImage moved = paint(line + " style=\"stroke-dasharray:20,10;stroke-dashoffset:-10\"/>", 100, 100);
+        assertEquals(0, alpha(moved, 5, 50), "the pattern starts ten later");
+        assertEquals(0xffff0000, moved.getRGB(20, 50));
+
+        BufferedImage odd = paint(line + " stroke-dasharray=\"10\"/>", 100, 100);
+        assertEquals(0xffff0000, odd.getRGB(5, 50));
+        assertEquals(0, alpha(odd, 15, 50), "one length is both the dash and the gap");
+
+        BufferedImage none = paint("<g stroke-dasharray=\"20 10\">" + line + " stroke-dasharray=\"none\"/></g>",
+                100, 100);
+        assertEquals(0xffff0000, none.getRGB(25, 50), "none overrides the inherited pattern");
+    }
+
+    @Test
+    void aRadialGradientStartsAtItsFocalPoint() throws Exception {
+        String stops = "<stop offset=\"0\" stop-color=\"#ffffff\"/><stop offset=\"1\" stop-color=\"#000000\"/>";
+        BufferedImage img = paint("<defs><radialGradient id=\"g\" gradientUnits=\"userSpaceOnUse\" cx=\"50\""
+                + " cy=\"50\" r=\"50\" fx=\"20\" fy=\"50\">" + stops + "</radialGradient></defs>"
+                + "<rect width=\"100\" height=\"100\" fill=\"url(#g)\"/>", 100, 100);
+        int atFocus = img.getRGB(20, 50) & 0xff;
+        int atCentre = img.getRGB(50, 50) & 0xff;
+        assertTrue(atFocus > 240, "brightest at the focal point, was " + atFocus);
+        assertTrue(atCentre < 200, "and already darker at the centre, was " + atCentre);
+
+        BufferedImage boxed = paint("<defs><radialGradient id=\"g\" fx=\"0.2\">" + stops
+                + "</radialGradient></defs><rect width=\"100\" height=\"100\" fill=\"url(#g)\"/>", 100, 100);
+        assertTrue((boxed.getRGB(20, 50) & 0xff) > 240);
+        assertTrue((boxed.getRGB(50, 50) & 0xff) < 200);
+    }
+
+    @Test
     void aUseThatNamesItselfDrawsNothingAndEnds() throws Exception {
         BufferedImage img = paint("<g id=\"loop\"><use href=\"#loop\"/></g>", 20, 20);
         assertEquals(0, alpha(img, 10, 10));

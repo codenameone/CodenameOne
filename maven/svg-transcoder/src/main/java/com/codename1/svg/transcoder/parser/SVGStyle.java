@@ -50,6 +50,8 @@ public final class SVGStyle {
      *  registered in the document's definitions map. */
     private String clipPathRef;
     private Boolean fillEvenOdd;
+    private float[] strokeDashArray;
+    private Float strokeDashOffset;
 
     public SVGPaint getFill() { return fill; }
     public void setFill(SVGPaint fill) { this.fill = fill; }
@@ -76,6 +78,15 @@ public final class SVGStyle {
     /** Whether fill-rule is evenodd; null when the element does not say. */
     public Boolean getFillEvenOdd() { return fillEvenOdd; }
     public void setFillEvenOdd(Boolean v) { this.fillEvenOdd = v; }
+    /**
+     * The lengths of the dashes and gaps of a stroke, an even number of
+     * them; empty for a solid line, null when the element does not say.
+     */
+    public float[] getStrokeDashArray() { return strokeDashArray; }
+    public void setStrokeDashArray(float[] v) { this.strokeDashArray = v; }
+    /** How far into the dash pattern a stroke starts. */
+    public Float getStrokeDashOffset() { return strokeDashOffset; }
+    public void setStrokeDashOffset(Float v) { this.strokeDashOffset = v; }
     public SVGStyle inherit(SVGStyle parent) {
         if (parent == null) return this;
         if (fill == null) fill = parent.fill;
@@ -88,6 +99,8 @@ public final class SVGStyle {
         if (strokeLineJoin == null) strokeLineJoin = parent.strokeLineJoin;
         if (strokeMiterLimit == null) strokeMiterLimit = parent.strokeMiterLimit;
         if (fillEvenOdd == null) fillEvenOdd = parent.fillEvenOdd;
+        if (strokeDashArray == null) strokeDashArray = parent.strokeDashArray;
+        if (strokeDashOffset == null) strokeDashOffset = parent.strokeDashOffset;
         // clip-path does NOT inherit per SVG spec.
         return this;
     }

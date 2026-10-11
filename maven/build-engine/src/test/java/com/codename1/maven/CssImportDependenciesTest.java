@@ -76,6 +76,19 @@ class CssImportDependenciesTest {
     }
 
     @Test
+    void anImportNamedWithAQueryIsTheFileBeforeIt(@TempDir Path tmp) throws Exception {
+        File dir = tmp.toFile();
+        File css = new File(dir, "css");
+        write(new File(css, "theme.css"), "@import \"../shared/base.css?v=1\";\n");
+        File base = write(new File(dir, "shared/base.css"), "A { color: red; }\n");
+
+        Set<File> found = CssImportDependencies.outside(css);
+
+        assertEquals(1, found.size(), found.toString());
+        assertTrue(found.contains(base.getCanonicalFile()));
+    }
+
+    @Test
     void aCommentDelimiterInsideAStringHidesNothingAfterIt(@TempDir Path tmp) throws Exception {
         File dir = tmp.toFile();
         File css = new File(dir, "css");

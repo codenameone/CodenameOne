@@ -210,6 +210,58 @@ public class CN1CSSCLI {
         System.exit(run(args));
     }
 
+    /// The arguments that compile `css` to `res` the way the two-file form
+    /// of the command line used to: `<file.css> <file.res>`, with nothing
+    /// else said.
+    ///
+    /// That form looked at the project around the stylesheet. For a
+    /// `theme.css` in a project whose settings say `codename1.cssTheme=true`
+    /// it compiled the stylesheets of the project's libraries, one
+    /// `theme.css` in each directory of the library CSS directory, ahead of
+    /// the application's own, through a merged file. A caller that still
+    /// names its files that way gets the same theme from these arguments.
+    public static String[] legacyArguments(String css, String res) {
+        List<String> out = new ArrayList<String>();
+        File input = new File(css);
+        ProjectLayout layout = "theme.css".equals(input.getName()) ? getLayout(input.getAbsoluteFile()) : null;
+        StringBuilder inputs = new StringBuilder();
+        if (layout != null && layout.settingsFile().isFile()) {
+            Properties settings = new Properties();
+            try (InputStream in = new FileInputStream(layout.settingsFile())) {
+                settings.load(in);
+            } catch (IOException ex) {
+                settings.clear();
+            }
+            File[] libraries = "true".equals(settings.getProperty("codename1.cssTheme"))
+                    ? layout.libraryCssDir().listFiles() : null;
+            if (libraries != null) {
+                // By name, so the same project gives the same theme on
+                // every machine.
+                Arrays.sort(libraries);
+                for (File library : libraries) {
+                    File theme = new File(library, "theme.css");
+                    // A list of inputs is split at its commas.
+                    if (library.isDirectory() && theme.isFile() && theme.getPath().indexOf(',') < 0) {
+                        inputs.append(theme.getPath()).append(',');
+                    }
+                }
+            }
+        }
+        out.add("-input");
+        out.add(inputs + css);
+        out.add("-output");
+        out.add(res);
+        if (inputs.length() > 0) {
+            out.add("-merge");
+            // Among the libraries in every layout, where Ant used to keep
+            // it beside the stylesheet: the inputs' directories are copied
+            // in next to the merged file, and a copy of the stylesheet's
+            // directory cannot go inside that directory.
+            out.add(new File(layout.libraryCssDir(), input.getName() + ".merged").getPath());
+        }
+        return out.toArray(new String[0]);
+    }
+
     /// Runs the compiler and reports the outcome as an exit status instead of
     /// ending the JVM, for callers in the same process.
     ///

@@ -547,12 +547,29 @@ public final class VectorImage {
             int join = style.getStrokeLineJoin() == null ? SVGStyle.LINEJOIN_MITER
                     : style.getStrokeLineJoin().intValue();
             float miter = style.getStrokeMiterLimit() == null ? 4f : style.getStrokeMiterLimit().floatValue();
+            float[] dashes = style.getStrokeDashArray();
+            if (dashes != null && dashes.length == 0) {
+                dashes = null;
+            }
+            float phase = 0f;
+            if (dashes != null && style.getStrokeDashOffset() != null) {
+                // A negative offset moves the pattern the other way, which
+                // is the same as moving it on by what is left of one round.
+                float round = 0f;
+                for (float d : dashes) {
+                    round += d;
+                }
+                phase = style.getStrokeDashOffset().floatValue() % round;
+                if (phase < 0f) {
+                    phase += round;
+                }
+            }
             BasicStroke pen = new BasicStroke(width,
                     cap == SVGStyle.LINECAP_ROUND ? BasicStroke.CAP_ROUND
                             : cap == SVGStyle.LINECAP_SQUARE ? BasicStroke.CAP_SQUARE : BasicStroke.CAP_BUTT,
                     join == SVGStyle.LINEJOIN_ROUND ? BasicStroke.JOIN_ROUND
                             : join == SVGStyle.LINEJOIN_BEVEL ? BasicStroke.JOIN_BEVEL : BasicStroke.JOIN_MITER,
-                    Math.max(1f, miter));
+                    Math.max(1f, miter), dashes, phase);
             float a = style.getStrokeOpacity() == null ? 1f : clamp(style.getStrokeOpacity().floatValue());
             paintWith(g, stroke, a, pen.createStrokedShape(shape), shape);
         }
@@ -632,7 +649,8 @@ public final class VectorImage {
             if (rg.getR() <= 0) {
                 return c[c.length - 1];
             }
-            return new RadialGradientPaint(new Point2D.Double(rg.getCx(), rg.getCy()), rg.getR(), f, c);
+            return new RadialGradientPaint(new Point2D.Double(rg.getCx(), rg.getCy()), rg.getR(), focusOf(rg), f, c,
+                    MultipleGradientPaint.CycleMethod.NO_CYCLE);
         }
         if (rg.getR() <= 0 || bounds.getWidth() <= 0 || bounds.getHeight() <= 0) {
             return c[c.length - 1];
@@ -642,8 +660,15 @@ public final class VectorImage {
         AffineTransform toBox = new AffineTransform(bounds.getWidth(), 0, 0, bounds.getHeight(),
                 bounds.getX(), bounds.getY());
         Point2D centre = new Point2D.Double(rg.getCx(), rg.getCy());
-        return new RadialGradientPaint(centre, rg.getR(), centre, f, c,
+        return new RadialGradientPaint(centre, rg.getR(), focusOf(rg), f, c,
                 MultipleGradientPaint.CycleMethod.NO_CYCLE, MultipleGradientPaint.ColorSpaceType.SRGB, toBox);
+    }
+
+    /// Where a radial gradient's first colour starts: its focal point,
+    /// which is its centre unless `fx` or `fy` says otherwise.
+    private static Point2D focusOf(SVGRadialGradient rg) {
+        return new Point2D.Double(rg.getFx() == null ? rg.getCx() : rg.getFx().floatValue(),
+                rg.getFy() == null ? rg.getCy() : rg.getFy().floatValue());
     }
 
     /// The stops of a gradient, taken from the one it refers to when it has

@@ -569,10 +569,11 @@ public class ResourceEditorApp extends SingleFrameApplication {
                 // display; this entry point only keeps `-css` working for
                 // whoever still launches the editor jar to compile a stylesheet.
                 // `-css theme.css theme.res` is how a build script written for
-                // this jar names its two files; the compiler takes them by name.
+                // this jar names its two files, and expects the stylesheets of
+                // the project's libraries to be compiled in with its own.
                 if (cssArgs.size() == 2 && !cssArgs.get(0).startsWith("-") && !cssArgs.get(1).startsWith("-")) {
-                    cssArgs.add(0, "-input");
-                    cssArgs.add(2, "-output");
+                    cssArgs = new ArrayList<String>(Arrays.asList(
+                            CN1CSSCLI.legacyArguments(cssArgs.get(0), cssArgs.get(1))));
                 }
                 System.exit(CN1CSSCLI.run(cssArgs.toArray(new String[cssArgs.size()])));
                 return;

@@ -256,6 +256,48 @@ class CN1CSSCLIEndToEndTest {
     }
 
     @Test
+    void theTwoFileFormOfAnAntProjectCompilesItsLibrariesIn(@TempDir Path tmp) throws Exception {
+        File project = tmp.toFile();
+        write(new File(project, "build.xml"), "<project/>");
+        write(new File(project, "codenameone_settings.properties"), "codename1.cssTheme=true\n");
+        File css = write(new File(project, "css/theme.css"), "Shared { color: #222222; }\n");
+        write(new File(project, "lib/impl/css/zlib/theme.css"), "Shared { color: #111111; }\nFromZ { color: #000003; }\n");
+        write(new File(project, "lib/impl/css/alib/theme.css"), "FromA { color: #000004; }\n");
+        write(new File(project, "lib/impl/css/notalib.txt"), "x");
+        File res = new File(project, "src/theme.res");
+
+        String[] args = CN1CSSCLI.legacyArguments(css.getPath(), res.getPath());
+        assertEquals("-input", args[0]);
+        assertTrue(args[1].endsWith("alib" + File.separator + "theme.css,"
+                + new File(project, "lib/impl/css/zlib/theme.css").getPath() + "," + css.getPath()), args[1]);
+        assertEquals("-merge", args[4]);
+        assertEquals(new File(project, "lib/impl/css/theme.css.merged").getAbsolutePath(),
+                new File(args[5]).getAbsolutePath());
+
+        assertEquals(0, CN1CSSCLI.run(args), stderr());
+        assertEquals("3", theme(res).get("FromZ.fgColor"));
+        assertEquals("4", theme(res).get("FromA.fgColor"));
+        assertEquals("222222", theme(res).get("Shared.fgColor"), "the application's own rule comes last");
+
+        File loose = write(new File(tmp.toFile(), "elsewhere/other.css"), "Label { color: #000001; }\n");
+        assertArrayEquals(new String[] {"-input", loose.getPath(), "-output", "o.res"},
+                CN1CSSCLI.legacyArguments(loose.getPath(), "o.res"));
+    }
+
+    @Test
+    void anImportNamedWithAQueryIsReadFromTheFileBeforeIt(@TempDir Path tmp) throws Exception {
+        File dir = tmp.toFile();
+        File css = write(new File(dir, "theme.css"),
+                "@import \"base.css?v=1\";\n@import url(more.css#top);\nLabel { color: #000001; }\n");
+        write(new File(dir, "base.css"), "Base { color: #000002; }\n");
+        write(new File(dir, "more.css"), "More { color: #000003; }\n");
+        File res = new File(dir, "theme.res");
+        assertEquals(0, CN1CSSCLI.run(new String[] {"-input", css.getPath(), "-output", res.getPath()}), stderr());
+        assertEquals("2", theme(res).get("Base.fgColor"));
+        assertEquals("3", theme(res).get("More.fgColor"));
+    }
+
+    @Test
     void anImportIsCompiledAndAnEditToItRecompiles(@TempDir Path tmp) throws Exception {
         File common = mavenProject(tmp.toFile());
         File css = write(new File(common, "src/main/css/theme.css"),
