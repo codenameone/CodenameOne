@@ -71,6 +71,19 @@ public final class TestSupport {
      * unresolvable without the jar that declares it.</p>
      */
     public static Result transpile(String[][] sources, java.util.List<File> stubEntries) {
+        return transpile(sources, stubEntries, java.util.Collections.<String[]>emptyList());
+    }
+
+    /**
+     * {@link #transpile(String[][], java.util.List)} with additional stub sources
+     * ({@code fileName -> content} pairs, same shape as {@code sources}) loaded into the
+     * registry alongside the classpath-published ones. A behavior fixture uses this for a
+     * hand-written Java class it declares only for itself: a {@code *.stub.dart} file beside
+     * {@code main.dart} describes it with {@code @JavaName}/{@code external} exactly like a
+     * runtime stub, without publishing it through any jar.
+     */
+    public static Result transpile(String[][] sources, java.util.List<File> stubEntries,
+            java.util.List<String[]> extraStubs) {
         Diagnostics diags = new Diagnostics();
         AstBuilder builder = new AstBuilder(diags);
         Program program = new Program();
@@ -80,8 +93,34 @@ public final class TestSupport {
         // loadFromClasspath falls back to the embedded set when nothing contributes, so an
         // empty list keeps the previous behaviour exactly.
         StubRegistry stubs = StubRegistry.loadFromClasspath(stubEntries, diags);
+        for (String[] s : extraStubs) {
+            stubs.load(s[0], s[1], diags);
+        }
         JavaEmitter emitter = new JavaEmitter(program, stubs, diags, PKG);
         return new Result(emitter.emit(), diags);
+    }
+
+    /**
+     * Matches a Java source's leading {@code package x.y.z;} declaration, so a
+     * hand-written support file can be dropped into the right directory under
+     * a javac source root regardless of its own file name.
+     */
+    private static final java.util.regex.Pattern PACKAGE_DECL =
+            java.util.regex.Pattern.compile("(?m)^\\s*package\\s+([\\w.]+)\\s*;");
+
+    /**
+     * Writes a fixture's hand-written {@code .java} support file under {@code srcRoot},
+     * at the path its own {@code package} declaration implies (the default package when it
+     * has none), and returns the file written -- ready to add to a {@code javac} argument
+     * list beside the generated sources.
+     */
+    public static File writeJavaSupportFile(File srcRoot, File javaFile) throws IOException {
+        String content = read(javaFile);
+        java.util.regex.Matcher m = PACKAGE_DECL.matcher(content);
+        File dir = m.find() ? new File(srcRoot, m.group(1).replace('.', '/')) : srcRoot;
+        File out = new File(dir, javaFile.getName());
+        write(out, content);
+        return out;
     }
 
     public static String read(File f) throws IOException {

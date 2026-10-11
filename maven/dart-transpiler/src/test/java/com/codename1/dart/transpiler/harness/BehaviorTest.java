@@ -90,24 +90,39 @@ public class BehaviorTest {
             stubEntries.add(flutterRuntime);
         }
         // main.dart, then any other library beside it (a case may need imports).
+        // A *.stub.dart file is NOT a program source: it describes a hand-written
+        // Java class this fixture alone declares (a *.java file, same base name),
+        // the way a runtime stub describes com.codename1.flutter.* -- loaded into
+        // the StubRegistry instead of parsed as a library to translate.
         List<String[]> sources = new ArrayList<String[]>();
         sources.add(new String[] {"main.dart", TestSupport.read(new File(dir, "main.dart"))});
+        List<String[]> extraStubs = new ArrayList<String[]>();
+        List<File> javaSupportFiles = new ArrayList<File>();
         String[] names = dir.list();
         java.util.Arrays.sort(names);
         for (String n : names) {
-            if (n.endsWith(".dart") && !n.equals("main.dart")) {
+            if (n.endsWith(".stub.dart")) {
+                extraStubs.add(new String[] {n, TestSupport.read(new File(dir, n))});
+            } else if (n.endsWith(".dart") && !n.equals("main.dart")) {
                 sources.add(new String[] {n, TestSupport.read(new File(dir, n))});
+            } else if (n.endsWith(".java")) {
+                javaSupportFiles.add(new File(dir, n));
             }
         }
-        TestSupport.Result r = TestSupport.transpile(sources.toArray(new String[0][]), stubEntries);
+        TestSupport.Result r = TestSupport.transpile(sources.toArray(new String[0][]), stubEntries, extraStubs);
         assertTrue(!r.diags.hasErrors(), "diagnostics: " + r.diags.asList());
 
         File work = Files.createTempDirectory("dart-behavior-" + dir.getName()).toFile();
         File srcDir = new File(work, "src/" + TestSupport.PKG.replace('.', '/'));
+        File srcRoot = new File(work, "src");
         List<String> javacArgs = new ArrayList<String>();
         for (GeneratedFile gf : r.files) {
             File out = new File(srcDir, gf.relativePath);
             TestSupport.write(out, gf.content);
+            javacArgs.add(out.getAbsolutePath());
+        }
+        for (File javaFile : javaSupportFiles) {
+            File out = TestSupport.writeJavaSupportFile(srcRoot, javaFile);
             javacArgs.add(out.getAbsolutePath());
         }
         File runner = new File(work, "src/Runner.java");
