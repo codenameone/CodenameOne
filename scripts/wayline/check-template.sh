@@ -16,7 +16,7 @@
 #
 # Needs this checkout's artifacts installed (core, javase, css-compiler, the
 # Maven plugin, backend, backend-test), a JDK 17 or newer as JAVA_HOME, python3
-# and unzip.
+# and unzip, and on Linux a display or xvfb-run.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -68,11 +68,24 @@ ls "$minimal"/backend/target/surefire-reports/TEST-*.xml >/dev/null 2>&1 \
 [ -f "$minimal/backend/target/generated-sources/cn1-annotations/$PACKAGE/api/RiderApiServer.java" ] \
     || { log "the server's half of the contract was not generated"; exit 1; }
 
+# Compiling the theme opens a window, so the app needs a display to build even
+# though nothing is shown. A Linux machine without one (a CI runner, a container)
+# gets a virtual display from xvfb-run when that is installed.
+display=()
+if [ "$(uname -s)" = "Linux" ] && [ -z "${DISPLAY:-}" ]; then
+  if command -v xvfb-run >/dev/null 2>&1; then
+    display=(xvfb-run -a)
+  else
+    log "no display and no xvfb-run: the theme may fail to compile (install xvfb)"
+  fi
+fi
+
 for layout in APP_WITH_BACKEND FULL; do
   project="$WORK/$layout"
   [ -d "$project" ] || project="$(extract "$layout")"
   log "building the generated app ($layout)"
-  (cd "$project" && "$MVN" -B -q -Dcodename1.platform=javase -Djava.awt.headless=true -DskipTests package)
+  # Spelled so that an empty list is not an unset variable to the bash 3 on macOS.
+  (cd "$project" && ${display[@]+"${display[@]}"} "$MVN" -B -q -Dcodename1.platform=javase -DskipTests package)
   for built in "classes/theme.res" "classes/$PACKAGE/api/RiderApiImpl.class" "classes/cn1app/RestClientBootstrap.class"; do
     [ -f "$project/common/target/$built" ] \
         || { log "$layout: common/target/$built was not built"; exit 1; }

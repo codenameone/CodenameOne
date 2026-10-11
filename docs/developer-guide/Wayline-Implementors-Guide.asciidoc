@@ -831,9 +831,9 @@ refunds, and builds receipts. Every charge carries a key made from the ride's
 id, so a request repeated after a timeout can't charge twice.
 
 A ride completes in one transaction and its payment is written in another,
-with the charge between them. A server that stops in between leaves a completed
+with the charge between them. A server that stops between the two leaves a completed
 ride whose payment is still pending. `Rides.settleLeftBehind` runs every minute,
-finds such rides once they are two minutes old, and settles them. Because the
+finds such rides once they're two minutes old, and settles them. Because the
 charge is keyed by the ride, a card that was already charged isn't charged
 again.
 
