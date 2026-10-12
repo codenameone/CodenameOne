@@ -270,6 +270,9 @@ final class SvgFilter {
                     boxUnits ? sdy * box.getHeight() : sdy);
         }
         if ("feOffset".equals(name)) {
+            // Handed over as written; offset() scales them by the box when
+            // the effects are measured in shares of it, as it does for
+            // the shadow below.
             return offset(input(p, "in", last, source, linear), number(p, "dx", 0), number(p, "dy", 0));
         }
         if ("feFlood".equals(name)) {

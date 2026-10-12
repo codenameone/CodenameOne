@@ -127,6 +127,14 @@ public final class VectorImage {
     /// it names with a relative address are found against.
     public static VectorImage readSvg(InputStream in, java.net.URL base) throws IOException {
         SVGDocument doc = new SVGParser().parse(in);
+        if (doc.getForeignObjects() > 0) {
+            // What is in one is a page, HTML as a rule, and drawing it
+            // takes a browser. Leaving it out would give an image with a
+            // hole where a label was and no word of it, so the file is
+            // refused, with what to do about it.
+            throw new IOException("it holds a <foreignObject>, whose content cannot be drawn here. Put it in a"
+                    + " <switch> with something to draw in its place, or take it out");
+        }
         VectorImage image = new VectorImage(doc, doc.isViewBoxDeclared());
         image.base = base;
         image.svg = true;
@@ -819,9 +827,15 @@ public final class VectorImage {
             } else {
                 Shape shape = outline(node);
                 if (shape != null) {
-                    fillAndStroke(g, shape, style);
-                    if (node instanceof SVGPath || node instanceof SVGLine || node instanceof SVGPolyline) {
-                        paintMarkers(g, shape, style, w, h);
+                    for (String layer : layers(style)) {
+                        if ("fill".equals(layer)) {
+                            fill(g, shape, style, true);
+                        } else if ("stroke".equals(layer)) {
+                            stroke(g, shape, style);
+                        } else if (node instanceof SVGPath || node instanceof SVGLine
+                                || node instanceof SVGPolyline) {
+                            paintMarkers(g, shape, style, w, h);
+                        }
                     }
                 }
             }
@@ -1543,13 +1557,42 @@ public final class VectorImage {
         p.append(AffineTransform.getRotateInstance(phi, cx, cy).createTransformedShape(arc), true);
     }
 
-    private void fillAndStroke(Graphics2D g, Shape shape, SVGStyle style) {
-        fillAndStroke(g, shape, style, true);
+    /// The layers of a shape, `fill`, `stroke` and `markers`, in the order
+    /// its `paint-order` has them painted: the ones it names first, in
+    /// the order it names them, and then the rest in their usual order.
+    private static String[] layers(SVGStyle style) {
+        List<String> order = new ArrayList<String>();
+        String given = style.getPaintOrder();
+        if (given != null) {
+            for (String word : given.trim().split("\\s+")) {
+                if (("fill".equals(word) || "stroke".equals(word) || "markers".equals(word))
+                        && !order.contains(word)) {
+                    order.add(word);
+                }
+            }
+        }
+        for (String word : new String[] {"fill", "stroke", "markers"}) {
+            if (!order.contains(word)) {
+                order.add(word);
+            }
+        }
+        return order.toArray(new String[0]);
     }
 
-    /// Fills `shape` and then strokes it. `ruled` is whether `fill-rule`
-    /// applies, which it does not to the outlines of text.
+    /// Fills `shape` and strokes it, in the order `paint-order` gives the
+    /// two. `ruled` is whether `fill-rule` applies, which it does not to
+    /// the outlines of text.
     private void fillAndStroke(Graphics2D g, Shape shape, SVGStyle style, boolean ruled) {
+        for (String layer : layers(style)) {
+            if ("fill".equals(layer)) {
+                fill(g, shape, style, ruled);
+            } else if ("stroke".equals(layer)) {
+                stroke(g, shape, style);
+            }
+        }
+    }
+
+    private void fill(Graphics2D g, Shape shape, SVGStyle style, boolean ruled) {
         SVGPaint fill = style.getFill() == null ? SVGPaint.BLACK : style.getFill();
         if (!fill.isNone()) {
             float a = style.getFillOpacity() == null ? 1f : clamp(style.getFillOpacity().floatValue());
@@ -1562,6 +1605,9 @@ public final class VectorImage {
             }
             paintWith(g, fill, a, filled, shape);
         }
+    }
+
+    private void stroke(Graphics2D g, Shape shape, SVGStyle style) {
         SVGPaint stroke = style.getStroke();
         if (stroke != null && !stroke.isNone()) {
             float width = style.getStrokeWidth() == null ? 1f : style.getStrokeWidth().floatValue();

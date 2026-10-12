@@ -55,6 +55,14 @@ public final class SVGDocument extends SVGGroup {
 
     public Map<String, SVGNode> getDefinitions() { return definitions; }
 
+    private int foreignObjects;
+    /// How many `<foreignObject>` elements the file has that nothing was
+    /// drawn in place of: content in another language, which is not read.
+    /// One inside a `<switch>` that had something else to draw is not
+    /// counted.
+    public int getForeignObjects() { return foreignObjects; }
+    public void setForeignObjects(int foreignObjects) { this.foreignObjects = foreignObjects; }
+
     private boolean viewBoxDeclared;
     private String preserveAspectRatio;
 

@@ -268,7 +268,11 @@ public final class ColorParser {
             throw new IllegalArgumentException("Bad rgb color: " + v);
         }
         String inside = v.substring(open + 1, close);
-        String[] parts = inside.split(",");
+        // With commas, or the newer way with spaces and the alpha after a
+        // slash: rgb(255 0 0 / 50%). Either function name takes an alpha.
+        String[] parts = inside.indexOf(',') >= 0 ? inside.split(",")
+                : inside.trim().replace("/", " ").trim().split("\\s+");
+        hasAlpha = hasAlpha || parts.length >= 4;
         if (parts.length < 3) throw new IllegalArgumentException("Bad rgb color: " + v);
         int r = component(parts[0]);
         int g = component(parts[1]);

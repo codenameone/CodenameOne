@@ -198,6 +198,14 @@ public final class CssImports {
                 i++;
             } else if (c == '@' && depth == 0 && text.regionMatches(true, i, "@import", 0, 7)
                     && i + 7 < len && !isIdentChar(text.charAt(i + 7))) {
+                // Wherever it stands, and so after a rule as well. A browser
+                // drops an import that follows a rule without a word; a
+                // compiler that did the same would leave a file out of a
+                // theme and say nothing, which is the fault importing was
+                // written to end. It is also what lets a theme be built
+                // from parts set end to end (scripts/build-native-themes.sh):
+                // the import of a second part comes after the rules of the
+                // first, and belongs to the theme all the same.
                 int end = endOfStatement(text, i);
                 String statement = text.substring(i + 7, end).trim();
                 out.append(resolve(current, statement, stack, imported));

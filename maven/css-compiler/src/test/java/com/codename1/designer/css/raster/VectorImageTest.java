@@ -1422,4 +1422,47 @@ class VectorImageTest {
         assertEquals(128, alpha(img, 50, 50), 2);
         assertEquals(0xff0000, img.getRGB(50, 50) & 0xffffff);
     }
+
+    @Test
+    void paintOrderPutsTheStrokeBehindTheFill() throws Exception {
+        String rect = "<rect x=\"20\" y=\"20\" width=\"60\" height=\"60\" fill=\"#00ff00\" stroke=\"#ff0000\""
+                + " stroke-width=\"20\"";
+        BufferedImage usual = paint(rect + "/>", 100, 100);
+        assertEquals(0xffff0000, usual.getRGB(25, 50), "the stroke lies over the edge of the fill");
+        BufferedImage behind = paint(rect + " paint-order=\"stroke\"/>", 100, 100);
+        assertEquals(0xff00ff00, behind.getRGB(25, 50), "the fill lies over the inner half of the stroke");
+        assertEquals(0xffff0000, behind.getRGB(15, 50), "the outer half still shows");
+        BufferedImage styled = paint("<g style=\"paint-order: stroke fill\">" + rect + "/></g>", 100, 100);
+        assertEquals(0xff00ff00, styled.getRGB(25, 50), "inherited from the group");
+    }
+
+    @Test
+    void anOffsetInSharesOfTheBoxIsAShareOfIt() throws Exception {
+        BufferedImage img = paint("<defs><filter id=\"f\" primitiveUnits=\"objectBoundingBox\" x=\"-1\" y=\"-1\""
+                + " width=\"3\" height=\"3\"><feOffset dx=\"0.5\" dy=\"0\"/></filter></defs>"
+                + "<rect x=\"10\" y=\"10\" width=\"40\" height=\"40\" fill=\"#ff0000\" filter=\"url(#f)\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(60, 30), "moved by half its width");
+        assertEquals(0, alpha(img, 20, 30));
+    }
+
+    @Test
+    void rgbIsReadWithSpacesAndASlashToo() throws Exception {
+        BufferedImage img = paint("<rect width=\"50\" height=\"100\" fill=\"rgb(255 0 0 / 50%)\"/>"
+                + "<rect x=\"50\" width=\"50\" height=\"100\" fill=\"rgb(0 255 0)\"/>", 100, 100);
+        assertEquals(128, alpha(img, 25, 50), 2);
+        assertEquals(0xff0000, img.getRGB(25, 50) & 0xffffff);
+        assertEquals(0xff00ff00, img.getRGB(75, 50));
+    }
+
+    @Test
+    void aForeignObjectWithNothingInItsPlaceIsRefused() throws Exception {
+        String foreign = "<foreignObject width=\"50\" height=\"50\"><p xmlns=\"http://www.w3.org/1999/xhtml\">x</p>"
+                + "</foreignObject>";
+        java.io.IOException refused = org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class,
+                () -> paint(foreign, 100, 100));
+        assertTrue(refused.getMessage().contains("foreignObject"), refused.getMessage());
+        BufferedImage img = paint("<switch>" + foreign + "<rect width=\"50\" height=\"50\" fill=\"#ff0000\"/></switch>",
+                100, 100);
+        assertEquals(0xffff0000, img.getRGB(25, 25), "the switch's other child is drawn in its place");
+    }
 }

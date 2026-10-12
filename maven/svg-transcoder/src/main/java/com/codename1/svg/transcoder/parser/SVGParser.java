@@ -207,8 +207,10 @@ public final class SVGParser {
             if (ev == XMLStreamConstants.START_ELEMENT && "svg".equals(r.getLocalName())) {
                 SVGDocument doc = new SVGDocument();
                 readSVGRoot(r, doc);
+                foreignObjects = 0;
                 readChildren(r, doc, doc);
                 indexById(doc, doc);
+                doc.setForeignObjects(foreignObjects);
                 return doc;
             }
         }
@@ -381,6 +383,9 @@ public final class SVGParser {
         return Boolean.valueOf("italic".equals(s) || "oblique".equals(s));
     }
 
+    /** How many {@code <foreignObject>} elements were passed over with nothing drawn in their place. */
+    private int foreignObjects;
+
     private void readChildren(XMLStreamReader r, SVGGroup parent, SVGDocument doc) throws XMLStreamException {
         while (r.hasNext()) {
             int ev = r.next();
@@ -405,10 +410,16 @@ public final class SVGParser {
                 applyCommon(g, ga);
                 parent.addChild(g);
                 Object[] font = enterFont(ga);
+                int foreignBefore = foreignObjects;
                 try {
                     readChildren(r, g, doc);
                 } finally {
                     leaveFont(font);
+                }
+                if ("switch".equals(name) && !g.getChildren().isEmpty()) {
+                    // The switch had something else to draw in its place,
+                    // which is what a switch is for.
+                    foreignObjects = foreignBefore;
                 }
                 if ("switch".equals(name)) {
                     while (g.getChildren().size() > 1) {
@@ -532,6 +543,12 @@ public final class SVGParser {
                 parent.addAnimation(an);
                 consumeUntilEnd(r);
             } else {
+                if ("foreignObject".equals(name)) {
+                    // A page of another language, HTML as a rule, which
+                    // nothing here can draw. It is counted, for a reader
+                    // that would not leave a hole where it was.
+                    foreignObjects++;
+                }
                 skip(r);
             }
         }
@@ -1497,7 +1514,7 @@ public final class SVGParser {
                     || "stroke-dasharray".equals(k) || "stroke-dashoffset".equals(k)
                     || "display".equals(k) || "visibility".equals(k) || "mask".equals(k)
                     || "color".equals(k) || "filter".equals(k) || "marker".equals(k) || "clip-rule".equals(k)
-                    || "vector-effect".equals(k)
+                    || "vector-effect".equals(k) || "paint-order".equals(k)
                     || "marker-start".equals(k) || "marker-mid".equals(k) || "marker-end".equals(k)) {
                 pres.put(k, e.getValue());
             }

@@ -54,6 +54,10 @@ public final class StyleParser {
         SVGStyle out = new SVGStyle();
         out.setFill(toPaint(merged.get("fill")));
         out.setStroke(toPaint(merged.get("stroke")));
+        String paintOrder = merged.get("paint-order");
+        if (paintOrder != null && !"inherit".equals(paintOrder.trim())) {
+            out.setPaintOrder(paintOrder.trim());
+        }
         out.setFillContext(toContext(merged.get("fill")));
         out.setStrokeContext(toContext(merged.get("stroke")));
         out.setFillCurrent(ColorParser.isCurrentColor(merged.get("fill")));

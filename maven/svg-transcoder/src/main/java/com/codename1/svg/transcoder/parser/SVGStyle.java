@@ -72,6 +72,14 @@ public final class SVGStyle {
     public void setClipEvenOdd(Boolean v) { this.clipEvenOdd = v; }
 
     private Integer color;
+    private String paintOrder;
+    /**
+     * The paint-order property as written: which of the fill, the stroke
+     * and the markers is painted first. Null when it is not set, which is
+     * {@code normal}: in that order.
+     */
+    public String getPaintOrder() { return paintOrder; }
+    public void setPaintOrder(String v) { this.paintOrder = v; }
     private String fillContext;
     private String strokeContext;
     private boolean fillCurrent;
@@ -171,6 +179,7 @@ public final class SVGStyle {
             if (strokeContext == null && !strokeCurrent) strokeContext = parent.strokeContext;
         }
         if (color == null) color = parent.color;
+        if (paintOrder == null) paintOrder = parent.paintOrder;
         if (clipEvenOdd == null) clipEvenOdd = parent.clipEvenOdd;
         // "" is `none` written out, which stops a marker being inherited.
         if (markerStart == null) markerStart = parent.markerStart;
