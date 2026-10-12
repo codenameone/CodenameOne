@@ -29,7 +29,8 @@ import java.util.Calendar;
 /** Sequential ZIP reader for STORED and DEFLATED entries. ZIP64 and encryption are refused. */
 public class ZipInputStream extends InflaterInputStream {
     private final CRC32 crc = new CRC32();
-    private final String encoding;
+    private final Charset encoding;
+    private byte[] drainBuffer;
     private ZipEntry entry;
     private long remaining, count;
     private int flags;
@@ -41,7 +42,7 @@ public class ZipInputStream extends InflaterInputStream {
         super(new PushbackInputStream(in, 8192), new Inflater(true), 8192);
         if (charset == null)
             throw new NullPointerException();
-        encoding = charset.displayName();
+        encoding = charset;
     }
     public ZipEntry getNextEntry() throws IOException {
         ensureOpen();
@@ -87,10 +88,10 @@ public class ZipInputStream extends InflaterInputStream {
                 throw new ZipException("Malformed ZIP extra");
             at += 4 + n;
         }
-        String nameEncoding = (flags & 0x800) != 0 ? "UTF-8" : encoding;
+        Charset nameEncoding = (flags & 0x800) != 0 ? Charset.forName("UTF-8") : encoding;
         String decodedName = new String(name, nameEncoding);
         if (!java.util.Arrays.equals(name, decodedName.getBytes(nameEncoding)))
-            throw new ZipException("Invalid ZIP entry name encoding: " + nameEncoding);
+            throw new ZipException("Invalid ZIP entry name encoding: " + nameEncoding.name());
         entry = createZipEntry(decodedName);
         entry.setMethod(method);
         Calendar c = Calendar.getInstance();
@@ -168,8 +169,11 @@ public class ZipInputStream extends InflaterInputStream {
     }
     public void closeEntry() throws IOException {
         ensureOpen();
-        byte[] b = new byte[8192];
-        while (entry != null && read(b, 0, b.length) >= 0) {
+        if (entry == null)
+            return;
+        if (drainBuffer == null)
+            drainBuffer = new byte[8192];
+        while (entry != null && read(drainBuffer, 0, drainBuffer.length) >= 0) {
         }
     }
     public int available() throws IOException {

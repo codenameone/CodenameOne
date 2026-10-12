@@ -1650,6 +1650,14 @@ JAVA_INT com_codename1_backend_Http2_streamChunkImpl___long_int_byte_1ARRAY_int_
     return 0;
 }
 
+JAVA_INT com_codename1_backend_Http2_resetStreamImpl___long_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_INT streamId) {
+    CN1H2Session* s = (CN1H2Session*)(intptr_t)handle;
+    if(s == NULL) return -1;
+    /* nghttp2 closes the stream and releases its provider through the usual
+       on_stream_close callback when the reset is sent. */
+    return nghttp2_submit_rst_stream(s->session, NGHTTP2_FLAG_NONE, streamId, NGHTTP2_INTERNAL_ERROR);
+}
+
 JAVA_INT com_codename1_backend_Http2_streamPendingImpl___long_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_INT streamId) {
     CN1H2Body* body = cn1H2StreamingBody((CN1H2Session*)(intptr_t)handle, streamId);
     return body == NULL ? -1 : (JAVA_INT)(body->length - body->offset);

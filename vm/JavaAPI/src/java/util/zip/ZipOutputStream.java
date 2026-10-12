@@ -48,7 +48,7 @@ public class ZipOutputStream extends DeflaterOutputStream {
     private final ArrayList<Record> entries = new ArrayList<Record>();
     private final HashSet<String> names = new HashSet<String>();
     private final CRC32 crc = new CRC32();
-    private final String encoding;
+    private final Charset encoding;
     private final int encodingFlag;
     private Record current;
     private ZipEntry original;
@@ -82,8 +82,8 @@ public class ZipOutputStream extends DeflaterOutputStream {
         if (charset == null) {
             throw new NullPointerException();
         }
-        encoding = charset.displayName();
-        encodingFlag = "UTF-8".equalsIgnoreCase(encoding) ? 0x800 : 0;
+        encoding = charset;
+        encodingFlag = "UTF-8".equalsIgnoreCase(encoding.name()) ? 0x800 : 0;
     }
 
     public void setMethod(int method) {
@@ -105,7 +105,7 @@ public class ZipOutputStream extends DeflaterOutputStream {
     private byte[] encode(String value) throws IOException {
         byte[] bytes = value.getBytes(encoding);
         if (!value.equals(new String(bytes, encoding))) {
-            throw new ZipException("ZIP field cannot be represented in " + encoding);
+            throw new ZipException("ZIP field cannot be represented in " + encoding.name());
         }
         if (bytes.length > 65535) {
             throw new ZipException("Encoded ZIP field exceeds 65535 bytes");

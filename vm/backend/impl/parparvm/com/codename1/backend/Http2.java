@@ -249,6 +249,13 @@ public final class Http2 {
         }
     }
 
+    /// Aborts a failed response without terminating other streams in the session.
+    public void resetStream(int streamId) throws IOException {
+        if (resetStreamImpl(session, streamId) != 0) {
+            throw new IOException("Could not reset HTTP/2 stream " + streamId);
+        }
+    }
+
     /// Unsent bytes, or -1 if the stream has closed or been reset.
     public int streamPending(int streamId) {
         return streamPendingImpl(session, streamId);
@@ -382,6 +389,7 @@ public final class Http2 {
 
     private static native int respondStreamImpl(long session, int streamId, String status, byte[] headers);
     private static native int streamChunkImpl(long session, int streamId, byte[] bytes, int length, boolean end);
+    private static native int resetStreamImpl(long session, int streamId);
     private static native int streamPendingImpl(long session, int streamId);
 
     private static native int respondImpl(long session, int streamId, String status,

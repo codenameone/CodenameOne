@@ -373,24 +373,29 @@ public class ZipApiApp {
         }
         require(truncated, "truncated ZIP header");
     }
-    static void checkedCloseFailures() throws Exception {
-        for (int mode = 1; mode <= 3; mode++) {
+    static void checkedCloseFailures(boolean customRuntime) throws Exception {
+        for (int mode = 0; mode <= 3; mode++) {
             final int failures = mode;
-            final boolean[] closed = {false};
+            final int[] calls = {0, 0};
             OutputStream sink = new OutputStream() {
                 public void write(int value) { }
                 public void flush() throws IOException {
+                    calls[0]++;
                     if ((failures & 1) != 0) throw new IOException("flush failed");
                 }
                 public void close() throws IOException {
-                    closed[0] = true;
+                    calls[1]++;
                     if ((failures & 2) != 0) throw new IOException("close failed");
                 }
             };
             boolean rejected = false;
-            try { new CheckedOutputStream(sink, new CRC32()).close(); }
+            CheckedOutputStream checked = new CheckedOutputStream(sink, new CRC32());
+            try { checked.close(); }
             catch (IOException expected) { rejected = true; }
-            require(rejected && closed[0], "checked stream reports errors and closes destination");
+            require(rejected == (mode != 0), "checked stream reports destination errors");
+            // JDK 8 predates the idempotent FilterOutputStream close guard.
+            if (customRuntime) checked.close();
+            require(calls[0] == 1 && calls[1] == 1, "checked close attempts flush/close exactly once");
         }
     }
     static byte[] zipNameHeader(byte[] name, boolean utf8) {
@@ -430,6 +435,25 @@ public class ZipApiApp {
         try (ZipInputStream in = new ZipInputStream(new ByteArrayInputStream(zipNameHeader(new byte[] {-1}, false)),
                 java.nio.charset.Charset.forName("ISO-8859-1"))) {
             require("\u00ff".equals(in.getNextEntry().getName()), "valid caller charset name preserved");
+        }
+    }
+    static void skipZipEntries() throws Exception {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try (ZipOutputStream out = new ZipOutputStream(bytes)) {
+            for (int i = 0; i < 100; i++) {
+                out.putNextEntry(entry("entry-" + i));
+                if ((i & 1) == 0) out.write(new byte[9000]);
+                out.closeEntry();
+            }
+        }
+        try (ZipInputStream in = new ZipInputStream(new ByteArrayInputStream(bytes.toByteArray()))) {
+            for (int i = 0; i < 100; i++) {
+                require(("entry-" + i).equals(in.getNextEntry().getName()), "drain advances to next entry");
+                if (i % 3 == 0) readAll(in);
+                else if (i % 3 == 1) in.closeEntry();
+            }
+            require(in.getNextEntry() == null, "drained all entries");
+            in.closeEntry();
         }
     }
     static void changeParameters(Deflater def, int change) {
@@ -570,7 +594,8 @@ public class ZipApiApp {
     public static void main(String[] args) throws Exception {
         byte[] data = payload();
         checksums();
-        checkedCloseFailures();
+        checkedCloseFailures(args.length > 1);
+        skipZipEntries();
         zipNameDecoding(args.length > 1);
         // JDK 8 also returns early after parameter changes; enforce the stronger
         // flush guarantee on the patched JavaAPI and translated runtime.

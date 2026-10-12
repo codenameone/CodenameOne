@@ -141,6 +141,11 @@ public final class Http2 {
         throw new IOException(UNSUPPORTED);
     }
 
+    /// Aborts a failed response without terminating other streams in the session.
+    public void resetStream(int streamId) throws IOException {
+        throw new IOException(UNSUPPORTED);
+    }
+
     /// Unsent bytes, or -1 if the stream has closed or been reset.
     public int streamPending(int streamId) {
         return -1;

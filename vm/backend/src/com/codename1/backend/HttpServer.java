@@ -6560,6 +6560,12 @@ public final class HttpServer {
                             } catch (StreamCancelledException cancelled) {
                                 // RST_STREAM cancels this producer, not other streams on the connection.
                                 handlerError = cancelled;
+                            } catch (IOException error) {
+                                handlerError = error;
+                                h2.resetStream(stream.getId());
+                            } catch (RuntimeException error) {
+                                handlerError = error;
+                                h2.resetStream(stream.getId());
                             }
                         }
                     } else if (response.fileFd >= 0 && !noBody

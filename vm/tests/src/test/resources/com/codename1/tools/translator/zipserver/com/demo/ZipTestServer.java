@@ -83,13 +83,19 @@ public final class ZipTestServer {
                                 opened.get() + " " + closed.get() + " " + readBlocks.get());
                         final long length = "/cancel.zip".equals(path) ? 1024L * 1024 * 1024
                                 : "/large.zip".equals(path) ? 64L * 1024 * 1024 : 1024;
-                        final boolean fail = "/fail".equals(path);
+                        final boolean fail = "/fail".equals(path) || "/fail-runtime".equals(path);
+                        final boolean runtimeFailure = "/fail-runtime".equals(path);
                         return HttpServer.Response.stream("/no-body".equals(path) ? 204 : 200,
                                 "application/zip", new HttpServer.BodyWriter() {
                                     public void writeTo(OutputStream destination) throws IOException {
                                         if (fail) {
-                                            destination.write(new byte[32768]);
-                                            throw new IOException("deliberate producer failure");
+                                            try (InputStream source = new Source(32768)) {
+                                                byte[] bytes = new byte[8192];
+                                                int n;
+                                                while ((n = source.read(bytes)) != -1) destination.write(bytes, 0, n);
+                                                if (runtimeFailure) throw new IllegalStateException("deliberate producer failure");
+                                                throw new IOException("deliberate producer failure");
+                                            }
                                         }
                                         archive(destination, length);
                                     }

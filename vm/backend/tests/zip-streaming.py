@@ -218,7 +218,37 @@ def main():
                         if stream == 3 and flags & 1:
                             break
                     break
-        print('HTTP/2 flow control and RST_STREAM cleanup passed')
+        for route in ('/fail', '/fail-runtime'):
+            before = metrics()
+            with h2start(route) as sock:
+                # Another request is already on this connection when the producer fails.
+                frame(sock, 1, 5, 3, b'\x82\x86\x04\x08/metrics\x01\x09localhost')
+                reset = False
+                other_finished = False
+                while not (reset and other_finished):
+                    kind, flags, stream, data = receive(sock)
+                    if kind == 4 and not flags & 1:
+                        frame(sock, 4, 1, 0)
+                    assert kind != 7, 'Producer failure closed the connection'
+                    if stream == 1:
+                        if kind == 3:
+                            assert int.from_bytes(data, 'big') == 2, 'Expected INTERNAL_ERROR reset'
+                            reset = True
+                        elif kind in (0, 1):
+                            assert not flags & 1, 'Failed producer ended its stream successfully'
+                    if stream == 3:
+                        assert kind != 3, 'Unrelated stream was reset'
+                        if kind in (0, 1) and flags & 1:
+                            other_finished = True
+                # A subsequent request must also succeed on the very same socket.
+                frame(sock, 1, 5, 5, b'\x82\x86\x04\x08/metrics\x01\x09localhost')
+                while True:
+                    kind, flags, stream, data = receive(sock)
+                    assert kind not in (3, 7), 'Session unusable after producer failure'
+                    if stream == 5 and kind in (0, 1) and flags & 1:
+                        break
+            cleaned(before)
+        print('HTTP/2 flow control, producer failure isolation and RST_STREAM cleanup passed')
     assert metrics()[0] == metrics()[1]
     print('ZIP_STREAMING_OK', args.artifacts)
 

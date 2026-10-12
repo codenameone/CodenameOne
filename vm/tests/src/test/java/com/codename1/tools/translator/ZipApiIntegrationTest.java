@@ -65,6 +65,21 @@ class ZipApiIntegrationTest {
         assertTrue(run(work, java, "-Xbootclasspath/p:" + patch, "-cp", app.toString(), "ZipApiApp", patched.toString(),
                 jdk + "-standard.zip")
                         .contains("ZIP_API_OK"));
+        // Compile this fixture against the JDK charset-provider API. The native
+        // runtime only exposes built-in charsets, while the shared writer also
+        // serves JVM ports where custom providers are supported.
+        Path charsetSource = work.resolve("ZipCharsetApp.java");
+        try (InputStream in = getClass().getResourceAsStream("/com/codename1/tools/translator/ZipCharsetApp.java")) {
+            assertNotNull(in);
+            Files.copy(in, charsetSource);
+        }
+        Path charsetApp = Files.createDirectories(work.resolve("charset-app"));
+        assertEquals(0, CompilerHelper.compile(config.jdkHome, Arrays.asList("-cp", app.toString(), "-d",
+                charsetApp.toString(), charsetSource.toString())), CompilerHelper.getLastErrorLog());
+        String charsetClasspath = charsetApp + File.pathSeparator + app;
+        assertTrue(run(work, java, "-cp", charsetClasspath, "ZipCharsetApp").contains("ZIP_CHARSET_OK"));
+        assertTrue(run(work, java, "-Xbootclasspath/p:" + patch, "-cp", charsetClasspath, "ZipCharsetApp")
+                .contains("ZIP_CHARSET_OK"));
         verifyArchive(patched, jdk);
         CompilerHelper.copyDirectory(api, app);
         Path output = work.resolve("translated");

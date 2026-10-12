@@ -26,6 +26,7 @@ import java.io.*;
 /** A stream which updates the supplied checksum. */
 public class CheckedOutputStream extends FilterOutputStream {
     private final Checksum checksum;
+    private boolean closed;
     public CheckedOutputStream(OutputStream stream, Checksum checksum) {
         super(stream);
         if (checksum == null)
@@ -44,6 +45,9 @@ public class CheckedOutputStream extends FilterOutputStream {
         checksum.update(b, off, len);
     }
     public void close() throws IOException {
+        if (closed)
+            return;
+        closed = true;
         // Always close the destination, even when flushing fails. The runtime's
         // FilterOutputStream.close() currently swallows both kinds of failure.
         try {
