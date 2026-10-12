@@ -564,6 +564,12 @@ public final class VectorImage {
     /// the way its `preserveAspectRatio` says. One that cannot be found or
     /// read leaves its box empty, as it does in a browser.
     private void paintImage(Graphics2D g, SVGImage image) {
+        // A width or a height of nothing, written out, is not one left to
+        // the picture: it shows nothing.
+        if ((image.isGiven("width") && !(image.getWidth() > 0))
+                || (image.isGiven("height") && !(image.getHeight() > 0))) {
+            return;
+        }
         BufferedImage picture = loadPicture(image);
         if (picture == null) {
             return;

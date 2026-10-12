@@ -937,14 +937,27 @@ final class SvgFilter {
         int ty = (int) number(p, "targetY", oy / 2);
         String edge = p.get("edgeMode") == null ? "duplicate" : p.get("edgeMode").trim();
         boolean keepAlpha = p.get("preserveAlpha") != null && "true".equals(p.get("preserveAlpha").trim());
+        // How far apart the kernel's cells are: one pixel of the image, or
+        // with `kernelUnitLength` that many of the units the effects are
+        // measured in, so that the result does not change with the size
+        // the image is drawn at.
+        double[] unit = numbers(p.get("kernelUnitLength"));
+        int stepX = 1;
+        int stepY = 1;
+        if (unit.length > 0 && unit[0] > 0) {
+            double across = unit[0];
+            double down = unit.length > 1 && unit[1] > 0 ? unit[1] : across;
+            stepX = (int) Math.max(1, Math.round(across * ux));
+            stepY = (int) Math.max(1, Math.round(down * uy));
+        }
         Plane out = new Plane(w, h, in.linear);
         for (int y = 0; y < h; y++) {
             for (int x = 0; x < w; x++) {
                 double[] acc = new double[4];
                 for (int j = 0; j < oy; j++) {
                     for (int i = 0; i < ox; i++) {
-                        int sx = x - tx + i;
-                        int sy = y - ty + j;
+                        int sx = x + (i - tx) * stepX;
+                        int sy = y + (j - ty) * stepY;
                         if ("wrap".equals(edge)) {
                             sx = Math.floorMod(sx, w);
                             sy = Math.floorMod(sy, h);
@@ -985,6 +998,16 @@ final class SvgFilter {
         double scale = number(p, "scale", 0);
         int xc = selector(p.get("xChannelSelector"));
         int yc = selector(p.get("yChannelSelector"));
+        // What the map moves a pixel by is a direction in the element's
+        // coordinates, across by one channel and down by the other. On an
+        // element that is turned that is not across and down the image,
+        // so the whole of it is taken through the element's transform.
+        double across = boxUnits ? scale * box.getWidth() : scale;
+        double down = boxUnits ? scale * box.getHeight() : scale;
+        double m00 = at.getScaleX() * across;
+        double m10 = at.getShearY() * across;
+        double m01 = at.getShearX() * down;
+        double m11 = at.getScaleY() * down;
         Plane out = new Plane(w, h, in.linear);
         for (int y = 0; y < h; y++) {
             for (int x = 0; x < w; x++) {
@@ -992,8 +1015,8 @@ final class SvgFilter {
                 float a = map.a[i];
                 float vx = xc == 3 ? a : a > 0 ? map.channel(xc)[i] / a : 0;
                 float vy = yc == 3 ? a : a > 0 ? map.channel(yc)[i] / a : 0;
-                int fromX = (int) Math.round(x + scale * ux * (vx - 0.5));
-                int fromY = (int) Math.round(y + scale * uy * (vy - 0.5));
+                int fromX = (int) Math.round(x + m00 * (vx - 0.5) + m01 * (vy - 0.5));
+                int fromY = (int) Math.round(y + m10 * (vx - 0.5) + m11 * (vy - 0.5));
                 if (fromX < 0 || fromX >= w || fromY < 0 || fromY >= h) {
                     continue;
                 }

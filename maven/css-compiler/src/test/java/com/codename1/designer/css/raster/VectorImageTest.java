@@ -1577,4 +1577,54 @@ class VectorImageTest {
         assertEquals(0xffff0000, img.getRGB(25, 50), "neither the dark rule nor the narrow one");
         assertEquals(0xff00ff00, img.getRGB(75, 50), "the light one, with its name in capitals");
     }
+
+    private static String redDot() throws Exception {
+        BufferedImage picture = new BufferedImage(4, 4, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < 4; y++) {
+            for (int x = 0; x < 4; x++) {
+                picture.setRGB(x, y, 0xffff0000);
+            }
+        }
+        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(picture, "png", bytes);
+        return "data:image/png;base64," + java.util.Base64.getEncoder().encodeToString(bytes.toByteArray());
+    }
+
+    @Test
+    void anImageOfNoWidthIsNotDrawn() throws Exception {
+        BufferedImage none = paint("<image href=\"" + redDot() + "\" width=\"0\" height=\"50\"/>", 100, 100);
+        assertEquals(0, alpha(none, 2, 2));
+        BufferedImage own = paint("<image href=\"" + redDot() + "\"/>", 100, 100);
+        assertEquals(0xffff0000, own.getRGB(2, 2), "left out, the picture's own size");
+    }
+
+    @Test
+    void aDisplacementTurnsWithTheElement() throws Exception {
+        // Every pixel is fetched from 20 further along the element's x,
+        // which on an element turned a quarter is 20 further down the
+        // image: the square shows 20 higher up, not 20 to the left.
+        String filter = "<defs><filter id=\"f\" filterUnits=\"userSpaceOnUse\" x=\"-200\" y=\"-200\" width=\"400\""
+                + " height=\"400\" color-interpolation-filters=\"sRGB\"><feFlood flood-color=\"#ff0000\" result=\"m\"/>"
+                + "<feDisplacementMap in=\"SourceGraphic\" in2=\"m\" scale=\"40\" xChannelSelector=\"R\""
+                + " yChannelSelector=\"G\"/></filter></defs>";
+        // R is 1 and G is 0: along x by +20 and along y by -20.
+        BufferedImage img = paint(filter + "<rect x=\"-10\" y=\"-10\" width=\"20\" height=\"20\" fill=\"#0000ff\""
+                + " filter=\"url(#f)\" transform=\"translate(50 50) rotate(90)\"/>", 100, 100);
+        assertEquals(0xff0000ff, img.getRGB(30, 30), "moved up and to the left of where it is drawn");
+        assertEquals(0, alpha(img, 50, 50));
+    }
+
+    @Test
+    void aKernelCanBeSpacedInUnits() throws Exception {
+        // Each pixel becomes the one two cells to its right: one pixel
+        // away by default, eight with cells four units apart.
+        String open = "<defs><filter id=\"f\" filterUnits=\"userSpaceOnUse\" x=\"0\" y=\"0\" width=\"100\" height=\"100\""
+                + " color-interpolation-filters=\"sRGB\"><feConvolveMatrix order=\"3 1\" kernelMatrix=\"1 0 0\""
+                + " edgeMode=\"none\"";
+        String shape = "/></filter></defs><rect x=\"50\" width=\"50\" height=\"100\" fill=\"#ff0000\" filter=\"url(#f)\"/>";
+        BufferedImage near = paint(open + shape, 100, 100);
+        BufferedImage far = paint(open + " kernelUnitLength=\"8\"" + shape, 100, 100);
+        assertEquals(0, alpha(near, 46, 50));
+        assertTrue(alpha(far, 46, 50) > 200, "fetched from eight to the right");
+    }
 }

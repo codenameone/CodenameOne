@@ -682,6 +682,10 @@ public final class SVGParser {
         image.setY(lengthY(a.get("y")));
         image.setWidth(imageSide(a.get("width"), viewportWidth));
         image.setHeight(imageSide(a.get("height"), viewportHeight));
+        // Whether each was written: left out, a side is the picture's own;
+        // written as zero, it is a box nothing is drawn in.
+        if (a.get("width") != null && !"auto".equals(a.get("width").trim())) image.markGiven("width");
+        if (a.get("height") != null && !"auto".equals(a.get("height").trim())) image.markGiven("height");
         image.setPreserveAspectRatio(a.get("preserveAspectRatio"));
         return image;
     }
