@@ -261,6 +261,7 @@ public final class SVGParser {
         fontBold = null;
         fontItalic = null;
         fontSpacing = null;
+        wordSpacing = null;
         inheritedColor = null;
         enterFont(a);
     }
@@ -359,7 +360,7 @@ public final class SVGParser {
 
     /** Takes in the font properties of a container; what is returned undoes it with {@link #leaveFont}. */
     private Object[] enterFont(Map<String, String> a) {
-        Object[] saved = {fontFamily, fontSize, fontBold, fontItalic, inheritedColor, fontSpacing};
+        Object[] saved = {fontFamily, fontSize, fontBold, fontItalic, inheritedColor, fontSpacing, wordSpacing};
         Integer color = colorOf(a);
         if (color != null) inheritedColor = color;
         String family = mergedValue(a, "font-family");
@@ -372,10 +373,13 @@ public final class SVGParser {
         if (italic != null) fontItalic = italic;
         Float spacing = spacingOf(mergedValue(a, "letter-spacing"));
         if (spacing != null) fontSpacing = spacing;
+        Float words = spacingOf(mergedValue(a, "word-spacing"));
+        if (words != null) wordSpacing = words;
         return saved;
     }
 
     private Float fontSpacing;
+    private Float wordSpacing;
 
     /** A letter-spacing: a length, zero for {@code normal}, null when it is not written or is inherited. */
     private Float spacingOf(String value) {
@@ -395,6 +399,7 @@ public final class SVGParser {
         fontItalic = (Boolean) saved[3];
         inheritedColor = (Integer) saved[4];
         fontSpacing = (Float) saved[5];
+        wordSpacing = (Float) saved[6];
     }
 
     /** A font size, a relative one taken against the size around it; null when there is none to read. */
@@ -1120,6 +1125,11 @@ public final class SVGParser {
         if (apart != null) {
             t.setLetterSpacing(apart.floatValue());
         }
+        Float words = spacingOf(mergedValue(a, "word-spacing"));
+        if (words == null) words = wordSpacing;
+        if (words != null) {
+            t.setWordSpacing(words.floatValue());
+        }
         String weight = mergedValue(a, "font-weight");
         if (weight != null) {
             String w = weight.trim().toLowerCase();
@@ -1227,6 +1237,7 @@ public final class SVGParser {
                     run.setBold(span.getBold());
                     run.setItalic(span.getItalic());
                     run.setLetterSpacing(span.getLetterSpacing());
+                    run.setWordSpacing(span.getWordSpacing());
                     run.setAnchor(span.getAnchor());
                     run.setPathRef(span.getPathRef());
                     run.setStartOffset(span.getStartOffset(), span.isStartOffsetShare());
@@ -1251,6 +1262,7 @@ public final class SVGParser {
                         placed.setBold(run.getBold());
                         placed.setItalic(run.getItalic());
                         placed.setLetterSpacing(run.getLetterSpacing());
+                        placed.setWordSpacing(run.getWordSpacing());
                         placed.setAnchor(run.getAnchor());
                         placed.setPathRef(run.getPathRef());
                         placed.setStartOffset(run.getStartOffset(), run.isStartOffsetShare());
@@ -1269,12 +1281,15 @@ public final class SVGParser {
                 SVGText.Run child = new SVGText.Run();
                 if (span != null) {
                     child.setLetterSpacing(span.getLetterSpacing());
+                    child.setWordSpacing(span.getWordSpacing());
                     child.setAnchor(span.getAnchor());
                     child.setPathRef(span.getPathRef());
                     child.setStartOffset(span.getStartOffset(), span.isStartOffsetShare());
                 }
                 Float spanSpacing = spacingOf(mergedValue(a, "letter-spacing"));
                 if (spanSpacing != null) child.setLetterSpacing(spanSpacing);
+                Float spanWords = spacingOf(mergedValue(a, "word-spacing"));
+                if (spanWords != null) child.setWordSpacing(spanWords);
                 String spanAnchor = mergedValue(a, "text-anchor");
                 if (spanAnchor != null) {
                     String norm = spanAnchor.trim();
@@ -1674,35 +1689,41 @@ public final class SVGParser {
             }
         }
         n.setStyle(StyleParser.parse(pres, a.get("style")));
-        // A percentage stroke width is that share of the viewport's
-        // diagonal, evened out between its sides, and not that many units.
+        // The lengths of a stroke are read as plain numbers. One that is a
+        // percentage is that share of the viewport's diagonal, evened out
+        // between its sides, and one in the size of the font is that many
+        // of the font the element is in: neither is that many units.
+        SVGStyle st = n.getStyle();
         String strokeWidth = mergedValue(a, "stroke-width");
-        if (strokeWidth != null && strokeWidth.trim().endsWith("%") && n.getStyle() != null
-                && n.getStyle().getStrokeWidth() != null) {
-            double diagonal = Math.sqrt((viewportWidth * (double) viewportWidth
-                    + viewportHeight * (double) viewportHeight) / 2);
-            n.getStyle().setStrokeWidth(Float.valueOf((float) (n.getStyle().getStrokeWidth().floatValue() / 100 * diagonal)));
+        if (st != null && strokeWidth != null && st.getStrokeWidth() != null) {
+            st.setStrokeWidth(Float.valueOf(st.getStrokeWidth().floatValue() * strokeUnit(strokeWidth)));
         }
-        // So are the dashes and where they start.
         String dashes = mergedValue(a, "stroke-dasharray");
-        float[] lengths = n.getStyle() == null ? null : n.getStyle().getStrokeDashArray();
-        if (dashes != null && dashes.indexOf('%') >= 0 && lengths != null && lengths.length > 0) {
+        float[] lengths = st == null ? null : st.getStrokeDashArray();
+        if (dashes != null && lengths != null && lengths.length > 0) {
             String[] parts = dashes.trim().split("[\\s,]+");
             // An odd list is stored written out twice.
             float[] scaled = lengths.clone();
             for (int i = 0; i < scaled.length && parts.length > 0; i++) {
-                if (parts[i % parts.length].endsWith("%")) {
-                    scaled[i] = (float) (scaled[i] / 100 * diagonal());
-                }
+                scaled[i] *= strokeUnit(parts[i % parts.length]);
             }
-            n.getStyle().setStrokeDashArray(scaled);
+            st.setStrokeDashArray(scaled);
         }
         String dashOffset = mergedValue(a, "stroke-dashoffset");
-        if (dashOffset != null && dashOffset.trim().endsWith("%") && n.getStyle() != null
-                && n.getStyle().getStrokeDashOffset() != null) {
-            n.getStyle().setStrokeDashOffset(Float.valueOf(
-                    (float) (n.getStyle().getStrokeDashOffset().floatValue() / 100 * diagonal())));
+        if (st != null && dashOffset != null && st.getStrokeDashOffset() != null) {
+            st.setStrokeDashOffset(Float.valueOf(st.getStrokeDashOffset().floatValue() * strokeUnit(dashOffset)));
         }
+    }
+
+    /** What the number of a stroke length is multiplied by to be in user units; 1 for a plain or absolute length. */
+    private float strokeUnit(String value) {
+        String v = value.trim();
+        float font = fontSize != null ? fontSize.floatValue() : 12f;
+        if (v.endsWith("%")) return (float) (diagonal() / 100);
+        if (v.endsWith("rem")) return 16f;
+        if (v.endsWith("em")) return font;
+        if (v.endsWith("ex")) return font / 2;
+        return 1f;
     }
 
     /** What a percentage of a length that runs neither across nor down is a share of. */

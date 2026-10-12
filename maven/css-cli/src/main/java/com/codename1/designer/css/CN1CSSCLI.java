@@ -394,12 +394,21 @@ public class CN1CSSCLI {
             // As above: the compile reports it.
         }
         if (options.localizationDir != null && options.localizationDir.isDirectory()) {
-            collectLocalizationFiles(options.localizationDir, out);
+            collectLocalizationFiles(options.localizationDir, out, new HashSet<File>());
         }
         return out;
     }
 
-    private static void collectLocalizationFiles(File dir, List<File> out) {
+    /// `seen` is every directory looked in, by where it really is: one
+    /// linked back to itself or to something it is in is looked in once.
+    private static void collectLocalizationFiles(File dir, List<File> out, Set<File> seen) {
+        try {
+            if (!seen.add(dir.getCanonicalFile())) {
+                return;
+            }
+        } catch (IOException ex) {
+            return;
+        }
         // The directory too: adding or removing a bundle changes its own
         // modification time and nothing else.
         out.add(dir);
@@ -409,7 +418,7 @@ public class CN1CSSCLI {
         }
         for (File child : children) {
             if (child.isDirectory()) {
-                collectLocalizationFiles(child, out);
+                collectLocalizationFiles(child, out, seen);
             } else if (child.getName().endsWith(".properties")) {
                 out.add(child);
             }

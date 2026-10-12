@@ -1800,4 +1800,50 @@ class VectorImageTest {
                 100, 100);
         assertEquals(inkRight(spaced), inkRight(inherited));
     }
+
+    @Test
+    void aStrokeCapThatInheritsIsTheOneAbove() throws Exception {
+        BufferedImage img = paint("<g stroke-linecap=\"round\"><line x1=\"30\" y1=\"50\" x2=\"70\" y2=\"50\""
+                + " stroke=\"#ff0000\" stroke-width=\"20\" stroke-linecap=\"inherit\"/></g>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(25, 50), "the round cap reaches past the end of the line");
+    }
+
+    @Test
+    void wordsAreSetApartByTheirSpacing() throws Exception {
+        String font = " font-family=\"monospace\" font-size=\"10\" fill=\"#ff0000\"";
+        BufferedImage plain = paint("<text x=\"5\" y=\"30\"" + font + ">I I</text>", 100, 100);
+        BufferedImage spaced = paint("<text x=\"5\" y=\"30\" word-spacing=\"20\"" + font + ">I I</text>", 100, 100);
+        assertEquals(inkRight(plain) + 20, inkRight(spaced), 1);
+    }
+
+    @Test
+    void aKernelsCellsTurnWithTheElement() throws Exception {
+        // Each pixel becomes the one two cells along the element's x, with
+        // cells eight units apart. Turned a quarter, that is down the image.
+        String filter = "<defs><filter id=\"f\" filterUnits=\"userSpaceOnUse\" x=\"-200\" y=\"-200\" width=\"400\""
+                + " height=\"400\" color-interpolation-filters=\"sRGB\"><feConvolveMatrix order=\"3 1\""
+                + " kernelMatrix=\"1 0 0\" edgeMode=\"none\" kernelUnitLength=\"8\"/></filter></defs>";
+        BufferedImage img = paint(filter + "<rect x=\"-10\" y=\"-10\" width=\"20\" height=\"20\" fill=\"#ff0000\""
+                + " filter=\"url(#f)\" transform=\"translate(50 50) rotate(90)\"/>", 100, 100);
+        assertTrue(alpha(img, 50, 34) > 200, "moved up the image, was " + alpha(img, 50, 34));
+        assertEquals(0, alpha(img, 34, 50), "and not across it");
+    }
+
+    @Test
+    void aMaskInSharesOfABoxWithNoHeightIsIgnored() throws Exception {
+        BufferedImage img = paint("<defs><mask id=\"m\"><rect width=\"100\" height=\"100\" fill=\"#000000\"/></mask></defs>"
+                + "<line x1=\"10\" y1=\"50\" x2=\"90\" y2=\"50\" stroke=\"#ff0000\" stroke-width=\"6\" mask=\"url(#m)\"/>",
+                100, 100);
+        assertEquals(0xffff0000, img.getRGB(50, 50), "a level line has no box: drawn as it is");
+    }
+
+    @Test
+    void strokeLengthsInEmsAreInTheFontTheyAreIn() throws Exception {
+        BufferedImage img = paint("<g font-size=\"20\"><line x1=\"0\" y1=\"50\" x2=\"100\" y2=\"50\" stroke=\"#ff0000\""
+                + " stroke-width=\"1em\" stroke-dasharray=\"2em 1em\"/></g>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(20, 42), "20 wide, so 10 either side of the line");
+        assertEquals(0, alpha(img, 20, 38));
+        assertEquals(0xffff0000, img.getRGB(35, 50), "a dash of 40");
+        assertEquals(0, alpha(img, 50, 50), "a gap of 20");
+    }
 }

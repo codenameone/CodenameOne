@@ -982,14 +982,33 @@ final class SvgFilter {
         // with `kernelUnitLength` that many of the units the effects are
         // measured in, so that the result does not change with the size
         // the image is drawn at.
+        // A cell across and a cell down are directions in the element's
+        // coordinates, so on one that is turned they are taken through
+        // its transform and do not lie along the image's rows and columns.
         double[] unit = numbers(p.get("kernelUnitLength"));
-        int stepX = 1;
-        int stepY = 1;
+        double ax = 1;
+        double ay = 0;
+        double bx = 0;
+        double by = 1;
         if (unit.length > 0 && unit[0] > 0) {
-            double across = unit[0];
-            double down = unit.length > 1 && unit[1] > 0 ? unit[1] : across;
-            stepX = (int) Math.max(1, Math.round(across * ux));
-            stepY = (int) Math.max(1, Math.round(down * uy));
+            double across = unit[0] * (boxUnits ? box.getWidth() : 1);
+            double down = (unit.length > 1 && unit[1] > 0 ? unit[1] : unit[0]) * (boxUnits ? box.getHeight() : 1);
+            ax = at.getScaleX() * across;
+            ay = at.getShearY() * across;
+            bx = at.getShearX() * down;
+            by = at.getScaleY() * down;
+            // Never less than a pixel apart, or the cells would all read
+            // the same one.
+            double al = Math.hypot(ax, ay);
+            double bl = Math.hypot(bx, by);
+            if (al > 0 && al < 1) {
+                ax /= al;
+                ay /= al;
+            }
+            if (bl > 0 && bl < 1) {
+                bx /= bl;
+                by /= bl;
+            }
         }
         Plane out = new Plane(w, h, in.linear);
         for (int y = 0; y < h; y++) {
@@ -997,8 +1016,8 @@ final class SvgFilter {
                 double[] acc = new double[4];
                 for (int j = 0; j < oy; j++) {
                     for (int i = 0; i < ox; i++) {
-                        int sx = x + (i - tx) * stepX;
-                        int sy = y + (j - ty) * stepY;
+                        int sx = (int) Math.round(x + (i - tx) * ax + (j - ty) * bx);
+                        int sy = (int) Math.round(y + (i - tx) * ay + (j - ty) * by);
                         if ("wrap".equals(edge)) {
                             sx = Math.floorMod(sx, w);
                             sy = Math.floorMod(sy, h);

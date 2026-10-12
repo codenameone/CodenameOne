@@ -509,6 +509,13 @@ public final class VectorImage {
             // box unless it says otherwise, and for an element with no box
             // to measure that leaves no region to keep to.
             Rectangle2D box = boundsOf(node);
+            if (!mask.isRegionUserSpace() && box != null && box.isEmpty()) {
+                // A region in shares of a box with no width or no height,
+                // around a level line say, is no region, and the mask is
+                // then ignored (SVG 1.1, 7.11): the element is left as it
+                // is drawn.
+                return;
+            }
             if (mask.isRegionUserSpace()) {
                 mg.clip(new Rectangle2D.Double(mask.getRegionX(), mask.getRegionY(),
                         mask.getRegionWidth(), mask.getRegionHeight()));
@@ -2314,19 +2321,24 @@ public final class VectorImage {
                 Font font = new Font(familyOf(family), (bold ? Font.BOLD : 0) | (italic ? Font.ITALIC : 0), 1)
                         .deriveFont(size);
                 java.awt.font.GlyphVector gv = font.createGlyphVector(context, run.getText());
-                // `letter-spacing`: that much more after every glyph.
+                // `letter-spacing`: that much more after every glyph, and
+                // `word-spacing` that much more again after a space.
                 float apart = spacingOf(text, run);
-                if (apart != 0f) {
+                float words = run.getWordSpacing() != null ? run.getWordSpacing().floatValue()
+                        : text.getWordSpacing();
+                if (apart != 0f || words != 0f) {
+                    double more = 0;
                     for (int j = 1; j <= gv.getNumGlyphs(); j++) {
+                        more += apart + (isSpace(run.getText(), gv.getGlyphCharIndex(j - 1)) ? words : 0);
                         Point2D at = gv.getGlyphPosition(j);
-                        gv.setGlyphPosition(j, new Point2D.Double(at.getX() + j * apart, at.getY()));
+                        gv.setGlyphPosition(j, new Point2D.Double(at.getX() + more, at.getY()));
                     }
                 }
                 glyphs.add(gv);
                 xs[k - i] = cx;
                 ys[k - i] = cy;
                 cx += gv.getLogicalBounds().getWidth();
-                if (apart != 0f) {
+                if (apart != 0f || words != 0f) {
                     // The bounds stop at the last glyph; the space after it
                     // is part of how far the text runs all the same.
                     cx = xs[k - i] + gv.getGlyphPosition(gv.getNumGlyphs()).getX();
@@ -2416,6 +2428,10 @@ public final class VectorImage {
             java.awt.font.GlyphVector gv = font.createGlyphVector(context, run.getText());
             glyphs.add(gv);
             advance += run.getDx() + gv.getLogicalBounds().getWidth() + gv.getNumGlyphs() * spacingOf(text, run);
+            float wide = run.getWordSpacing() != null ? run.getWordSpacing().floatValue() : text.getWordSpacing();
+            for (int j = 0; wide != 0f && j < gv.getNumGlyphs(); j++) {
+                advance += isSpace(run.getText(), gv.getGlyphCharIndex(j)) ? wide : 0;
+            }
         }
         SVGText.Run head = runs.get(from);
         double along = head.isStartOffsetShare() ? head.getStartOffset() * total : head.getStartOffset();
@@ -2432,6 +2448,9 @@ public final class VectorImage {
                 double wide = gv.getGlyphMetrics(j).getAdvanceX();
                 double middle = along + wide / 2;
                 along += wide + spacingOf(text, run);
+                if (isSpace(run.getText(), gv.getGlyphCharIndex(j))) {
+                    along += run.getWordSpacing() != null ? run.getWordSpacing().floatValue() : text.getWordSpacing();
+                }
                 if (middle < 0 || middle > total) {
                     continue;
                 }
@@ -2459,6 +2478,11 @@ public final class VectorImage {
         }
         double[] last = pieces.get(pieces.size() - 1);
         return new double[] {last[2], last[3]};
+    }
+
+    /// Whether the character at `index` of `text` is a space between words.
+    private static boolean isSpace(String text, int index) {
+        return index >= 0 && index < text.length() && (text.charAt(index) == ' ' || text.charAt(index) == 0xa0);
     }
 
     /// How much further apart than the font has them the glyphs of a

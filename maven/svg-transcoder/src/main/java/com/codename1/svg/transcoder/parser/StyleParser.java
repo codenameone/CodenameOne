@@ -51,6 +51,17 @@ public final class StyleParser {
             }
         }
 
+        // `inherit` and `unset` say to take a property from what the element
+        // is in, which is what a property that is not set here does: it is
+        // left for the inheriting to fill in, where it is one that is
+        // inherited, and is at its usual value where it is not.
+        for (java.util.Iterator<Map.Entry<String, String>> it = merged.entrySet().iterator(); it.hasNext();) {
+            String v = it.next().getValue();
+            if (v != null && ("inherit".equals(v.trim()) || "unset".equals(v.trim()))) {
+                it.remove();
+            }
+        }
+
         SVGStyle out = new SVGStyle();
         out.setFill(toPaint(merged.get("fill")));
         out.setStroke(toPaint(merged.get("stroke")));
