@@ -22,27 +22,6 @@
     }
    }
   },
-  "linux-x64@amd-epyc-7763-64-core-processor": {
-   "translator": {
-    "all": {
-     "from": {
-      "memory": 0.519,
-      "time": 0.515,
-      "tolerance": {
-       "time": 0.2
-      }
-     },
-     "memory": 0.481,
-     "reason": "Recalibrate translator RAM on EPYC 7763 from four complete five-round runs: this pull request's runs 37997610022 at 8a51fcb4b1 (run median 0.428x, which failed as IMPROVED at -17.5% against the 0.519x row's 15% tolerance) and 37962653289 at e453c39d61 (0.478x, which passed), and two master controls, 37790360588 at ebe0e64be3 (0.484x) and 37746994710 at 6478b2f347 (0.484x). Both master controls predate d65703afaa, the commit this branch is based on: no run of master at or after that commit landed on this CPU model, so there is no same-model control at the base commit. On Xeon Platinum 8573C, master at d65703afaa measured 0.414x (run 37927504399), lower than the run that failed here. Per round, the two master runs on this model range 0.44-0.51x and this pull request's failing run 0.41-0.50x, three of its five rounds at 0.41-0.43x. Whether this pull request makes the lower rounds more frequent on this model or one run of five rounds simply drew them was NOT established. So this records no improvement: it sets the baseline to the pooled run median (0.481x) and widens the RAM tolerance to the 20% the tool derives from the observed spread. Time is unchanged.",
-     "runs": 4,
-     "time": 0.515,
-     "tolerance": {
-      "memory": 0.2,
-      "time": 0.2
-     }
-    }
-   }
-  },
   "linux-x64@intel-xeon-platinum-8573c": {
    "translator": {
     "all": {

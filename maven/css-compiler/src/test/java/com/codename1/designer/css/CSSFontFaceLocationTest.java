@@ -162,6 +162,49 @@ public class CSSFontFaceLocationTest {
         }
     }
 
+    /**
+     * A font from a file is stored as its file name and its size setting.
+     * The measurements of the system font, which this compiler does not
+     * have, are not part of what is written, so a size given as a keyword or
+     * not at all saves like any other.
+     */
+    @Test
+    void testFontFileWithKeywordOrNoSizeIsSaved() throws Exception {
+        Path cssDir = Files.createTempDirectory("cn1-font-size");
+        Path outDir = Files.createTempDirectory("cn1-font-size-out");
+        try {
+            copyFixture(cssDir.resolve("TestFont-Regular.ttf"));
+            Path cssFile = cssDir.resolve("theme.css");
+            Files.write(cssFile, ("@font-face {"
+                    + "  font-family: \"TestFont\";"
+                    + "  src: url(TestFont-Regular.ttf);"
+                    + "}"
+                    + "Plain { font-family: \"TestFont\"; }"
+                    + "Small { font-family: \"TestFont\"; font-size: small; }"
+                    + "Medium { font-family: \"TestFont\"; font-size: medium; }"
+                    + "Large { font-family: \"TestFont\"; font-size: large; }")
+                    .getBytes(StandardCharsets.UTF_8));
+            Path resFile = outDir.resolve("theme.res");
+
+            CSSTheme theme = CSSTheme.load(cssFile.toUri().toURL());
+            theme.resourceFile = resFile.toFile();
+            theme.res = new com.codename1.ui.util.EditableResourcesForCSS(resFile.toFile());
+            theme.res.setTheme("Theme", new Hashtable());
+            theme.updateResources();
+            theme.save(resFile.toFile());
+
+            assertTrue(resFile.toFile().length() > 0, "the resource file was written");
+            Hashtable themeProps = theme.res.getTheme("Theme");
+            for (String uiid : new String[] {"Plain", "Small", "Medium", "Large"}) {
+                assertEquals("TestFont-Regular.ttf", fontFor(themeProps, uiid + ".font").getFontFile().getName(),
+                        uiid + " font file");
+            }
+        } finally {
+            deleteTree(cssDir);
+            deleteTree(outDir);
+        }
+    }
+
     private static Hashtable compile(Path cssFile, Path resFile) throws Exception {
         CSSTheme theme = CSSTheme.load(cssFile.toUri().toURL());
         theme.resourceFile = resFile.toFile();

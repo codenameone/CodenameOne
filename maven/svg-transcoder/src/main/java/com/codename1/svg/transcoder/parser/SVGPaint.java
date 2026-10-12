@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.svg.transcoder.parser;
 
 /**
@@ -13,10 +35,39 @@ public final class SVGPaint {
     private final int color;
     private final String reference;
 
+    private final SVGPaint fallback;
+
     private SVGPaint(boolean none, int color, String reference) {
+        this(none, color, reference, null);
+    }
+
+    private SVGPaint(boolean none, int color, String reference, SVGPaint fallback) {
         this.none = none;
         this.color = color;
         this.reference = reference;
+        this.fallback = fallback;
+    }
+
+    /**
+     * What a reference is painted with when nothing has its id: the colour
+     * or {@code none} written after it, as in {@code url(#g) red}. Null when
+     * nothing is written there.
+     */
+    public SVGPaint getFallback() { return fallback; }
+
+    private boolean fallbackCurrent;
+
+    /**
+     * Whether the fallback is written as {@code currentColor}: the
+     * {@code color} of the element the paint is on, which is known where it
+     * is painted and not here. {@link #getFallback} is then null until
+     * {@link #withCurrent} puts that colour in.
+     */
+    public boolean isFallbackCurrent() { return fallbackCurrent; }
+
+    /** This reference with its {@code currentColor} fallback made the colour given. */
+    public SVGPaint withCurrent(int argb) {
+        return new SVGPaint(none, color, reference, ofColor(argb));
     }
 
     public static SVGPaint ofColor(int argb) {
@@ -34,10 +85,27 @@ public final class SVGPaint {
 
     public static SVGPaint setReference(String value) {
         String r = stripUrl(value);
-        return r == null ? null : ofReference(r);
+        if (r == null) return null;
+        String rest = value.substring(value.indexOf(')') + 1).trim();
+        SVGPaint fallback = null;
+        if (ColorParser.isNone(rest)) {
+            fallback = NONE;
+        } else if (!rest.isEmpty() && !ColorParser.isCurrentColor(rest)) {
+            try {
+                fallback = ofColor(ColorParser.parse(rest));
+            } catch (RuntimeException e) {
+                // not a colour: no fallback
+            }
+        }
+        SVGPaint out = new SVGPaint(false, 0, r, fallback);
+        out.fallbackCurrent = ColorParser.isCurrentColor(rest);
+        return out;
     }
 
-    /** "url(#foo)" -> "foo"; returns null otherwise. */
+    /**
+     * "url(#foo)" -> "foo"; returns null otherwise. The fragment may be
+     * quoted, as in {@code url('#foo')} or {@code url("#foo")}.
+     */
     public static String stripUrl(String s) {
         if (s == null) return null;
         String t = s.trim();
@@ -45,6 +113,12 @@ public final class SVGPaint {
         int close = t.indexOf(')', 4);
         if (close < 0) return null;
         String inside = t.substring(4, close).trim();
+        if (inside.length() >= 2) {
+            char q = inside.charAt(0);
+            if ((q == '"' || q == '\'') && inside.charAt(inside.length() - 1) == q) {
+                inside = inside.substring(1, inside.length() - 1).trim();
+            }
+        }
         if (inside.startsWith("#")) inside = inside.substring(1);
         return inside;
     }

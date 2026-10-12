@@ -207,16 +207,13 @@ public class CSSImageImporter {
                 .append("  cn1-source-dpi: ").append(sourceDpi).append(";\n")
                 .append("}\n");
         appendCSS(css.toString());
-        try {
-            CN1CSSCLI.main(new String[]{
-                getCSSFile().getAbsolutePath(),
-                getResourceFile().getAbsolutePath()
-            });
-        } catch (Exception ex) {
-            if (ex instanceof IOException) {
-                throw (IOException)ex;
-            }
-            throw new RuntimeException("Failed to compile CSS file.", ex);
+        // run(), not main(): main ends the JVM, and this is the editor's own.
+        // The stylesheets of the project's libraries are compiled in ahead
+        // of its own, so the theme written here still has what they define.
+        int status = CN1CSSCLI.run(CN1CSSCLI.legacyArguments(
+            getCSSFile().getAbsolutePath(), getResourceFile().getAbsolutePath()));
+        if (status != 0) {
+            throw new IOException("Failed to compile CSS file " + getCSSFile() + ". See the console for the reason.");
         }
         
         

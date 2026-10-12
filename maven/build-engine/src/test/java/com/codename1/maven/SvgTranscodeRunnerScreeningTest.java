@@ -43,7 +43,8 @@ import static org.junit.Assert.fail;
  * it decides that before it starts rather than by behaving differently once it
  * has.
  *
- * <p>A {@code .lottie} is a ZIP that the JSON-only parser cannot read, and any
+ * <p>A {@code .lottie} that is not an archive with an animation in it cannot
+ * be read, and any
  * unrelated {@code .json} sitting in a vector directory is claimed by extension
  * alone. The transcoder reports both and stops -- one behaviour, the same one
  * the bound goal has. {@link SvgTranscodeRunner#unreadableSources()} is how a
@@ -126,6 +127,27 @@ public class SvgTranscodeRunnerScreeningTest {
         File basedir = projectWith("spin.json",
                 ("{\"v\":\"5.7.4\",\"fr\":30,\"ip\":0,\"op\":30,\"w\":64,\"h\":64,"
                         + "\"layers\":[]}").getBytes("UTF-8"));
+        SvgTranscodeRunner runner = runner(basedir);
+        assertTrue("not screened out: " + runner.unreadableSources(),
+                runner.unreadableSources().isEmpty());
+        runner.run();
+        assertTrue(generated(basedir, "Spin.java").isFile());
+    }
+
+    /** A dotLottie archive is read through to the animation it holds. */
+    @Test
+    public void acceptsADotLottieArchive() throws Exception {
+        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+        java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(bytes);
+        zip.putNextEntry(new java.util.zip.ZipEntry("manifest.json"));
+        zip.write("{\"animations\":[{\"id\":\"spin\"}]}".getBytes("UTF-8"));
+        zip.closeEntry();
+        zip.putNextEntry(new java.util.zip.ZipEntry("animations/spin.json"));
+        zip.write(("{\"v\":\"5.7.4\",\"fr\":30,\"ip\":0,\"op\":30,\"w\":64,\"h\":64,"
+                + "\"layers\":[]}").getBytes("UTF-8"));
+        zip.closeEntry();
+        zip.close();
+        File basedir = projectWith("spin.lottie", bytes.toByteArray());
         SvgTranscodeRunner runner = runner(basedir);
         assertTrue("not screened out: " + runner.unreadableSources(),
                 runner.unreadableSources().isEmpty());

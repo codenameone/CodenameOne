@@ -368,3 +368,21 @@ vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/TryCatch
 vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/TypeInsnNode.java | Rewrite of ASM org.objectweb.asm.tree.TypeInsnNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
 vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/VarInsnNode.java | Rewrite of ASM org.objectweb.asm.tree.VarInsnNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
 scripts/backend-mvc/src/main/resources/static/htmx-2.0.11.min.js | Unmodified htmx 2.0.11 distribution, Zero-Clause BSD license in scripts/backend-mvc/HTMX-LICENSE.txt
+
+# Relocated JZlib retains its original BSD license.
+vm/JavaAPI/src/com/codename1/impl/zip/Adler32.java | JZlib, Copyright ymnk, JCraft Inc., BSD license; generated relocation retains original notice
+vm/JavaAPI/src/com/codename1/impl/zip/CRC32.java | JZlib, Copyright ymnk, JCraft Inc., BSD license; generated relocation retains original notice
+vm/JavaAPI/src/com/codename1/impl/zip/Checksum.java | JZlib, Copyright ymnk, JCraft Inc., BSD license; generated relocation retains original notice
+vm/JavaAPI/src/com/codename1/impl/zip/Deflate.java | JZlib, Copyright ymnk, JCraft Inc., BSD license; generated relocation retains original notice
+vm/JavaAPI/src/com/codename1/impl/zip/Deflater.java | JZlib, Copyright ymnk, JCraft Inc., BSD license; generated relocation retains original notice
+vm/JavaAPI/src/com/codename1/impl/zip/GZIPException.java | JZlib, Copyright ymnk, JCraft Inc., BSD license; generated relocation retains original notice
+vm/JavaAPI/src/com/codename1/impl/zip/GZIPHeader.java | JZlib, Copyright ymnk, JCraft Inc., BSD license; generated relocation retains original notice
+vm/JavaAPI/src/com/codename1/impl/zip/InfBlocks.java | JZlib, Copyright ymnk, JCraft Inc., BSD license; generated relocation retains original notice
+vm/JavaAPI/src/com/codename1/impl/zip/InfCodes.java | JZlib, Copyright ymnk, JCraft Inc., BSD license; generated relocation retains original notice
+vm/JavaAPI/src/com/codename1/impl/zip/InfTree.java | JZlib, Copyright ymnk, JCraft Inc., BSD license; generated relocation retains original notice
+vm/JavaAPI/src/com/codename1/impl/zip/Inflate.java | JZlib, Copyright ymnk, JCraft Inc., BSD license; generated relocation retains original notice
+vm/JavaAPI/src/com/codename1/impl/zip/Inflater.java | JZlib, Copyright ymnk, JCraft Inc., BSD license; generated relocation retains original notice
+vm/JavaAPI/src/com/codename1/impl/zip/JZlib.java | JZlib, Copyright ymnk, JCraft Inc., BSD license; generated relocation retains original notice
+vm/JavaAPI/src/com/codename1/impl/zip/StaticTree.java | JZlib, Copyright ymnk, JCraft Inc., BSD license; generated relocation retains original notice
+vm/JavaAPI/src/com/codename1/impl/zip/Tree.java | JZlib, Copyright ymnk, JCraft Inc., BSD license; generated relocation retains original notice
+vm/JavaAPI/src/com/codename1/impl/zip/ZStream.java | JZlib, Copyright ymnk, JCraft Inc., BSD license; generated relocation retains original notice

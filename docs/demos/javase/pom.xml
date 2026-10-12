@@ -491,11 +491,6 @@
 
 
 
-                              <!-- The location of the designer jar.  This property is set in the
-                                  prepare-simulator-classpath goal, and the file itself is managed
-                                  by maven. -->
-                              <argument>-Dcodename1.designer.jar=${codename1.designer.jar}</argument>
-
                               <!-- The location of the theme.css file.  This property
                                   is set in the prepare-simulator-classpath goal.  This is used by the simulator
                                   for watching CSS for changes. -->
@@ -592,11 +587,6 @@
 
 
 
-                              <!-- The location of the designer jar.  This property is set in the
-                                  prepare-simulator-classpath goal, and the file itself is managed
-                                  by maven. -->
-                              <argument>-Dcodename1.designer.jar=${codename1.designer.jar}</argument>
-
                               <!-- The location of the theme.css file.  This property
                                   is set in the prepare-simulator-classpath goal.  This is used by the simulator
                                   for watching CSS for changes. -->
@@ -685,11 +675,6 @@
                           <arguments>
                               <argument>-Xmx1024M</argument>
 
-
-                              <!-- The location of the designer jar.  This property is set in the
-                                  prepare-simulator-classpath goal, and the file itself is managed
-                                  by maven. -->
-                              <argument>-Dcodename1.designer.jar=${codename1.designer.jar}</argument>
 
                               <!-- The location of the theme.css file.  This property
                                   is set in the prepare-simulator-classpath goal.  This is used by the simulator
@@ -792,13 +777,6 @@
                                     are set in the prepare-simulator-classpath goal
                                     of the codenameone-maven-plugin which was run during
                                     the initialize phase. -->
-                              <systemProperty>
-                                  <!-- The location of the designer jar.  This property is set in the
-                                  prepare-simulator-classpath goal, and the file itself is managed
-                                  by maven. -->
-                                  <key>codename1.designer.jar</key>
-                                  <value>${codename1.designer.jar}</value>
-                              </systemProperty>
                               <systemProperty>
                                   <!-- The location of the theme.css file.  This property
                                   is set in the prepare-simulator-classpath goal.  This is used by the simulator

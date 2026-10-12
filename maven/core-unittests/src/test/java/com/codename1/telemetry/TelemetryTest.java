@@ -916,10 +916,10 @@ class TelemetryTest extends UITestBase {
                 "the export followed a redirect, credential and all");
     }
 
-    @Test
+    @org.junit.jupiter.api.RepeatedTest(50)
     void aRetryFromAResponseCodeListenerContinuesTheTrace() throws Exception {
-        // The listener runs LATER, on the EDT, after the network thread has ended
-        // the attempt; its retry must still continue the failed attempt's trace.
+        // The EDT listener races with the network thread ending the attempt.
+        // Repeat to exercise both orderings; retries must preserve the trace.
         TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
         final TestCodenameOneImplementation.TestConnection mock =
                 impl.createConnection("http://flaky.test/api");

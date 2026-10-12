@@ -50,8 +50,8 @@ public class CSSLocalizationTest {
         Path tempDir = Files.createTempDirectory("cn1-css-localization-utf8");
         try {
             Path localizationRoot = Files.createDirectory(tempDir.resolve("l10n"));
-            // The exact string from issue #4883 — UTF-8 encoded Italian with accented à.
-            String value = "Non ci sono ancora attività. Usa il pulsante flottante per aggiungere la prima routine.";
+            // The exact string from issue #4883 -- UTF-8 encoded Italian with accented a-grave.
+            String value = "Non ci sono ancora attivit\u00e0. Usa il pulsante flottante per aggiungere la prima routine.";
             Files.write(localizationRoot.resolve("Bundle_it.properties"),
                     ("home.empty=" + value + System.lineSeparator()).getBytes(StandardCharsets.UTF_8));
 
@@ -71,7 +71,7 @@ public class CSSLocalizationTest {
         try {
             Path localizationRoot = Files.createDirectory(tempDir.resolve("l10n"));
             // Pre-Java-9 native2ascii-style file: ISO-8859-1 with a literal accented byte.
-            String value = "café";
+            String value = "caf\u00e9";
             Files.write(localizationRoot.resolve("Bundle_fr.properties"),
                     ("greeting=" + value + System.lineSeparator()).getBytes(StandardCharsets.ISO_8859_1));
 
@@ -97,7 +97,7 @@ public class CSSLocalizationTest {
             Map<String, Map<String, Map<String, String>>> bundles = loadLocalizationBundles(localizationRoot.toFile());
             Map<String, Map<String, String>> bundle = bundles.get("Bundle");
             assertTrue(bundle != null, "Bundle should be detected");
-            assertEquals(bundle.get("it"), stringMap("home.empty", "attività"),
+            assertEquals(bundle.get("it"), stringMap("home.empty", "attivit\u00e0"),
                     "\\uXXXX escapes should still be decoded");
         } finally {
             deleteRecursively(tempDir);

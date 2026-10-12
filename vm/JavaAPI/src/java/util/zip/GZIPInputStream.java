@@ -1,0 +1,158 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package java.util.zip;
+import java.io.*;
+
+/**
+ * RFC 1952 decoder, including concatenated members and header/trailer CRC checks.
+ * Set jdk.util.gzip.tryReadAheadAfterTrailer=true before constructing a stream
+ * to read subsequent members even when the source reports zero available bytes.
+ * This may block on a live source; the default only probes available data.
+ */
+public class GZIPInputStream extends InflaterInputStream {
+    public static final int GZIP_MAGIC = 0x8b1f;
+    protected CRC32 crc = new CRC32();
+    protected boolean eos;
+    private final boolean readAhead = Boolean.parseBoolean(
+            System.getProperty("jdk.util.gzip.tryReadAheadAfterTrailer"));
+    public GZIPInputStream(InputStream in) throws IOException {
+        this(in, 512);
+    }
+    public GZIPInputStream(InputStream in, int size) throws IOException {
+        super(new PushbackInputStream(in, Math.max(size, 2)), new Inflater(true), size);
+        try {
+            header(false);
+        } catch (IOException ex) {
+            inf.end();
+            throw ex;
+        }
+    }
+    private int byteValue() throws IOException {
+        int b = in.read();
+        if (b < 0)
+            throw new EOFException("Truncated GZIP");
+        return b;
+    }
+    private int headerValue(boolean availableOnly) throws IOException {
+        // Probe a subsequent header only while bytes can be read without
+        // blocking. This includes optional fields and their CRC bytes.
+        if (availableOnly && in.available() == 0)
+            throw new EOFException("Incomplete available GZIP header");
+        return byteValue();
+    }
+    private int headerByte(boolean availableOnly) throws IOException {
+        int b = headerValue(availableOnly);
+        crc.update(b);
+        return b;
+    }
+    private void header(boolean availableOnly) throws IOException {
+        crc.reset();
+        if (headerByte(availableOnly) != 31 || headerByte(availableOnly) != 139 || headerByte(availableOnly) != 8)
+            throw new ZipException("Invalid GZIP header");
+        int flags = headerByte(availableOnly);
+        if ((flags & 224) != 0)
+            throw new ZipException("Reserved GZIP flags");
+        for (int i = 0; i < 6; i++) headerByte(availableOnly);
+        if ((flags & 4) != 0) {
+            int n = headerByte(availableOnly) | (headerByte(availableOnly) << 8);
+            while (n-- > 0) headerByte(availableOnly);
+        }
+        if ((flags & 8) != 0)
+            while (headerByte(availableOnly) != 0) {
+            }
+        if ((flags & 16) != 0)
+            while (headerByte(availableOnly) != 0) {
+            }
+        if ((flags & 2) != 0) {
+            int expected = (int) crc.getValue() & 65535;
+            if ((headerValue(availableOnly) | (headerValue(availableOnly) << 8)) != expected)
+                throw new ZipException("Invalid GZIP header CRC");
+        }
+        crc.reset();
+    }
+    private long word() throws IOException {
+        long result = 0;
+        for (int i = 0; i < 4; i++) result |= (long) byteValue() << (8 * i);
+        return result;
+    }
+    protected void fill() throws IOException {
+        ensureOpen();
+        // A concatenated member may be wholly in the pushback buffer. Asking
+        // for more than its available bytes would also read the idle source.
+        int ready = in.available();
+        len = in.read(buf, 0, ready > 0 ? Math.min(ready, buf.length) : buf.length);
+        if (len < 0)
+            throw new EOFException("Truncated compressed stream");
+        if (len == 0) {
+            int b = in.read();
+            if (b < 0)
+                throw new EOFException();
+            buf[0] = (byte) b;
+            len = 1;
+        }
+        inf.setInput(buf, 0, len);
+    }
+    public int read(byte[] b, int off, int length) throws IOException {
+        ensureOpen();
+        Deflater.bounds(b, off, length);
+        if (length == 0)
+            return 0;
+        while (!eos) {
+            int n = super.read(b, off, length);
+            if (n > 0) {
+                crc.update(b, off, n);
+                return n;
+            }
+            if (!inf.finished())
+                throw new ZipException("GZIP dictionary unsupported");
+            int left = inf.getRemaining();
+            if (left > 0)
+                ((PushbackInputStream) in).unread(buf, len - left, left);
+            if (word() != crc.getValue() || word() != (inf.getBytesWritten() & 0xffffffffL))
+                throw new ZipException("Invalid GZIP trailer");
+            try {
+                // Validate the entire candidate header before accepting it.
+                // PushbackInputStream includes buffered bytes in available().
+                header(!readAhead);
+            } catch (IOException trailingData) {
+                // Like the JDK, ignore bytes that are not another complete header.
+                // Payload and trailer errors after a valid header remain errors.
+                eos = true;
+                break;
+            }
+            inf.reset();
+        }
+        return -1;
+    }
+    public int available() throws IOException {
+        ensureOpen();
+        return eos ? 0 : 1;
+    }
+    public void close() throws IOException {
+        try {
+            super.close();
+        } finally {
+            inf.end();
+        }
+    }
+}
