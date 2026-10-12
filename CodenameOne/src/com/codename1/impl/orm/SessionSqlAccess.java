@@ -153,9 +153,9 @@ public final class SessionSqlAccess implements SqlAccess {
             if (nativeScalar) {
                 // SQLite's typed Row getters coerce values. Read typeof alongside the
                 // value, and let the CTE's column list enforce width even for empty results.
-                String alias = "cn1_native_scalar";
-                while (containsAlias(sql, alias)) {
-                    alias += "_";
+                StringBuilder alias = new StringBuilder("cn1_native_scalar");
+                while (containsAlias(sql, alias.toString())) {
+                    alias.append('_');
                 }
                 // OFFSET prevents SQLite flattening the CTE and evaluating a volatile
                 // expression separately for its type and value.
