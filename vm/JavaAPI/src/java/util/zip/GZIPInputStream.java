@@ -41,7 +41,7 @@ public class GZIPInputStream extends InflaterInputStream {
     public GZIPInputStream(InputStream in, int size) throws IOException {
         super(new PushbackInputStream(in, Math.max(size, 2)), new Inflater(true), size);
         try {
-            header();
+            header(false);
         } catch (IOException ex) {
             inf.end();
             throw ex;
@@ -53,32 +53,39 @@ public class GZIPInputStream extends InflaterInputStream {
             throw new EOFException("Truncated GZIP");
         return b;
     }
-    private int headerByte() throws IOException {
-        int b = byteValue();
+    private int headerValue(boolean availableOnly) throws IOException {
+        // Probe a subsequent header only while bytes can be read without
+        // blocking. This includes optional fields and their CRC bytes.
+        if (availableOnly && in.available() == 0)
+            throw new EOFException("Incomplete available GZIP header");
+        return byteValue();
+    }
+    private int headerByte(boolean availableOnly) throws IOException {
+        int b = headerValue(availableOnly);
         crc.update(b);
         return b;
     }
-    private void header() throws IOException {
+    private void header(boolean availableOnly) throws IOException {
         crc.reset();
-        if (headerByte() != 31 || headerByte() != 139 || headerByte() != 8)
+        if (headerByte(availableOnly) != 31 || headerByte(availableOnly) != 139 || headerByte(availableOnly) != 8)
             throw new ZipException("Invalid GZIP header");
-        int flags = headerByte();
+        int flags = headerByte(availableOnly);
         if ((flags & 224) != 0)
             throw new ZipException("Reserved GZIP flags");
-        for (int i = 0; i < 6; i++) headerByte();
+        for (int i = 0; i < 6; i++) headerByte(availableOnly);
         if ((flags & 4) != 0) {
-            int n = headerByte() | (headerByte() << 8);
-            while (n-- > 0) headerByte();
+            int n = headerByte(availableOnly) | (headerByte(availableOnly) << 8);
+            while (n-- > 0) headerByte(availableOnly);
         }
         if ((flags & 8) != 0)
-            while (headerByte() != 0) {
+            while (headerByte(availableOnly) != 0) {
             }
         if ((flags & 16) != 0)
-            while (headerByte() != 0) {
+            while (headerByte(availableOnly) != 0) {
             }
         if ((flags & 2) != 0) {
             int expected = (int) crc.getValue() & 65535;
-            if ((byteValue() | (byteValue() << 8)) != expected)
+            if ((headerValue(availableOnly) | (headerValue(availableOnly) << 8)) != expected)
                 throw new ZipException("Invalid GZIP header CRC");
         }
         crc.reset();
@@ -123,20 +130,10 @@ public class GZIPInputStream extends InflaterInputStream {
                 ((PushbackInputStream) in).unread(buf, len - left, left);
             if (word() != crc.getValue() || word() != (inf.getBytesWritten() & 0xffffffffL))
                 throw new ZipException("Invalid GZIP trailer");
-            // PushbackInputStream counts both buffered bytes and source data.
-            // A completed member must not wait for a persistent source to close.
-            if (!readAhead && in.available() == 0) {
-                eos = true;
-                break;
-            }
-            int first = in.read();
-            if (first < 0) {
-                eos = true;
-                break;
-            }
-            ((PushbackInputStream) in).unread(first);
             try {
-                header();
+                // Validate the entire candidate header before accepting it.
+                // PushbackInputStream includes buffered bytes in available().
+                header(!readAhead);
             } catch (IOException trailingData) {
                 // Like the JDK, ignore bytes that are not another complete header.
                 // Payload and trailer errors after a valid header remain errors.

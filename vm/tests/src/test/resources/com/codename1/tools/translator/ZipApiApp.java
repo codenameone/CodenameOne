@@ -668,6 +668,59 @@ public class ZipApiApp {
             }
         }
     }
+    static void gzipPartialLiveHeaders() throws Exception {
+        byte[] data = "complete member before a partial header".getBytes("UTF-8");
+        ByteArrayOutputStream member = new ByteArrayOutputStream();
+        try (GZIPOutputStream out = new GZIPOutputStream(member)) { out.write(data); }
+        byte[] plainMember = member.toByteArray();
+        // Exercise every optional field, including both extra-length bytes,
+        // zero-terminated name/comment fields, and both header checksum bytes.
+        for (int flags : new int[] {0, 2, 4, 8, 16, 30}) {
+            ByteArrayOutputStream header = new ByteArrayOutputStream();
+            header.write(plainMember, 0, 3);
+            header.write(flags);
+            header.write(plainMember, 4, 6);
+            if ((flags & 4) != 0) header.write(new byte[] {3, 0, 31, 0, 42});
+            if ((flags & 8) != 0) header.write(new byte[] {'n', 'a', 'm', 'e', 0});
+            if ((flags & 16) != 0) header.write(new byte[] {'n', 'o', 't', 'e', 0});
+            if ((flags & 2) != 0) {
+                CRC32 crc = new CRC32();
+                crc.update(header.toByteArray());
+                header.write((int) crc.getValue() & 255);
+                header.write((int) (crc.getValue() >>> 8) & 255);
+            }
+            byte[] candidate = header.toByteArray();
+            for (int prefix = 0; prefix <= candidate.length; prefix++) {
+                boolean complete = prefix == candidate.length;
+                ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+                bytes.write(plainMember);
+                bytes.write(candidate, 0, prefix);
+                // A complete header must still accept and decode the next member.
+                if (complete) bytes.write(plainMember, 10, plainMember.length - 10);
+                ByteArrayOutputStream expected = new ByteArrayOutputStream();
+                expected.write(data);
+                if (complete) expected.write(data);
+                for (int size : new int[] {1, 512}) {
+                    final ByteArrayInputStream arrived = new ByteArrayInputStream(bytes.toByteArray());
+                    InputStream live = new InputStream() {
+                        public int available() { return arrived.available(); }
+                        public int read() {
+                            require(arrived.available() > 0, "partial GZIP header must not read idle source");
+                            return arrived.read();
+                        }
+                        public int read(byte[] b, int off, int len) {
+                            require(arrived.available() > 0, "partial GZIP header must not fill idle source");
+                            return arrived.read(b, off, len);
+                        }
+                    };
+                    try (GZIPInputStream in = new GZIPInputStream(live, size)) {
+                        require(Arrays.equals(expected.toByteArray(), readAll(in)), "partial or complete live header");
+                        require(in.read() == -1 && in.available() == 0, "partial header stays at EOF");
+                    }
+                }
+            }
+        }
+    }
     static void compatibilityRegressions(boolean customRuntime) throws Exception {
         byte[] data = "flushed payload".getBytes("UTF-8");
         // JDK 8 itself loops indefinitely with buffers smaller than the flush marker.
@@ -756,6 +809,7 @@ public class ZipApiApp {
         if (args.length > 1) {
             // JDK 8 lacks the read-ahead option and has the descriptor CRC ambiguity.
             gzipReadAhead();
+            gzipPartialLiveHeaders();
             ambiguousZipDescriptor();
         }
         checkedCloseFailures(args.length > 1);
