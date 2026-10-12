@@ -175,6 +175,9 @@ jobs:
     needs: select
     if: needs.select.outputs.any == 'true'
     uses: ./.github/workflows/_build-ios-port.yml
+    with:
+      # One test server for every suite job of the run; see the step there.
+      test_server: true
 
   build-ios-metal:
     if: ${{ !inputs.watch_only && needs.select.outputs.ios == 'true' }}
@@ -290,6 +293,17 @@ jobs:
           # ~/.m2/com/codenameone + Themes + Ports/iOSPort/nativeSources to
           # their original absolute paths.
           tar -C / -xf "$RUNNER_TEMP/cn1-built-bundle.tar"
+          # The test server build-port built for the whole run, when it did.
+          # Without it the suite script builds its own, as it always has.
+          if [ -f "$RUNNER_TEMP/cn1ss-server.tar" ]; then
+            tar -C / -xf "$RUNNER_TEMP/cn1ss-server.tar"
+          fi
+          if [ -d "$RUNNER_TEMP/cn1ss-server/classes" ]; then
+            echo "CN1SS_SERVER_DIST=$RUNNER_TEMP/cn1ss-server" >> "$GITHUB_ENV"
+            echo "Using the prebuilt test server in $RUNNER_TEMP/cn1ss-server"
+          else
+            echo "No prebuilt test server in the bundle; the suite builds its own."
+          fi
 
       - name: Install Metal Toolchain
         # Xcode 26+ requires the Metal Toolchain component to be downloaded
@@ -693,6 +707,17 @@ jobs:
           # ~/.m2/com/codenameone + Themes + Ports/iOSPort/nativeSources to
           # their original absolute paths.
           tar -C / -xf "$RUNNER_TEMP/cn1-built-bundle.tar"
+          # The test server build-port built for the whole run, when it did.
+          # Without it the suite script builds its own, as it always has.
+          if [ -f "$RUNNER_TEMP/cn1ss-server.tar" ]; then
+            tar -C / -xf "$RUNNER_TEMP/cn1ss-server.tar"
+          fi
+          if [ -d "$RUNNER_TEMP/cn1ss-server/classes" ]; then
+            echo "CN1SS_SERVER_DIST=$RUNNER_TEMP/cn1ss-server" >> "$GITHUB_ENV"
+            echo "Using the prebuilt test server in $RUNNER_TEMP/cn1ss-server"
+          else
+            echo "No prebuilt test server in the bundle; the suite builds its own."
+          fi
 
       - name: Install Metal Toolchain
         # Xcode 26+ requires the Metal Toolchain component to be downloaded
@@ -801,6 +826,15 @@ jobs:
         # The device TYPE is available even though no instance is, so create one.
         # Same model as the iOS 26 leg on purpose: the two sets then differ by
         # runtime and theme, which is what they are for, rather than by hardware.
+        #
+        # Booted, proven, and shut down again: this step is here to create the
+        # device and to find out on a deadline that its runtime boots, not to
+        # keep it running. run-ios-ui-tests.sh boots the device itself (simctl
+        # boot, then bootstatus -b) before it compiles and again before it
+        # installs. See the script for what the first boot was costing the
+        # step after it.
+        env:
+          CN1_SIM_SHUTDOWN_AFTER_BOOT: '1'
         run: ./scripts/ci/boot-ios-simulator.sh 'iOS-27[0-9-]*' 'iPhone 16' iPhone16-metal27
       - name: Run iOS UI screenshot tests (Metal)
         env:
@@ -1069,6 +1103,17 @@ jobs:
           # Replaces the evictable cn1-built cache restore with the artifact
           # build-port handed off (not LRU-evicted, survives --failed re-runs).
           tar -C / -xf "$RUNNER_TEMP/cn1-built-bundle.tar"
+          # The test server build-port built for the whole run, when it did.
+          # Without it the suite script builds its own, as it always has.
+          if [ -f "$RUNNER_TEMP/cn1ss-server.tar" ]; then
+            tar -C / -xf "$RUNNER_TEMP/cn1ss-server.tar"
+          fi
+          if [ -d "$RUNNER_TEMP/cn1ss-server/classes" ]; then
+            echo "CN1SS_SERVER_DIST=$RUNNER_TEMP/cn1ss-server" >> "$GITHUB_ENV"
+            echo "Using the prebuilt test server in $RUNNER_TEMP/cn1ss-server"
+          else
+            echo "No prebuilt test server in the bundle; the suite builds its own."
+          fi
 
       # After everything that fills the local Maven repository and before the
       # application is built; this job has no .NET SDK (see the action).
@@ -1230,6 +1275,17 @@ jobs:
           # Replaces the evictable cn1-built cache restore with the artifact
           # build-port handed off (not LRU-evicted, survives --failed re-runs).
           tar -C / -xf "$RUNNER_TEMP/cn1-built-bundle.tar"
+          # The test server build-port built for the whole run, when it did.
+          # Without it the suite script builds its own, as it always has.
+          if [ -f "$RUNNER_TEMP/cn1ss-server.tar" ]; then
+            tar -C / -xf "$RUNNER_TEMP/cn1ss-server.tar"
+          fi
+          if [ -d "$RUNNER_TEMP/cn1ss-server/classes" ]; then
+            echo "CN1SS_SERVER_DIST=$RUNNER_TEMP/cn1ss-server" >> "$GITHUB_ENV"
+            echo "Using the prebuilt test server in $RUNNER_TEMP/cn1ss-server"
+          else
+            echo "No prebuilt test server in the bundle; the suite builds its own."
+          fi
 
       # After everything that fills the local Maven repository and before the
       # application is built; this job has no .NET SDK (see the action).

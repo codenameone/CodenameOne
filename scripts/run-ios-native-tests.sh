@@ -211,6 +211,17 @@ if [ -f "$PODFILE_LOCK" ] && grep -q "GoogleMLKit/" "$PODFILE_LOCK"; then
     "EXCLUDED_ARCHS=arm64 armv7 armv7s"
   )
   ri_log "Google ML Kit detected; selecting its supported x86_64 simulator slice"
+else
+  # The test scheme builds the app, and the app embeds a watch app that xcodebuild
+  # compiles for arm64 AND x86_64 when the destination is an iPhone: 9,880 of this
+  # build's 14,835 compile units, in a job whose tests run for 0.17 seconds. Hold it
+  # to one slice, the way run-ios-ui-tests.sh does; the lines and how they were
+  # checked are in scripts/lib/xcode.sh. Not in the branch above: its unscoped
+  # ARCHS already leaves every target a single slice, and -xcconfig would outrank it.
+  WATCH_ARCH_XCCONFIG="$(mktemp -t cn1-ios-native-archs).xcconfig"
+  cn1_watch_simulator_arch_xcconfig > "$WATCH_ARCH_XCCONFIG"
+  SIMULATOR_ARCH_ARGS=(-xcconfig "$WATCH_ARCH_XCCONFIG")
+  ri_log "Building the embedded watch app for one simulator slice ($WATCH_ARCH_XCCONFIG)"
 fi
 ri_log "Running xcodebuild test (scheme=$TEST_SCHEME, destination=$DESTINATION)"
 set +e

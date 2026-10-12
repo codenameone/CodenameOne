@@ -30,6 +30,8 @@ jobs:
   build-port:
     if: ${{ !inputs.port_prepared }}
     uses: ./.github/workflows/_build-ios-port.yml
+    with:
+      test_server: true
 
   packaging:
     if: ${{ !cancelled() && (inputs.port_prepared || needs.build-port.result == 'success') && (inputs.unity_prepared || needs.unity-gallery.result == 'success') }}
@@ -37,11 +39,13 @@ jobs:
     permissions:
       contents: read
     runs-on: macos-15
-    # This job runs device Release, simulator UI, and notification builds in
-    # sequence. On a cold runner all tests passed after 119m44s, leaving only
-    # 16s of the old two-hour budget for artifact upload and cache saves. Keep
+    # This job runs device Release and simulator UI builds in sequence. The
+    # numbers below are from when a third build, for the notification tests,
+    # followed them; it is gone (see the end of the job) and the limit has been
+    # left where it was. On a cold runner all tests passed after 119m44s, leaving
+    # only 16s of the old two-hour budget for artifact upload and cache saves. Keep
     # the individual step limits below and allow 30m of finalization headroom.
-    # The hello app now also translates the Android compatibility gallery, its runtime and the Kotlin stdlib; 150 no longer covers the three builds.
+    # The hello app now also translates the Android compatibility gallery, its runtime and the Kotlin stdlib; 150 no longer covered the three builds.
     timeout-minutes: 210
     # Exercises both CocoaPods and SPM in a single Xcode project. Catches
     # regressions in either dependency manager (each pathway runs end to end)
@@ -149,6 +153,17 @@ jobs:
           # Replaces the evictable cn1-built cache restore with the artifact
           # build-port handed off (not LRU-evicted, survives --failed re-runs).
           tar -C / -xf "$RUNNER_TEMP/cn1-built-bundle.tar"
+          # The test server build-port built for the whole run, when it did.
+          # Without it the suite script builds its own, as it always has.
+          if [ -f "$RUNNER_TEMP/cn1ss-server.tar" ]; then
+            tar -C / -xf "$RUNNER_TEMP/cn1ss-server.tar"
+          fi
+          if [ -d "$RUNNER_TEMP/cn1ss-server/classes" ]; then
+            echo "CN1SS_SERVER_DIST=$RUNNER_TEMP/cn1ss-server" >> "$GITHUB_ENV"
+            echo "Using the prebuilt test server in $RUNNER_TEMP/cn1ss-server"
+          else
+            echo "No prebuilt test server in the bundle; the suite builds its own."
+          fi
 
       # After everything that fills the local Maven repository and before the
       # application is built; this job has no .NET SDK (see the action).
@@ -225,8 +240,8 @@ jobs:
           # within budget after the gaming runtime enlarged core. The benchmark/metal pipeline
           # keeps the -O2 default.
           CN1_TEST_OPT_LEVEL: "1"
-          # Shared, cached derived-data dir: the native-test step reuses these compiled objects,
-          # and a re-run restores them, instead of recompiling the whole translated core.
+          # Cached derived-data dir: a re-run restores these compiled objects instead of
+          # recompiling the whole translated core.
           CN1_IOS_DERIVED_DATA: ${{ runner.temp }}/cn1-ios-derived
         run: |
           set -euo pipefail
@@ -240,34 +255,21 @@ jobs:
         # The cold -O1 compile alone reached 52 minutes once the hello app gained the Android compatibility gallery, its runtime and the Kotlin stdlib.
         timeout-minutes: 100
 
-      - name: Run native iOS notification tests
-        env:
-          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-packaging-native
-          # Reuse the app + core already compiled by the UI-smoke step (same shared derived data)
-          # so this test build does not recompile the whole translated core a second time.
-          CN1_IOS_DERIVED_DATA: ${{ runner.temp }}/cn1-ios-derived
-          CN1_TEST_OPT_LEVEL: "1"
-        run: |
-          set -euo pipefail
-          mkdir -p "${ARTIFACTS_DIR}"
-          ./scripts/run-ios-native-tests.sh \
-            "${{ steps.build_ios_app.outputs.workspace }}" \
-            "${{ steps.build_ios_app.outputs.scheme }}"
-        # Two things grew into this budget, and both still apply. The reuse above is partial:
-        # run-ios-native-tests.sh injects the test target into the pbxproj before building, and
-        # Xcode rebuilds the app target after a project change even though the objects are there,
-        # so this step still pays a near-full native build -- 6m55s of the 8m13s it takes on a
-        # fast runner. Measured on one commit, a slow runner spent 4m31s booting the simulator
-        # (a fast one: 1m15s) and 13 minutes on that build, and the cap fired before the tests
-        # started. On top of that the sample now declares a watchMain, so the app scheme carries
-        # an embedded watch app with a ParparVM translation of its own, which xcodebuild builds
-        # before running a single test -- the raise scripts-ios-native.yml already took.
-        #
-        # So the higher of the two, not either alone: the watch build is added work on top of the
-        # rebuild, not a re-description of it. The real fix is to inject before the UI-smoke step
-        # so this build is genuinely incremental; until then the budget has to cover the build it
-        # actually does. The hello app's growth (the Android compatibility gallery, its runtime and the Kotlin stdlib) added roughly half again to that build.
-        timeout-minutes: 60
+      # No XCTest run here. This job used to end with run-ios-native-tests.sh, the
+      # same notification tests scripts-ios-native.yml runs, from the same script.
+      # Measured over three runs it took 23.5, 25.3 and 38 minutes of this job, and
+      # the tests in it take 0.17 seconds: the rest was the rebuild Xcode does after
+      # the test target is injected into the project.
+      #
+      # scripts-ios-native.yml is the one that stays. Both are called from
+      # scripts-ios.yml on the same events, and .github/ci/apple-checks.json selects
+      # that suite for every path that selected this one for the tests' sake, plus
+      # the core, the VM and the Maven modules, which this job is not selected for.
+      # What is no longer covered anywhere: the tests built in THIS job's
+      # configuration -- CocoaPods and SPM together, Google sign-in on, -O1. The
+      # application itself still builds and runs that way in the smoke above.
+      # A standalone dispatch of this workflow runs no XCTest; dispatch
+      # scripts-ios-native.yml for that.
 
       - name: Upload packaging artifacts
         if: ${{ !cancelled() }}

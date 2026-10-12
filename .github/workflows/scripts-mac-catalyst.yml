@@ -47,6 +47,8 @@ jobs:
     # via the cn1-built cache; first runner to land a fresh SHA populates it
     # and the others skip the rebuild.
     uses: ./.github/workflows/_build-ios-port.yml
+    with:
+      test_server: true
 
   build-mac-catalyst:
     if: ${{ !cancelled() && (inputs.port_prepared || needs.build-port.result == 'success') && (inputs.unity_prepared || needs.unity-gallery.result == 'success') }}
@@ -146,6 +148,17 @@ jobs:
           # Replaces the evictable cn1-built cache restore with the artifact
           # build-port handed off (not LRU-evicted, survives --failed re-runs).
           tar -C / -xf "$RUNNER_TEMP/cn1-built-bundle.tar"
+          # The test server build-port built for the whole run, when it did.
+          # Without it the suite script builds its own, as it always has.
+          if [ -f "$RUNNER_TEMP/cn1ss-server.tar" ]; then
+            tar -C / -xf "$RUNNER_TEMP/cn1ss-server.tar"
+          fi
+          if [ -d "$RUNNER_TEMP/cn1ss-server/classes" ]; then
+            echo "CN1SS_SERVER_DIST=$RUNNER_TEMP/cn1ss-server" >> "$GITHUB_ENV"
+            echo "Using the prebuilt test server in $RUNNER_TEMP/cn1ss-server"
+          else
+            echo "No prebuilt test server in the bundle; the suite builds its own."
+          fi
 
       - name: Install Metal Toolchain
         # Xcode 26+ requires the Metal Toolchain component for .metal
