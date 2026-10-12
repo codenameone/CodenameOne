@@ -44,26 +44,6 @@
    }
   },
   "linux-x64@intel-xeon-platinum-8573c": {
-   "hello": {
-    "all": {
-     "from": {
-      "memory": 0.732,
-      "time": 0.942,
-      "tolerance": {
-       "memory": 0.2,
-       "time": 0.5
-      }
-     },
-     "memory": 0.905,
-     "reason": "Recalibrate hello RAM on Xeon Platinum 8573C from three complete five-round runs: this pull request's run 37974545389 at bb185e0f13 (run median 0.905x) and two master controls, 37927504399 at d65703afaa, the commit this branch is based on (0.926x), and 37889241211 at 8e6f2cf05d (0.880x). All three fail the 0.732x row, which came from a single run, by +20.2% to +26.5% against its 20% tolerance, and this pull request's figure lies between the two master figures. The shift is therefore present on master at the base commit and is not attributed to this pull request; what moved it on master was not investigated. No improvement or regression is claimed. The baseline moves to the pooled run median, the RAM tolerance stays at 20% and time is unchanged.",
-     "runs": 3,
-     "time": 0.942,
-     "tolerance": {
-      "memory": 0.2,
-      "time": 0.5
-     }
-    }
-   },
    "translator": {
     "all": {
      "from": {
