@@ -40,19 +40,97 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Regression coverage for {@link MavenUtils#findDesignerJarInM2(File)}.
+ * Regression coverage for {@link MavenUtils#findDesignerJarInM2(File)} and
+ * {@link MavenUtils#isRunningInMaven()}.
  *
  * <p>Published {@code codenameone-designer-<v>-jar-with-dependencies.jar} artifacts
  * are not directly runnable: {@code maven/designer/pom.xml} renames the shaded
  * output to {@code designer_1.jar} and re-zips it, so the artifact in m2 is a
  * plain zip containing a single inner jar (no top-level {@code Main-Class}
- * manifest). The CSSWatcher fallback used to hand this wrapper zip to
- * {@code java -jar}, which fails with "no main manifest attribute" and silently
- * disables live CSS reload whenever the {@code codename1.designer.jar} system
- * property isn't set (e.g. simulator launches from an IDE without going through
- * {@code mvn cn1:run}).</p>
+ * manifest). Handing this wrapper zip to {@code java -jar} fails with "no main
+ * manifest attribute", so the Component Inspector's Edit Style action, the one
+ * thing that still launches the Resource Editor from the simulator, has to be
+ * given the inner jar.</p>
  */
 class MavenUtilsTest {
+    /** Everything {@link MavenUtils#isRunningInMaven()} reads. */
+    private static final String[] MAVEN_SIGNALS = {
+        "user.dir", "cn1.library.path", "maven.home", "codename1.designer.jar"
+    };
+
+    /**
+     * Runs {@code isRunningInMaven()} for a simulator started in {@code cwd}
+     * with none of the launch properties set, then puts everything back.
+     */
+    private static boolean runningInMavenFrom(File cwd, String designerJarProperty) {
+        String[] saved = new String[MAVEN_SIGNALS.length];
+        for (int i = 0; i < MAVEN_SIGNALS.length; i++) {
+            saved[i] = System.getProperty(MAVEN_SIGNALS[i]);
+            System.clearProperty(MAVEN_SIGNALS[i]);
+        }
+        try {
+            System.setProperty("user.dir", cwd.getAbsolutePath());
+            if (designerJarProperty != null) {
+                System.setProperty("codename1.designer.jar", designerJarProperty);
+            }
+            MavenUtils.reset();
+            return MavenUtils.isRunningInMaven();
+        } finally {
+            for (int i = 0; i < MAVEN_SIGNALS.length; i++) {
+                if (saved[i] == null) {
+                    System.clearProperty(MAVEN_SIGNALS[i]);
+                } else {
+                    System.setProperty(MAVEN_SIGNALS[i], saved[i]);
+                }
+            }
+            MavenUtils.reset();
+        }
+    }
+
+    private static void writeText(File file, String content) throws Exception {
+        Files.createDirectories(file.getParentFile().toPath());
+        Files.write(file.toPath(), content.getBytes("UTF-8"));
+    }
+
+    @Test
+    void mavenProjectLayoutIsRunningInMavenWithoutAnyLaunchProperty(@TempDir Path tempDir) throws Exception {
+        // The generated project: exec:exec forks the simulator in javase/, and
+        // no longer forwards -Dcodename1.designer.jar.
+        File root = tempDir.toFile();
+        writeText(new File(root, "pom.xml"), "<project/>");
+        writeText(new File(root, "common/pom.xml"), "<project/>");
+        writeText(new File(root, "common/codenameone_settings.properties"), "codename1.mainName=App\n");
+        writeText(new File(root, "javase/pom.xml"), "<project/>");
+
+        assertTrue(runningInMavenFrom(new File(root, "javase"), null), "from the javase module");
+        assertTrue(runningInMavenFrom(new File(root, "common"), null), "from the common module");
+        assertTrue(runningInMavenFrom(root, null), "from the project root");
+    }
+
+    @Test
+    void gradleAndAntProjectsAreNotRunningInMaven(@TempDir Path tempDir) throws Exception {
+        File gradle = tempDir.resolve("gradle-app").toFile();
+        writeText(new File(gradle, "settings.gradle.kts"), "rootProject.name = \"app\"\n");
+        writeText(new File(gradle, "build.gradle.kts"), "plugins { id(\"com.codenameone\") }\n");
+        writeText(new File(gradle, "codenameone_settings.properties"), "codename1.mainName=App\n");
+        assertFalse(runningInMavenFrom(gradle, null), "a Gradle project has its own launch path");
+
+        File ant = tempDir.resolve("ant-app").toFile();
+        writeText(new File(ant, "build.xml"), "<project/>");
+        writeText(new File(ant, "codenameone_settings.properties"), "codename1.mainName=App\n");
+        assertFalse(runningInMavenFrom(ant, null), "an Ant project is not a Maven one");
+
+        File nothing = Files.createDirectories(tempDir.resolve("nothing")).toFile();
+        assertFalse(runningInMavenFrom(nothing, null), "no project at all");
+    }
+
+    @Test
+    void designerJarPropertyOfAnEarlierGeneratedProjectStillCounts(@TempDir Path tempDir) throws Exception {
+        // Projects generated earlier keep forwarding the property, blank; with no
+        // layout to recognise, it is still what says "Maven".
+        File nothing = Files.createDirectories(tempDir.resolve("nothing")).toFile();
+        assertTrue(runningInMavenFrom(nothing, ""));
+    }
 
     @Test
     void resolvesInnerDesignerJarFromWrapperZip(@TempDir Path tempDir) throws Exception {
@@ -140,8 +218,8 @@ class MavenUtilsTest {
     @Test
     void returnsNullForUnrelatedJarLocation(@TempDir Path tempDir) throws Exception {
         // Core jar living outside an m2 layout: resolver must give up rather
-        // than return a phantom path. CSSWatcher then falls through to its
-        // ~/.codenameone/designer_1.jar legacy fallback.
+        // than return a phantom path. The Component Inspector then falls through
+        // to its ~/.codenameone/designer_1.jar legacy fallback.
         File notInM2 = tempDir.resolve("build/codenameone-core.jar").toFile();
         Files.createDirectories(notInM2.getParentFile().toPath());
         Files.write(notInM2.toPath(), new byte[]{0x50, 0x4B, 0x05, 0x06});

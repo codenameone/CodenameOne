@@ -120,19 +120,12 @@ export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
 "$JAVA17_HOME/bin/java" -version
 "$MAVEN_HOME/bin/mvn" -version
 
-run_maven() {
-  # xvfb-run only exists on the Linux CI runners (headless X for AWT-touching
-  # build steps); on macOS Maven runs directly against the window server.
-  if command -v xvfb-run >/dev/null 2>&1; then
-    xvfb-run -a "$MAVEN_HOME/bin/mvn" "$@"
-  else
-    "$MAVEN_HOME/bin/mvn" "$@"
-  fi
-}
-
+# Maven runs directly, with no virtual display: every step below passes
+# -Djava.awt.headless=true or opens no window at all, and the CSS compiler
+# these modules feed is headless by construction.
 BUILD_CLIENT="$HOME/.codenameone/CodeNameOneBuildClient.jar"
 if [ ! -f "$BUILD_CLIENT" ]; then
-  if ! run_maven -q -f maven/pom.xml -Dcn1.binaries="$CN1_BINARIES" -P !download-cn1-binaries cn1:install-codenameone "$@"; then
+  if ! "$MAVEN_HOME/bin/mvn" -q -f maven/pom.xml -Dcn1.binaries="$CN1_BINARIES" -P !download-cn1-binaries cn1:install-codenameone "$@"; then
     [ -f maven/CodeNameOneBuildClient.jar ] && cp maven/CodeNameOneBuildClient.jar "$BUILD_CLIENT" || true
   fi
 fi
@@ -143,15 +136,16 @@ fi
 # kept in sync by .github/workflows/native-themes-sync.yml. For local iteration
 # on native-themes/android-material/theme.css, run scripts/build-native-themes.sh.
 
-# Rebuild the `designer` module first so changes under maven/css-compiler/
-# are picked up by the maven plugin's CSS compile step. The designer module's
-# jar-with-dependencies embeds css-compiler classes (CSSTheme etc.); the
-# maven plugin's CompileCSSMojo runs designer_1.jar to compile theme.css ->
-# theme.res. Without an explicit designer install, a cached ~/.m2/repository
-# restores the previous build's designer.jar even when CSSTheme.java has
-# changed - so new gradient / filter parsing additions silently miss the
-# app's theme.res. Done as a separate invocation (with -Plocal-dev-javase)
-# because `designer` -> `javase-svg` -> `javase`, and the javase port only
-# resolves its CEF dependency under that profile.
-run_maven -q -f maven/pom.xml -pl designer -am -Dcn1.binaries="$CN1_BINARIES" -P !download-cn1-binaries,local-dev-javase -DskipTests -Dmaven.javadoc.skip=true -Dmaven.source.skip=true -Djava.awt.headless=true install
-run_maven -q -f maven/pom.xml -pl android -am -Dcn1.binaries="$CN1_BINARIES" -P !download-cn1-binaries -T 1C -Dmaven.javadoc.skip=true -Dmaven.source.skip=true -Djava.awt.headless=true clean install "$@"
+# Reinstall the CSS compiler first so changes under maven/css-compiler/ and
+# maven/css-cli/ reach the app build that follows this script. The maven
+# plugin's css goal forks com.codename1.designer.css.CN1CSSCLI on a classpath
+# it resolves from the local repository (codenameone-css-cli, which brings
+# codenameone-css-compiler and codenameone-project-model), so a cached
+# ~/.m2/repository would otherwise hand it the previous build's jars even when
+# CSSTheme.java has changed, and the new parsing would silently miss the
+# app's theme.res. The designer module has no part in this -- it is the
+# resource editor, and no build runs it -- so it is not built here. Nothing
+# else in this slice is needed later: `-pl android -am` below rebuilds core
+# itself, and the plugin and the javase port come from setup-workspace.sh.
+"$MAVEN_HOME/bin/mvn" -q -f maven/pom.xml -pl css-cli -am -Dcn1.binaries="$CN1_BINARIES" -P !download-cn1-binaries -DskipTests -Dmaven.javadoc.skip=true -Dmaven.source.skip=true -Djava.awt.headless=true install
+"$MAVEN_HOME/bin/mvn" -q -f maven/pom.xml -pl android -am -Dcn1.binaries="$CN1_BINARIES" -P !download-cn1-binaries -T 1C -Dmaven.javadoc.skip=true -Dmaven.source.skip=true -Djava.awt.headless=true clean install "$@"

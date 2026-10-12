@@ -257,14 +257,39 @@ def select_candidate(
     return None
 
 
-_RELATIVE_LINK_RE = re.compile(r"(\]\()(/[^)\s]+)(\))")
-_RELATIVE_IMG_RE = re.compile(r'(<img\s+[^>]*src=["\'])(/[^"\']+)(["\'])', re.IGNORECASE)
+_RELATIVE_LINK_RE = re.compile(r"(\]\()(/(?!/)[^)\s]+)(\))")
+# Keep the original HTML and its attributes intact; only rewrite URL values.
+# Match whole quoted values so a '>' or attribute-like text inside one cannot
+# be mistaken for the end of a tag or for another attribute.
+_HTML_LINK_TAG_RE = re.compile(
+    r'''<(?:a|img|video|source)\b(?:[^'">]|"[^"]*"|'[^']*')*>''',
+    re.IGNORECASE,
+)
+_HTML_ATTRIBUTE_RE = re.compile(
+    r'''([\w:-]+)(\s*=\s*)("[^"]*"|'[^']*'|[^\s>]+)'''
+)
+
+
+def absolutize_html_links(body: str) -> str:
+    """Keep HTML media and fallback links on the source site after syndication."""
+    def attribute(match: re.Match[str]) -> str:
+        name, assignment, value = match.groups()
+        if name.lower() not in {"href", "src", "poster"}:
+            return match.group(0)
+        quote = value[0] if value[0] in "\"'" else ""
+        url = value[1:-1] if quote else value
+        if not url.startswith("/") or url.startswith("//"):
+            return match.group(0)
+        return f"{name}{assignment}{quote}{SITE_BASE_URL}{url}{quote}"
+
+    return _HTML_LINK_TAG_RE.sub(
+        lambda tag: _HTML_ATTRIBUTE_RE.sub(attribute, tag.group(0)), body
+    )
 
 
 def absolutize_links(body: str) -> str:
     body = _RELATIVE_LINK_RE.sub(lambda m: f"{m.group(1)}{SITE_BASE_URL}{m.group(2)}{m.group(3)}", body)
-    body = _RELATIVE_IMG_RE.sub(lambda m: f"{m.group(1)}{SITE_BASE_URL}{m.group(2)}{m.group(3)}", body)
-    return body
+    return absolutize_html_links(body)
 
 
 def insert_blurb(body: str, blurb: str) -> str:

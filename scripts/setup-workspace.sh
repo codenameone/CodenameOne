@@ -273,7 +273,7 @@ if [ ! -d "$CN1_BINARIES/.git" ]; then
   clone_cn1_binaries
 fi
 
-# Both builds below run with -T 1C, so several modules install into the local
+# The reactor below runs with -T 1C, so several modules install into the local
 # repository at once and contend for its lock. Maven's default wait is 30 seconds,
 # and on a cold cache under a loaded runner that is not always enough -- the build
 # then dies with "Could not acquire lock(s)" having compiled nothing wrong. Waiting
@@ -320,17 +320,12 @@ mvn_retry() {
   done
 }
 
-log "Building Codename One core modules"
+log "Building Codename One core modules and Maven plugin"
 mvn_retry -f maven/pom.xml $MVN_LOCK_ARGS -T 1C -Dmaven.javadoc.skip=true -Dmaven.source.skip=true -DskipTests -Djava.awt.headless=true -Dcn1.binaries="$CN1_BINARIES" -Dcodename1.platform=javase -P local-dev-javase,compile-android,!download-cn1-binaries install "$@"
 
-log "Building Codename One Maven plugin"
-mvn_retry -f maven/pom.xml \
-  -pl codenameone-maven-plugin -am \
-  $MVN_LOCK_ARGS -T 1C -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
-  -DskipTests -Djava.awt.headless=true \
-  -Dcn1.binaries="$CN1_BINARIES" \
-  -P !download-cn1-binaries \
-  install "$@"
+# codenameone-maven-plugin is already an unconditional module of this reactor.
+# A second -pl codenameone-maven-plugin -am install rebuilt and re-analysed its
+# dependencies, exhausting the macOS setup deadline after the first build passed.
 
 BUILD_CLIENT="$HOME/.codenameone/CodeNameOneBuildClient.jar"
 log "Ensuring CodeNameOneBuildClient.jar is installed"

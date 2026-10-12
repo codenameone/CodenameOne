@@ -24,7 +24,6 @@ package com.codename1.backend.sql;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -359,7 +358,7 @@ public final class MySql {
     }
 
     public List query(String sql, Object[] params) throws IOException {
-        List rows = new ArrayList();
+        QueryRows rows = new QueryRows(0);
         runPrepared(sql, params, rows);
         return rows;
     }
@@ -450,7 +449,7 @@ public final class MySql {
     /// The statement is closed rather than cached: a cache keyed by SQL text is
     /// where a pooled connection starts leaking server-side handles, and preparing
     /// costs one round trip.
-    private long runPrepared(String sql, Object[] params, List rows) throws IOException {
+    private long runPrepared(String sql, Object[] params, QueryRows rows) throws IOException {
         checkOpen();
         sequence = 0;
         ByteArrayOutputStream prepare = new ByteArrayOutputStream();
@@ -523,7 +522,7 @@ public final class MySql {
     }
 
     private long executePrepared(int statementId, Object[] params, Column[] columns,
-            List rows, String sql) throws IOException {
+            QueryRows rows, String sql) throws IOException {
         sequence = 0;
         int count = params == null ? 0 : params.length;
         ByteArrayOutputStream execute = new ByteArrayOutputStream();
@@ -575,6 +574,9 @@ public final class MySql {
         // A result set: a column count, the definitions again, then binary rows.
         Reader header = new Reader(first.body);
         int resultColumns = columnCount(header.lengthEncoded());
+        if (rows != null) {
+            rows.setColumnCount(resultColumns);
+        }
         Column[] resultDefinitions = new Column[resultColumns];
         for (int iter = 0 ; iter < resultColumns ; iter++) {
             Packet definition = readPacket();

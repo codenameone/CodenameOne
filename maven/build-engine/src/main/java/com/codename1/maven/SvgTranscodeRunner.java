@@ -23,6 +23,7 @@
 package com.codename1.maven;
 
 import com.codename1.lottie.transcoder.LottieTranscoder;
+import com.codename1.lottie.transcoder.parser.DotLottie;
 import com.codename1.lottie.transcoder.parser.JsonParser;
 import com.codename1.svg.transcoder.SVGTranscoder;
 import com.codename1.svg.transcoder.SVGTranscoder.GeneratedClass;
@@ -31,14 +32,18 @@ import com.codename1.builders.BuildException;
 import com.codename1.build.Log;
 
 import java.io.BufferedWriter;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.Writer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -154,8 +159,8 @@ public class SvgTranscodeRunner {
 
     /**
      * The vector sources in this module that the transcoder cannot be relied
-     * on to read: a {@code .lottie} archive, or a {@code .json} that is not a
-     * Lottie document.
+     * on to read: a {@code .json} that is not a Lottie document, or a
+     * {@code .lottie} archive with no animation in it.
      *
      * <p>Asked before anything is generated, so a caller that must not break a
      * build can decide not to start. The transcoder itself has one behaviour
@@ -486,8 +491,8 @@ public class SvgTranscodeRunner {
 
     /**
      * Whether a Lottie-shaped input is plausibly an animation: a JSON object
-     * carrying a {@code layers} key. A {@code .lottie} is a ZIP archive and is
-     * never readable here, so it never qualifies.
+     * carrying a {@code layers} key. For a {@code .lottie} archive the question
+     * is asked of the animation inside it.
      *
      * <p>Deliberately a shape check and not a parse. The parser is permissive
      * by design -- that permissiveness is exactly what made an unrelated JSON
@@ -495,12 +500,13 @@ public class SvgTranscodeRunner {
      * the cheap structural one the parser does not ask.</p>
      */
     private static boolean looksLikeLottie(File file, VectorFormat fmt) {
-        if (fmt != VectorFormat.LOTTIE_JSON) {
-            return false;
-        }
         Object root;
         try {
-            root = JsonParser.parse(readFile(file));
+            String json = fmt == VectorFormat.LOTTIE_PACK ? dotLottieAnimation(file) : readFile(file);
+            if (json == null) {
+                return false;
+            }
+            root = JsonParser.parse(json);
         } catch (Exception ex) {
             return false;
         }
@@ -547,12 +553,34 @@ public class SvgTranscodeRunner {
                 SVGTranscoder.transcode(src, pkg, className, outFile);
                 break;
             case LOTTIE_JSON:
-            case LOTTIE_PACK:
-                // .lottie (dotLottie ZIP) needs an extra archive-extract step
-                // we don't perform here yet -- the parser treats the bytes as
-                // a JSON document. Drop a plain Lottie JSON for now.
                 LottieTranscoder.transcode(src, pkg, className, outFile);
                 break;
+            case LOTTIE_PACK: {
+                // A dotLottie file is an archive around the same JSON.
+                String json = dotLottieAnimation(src);
+                if (json == null) {
+                    throw new IOException(src + " is not a dotLottie archive holding an animation");
+                }
+                if (outFile.getParentFile() != null) {
+                    Files.createDirectories(outFile.getParentFile().toPath());
+                }
+                try (Writer out = new OutputStreamWriter(new FileOutputStream(outFile), StandardCharsets.UTF_8)) {
+                    LottieTranscoder.transcode(new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8)),
+                            pkg, className, out);
+                }
+                break;
+            }
+        }
+    }
+
+    /**
+     * The animation of a dotLottie archive as JSON text: the one its manifest
+     * picks, see {@link DotLottie#animation}. Null when the archive holds
+     * none.
+     */
+    private static String dotLottieAnimation(File file) throws IOException {
+        try (InputStream in = new FileInputStream(file)) {
+            return DotLottie.animation(in);
         }
     }
 

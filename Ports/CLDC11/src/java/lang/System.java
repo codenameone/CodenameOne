@@ -80,6 +80,18 @@ public final class System{
         return null; //TODO codavaj!!
     }
 
+    public static String getProperty(String key, String defaultValue) {
+        throw new RuntimeException("Compile-time stub");
+    }
+
+    public static String setProperty(String key, String value) {
+        throw new RuntimeException("Compile-time stub");
+    }
+
+    public static String clearProperty(String key) {
+        throw new RuntimeException("Compile-time stub");
+    }
+
     /// Returns the same hashcode for the given object as would be returned by the default method hashCode(), whether or not the given object's class overrides hashCode(). The hashcode for the null reference is zero.
     public static int identityHashCode(java.lang.Object x){
         return 0; //TODO codavaj!!

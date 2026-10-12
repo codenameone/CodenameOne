@@ -225,6 +225,14 @@ async function picker(name, page, press) {
       check(await select.inputValue() === '0', `${name}: the <select> starts on the Picker's value`);
       // Browsers without showPicker() leave the list one more click away; where it exists it
       // has to succeed, since the click that asked for it is still a live gesture.
+      // Attaching the select precedes layout/focus and showPicker in the worker. Wait for
+      // that same click's result; DOM attachment alone does not mean show() has finished.
+      try {
+        await page.waitForFunction(() => !('showPicker' in HTMLSelectElement.prototype)
+          || window.__cn1ShowPicker.length > 0, null, { timeout: 10000 });
+      } catch (err) {
+        // Keep the assertion below: a missing or failed call still fails this check.
+      }
       const opened = await page.evaluate(() => ({ has: 'showPicker' in HTMLSelectElement.prototype, calls: window.__cn1ShowPicker }));
       check(!opened.has || (opened.calls.length === 1 && opened.calls[0] === 'opened'),
         `${name}: the list opens on the first click`, opened.has ? JSON.stringify(opened.calls) : 'no showPicker() in this browser');

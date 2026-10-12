@@ -110,7 +110,6 @@
                                 <argument>-Xmx1024M</argument>
                                 <argument>-Dffmpeg.dir=${ffmpeg.dir}</argument>
                                 <argument>-Dcn1.test.video=${cn1.test.video}</argument>
-                                <argument>-Dcodename1.designer.jar=${codename1.designer.jar}</argument>
                                 <argument>${codename1.exec.args.debug}</argument>
                                 <argument>${codename1.exec.args.runjdwp.transport}</argument>
                                 <argument>-classpath</argument>

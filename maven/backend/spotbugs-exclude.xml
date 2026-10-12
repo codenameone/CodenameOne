@@ -34,6 +34,17 @@
     <Match><Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS" /></Match>
 
     <!--
+    Database.query() exposes QueryRows as a List. Its projection width is driver
+    metadata, not part of the list value. Inherited ArrayList equality and hashCode
+    deliberately preserve symmetry with ordinary Lists. Including columnCount in
+    equality would violate that contract; redundant overrides also trigger PMD.
+    -->
+    <Match>
+        <Class name="com.codename1.backend.sql.QueryRows" />
+        <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS" />
+    </Match>
+
+    <!--
     The database API runs the statement its caller wrote. Parameters are always
     bound through the prepared statement and never interpolated, which is the
     property this pattern exists to protect.

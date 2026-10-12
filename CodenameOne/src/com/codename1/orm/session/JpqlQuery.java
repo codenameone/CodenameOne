@@ -24,7 +24,10 @@ package com.codename1.orm.session;
 
 import java.util.List;
 
-/// A mutable query obtained from {@link Session#createQuery(String, Class)}.
+/// A mutable query obtained from {@link Session#createQuery(String, Class)} or
+/// {@link Session#createNativeQuery(String, Class)}. Native queries use the same
+/// binding, pagination and bulk-execution contract but accept native SQL instead
+/// of the JPQL features below.
 /// Supports entity and scalar selections, relationship joins, aggregates, grouping,
 /// ordering, predicate subqueries, and transactional bulk update/delete statements.
 /// This is a JPQL subset, not a complete JPA implementation; unsupported syntax is

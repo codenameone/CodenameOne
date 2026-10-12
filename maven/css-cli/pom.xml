@@ -1,22 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <!--
-    Headless CSS compiler CLI. Holds CN1CSSCLI, the driver that the
-    codenameone-maven-plugin (CompileCSSMojo) and the simulator's CSSWatcher
-    fork to turn a project's CSS into theme.res.
+    The CSS compiler's command line. Holds CN1CSSCLI, the driver that the
+    Maven css goal, the Gradle cn1Css task and the simulator's CSSWatcher fork
+    to turn a project's CSS into theme.res.
 
-    This used to live in CodenameOneDesigner and was reached by running the
-    43MB codenameone-designer jar-with-dependencies, which dragged the whole
-    Swing resource editor (swingx, appframework, batik) into a headless build.
-    CN1CSSCLI referenced no other Designer class, so it moved here unchanged.
-
-    Unlike codenameone-css-compiler, which is deliberately core+flute+sac only
-    and rejects any rule needing browser rasterization (see NoCefCSSCLI and
-    CSSTheme.strictNoCef), this module depends on codenameone-javase for
-    JavaSEPort / CN1Bootstrap, so it can rasterize box-shadow, gradients and
-    friends through CEF. It is published as a plain thin jar: consumers resolve
-    it transitively and launch it with `java -cp`, so nothing has to ship a
-    shaded copy of the JavaSE port.
+    It needs no display and no simulator port: it depends on the engine
+    (codenameone-css-compiler) and on project-model, which finds the project
+    around a stylesheet. It is published as a thin jar that consumers resolve
+    transitively and launch with `java -cp`, and also as a
+    jar-with-dependencies that the framework's own native-themes build runs
+    with `java -jar`.
     -->
     <parent>
         <groupId>com.codenameone</groupId>
@@ -45,10 +39,6 @@
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-css-compiler</artifactId>
         </dependency>
-        <dependency>
-            <groupId>com.codenameone</groupId>
-            <artifactId>codenameone-javase</artifactId>
-        </dependency>
         <!-- Finds the project around the CSS file (Ant, Maven or Gradle). -->
         <dependency>
             <groupId>com.codenameone</groupId>
@@ -61,4 +51,65 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <!-- The compiler must never need a display. Running the
+                         tests headless makes any use of a window or a dialog
+                         throw on every machine, a developer's Mac included. -->
+                    <argLine>-Djava.awt.headless=true</argLine>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>3.3.0</version>
+                <executions>
+                    <execution>
+                        <id>build-jar-with-dependencies</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <configuration>
+                            <archive>
+                                <manifest>
+                                    <mainClass>com.codename1.designer.css.CN1CSSCLI</mainClass>
+                                </manifest>
+                            </archive>
+                            <descriptorRefs>
+                                <descriptorRef>jar-with-dependencies</descriptorRef>
+                            </descriptorRefs>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>attach-jar-with-dependencies</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>attach-artifact</goal>
+                        </goals>
+                        <configuration>
+                            <artifacts>
+                                <artifact>
+                                    <file>${project.build.directory}/${project.build.finalName}-jar-with-dependencies.jar</file>
+                                    <type>jar</type>
+                                    <classifier>jar-with-dependencies</classifier>
+                                </artifact>
+                            </artifacts>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

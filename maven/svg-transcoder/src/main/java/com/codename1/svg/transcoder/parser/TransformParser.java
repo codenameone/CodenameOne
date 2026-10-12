@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.svg.transcoder.parser;
 
 /**
@@ -36,6 +58,81 @@ public final class TransformParser {
             result = result.multiply(op);
         }
         return result.isIdentity() ? null : result;
+    }
+
+    /**
+     * Parses the value of the CSS {@code transform} property, which names
+     * more functions than the attribute and gives its arguments units:
+     * {@code translate(10px, 5px) rotate(0.25turn)}.
+     *
+     * @return the transform, or null for {@code none} and for one that changes nothing
+     * @throws IllegalArgumentException for a function that is not a flat transform
+     */
+    public static SVGTransform parseCss(String s) {
+        return parseCss(s, 0f, 0f);
+    }
+
+    /**
+     * As {@link #parseCss(String)}, with the size of the box a percentage
+     * in a translation is a share of: the viewport the element is in.
+     */
+    public static SVGTransform parseCss(String s, float boxWidth, float boxHeight) {
+        String t = s == null ? "" : s.trim();
+        if (t.isEmpty() || "none".equals(t)) return null;
+        SVGTransform result = SVGTransform.identity();
+        int i = 0;
+        while (i < t.length()) {
+            int open = t.indexOf('(', i);
+            if (open < 0) {
+                if (t.substring(i).trim().isEmpty()) break;
+                throw new IllegalArgumentException("Expected a function in " + s);
+            }
+            int close = t.indexOf(')', open);
+            if (close < 0) throw new IllegalArgumentException("Unclosed transform in " + s);
+            String name = t.substring(i, open).trim();
+            String inside = t.substring(open + 1, close).trim();
+            String[] parts = inside.isEmpty() ? new String[0] : inside.split("[\\s,]+");
+            boolean turns = "rotate".equals(name) || name.startsWith("skew");
+            float[] args = new float[parts.length];
+            for (int k = 0; k < parts.length; k++) {
+                args[k] = turns ? degrees(parts[k]) : NumberParser.parseFloat(parts[k]);
+                if (parts[k].endsWith("%") && name.startsWith("translate")) {
+                    boolean down = "translateY".equals(name) || ("translate".equals(name) && k == 1);
+                    args[k] = args[k] / 100f * (down ? boxHeight : boxWidth);
+                }
+            }
+            SVGTransform op;
+            if ("translateX".equals(name)) {
+                op = SVGTransform.translate(args.length > 0 ? args[0] : 0, 0);
+            } else if ("translateY".equals(name)) {
+                op = SVGTransform.translate(0, args.length > 0 ? args[0] : 0);
+            } else if ("scaleX".equals(name)) {
+                op = SVGTransform.scale(args.length > 0 ? args[0] : 1, 1);
+            } else if ("scaleY".equals(name)) {
+                op = SVGTransform.scale(1, args.length > 0 ? args[0] : 1);
+            } else if ("rotate".equals(name)) {
+                // Always about the origin; the attribute's centre is not CSS.
+                op = SVGTransform.rotate(args.length > 0 ? args[0] : 0, 0, 0);
+            } else if ("skew".equals(name)) {
+                op = new SVGTransform(1, (float) Math.tan(Math.toRadians(args.length > 1 ? args[1] : 0)),
+                        (float) Math.tan(Math.toRadians(args.length > 0 ? args[0] : 0)), 1, 0, 0);
+            } else {
+                op = build(name, args);
+            }
+            result = result.multiply(op);
+            i = close + 1;
+        }
+        return result.isIdentity() ? null : result;
+    }
+
+    /** An angle in degrees, from any of the units CSS writes one in; a bare number is degrees. */
+    private static float degrees(String value) {
+        String v = value.trim();
+        if (v.endsWith("grad")) return Float.parseFloat(v.substring(0, v.length() - 4)) * 0.9f;
+        if (v.endsWith("rad")) return (float) Math.toDegrees(Float.parseFloat(v.substring(0, v.length() - 3)));
+        if (v.endsWith("turn")) return Float.parseFloat(v.substring(0, v.length() - 4)) * 360f;
+        if (v.endsWith("deg")) return Float.parseFloat(v.substring(0, v.length() - 3));
+        return Float.parseFloat(v);
     }
 
     private static float[] parseArgs(String s) {

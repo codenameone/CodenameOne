@@ -185,8 +185,33 @@ public final class System {
     /**
      * Gets the system property indicated by the specified key.
      */
-    public static java.lang.String getProperty(java.lang.String key){
-        return null; 
+    public static synchronized java.lang.String getProperty(java.lang.String key){
+        checkPropertyKey(key);
+        return properties == null ? null : properties.get(key);
+    }
+
+    private static java.util.Hashtable<String, String> properties;
+
+    private static void checkPropertyKey(String key) {
+        if (key == null) throw new NullPointerException();
+        if (key.length() == 0) throw new IllegalArgumentException("Empty property key");
+    }
+
+    public static String getProperty(String key, String defaultValue) {
+        String value = getProperty(key);
+        return value == null ? defaultValue : value;
+    }
+
+    public static synchronized String setProperty(String key, String value) {
+        checkPropertyKey(key);
+        if (value == null) throw new NullPointerException();
+        if (properties == null) properties = new java.util.Hashtable<String, String>();
+        return properties.put(key, value);
+    }
+
+    public static synchronized String clearProperty(String key) {
+        checkPropertyKey(key);
+        return properties == null ? null : properties.remove(key);
     }
 
     /**

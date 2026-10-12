@@ -31,9 +31,9 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import com.codename1.backend.sql.QueryRows;
 import java.util.Map;
 
 /// Java SE twin of Db, over JDBC.
@@ -297,9 +297,9 @@ public final class Db {
     }
 
     private static List readRows(ResultSet results) throws SQLException {
-        List rows = new ArrayList();
         ResultSetMetaData meta = results.getMetaData();
         int columns = meta.getColumnCount();
+        List rows = new QueryRows(columns);
         String[] names = new String[columns];
         for (int iter = 0 ; iter < columns ; iter++) {
             names[iter] = meta.getColumnLabel(iter + 1);

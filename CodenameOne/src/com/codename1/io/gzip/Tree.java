@@ -259,7 +259,8 @@ final class Tree {
                 bits--;
             }
             s.blCount[bits]--;      // move one leaf down the tree
-            s.blCount[bits + 1] += 2;   // move one overflow item as its brother
+            // Counts are bounded by the number of tree leaves (at most L_CODES).
+            s.blCount[bits + 1] = (short) (s.blCount[bits + 1] + 2); // move its brother
             s.blCount[maxLength]--;
             // The brother of the overflow item also moves one step up,
             // but this does not affect bl_count[maxLength]
@@ -275,7 +276,9 @@ final class Tree {
                     continue;
                 }
                 if (tree[m * 2 + 1] != bits) {
-                    s.optLen += ((long) bits - (long) tree[m * 2 + 1]) * (long) tree[m * 2];
+                    // Code lengths are at most 15 and frequencies at most 32767;
+                    // this block cost correction fits in an int.
+                    s.optLen += (bits - tree[m * 2 + 1]) * tree[m * 2];
                     tree[m * 2 + 1] = (short) bits;
                 }
                 n--;

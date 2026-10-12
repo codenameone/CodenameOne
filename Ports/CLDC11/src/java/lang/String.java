@@ -75,7 +75,7 @@ public final class String implements CharSequence, Comparable<String> {
     ///
     /// 8.0
     public String(byte[] bytes, java.nio.charset.Charset charset) throws java.io.UnsupportedEncodingException {
-        this(bytes, 0, bytes.length, charset.displayName());
+        this(bytes, 0, bytes.length, charset.name());
     }
 
     /// Construct a new String by converting the specified array of bytes using the specified character encoding. The length of the new String is a function of the encoding, and hence may not be equal to the length of the byte array.
@@ -187,7 +187,7 @@ public final class String implements CharSequence, Comparable<String> {
     
     /// Convert this String into bytes according to the specified character encoding, storing the result into a new byte array.
     public byte[] getBytes(Charset charset) throws java.io.UnsupportedEncodingException {
-        return getBytes(charset.displayName());
+        return getBytes(charset.name());
     }
 
     /// Copies characters from this string into the destination character array.
