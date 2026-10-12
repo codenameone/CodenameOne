@@ -34,6 +34,36 @@ public final class StyleParser {
 
     private StyleParser() { }
 
+    /** What each property starts as, for {@code initial}; one that is not here is not inherited anyway. */
+    private static final Map<String, String> INITIAL = new HashMap<String, String>();
+
+    static {
+        INITIAL.put("fill", "black");
+        INITIAL.put("stroke", "none");
+        INITIAL.put("color", "black");
+        INITIAL.put("fill-opacity", "1");
+        INITIAL.put("stroke-opacity", "1");
+        INITIAL.put("opacity", "1");
+        INITIAL.put("stroke-width", "1");
+        INITIAL.put("stroke-linecap", "butt");
+        INITIAL.put("stroke-linejoin", "miter");
+        INITIAL.put("stroke-miterlimit", "4");
+        INITIAL.put("stroke-dasharray", "none");
+        INITIAL.put("stroke-dashoffset", "0");
+        INITIAL.put("fill-rule", "nonzero");
+        INITIAL.put("clip-rule", "nonzero");
+        INITIAL.put("visibility", "visible");
+        INITIAL.put("display", "inline");
+        INITIAL.put("marker", "none");
+        INITIAL.put("marker-start", "none");
+        INITIAL.put("marker-mid", "none");
+        INITIAL.put("marker-end", "none");
+        INITIAL.put("paint-order", "normal");
+        INITIAL.put("clip-path", "none");
+        INITIAL.put("mask", "none");
+        INITIAL.put("filter", "none");
+    }
+
     public static SVGStyle parse(Map<String, String> presentationAttrs, String styleAttr) {
         Map<String, String> merged = new HashMap<String, String>();
         if (presentationAttrs != null) {
@@ -55,6 +85,19 @@ public final class StyleParser {
         // is in, which is what a property that is not set here does: it is
         // left for the inheriting to fill in, where it is one that is
         // inherited, and is at its usual value where it is not.
+        // `initial` is the value a property starts with, whatever the
+        // element is in: black for a fill that would otherwise be the
+        // group's red. It is written out as that value, so that it is a
+        // value like any other and not something left to be inherited.
+        // `revert` falls back to the same here, there being no other
+        // sheet to go back to.
+        for (Map.Entry<String, String> e : merged.entrySet()) {
+            String v = e.getValue() == null ? "" : e.getValue().trim();
+            if ("initial".equals(v) || "revert".equals(v) || "revert-layer".equals(v)) {
+                String start = INITIAL.get(e.getKey());
+                e.setValue(start == null ? "unset" : start);
+            }
+        }
         // Opacity is not inherited, so there `inherit` is not the same as
         // leaving it out: it asks for the opacity of what the element is
         // in, to be applied again to the element itself.

@@ -1970,4 +1970,32 @@ class VectorImageTest {
         assertEquals(0xffff0000, img.getRGB(25, 50), "the first branch that needs only what there is");
         assertEquals(0, alpha(img, 75, 50));
     }
+
+    @Test
+    void initialIsTheValueAPropertyStartsWith() throws Exception {
+        BufferedImage img = paint("<g fill=\"#ff0000\" stroke=\"#00ff00\" stroke-width=\"10\">"
+                + "<rect x=\"20\" y=\"20\" width=\"60\" height=\"60\" fill=\"initial\" stroke=\"initial\"/></g>", 100, 100);
+        assertEquals(0xff000000, img.getRGB(50, 50), "black, not the group's red");
+        assertEquals(0, alpha(img, 17, 50), "and no stroke, not the group's");
+    }
+
+    @Test
+    void aListPlacesAWholeCharacterEvenOneStoredAsTwo() throws Exception {
+        // The first character is one outside the basic plane, stored as a
+        // pair. The list's second place is for the letter after it.
+        String astral = new String(Character.toChars(0x1D400));
+        VectorImage image = read("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\">"
+                + "<text x=\"5 70\" y=\"30\" font-family=\"monospace\" font-size=\"10\" fill=\"#ff0000\">"
+                + astral + "I</text></svg>");
+        BufferedImage img = image.paint(100, 100);
+        assertTrue(inkRight(img) > 70, "the letter where the list puts it, was " + inkRight(img));
+        assertTrue(inkRight(img) < 85, "and nothing set down after it, was " + inkRight(img));
+    }
+
+    @Test
+    void anEmptySpanDoesNotTakeThePlaceOfTheOneItIsIn() throws Exception {
+        String font = " font-family=\"monospace\" font-size=\"10\" fill=\"#ff0000\"";
+        BufferedImage img = paint("<text y=\"30\"" + font + "><tspan x=\"60\"><tspan></tspan>I</tspan></text>", 100, 100);
+        assertTrue(inkRight(img) > 60, "where the outer span says, was " + inkRight(img));
+    }
 }

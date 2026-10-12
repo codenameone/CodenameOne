@@ -1289,13 +1289,18 @@ public final class SVGParser {
                 // or the span starts, which is placed already.
                 int listed = 0;
                 for (float[] list : glyphLists) listed = Math.max(listed, list.length);
+                // Counted in characters, not in the two halves some of them
+                // are stored as: a list places a whole character, and one
+                // cut between its halves is two things that are not text.
                 int from = glyphIndex;
-                glyphIndex += shown.length();
-                textRead += shown.length();
+                int count = shown.codePointCount(0, shown.length());
+                glyphIndex += count;
+                textRead += count;
                 int head = 0;
-                while (head < shown.length() && (from + head < 1 || from + head >= listed)) head++;
-                String rest = shown.substring(head);
-                shown.setLength(head);
+                while (head < count && (from + head < 1 || from + head >= listed)) head++;
+                int cut = shown.offsetByCodePoints(0, head);
+                String rest = shown.substring(cut);
+                shown.setLength(cut);
                 SVGText.Run run = new SVGText.Run();
                 run.setText(shown.toString());
                 run.setRotate(rotateAt(from));
@@ -1322,8 +1327,8 @@ public final class SVGParser {
                 }
                 if (shown.length() > 0) text.getRuns().add(run);
                 SVGText.Run placed = null;
-                for (int i = 0; i < rest.length(); i++) {
-                    int at = from + head + i;
+                for (int i = 0, n = 0; i < rest.length(); i += Character.charCount(rest.codePointAt(i)), n++) {
+                    int at = from + head + n;
                     if (at < listed || placed == null) {
                         placed = new SVGText.Run();
                         placed.setStyle(run.getStyle());
@@ -1344,7 +1349,7 @@ public final class SVGParser {
                         if (at < glyphLists[3].length) placed.setDy(glyphLists[3][at]);
                         text.getRuns().add(placed);
                     }
-                    placed.setText(placed.getText() + rest.charAt(i));
+                    placed.setText(placed.getText() + new String(Character.toChars(rest.codePointAt(i))));
                 }
             } else if (ev == XMLStreamConstants.START_ELEMENT) {
                 // tspan / textPath / etc.
@@ -1464,6 +1469,8 @@ public final class SVGParser {
                     String s = slant.trim();
                     child.setItalic(Boolean.valueOf("italic".equals(s) || "oblique".equals(s)));
                 }
+                boolean pending = spanUnplaced;
+                int readBefore = textRead;
                 spanUnplaced = true;
                 try {
                     readTextContent(r, out, text, child);
@@ -1475,8 +1482,9 @@ public final class SVGParser {
                     glyphIndex = outerIndex + (textRead - outerRead);
                 }
                 // Back in the enclosing span, which has been placed by now
-                // or handed its position on.
-                spanUnplaced = false;
+                // or handed its position on -- unless the span inside it
+                // was empty and took nothing: then it is still to place.
+                spanUnplaced = textRead == readBefore && pending;
             }
         }
     }
