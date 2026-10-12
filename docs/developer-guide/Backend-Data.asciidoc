@@ -563,13 +563,14 @@ Isolation on a scope that runs without a transaction is rejected.
 | SQLite | `SERIALIZABLE`. A connection configured with `PRAGMA read_uncommitted`
 is rejected for that request. Other explicit levels are unsupported.
 | PostgreSQL | `READ_COMMITTED`, `REPEATABLE_READ`, `SERIALIZABLE`.
-`READ_UNCOMMITTED` is rejected instead of silently mapping it to `READ_COMMITTED`.
+`READ_UNCOMMITTED` is rejected instead of mapping it to `READ_COMMITTED`.
 | MySQL/MariaDB | `READ_UNCOMMITTED`, `READ_COMMITTED`, `REPEATABLE_READ`, `SERIALIZABLE`.
 Use transactional tables such as InnoDB.
 |===
 
 Support is checked when the lazy transaction first borrows a connection, before
-application SQL executes. A failed begin marks the scope rollback-only.
+application SQL executes. A failure to acquire a connection or start a transaction
+marks the scope rollback-only.
 PostgreSQL uses transaction-local `BEGIN` characteristics; MySQL uses a
 next-transaction setting. Neither changes the session default. SQLite's supported
 level requires no setting change. Commit and rollback therefore leave pooled
@@ -607,19 +608,19 @@ Hooks run synchronously in registration order within each phase. `beforeCommit`
 runs before the session flush; it may use the transaction's database connection.
 It receives the physical transaction's read-only flag, including for read-only
 transactions. Read-only scopes still run all phases. Registration closes when
-completion starts, so a callback cannot register further hooks on that scope.
+completion starts, so a callback can't register further hooks on that scope.
 A before-commit exception or `Error` aborts the remaining before hooks and rolls
 back. Rollback-only and timeout checks run again after before hooks.
 
 `afterCommit` runs only after the database acknowledges commit. A failure in one
-hook does not stop later after-commit hooks or completion hooks; the caller gets
+hook doesn't stop later after-commit hooks or completion hooks; the caller gets
 `TransactionException` reporting that the transaction committed but its callback
-failed. Do not retry the whole transaction based on that exception alone.
+failed. Don't retry the whole transaction based on that exception alone.
 `afterCompletion` runs once per registration at the end of each physical scope,
 including one that never needed a connection. Its failures are logged, and later
 cleanup still runs. Exception-driven rollback preserves the body's original
 exception. A commit failure or failed rollback reports `UNKNOWN` because database
-durability cannot be established safely; no after-commit hooks run in that case.
+durability can't be established; no after-commit hooks run in that case.
 
 The session closes and the connection returns to the pool before after-commit
 and completion hooks. During those hooks `Transactions.isActive()` is false;
@@ -628,7 +629,7 @@ database work must use `REQUIRES_NEW` or an explicitly suspended scope.
 `Transactions.bindResource(key, value)` binds a non-null value under a non-null
 key. Duplicate bindings fail. `getResource(key)` returns the binding or null;
 `unbindResource(key)` removes it. Bindings remain available to all completion
-hooks and are cleared afterwards, even if a hook fails. Values are not implicitly
+hooks and are cleared afterward, even if a hook fails. Values aren't implicitly
 closed: use a completion hook for disposal.
 
 `REQUIRED` participants share the physical scope's hooks and bindings.

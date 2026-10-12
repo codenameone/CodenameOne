@@ -751,8 +751,9 @@ public final class Transactions {
             throw new IOException("The transaction ran past its timeout before it used the "
                     + "database");
         }
-        Database db = p.pool.borrowFromPool();
+        Database db = null;
         try {
+            db = p.pool.borrowFromPool();
             if ("sqlite".equals(db.dialect().getName())) {
                 // The ORM relies on it and sets it outside a transaction, which is
                 // the only place SQLite honours it: inside one it is ignored.
@@ -767,14 +768,16 @@ public final class Transactions {
             }
         } catch (IOException err) {
             p.rollbackOnly = true;
-            try {
-                if (db.isInTransaction()) {
-                    db.rollbackTransaction();
+            if (db != null) {
+                try {
+                    if (db.isInTransaction()) {
+                        db.rollbackTransaction();
+                    }
+                } catch (IOException ignored) {
+                    db.close();
                 }
-            } catch (IOException ignored) {
-                db.close();
+                p.pool.releaseToPool(db);
             }
-            p.pool.releaseToPool(db);
             throw err;
         }
         p.db = db;

@@ -165,10 +165,34 @@ public class TransactionCheck {
                 check(events.toString().equals("commit-failed:before:false;commit-failed:UNKNOWN;"), "failed commit skips after-commit");
                 check(!Transactions.isActive(), "failed commit clears thread");
             }
+            caughtBorrowFailureRollsBack();
             System.out.println("TXCHECK OK passed=" + passed);
         } finally {
             pool.close();
         }
+    }
+
+    private static void caughtBorrowFailureRollsBack() throws Exception {
+        final DataSource closed = DataSource.open(":memory:");
+        closed.close();
+        events.setLength(0);
+        try {
+            Transactions.execute(new Transactions.Work() {
+                public Object run() throws Exception {
+                    Transactions.bindResource("failed-borrow", "resource");
+                    Transactions.registerSynchronization(hook("borrow-failed"));
+                    try {
+                        closed.query("SELECT 1", null);
+                        throw new RuntimeException("closed pool allowed a query");
+                    } catch (IOException expected) { }
+                    return null;
+                }
+            });
+            throw new RuntimeException("caught borrow failure committed");
+        } catch (TransactionException.UnexpectedRollback expected) { }
+        check(events.toString().equals("borrow-failed:ROLLED_BACK;"), "borrow failure skips commit hooks");
+        check(!Transactions.isActive() && Transactions.getResource("failed-borrow") == null,
+                "borrow failure clears transaction and resources");
     }
 
     private static Transactions.Synchronization hook(final String name) {

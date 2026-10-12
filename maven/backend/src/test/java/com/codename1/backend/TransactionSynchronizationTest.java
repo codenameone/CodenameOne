@@ -371,4 +371,64 @@ class TransactionSynchronizationTest {
         } finally { pool.close(); }
     }
 
+    @Test void caughtClosedPoolFailurePreventsCommitCallbacks() throws Exception {
+        DataSource pool = pool();
+        pool.close();
+        assertCaughtBorrowFailureRollsBack(pool);
+    }
+
+    @Test void caughtPoolExhaustionPreventsCommitCallbacksAndPreservesBorrowedConnection() throws Exception {
+        DataSource pool = DataSource.open(new File(dir, "exhausted.db").getAbsolutePath(), 1, 1000, 25);
+        Database held = pool.borrow();
+        try {
+            assertCaughtBorrowFailureRollsBack(pool);
+            pool.release(held);
+            Database next = pool.borrow();
+            assertSame(held, next);
+            assertFalse(next.isInTransaction());
+            pool.release(next);
+        } finally { pool.close(); }
+    }
+
+    @Test void caughtReplacementOpenFailurePreventsCommitCallbacks() throws Exception {
+        DataSource pool = pool();
+        try {
+            Database first = pool.borrow();
+            first.close();
+            pool.release(first);
+            File database = new File(dir, "sync.db");
+            assertTrue(database.delete());
+            assertTrue(database.mkdir()); // SQLite cannot open a directory as its database.
+            assertCaughtBorrowFailureRollsBack(pool);
+        } finally { pool.close(); }
+    }
+
+    private void assertCaughtBorrowFailureRollsBack(final DataSource pool) throws Exception {
+        final List<String> events = new ArrayList<String>();
+        final Object[] resourceAtCompletion = new Object[1];
+        Transactions.execute(() -> {
+            Transactions.bindResource("scope", "outer");
+            assertThrows(TransactionException.UnexpectedRollback.class, () -> Transactions.execute(Propagation.REQUIRES_NEW,
+                    false, -1, Isolation.DEFAULT, () -> {
+                        Transactions.bindResource("scope", "inner");
+                        Transactions.registerSynchronization(hook(events, "tx"));
+                        Transactions.registerSynchronization(new Transactions.Synchronization() {
+                            public void afterCompletion(Transactions.Outcome outcome) {
+                                resourceAtCompletion[0] = Transactions.getResource("scope");
+                            }
+                        });
+                        assertThrows(IOException.class, () -> pool.query("SELECT 1", null));
+                        return null; // The application caught the acquisition failure.
+                    }));
+            assertTrue(Transactions.isActive());
+            assertFalse(Transactions.isRollbackOnly());
+            assertEquals("outer", Transactions.getResource("scope"));
+            return null;
+        });
+        assertEquals(Arrays.asList("tx:ROLLED_BACK"), events);
+        assertEquals("inner", resourceAtCompletion[0]);
+        assertNull(Transactions.getResource("scope"));
+        assertFalse(Transactions.isActive());
+    }
+
 }
