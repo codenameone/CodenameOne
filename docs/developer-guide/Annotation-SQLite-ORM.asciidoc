@@ -441,28 +441,18 @@ proxy generation, or Hibernate dependency.
 
 [source,java]
 ----
-include::../../vm/backend/contract/com/demo/Records.java[tag=generated-repository]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/repository/Records.java[tag=generated-repository]
 ----
 
 The example's `RepositoryRecord` entity has `@Id public long id`,
-`public String name`, and `public long score`. After the build generates the class:
+`public String name`, and `public long score`. After the build generates the class,
+open a session with `entityManager.openSession()` and construct
+`new RecordsCn1Repository(session)`. Pass both objects to this operation, which
+commits the insert and closes the session:
 
 [source,java]
 ----
-Session session = entityManager.openSession();
-Records records = new RecordsCn1Repository(session);
-session.beginTransaction();
-try {
-    RepositoryRecord record = new RepositoryRecord();
-    record.name = "open";
-    records.insert(record);
-    session.commitTransaction();
-} catch (RuntimeException error) {
-    session.rollbackTransaction();
-    throw error;
-} finally {
-    session.close();
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/repository/RepositorySnippets.java[tag=repository-unit-of-work]
 ----
 
 The inherited CRUD methods are `insert`, `save`, `findById`, `findAll`, `count`,
@@ -479,7 +469,7 @@ Derived methods support the following bounded grammar:
   assertion.
 * `countBy` returns `long`; `existsBy` returns `boolean`; `deleteBy` returns `int`
   (affected rows) or `void`.
-* Direct scalar property names combine with `And` and `Or`; AND binds more tightly.
+* Direct scalar property names combine with `And` and `Or`; AND has higher precedence than OR.
   Comparison suffixes are `Not`, `GreaterThan`, `GreaterThanEqual`, `LessThan`,
   `LessThanEqual`, `Like`, and `In`. No suffix means equality. `IsNull`,
   `IsNotNull`, `True`, and `False` consume no parameter. `In` takes an Iterable or
@@ -516,7 +506,7 @@ sort arguments, and arbitrary DTO projections aren't supported.
 Repositories never open, commit, roll back, or close transactions or sessions.
 The caller owns those boundaries, including when the supplied Session is injected
 into a backend `@Transactional` service. Writes require an active usable
-transaction. Reads follow Session's auto-flush rules. Redeclare only
+transaction. Reads follow Session's automatic flush rules. Redeclare only
 `findById(Key)` with `@Lock` to request a lock; pessimistic locks need an active
 transaction and an engine supporting row locks. SQLite rejects them explicitly.
 

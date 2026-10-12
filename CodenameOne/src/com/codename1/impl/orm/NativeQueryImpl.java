@@ -44,7 +44,9 @@ public final class NativeQueryImpl<T> implements JpqlQuery<T> {
     private int skip;
 
     NativeQueryImpl(SessionImpl session, String statement, Class<T> type) {
-        if (statement == null || type == null) throw new IllegalArgumentException("statement/resultType is null");
+        if (statement == null || type == null) {
+            throw new IllegalArgumentException("statement/resultType is null");
+        }
         this.session = session;
         this.type = type;
         String start = statement.trim();
@@ -55,17 +57,24 @@ public final class NativeQueryImpl<T> implements JpqlQuery<T> {
         kind = type == String.class ? Attribute.TEXT : type == Long.class || type == Object.class && mutation ? Attribute.BIGINT
                 : type == Integer.class ? Attribute.INTEGER : type == Double.class ? Attribute.REAL
                 : type == Boolean.class ? Attribute.BOOLEAN : type == byte[].class ? Attribute.BLOB : -1;
-        if (kind < 0) throw new IllegalArgumentException("Native selects support String, Long, Integer, Double, Boolean or byte[] scalars");
+        if (kind < 0) {
+            throw new IllegalArgumentException("Native selects support String, Long, Integer, Double, Boolean or byte[] scalars");
+        }
         StringBuilder output = new StringBuilder();
         char quote = 0;
         for (int i = 0; i < statement.length(); i++) {
             char c = statement.charAt(i);
-            if (c == '\\') throw new IllegalArgumentException("Bind backslashes as parameter values instead of SQL literals");
+            if (c == '\\') {
+                throw new IllegalArgumentException("Bind backslashes as parameter values instead of SQL literals");
+            }
             if (quote != 0) {
                 output.append(c);
                 if (c == quote) {
-                    if (i + 1 < statement.length() && statement.charAt(i + 1) == quote) output.append(statement.charAt(++i));
-                    else quote = 0;
+                    if (i + 1 < statement.length() && statement.charAt(i + 1) == quote) {
+                        output.append(statement.charAt(++i));
+                    } else {
+                        quote = 0;
+                    }
                 }
             } else if (c == '\'' || c == '"') {
                 quote = c; output.append(c);
@@ -76,7 +85,9 @@ public final class NativeQueryImpl<T> implements JpqlQuery<T> {
                 if (i >= statement.length() || !Character.isJavaIdentifierStart(statement.charAt(i))) {
                     throw new IllegalArgumentException("Expected native parameter name after colon");
                 }
-                while (i < statement.length() && Character.isJavaIdentifierPart(statement.charAt(i))) i++;
+                while (i < statement.length() && Character.isJavaIdentifierPart(statement.charAt(i))) {
+                    i++;
+                }
                 names.add(statement.substring(begin, i--)); output.append('?');
             } else {
                 if (c == ';' || c == '?' || c == '$' || c == '`'
@@ -87,26 +98,37 @@ public final class NativeQueryImpl<T> implements JpqlQuery<T> {
                 output.append(c);
             }
         }
-        if (quote != 0) throw new IllegalArgumentException("Unterminated native SQL quote");
+        if (quote != 0) {
+            throw new IllegalArgumentException("Unterminated native SQL quote");
+        }
         sql = output.toString();
     }
     private static boolean keyword(String sql, String word) {
         return sql.length() > word.length() && sql.substring(0, word.length()).equalsIgnoreCase(word)
                 && Character.isWhitespace(sql.charAt(word.length()));
     }
+    @Override
     public JpqlQuery<T> setParameter(String name, Object value) {
-        if (!names.contains(name)) throw new IllegalArgumentException("Unknown named parameter: " + name);
+        if (!names.contains(name)) {
+            throw new IllegalArgumentException("Unknown named parameter: " + name);
+        }
         if (value instanceof Iterable || value != null && value.getClass().isArray() && !(value instanceof byte[])) {
             throw new IllegalArgumentException("Native parameters must be scalars or byte[] BLOBs");
         }
         parameters.put(name, value); return this;
     }
+    @Override
     public JpqlQuery<T> limit(int value) {
-        if (value < 0) throw new IllegalArgumentException("Negative limit");
+        if (value < 0) {
+            throw new IllegalArgumentException("Negative limit");
+        }
         maximum = value; return this;
     }
+    @Override
     public JpqlQuery<T> offset(int value) {
-        if (value < 0) throw new IllegalArgumentException("Negative offset");
+        if (value < 0) {
+            throw new IllegalArgumentException("Negative offset");
+        }
         skip = value; return this;
     }
     private Object[] arguments() {
@@ -114,39 +136,60 @@ public final class NativeQueryImpl<T> implements JpqlQuery<T> {
         Object[] result = new Object[names.size()];
         for (int i = 0; i < result.length; i++) {
             String name = names.get(i);
-            if (!parameters.containsKey(name)) throw new IllegalArgumentException("Unbound named parameter: " + name);
+            if (!parameters.containsKey(name)) {
+                throw new IllegalArgumentException("Unbound named parameter: " + name);
+            }
             result[i] = parameters.get(name);
         }
         return result;
     }
-    public List<T> list() { return list(maximum); }
+    @Override
+    public List<T> list() {
+        return list(maximum);
+    }
+    @Override
     public T first() {
         List<T> rows = list(maximum == 0 ? 0 : 1);
         return rows.isEmpty() ? null : rows.get(0);
     }
     private List<T> list(int max) {
-        if (mutation) throw new IllegalStateException("Use executeUpdate for bulk mutations");
+        if (mutation) {
+            throw new IllegalStateException("Use executeUpdate for bulk mutations");
+        }
         Object[] args = arguments();
         session.autoFlush();
         List<T> result = new ArrayList<T>();
-        if (max == 0) return result;
+        if (max == 0) {
+            return result;
+        }
         for (Object[] row : session.read(sql + session.limit(max, skip), args, new int[]{kind})) {
             Object value = row[0];
             try {
-                if (kind == Attribute.BOOLEAN) value = Values.asBooleanObject(value);
-                else if (kind == Attribute.INTEGER) value = Values.asIntObject(value);
-                else if (kind == Attribute.BIGINT) value = Values.asLongObject(value);
+                if (kind == Attribute.BOOLEAN) {
+                    value = Values.asBooleanObject(value);
+                } else if (kind == Attribute.INTEGER) {
+                    value = Values.asIntObject(value);
+                } else if (kind == Attribute.BIGINT) {
+                    value = Values.asLongObject(value);
+                }
             } catch (java.io.IOException error) {
                 throw new PersistenceException("Invalid native scalar projection", error);
             }
-            if (value != null && !type.isInstance(value)) throw new PersistenceException("Native scalar does not match " + type.getName());
+            if (value != null && !type.isInstance(value)) {
+                throw new PersistenceException("Native scalar does not match " + type.getName());
+            }
             result.add((T) value);
         }
         return result;
     }
+    @Override
     public int executeUpdate() {
-        if (!mutation) throw new IllegalStateException("Not a bulk mutation");
-        if (maximum >= 0 || skip > 0) throw new IllegalArgumentException("Bulk mutation pagination is not supported");
+        if (!mutation) {
+            throw new IllegalStateException("Not a bulk mutation");
+        }
+        if (maximum >= 0 || skip > 0) {
+            throw new IllegalArgumentException("Bulk mutation pagination is not supported");
+        }
         Object[] args = arguments();
         session.requireTransaction();
         session.flush();

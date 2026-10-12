@@ -858,7 +858,8 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     compatible(operand, test);
                     bindType(operand, test);
                     bindType(test, operand);
-                    String left = operand.sql, right = test.sql;
+                    String left = operand.sql;
+                    String right = test.sql;
                     if (operand.kind == Attribute.BOOLEAN || test.kind == Attribute.BOOLEAN) {
                         left = condition(operand); right = condition(test);
                     } else if (numericKind(operand.kind) && numericKind(test.kind)
@@ -876,7 +877,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             branches.add(take("ELSE") ? expression() : literal(-1, null));
             expect("END");
             int kind = commonKind(branches);
-            if (kind < 0) throw error("CASE needs at least one typed result branch");
+            if (kind < 0) {
+                throw error("CASE needs at least one typed result branch");
+            }
             Expr mapping = coalesceMapping(branches);
             StringBuilder sql = new StringBuilder("CASE");
             for (int i = 0; i < branches.size(); i++) {
@@ -885,7 +888,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 if (branch.entity != null || branch.association || branch.predicate) {
                     throw error("CASE result branches must be scalar values, not entities or predicates");
                 }
-                if (mapping != null && mapping.projectionQuery != null) bindType(mapping, branch);
+                if (mapping != null && mapping.projectionQuery != null) {
+                    bindType(mapping, branch);
+                }
                 sql.append(i < predicates.size() ? " WHEN " + predicates.get(i) + " THEN " : " ELSE ");
                 // Explicit numeric casts give PostgreSQL the same branch promotion as SQLite.
                 sql.append(numericKind(kind) ? session.numericOperand(branch.sql, kind) : branch.sql);
@@ -901,7 +906,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             return result;
         }
         private Expr primary() {
-            if (take("CASE")) return caseExpression();
+            if (take("CASE")) {
+                return caseExpression();
+            }
             if (take("-")) {
                 String magnitude = peek();
                 if (magnitude.length() > 0 && Character.isDigit(magnitude.charAt(0))
@@ -1242,7 +1249,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             }
             if (value.resultBranches != null) {
                 for (Expr branch : value.resultBranches) {
-                    if (!nonNullExpression(branch, allowParameters, enforce)) return false;
+                    if (!nonNullExpression(branch, allowParameters, enforce)) {
+                        return false;
+                    }
                 }
                 return true;
             }

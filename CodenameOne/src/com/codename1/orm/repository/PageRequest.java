@@ -29,10 +29,16 @@ public final class PageRequest {
     private final int offset;
     private final int size;
     public PageRequest(int offset, int size) {
-        if (offset < 0 || size <= 0) throw new IllegalArgumentException("Page offset must be nonnegative and size positive");
+        if (offset < 0 || size <= 0) {
+            throw new IllegalArgumentException("Page offset must be nonnegative and size positive");
+        }
         this.offset = offset;
         this.size = size;
     }
-    public int getOffset() { return offset; }
-    public int getSize() { return size; }
+    public int getOffset() {
+        return offset;
+    }
+    public int getSize() {
+        return size;
+    }
 }
