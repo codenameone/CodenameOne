@@ -729,6 +729,42 @@ class CN1CSSCLIEndToEndTest {
     }
 
     @Test
+    void watchModeTakesAnImagePutBackWithAnOlderTime(@TempDir Path tmp) throws Exception {
+        File dir = tmp.toFile();
+        final File css = write(new File(dir, "theme.css"),
+                "Badge { background-image: url(img/a.png); cn1-source-dpi: 160; }\n");
+        File image = png(new File(dir, "img/a.png"), 8, 6, 0xff336699);
+        final File res = new File(dir, "theme.res");
+
+        ServerSocket parent = new ServerSocket(0);
+        try {
+            System.setProperty("parent.port", String.valueOf(parent.getLocalPort()));
+            Thread watcher = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    CN1CSSCLI.run(new String[]{"-input", css.getPath(), "-output", res.getPath(), "-watch"});
+                }
+            }, "css-watch-under-test");
+            watcher.start();
+            Socket child = parent.accept();
+            awaitStdout("CSS file successfully compiled.");
+            assertEquals(0xff336699, open(res).getImage("a.png").getRGB()[0]);
+
+            // Another picture, older than everything built from the first.
+            png(image, 8, 6, 0xff996633);
+            assertTrue(image.setLastModified(res.lastModified() - 600000));
+            awaitStdout(CN1CSSCLI.REFRESH_SIGNAL);
+            assertEquals(0xff996633, open(res).getImage("a.png").getRGB()[0], "the picture that is there now");
+
+            child.close();
+            watcher.join(20000);
+            assertFalse(watcher.isAlive());
+        } finally {
+            parent.close();
+        }
+    }
+
+    @Test
     void aFailedRecompileInWatchModeIsNotAReload(@TempDir Path tmp) throws Exception {
         File dir = tmp.toFile();
         final File css = write(new File(dir, "theme.css"), "Label { color: #000001; }\n");

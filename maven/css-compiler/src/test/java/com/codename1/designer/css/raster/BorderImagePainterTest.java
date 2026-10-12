@@ -226,4 +226,20 @@ class BorderImagePainterTest {
         assertPixel(MAGENTA, img, 60, 5);
         assertPixel(MAGENTA, img, 88, 5);
     }
+
+    @Test
+    void widthsThatOverlapAreAllMadeToFit() {
+        // Eight to the left and eight to the right of a box of ten: five
+        // each, side by side, not two corners lying over one another.
+        BufferedImage img = paint(BoxStyle.builder().size(10, 60)
+                .top(new BorderSide(8, BorderStyle.SOLID, BORDER))
+                .right(new BorderSide(8, BorderStyle.SOLID, BORDER))
+                .bottom(new BorderSide(8, BorderStyle.SOLID, BORDER))
+                .left(new BorderSide(8, BorderStyle.SOLID, BORDER))
+                .borderImage(new BorderImage(nine(), 10, 10, 10, 10, false, Mode.STRETCH)));
+        assertPixel(RED, img, 3, 1);
+        assertPixel(GREEN, img, 6, 1);
+        assertPixel(YELLOW, img, 3, 58);
+        assertPixel(BLUE, img, 6, 58);
+    }
 }

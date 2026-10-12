@@ -312,7 +312,7 @@ public class CN1CSSCLI {
     /// true when the output was written, false when it was already newer than
     /// everything it is built from.
     private static boolean compileOnce(Options options) throws IOException {
-        return compileOnce(options, false);
+        return compileOnce(options, false, false);
     }
 
     /// As above; with `changed` the output is written whatever the times
@@ -320,7 +320,12 @@ public class CN1CSSCLI {
     /// way: a checkout that puts an older file back, or an edit within the
     /// same second as the last build, is a change no comparison of times
     /// with the output would call one.
-    private static boolean compileOnce(Options options, boolean changed) throws IOException {
+    ///
+    /// With `assets` as well, what changed was not a stylesheet: an image
+    /// or a font. The rules already built are then not reused. They are
+    /// known by their CSS alone, which an image put back with an older
+    /// time leaves as it was, and so would be answered with the old image.
+    private static boolean compileOnce(Options options, boolean changed, boolean assets) throws IOException {
         File css = options.mergeFile != null ? options.mergeFile : options.inputFiles[0];
         File outputDir = options.outputFile.getAbsoluteFile().getParentFile();
         if (outputDir != null && !outputDir.isDirectory() && !outputDir.mkdirs()) {
@@ -363,7 +368,7 @@ public class CN1CSSCLI {
                     System.out.println("File has not changed since last compile.");
                     return false;
                 }
-                compile(css, options, true);
+                compile(css, options, !assets);
                 return true;
             } finally {
                 lock.release();
@@ -520,6 +525,8 @@ public class CN1CSSCLI {
         startParentPulse(Thread.currentThread());
         long reported = options.outputFile.lastModified();
         boolean first = true;
+        // Whether something other than a stylesheet is what changed last.
+        boolean assetsMoved = false;
         while (!Thread.currentThread().isInterrupted()) {
             // Snapshot the sources before compiling, not after: an edit made
             // while the compile is running then shows up as a change on the
@@ -528,7 +535,7 @@ public class CN1CSSCLI {
             boolean failed = false;
             boolean written = false;
             try {
-                written = compileOnce(options, !first);
+                written = compileOnce(options, !first, assetsMoved);
                 if (written && first) {
                     System.out.println("CSS file successfully compiled.  " + options.outputFile);
                 }
@@ -560,6 +567,12 @@ public class CN1CSSCLI {
                 watcher.poll();
             } catch (InterruptedException parentGone) {
                 break;
+            }
+            assetsMoved = false;
+            for (File moved : watcher.changed()) {
+                String name = moved.getName();
+                boolean sheet = name.regionMatches(true, Math.max(0, name.length() - 4), ".css", 0, 4);
+                assetsMoved = assetsMoved || !sheet;
             }
             System.out.println("Change detected in " + Arrays.toString(options.inputFiles) + ".  Recompiling");
         }

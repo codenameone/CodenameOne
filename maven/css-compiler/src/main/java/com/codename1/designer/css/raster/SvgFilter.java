@@ -866,6 +866,47 @@ final class SvgFilter {
         }
         boolean dilate = p.get("operator") != null && "dilate".equals(p.get("operator").trim());
         Plane out = new Plane(w, h, in.linear);
+        if (Math.abs(at.getShearX()) > 1e-9 || Math.abs(at.getShearY()) > 1e-9) {
+            // The kernel is a rectangle in the element's coordinates. On
+            // an element that is turned or sheared it is not one on the
+            // image, and cannot be done a row and then a column at a time:
+            // every pixel of it is looked at, where the element puts it.
+            double across = boxUnits ? rx * box.getWidth() : rx;
+            double down = boxUnits ? ry * box.getHeight() : ry;
+            double det = at.getScaleX() * at.getScaleY() - at.getShearX() * at.getShearY();
+            if (Math.abs(det) < 1e-12) {
+                return copy(in);
+            }
+            int reachX = (int) Math.ceil(Math.abs(at.getScaleX()) * across + Math.abs(at.getShearX()) * down);
+            int reachY = (int) Math.ceil(Math.abs(at.getShearY()) * across + Math.abs(at.getScaleY()) * down);
+            java.util.List<int[]> cells = new java.util.ArrayList<int[]>();
+            for (int dy = -reachY; dy <= reachY; dy++) {
+                for (int dx = -reachX; dx <= reachX; dx++) {
+                    double ex = (at.getScaleY() * dx - at.getShearX() * dy) / det;
+                    double ey = (-at.getShearY() * dx + at.getScaleX() * dy) / det;
+                    if (Math.abs(ex) <= across + 1e-6 && Math.abs(ey) <= down + 1e-6) {
+                        cells.add(new int[] {dx, dy});
+                    }
+                }
+            }
+            for (int c = 0; c < 4; c++) {
+                float[] src = in.channel(c);
+                float[] dst = out.channel(c);
+                for (int y = 0; y < h; y++) {
+                    for (int x = 0; x < w; x++) {
+                        float v = dilate ? 0f : 1f;
+                        for (int[] cell : cells) {
+                            int sx = x + cell[0];
+                            int sy = y + cell[1];
+                            float s = sx < 0 || sx >= w || sy < 0 || sy >= h ? 0f : src[sy * w + sx];
+                            v = dilate ? Math.max(v, s) : Math.min(v, s);
+                        }
+                        dst[y * w + x] = v;
+                    }
+                }
+            }
+            return out;
+        }
         float[] row = new float[w * h];
         for (int c = 0; c < 4; c++) {
             float[] src = in.channel(c);

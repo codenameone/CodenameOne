@@ -685,8 +685,23 @@ public final class VectorImage {
                 if (kind.length() >= 7 && kind.regionMatches(true, kind.length() - 7, ";base64", 0, 7)) {
                     data = java.util.Base64.getMimeDecoder().decode(payload);
                 } else {
-                    data = java.net.URLDecoder.decode(payload.replace("+", "%2B"), "UTF-8")
-                            .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                    // The bytes themselves: %89 is the byte 0x89 of a
+                    // picture, not a character to be read and written
+                    // back as some other bytes. Anything not escaped is
+                    // text, and goes in as the text's own bytes.
+                    java.io.ByteArrayOutputStream octets = new java.io.ByteArrayOutputStream();
+                    for (int i = 0; i < payload.length(); i++) {
+                        char c = payload.charAt(i);
+                        int hi = c == '%' && i + 2 < payload.length() ? Character.digit(payload.charAt(i + 1), 16) : -1;
+                        int lo = hi >= 0 ? Character.digit(payload.charAt(i + 2), 16) : -1;
+                        if (hi >= 0 && lo >= 0) {
+                            octets.write((hi << 4) | lo);
+                            i += 2;
+                        } else {
+                            octets.write(String.valueOf(c).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                        }
+                    }
+                    data = octets.toByteArray();
                 }
             } else {
                 // Only a file: an image baked into a theme is not something
@@ -1054,9 +1069,18 @@ public final class VectorImage {
         } else if ("auto-start-reverse".equals(orient)) {
             turn = first ? angle + Math.PI : angle;
         } else if (orient.length() > 0) {
+            // An angle in any of its units; a bare number is degrees.
+            String o = orient.trim();
             try {
-                turn = Math.toRadians(Double.parseDouble(orient.endsWith("deg")
-                        ? orient.substring(0, orient.length() - 3) : orient));
+                if (o.endsWith("grad")) {
+                    turn = Math.toRadians(Double.parseDouble(o.substring(0, o.length() - 4)) * 0.9);
+                } else if (o.endsWith("rad")) {
+                    turn = Double.parseDouble(o.substring(0, o.length() - 3));
+                } else if (o.endsWith("turn")) {
+                    turn = Double.parseDouble(o.substring(0, o.length() - 4)) * 2 * Math.PI;
+                } else {
+                    turn = Math.toRadians(Double.parseDouble(o.endsWith("deg") ? o.substring(0, o.length() - 3) : o));
+                }
             } catch (NumberFormatException ex) {
                 turn = 0;
             }

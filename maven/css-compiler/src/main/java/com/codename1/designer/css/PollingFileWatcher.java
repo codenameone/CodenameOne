@@ -51,7 +51,23 @@ public class PollingFileWatcher  {
         while (!stop && java.util.Arrays.equals(lastModified(), lastMtime)) {
             wait(interval);
         }
-        lastMtime = lastModified();
+        long[] now = lastModified();
+        java.util.List<File> moved = new java.util.ArrayList<File>();
+        for (int i = 0; i < now.length; i++) {
+            if (now[i] != lastMtime[i]) {
+                moved.add(files[i]);
+            }
+        }
+        changed = moved.toArray(new File[moved.size()]);
+        lastMtime = now;
+    }
+
+    private File[] changed = new File[0];
+
+    /// The files whose time moved, either way, at the poll that last
+    /// returned; none before the first.
+    public synchronized File[] changed() {
+        return changed.clone();
     }
     
     public synchronized void stop() {

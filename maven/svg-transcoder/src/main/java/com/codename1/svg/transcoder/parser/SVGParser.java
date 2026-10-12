@@ -756,8 +756,7 @@ public final class SVGParser {
         m.setTransform(null);
         if (a.containsKey("markerWidth")) m.setMarkerWidth(lengthX(a.get("markerWidth")));
         if (a.containsKey("markerHeight")) m.setMarkerHeight(lengthY(a.get("markerHeight")));
-        m.setRefX(markerRef(a.get("refX")));
-        m.setRefY(markerRef(a.get("refY")));
+
         m.setOrient(a.get("orient") == null ? null : a.get("orient").trim());
         m.setUserSpace("userSpaceOnUse".equals(a.get("markerUnits")));
         m.setPreserveAspectRatio(a.get("preserveAspectRatio"));
@@ -772,6 +771,14 @@ public final class SVGParser {
                 // no view box
             }
         }
+        // The point of the marker that is put on the line: a length, a share
+        // of the view box, or a side of it by name. Without a view box the
+        // marker's own size is what it is a share of.
+        boolean boxed = m.getViewBoxWidth() > 0 && m.getViewBoxHeight() > 0;
+        m.setRefX(markerRef(a.get("refX"), boxed ? m.getViewBoxX() : 0f,
+                boxed ? m.getViewBoxWidth() : m.getMarkerWidth(), "left", "right"));
+        m.setRefY(markerRef(a.get("refY"), boxed ? m.getViewBoxY() : 0f,
+                boxed ? m.getViewBoxHeight() : m.getMarkerHeight(), "top", "bottom"));
         // What is inside measures its percentages against the marker's view
         // box, or without one against the marker's own size.
         float outerWidth = viewportWidth;
@@ -792,11 +799,16 @@ public final class SVGParser {
         return m;
     }
 
-    private static float markerRef(String value) {
+    private static float markerRef(String value, float from, float whole, String near, String far) {
+        if (value == null) return 0f;
+        String v = value.trim();
+        if (near.equals(v)) return from;
+        if ("center".equals(v)) return from + whole / 2;
+        if (far.equals(v)) return from + whole;
         try {
-            return NumberParser.parseFloat(value);
+            float n = NumberParser.parseFloat(v);
+            return v.endsWith("%") ? from + n / 100f * whole : n;
         } catch (RuntimeException e) {
-            // A keyword (left, center, ...): the corner, as when left out.
             return 0f;
         }
     }

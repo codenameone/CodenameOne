@@ -1683,4 +1683,61 @@ class VectorImageTest {
             assertEquals(one.getRGB(i, i), almostTwo.getRGB(i, i));
         }
     }
+
+    @Test
+    void aMorphologyKernelTurnsWithTheElement() throws Exception {
+        // Grown ten along the element's x and none along its y. Turned a
+        // quarter, that is ten down the image and none across it.
+        String filter = "<defs><filter id=\"f\" filterUnits=\"userSpaceOnUse\" x=\"-200\" y=\"-200\" width=\"400\""
+                + " height=\"400\"><feMorphology operator=\"dilate\" radius=\"10 0.01\"/></filter></defs>";
+        BufferedImage img = paint(filter + "<rect x=\"-5\" y=\"-5\" width=\"10\" height=\"10\" fill=\"#ff0000\""
+                + " filter=\"url(#f)\" transform=\"translate(50 50) rotate(90)\"/>", 100, 100);
+        assertTrue(alpha(img, 50, 62) > 200, "grown down the image");
+        assertEquals(0, alpha(img, 62, 50), "and not across it");
+    }
+
+    @Test
+    void aPictureGivenAsEscapedBytesIsRead() throws Exception {
+        String base64 = redDot().substring("data:image/png;base64,".length());
+        byte[] bytes = java.util.Base64.getDecoder().decode(base64);
+        StringBuilder escaped = new StringBuilder("data:image/png,");
+        for (byte b : bytes) {
+            int v = b & 0xff;
+            escaped.append('%').append(Character.forDigit(v >> 4, 16)).append(Character.forDigit(v & 15, 16));
+        }
+        BufferedImage img = paint("<image href=\"" + escaped + "\" width=\"40\" height=\"40\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(20, 20));
+    }
+
+    @Test
+    void aMarkerIsHeldByTheSideOrTheShareItNames() throws Exception {
+        String open = "<defs><marker id=\"m\" viewBox=\"0 0 10 10\" markerWidth=\"20\" markerHeight=\"20\""
+                + " markerUnits=\"userSpaceOnUse\"";
+        String rest = "><rect width=\"10\" height=\"10\" fill=\"#00ff00\"/></marker></defs>"
+                + "<line x1=\"10\" y1=\"50\" x2=\"50\" y2=\"50\" stroke=\"#ff0000\" marker-end=\"url(#m)\"/>";
+        // Held by its middle, the marker is ten each way about the end.
+        for (String ref : new String[] {" refX=\"center\" refY=\"center\"", " refX=\"50%\" refY=\"50%\""}) {
+            BufferedImage img = paint(open + ref + rest, 100, 100);
+            assertEquals(0xff00ff00, img.getRGB(43, 43), ref);
+            assertEquals(0xff00ff00, img.getRGB(57, 57), ref);
+            assertEquals(0, alpha(img, 65, 50), ref);
+        }
+        BufferedImage right = paint(open + " refX=\"right\" refY=\"bottom\"" + rest, 100, 100);
+        assertEquals(0xff00ff00, right.getRGB(35, 35), "its far corner on the end of the line");
+        assertEquals(0, alpha(right, 55, 55));
+    }
+
+    @Test
+    void aMarkerCanBeTurnedInAnyUnitOfAngle() throws Exception {
+        // A marker that points along x, turned a quarter: it points down.
+        String open = "<defs><marker id=\"m\" markerWidth=\"20\" markerHeight=\"4\" refY=\"2\""
+                + " markerUnits=\"userSpaceOnUse\" overflow=\"visible\" orient=\"";
+        String rest = "\"><rect width=\"20\" height=\"4\" fill=\"#00ff00\"/></marker></defs>"
+                + "<line x1=\"10\" y1=\"50\" x2=\"50\" y2=\"50\" stroke=\"none\" marker-end=\"url(#m)\"/>";
+        for (String angle : new String[] {"90", "90deg", "1.5708rad", "100grad", "0.25turn"}) {
+            BufferedImage img = paint(open + angle + rest, 100, 100);
+            assertEquals(0xff00ff00, img.getRGB(50, 62), angle);
+            assertEquals(0, alpha(img, 62, 50), angle);
+        }
+    }
 }

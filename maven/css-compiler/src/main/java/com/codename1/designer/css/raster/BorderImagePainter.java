@@ -85,6 +85,23 @@ public final class BorderImagePainter {
         double r = widths[RoundedBox.RIGHT];
         double b = widths[RoundedBox.BOTTOM];
         double l = widths[RoundedBox.LEFT];
+        // Opposite widths that are more than the box between them are all
+        // made smaller by the one factor that makes them fit, as CSS has
+        // it: two corners of eight in a box of ten are each five, and do
+        // not lie over one another.
+        double fit = 1;
+        if (l + r > box.getWidth() && l + r > 0) {
+            fit = Math.min(fit, box.getWidth() / (l + r));
+        }
+        if (t + b > box.getHeight() && t + b > 0) {
+            fit = Math.min(fit, box.getHeight() / (t + b));
+        }
+        if (fit < 1) {
+            t *= fit;
+            r *= fit;
+            b *= fit;
+            l *= fit;
+        }
         double x0 = box.getX();
         double y0 = box.getY();
         double x3 = box.getMaxX();
