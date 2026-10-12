@@ -512,6 +512,128 @@ public class ZipApiApp {
             }
         }
     }
+    static void singleByteStreams() throws Exception {
+        byte[] data = new byte[32768];
+        for (int i = 0; i < data.length; i++) data[i] = (byte) i;
+        for (Checksum sum : new Checksum[] {new CRC32(), new Adler32()}) {
+            sum.update(data, 0, data.length);
+            long expected = sum.getValue();
+            sum.reset();
+            CheckedOutputStream checked = new CheckedOutputStream(new ByteArrayOutputStream(), sum);
+            for (byte b : data) checked.write((b & 255) | 0x100);
+            require(sum.getValue() == expected, "single byte checksum output masks high bits");
+            sum.reset();
+            CheckedInputStream input = new CheckedInputStream(new ByteArrayInputStream(data), sum);
+            while (input.read() >= 0) { }
+            require(sum.getValue() == expected, "single byte checksum input");
+        }
+        for (int format = 0; format < 3; format++) {
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            if (format == 0) {
+                try (DeflaterOutputStream out = new DeflaterOutputStream(bytes)) { out.write(data); }
+            } else if (format == 1) {
+                try (GZIPOutputStream out = new GZIPOutputStream(bytes)) { out.write(data); }
+            } else {
+                try (ZipOutputStream out = new ZipOutputStream(bytes)) {
+                    out.putNextEntry(entry("single-byte"));
+                    out.write(data);
+                }
+            }
+            InputStream source = new ByteArrayInputStream(bytes.toByteArray());
+            InputStream decoded = format == 0 ? new InflaterInputStream(source)
+                    : format == 1 ? new GZIPInputStream(source) : new ZipInputStream(source);
+            try {
+                if (format == 2) ((ZipInputStream) decoded).getNextEntry();
+                for (byte b : data) require(decoded.read() == (b & 255), "single byte decompression");
+                require(decoded.read() == -1, "single byte decompression EOF");
+            } finally { decoded.close(); }
+        }
+    }
+    static void zipWord(OutputStream out, long value) throws IOException {
+        for (int i = 0; i < 4; i++) out.write((int) (value >>> (8 * i)) & 255);
+    }
+    static void ambiguousZipDescriptor() throws Exception {
+        byte[] data = {(byte) 172, 10, 122, (byte) 213};
+        CRC32 crc = new CRC32();
+        crc.update(data);
+        require(crc.getValue() == 0x08074b50L, "descriptor-signature CRC fixture");
+        ByteArrayOutputStream compressed = new ByteArrayOutputStream();
+        Deflater def = new Deflater(Deflater.DEFAULT_COMPRESSION, true);
+        try (DeflaterOutputStream out = new DeflaterOutputStream(compressed, def)) { out.write(data); }
+        finally { def.end(); }
+        for (boolean signed : new boolean[] {false, true}) {
+            ByteArrayOutputStream archive = new ByteArrayOutputStream();
+            byte[] header = zipNameHeader("collision".getBytes("UTF-8"), true);
+            header[6] = 8; // Descriptor follows the compressed payload.
+            header[8] = 8; // DEFLATED
+            archive.write(header);
+            archive.write(compressed.toByteArray());
+            if (signed) zipWord(archive, 0x08074b50L);
+            zipWord(archive, crc.getValue());
+            zipWord(archive, compressed.size());
+            zipWord(archive, data.length);
+            archive.write(zipNameHeader("following".getBytes("UTF-8"), true));
+            try (ZipInputStream in = new ZipInputStream(new ByteArrayInputStream(archive.toByteArray()))) {
+                require("collision".equals(in.getNextEntry().getName()), "descriptor collision entry");
+                require(Arrays.equals(data, readAll(in)), "descriptor signature and CRC disambiguated");
+                require("following".equals(in.getNextEntry().getName()), "descriptor leaves next header intact");
+                require(in.read() == -1 && in.getNextEntry() == null, "following empty entry preserved");
+            }
+        }
+    }
+    static void systemPropertyConfiguration() {
+        String key = "cn1.zip.test.configuration";
+        String old = System.clearProperty(key);
+        try {
+            require("fallback".equals(System.getProperty(key, "fallback")), "property fallback");
+            require(System.setProperty(key, "first") == null, "first property value");
+            require("first".equals(System.setProperty(key, "second")), "property returns previous value");
+            require("second".equals(System.getProperty(key)), "property replacement");
+            require("second".equals(System.clearProperty(key)), "property removal returns previous value");
+            require(System.getProperty(key) == null, "removed property absent");
+            boolean rejected = false;
+            try { System.setProperty(key, null); } catch (NullPointerException expected) { rejected = true; }
+            require(rejected, "null property value rejected");
+            rejected = false;
+            try { System.getProperty(null); } catch (NullPointerException expected) { rejected = true; }
+            require(rejected, "null property key rejected");
+            rejected = false;
+            try { System.clearProperty(""); } catch (IllegalArgumentException expected) { rejected = true; }
+            require(rejected, "empty property key rejected");
+        } finally {
+            if (old == null) System.clearProperty(key);
+            else System.setProperty(key, old);
+        }
+    }
+    static void gzipReadAhead() throws Exception {
+        String key = "jdk.util.gzip.tryReadAheadAfterTrailer";
+        String old = System.setProperty(key, "true");
+        try {
+            require("true".equals(System.getProperty(key, "false")), "read-ahead property stored");
+            byte[] data = "member on a source with default available()".getBytes("UTF-8");
+            ByteArrayOutputStream member = new ByteArrayOutputStream();
+            try (GZIPOutputStream out = new GZIPOutputStream(member)) { out.write(data); }
+            ByteArrayOutputStream encoded = new ByteArrayOutputStream();
+            ByteArrayOutputStream expected = new ByteArrayOutputStream();
+            for (int i = 0; i < 3; i++) { encoded.write(member.toByteArray()); expected.write(data); }
+            for (final int chunk : new int[] {1, 7, member.size(), 512}) {
+                final ByteArrayInputStream source = new ByteArrayInputStream(encoded.toByteArray());
+                InputStream zeroAvailable = new InputStream() {
+                    public int read() { return source.read(); }
+                    public int read(byte[] b, int off, int len) { return source.read(b, off, Math.min(chunk, len)); }
+                };
+                require(zeroAvailable.available() == 0, "fixture inherits zero availability");
+                try (GZIPInputStream in = new GZIPInputStream(zeroAvailable)) {
+                    require(Arrays.equals(expected.toByteArray(), readAll(in)), "read-ahead preserves all GZIP members");
+                }
+            }
+        } finally {
+            if (old == null) System.clearProperty(key);
+            else System.setProperty(key, old);
+        }
+        require(old == null ? System.getProperty(key) == null : old.equals(System.getProperty(key)),
+                "read-ahead property restored");
+    }
     static void gzipLiveSource() throws Exception {
         byte[] data = "completed member on an open source".getBytes("UTF-8");
         ByteArrayOutputStream member = new ByteArrayOutputStream();
@@ -628,7 +750,14 @@ public class ZipApiApp {
     public static void main(String[] args) throws Exception {
         byte[] data = payload();
         checksums();
+        systemPropertyConfiguration();
+        singleByteStreams();
         gzipLiveSource();
+        if (args.length > 1) {
+            // JDK 8 lacks the read-ahead option and has the descriptor CRC ambiguity.
+            gzipReadAhead();
+            ambiguousZipDescriptor();
+        }
         checkedCloseFailures(args.length > 1);
         skipZipEntries();
         zipNameDecoding(args.length > 1);

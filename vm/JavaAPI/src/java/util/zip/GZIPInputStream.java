@@ -23,11 +23,18 @@
 package java.util.zip;
 import java.io.*;
 
-/** RFC 1952 decoder, including concatenated members and header/trailer CRC checks. */
+/**
+ * RFC 1952 decoder, including concatenated members and header/trailer CRC checks.
+ * Set jdk.util.gzip.tryReadAheadAfterTrailer=true before constructing a stream
+ * to read subsequent members even when the source reports zero available bytes.
+ * This may block on a live source; the default only probes available data.
+ */
 public class GZIPInputStream extends InflaterInputStream {
     public static final int GZIP_MAGIC = 0x8b1f;
     protected CRC32 crc = new CRC32();
     protected boolean eos;
+    private final boolean readAhead = Boolean.parseBoolean(
+            System.getProperty("jdk.util.gzip.tryReadAheadAfterTrailer"));
     public GZIPInputStream(InputStream in) throws IOException {
         this(in, 512);
     }
@@ -118,7 +125,7 @@ public class GZIPInputStream extends InflaterInputStream {
                 throw new ZipException("Invalid GZIP trailer");
             // PushbackInputStream counts both buffered bytes and source data.
             // A completed member must not wait for a persistent source to close.
-            if (in.available() == 0) {
+            if (!readAhead && in.available() == 0) {
                 eos = true;
                 break;
             }

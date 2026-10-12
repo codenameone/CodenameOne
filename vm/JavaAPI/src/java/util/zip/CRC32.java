@@ -25,8 +25,10 @@ package java.util.zip;
 /** Standard CRC32 checksum. */
 public class CRC32 implements Checksum {
     private final com.codename1.impl.zip.CRC32 delegate = new com.codename1.impl.zip.CRC32();
+    private final byte[] singleByte = new byte[1];
     public void update(int value) {
-        update(new byte[] {(byte) value}, 0, 1);
+        singleByte[0] = (byte) value;
+        delegate.update(singleByte, 0, 1);
     }
     public void update(byte[] data) {
         update(data, 0, data.length);

@@ -296,7 +296,14 @@ The local JVM transport supports HTTP/1; test HTTP/2 with the packaged backend.
 * Reading supports STORED and DEFLATED ZIP entries, with or without descriptors
   for DEFLATED entries. ZIP64, encryption, other compression methods, and STORED
   descriptors are explicitly rejected. GZIP supports concatenated members and
-  validates header and trailer checksums.
+  validates header and trailer checksums. By default it probes for another
+  GZIP member only when buffered or available bytes remain, avoiding a blocking
+  read on an idle open connection. For concatenated members on sources whose
+  `available()` method does not report readable bytes, call
+  `System.setProperty("jdk.util.gzip.tryReadAheadAfterTrailer", "true")` before
+  constructing the stream. This follows OpenJDK's read-ahead option: it reads
+  until the source ends and can block on a persistent connection. ParparVM
+  captures the setting when each GZIP stream is constructed.
 
 These explicit ZIP limits belong to the ParparVM implementation and the CN1
 helper. The platform's own `java.util.zip.ZipOutputStream` may have broader

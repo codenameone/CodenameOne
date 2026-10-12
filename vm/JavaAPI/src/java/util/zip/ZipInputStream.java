@@ -155,12 +155,33 @@ public class ZipInputStream extends InflaterInputStream {
                 ((PushbackInputStream) in).unread(buf, len - left, left);
         }
         if ((flags & 8) != 0) {
-            long value = word(4);
-            if (value == 0x08074b50L)
-                value = word(4);
+            long value = word(4), compressedSize = word(4), size = word(4);
+            if (value == 0x08074b50L) {
+                boolean unsigned = value == crc.getValue() && compressedSize == compressed && size == count;
+                if (!unsigned) {
+                    value = compressedSize;
+                    compressedSize = size;
+                    size = word(4);
+                } else if (compressedSize == value && size == compressed) {
+                    // All three values equal the signature: both layouts fit.
+                    // A signed descriptor has one more size word; otherwise put
+                    // the following header (or its partial bytes) back unchanged.
+                    byte[] next = new byte[4];
+                    int ahead = 0;
+                    long last = 0;
+                    while (ahead < next.length) {
+                        int nextByte = in.read();
+                        if (nextByte < 0) break;
+                        next[ahead] = (byte) nextByte;
+                        last |= (long) nextByte << (8 * ahead++);
+                    }
+                    if (ahead < next.length || last != count)
+                        ((PushbackInputStream) in).unread(next, 0, ahead);
+                }
+            }
             entry.setCrc(value);
-            entry.setCompressedSize(word(4));
-            entry.setSize(word(4));
+            entry.setCompressedSize(compressedSize);
+            entry.setSize(size);
         }
         if (entry.getCrc() != crc.getValue() || entry.getSize() != count || entry.getCompressedSize() != compressed)
             throw new ZipException("ZIP entry CRC or size mismatch");

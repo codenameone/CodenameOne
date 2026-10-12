@@ -30,6 +30,7 @@ public class InflaterInputStream extends FilterInputStream {
     protected byte[] buf;
     protected int len;
     private boolean own, closed, eof;
+    private final byte[] singleByte = new byte[1];
     public InflaterInputStream(InputStream in) {
         this(in, new Inflater(), 512);
         own = true;
@@ -51,8 +52,7 @@ public class InflaterInputStream extends FilterInputStream {
             throw new IOException("Stream closed");
     }
     public int read() throws IOException {
-        byte[] b = new byte[1];
-        return read(b, 0, 1) < 0 ? -1 : b[0] & 255;
+        return read(singleByte, 0, 1) < 0 ? -1 : singleByte[0] & 255;
     }
     public int read(byte[] b, int off, int length) throws IOException {
         ensureOpen();
