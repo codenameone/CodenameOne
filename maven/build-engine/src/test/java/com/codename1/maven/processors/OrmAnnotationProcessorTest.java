@@ -49,6 +49,7 @@ import java.util.Set;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
 /// Verifies the `@Entity` processor produces a structurally sound dao for a
@@ -58,6 +59,182 @@ public class OrmAnnotationProcessorTest {
 
     @Rule
     public TemporaryFolder tmp = new TemporaryFolder();
+
+    @Test
+    public void generatedRepositoryExecutesCrudDerivedPagingLocksAndDeclaredQueries() throws Exception {
+        generatedRepository(false);
+        generatedRepository(true);
+    }
+    private void generatedRepository(boolean backend) throws Exception {
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("repositories.Note","package repositories; import com.codename1.annotations.*; @Entity(table=\"repository_note\") public class Note { @Id public long id; public String name; public long score; public boolean active; public Boolean archived; }");
+        sources.put("repositories.Notes","package repositories; import com.codename1.orm.repository.*; import java.util.List; @Repository(entity=Note.class,key=Long.class) public interface Notes extends CrudRepository<Note,Long> { "
+            + "List<Note> findByNameAndScoreGreaterThanOrderByScoreDescIdAsc(String name,long score,PageRequest page); "
+            + "List<Note> findByActiveTrue(); List<Note> findByArchivedFalse(); List<Note> findByNameAndScoreIn(String name,java.util.List<Long> scores); List<Note> findByScoreIn(Long[] scores); List<Note> findByNameIn(java.util.Set<String> names); "
+            + "List<Note> findTop1ByNameOrderByScoreDesc(String name); long countByName(String name); boolean existsByName(String name); int deleteByName(String name); "
+            + "@Lock(com.codename1.orm.session.LockMode.PESSIMISTIC_WRITE) Note findById(Long id); "
+            + "@Query(\"select sum(case when e.score>=:floor then 1 else 0 end) from repositories.Note e\") Long qualified(@Param(\"floor\") long floor); "
+            + "@Modifying @Query(\"update repositories.Note e set e.score=:score where e.name=:name\") int revise(@Param(\"name\") String name,@Param(\"score\") long score); "
+            + "@Query(value=\"SELECT COUNT(*) FROM repository_note WHERE name=:name\",nativeSql=true) Long nativeCount(@Param(\"name\") String name); }");
+        // Compile the caller with the interface, before generating any implementation.
+        sources.put("repositories.Check","package repositories; import com.codename1.orm.repository.*; import com.codename1.orm.session.*; public class Check { public static void run(Session s) { "
+            + "Notes repo=Repositories.create(Notes.class,s); s.createTables(); s.beginTransaction(); Note a=new Note(); a.name=\"same\";a.score=3;a.active=true;a.archived=false;repo.insert(a);Note b=new Note();b.name=\"same\";b.score=9;repo.insert(b);s.commitTransaction(); "
+            + "if(repo.count()!=2 || !repo.existsByName(\"same\") || repo.countByName(\"same\")!=2 || repo.nativeCount(\"same\")!=2) throw new AssertionError(\"counts\"); "
+            + "if(repo.findByNameAndScoreGreaterThanOrderByScoreDescIdAsc(\"same\",0,new PageRequest(1,1)).get(0)!=a || repo.findTop1ByNameOrderByScoreDesc(\"same\").get(0)!=b || repo.qualified(5)!=1) throw new AssertionError(\"queries\"); "
+            + "if(repo.findByActiveTrue().get(0)!=a || repo.findByArchivedFalse().get(0)!=a || repo.findByNameAndScoreIn(\"same\",java.util.Arrays.asList(3L)).get(0)!=a || repo.findByScoreIn(new Long[]{9L}).get(0)!=b || repo.findByNameIn(java.util.Collections.singleton(\"same\")).size()!=2) throw new AssertionError(\"typed finders\"); "
+            + "s.beginTransaction(); a.score=4; if(repo.revise(\"same\",11)!=2 || s.contains(a)) throw new AssertionError(\"bulk\"); s.rollbackTransaction(); "
+            + "if(s.find(Note.class,a.id).score!=3) throw new AssertionError(\"rollback\"); "
+            + "s.beginTransaction(); try { repo.findById(a.id); throw new AssertionError(\"SQLite should refuse row lock\"); } catch(UnsupportedOperationException expected) {} s.rollbackTransaction(); "
+            + "s.beginTransaction(); if(repo.save(a)==a) throw new AssertionError(\"merge returns managed copy\"); repo.deleteById(b.id); s.commitTransaction(); "
+            + "s.beginTransaction(); if(repo.deleteByName(\"same\")!=1) throw new AssertionError(\"delete\");s.commitTransaction();if(repo.count()!=0) throw new AssertionError(); }}");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        assertFalse(new File(classes,"repositories/NotesCn1Repository.class").exists());
+        ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+        loader.loadClass(backend ? "cn1app.BackendDaoBootstrap" : "cn1app.DaoBootstrap").newInstance();
+        com.codename1.backend.orm.EntityManager server=backend ? com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:")) : null;
+        com.codename1.orm.EntityManager client=backend ? null : com.codename1.orm.EntityManager.open(new com.codename1.impl.javase.SEDatabase(java.sql.DriverManager.getConnection("jdbc:sqlite::memory:")));
+        com.codename1.orm.session.Session session=backend ? server.openSession() : client.openSession();
+        try { loader.loadClass("repositories.Check").getMethod("run",com.codename1.orm.session.Session.class).invoke(null,session); }
+        finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
+    }
+
+    @Test
+    public void clientRepositoryBuildDoesNotDependOnBackend() throws Exception {
+        StringBuilder classpath = new StringBuilder();
+        String original = System.getProperty("surefire.test.class.path", System.getProperty("java.class.path"));
+        for (String entry : original.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
+            File file = new File(entry);
+            boolean backend = false;
+            if (file.isDirectory()) {
+                backend = new File(file,"com/codename1/backend/annotations/Generated.class").isFile();
+            } else if (file.isFile() && entry.endsWith(".jar")) {
+                try (java.util.jar.JarFile jar = new java.util.jar.JarFile(file)) {
+                    backend = jar.getEntry("com/codename1/backend/annotations/Generated.class") != null;
+                }
+            }
+            if (!backend) {
+                if (classpath.length() > 0) classpath.append(File.pathSeparator);
+                classpath.append(entry);
+            }
+        }
+        File output = tmp.newFile();
+        Process process = new ProcessBuilder(new File(System.getProperty("java.home"),"bin/java").getPath(),
+                "-cp",classpath.toString(),ClientRepositoryCompileFixture.class.getName(),tmp.newFolder().getPath())
+                .redirectErrorStream(true).redirectOutput(output).start();
+        if (!process.waitFor(60, java.util.concurrent.TimeUnit.SECONDS)) {
+            process.destroyForcibly();
+            fail("Client compilation timed out");
+        }
+        assertEquals(new String(Files.readAllBytes(output.toPath()),"UTF-8"),0,process.exitValue());
+    }
+
+    @Test
+    public void generatedRepositoriesRejectUnsupportedSignatures() throws Exception {
+        for(String declaration:new String[]{
+            "java.util.List<Note> findByMissing(String value);",
+            "long findByName(String value);",
+            "java.util.List<Note> findByName();",
+            "java.util.List<Note> findByName(long value);",
+            "java.util.List<Note> findByNameTrue();",
+            "java.util.List<Note> findByScoreFalse();",
+            "java.util.List<Note> findByScoreIn(String[] values);",
+            "java.util.List<Note> findByScoreIn(Long[][] values);",
+            "java.util.List<Note> findByScoreIn(long[] values);",
+            "java.util.List<Note> findByScoreIn(java.util.List<String> values);",
+            "java.util.List<Note> findByNameAndScoreIn(String name,java.util.Set<String> values);",
+            "java.util.List<Note> findByScoreIn(java.util.List values);",
+            "java.util.List<Note> findByScoreIn(java.util.List<?> values);",
+            "java.util.List<Note> findByScoreIn(java.util.List<? extends Long> values);",
+            "java.util.List<Note> findByScoreIn(java.util.List<java.util.List<Long>> values);",
+            "@Query(\"select e from badrepo.Note e where e.name=:name\") Note lookup(String name);",
+            "@Query(\"update badrepo.Note e set e.name=:name\") int rename(@Param(\"name\") String name);",
+            "@Lock(com.codename1.orm.session.LockMode.PESSIMISTIC_WRITE) Note findByName(String name);"
+        }) {
+            File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+            sources.put("badrepo.Note","package badrepo; import com.codename1.annotations.*; @Entity public class Note { @Id public long id; public String name; public long score; }");
+            sources.put("badrepo.Notes","package badrepo; import com.codename1.orm.repository.*; @Repository(entity=Note.class,key=Long.class) public interface Notes extends CrudRepository<Note,Long> {"+declaration+"}");
+            JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+            ProcessorContext ctx=runProcessor(classes,backendClasspath());
+            assertTrue(declaration+ctx.getErrors(),ctx.hasErrors());
+            assertFalse(new File(classes,"badrepo/NotesCn1Repository.class").exists());
+        }
+    }
+
+    @Test
+    public void nativeRepositoryParametersMustBeBindableScalars() throws Exception {
+        for (boolean backend : new boolean[]{false,true}) {
+            for (String type : new String[]{"java.util.List<Long>","java.lang.Iterable<Long>","java.util.ArrayList<Long>","Long[]","int[]","byte[][]","byte[]","String","long"}) {
+                File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+                sources.put("nativeparams.Note","package nativeparams; import com.codename1.annotations.*; @Entity public class Note { @Id public long id; }");
+                sources.put("nativeparams.Notes","package nativeparams; import com.codename1.orm.repository.*; @Repository(entity=Note.class,key=Long.class) public interface Notes extends CrudRepository<Note,Long> { @Query(value=\"SELECT COUNT(*) FROM note WHERE id=:value\",nativeSql=true) Long lookup(@Param(\"value\") "+type+" value); }");
+                JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+                ProcessorContext ctx=runProcessor(classes,backend?backendClasspath():Collections.<String>emptyList());
+                boolean supported=type.equals("byte[]")||type.equals("String")||type.equals("long");
+                assertEquals(type+ctx.getErrors(),!supported,ctx.hasErrors());
+                if (!supported) assertTrue(ctx.getErrors().toString(),ctx.getErrors().toString().contains("Native query parameters"));
+                assertEquals(supported,new File(classes,"nativeparams/NotesCn1Repository.class").isFile());
+            }
+        }
+    }
+
+    @Test
+    public void repositoryLikeRequiresTextStorage() throws Exception {
+        for (boolean backend : new boolean[]{false,true}) {
+            for (String storage : new String[]{"Long","byte[]","String"}) {
+                File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+                sources.put("likeconverter.Converter","package likeconverter; public class Converter implements com.codename1.orm.session.AttributeConverter<String,"+storage+"> { public "+storage+" toDatabase(String value) { return null; } public String fromDatabase("+storage+" value) { return null; } }");
+                sources.put("likeconverter.Note","package likeconverter; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Note { @Id public long id; @Convert(converter=Converter.class,storageType="+storage+".class) public String code; }");
+                sources.put("likeconverter.Notes","package likeconverter; import com.codename1.orm.repository.*; @Repository(entity=Note.class,key=Long.class) public interface Notes extends CrudRepository<Note,Long> { java.util.List<Note> findByCodeLike(String value); }");
+                JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+                ProcessorContext ctx=runProcessor(classes,backend?backendClasspath():Collections.<String>emptyList());
+                boolean supported=storage.equals("String");
+                assertEquals(storage+ctx.getErrors(),!supported,ctx.hasErrors());
+                if (!supported) assertTrue(ctx.getErrors().toString(),ctx.getErrors().toString().contains("Like requires a String property with text storage"));
+                assertEquals(supported,new File(classes,"likeconverter/NotesCn1Repository.class").isFile());
+            }
+        }
+    }
+
+    @Test
+    public void incrementalBuildRemovesOnlyStaleGeneratedRepositories() throws Exception {
+        for (boolean backend : new boolean[]{false,true}) {
+            for (boolean deleteSource : new boolean[]{false,true}) {
+                File classes=tmp.newFolder(), sourcesDir=tmp.newFolder();
+                Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+                sources.put("incrementalrepo.Note","package incrementalrepo; import com.codename1.annotations.*; @Entity public class Note { @Id public long id; }");
+                String repository="package incrementalrepo; import com.codename1.orm.repository.*; @Repository(entity=Note.class,key=Long.class) public interface Notes extends CrudRepository<Note,Long> {}";
+                sources.put("incrementalrepo.Notes",repository);
+                sources.put("incrementalrepo.Live",repository.replace("interface Notes", "interface Live"));
+                sources.put("incrementalrepo.HandwrittenCn1Repository","package incrementalrepo; public class HandwrittenCn1Repository {}");
+                File pkg=new File(sourcesDir,"incrementalrepo");assertTrue(pkg.mkdirs());
+                for(Map.Entry<String,String> source:sources.entrySet()) {
+                    writeFile(new File(pkg,source.getKey().substring(source.getKey().lastIndexOf('.')+1)+".java"),source.getValue());
+                }
+                JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+                List<String> cp=backend?backendClasspath():Collections.<String>emptyList();
+                ProcessorContext first=runProcessor(classes,cp,Arrays.asList(sourcesDir.getAbsolutePath()));
+                assertFalse(first.getErrors().toString(),first.hasErrors());
+                File generated=new File(classes,"incrementalrepo/NotesCn1Repository.class");assertTrue(generated.isFile());
+                File factory=new File(classes,"incrementalrepo/NotesCn1Repository$Factory.class");assertTrue(factory.isFile());
+                File handwritten=new File(classes,"incrementalrepo/HandwrittenCn1Repository.class");byte[] original=Files.readAllBytes(handwritten.toPath());
+                if(deleteSource) {
+                    assertTrue(new File(pkg,"Notes.java").delete()); // Leave its stale .class, like Maven does.
+                } else {
+                    sources.clear();sources.put("incrementalrepo.Notes",repository.replace("@Repository(entity=Note.class,key=Long.class) ",""));
+                    writeFile(new File(pkg,"Notes.java"),sources.get("incrementalrepo.Notes"));
+                    JavaSourceCompiler.compile(sources,classes,Arrays.asList(classes,testClassesDir()));
+                }
+                ProcessorContext second=runProcessor(classes,cp,Arrays.asList(sourcesDir.getAbsolutePath()));
+                assertFalse(second.getErrors().toString(),second.hasErrors());
+                assertFalse("obsolete implementation survives incremental processing",generated.exists());
+                assertFalse("obsolete factory survives incremental processing",factory.exists());
+                assertTrue(new File(classes,"incrementalrepo/LiveCn1Repository.class").isFile());
+                org.junit.Assert.assertArrayEquals(original,Files.readAllBytes(handwritten.toPath()));
+            }
+        }
+    }
 
     @Test
     public void managedPublicContractsDoNotExposeRuntimePlumbing() {
@@ -540,6 +717,17 @@ public class OrmAnnotationProcessorTest {
                 Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
                 try { session.createTables();session.beginTransaction();session.persist(type.newInstance());session.commitTransaction();
                     for(String expression:Arrays.asList("coalesce(e.code,e.name)","coalesce(e.name,e.code)","coalesce(e.code,e.other)","coalesce(e.state,e.color)","coalesce(e.code,lower(e.backup))","coalesce(lower(e.backup),e.code)","coalesce(e.code,(select max(i.name) from Entry i))","coalesce(e.name,coalesce(e.code,e.backup))")) { try { session.createQuery("select "+expression+" from Entry e");fail(expression); } catch(IllegalArgumentException expected) { assertTrue(expected.getMessage().contains("mapping")); } }
+                    for (String operand : Arrays.asList(":value", "'fallback'")) {
+                        for (String pair : Arrays.asList("e.code then 1 when e.other", "e.other then 1 when e.code", "e.code then 1 when e.name", "e.state then 1 when e.color")) {
+                            try { session.createQuery("select case " + operand + " when " + pair + " then 2 else 3 end from Entry e"); fail(pair); }
+                            catch (IllegalArgumentException expected) { assertTrue(expected.getMessage(), expected.getMessage().contains("mapping")); }
+                        }
+                        com.codename1.orm.session.JpqlQuery<Long> query=session.createQuery("select case " + operand + " when e.code then 1 when e.backup then 2 else 3 end from Entry e",Long.class);
+                        if (operand.equals(":value")) query.setParameter("value","fallback");
+                        assertEquals(Long.valueOf(2),query.first());
+                    }
+                    assertEquals(Long.valueOf(2),session.createQuery("select case :value when 'missing' then 1 when e.backup then 2 else 3 end from Entry e",Long.class).setParameter("value","fallback").first());
+                    assertEquals(Long.valueOf(2),session.createQuery("select case :value when e.state then 1 when e.backupState then 2 else 3 end from Entry e",Long.class).setParameter("value",loader.loadClass("coalescemappings.State").getEnumConstants()[0]).first());
                     org.junit.Assert.assertEquals("fallback",session.createQuery("select coalesce(e.code,e.backup) from Entry e",String.class).first());org.junit.Assert.assertEquals("ACTIVE",session.createQuery("select coalesce(e.state,e.backupState) from Entry e").first().toString());
                     org.junit.Assert.assertEquals("literal",session.createQuery("select coalesce(e.code,'literal') from Entry e",String.class).first());org.junit.Assert.assertEquals("parameter",session.createQuery("select coalesce(e.code,:value) from Entry e",String.class).setParameter("value","parameter").first());
                     org.junit.Assert.assertEquals("raw",session.createQuery("select coalesce(lower(e.name),'fallback') from Entry e",String.class).first());
@@ -2705,6 +2893,48 @@ public class OrmAnnotationProcessorTest {
         assertTrue(reported, reported.contains("label"));
         assertTrue(reported, reported.contains("name"));
         assertTrue(reported, reported.contains("title"));
+    }
+
+    @Test
+    public void dependencyRepositoriesAreRegisteredByTheApplicationBootstrap() throws Exception {
+        for (boolean backend : new boolean[]{false,true}) {
+            for (boolean archive : new boolean[]{false,true}) {
+                File library=tmp.newFolder();
+                Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+                sources.put("dependency.Entry","package dependency; @com.codename1.annotations.Entity(table=\"dependency_repository_entry\") public class Entry { @com.codename1.annotations.Id public long id; public String name; }");
+                sources.put("dependency.Entries","package dependency; import com.codename1.orm.repository.*; @Repository(entity=Entry.class,key=Long.class) public interface Entries extends CrudRepository<Entry,Long> { long countByName(String name); }");
+                JavaSourceCompiler.compile(sources,library,Arrays.asList(testClassesDir()));
+                ProcessorContext lib=runProcessor(library,backend?backendClasspath():Collections.<String>emptyList());
+                assertFalse(lib.getErrors().toString(),lib.hasErrors());
+                File dependency=library;
+                if (archive) {
+                    dependency=tmp.newFile("repositories-"+backend+".jar");
+                    try (java.util.jar.JarOutputStream out=new java.util.jar.JarOutputStream(new java.io.FileOutputStream(dependency));
+                            java.util.stream.Stream<java.nio.file.Path> files=Files.walk(library.toPath())) {
+                        for (java.nio.file.Path file : (Iterable<java.nio.file.Path>)files.filter(Files::isRegularFile)::iterator) {
+                            addJarClass(out,library.toPath().relativize(file).toString().replace(File.separatorChar,'/'),file.toFile());
+                        }
+                    }
+                }
+                File app=tmp.newFolder();
+                sources.clear();
+                sources.put("consumer.Caller","package consumer; public class Caller { public static void run(com.codename1.orm.session.Session s) { dependency.Entries entries=com.codename1.orm.repository.Repositories.create(dependency.Entries.class,s); s.createTables(); s.beginTransaction(); dependency.Entry e=new dependency.Entry();e.name=\"shared\";entries.insert(e);s.commitTransaction(); if(entries.countByName(\"shared\")!=1 || entries.findById(e.id)!=e) throw new AssertionError(); } }");
+                JavaSourceCompiler.compile(sources,app,Arrays.asList(dependency,testClassesDir()));
+                List<String> cp=new ArrayList<String>(backend?backendClasspath():Collections.<String>emptyList());cp.add(dependency.getAbsolutePath());
+                for (int pass=0;pass<2;pass++) {
+                    ProcessorContext ctx=runProcessor(app,cp);
+                    assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+                }
+                try (java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{app.toURI().toURL(),dependency.toURI().toURL()},getClass().getClassLoader())) {
+                    loader.loadClass(backend?"cn1app.BackendDaoBootstrap":"cn1app.DaoBootstrap").newInstance();
+                    com.codename1.backend.orm.EntityManager server=backend?com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:")):null;
+                    com.codename1.orm.EntityManager client=backend?null:com.codename1.orm.EntityManager.open(new com.codename1.impl.javase.SEDatabase(java.sql.DriverManager.getConnection("jdbc:sqlite::memory:")));
+                    com.codename1.orm.session.Session session=backend?server.openSession():client.openSession();
+                    try { loader.loadClass("consumer.Caller").getMethod("run",com.codename1.orm.session.Session.class).invoke(null,session); }
+                    finally { session.close();if(server!=null)server.close();if(client!=null)client.close(); }
+                }
+            }
+        }
     }
 
     @Test

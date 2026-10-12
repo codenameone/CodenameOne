@@ -136,17 +136,57 @@ public final class SessionSqlAccess implements SqlAccess {
             }
         }
     }
+    private static boolean containsAlias(String sql, String alias) {
+        for (int i = 0; i <= sql.length() - alias.length(); i++) {
+            if (sql.regionMatches(true, i, alias, 0, alias.length())) {
+                return true;
+            }
+        }
+        return false;
+    }
     @Override
     public List<Object[]> query(String sql, Object[] args, int[] kinds) throws IOException {
         validateParameters(args);
         synchronized (db) {
             checkOwner();
+            boolean nativeScalar = kinds.length == 1 && kinds[0] == SqlAccess.NATIVE_SCALAR;
+            if (nativeScalar) {
+                // SQLite's typed Row getters coerce values. Read typeof alongside the
+                // value, and let the CTE's column list enforce width even for empty results.
+                StringBuilder alias = new StringBuilder("cn1_native_scalar");
+                while (containsAlias(sql, alias.toString())) {
+                    alias.append('_');
+                }
+                // OFFSET prevents SQLite flattening the CTE and evaluating a volatile
+                // expression separately for its type and value.
+                sql = "WITH " + alias + "(value) AS (SELECT * FROM (" + sql
+                        + ") LIMIT -1 OFFSET 0) SELECT typeof(value), value FROM " + alias;
+            }
             Cursor cursor = db.executeQuery(sql, args);
             try {
+                if (cursor.getColumnCount() != (nativeScalar ? 2 : kinds.length)) {
+                    throw new IOException("Unexpected SQL projection width");
+                }
                 List<Object[]> result = new ArrayList<Object[]>();
                 while (cursor.next()) {
                     Row row = cursor.getRow();
                     Object[] values = new Object[kinds.length];
+                    if (nativeScalar) {
+                        String storage = row.getString(0);
+                        if ("integer".equals(storage)) {
+                            values[0] = Long.valueOf(row.getLong(1));
+                        } else if ("real".equals(storage)) {
+                            values[0] = Double.valueOf(row.getDouble(1));
+                        } else if ("text".equals(storage)) {
+                            values[0] = row.getString(1);
+                        } else if ("blob".equals(storage)) {
+                            values[0] = row.getBlob(1);
+                        } else if (!"null".equals(storage)) {
+                            throw new IOException("Unknown SQLite storage type: " + storage);
+                        }
+                        result.add(values);
+                        continue;
+                    }
                     for (int i = 0; i < values.length; i++) {
                         switch (kinds[i]) {
                             case Attribute.TEXT:

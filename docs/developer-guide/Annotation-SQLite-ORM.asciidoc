@@ -157,6 +157,22 @@ parameters can't be compared directly. `IS NULL` and `IS NOT NULL` also require 
 known operand type; a standalone untyped parameter is rejected. A scalar nested query requires an
 aggregate without `GROUP BY`, so it returns at most one row. `IN` and `EXISTS`
 may use queries that return multiple rows.
+Searched `CASE WHEN predicate THEN value ... ELSE value END` and simple
+`CASE expression WHEN value THEN value ... ELSE value END` work in scalar
+expressions, including `SUM(CASE WHEN ... THEN ... ELSE ... END)`. The first
+matching branch wins. An omitted `ELSE` yields SQL NULL; a NULL condition is
+not true, and simple CASE uses SQL equality (NULL doesn't match NULL). Aggregates
+ignore NULL inputs; SUM over no non-null inputs yields NULL, while COUNT yields
+zero. Use a boxed scalar return type when NULL is possible.
+
+Result branches must have compatible scalar storage types. Integral branches
+promote to Long when combined with Long literals; any real branch promotes the
+result to Double. At least one branch must have a known type; CASE with only
+untyped parameters or NULL branches is rejected. Entity and predicate result
+branches are unsupported; Boolean values and literals are supported. Converter
+mappings must agree across mapped result branches. Parameters in WHEN conditions
+and result branches remain bound parameters.
+
 A `DISTINCT` query can order only by selected expressions. Text range comparisons
 and `LIKE` patterns are case-sensitive across supported databases. An explicit
 `LIKE ... ESCAPE` uses a literal or named parameter for both the pattern and the
@@ -409,3 +425,105 @@ The runtime registry is keyed on `Class#getName()`; obfuscation renames
 the call sites and the registered keys together within a single
 execution. The keys are never persisted across builds, so the renaming
 has no observable effect on behavior.
+
+
+[[generated-orm-repositories]]
+=== Generated repositories
+
+A public top-level interface annotated with
+`com.codename1.orm.repository.Repository` and extending
+`CrudRepository<Entity, Key>` directly gets an `InterfaceNameCn1Repository`
+implementation during `cn1:process-annotations`. Both class literals are explicit;
+the key must match the mapped identifier's boxed type (the embedded key class or
+`Identifier` for composite keys). Use `Repositories.create(Records.class, session)` to obtain an implementation.
+This factory references the interface, so application sources compile on a clean
+build before `process-classes` generates the implementation. The generated DAO
+bootstrap registers direct factories alongside the entity mappings.
+The implementation makes direct session calls. There is no runtime classpath scan,
+proxy generation, or Hibernate dependency.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/repository/Records.java[tag=generated-repository]
+----
+
+The example's `RepositoryRecord` entity has `@Id public long id`,
+`public String name`, and `public long score`. This operation opens a session,
+creates its repository, commits the insert, and closes the session:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/repository/RepositorySnippets.java[tag=repository-unit-of-work]
+----
+
+The inherited CRUD methods are `insert`, `save`, `findById`, `findAll`, `count`,
+`existsById`, and `deleteById`. `insert` calls `persist`; `save` calls `merge` and
+returns the managed instance, which may differ from the argument. `findById`
+returns null for a missing row. `deleteById` removes a managed entity and observes
+its cascades and callbacks; deleting a missing key is a no-op in an active
+transaction.
+
+Derived methods support the following bounded grammar:
+
+* `findBy`, `findFirstBy`, `findTopBy`, `findFirstNBy`, and `findTopNBy` return the
+  entity or `List<Entity>`. A single result means the first row, not a uniqueness
+  assertion.
+* `countBy` returns `long`; `existsBy` returns `boolean`; `deleteBy` returns `int`
+  (affected rows) or `void`.
+* Direct scalar property names combine with `And` and `Or`; AND has higher precedence than OR.
+  Comparison suffixes are `Not`, `GreaterThan`, `GreaterThanEqual`, `LessThan`,
+  `LessThanEqual`, `Like`, and `In`. No suffix means equality. `IsNull`,
+  `IsNotNull`, `True`, and `False` consume no parameter. `In` takes an Iterable or
+  object array whose concrete element type matches the property. Raw and wildcard
+  collections are rejected at build time. `Like` requires String properties with
+  text storage. `True` and `False` require Boolean
+  properties with Boolean storage. Use `IsNull` to match NULL; equality retains SQL NULL semantics.
+* Find methods can end with `OrderByScoreDescIdAsc`; every field needs an explicit
+  `Asc` or `Desc`. Relationship paths and ambiguous property names containing
+  grammar keywords should use `@Query` instead.
+* A list select can take one final `PageRequest(offset, size)`. Offset must be
+  nonnegative and size positive. It returns the requested list without a separate
+  total-count query. Use explicit ordering with a unique tie-breaker for stable
+  pages. Top/First and PageRequest aren't combined.
+
+`@Query` declares the existing JPQL subset. Every value argument requires a unique
+`@Param("name")` matching the query exactly. SQL values are bound, never
+interpolated. `@Modifying` is required for declared UPDATE/DELETE and forbidden
+for SELECT. Such methods return `int` or `void`. Native SQL uses
+`@Query(value="...", nativeSql=true)` with the same named parameters, including
+repeated occurrences. Native parameters accept primitive and boxed scalar types,
+String, Date, BigInteger, BigDecimal, and `byte[]` BLOBs. Date values bind as epoch
+milliseconds and Character values as numeric code units on both client and backend.
+Collections and other array types are rejected during generation. Native repository
+selects return one scalar column of
+String, Long, Integer, Double, or Boolean, or a List of that type. They don't hydrate
+entities. Scalar conversion rejects fractional values requested as integers and
+integer values requested as String; it preserves SQL NULL. Native SQL is
+database-specific: use portable SQL or validate each engine. Only SELECT, UPDATE, and DELETE are accepted; comments, multiple
+statements, positional parameters, dollar quoting, and backtick quoting are
+unsupported. Use standard quotes and bind values containing backslashes.
+
+Unsupported signatures, unmapped derived fields, and missing or surplus declared
+parameter names produce build errors naming the repository and method. JPQL syntax
+and mapped names are validated when the method creates its query, before SQL
+execution. Native SQL syntax beyond the supported envelope is checked by the
+database. Generic methods, additional parent interfaces, default methods, dynamic
+sort arguments, and arbitrary DTO projections aren't supported.
+
+Repositories never open, commit, roll back, or close transactions or sessions.
+The caller owns those boundaries, including when the supplied Session is injected
+into a backend `@Transactional` service. Writes require an active usable
+transaction. Reads follow Session's automatic flush rules. Redeclare only
+`findById(Key)` with `@Lock` to request a lock; pessimistic locks need an active
+transaction and an engine supporting row locks. SQLite rejects them explicitly.
+
+Derived deletes and declared JPQL/native modifications flush pending changes,
+execute bulk SQL, then clear the entire persistence context. They bypass entity
+callbacks, cascades, and automatic optimistic-version updates. Previously held
+objects are detached and retain their old Java values; reload them before further
+work. There is no option to disable flush or clear. Validation failures remain
+`IllegalArgumentException`; database failures remain `PersistenceException`, and
+optimistic conflicts remain `OptimisticLockException`. Repository code neither
+swallows nor retries them. Roll back after a failed database write; Session marks
+the transaction rollback-only. Rollback detaches entities without reverting Java
+field values.
