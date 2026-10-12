@@ -24,7 +24,6 @@ package com.codename1.backend.sql;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -590,6 +589,7 @@ public final class Postgres {
                 case ROW_DESCRIPTION: {
                     requireBytes(message.body, 0, 2);
                     int columns = shortAt(message.body, 0);
+                    result.rows.setColumnCount(columns);
                     names = new String[columns];
                     types = new int[columns];
                     int at = 2;
@@ -929,7 +929,7 @@ public final class Postgres {
     }
 
     private static final class Result {
-        final List rows = new ArrayList();
+        final QueryRows rows = new QueryRows(0);
         int affected;
     }
 

@@ -25,6 +25,57 @@ sys.modules[spec.name] = syndicate
 spec.loader.exec_module(syndicate)
 
 
+class SyndicatedMediaTest(unittest.TestCase):
+    def test_tab_bar_article_keeps_both_playable_videos(self):
+        posts = syndicate.discover_posts(syndicate.BLOG_DIR)
+        post = next(p for p in posts if p.slug == "ios27-glass-from-measurements")
+        body = syndicate.render_syndicated_body(post, posts, dt.date(2026, 10, 12))
+
+        self.assertEqual(2, body.count("<video controls playsinline"))
+        for filename in ("light.mp4", "dark-tabs.mp4"):
+            url = f"{syndicate.SITE_BASE_URL}/blog/ios27-measured-glass/{filename}"
+            self.assertIn(f'<source src="{url}" type="video/mp4">', body)
+            self.assertIn(f'<a href="{url}">Download the ', body)
+        for filename in ("light-poster.jpg", "dark-poster.jpg"):
+            self.assertIn(
+                f'poster="{syndicate.SITE_BASE_URL}/blog/ios27-measured-glass/{filename}"',
+                body,
+            )
+        self.assertNotRegex(body, r'(?:src|poster|href)=["\']/')
+        self.assertNotIn("guide-block", body)
+
+    def test_html_urls_preserve_markup_and_support_attribute_styles(self):
+        body = (
+            '<VIDEO controls SRC = "/clip.mp4" POSTER=\'/poster.jpg\'>\n'
+            '<source src=/clip.webm type="video/webm">\n'
+            '<a class="download" href = "/clip.mp4?x=1&amp;y=2">Download</a>\n'
+            '</VIDEO>\n<img alt="Preview > image" src="/preview.jpg">'
+        )
+        expected = body
+        for url in ("/clip.mp4", "/poster.jpg", "/clip.webm", "/preview.jpg"):
+            expected = expected.replace(url, syndicate.SITE_BASE_URL + url)
+        self.assertEqual(expected, syndicate.absolutize_links(body))
+        self.assertEqual(expected, syndicate.absolutize_links(expected))
+
+    def test_external_urls_and_non_url_attributes_are_unchanged(self):
+        body = (
+            '<video src="https://media.example/clip.mp4" poster="//cdn.example/poster.jpg">'
+            '<source src="data:video/mp4;base64,AAAA"></video>\n'
+            '<img data-src="/lazy.jpg" alt="src=\'/example.jpg\'" src="//cdn.example/a.jpg">\n'
+            '<a href="#section" title="href=\'/example\'">Section</a>\n'
+            '<a href="mailto:help@example.com">Email</a>\n'
+            '[External](//example.com/post) ![Image](//cdn.example/a.jpg)'
+        )
+        self.assertEqual(body, syndicate.absolutize_links(body))
+
+    def test_existing_markdown_links_still_become_absolute(self):
+        self.assertEqual(
+            f'[Post]({syndicate.SITE_BASE_URL}/blog/post/) '
+            f'![Image]({syndicate.SITE_BASE_URL}/blog/image.jpg)',
+            syndicate.absolutize_links('[Post](/blog/post/) ![Image](/blog/image.jpg)'),
+        )
+
+
 class DevToRecoveryTest(unittest.TestCase):
     def setUp(self):
         self.post = syndicate.Post(
