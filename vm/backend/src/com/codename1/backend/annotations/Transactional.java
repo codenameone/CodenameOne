@@ -57,6 +57,9 @@ import java.lang.annotation.Target;
 public @interface Transactional {
     /// What to do about a transaction that is already open.
     Propagation propagation() default Propagation.REQUIRED;
+    /// Isolation for a new physical transaction. An explicit level joining an
+    /// existing transaction must match its explicit level, including at savepoints.
+    Isolation isolation() default Isolation.DEFAULT;
     /// A hint that the method only reads. Engines that support a read-only
     /// transaction get one, which lets them skip work and refuse writes.
     boolean readOnly() default false;

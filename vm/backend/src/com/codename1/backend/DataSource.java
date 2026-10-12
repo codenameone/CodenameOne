@@ -22,6 +22,8 @@
  */
 package com.codename1.backend;
 
+import com.codename1.backend.annotations.Isolation;
+import com.codename1.backend.annotations.Propagation;
 import com.codename1.impl.backend.AsyncTask;
 
 import java.io.IOException;
@@ -427,6 +429,18 @@ public final class DataSource {
             }
         }
         return withConnection(new TransactionWork(body));
+    }
+
+    /// Runs a REQUIRED thread-bound transaction with explicit isolation. Pool
+    /// operations in the body join it, and transaction callbacks/resources are available.
+    public Object inTransaction(final Isolation isolation,
+                                final Work body) throws Exception {
+        return Transactions.execute(Propagation.REQUIRED,
+                false, -1, isolation, new Transactions.Work() {
+                    public Object run() throws Exception {
+                        return body.run(borrow());
+                    }
+                });
     }
 
     /// [#inTransaction]'s body, run inside a transaction on the borrowed
