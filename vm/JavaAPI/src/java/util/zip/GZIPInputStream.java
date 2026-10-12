@@ -81,6 +81,23 @@ public class GZIPInputStream extends InflaterInputStream {
         for (int i = 0; i < 4; i++) result |= (long) byteValue() << (8 * i);
         return result;
     }
+    protected void fill() throws IOException {
+        ensureOpen();
+        // A concatenated member may be wholly in the pushback buffer. Asking
+        // for more than its available bytes would also read the idle source.
+        int ready = in.available();
+        len = in.read(buf, 0, ready > 0 ? Math.min(ready, buf.length) : buf.length);
+        if (len < 0)
+            throw new EOFException("Truncated compressed stream");
+        if (len == 0) {
+            int b = in.read();
+            if (b < 0)
+                throw new EOFException();
+            buf[0] = (byte) b;
+            len = 1;
+        }
+        inf.setInput(buf, 0, len);
+    }
     public int read(byte[] b, int off, int length) throws IOException {
         ensureOpen();
         Deflater.bounds(b, off, length);
@@ -99,6 +116,12 @@ public class GZIPInputStream extends InflaterInputStream {
                 ((PushbackInputStream) in).unread(buf, len - left, left);
             if (word() != crc.getValue() || word() != (inf.getBytesWritten() & 0xffffffffL))
                 throw new ZipException("Invalid GZIP trailer");
+            // PushbackInputStream counts both buffered bytes and source data.
+            // A completed member must not wait for a persistent source to close.
+            if (in.available() == 0) {
+                eos = true;
+                break;
+            }
             int first = in.read();
             if (first < 0) {
                 eos = true;

@@ -29,6 +29,7 @@ public class GZIPInputStream extends java.util.zip.InflaterInputStream {
   protected boolean eos;
   public GZIPInputStream(java.io.InputStream arg0) throws java.io.IOException { super(null); throw new RuntimeException("Compile-time stub"); }
   public GZIPInputStream(java.io.InputStream arg0, int arg1) throws java.io.IOException { super(null); throw new RuntimeException("Compile-time stub"); }
+  protected void fill() throws java.io.IOException { throw new RuntimeException("Compile-time stub"); }
   public int read(byte[] arg0, int arg1, int arg2) throws java.io.IOException { throw new RuntimeException("Compile-time stub"); }
   public int available() throws java.io.IOException { throw new RuntimeException("Compile-time stub"); }
   public void close() throws java.io.IOException { throw new RuntimeException("Compile-time stub"); }

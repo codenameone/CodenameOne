@@ -512,6 +512,40 @@ public class ZipApiApp {
             }
         }
     }
+    static void gzipLiveSource() throws Exception {
+        byte[] data = "completed member on an open source".getBytes("UTF-8");
+        ByteArrayOutputStream member = new ByteArrayOutputStream();
+        try (GZIPOutputStream out = new GZIPOutputStream(member)) { out.write(data); }
+        for (int members = 1; members <= 2; members++) {
+            for (int size : new int[] {1, 512}) {
+                ByteArrayOutputStream encoded = new ByteArrayOutputStream();
+                ByteArrayOutputStream expected = new ByteArrayOutputStream();
+                for (int i = 0; i < members; i++) {
+                    encoded.write(member.toByteArray());
+                    expected.write(data);
+                }
+                final ByteArrayInputStream arrived = new ByteArrayInputStream(encoded.toByteArray());
+                final boolean advertise = size == 1;
+                InputStream live = new InputStream() {
+                    public int available() { return advertise ? arrived.available() : 0; }
+                    public int read() {
+                        require(arrived.available() > 0, "GZIP must not probe an idle live source");
+                        return arrived.read();
+                    }
+                    public int read(byte[] b, int off, int len) {
+                        require(arrived.available() > 0, "GZIP must not fill from an idle live source");
+                        return arrived.read(b, off, len);
+                    }
+                };
+                try (GZIPInputStream in = new GZIPInputStream(live, size)) {
+                    // With size 512, concatenated members are already buffered
+                    // even though the source advertises no additional bytes.
+                    require(Arrays.equals(expected.toByteArray(), readAll(in)), "live GZIP members");
+                    require(in.read() == -1 && in.available() == 0, "completed live GZIP stays at EOF");
+                }
+            }
+        }
+    }
     static void compatibilityRegressions(boolean customRuntime) throws Exception {
         byte[] data = "flushed payload".getBytes("UTF-8");
         // JDK 8 itself loops indefinitely with buffers smaller than the flush marker.
@@ -594,6 +628,7 @@ public class ZipApiApp {
     public static void main(String[] args) throws Exception {
         byte[] data = payload();
         checksums();
+        gzipLiveSource();
         checkedCloseFailures(args.length > 1);
         skipZipEntries();
         zipNameDecoding(args.length > 1);
