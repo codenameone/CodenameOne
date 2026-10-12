@@ -176,4 +176,18 @@ class CSSImportTest {
     private static String asText(Object value) {
         return value instanceof float[] ? java.util.Arrays.toString((float[]) value) : String.valueOf(value);
     }
+
+    @Test
+    void anImportAfterARuleStopsTheCompileNamingIt(@TempDir Path tmp) throws Exception {
+        File dir = tmp.toFile();
+        write(new File(dir, "late.css"), "Late { color: #111111; }\n");
+        File root = write(new File(dir, "theme.css"), "Title { color: #333333; }\n@import \"late.css\";\n");
+        IOException ex = assertThrows(IOException.class, () -> CssImports.collect(root));
+        assertTrue(ex.getMessage().contains("late.css") && ex.getMessage().contains("after a rule"), ex.getMessage());
+
+        // Before every rule, comments and other imports aside, it is read.
+        File fine = write(new File(dir, "fine.css"),
+                "/* a note */\n@import \"late.css\";\n@import 'late.css';\nTitle { color: #333333; }\n");
+        assertEquals(1, CssImports.collect(fine).size());
+    }
 }

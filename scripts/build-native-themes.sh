@@ -192,13 +192,23 @@ compile_theme() {
   [ "$missing" -eq 0 ] || return
   mkdir -p "$OUT_DIR" "$build_dir"
   : > "$css"
+  # The compiler refuses an `@import` that comes after a rule, as CSS has it,
+  # and set end to end the import of a second part would come after the rules
+  # of the first. So the imports of every part go first, in the order of the
+  # parts, and each part follows without its own. An import is taken to be a
+  # line that begins with one, which is how they are written here.
+  while IFS= read -r part; do
+    cat_part "$CSS_SRC_ROOT/$part" "../../$(dirname "$part")/" \
+      | { grep -E '^[[:space:]]*@import[[:space:]]' || true; } >> "$css"
+  done < <(theme_parts "$name")
   while IFS= read -r part; do
     # A provenance banner per part: parse errors report a line number in THIS
     # concatenated file, so without it an error in gen27.css points at a line of
     # a file nobody edited. Comments are inert here -- the dark-mode rewriter
     # uses indexOfOutsideComments and skips them.
     printf '/* ===== native-themes/%s ===== */\n' "$part" >> "$css"
-    cat_part "$CSS_SRC_ROOT/$part" "../../$(dirname "$part")/" >> "$css"
+    cat_part "$CSS_SRC_ROOT/$part" "../../$(dirname "$part")/" \
+      | { grep -v -E '^[[:space:]]*@import[[:space:]]' || true; } >> "$css"
     printf '\n' >> "$css"
   done < <(theme_parts "$name")
   log "Compiling $name -> $out"

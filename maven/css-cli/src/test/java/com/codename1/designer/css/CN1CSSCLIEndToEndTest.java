@@ -278,6 +278,26 @@ class CN1CSSCLIEndToEndTest {
     }
 
     @Test
+    void aMergedBuildTakesAnOutsideImagePutBackWithAnOlderTime(@TempDir Path tmp) throws Exception {
+        File dir = tmp.toFile();
+        write(new File(dir, "shared/base.css"), "Badge { background-image: url(img/a.png); cn1-source-dpi: 160; }\n");
+        File image = png(new File(dir, "shared/img/a.png"), 8, 6, 0xff336699);
+        File app = write(new File(dir, "app/css/theme.css"), "@import \"../../shared/base.css\";\n");
+        File merged = new File(dir, "work/theme.css.merged");
+        File res = new File(dir, "work/theme.res");
+        String[] args = {"-input", app.getPath(), "-output", res.getPath(), "-merge", merged.getPath()};
+        assertEquals(0, CN1CSSCLI.run(args), stderr());
+        long length = image.length();
+
+        // The same size, another colour, and older than everything built.
+        png(image, 8, 6, 0xff996633);
+        org.junit.jupiter.api.Assumptions.assumeTrue(image.length() == length, "the two pictures are the same size");
+        assertTrue(image.setLastModified(res.lastModified() - 600000));
+        assertEquals(0, CN1CSSCLI.run(args), stderr());
+        assertEquals(0xff996633, open(res).getImage("a.png").getRGB()[0], "the picture that is there now");
+    }
+
+    @Test
     void anEditToAnImageAloneRecompilesAMergedBuild(@TempDir Path tmp) throws Exception {
         File dir = tmp.toFile();
         File app = write(new File(dir, "app/theme.css"),

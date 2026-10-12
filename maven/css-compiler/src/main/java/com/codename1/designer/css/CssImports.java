@@ -177,6 +177,8 @@ public final class CssImports {
         int len = text.length();
         int i = 0;
         int depth = 0;
+        // Whether a rule, or a block of any kind, has been met in this file.
+        boolean ruled = false;
         while (i < len) {
             char c = text.charAt(i);
             if (c == '/' && i + 1 < len && text.charAt(i + 1) == '*') {
@@ -190,6 +192,7 @@ public final class CssImports {
                 i = end;
             } else if (c == '{') {
                 depth++;
+                ruled = true;
                 out.append(c);
                 i++;
             } else if (c == '}') {
@@ -198,14 +201,15 @@ public final class CssImports {
                 i++;
             } else if (c == '@' && depth == 0 && text.regionMatches(true, i, "@import", 0, 7)
                     && i + 7 < len && !isIdentChar(text.charAt(i + 7))) {
-                // Wherever it stands, and so after a rule as well. A browser
-                // drops an import that follows a rule without a word; a
-                // compiler that did the same would leave a file out of a
-                // theme and say nothing, which is the fault importing was
-                // written to end. It is also what lets a theme be built
-                // from parts set end to end (scripts/build-native-themes.sh):
-                // the import of a second part comes after the rules of the
-                // first, and belongs to the theme all the same.
+                // An import comes before every rule of its file, which is
+                // what CSS asks. A browser drops one that comes later and
+                // says nothing; here that would leave a file out of a theme
+                // without a word, so the compile stops and names it.
+                if (ruled) {
+                    int stop = endOfStatement(text, i);
+                    throw new IOException(current + ": " + text.substring(i, Math.min(len, stop)).trim()
+                            + " comes after a rule. Move every @import to the top of the file.");
+                }
                 int end = endOfStatement(text, i);
                 String statement = text.substring(i + 7, end).trim();
                 out.append(resolve(current, statement, stack, imported));

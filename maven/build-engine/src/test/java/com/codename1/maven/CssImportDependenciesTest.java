@@ -235,4 +235,20 @@ class CssImportDependenciesTest {
 
         assertEquals(java.util.Collections.singleton(shared.getCanonicalFile()), CssImportDependencies.outside(css));
     }
+
+    @Test
+    void aMultiImageDirectoryLinkedBackToItselfIsLookedInOnce(@TempDir Path tmp) throws Exception {
+        File dir = tmp.toFile();
+        File css = new File(dir, "css");
+        write(new File(css, "theme.css"), "Label { background-image: url(../shared/icon.png); }\n");
+        File multi = new File(dir, "shared/icon.png");
+        File high = write(new File(multi, "high.png"), "x");
+        assertTrue(high.setLastModified(1700000000000L));
+        try {
+            java.nio.file.Files.createSymbolicLink(new File(multi, "again").toPath(), multi.toPath());
+        } catch (UnsupportedOperationException | java.io.IOException ex) {
+            org.junit.jupiter.api.Assumptions.assumeTrue(false, "no symbolic links here");
+        }
+        assertTrue(CssImportDependencies.lastModified(css) < Long.MAX_VALUE);
+    }
 }

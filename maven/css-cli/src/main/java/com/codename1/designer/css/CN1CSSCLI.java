@@ -865,8 +865,13 @@ public class CN1CSSCLI {
                 File copy = new File(new File(new File(mirrorDir, OUTSIDE_ASSETS_DIR), origin),
                         target.getFileName().toString());
                 File source = target.toFile();
+                // Also one of the same size that is not newer: a checkout
+                // that puts an older file back changes what is in it and
+                // moves its time the wrong way. What is in the two is what
+                // says whether the copy still stands.
                 if (!copy.isFile() || copy.lastModified() < source.lastModified()
-                        || copy.length() != source.length()) {
+                        || copy.length() != source.length()
+                        || !Arrays.equals(Files.readAllBytes(copy.toPath()), Files.readAllBytes(target))) {
                     File parent = copy.getParentFile();
                     if (!parent.isDirectory() && !parent.mkdirs()) {
                         throw new IOException("Could not create " + parent);

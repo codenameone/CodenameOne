@@ -91,9 +91,18 @@ log "Baseline: $BASE_REF:$BASE_CSS"
 java -Djava.awt.headless=true -jar "$JAR" -no-raster -native-theme-units -input "$WORK/baseline.css" -output "$WORK/baseline.res" >/dev/null
 
 # The split side is whatever the build script would feed the compiler today.
-repoint_imports < native-themes/ios-modern/common.css > "$WORK/split.css"
-printf '\n' >> "$WORK/split.css"
-repoint_imports < native-themes/ios-modern/gen26.css >> "$WORK/split.css"
+# Imports first, as the build script sets them: the compiler refuses one that
+# comes after a rule.
+: > "$WORK/split.css"
+for part in common gen26; do
+    repoint_imports < "native-themes/ios-modern/$part.css" \
+        | { grep -E '^[[:space:]]*@import[[:space:]]' || true; } >> "$WORK/split.css"
+done
+for part in common gen26; do
+    repoint_imports < "native-themes/ios-modern/$part.css" \
+        | { grep -v -E '^[[:space:]]*@import[[:space:]]' || true; } >> "$WORK/split.css"
+    printf '\n' >> "$WORK/split.css"
+done
 java -Djava.awt.headless=true -jar "$JAR" -no-raster -native-theme-units -input "$WORK/split.css" -output "$WORK/split.res" >/dev/null
 
 if cmp -s "$WORK/baseline.res" "$WORK/split.res"; then

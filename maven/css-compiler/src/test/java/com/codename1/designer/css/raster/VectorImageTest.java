@@ -1458,11 +1458,53 @@ class VectorImageTest {
     void aForeignObjectWithNothingInItsPlaceIsRefused() throws Exception {
         String foreign = "<foreignObject width=\"50\" height=\"50\"><p xmlns=\"http://www.w3.org/1999/xhtml\">x</p>"
                 + "</foreignObject>";
-        java.io.IOException refused = org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class,
-                () -> paint(foreign, 100, 100));
+        IllegalArgumentException refused = org.junit.jupiter.api.Assertions.assertThrows(
+                IllegalArgumentException.class, () -> paint(foreign, 100, 100));
         assertTrue(refused.getMessage().contains("foreignObject"), refused.getMessage());
         BufferedImage img = paint("<switch>" + foreign + "<rect width=\"50\" height=\"50\" fill=\"#ff0000\"/></switch>",
                 100, 100);
         assertEquals(0xffff0000, img.getRGB(25, 25), "the switch's other child is drawn in its place");
+        // One that is never drawn is no fault: in a definition nothing
+        // uses, or in something that is not displayed.
+        paint("<defs><g id=\"unused\">" + foreign + "</g></defs><g display=\"none\">" + foreign + "</g>", 100, 100);
+    }
+
+    @Test
+    void aFloodCanTakeTheCurrentColor() throws Exception {
+        BufferedImage img = paint("<defs><filter id=\"f\" color=\"#00ff00\" x=\"0\" y=\"0\" width=\"1\" height=\"1\""
+                + " color-interpolation-filters=\"sRGB\"><feFlood flood-color=\"currentColor\"/></filter></defs>"
+                + "<rect width=\"100\" height=\"100\" filter=\"url(#f)\"/>", 100, 100);
+        assertEquals(0xff00ff00, img.getRGB(50, 50));
+    }
+
+    @Test
+    void aGradientOfAnotherFilePaintsAShape(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tmp)
+            throws Exception {
+        java.nio.file.Files.write(tmp.resolve("paints.svg"), ("<svg xmlns=\"http://www.w3.org/2000/svg\"><defs>"
+                + "<linearGradient id=\"g\"><stop offset=\"0\" stop-color=\"#00ff00\"/></linearGradient></defs></svg>")
+                .getBytes(StandardCharsets.UTF_8));
+        java.nio.file.Path main = tmp.resolve("main.svg");
+        java.nio.file.Files.write(main, ("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\">"
+                + "<rect width=\"100\" height=\"100\" fill=\"url(paints.svg#g)\"/></svg>")
+                .getBytes(StandardCharsets.UTF_8));
+        BufferedImage img;
+        try (java.io.InputStream in = java.nio.file.Files.newInputStream(main)) {
+            img = VectorImage.readSvg(in, main.toUri().toURL()).paint(100, 100);
+        }
+        assertEquals(0xff00ff00, img.getRGB(50, 50));
+    }
+
+    @Test
+    void deferBeforeAnImagesFittingIsPassedOver() throws Exception {
+        // A 2 by 1 picture, sliced into a square box from its left edge.
+        BufferedImage picture = new BufferedImage(2, 1, BufferedImage.TYPE_INT_ARGB);
+        picture.setRGB(0, 0, 0xffff0000);
+        picture.setRGB(1, 0, 0xff0000ff);
+        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(picture, "png", bytes);
+        String data = "data:image/png;base64," + java.util.Base64.getEncoder().encodeToString(bytes.toByteArray());
+        BufferedImage img = paint("<image href=\"" + data + "\" width=\"100\" height=\"100\""
+                + " preserveAspectRatio=\"defer xMinYMin slice\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(20, 50), "the left of the picture, at the left of the box");
     }
 }

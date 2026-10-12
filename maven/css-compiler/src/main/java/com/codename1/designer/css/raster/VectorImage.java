@@ -127,14 +127,6 @@ public final class VectorImage {
     /// it names with a relative address are found against.
     public static VectorImage readSvg(InputStream in, java.net.URL base) throws IOException {
         SVGDocument doc = new SVGParser().parse(in);
-        if (doc.getForeignObjects() > 0) {
-            // What is in one is a page, HTML as a rule, and drawing it
-            // takes a browser. Leaving it out would give an image with a
-            // hole where a label was and no word of it, so the file is
-            // refused, with what to do about it.
-            throw new IOException("it holds a <foreignObject>, whose content cannot be drawn here. Put it in a"
-                    + " <switch> with something to draw in its place, or take it out");
-        }
         VectorImage image = new VectorImage(doc, doc.isViewBoxDeclared());
         image.base = base;
         image.svg = true;
@@ -578,7 +570,7 @@ public final class VectorImage {
         }
         double bw = image.getWidth() > 0 ? image.getWidth() : picture.getWidth();
         double bh = image.getHeight() > 0 ? image.getHeight() : picture.getHeight();
-        String par = image.getPreserveAspectRatio() == null ? "" : image.getPreserveAspectRatio().trim();
+        String par = undeferred(image.getPreserveAspectRatio());
         double sx = bw / picture.getWidth();
         double sy = bh / picture.getHeight();
         double tx = 0;
@@ -657,6 +649,13 @@ public final class VectorImage {
         }
     }
 
+    /// A `preserveAspectRatio` without the `defer` an `<image>` may put
+    /// before it, which only matters to a picture that has one of its own.
+    private static String undeferred(String par) {
+        String p = par == null ? "" : par.trim();
+        return p.startsWith("defer") ? p.substring(5).trim() : p;
+    }
+
     /// The pixels of the picture an `<image>` names, or null. A `data:`
     /// address is decoded; any other is a file beside this one. An SVG is
     /// painted at the size of the box it goes in.
@@ -718,7 +717,10 @@ public final class VectorImage {
             }
             // How it is fitted to the box is for the `<image>` to say. What
             // the file's own root says is for when it is shown by itself.
-            inner.fitAs = image.getPreserveAspectRatio() == null ? "" : image.getPreserveAspectRatio();
+            // Unless it defers: then the file's own, where it has one.
+            String asked = image.getPreserveAspectRatio() == null ? "" : image.getPreserveAspectRatio().trim();
+            inner.fitAs = asked.startsWith("defer") && inner.doc.getPreserveAspectRatio() != null ? null
+                    : undeferred(asked);
             return inner.paint(pw, ph, 4096);
         } catch (IOException ex) {
             return null;
@@ -794,6 +796,15 @@ public final class VectorImage {
             if (node instanceof SVGClipPath) {
                 // A definition. It is used through clip-path, never drawn.
                 return;
+            }
+            if (node instanceof com.codename1.svg.transcoder.model.SVGForeignObject) {
+                // What is in one is a page, HTML as a rule, and drawing it
+                // takes a browser. Leaving it out would give an image with
+                // a hole where a label was and no word of it, so the image
+                // is refused, with what to do about it. Only here, where
+                // it would be drawn: one nothing shows is no fault.
+                throw new IllegalArgumentException("the SVG holds a <foreignObject>, whose content cannot be drawn"
+                        + " here. Put it in a <switch> with something to draw in its place, or take it out");
             }
             if (node instanceof SVGUse) {
                 paintUse(g, (SVGUse) node, style, w, h);
@@ -1668,13 +1679,25 @@ public final class VectorImage {
         }
         Paint p;
         if (paint.isReference()) {
-            SVGNode def = doc.getDefinitions().get(paint.getReference());
+            String ref = paint.getReference();
+            SVGNode def = doc.getDefinitions().get(ref);
+            // A gradient or a pattern of another file beside this one,
+            // `paints.svg#g`, is worked out by that file, which is the one
+            // that knows what it refers to in its turn.
+            VectorImage owner = this;
+            if (def == null && ref.indexOf('#') > 0) {
+                VectorImage other = beside(ref.substring(0, ref.indexOf('#')));
+                if (other != null) {
+                    owner = other;
+                    def = other.doc.getDefinitions().get(ref.substring(ref.indexOf('#') + 1));
+                }
+            }
             if (def instanceof SVGPattern) {
-                paintPattern(g, (SVGPattern) def, alpha, area, boundsOf.getBounds2D());
+                owner.paintPattern(g, (SVGPattern) def, alpha, area, boundsOf.getBounds2D());
                 return;
             }
             if (def instanceof SVGLinearGradient || def instanceof SVGRadialGradient) {
-                p = gradient(def, boundsOf.getBounds2D());
+                p = owner.gradient(def, boundsOf.getBounds2D());
                 if (p == null) {
                     return;
                 }

@@ -207,10 +207,8 @@ public final class SVGParser {
             if (ev == XMLStreamConstants.START_ELEMENT && "svg".equals(r.getLocalName())) {
                 SVGDocument doc = new SVGDocument();
                 readSVGRoot(r, doc);
-                foreignObjects = 0;
                 readChildren(r, doc, doc);
                 indexById(doc, doc);
-                doc.setForeignObjects(foreignObjects);
                 return doc;
             }
         }
@@ -383,9 +381,6 @@ public final class SVGParser {
         return Boolean.valueOf("italic".equals(s) || "oblique".equals(s));
     }
 
-    /** How many {@code <foreignObject>} elements were passed over with nothing drawn in their place. */
-    private int foreignObjects;
-
     private void readChildren(XMLStreamReader r, SVGGroup parent, SVGDocument doc) throws XMLStreamException {
         while (r.hasNext()) {
             int ev = r.next();
@@ -410,18 +405,24 @@ public final class SVGParser {
                 applyCommon(g, ga);
                 parent.addChild(g);
                 Object[] font = enterFont(ga);
-                int foreignBefore = foreignObjects;
                 try {
                     readChildren(r, g, doc);
                 } finally {
                     leaveFont(font);
                 }
-                if ("switch".equals(name) && !g.getChildren().isEmpty()) {
-                    // The switch had something else to draw in its place,
-                    // which is what a switch is for.
-                    foreignObjects = foreignBefore;
-                }
                 if ("switch".equals(name)) {
+                    // A foreign object is only what the switch draws when
+                    // it has nothing else to draw in its place, which is
+                    // what a switch is for.
+                    boolean other = false;
+                    for (SVGNode child : g.getChildren()) {
+                        other = other || !(child instanceof SVGForeignObject);
+                    }
+                    if (other) {
+                        for (int i = g.getChildren().size() - 1; i >= 0; i--) {
+                            if (g.getChildren().get(i) instanceof SVGForeignObject) g.getChildren().remove(i);
+                        }
+                    }
                     while (g.getChildren().size() > 1) {
                         g.getChildren().remove(g.getChildren().size() - 1);
                     }
@@ -545,9 +546,14 @@ public final class SVGParser {
             } else {
                 if ("foreignObject".equals(name)) {
                     // A page of another language, HTML as a rule, which
-                    // nothing here can draw. It is counted, for a reader
-                    // that would not leave a hole where it was.
-                    foreignObjects++;
+                    // nothing here can draw. It is kept as a mark of where
+                    // it was, for a renderer that comes to draw it to say
+                    // so and not leave a hole. One that is never drawn --
+                    // in a definition nothing uses, or in something not
+                    // displayed -- is then never a fault.
+                    SVGForeignObject foreign = new SVGForeignObject();
+                    applyCommon(foreign, attrs(r));
+                    parent.addChild(foreign);
                 }
                 skip(r);
             }
@@ -809,7 +815,25 @@ public final class SVGParser {
         // the filter is written in, or of the element's box when the
         // effects are measured in that. It is worked out here, where the
         // viewport is known, into the number it stands for.
+        Integer around = colorOf(a) != null ? colorOf(a) : inheritedColor;
         for (SVGFilter.Primitive p : f.getPrimitives()) {
+            // `currentColor` is the `color` of the effect, which it has
+            // from the filter and what that is in when it sets none.
+            for (String painted : new String[] {"flood-color", "lighting-color"}) {
+                if (p.get(painted) != null && ColorParser.isCurrentColor(p.get(painted))) {
+                    Integer own = null;
+                    try {
+                        own = p.get("color") == null ? null : Integer.valueOf(ColorParser.parse(p.get("color")));
+                    } catch (RuntimeException e) {
+                        own = null;
+                    }
+                    Integer is = own != null ? own : around;
+                    if (is != null) {
+                        String hex = Integer.toHexString(is.intValue() & 0xffffff);
+                        p.set(painted, "#" + "000000".substring(hex.length()) + hex);
+                    }
+                }
+            }
             resolveShare(p, "x", viewportWidth, f.isPrimitiveObjectBoundingBox());
             resolveShare(p, "width", viewportWidth, f.isPrimitiveObjectBoundingBox());
             resolveShare(p, "y", viewportHeight, f.isPrimitiveObjectBoundingBox());

@@ -246,7 +246,7 @@ public final class CssImportDependencies {
         long newest = 0;
         for (File f : outside(cssDir)) {
             if (f.isDirectory()) {
-                newest = Math.max(newest, newestIn(f));
+                newest = Math.max(newest, newestIn(f, new java.util.HashSet<File>()));
                 continue;
             }
             if (!f.isFile()) {
@@ -257,12 +257,21 @@ public final class CssImportDependencies {
         return newest;
     }
 
-    private static long newestIn(File dir) {
+    /// `seen` as for [#collectStylesheets]: a directory linked back to
+    /// itself or to something it is in is looked in once.
+    private static long newestIn(File dir, Set<File> seen) {
         long newest = dir.lastModified();
+        try {
+            if (!seen.add(dir.getCanonicalFile())) {
+                return newest;
+            }
+        } catch (IOException ex) {
+            return newest;
+        }
         File[] children = dir.listFiles();
         if (children != null) {
             for (File child : children) {
-                newest = Math.max(newest, child.isDirectory() ? newestIn(child) : child.lastModified());
+                newest = Math.max(newest, child.isDirectory() ? newestIn(child, seen) : child.lastModified());
             }
         }
         return newest;

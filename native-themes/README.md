@@ -43,9 +43,14 @@ PARTS instead, because two OS design generations ship from it:
 concatenates them into `native-themes/<theme>/target/` before compiling.
 
 **Layers go in `theme_parts()`, not in an `@import`.** The compiler does inline
-a local `@import` at the point it appears, but an `@import` is written into the
-file, and the point of the split is that the SAME `common.css` compiles twice
-with a different last part. Keep `@import` for sharing a file inside one theme.
+a local `@import`, but an `@import` is written into the file, and the point of
+the split is that the SAME `common.css` compiles twice with a different last
+part. Keep `@import` for sharing a file inside one theme.
+
+An `@import` goes at the top of its file, each on a line of its own. The
+compiler stops on one that comes after a rule. The script moves the imports of
+every part to the top of the concatenated file, in the order of the parts, so a
+part other than the first may still have them.
 
 ### What the cascade guarantees
 
