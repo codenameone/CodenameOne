@@ -62,6 +62,7 @@ public class ZipArchiveOutputStream extends DeflaterOutputStream {
     private boolean closed;
     private IOException failure;
     private byte[] comment = new byte[0];
+    private final byte[] singleByte = new byte[1];
 
     private static final class Record {
         ZipEntry entry;
@@ -302,7 +303,8 @@ public class ZipArchiveOutputStream extends DeflaterOutputStream {
     }
     @Override
     public void write(int value) throws IOException {
-        write(new byte[] {(byte) value}, 0, 1);
+        singleByte[0] = (byte) value;
+        write(singleByte, 0, 1);
     }
     @Override
     public void write(byte[] data, int off, int len) throws IOException {

@@ -527,27 +527,44 @@ public class ZipApiApp {
             while (input.read() >= 0) { }
             require(sum.getValue() == expected, "single byte checksum input");
         }
-        for (int format = 0; format < 3; format++) {
+        for (int format = 0; format < 6; format++) {
             ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            ZipEntry e = entry("single-byte");
+            if (format >= 4) {
+                CRC32 crc = new CRC32();
+                crc.update(data);
+                e.setMethod(ZipEntry.STORED);
+                e.setSize(data.length);
+                e.setCrc(crc.getValue());
+            }
             if (format == 0) {
-                try (DeflaterOutputStream out = new DeflaterOutputStream(bytes)) { out.write(data); }
+                try (DeflaterOutputStream out = new DeflaterOutputStream(bytes)) { writeSingleBytes(out, data); }
             } else if (format == 1) {
-                try (GZIPOutputStream out = new GZIPOutputStream(bytes)) { out.write(data); }
-            } else {
+                try (GZIPOutputStream out = new GZIPOutputStream(bytes)) { writeSingleBytes(out, data); }
+            } else if (format == 2 || format == 4) {
                 try (ZipOutputStream out = new ZipOutputStream(bytes)) {
-                    out.putNextEntry(entry("single-byte"));
-                    out.write(data);
+                    out.putNextEntry(e);
+                    writeSingleBytes(out, data);
+                }
+            } else {
+                try (ZipArchiveOutputStream out = new ZipArchiveOutputStream(bytes)) {
+                    out.putNextEntry(e);
+                    writeSingleBytes(out, data);
                 }
             }
             InputStream source = new ByteArrayInputStream(bytes.toByteArray());
             InputStream decoded = format == 0 ? new InflaterInputStream(source)
                     : format == 1 ? new GZIPInputStream(source) : new ZipInputStream(source);
             try {
-                if (format == 2) ((ZipInputStream) decoded).getNextEntry();
-                for (byte b : data) require(decoded.read() == (b & 255), "single byte decompression");
+                if (format >= 2) ((ZipInputStream) decoded).getNextEntry();
+                for (byte b : data) require(decoded.read() == (b & 255), "single byte compression roundtrip");
                 require(decoded.read() == -1, "single byte decompression EOF");
             } finally { decoded.close(); }
         }
+    }
+    static void writeSingleBytes(OutputStream out, byte[] data) throws IOException {
+        // Values outside 0..255 must still write only the low eight bits.
+        for (byte b : data) out.write((b & 255) | 0x100);
     }
     static void zipWord(OutputStream out, long value) throws IOException {
         for (int i = 0; i < 4; i++) out.write((int) (value >>> (8 * i)) & 255);

@@ -29,6 +29,7 @@ public class DeflaterOutputStream extends FilterOutputStream {
     protected Deflater def;
     protected byte[] buf;
     private boolean own, closed, syncFlush;
+    private final byte[] singleByte = new byte[1];
     public DeflaterOutputStream(OutputStream out) {
         this(out, new Deflater(), 512, false);
         own = true;
@@ -57,7 +58,8 @@ public class DeflaterOutputStream extends FilterOutputStream {
         this.syncFlush = syncFlush;
     }
     public void write(int b) throws IOException {
-        write(new byte[] {(byte) b}, 0, 1);
+        singleByte[0] = (byte) b;
+        write(singleByte, 0, 1);
     }
     public void write(byte[] b, int off, int len) throws IOException {
         if (closed)
