@@ -49,6 +49,15 @@ import java.util.Map;
  * using selected JDK homes.
  */
 public class GeneratorModelIntegrationBuildTest extends AbstractTest {
+    /// Each generated project is built by a Maven of its own, in a home of its
+    /// own, so every build starts by downloading its plugins and the framework.
+    /// On a machine that has never built one, two of those do not fit in the two
+    /// minutes a test gets unless it says otherwise.
+    @Override
+    public int getTimeoutMillis() {
+        return 20 * 60 * 1000;
+    }
+
     @Override
     public boolean runTest() throws Exception {
         Path java8Or11 = findJava8Or11Home();

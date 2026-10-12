@@ -372,7 +372,7 @@ therefore start by writing the rider's profile row, or the driver's state row,
 to the value it already has (`ProfileRepository.hold`, `DriverRepository.hold`).
 The database keeps a written row for its writer until the transaction commits,
 so the second transaction waits there and then reads what the first one left.
-The write has to be the transaction's first statement: a transaction that reads
+That write must come first in the transaction: a transaction that reads
 first may go on seeing the database as it was at that read. That's why choosing
 a driver and offering them the ride are two transactions.
 
