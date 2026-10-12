@@ -56,9 +56,12 @@ class ZipApiIntegrationTest {
         String java = config.jdkHome.resolve("bin/java").toString();
         Path jdk = work.resolve("jdk"), patched = work.resolve("patched"), nativePrefix = work.resolve("native");
         assertTrue(run(work, java, "-cp", app.toString(), "ZipApiApp", jdk.toString()).contains("ZIP_API_OK"));
-        // Patch only ZIP and its engine. Replacing Object/String on HotSpot is invalid.
+        // Patch ZIP, its engine and its output wrapper base so close behavior is
+        // tested against JavaAPI. Replacing Object/String on HotSpot is invalid.
         CompilerHelper.copyDirectory(api.resolve("java/util/zip"), patch.resolve("java/util/zip"));
         CompilerHelper.copyDirectory(api.resolve("com/codename1/impl/zip"), patch.resolve("com/codename1/impl/zip"));
+        Files.createDirectories(patch.resolve("java/io"));
+        Files.copy(api.resolve("java/io/FilterOutputStream.class"), patch.resolve("java/io/FilterOutputStream.class"));
         assertTrue(run(work, java, "-Xbootclasspath/p:" + patch, "-cp", app.toString(), "ZipApiApp", patched.toString(),
                 jdk + "-standard.zip")
                         .contains("ZIP_API_OK"));

@@ -28,4 +28,5 @@ public class CheckedOutputStream extends java.io.FilterOutputStream {
   public java.util.zip.Checksum getChecksum() { throw new RuntimeException("Compile-time stub"); }
   public void write(int arg0) throws java.io.IOException { throw new RuntimeException("Compile-time stub"); }
   public void write(byte[] arg0, int arg1, int arg2) throws java.io.IOException { throw new RuntimeException("Compile-time stub"); }
+  public void close() throws java.io.IOException { throw new RuntimeException("Compile-time stub"); }
 }

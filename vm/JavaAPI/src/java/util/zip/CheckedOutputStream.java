@@ -43,4 +43,13 @@ public class CheckedOutputStream extends FilterOutputStream {
         out.write(b, off, len);
         checksum.update(b, off, len);
     }
+    public void close() throws IOException {
+        // Always close the destination, even when flushing fails. The runtime's
+        // FilterOutputStream.close() currently swallows both kinds of failure.
+        try {
+            flush();
+        } finally {
+            out.close();
+        }
+    }
 }

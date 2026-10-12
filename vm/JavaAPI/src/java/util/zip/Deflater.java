@@ -127,8 +127,11 @@ public class Deflater {
                 paramsChanged = false;
             else if (rc != -5)
                 throw new IllegalStateException(engine.msg);
-            // deflateParams may itself produce output, including a partial flush.
-            return len - engine.availOut;
+            // Parameter changes may emit a partial flush, but this does not
+            // satisfy a requested sync/full flush or finish. Continue using
+            // the remaining output space, retaining any bytes already emitted.
+            if (engine.availOut == 0)
+                return len;
         }
         int rc = engine.deflate(finishing ? 4 : flush);
         if (rc == 1)

@@ -373,6 +373,121 @@ public class ZipApiApp {
         }
         require(truncated, "truncated ZIP header");
     }
+    static void checkedCloseFailures() throws Exception {
+        for (int mode = 1; mode <= 3; mode++) {
+            final int failures = mode;
+            final boolean[] closed = {false};
+            OutputStream sink = new OutputStream() {
+                public void write(int value) { }
+                public void flush() throws IOException {
+                    if ((failures & 1) != 0) throw new IOException("flush failed");
+                }
+                public void close() throws IOException {
+                    closed[0] = true;
+                    if ((failures & 2) != 0) throw new IOException("close failed");
+                }
+            };
+            boolean rejected = false;
+            try { new CheckedOutputStream(sink, new CRC32()).close(); }
+            catch (IOException expected) { rejected = true; }
+            require(rejected && closed[0], "checked stream reports errors and closes destination");
+        }
+    }
+    static byte[] zipNameHeader(byte[] name, boolean utf8) {
+        byte[] header = new byte[30 + name.length];
+        header[0] = 0x50; header[1] = 0x4b; header[2] = 3; header[3] = 4;
+        header[4] = 20;
+        header[7] = (byte) (utf8 ? 8 : 0);
+        header[12] = 0x21; // 1980-01-01 DOS date
+        header[26] = (byte) name.length;
+        header[27] = (byte) (name.length >>> 8);
+        System.arraycopy(name, 0, header, 30, name.length);
+        return header;
+    }
+    static void zipNameDecoding(boolean customRuntime) throws Exception {
+        for (byte[] name : new byte[][] {{-1}, {-64, -81}, {-30, -126}, {-19, -96, -128}}) {
+            // The UTF-8 flag overrides the caller's otherwise valid Latin-1 charset.
+            boolean rejected = false;
+            try (ZipInputStream in = new ZipInputStream(new ByteArrayInputStream(zipNameHeader(name, true)),
+                    java.nio.charset.Charset.forName("ISO-8859-1"))) {
+                in.getNextEntry();
+            } catch (ZipException expected) { rejected = true; }
+            catch (IllegalArgumentException expected) { require(!customRuntime, "runtime uses ZipException"); rejected = true; }
+            require(rejected, "malformed UTF-8 ZIP name rejected: " + Arrays.toString(name));
+        }
+        boolean rejected = false;
+        try (ZipInputStream in = new ZipInputStream(new ByteArrayInputStream(zipNameHeader(new byte[] {-1}, false)),
+                java.nio.charset.Charset.forName("US-ASCII"))) {
+            in.getNextEntry();
+        } catch (ZipException expected) { rejected = true; }
+        catch (IllegalArgumentException expected) { require(!customRuntime, "runtime uses ZipException"); rejected = true; }
+        require(rejected, "malformed caller charset ZIP name rejected");
+        for (String name : new String[] {"replacement-\ufffd", "unicode-\ud83d\ude00"}) {
+            try (ZipInputStream in = new ZipInputStream(new ByteArrayInputStream(zipNameHeader(name.getBytes("UTF-8"), true)))) {
+                require(name.equals(in.getNextEntry().getName()), "valid UTF-8 name preserved");
+            }
+        }
+        try (ZipInputStream in = new ZipInputStream(new ByteArrayInputStream(zipNameHeader(new byte[] {-1}, false)),
+                java.nio.charset.Charset.forName("ISO-8859-1"))) {
+            require("\u00ff".equals(in.getNextEntry().getName()), "valid caller charset name preserved");
+        }
+    }
+    static void changeParameters(Deflater def, int change) {
+        if (change == 0) def.setLevel(9); // Same compression algorithm as the default level.
+        else if (change == 1) def.setLevel(1); // Changing algorithm may itself emit bytes.
+        else def.setStrategy(Deflater.HUFFMAN_ONLY);
+    }
+    static void requireFlushed(byte[] compressed, byte[] expected) throws Exception {
+        Inflater inf = new Inflater();
+        try {
+            inf.setInput(compressed);
+            byte[] actual = new byte[expected.length + 1];
+            int count = 0, n;
+            while ((n = inf.inflate(actual, count, actual.length - count)) > 0) count += n;
+            require(count == expected.length && Arrays.equals(expected, Arrays.copyOf(actual, count)),
+                    "parameter change flush exposes entire payload before finish");
+        } finally { inf.end(); }
+    }
+    static void parameterFlushes() throws Exception {
+        byte[] data = "buffered payload before parameter change".getBytes("UTF-8");
+        for (int change = 0; change < 3; change++) {
+            for (int size : new int[] {1, 8, 512}) {
+                Deflater def = new Deflater();
+                ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+                try (DeflaterOutputStream out = new DeflaterOutputStream(bytes, def, size, true)) {
+                    out.write(data);
+                    changeParameters(def, change);
+                    out.flush();
+                    requireFlushed(bytes.toByteArray(), data);
+                } finally { def.end(); }
+            }
+            for (int flush : new int[] {Deflater.SYNC_FLUSH, Deflater.FULL_FLUSH}) {
+                for (int size : new int[] {1, 8, 512}) {
+                    Deflater def = new Deflater();
+                    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+                    try {
+                        byte[] output = new byte[512];
+                        def.setInput(data);
+                        while (!def.needsInput()) {
+                            int n = def.deflate(output);
+                            bytes.write(output, 0, n);
+                        }
+                        changeParameters(def, change);
+                        int n = def.deflate(output, 0, size, flush);
+                        bytes.write(output, 0, n);
+                        if (n == size) {
+                            // Drain tiny initial buffers with enough room to finish the flush marker.
+                            do {
+                                n = def.deflate(output, 0, output.length, flush);
+                                bytes.write(output, 0, n);
+                            } while (n == output.length);
+                        }
+                        requireFlushed(bytes.toByteArray(), data);
+                    } finally { def.end(); }
+                }
+            }
+        }
+    }
     static void compatibilityRegressions(boolean customRuntime) throws Exception {
         byte[] data = "flushed payload".getBytes("UTF-8");
         // JDK 8 itself loops indefinitely with buffers smaller than the flush marker.
@@ -455,6 +570,11 @@ public class ZipApiApp {
     public static void main(String[] args) throws Exception {
         byte[] data = payload();
         checksums();
+        checkedCloseFailures();
+        zipNameDecoding(args.length > 1);
+        // JDK 8 also returns early after parameter changes; enforce the stronger
+        // flush guarantee on the patched JavaAPI and translated runtime.
+        if (args.length > 1) parameterFlushes();
         compatibilityRegressions(args.length > 1);
         compression(data);
         gzip(data, args[0]);

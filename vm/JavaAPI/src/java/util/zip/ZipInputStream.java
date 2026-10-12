@@ -87,7 +87,11 @@ public class ZipInputStream extends InflaterInputStream {
                 throw new ZipException("Malformed ZIP extra");
             at += 4 + n;
         }
-        entry = createZipEntry(new String(name, (flags & 0x800) != 0 ? "UTF-8" : encoding));
+        String nameEncoding = (flags & 0x800) != 0 ? "UTF-8" : encoding;
+        String decodedName = new String(name, nameEncoding);
+        if (!java.util.Arrays.equals(name, decodedName.getBytes(nameEncoding)))
+            throw new ZipException("Invalid ZIP entry name encoding: " + nameEncoding);
+        entry = createZipEntry(decodedName);
         entry.setMethod(method);
         Calendar c = Calendar.getInstance();
         c.set(Calendar.YEAR, 1980 + (int) (time >>> 25));
