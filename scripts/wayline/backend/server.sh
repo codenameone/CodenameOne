@@ -48,21 +48,9 @@ build_native() {
       -Dcn1.backend.output="$APP/backend/target/wayline-server" >&2
 }
 
-# Compiling the theme opens a window, so the browser build needs a display even
-# though nothing is shown. A Linux machine without one (a CI runner, a container)
-# gets a virtual display from xvfb-run when that is installed.
 build_web() {
   log "building the app for the browser"
-  local display=()
-  if [ "$(uname -s)" = "Linux" ] && [ -z "${DISPLAY:-}" ]; then
-    if command -v xvfb-run >/dev/null 2>&1; then
-      display=(xvfb-run -a)
-    else
-      log "no display and no xvfb-run: the theme may fail to compile (install xvfb)"
-    fi
-  fi
-  # Spelled so that an empty list is not an unset variable to the bash 3 on macOS.
-  ${display[@]+"${display[@]}"} "$MVN" -B -q -f "$APP/pom.xml" -Dcodename1.platform=backend -pl backend \
+  "$MVN" -B -q -f "$APP/pom.xml" -Dcodename1.platform=backend -pl backend \
       cn1:backend-webapp >&2
 }
 

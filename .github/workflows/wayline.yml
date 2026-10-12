@@ -274,14 +274,6 @@ jobs:
           npx playwright install-deps chromium
           npx playwright install chromium
 
-      # Compiling the theme opens a window, so the browser build needs a
-      # display; server.sh wraps it in xvfb-run when there is none.
-      - name: Ensure a virtual display (xvfb) for the theme compiler
-        run: |
-          if ! command -v xvfb-run >/dev/null 2>&1; then
-            (timeout 300 sudo apt-get update && timeout 300 sudo apt-get install -y xvfb) || true
-          fi
-
       # The JavaScript build is the plugin's own: the port and the translator
       # travel inside it, so installing the plugin with what it is built from
       # is all the browser build needs.
