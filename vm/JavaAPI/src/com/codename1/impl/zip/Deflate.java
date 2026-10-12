@@ -1490,9 +1490,6 @@ final class Deflate {
     }
 
     int deflateSetDictionary(byte[] dictionary, int dictLength) {
-        int length = dictLength;
-        int index = 0;
-
         // Raw DEFLATE begins in BUSY_STATE because it has no zlib header.
         // A preset dictionary is still valid before any input is compressed.
         if (dictionary == null || (status != INIT_STATE &&
@@ -1504,16 +1501,27 @@ final class Deflate {
             strm.adler.update(dictionary, 0, dictLength);
         }
 
-        if (length < MIN_MATCH) {
-            return Z_OK;
-        }
-        if (length > wSize - MIN_LOOKAHEAD) {
-            length = wSize - MIN_LOOKAHEAD;
-            index = dictLength - length; // use the tail of the dictionary
-        }
-        System.arraycopy(dictionary, index, window, 0, length);
+        // Repeated calls append to the history, while the Adler checksum
+        // above covers every supplied byte. Keep only the usable window tail.
+        int capacity = wSize - MIN_LOOKAHEAD;
+        int copied = Math.min(dictLength, capacity);
+        int retained = Math.min(strStart, capacity - copied);
+        System.arraycopy(window, strStart - retained, window, 0, retained);
+        System.arraycopy(dictionary, dictLength - copied, window, retained, copied);
+        int length = retained + copied;
         strStart = length;
         blockStart = length;
+        // The window has moved, so no hash chain may retain its old offsets.
+        for (int n = 0; n < head.length; n++) {
+            head[n] = 0;
+        }
+        for (int n = 0; n < prev.length; n++) {
+            prev[n] = 0;
+        }
+        if (length < MIN_MATCH) {
+            insH = 0;
+            return Z_OK;
+        }
 
         // Insert all strings in the hash table (except for the last two bytes).
         // s->lookahead stays null, so s->ins_h will be recomputed at the next

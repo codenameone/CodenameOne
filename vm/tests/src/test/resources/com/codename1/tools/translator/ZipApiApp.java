@@ -132,6 +132,71 @@ public class ZipApiApp {
         }
     }
 
+    static void repeatedDictionaries() throws Exception {
+        for (boolean raw : new boolean[] {false, true}) {
+            for (int[] lengths : new int[][] {{32, 1}, {32, 2}, {1, 1, 1}, {0, 2, 0, 1},
+                    {40000, 2}, {128, 40000, 1}}) {
+                Deflater def = new Deflater(6, raw);
+                Inflater inf = new Inflater(raw);
+                try {
+                    for (int cycle = 0; cycle < 2; cycle++) {
+                        ByteArrayOutputStream dictionary = new ByteArrayOutputStream();
+                        Random random = new Random(21 + cycle);
+                        for (int length : lengths) {
+                            byte[] part = new byte[length + 2];
+                            random.nextBytes(part);
+                            def.setDictionary(part, 1, length);
+                            dictionary.write(part, 1, length);
+                            Arrays.fill(part, (byte) 0); // The compressor must retain its own history.
+                        }
+                        byte[] combined = dictionary.toByteArray();
+                        Adler32 sum = new Adler32();
+                        sum.update(combined);
+                        if (!raw) require(def.getAdler() == (int) sum.getValue(), "combined dictionary Adler");
+                        int tail = Math.min(combined.length, 20000);
+                        byte[] data = new byte[tail * 2];
+                        System.arraycopy(combined, combined.length - tail, data, 0, tail);
+                        System.arraycopy(data, 0, data, tail, tail);
+                        def.setInput(data);
+                        def.finish();
+                        ByteArrayOutputStream compressed = new ByteArrayOutputStream();
+                        byte[] buffer = new byte[137];
+                        while (!def.finished()) {
+                            int n = def.deflate(buffer);
+                            compressed.write(buffer, 0, n);
+                        }
+                        if (raw) {
+                            inf.setDictionary(combined);
+                            // Raw inflate may need one dummy byte after its final bit.
+                            compressed.write(0);
+                        }
+                        inf.setInput(compressed.toByteArray());
+                        ByteArrayOutputStream decoded = new ByteArrayOutputStream();
+                        while (!inf.finished()) {
+                            long before = inf.getBytesRead();
+                            int n = inf.inflate(buffer);
+                            decoded.write(buffer, 0, n);
+                            if (inf.needsDictionary()) {
+                                require(inf.getAdler() == (int) sum.getValue(), "required combined dictionary Adler");
+                                inf.setDictionary(combined);
+                            } else {
+                                require(n > 0 || inf.finished() || inf.getBytesRead() > before,
+                                        "dictionary decompression makes progress: raw=" + raw + " lengths=" + Arrays.toString(lengths)
+                                        + " remaining=" + inf.getRemaining() + " decoded=" + decoded.size());
+                            }
+                        }
+                        require(Arrays.equals(data, decoded.toByteArray()), "repeated dictionary roundtrip");
+                        def.reset();
+                        inf.reset();
+                    }
+                } finally {
+                    def.end();
+                    inf.end();
+                }
+            }
+        }
+    }
+
     static void gzip(byte[] data, String prefix) throws Exception {
         ByteArrayOutputStream b = new ByteArrayOutputStream();
         GZIPOutputStream g = new GZIPOutputStream(b, 123, true);
@@ -837,6 +902,7 @@ public class ZipApiApp {
         if (args.length > 1) parameterFlushes();
         compatibilityRegressions(args.length > 1);
         compression(data);
+        repeatedDictionaries();
         gzip(data, args[0]);
         archive(data, args[0]);
         cancellation(data);
