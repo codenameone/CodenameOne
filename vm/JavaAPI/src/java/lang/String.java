@@ -250,7 +250,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     }
     
     public String(byte[] bytes, java.nio.charset.Charset charset) throws java.io.UnsupportedEncodingException {
-        this(bytes, 0, bytes.length, charset.displayName());
+        this(bytes, 0, bytes.length, charset.name());
     }
 
     /**
@@ -684,7 +684,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     }
     
     public byte[] getBytes(Charset charset) throws java.io.UnsupportedEncodingException {
-        return getBytes(charset.displayName());
+        return getBytes(charset.name());
     }
 
     /**

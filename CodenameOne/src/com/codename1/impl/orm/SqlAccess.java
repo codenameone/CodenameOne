@@ -33,6 +33,8 @@ import java.util.List;
 /// @hidden
 @com.codename1.impl.SharedWithBackend
 public interface SqlAccess {
+    /// A single native scalar read using its physical storage type, without requested-type coercion.
+    int NATIVE_SCALAR = -2;
     /// Returns the dialect identifier used for schema and query choices.
     String dialect();
     /// Rows contain column name, declared SQL type, not-null flag, primary-key flag.

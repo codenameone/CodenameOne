@@ -183,6 +183,12 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         return result;
     }
     @Override
+    public <T> com.codename1.orm.session.JpqlQuery<T> createNativeQuery(String statement, Class<T> resultType) {
+        check();
+        return new NativeQueryImpl<T>(this, statement, resultType);
+    }
+
+    @Override
     public <T> JpqlQueryImpl<T> createQuery(String statement, Class<T> resultType) {
         check();
         return new JpqlQueryImpl<T>(this, statement, resultType);
