@@ -77,13 +77,9 @@ public class OrmAnnotationProcessorTest {
             + "@Query(\"select sum(case when e.score>=:floor then 1 else 0 end) from repositories.Note e\") Long qualified(@Param(\"floor\") long floor); "
             + "@Modifying @Query(\"update repositories.Note e set e.score=:score where e.name=:name\") int revise(@Param(\"name\") String name,@Param(\"score\") long score); "
             + "@Query(value=\"SELECT COUNT(*) FROM repository_note WHERE name=:name\",nativeSql=true) Long nativeCount(@Param(\"name\") String name); }");
-        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
-        ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
-        // Compile a real caller against the generated class, so generic signatures and all
-        // CRUD methods are checked by javac as well as exercised against a database.
-        sources.clear();
+        // Compile the caller with the interface, before generating any implementation.
         sources.put("repositories.Check","package repositories; import com.codename1.orm.repository.*; import com.codename1.orm.session.*; public class Check { public static void run(Session s) { "
-            + "Notes repo=new NotesCn1Repository(s); s.createTables(); s.beginTransaction(); Note a=new Note(); a.name=\"same\";a.score=3;a.active=true;a.archived=false;repo.insert(a);Note b=new Note();b.name=\"same\";b.score=9;repo.insert(b);s.commitTransaction(); "
+            + "Notes repo=Repositories.create(Notes.class,s); s.createTables(); s.beginTransaction(); Note a=new Note(); a.name=\"same\";a.score=3;a.active=true;a.archived=false;repo.insert(a);Note b=new Note();b.name=\"same\";b.score=9;repo.insert(b);s.commitTransaction(); "
             + "if(repo.count()!=2 || !repo.existsByName(\"same\") || repo.countByName(\"same\")!=2 || repo.nativeCount(\"same\")!=2) throw new AssertionError(\"counts\"); "
             + "if(repo.findByNameAndScoreGreaterThanOrderByScoreDescIdAsc(\"same\",0,new PageRequest(1,1)).get(0)!=a || repo.findTop1ByNameOrderByScoreDesc(\"same\").get(0)!=b || repo.qualified(5)!=1) throw new AssertionError(\"queries\"); "
             + "if(repo.findByActiveTrue().get(0)!=a || repo.findByArchivedFalse().get(0)!=a || repo.findByNameAndScoreIn(\"same\",java.util.Arrays.asList(3L)).get(0)!=a || repo.findByScoreIn(new Long[]{9L}).get(0)!=b || repo.findByNameIn(java.util.Collections.singleton(\"same\")).size()!=2) throw new AssertionError(\"typed finders\"); "
@@ -92,7 +88,9 @@ public class OrmAnnotationProcessorTest {
             + "s.beginTransaction(); try { repo.findById(a.id); throw new AssertionError(\"SQLite should refuse row lock\"); } catch(UnsupportedOperationException expected) {} s.rollbackTransaction(); "
             + "s.beginTransaction(); if(repo.save(a)==a) throw new AssertionError(\"merge returns managed copy\"); repo.deleteById(b.id); s.commitTransaction(); "
             + "s.beginTransaction(); if(repo.deleteByName(\"same\")!=1) throw new AssertionError(\"delete\");s.commitTransaction();if(repo.count()!=0) throw new AssertionError(); }}");
-        JavaSourceCompiler.compile(sources,classes,Arrays.asList(classes,testClassesDir()));
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        assertFalse(new File(classes,"repositories/NotesCn1Repository.class").exists());
+        ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
         java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
         loader.loadClass(backend ? "cn1app.BackendDaoBootstrap" : "cn1app.DaoBootstrap").newInstance();
         com.codename1.backend.orm.EntityManager server=backend ? com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:")) : null;
@@ -100,6 +98,36 @@ public class OrmAnnotationProcessorTest {
         com.codename1.orm.session.Session session=backend ? server.openSession() : client.openSession();
         try { loader.loadClass("repositories.Check").getMethod("run",com.codename1.orm.session.Session.class).invoke(null,session); }
         finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
+    }
+
+    @Test
+    public void clientRepositoryBuildDoesNotDependOnBackend() throws Exception {
+        StringBuilder classpath = new StringBuilder();
+        String original = System.getProperty("surefire.test.class.path", System.getProperty("java.class.path"));
+        for (String entry : original.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
+            File file = new File(entry);
+            boolean backend = false;
+            if (file.isDirectory()) {
+                backend = new File(file,"com/codename1/backend/annotations/Generated.class").isFile();
+            } else if (file.isFile() && entry.endsWith(".jar")) {
+                try (java.util.jar.JarFile jar = new java.util.jar.JarFile(file)) {
+                    backend = jar.getEntry("com/codename1/backend/annotations/Generated.class") != null;
+                }
+            }
+            if (!backend) {
+                if (classpath.length() > 0) classpath.append(File.pathSeparator);
+                classpath.append(entry);
+            }
+        }
+        File output = tmp.newFile();
+        Process process = new ProcessBuilder(new File(System.getProperty("java.home"),"bin/java").getPath(),
+                "-cp",classpath.toString(),ClientRepositoryCompileFixture.class.getName(),tmp.newFolder().getPath())
+                .redirectErrorStream(true).redirectOutput(output).start();
+        if (!process.waitFor(60, java.util.concurrent.TimeUnit.SECONDS)) {
+            process.destroyForcibly();
+            fail("Client compilation timed out");
+        }
+        assertEquals(new String(Files.readAllBytes(output.toPath()),"UTF-8"),0,process.exitValue());
     }
 
     @Test
@@ -189,6 +217,7 @@ public class OrmAnnotationProcessorTest {
                 ProcessorContext first=runProcessor(classes,cp,Arrays.asList(sourcesDir.getAbsolutePath()));
                 assertFalse(first.getErrors().toString(),first.hasErrors());
                 File generated=new File(classes,"incrementalrepo/NotesCn1Repository.class");assertTrue(generated.isFile());
+                File factory=new File(classes,"incrementalrepo/NotesCn1Repository$Factory.class");assertTrue(factory.isFile());
                 File handwritten=new File(classes,"incrementalrepo/HandwrittenCn1Repository.class");byte[] original=Files.readAllBytes(handwritten.toPath());
                 if(deleteSource) {
                     assertTrue(new File(pkg,"Notes.java").delete()); // Leave its stale .class, like Maven does.
@@ -200,6 +229,7 @@ public class OrmAnnotationProcessorTest {
                 ProcessorContext second=runProcessor(classes,cp,Arrays.asList(sourcesDir.getAbsolutePath()));
                 assertFalse(second.getErrors().toString(),second.hasErrors());
                 assertFalse("obsolete implementation survives incremental processing",generated.exists());
+                assertFalse("obsolete factory survives incremental processing",factory.exists());
                 assertTrue(new File(classes,"incrementalrepo/LiveCn1Repository.class").isFile());
                 org.junit.Assert.assertArrayEquals(original,Files.readAllBytes(handwritten.toPath()));
             }
@@ -687,6 +717,17 @@ public class OrmAnnotationProcessorTest {
                 Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
                 try { session.createTables();session.beginTransaction();session.persist(type.newInstance());session.commitTransaction();
                     for(String expression:Arrays.asList("coalesce(e.code,e.name)","coalesce(e.name,e.code)","coalesce(e.code,e.other)","coalesce(e.state,e.color)","coalesce(e.code,lower(e.backup))","coalesce(lower(e.backup),e.code)","coalesce(e.code,(select max(i.name) from Entry i))","coalesce(e.name,coalesce(e.code,e.backup))")) { try { session.createQuery("select "+expression+" from Entry e");fail(expression); } catch(IllegalArgumentException expected) { assertTrue(expected.getMessage().contains("mapping")); } }
+                    for (String operand : Arrays.asList(":value", "'fallback'")) {
+                        for (String pair : Arrays.asList("e.code then 1 when e.other", "e.other then 1 when e.code", "e.code then 1 when e.name", "e.state then 1 when e.color")) {
+                            try { session.createQuery("select case " + operand + " when " + pair + " then 2 else 3 end from Entry e"); fail(pair); }
+                            catch (IllegalArgumentException expected) { assertTrue(expected.getMessage(), expected.getMessage().contains("mapping")); }
+                        }
+                        com.codename1.orm.session.JpqlQuery<Long> query=session.createQuery("select case " + operand + " when e.code then 1 when e.backup then 2 else 3 end from Entry e",Long.class);
+                        if (operand.equals(":value")) query.setParameter("value","fallback");
+                        assertEquals(Long.valueOf(2),query.first());
+                    }
+                    assertEquals(Long.valueOf(2),session.createQuery("select case :value when 'missing' then 1 when e.backup then 2 else 3 end from Entry e",Long.class).setParameter("value","fallback").first());
+                    assertEquals(Long.valueOf(2),session.createQuery("select case :value when e.state then 1 when e.backupState then 2 else 3 end from Entry e",Long.class).setParameter("value",loader.loadClass("coalescemappings.State").getEnumConstants()[0]).first());
                     org.junit.Assert.assertEquals("fallback",session.createQuery("select coalesce(e.code,e.backup) from Entry e",String.class).first());org.junit.Assert.assertEquals("ACTIVE",session.createQuery("select coalesce(e.state,e.backupState) from Entry e").first().toString());
                     org.junit.Assert.assertEquals("literal",session.createQuery("select coalesce(e.code,'literal') from Entry e",String.class).first());org.junit.Assert.assertEquals("parameter",session.createQuery("select coalesce(e.code,:value) from Entry e",String.class).setParameter("value","parameter").first());
                     org.junit.Assert.assertEquals("raw",session.createQuery("select coalesce(lower(e.name),'fallback') from Entry e",String.class).first());

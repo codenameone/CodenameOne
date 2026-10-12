@@ -435,7 +435,10 @@ A public top-level interface annotated with
 `CrudRepository<Entity, Key>` directly gets an `InterfaceNameCn1Repository`
 implementation during `cn1:process-annotations`. Both class literals are explicit;
 the key must match the mapped identifier's boxed type (the embedded key class or
-`Identifier` for composite keys). Instantiate the generated class with a `Session`.
+`Identifier` for composite keys). Use `Repositories.create(Records.class, session)` to obtain an implementation.
+This factory references the interface, so application sources compile on a clean
+build before `process-classes` generates the implementation. The generated DAO
+bootstrap registers direct factories alongside the entity mappings.
 The implementation makes direct session calls. There is no runtime classpath scan,
 proxy generation, or Hibernate dependency.
 
@@ -445,10 +448,8 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/r
 ----
 
 The example's `RepositoryRecord` entity has `@Id public long id`,
-`public String name`, and `public long score`. After the build generates the class,
-open a session with `entityManager.openSession()` and construct
-`new RecordsCn1Repository(session)`. Pass both objects to this operation, which
-commits the insert and closes the session:
+`public String name`, and `public long score`. This operation opens a session,
+creates its repository, commits the insert, and closes the session:
 
 [source,java]
 ----

@@ -113,7 +113,7 @@ public class OrmCheck {
         com.codename1.orm.session.Session s=em.openSession();
         try {
             s.createTables();
-            Records records=new RecordsCn1Repository(s);
+            Records records=com.codename1.orm.repository.Repositories.create(Records.class,s);
             s.beginTransaction();
             s.createQuery("delete from com.demo.RepositoryRecord").executeUpdate();
             RepositoryRecord first=new RepositoryRecord();first.name="repository";first.score=3;records.insert(first);

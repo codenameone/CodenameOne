@@ -91,7 +91,9 @@ final class RepositoryGenerator {
         int dot = repository.getBinaryName().lastIndexOf('.');
         String simple = repository.getBinaryName().substring(dot + 1) + "Cn1Repository";
         return (dot < 0 ? "" : "package " + repository.getBinaryName().substring(0, dot) + ";\n")
-                + "@com.codename1.backend.annotations.Generated public final class " + simple + " implements " + repository.getBinaryName() + " {\n"
+                + "@com.codename1.impl.orm.GeneratedRepository public final class " + simple + " implements " + repository.getBinaryName() + " {\n"
+                + "public static void register() { com.codename1.impl.orm.RepositoryFactories.register(" + repository.getBinaryName() + ".class,new Factory()); }\n"
+                + "private static final class Factory implements com.codename1.impl.orm.RepositoryFactories.Factory<" + repository.getBinaryName() + "> { public " + repository.getBinaryName() + " create(com.codename1.orm.session.Session session) { return new " + simple + "(session); } }\n"
                 + "private final com.codename1.orm.session.Session session;\n"
                 + "public " + simple + "(com.codename1.orm.session.Session session) { if(session==null) throw new IllegalArgumentException(\"session is null\"); this.session=session; "
                 + " }\n"

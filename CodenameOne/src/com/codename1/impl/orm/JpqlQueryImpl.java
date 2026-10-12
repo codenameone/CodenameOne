@@ -851,9 +851,26 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             List<Expr> conditions = new ArrayList<Expr>();
             List<Expr> branches = new ArrayList<Expr>();
             List<String> predicates = new ArrayList<String>();
+            List<Expr> tests = new ArrayList<Expr>();
             do {
                 expect("WHEN");
-                Expr test = expression();
+                tests.add(expression());
+                expect("THEN");
+                branches.add(expression());
+            } while (peek("WHEN"));
+            branches.add(take("ELSE") ? expression() : literal(-1, null));
+            expect("END");
+            if (operand != null) {
+                List<Expr> comparisons = new ArrayList<Expr>(tests);
+                comparisons.add(operand);
+                Expr comparisonMapping = matchingMapping(comparisons, "CASE");
+                if (comparisonMapping != null && comparisonMapping.projectionQuery != null) {
+                    for (Expr comparison : comparisons) {
+                        bindType(comparisonMapping, comparison);
+                    }
+                }
+            }
+            for (Expr test : tests) {
                 if (operand != null) {
                     compatible(operand, test);
                     bindType(operand, test);
@@ -871,11 +888,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 }
                 predicates.add(condition(test));
                 conditions.add(test);
-                expect("THEN");
-                branches.add(expression());
-            } while (peek("WHEN"));
-            branches.add(take("ELSE") ? expression() : literal(-1, null));
-            expect("END");
+            }
             int kind = commonKind(branches);
             if (kind < 0) {
                 throw error("CASE needs at least one typed result branch");
@@ -1302,6 +1315,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             return false;
         }
         private Expr coalesceMapping(List<Expr> args) {
+            return matchingMapping(args, "COALESCE");
+        }
+        private Expr matchingMapping(List<Expr> args, String operator) {
             Expr selected = null;
             String mapping = null;
             for (Expr arg : args) {
@@ -1311,7 +1327,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 String current = arg.projectionQuery == null ? ""
                         : arg.projectionQuery.mapping(arg.projectionField);
                 if (mapping != null && !mapping.equals(current)) {
-                    throw error("COALESCE operands require matching domain and converter mappings");
+                    throw error(operator + " operands require matching domain and converter mappings");
                 }
                 if (selected == null) {
                     selected = arg;

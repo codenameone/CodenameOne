@@ -78,6 +78,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     /// The marker every generated source here carries, so that the class this
     /// processor wrote on a previous pass is not read as a name collision on
     /// the next one. See wouldReplaceAnExistingClass.
+    private static final String REPOSITORY_GENERATED_DESC = "Lcom/codename1/impl/orm/GeneratedRepository;";
     private static final String GENERATED_DESC = "Lcom/codename1/backend/annotations/Generated;";
 
     static final String BOOTSTRAP_BINARY = "cn1app.DaoBootstrap";
@@ -840,7 +841,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         // developer to rename a class they never wrote. It carries the marker
         // regardless, which is what makes its provenance readable.
         sources.put(backend ? BACKEND_BOOTSTRAP_BINARY : BOOTSTRAP_BINARY,
-                generateBootstrapSource(accepted.values(), backend, !migrations.isEmpty()));
+                generateBootstrapSource(accepted.values(), repositories, backend, !migrations.isEmpty()));
         compileGenerated(ctx, sources);
         try {
             OrmEnhancer.enhance(accepted, ctx);
@@ -2338,11 +2339,11 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         for (AnnotatedClass cls : ctx.getClassIndex().values()) {
             String name = cls.getBinaryName();
             if (!name.endsWith("Cn1Repository") || live.contains(name)
-                    || cls.getClassAnnotation(GENERATED_DESC) == null) continue;
+                    || (cls.getClassAnnotation(GENERATED_DESC) == null
+                        && cls.getClassAnnotation(REPOSITORY_GENERATED_DESC) == null)) continue;
             String owner = name.substring(0, name.length() - "Cn1Repository".length()).replace('.', '/');
             if (!cls.getInterfaceInternalNames().contains(owner)) continue;
-            File output = new File(ctx.getOutputClassDir(), cls.getInternalName() + ".class");
-            if (output.isFile() && !output.delete()) {
+            if (!deleteGenerated(ctx, name)) {
                 throw new ProcessingException("Could not remove stale generated repository " + name + "; run a clean build");
             }
             ctx.getLog().info("cn1: removed " + name + ", whose repository annotation or source was removed");
@@ -2403,7 +2404,9 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         if (existing == null) {
             return false;
         }
-        if (existing.getClassAnnotations().containsKey(GENERATED_DESC)) {
+        if (existing.getClassAnnotations().containsKey(GENERATED_DESC)
+                || (what.startsWith("repository for ")
+                    && existing.getClassAnnotations().containsKey(REPOSITORY_GENERATED_DESC))) {
             return false;
         }
         ctx.error(binaryName + " already exists, and the " + what + " generated here would "
@@ -2493,7 +2496,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         }
     }
 
-    private static String generateBootstrapSource(Iterable<EntityClass> classes, boolean backend,
+    private static String generateBootstrapSource(Iterable<EntityClass> classes, Iterable<AnnotatedClass> repositories, boolean backend,
             boolean migrations) {
         StringBuilder sb = new StringBuilder(1024);
         sb.append("package ").append(BOOTSTRAP_PACKAGE).append(";\n\n");
@@ -2525,6 +2528,9 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         sb.append("    public ").append(simple).append("() {\n");
         for (EntityClass ec : classes) {
             sb.append("        ").append(ec.daoBinaryName).append(".register();\n");
+        }
+        for (AnnotatedClass repository : repositories) {
+            sb.append("        ").append(repository.getBinaryName()).append("Cn1Repository.register();\n");
         }
         if (migrations) {
             // By direct reference, like the daos: nothing may look the set up by name.

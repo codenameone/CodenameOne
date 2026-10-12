@@ -23,10 +23,14 @@
 package com.codenameone.developerguide.snippets.repository;
 
 import com.codename1.orm.session.Session;
+import com.codename1.orm.EntityManager;
+import com.codename1.orm.repository.Repositories;
 
 public class RepositorySnippets {
     // tag::repository-unit-of-work[]
-    public void insertRecord(Session session, Records records) {
+    public void insertRecord(EntityManager entityManager) {
+        Session session = entityManager.openSession();
+        Records records = Repositories.create(Records.class, session);
         session.beginTransaction();
         try {
             RepositoryRecord record = new RepositoryRecord();
