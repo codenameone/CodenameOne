@@ -537,6 +537,8 @@ public final class SVGParser {
                 Map<String, String> sa = attrs(r);
                 applyCommon(symbol, sa);
                 symbol.setPreserveAspectRatio(sa.get("preserveAspectRatio"));
+                String spill = mergedValue(sa, "overflow");
+                symbol.setOverflowVisible(spill != null && ("visible".equals(spill.trim()) || "auto".equals(spill.trim())));
                 String svb = sa.get("viewBox");
                 if (svb != null) {
                     NumberParser np = new NumberParser(svb);

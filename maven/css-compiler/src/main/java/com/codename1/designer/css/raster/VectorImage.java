@@ -94,6 +94,8 @@ public final class VectorImage {
     private final SVGDocument doc;
     /// Whether the drawing is fitted to the viewport it is painted into.
     private final boolean scales;
+    /// The symbol a `<use>` is drawing a copy of at the moment, or null.
+    private SVGNode instanced;
     private static final int MAX_USE_DEPTH = 16;
     /// The size of text whose font size nobody sets: CSS's `medium`, which
     /// is 16 pixels.
@@ -337,7 +339,10 @@ public final class VectorImage {
         SVGStyle style = new SVGStyle();
         SVGStyle own = node.getStyle();
         if (own != null) {
-            if (own.isDisplayNone()) {
+            // Not a symbol a `<use>` is drawing: its `display` is that of
+            // the definition, which is never shown, and says nothing of
+            // the copy the `<use>` makes of it.
+            if (own.isDisplayNone() && node != instanced) {
                 return;
             }
             style.inherit(own);
@@ -1226,12 +1231,27 @@ public final class VectorImage {
         int ownerDepth = owner.useDepth;
         try {
             owner.useDepth = useDepth;
+            Shape outer = g.getClip();
+            if (target instanceof SVGSymbol && !((SVGSymbol) target).isOverflowVisible()
+                    && use.getWidth() > 0 && use.getHeight() > 0) {
+                // A symbol is a viewport, and what reaches past the size
+                // the `<use>` gives it is cut off unless it says not.
+                g.clip(new Rectangle2D.Double(use.getX(), use.getY(), use.getWidth(), use.getHeight()));
+            }
             g.transform(placing(use, target));
             target = sized(use, target);
             if (target == null) {
+                g.setClip(outer);
                 return;
             }
-            owner.paintNode(g, target, style, w, h);
+            SVGNode outerInstanced = owner.instanced;
+            owner.instanced = target instanceof SVGSymbol ? target : outerInstanced;
+            try {
+                owner.paintNode(g, target, style, w, h);
+            } finally {
+                owner.instanced = outerInstanced;
+                g.setClip(outer);
+            }
         } finally {
             owner.useDepth = ownerDepth;
             useDepth--;
@@ -1443,11 +1463,21 @@ public final class VectorImage {
 
     private void addOutlines(java.awt.geom.Area all, SVGGroup group, AffineTransform at, Boolean evenOdd,
             int depth) {
+        addOutlines(all, group, at, evenOdd, depth,
+                group.getStyle() == null ? null : group.getStyle().getVisible());
+    }
+
+    /// `visible` is the `visibility` the children have from what they are
+    /// in, which each may set again for itself.
+    private void addOutlines(java.awt.geom.Area all, SVGGroup group, AffineTransform at, Boolean evenOdd,
+            int depth, Boolean visible) {
         for (SVGNode child : group.getChildren()) {
             // What is not displayed cuts nothing, nor does anything in it.
             if (child.getStyle() != null && child.getStyle().isDisplayNone()) {
                 continue;
             }
+            Boolean seen = child.getStyle() != null && child.getStyle().getVisible() != null
+                    ? child.getStyle().getVisible() : visible;
             AffineTransform childAt = new AffineTransform(at);
             SVGTransform t = child.getTransform();
             if (t != null) {
@@ -1466,12 +1496,12 @@ public final class VectorImage {
                 childAt.concatenate(placing(use, target));
                 SVGGroup one = new SVGGroup();
                 one.addChild(target);
-                addOutlines(all, one, childAt, rule, depth + 1);
+                addOutlines(all, one, childAt, rule, depth + 1, seen);
             } else if (child instanceof SVGGroup) {
-                addOutlines(all, (SVGGroup) child, childAt, rule, depth + 1);
+                addOutlines(all, (SVGGroup) child, childAt, rule, depth + 1, seen);
             } else {
                 Shape shape = outline(child);
-                if (shape != null) {
+                if (shape != null && !Boolean.FALSE.equals(seen)) {
                     Path2D.Double ruled = new Path2D.Double(shape);
                     ruled.setWindingRule(Boolean.TRUE.equals(rule) ? Path2D.WIND_EVEN_ODD : Path2D.WIND_NON_ZERO);
                     java.awt.geom.Area part = new java.awt.geom.Area(ruled);
@@ -2324,7 +2354,10 @@ public final class VectorImage {
             // A span that is not opaque is painted whole and then laid down
             // at its opacity, like any element: its stroke does not show
             // through its fill where they overlap.
-            float opacity = own == null || own.getOpacity() == null ? 1f : clamp(own.getOpacity().floatValue());
+            // `inherit` is the opacity of the text it is in, applied to
+            // the span as well.
+            Float given = own == null ? null : own.isOpacityInherited() ? style.getOpacity() : own.getOpacity();
+            float opacity = given == null ? 1f : clamp(given.floatValue());
             if (opacity <= 0f) {
                 continue;
             }

@@ -1998,4 +1998,45 @@ class VectorImageTest {
         BufferedImage img = paint("<text y=\"30\"" + font + "><tspan x=\"60\"><tspan></tspan>I</tspan></text>", 100, 100);
         assertTrue(inkRight(img) > 60, "where the outer span says, was " + inkRight(img));
     }
+
+    @Test
+    void aSpansInheritedOpacityIsAppliedAgain() throws Exception {
+        BufferedImage img = paint("<text x=\"5\" y=\"70\" font-family=\"monospace\" font-size=\"60\" font-weight=\"bold\""
+                + " fill=\"#ff0000\" opacity=\"0.5\"><tspan opacity=\"inherit\">M</tspan></text>", 100, 100);
+        int most = 0;
+        for (int y = 0; y < 100; y++) {
+            for (int x = 0; x < 100; x++) {
+                most = Math.max(most, alpha(img, x, y));
+            }
+        }
+        assertEquals(64, most, 3, "the text's half, and the span's again");
+    }
+
+    @Test
+    void whatIsHiddenCutsNothingOutOfAClip() throws Exception {
+        BufferedImage img = paint("<defs><clipPath id=\"c\"><rect width=\"100\" height=\"100\" visibility=\"hidden\"/>"
+                + "<rect width=\"30\" height=\"100\"/></clipPath></defs>"
+                + "<rect width=\"100\" height=\"100\" fill=\"#ff0000\" clip-path=\"url(#c)\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(15, 50));
+        assertEquals(0, alpha(img, 60, 50));
+    }
+
+    @Test
+    void aSymbolIsCutOffAtTheSizeItsUseGives() throws Exception {
+        String symbol = "<rect x=\"-10\" width=\"30\" height=\"10\" fill=\"#ff0000\"/></symbol>"
+                + "<use href=\"#s\" x=\"30\" y=\"30\" width=\"40\" height=\"40\"/>";
+        BufferedImage cut = paint("<symbol id=\"s\" viewBox=\"0 0 10 10\">" + symbol, 100, 100);
+        assertEquals(0xffff0000, cut.getRGB(50, 50));
+        assertEquals(0, alpha(cut, 20, 50), "what is left of the view box");
+        assertEquals(0, alpha(cut, 80, 50), "and right of it");
+        BufferedImage shown = paint("<symbol id=\"s\" viewBox=\"0 0 10 10\" overflow=\"visible\">" + symbol, 100, 100);
+        assertEquals(0xffff0000, shown.getRGB(80, 50), "unless it says to show it");
+    }
+
+    @Test
+    void aSymbolThatIsNotDisplayedIsStillDrawnByAUse() throws Exception {
+        BufferedImage img = paint("<symbol id=\"s\" display=\"none\"><rect width=\"50\" height=\"50\" fill=\"#ff0000\"/>"
+                + "</symbol><use href=\"#s\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(25, 25));
+    }
 }

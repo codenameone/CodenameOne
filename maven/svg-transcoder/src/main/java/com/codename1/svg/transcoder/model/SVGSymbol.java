@@ -28,6 +28,11 @@ package com.codename1.svg.transcoder.model;
  */
 public final class SVGSymbol extends SVGGroup {
     private float viewBoxX, viewBoxY, viewBoxWidth, viewBoxHeight;
+    private boolean overflowVisible;
+
+    /** Whether what reaches past the size a {@code <use>} gives the symbol is still drawn ({@code overflow="visible"}). Only a renderer that reads the model applies it. */
+    public boolean isOverflowVisible() { return overflowVisible; }
+    public void setOverflowVisible(boolean v) { this.overflowVisible = v; }
 
     public float getViewBoxX() { return viewBoxX; }
     public float getViewBoxY() { return viewBoxY; }
