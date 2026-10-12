@@ -63,6 +63,11 @@ public final class TransactionSession implements Session {
     }
 
     @Override
+    public <T> JpqlQuery<T> createNativeQuery(String statement, Class<T> resultType) {
+        return current().createNativeQuery(statement, resultType);
+    }
+
+    @Override
     public <T> JpqlQuery<T> createQuery(String statement, Class<T> resultType) {
         return current().createQuery(statement, resultType);
     }

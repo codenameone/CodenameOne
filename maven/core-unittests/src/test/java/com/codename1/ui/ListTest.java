@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
@@ -246,5 +268,92 @@ class ListTest extends UITestBase {
         List list = new List(new String[]{"A", "B"});
         assertDoesNotThrow(() -> list.refreshTheme(false));
         assertDoesNotThrow(() -> list.refreshTheme(true));
+    }
+
+    private static String[] rows(int count) {
+        String[] items = new String[count];
+        for (int i = 0; i < count; i++) {
+            items[i] = "Item " + i;
+        }
+        return items;
+    }
+
+    /// A list whose preferred height is capped, the way an application keeps a long list
+    /// from swallowing the form.
+    private static final class CappedList extends List<String> {
+        private final int cap;
+
+        CappedList(int cap, String... items) {
+            super(items);
+            this.cap = cap;
+        }
+
+        @Override
+        protected com.codename1.ui.geom.Dimension calcPreferredSize() {
+            com.codename1.ui.geom.Dimension d = super.calcPreferredSize();
+            return new com.codename1.ui.geom.Dimension(d.getWidth(), Math.min(d.getHeight(), cap));
+        }
+    }
+
+    /// The scroll size used to be the preferred size, so capping one capped the other: the
+    /// list was laid out at exactly its "scroll" height and stopped being scrollable, with
+    /// fifty rows below the fold that neither the wheel nor a drag could reach.
+    @FormTest
+    void cappingThePreferredHeightLeavesTheListScrollable() {
+        Form form = Display.getInstance().getCurrent();
+        form.removeAll();
+        form.setScrollable(false);
+        form.setLayout(new BorderLayout());
+
+        CappedList list = new CappedList(120, rows(60));
+        form.add(BorderLayout.NORTH, list);
+        form.revalidate();
+
+        assertEquals(120, list.getHeight(), "the cap is what the layout gives the list");
+        int rowHeight = list.getElementSize(false, true).getHeight();
+        assertTrue(rowHeight > 0);
+        assertTrue(list.getScrollDimension().getHeight() >= rowHeight * 60,
+                "the scroll size is every row in the model, not the capped preferred height");
+        assertTrue(list.isScrollableY(), "a list taller than its viewport has to scroll");
+    }
+
+    /// The same trap through the list's own API rather than a subclass.
+    @FormTest
+    void maxElementHeightLimitsTheViewportNotTheContent() {
+        Form form = Display.getInstance().getCurrent();
+        form.removeAll();
+        form.setScrollable(false);
+        form.setLayout(new BorderLayout());
+
+        List<String> list = new List<String>(rows(60));
+        list.setMaxElementHeight(5);
+        form.add(BorderLayout.NORTH, list);
+        form.revalidate();
+
+        int rowHeight = list.getElementSize(false, true).getHeight();
+        assertTrue(list.getHeight() < rowHeight * 7, "five rows are what it asks for");
+        assertTrue(list.getScrollDimension().getHeight() >= rowHeight * 60);
+        assertTrue(list.isScrollableY());
+    }
+
+    /// The other half: a list that fits must not become scrollable, and a combo box face,
+    /// which shares the class, is not a scrolling list at all.
+    @FormTest
+    void aListThatFitsAndAComboBoxFaceStayUnscrollable() {
+        Form form = Display.getInstance().getCurrent();
+        form.removeAll();
+        form.setScrollable(false);
+        form.setLayout(new BorderLayout());
+
+        List<String> list = new List<String>(rows(3));
+        ComboBox<String> combo = new ComboBox<String>((Object[]) rows(60));
+        form.add(BorderLayout.NORTH, list);
+        form.add(BorderLayout.SOUTH, combo);
+        form.revalidate();
+
+        assertEquals(list.getPreferredH(), list.getScrollDimension().getHeight());
+        assertFalse(list.isScrollableY());
+        assertEquals(combo.getPreferredH(), combo.getScrollDimension().getHeight());
+        assertFalse(combo.isScrollableY());
     }
 }

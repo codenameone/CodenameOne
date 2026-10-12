@@ -311,7 +311,9 @@ public final class BuildHintCodeGenerator {
         for (BuildHints.Hint h : all) {
             // Dynamic families are listed too: their names are patterns rather than
             // keys, but they are real settings a reader needs to find.
-            sb.append('|').append(cell(h.name())).append('\n');
+            // Hint names are literal identifiers: paired wildcards in a dynamic
+            // family (ios.*.appext.*) must not become AsciiDoc bold markup.
+            sb.append("|`+").append(cell(h.name())).append("+`\n");
             sb.append('|').append(cell(adocType(h))).append('\n');
             // A default is a literal value, not prose. One containing a quote --
             // android.file_paths defaults to an XML fragment -- trips Vale's

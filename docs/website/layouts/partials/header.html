@@ -73,7 +73,7 @@
                     </ul>
                     {{- else }}
                     {{- if eq .Identifier "search" }}
-                    <a class="cn1-menu-search-link" href="{{ .URL | relLangURL }}" aria-label="Search">
+                    <a class="cn1-menu-search-link" href="{{ .URL | relLangURL }}" aria-label="Search" accesskey="/" title="Search (Alt + /)">
                         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 4 4"/></svg>
                     </a>
                     {{- else }}

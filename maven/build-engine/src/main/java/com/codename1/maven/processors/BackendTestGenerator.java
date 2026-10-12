@@ -358,6 +358,8 @@ final class BackendTestGenerator {
             String[] f = line.split("\t", -1);
             if (f.length >= 2 && "package".equals(f[0])) {
                 entryPackage = f[1];
+            } else if (f.length >= 2 && "mvc-assets".equals(f[0]) && "true".equals(f[1])) {
+                ctx.setAttribute("cn1.backend.mvc", Boolean.TRUE);
             } else if (f.length >= 3 && "router".equals(f[0])) {
                 routers.add(new BackendWiringWriter.Router(f[1], f[2]));
             } else if (f.length >= 3 && "socket".equals(f[0])) {

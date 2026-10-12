@@ -80,6 +80,12 @@ class ManagedSessionDatabaseTest {
             ManagedSessionTest.assertDecimalIdentifiers(db);
             ManagedSessionTest.assertBulkTextKeyBounds(db);
             ManagedSessionTest.assertMinimumLongLiteral(session);
+            ManagedSessionTest.assertCaseAndNativeQueries(session);
+            ManagedSessionTest.assertNativeProjectionWidths(session);
+            assertThrows(PersistenceException.class,()->session.createNativeQuery("SELECT 1.5",Long.class).first());
+            assertThrows(PersistenceException.class,()->session.createNativeQuery("SELECT 1",String.class).first());
+            assertEquals(Long.valueOf(12345),session.createNativeQuery("SELECT :value",Long.class).setParameter("value",new java.util.Date(12345)).first());
+            assertEquals(Long.valueOf(65),session.createNativeQuery("SELECT :value",Long.class).setParameter("value",Character.valueOf('A')).first());
             java.util.Map<String,com.codename1.impl.orm.EntityModel<?>> realModels=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();realModels.put(ManagedSessionTest.RealRecord.class.getName(),new ManagedSessionTest.RealModel());
             Session realSession=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),realModels);
             try { ManagedSessionTest.assertRealAssignments(realSession); } finally { realSession.close(); }

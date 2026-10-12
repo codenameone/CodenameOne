@@ -24,6 +24,7 @@ package com.codename1.gradle.tasks;
 
 import com.codename1.build.BuildExecutionException;
 import com.codename1.gradle.GradleLog;
+import com.codename1.maven.annotations.JavaSourceCompiler;
 import com.codename1.maven.processors.BackendTests;
 import org.gradle.api.Action;
 import org.gradle.api.GradleException;
@@ -79,6 +80,14 @@ public final class ProcessTestAnnotationsAction implements Action<Task> {
         this.deferTo = deferTo;
     }
 
+    private org.gradle.api.provider.Provider<File> compilerJdk;
+
+    /// Use the Java compile task's toolchain for generated wiring as well.
+    public ProcessTestAnnotationsAction withCompilerJdk(org.gradle.api.provider.Provider<File> jdk) {
+        this.compilerJdk = jdk;
+        return this;
+    }
+
     @Override
     public void execute(Task task) {
         File tests = testClasses.get();
@@ -93,7 +102,8 @@ public final class ProcessTestAnnotationsAction implements Action<Task> {
         for (File f : testClasspath) {
             classpath.add(f.getAbsolutePath());
         }
-        try {
+        try (JavaSourceCompiler.CompilerScope ignored = JavaSourceCompiler.useJdk(
+                compilerJdk == null ? null : compilerJdk.get())) {
             int generated = BackendTests.process(new ArrayList<File>(mainClassDirs.getFiles()), tests, others,
                     stubDir, projectDir,
                     new ArrayList<String>(sourceRoots.get()), encoding.get(), classpath, false, null,

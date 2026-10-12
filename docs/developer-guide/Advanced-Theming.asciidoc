@@ -165,6 +165,9 @@ Internally, Codename One has many built-in constants, and the list keeps growing
 |comboImage
 |Combo image to use instead of Codename One drawing it on its own
 
+|comboPopupMaxRowsInt
+|The most rows the popup of the combo box shows before it scrolls. A popup with a limit opens below or above the combo box and doesn't cover it. Defaults to 10 on a desktop and to 0, which means no limit, on other platforms
+
 |commandBehavior
 |Deprecated: don't use this constant as it conflicts with the `Toolbar`. Indicates how commands should act, as a touch menu, native menu etc. Possible values:
 SoftKey, Touch, Bar, Title, Right, Native

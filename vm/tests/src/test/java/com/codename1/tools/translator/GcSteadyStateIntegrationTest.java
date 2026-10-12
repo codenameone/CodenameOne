@@ -1110,6 +1110,23 @@ class GcSteadyStateIntegrationTest {
         return max;
     }
 
+    @Test
+    public void keepsDiagnosticWritesOutOfResultLine() throws Exception {
+        Path directory = Files.createTempDirectory("gc-output-streams");
+        Path executable = directory.resolve("workload.sh");
+        try {
+            Files.write(executable, ("#!/bin/sh\nprintf 'RESULT=39'\nprintf 'gc-diagnostic\\n' >&2\nprintf '806\\n'\n").getBytes(StandardCharsets.UTF_8));
+            assertTrue(executable.toFile().setExecutable(true));
+            Run result = run(executable, directory, new HashMap<String, String>());
+            assertEquals(0, result.exit);
+            assertEquals("RESULT=39806", extractLine(result.output, "RESULT="));
+            assertTrue(result.output.contains("gc-diagnostic"));
+        } finally {
+            Files.deleteIfExists(executable);
+            Files.deleteIfExists(directory);
+        }
+    }
+
     private Run run(Path executable, Path workingDir, Map<String, String> env) throws Exception {
         return run(executable, workingDir, env, false);
     }
@@ -1127,7 +1144,8 @@ class GcSteadyStateIntegrationTest {
         builder.environment().put("CN1_GC_PROBE", "1");
         builder.environment().put("CN1_LOG_PACING_PARKS", "1");
         builder.environment().putAll(env);
-        builder.redirectErrorStream(true);
+        // Keep diagnostics separate: native printf writes can split RESULT= across
+        // writes, and merging stderr lets a GC probe splice into that line.
         final Process process = builder.start();
 
         // Drained CONCURRENTLY and waited for with a bound, as GcOverflowSpiralIntegration
@@ -1138,22 +1156,9 @@ class GcSteadyStateIntegrationTest {
         // Draining as we go also means a killed run still yields whatever it printed, which
         // is the only diagnostic a stalled run leaves behind.
         final StringBuilder captured = new StringBuilder();
-        Thread drain = new Thread(() -> {
-            try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    synchronized (captured) {
-                        captured.append(line).append('\n');
-                    }
-                }
-            } catch (Exception e) {
-                // The stream ends abruptly when a timed-out child is destroyed. Whatever
-                // was captured before that is exactly what should be reported.
-            }
-        });
-        drain.setDaemon(true);
-        drain.start();
+        final StringBuilder diagnostics = new StringBuilder();
+        Thread drain = drainOutput(process.getInputStream(), captured);
+        Thread errorDrain = drainOutput(process.getErrorStream(), diagnostics);
 
         boolean exited = process.waitFor(VM_RUN_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         if (!exited) {
@@ -1161,9 +1166,13 @@ class GcSteadyStateIntegrationTest {
             process.waitFor(10, TimeUnit.SECONDS);
         }
         drain.join(10_000);
+        errorDrain.join(10_000);
         String output;
         synchronized (captured) {
             output = captured.toString();
+        }
+        synchronized (diagnostics) {
+            output += "\n" + diagnostics.toString();
         }
         if (!exited && mayWedge) {
             return new Run(WEDGED, output);
@@ -1175,6 +1184,24 @@ class GcSteadyStateIntegrationTest {
                         + " cycles is one of the regressions it watches for. Output so far:\n"
                         + tail(output));
         return new Run(exited ? process.exitValue() : -1, output);
+    }
+
+    private Thread drainOutput(final java.io.InputStream stream, final StringBuilder captured) {
+        Thread drain = new Thread(() -> {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    synchronized (captured) {
+                        captured.append(line).append('\n');
+                    }
+                }
+            } catch (Exception e) {
+                // A timed-out process can close its stream abruptly; retain diagnostics so far.
+            }
+        });
+        drain.setDaemon(true);
+        drain.start();
+        return drain;
     }
 
     private String tail(String output) {

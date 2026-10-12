@@ -1,6 +1,14 @@
 <?xml version="1.0"?>
 <component-set>
     <components>
+        <!-- Build progress reporting for projects the Initializr or the Build Cloud
+             starter generated (they declare this plugin with extensions=true and set
+             cn1.telemetry.project / cn1.telemetry.events). See FirstBuildTelemetry. -->
+        <component>
+            <role>org.apache.maven.AbstractMavenLifecycleParticipant</role>
+            <role-hint>cn1-first-build-telemetry</role-hint>
+            <implementation>com.codename1.maven.FirstBuildTelemetryParticipant</implementation>
+        </component>
         <component>
             <role>org.apache.maven.lifecycle.mapping.LifecycleMapping</role>
             <role-hint>cn1lib</role-hint>

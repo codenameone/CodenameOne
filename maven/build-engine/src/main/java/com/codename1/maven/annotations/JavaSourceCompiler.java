@@ -50,6 +50,22 @@ public final class JavaSourceCompiler {
 
     private JavaSourceCompiler() { }
 
+    private static final ThreadLocal<File> FORKED_JDK = new ThreadLocal<File>();
+
+    /// Generated classes remain Java 8; use this JDK to read newer application
+    /// bytecode even when the build tool itself runs on an older JVM.
+    public static CompilerScope useJdk(File jdk) {
+        return new CompilerScope(jdk);
+    }
+
+    public static final class CompilerScope implements AutoCloseable {
+        private final File previous = FORKED_JDK.get();
+        private CompilerScope(File jdk) { FORKED_JDK.set(jdk); }
+        @Override public void close() {
+            if (previous == null) FORKED_JDK.remove(); else FORKED_JDK.set(previous);
+        }
+    }
+
     /// The project's compile classpath while [com.codename1.maven.AnnotationProcessing]
     /// runs, appended to every compile below. Processors compile their generated
     /// sources against the output directory, which under Maven holds every
@@ -74,31 +90,9 @@ public final class JavaSourceCompiler {
     /// rooted at `outputClassDir`. Adds `extraClasspath` (typically the plugin's
     /// own test-classes directory so the @Route + Form + Router stubs resolve).
     ///
-    /// JAVA 8 BYTECODE, WHATEVER JDK IS RUNNING. Everything the annotation
-    /// processors generate is Codename One code, and every consumer of it reads
-    /// class file version 52: ParparVM translates an app's generated routers,
-    /// mappers and bindings, and `cn1:backend-package` hands the generated entry
-    /// point straight to the translator. The class file version used to be the
-    /// running JDK's default, so packaging a backend on a JDK 25 died inside the
-    /// translator with "Unsupported class file major version 69" -- naming ASM and
-    /// no source, on a class the developer never wrote. It stayed invisible
-    /// because that goal demanded a JDK 8 until this was fixed.
-    ///
-    /// Pass a level explicitly through the overload below to compile a source that
-    /// needs a newer language than 8 -- a record, say. Only a test has reason to:
-    /// generated source that cannot be translated is of no use to a build.
-    ///
-    /// THE COMPILER IS ALWAYS THE JDK RUNNING MAVEN. JSR 199 hands back the one
-    /// inside this JVM and offers no way to redirect it, so
-    /// `-Dcn1.backend.jdk` -- which selects the javac and the java that
-    /// `cn1:backend-package` FORKS -- does not reach this line. That costs nothing
-    /// while every JDK from 8 up accepts `-source 8`, since all of them emit the
-    /// same class file version 52. On a release that has dropped the option this
-    /// fails, and the remedy is to run Maven on a JDK that still has it, which
-    /// BackendPackageMojo's error message says; a release like that takes
-    /// `-source 8` from every compile in this build, including the 1.5 that
-    /// codenameone-core still asks for, so forking one call here would rescue
-    /// nothing.
+    /// Generated source stays at Java 8 for compatibility. This does not constrain
+    /// the application's language level. Backend packaging supplies its selected
+    /// JDK through useJdk so generated sources can refer to modern app classes.
     public static void compile(Map<String, String> sources, File outputClassDir, List<File> extraClasspath)
             throws IOException {
         compile(sources, outputClassDir, extraClasspath, GENERATED_SOURCE_LEVEL);
@@ -113,6 +107,11 @@ public final class JavaSourceCompiler {
     public static void compile(Map<String, String> sources, File outputClassDir,
             List<File> extraClasspath, String sourceLevel)
             throws IOException {
+        File forkedJdk = FORKED_JDK.get();
+        if (forkedJdk != null) {
+            compileForked(forkedJdk, sources, outputClassDir, extraClasspath, sourceLevel);
+            return;
+        }
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
         if (compiler == null) {
             throw new IllegalStateException(
@@ -191,6 +190,54 @@ public final class JavaSourceCompiler {
             }
         } finally {
             fm.close();
+        }
+    }
+
+    private static void compileForked(File jdk, Map<String, String> sources, File output,
+            List<File> extraClasspath, String level) throws IOException {
+        if (sources.isEmpty()) return;
+        java.nio.file.Path temporary = java.nio.file.Files.createTempDirectory("cn1-generated-java-");
+        try {
+            java.nio.file.Files.createDirectories(output.toPath());
+            List<String> command = new ArrayList<String>(Arrays.asList(
+                    new File(jdk, "bin/javac").getAbsolutePath(), "-Xlint:none", "-proc:none",
+                    "-encoding", "UTF-8", "-d", output.getAbsolutePath()));
+            if (level != null) command.addAll(Arrays.asList("-source", level, "-target", level));
+            List<File> cp = new ArrayList<File>();
+            cp.add(output);
+            if (extraClasspath != null) cp.addAll(extraClasspath);
+            if (PROJECT_CLASSPATH.get() != null) cp.addAll(PROJECT_CLASSPATH.get());
+            StringBuilder paths = new StringBuilder();
+            for (File file : cp) {
+                if (paths.length() > 0) paths.append(File.pathSeparator);
+                paths.append(file.getAbsolutePath());
+            }
+            command.addAll(Arrays.asList("-classpath", paths.toString()));
+            for (Map.Entry<String, String> entry : sources.entrySet()) {
+                java.nio.file.Path file = temporary.resolve(entry.getKey().replace('.', '/') + ".java");
+                java.nio.file.Files.createDirectories(file.getParent());
+                java.nio.file.Files.write(file, entry.getValue().getBytes(StandardCharsets.UTF_8));
+                command.add(file.toString());
+            }
+            Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
+            java.io.ByteArrayOutputStream diagnostics = new java.io.ByteArrayOutputStream();
+            try (java.io.InputStream stream = process.getInputStream()) {
+                byte[] buffer = new byte[8192];
+                int count;
+                while ((count = stream.read(buffer)) != -1) diagnostics.write(buffer, 0, count);
+            }
+            try {
+                if (process.waitFor() != 0) {
+                    throw new IOException("Generated backend source compilation failed:\n"
+                            + diagnostics.toString("UTF-8"));
+                }
+            } catch (InterruptedException ex) {
+                process.destroy();
+                Thread.currentThread().interrupt();
+                throw new IOException("Interrupted compiling generated backend sources", ex);
+            }
+        } finally {
+            org.apache.commons.io.FileUtils.deleteDirectory(temporary.toFile());
         }
     }
 

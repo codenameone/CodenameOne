@@ -33,7 +33,6 @@ import com.codename1.html5.js.dom.HTMLElement;
 import com.codename1.html5.js.JSObject;
 import com.codename1.html5.js.JSProperty;
 import com.codename1.html5.js.JSMethod;
-import com.codename1.html5.js.JSBody;
 import com.codename1.html5.js.dom.HTMLInputElement;
 import com.codename1.html5.js.dom.HTMLDocument;
 
@@ -154,19 +153,27 @@ abstract class NativePicker {
         
         
     }
-    @JSBody(params={"text", "value", "defaultSelected", "selected"}, script="return new Option(text, value, defaultSelected, selected);")
-    native static HTMLOptionElement createOption(String text, String value, boolean defaultSelected, boolean selected);
-    
+    // The application runs in a Web Worker, which has no DOM: an inline script such as
+    // "new Option(...)" is evaluated there and fails with "Option is not defined". Everything
+    // that touches the page has to go through the document, whose calls are forwarded to the
+    // main thread.
+    static HTMLOptionElement createOption(HTMLDocument doc, String text, String value, boolean selected) {
+        HTMLOptionElement opt = (HTMLOptionElement)doc.createElement("option");
+        opt.setText(text);
+        opt.setValue(value);
+        opt.setSelected(selected);
+        return opt;
+    }
+
     protected final HTMLDocument document = HTML5Implementation.getInstance().window.getDocument();
     
     static HTMLSelectElement createSelect(String[] options, String selectedValue) {
-        HTMLSelectElement el = (HTMLSelectElement)HTML5Implementation.getInstance().window.getDocument().createElement("select");
+        HTMLDocument doc = HTML5Implementation.getInstance().window.getDocument();
+        HTMLSelectElement el = (HTMLSelectElement)doc.createElement("select");
         int len = options.length;
         for (int i=0; i<len; i++) {
             String val = options[i];
-            boolean selected = val.equals(selectedValue);
-            HTMLOptionElement opt = createOption(val, String.valueOf(i), selected, selected);
-            el.add(opt, i);
+            el.appendChild(createOption(doc, val, String.valueOf(i), val.equals(selectedValue)));
         }
         return el;
     }
@@ -204,6 +211,11 @@ abstract class NativePicker {
         
         @JSMethod
         void remove(int index);
+
+        /// Opens the list. Not every browser has it, and those that do refuse it outside a
+        /// user gesture, so a caller must be ready for it to throw.
+        @JSMethod
+        void showPicker();
         
         @JSProperty
         HTMLOptionsCollection getOptions();

@@ -24,6 +24,7 @@ package com.codename1.gradle.tasks;
 
 import com.codename1.build.BuildExecutionException;
 import com.codename1.gradle.GradleLog;
+import com.codename1.maven.annotations.JavaSourceCompiler;
 import com.codename1.maven.AnnotationProcessing;
 import org.gradle.api.Action;
 import org.gradle.api.GradleException;
@@ -165,6 +166,14 @@ public final class ProcessAnnotationsAction implements Action<Task> {
         }
     }
 
+    private org.gradle.api.provider.Provider<File> compilerJdk;
+
+    /// Use the Java compile task's toolchain for generated wiring as well.
+    public ProcessAnnotationsAction withCompilerJdk(org.gradle.api.provider.Provider<File> jdk) {
+        this.compilerJdk = jdk;
+        return this;
+    }
+
     @Override
     public void execute(Task task) {
         File classesDir = this.classesDir.get();
@@ -201,7 +210,8 @@ public final class ProcessAnnotationsAction implements Action<Task> {
         if (pending != null) {
             classpath.add(pending.getAbsolutePath());
         }
-        try {
+        try (JavaSourceCompiler.CompilerScope ignored = JavaSourceCompiler.useJdk(
+                compilerJdk == null ? null : compilerJdk.get())) {
             new AnnotationProcessing(new GradleLog(task.getLogger()), classesDir, stubDir, projectDir, raw,
                     mainClass, new ArrayList<String>(sourceRoots.get()), encoding, classpath).run();
         } catch (BuildExecutionException ex) {
