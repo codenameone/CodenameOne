@@ -260,6 +260,7 @@ public final class SVGParser {
         fontSize = null;
         fontBold = null;
         fontItalic = null;
+        fontSpacing = null;
         inheritedColor = null;
         enterFont(a);
     }
@@ -358,7 +359,7 @@ public final class SVGParser {
 
     /** Takes in the font properties of a container; what is returned undoes it with {@link #leaveFont}. */
     private Object[] enterFont(Map<String, String> a) {
-        Object[] saved = {fontFamily, fontSize, fontBold, fontItalic, inheritedColor};
+        Object[] saved = {fontFamily, fontSize, fontBold, fontItalic, inheritedColor, fontSpacing};
         Integer color = colorOf(a);
         if (color != null) inheritedColor = color;
         String family = mergedValue(a, "font-family");
@@ -369,7 +370,22 @@ public final class SVGParser {
         if (bold != null) fontBold = bold;
         Boolean italic = italicOf(mergedValue(a, "font-style"));
         if (italic != null) fontItalic = italic;
+        Float spacing = spacingOf(mergedValue(a, "letter-spacing"));
+        if (spacing != null) fontSpacing = spacing;
         return saved;
+    }
+
+    private Float fontSpacing;
+
+    /** A letter-spacing: a length, zero for {@code normal}, null when it is not written or is inherited. */
+    private Float spacingOf(String value) {
+        if (value == null || "inherit".equals(value.trim())) return null;
+        if ("normal".equals(value.trim())) return Float.valueOf(0f);
+        try {
+            return Float.valueOf(length(value, 0f));
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     private void leaveFont(Object[] saved) {
@@ -378,6 +394,7 @@ public final class SVGParser {
         fontBold = (Boolean) saved[2];
         fontItalic = (Boolean) saved[3];
         inheritedColor = (Integer) saved[4];
+        fontSpacing = (Float) saved[5];
     }
 
     /** A font size, a relative one taken against the size around it; null when there is none to read. */
@@ -1098,6 +1115,11 @@ public final class SVGParser {
         if (mergedValue(a, "font-style") == null && fontItalic != null) {
             t.setItalic(fontItalic.booleanValue());
         }
+        Float apart = spacingOf(mergedValue(a, "letter-spacing"));
+        if (apart == null) apart = fontSpacing;
+        if (apart != null) {
+            t.setLetterSpacing(apart.floatValue());
+        }
         String weight = mergedValue(a, "font-weight");
         if (weight != null) {
             String w = weight.trim().toLowerCase();
@@ -1204,6 +1226,7 @@ public final class SVGParser {
                     run.setFontSize(span.getFontSize());
                     run.setBold(span.getBold());
                     run.setItalic(span.getItalic());
+                    run.setLetterSpacing(span.getLetterSpacing());
                     run.setAnchor(span.getAnchor());
                     run.setPathRef(span.getPathRef());
                     run.setStartOffset(span.getStartOffset(), span.isStartOffsetShare());
@@ -1227,6 +1250,7 @@ public final class SVGParser {
                         placed.setFontSize(run.getFontSize());
                         placed.setBold(run.getBold());
                         placed.setItalic(run.getItalic());
+                        placed.setLetterSpacing(run.getLetterSpacing());
                         placed.setAnchor(run.getAnchor());
                         placed.setPathRef(run.getPathRef());
                         placed.setStartOffset(run.getStartOffset(), run.isStartOffsetShare());
@@ -1244,10 +1268,13 @@ public final class SVGParser {
                 Map<String, String> a = attrs(r);
                 SVGText.Run child = new SVGText.Run();
                 if (span != null) {
+                    child.setLetterSpacing(span.getLetterSpacing());
                     child.setAnchor(span.getAnchor());
                     child.setPathRef(span.getPathRef());
                     child.setStartOffset(span.getStartOffset(), span.isStartOffsetShare());
                 }
+                Float spanSpacing = spacingOf(mergedValue(a, "letter-spacing"));
+                if (spanSpacing != null) child.setLetterSpacing(spanSpacing);
                 String spanAnchor = mergedValue(a, "text-anchor");
                 if (spanAnchor != null) {
                     String norm = spanAnchor.trim();
@@ -1404,6 +1431,12 @@ public final class SVGParser {
         }
         if (a.containsKey("gradientUnits")) g.markGiven("gradientUnits");
         if ("userSpaceOnUse".equals(a.get("gradientUnits"))) g.setUserSpace(true);
+        // Which light the colours between the stops are mixed in.
+        String mixed = mergedValue(a, "color-interpolation");
+        if (mixed != null && !"inherit".equals(mixed.trim())) {
+            g.markGiven("color-interpolation");
+            if ("linearRGB".equalsIgnoreCase(mixed.trim())) g.markGiven("linearRGB");
+        }
         if (a.get("gradientTransform") != null) g.setGradientTransform(TransformParser.parse(a.get("gradientTransform")));
         String href = a.get("href");
         if (href == null) href = a.get("xlink:href");
@@ -1434,6 +1467,12 @@ public final class SVGParser {
         }
         if (a.containsKey("gradientUnits")) g.markGiven("gradientUnits");
         if ("userSpaceOnUse".equals(a.get("gradientUnits"))) g.setUserSpace(true);
+        // Which light the colours between the stops are mixed in.
+        String mixed = mergedValue(a, "color-interpolation");
+        if (mixed != null && !"inherit".equals(mixed.trim())) {
+            g.markGiven("color-interpolation");
+            if ("linearRGB".equalsIgnoreCase(mixed.trim())) g.markGiven("linearRGB");
+        }
         String href = a.get("href");
         if (href == null) href = a.get("xlink:href");
         if (href != null && href.startsWith("#")) g.setHref(href.substring(1));

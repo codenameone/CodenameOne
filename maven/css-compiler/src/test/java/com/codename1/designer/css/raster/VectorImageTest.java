@@ -1769,4 +1769,35 @@ class VectorImageTest {
                         100, 100));
         assertTrue(refused.getMessage().contains("transform-box"), refused.getMessage());
     }
+
+    @Test
+    void aFillRuleThatInheritsIsTheOneAbove() throws Exception {
+        String ring = "M 10 10 H 90 V 90 H 10 Z M 30 30 H 70 V 70 H 30 Z";
+        BufferedImage img = paint("<g fill-rule=\"evenodd\"><path d=\"" + ring
+                + "\" fill=\"#ff0000\" fill-rule=\"inherit\"/></g>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(20, 50));
+        assertEquals(0, alpha(img, 50, 50), "the hole of the group's rule");
+    }
+
+    @Test
+    void aGradientCanBeMixedInLinearLight() throws Exception {
+        String stops = "<stop offset=\"0\" stop-color=\"#000000\"/><stop offset=\"1\" stop-color=\"#ffffff\"/>"
+                + "</linearGradient></defs><rect width=\"100\" height=\"100\" fill=\"url(#g)\"/>";
+        BufferedImage plain = paint("<defs><linearGradient id=\"g\">" + stops, 100, 100);
+        BufferedImage linear = paint("<defs><linearGradient id=\"g\" color-interpolation=\"linearRGB\">" + stops,
+                100, 100);
+        assertEquals(128, plain.getRGB(50, 50) & 0xff, 4, "half way, as written");
+        assertEquals(188, linear.getRGB(50, 50) & 0xff, 5, "half the light, which is a light grey");
+    }
+
+    @Test
+    void lettersAreSetApartByTheirSpacing() throws Exception {
+        String font = " font-family=\"monospace\" font-size=\"10\" fill=\"#ff0000\"";
+        BufferedImage plain = paint("<text x=\"5\" y=\"30\"" + font + ">III</text>", 100, 100);
+        BufferedImage spaced = paint("<text x=\"5\" y=\"30\" letter-spacing=\"10\"" + font + ">III</text>", 100, 100);
+        assertEquals(inkRight(plain) + 20, inkRight(spaced), 1, "two gaps of ten between three letters");
+        BufferedImage inherited = paint("<g letter-spacing=\"10\"><text x=\"5\" y=\"30\"" + font + ">III</text></g>",
+                100, 100);
+        assertEquals(inkRight(spaced), inkRight(inherited));
+    }
 }

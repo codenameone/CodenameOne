@@ -233,13 +233,20 @@ public final class BackgroundImagePainter {
         return bg.size == BackgroundImage.Size.EXPLICIT && (width ? bg.sizeW < 0 : bg.sizeH < 0);
     }
 
-    /// Halves an image until it is less than twice the target size.
+    /// Halves an image, each way by itself, until that way it is less than
+    /// twice the target size. A wide strip drawn narrow and no lower is
+    /// halved across only, which is where it would otherwise be sampled
+    /// too thinly.
     private static BufferedImage reduce(BufferedImage img, double tw, double th) {
         BufferedImage cur = img;
-        while (cur.getWidth() >= tw * 2 && cur.getHeight() >= th * 2
-                && cur.getWidth() >= 2 && cur.getHeight() >= 2) {
-            int nw = cur.getWidth() / 2;
-            int nh = cur.getHeight() / 2;
+        while (true) {
+            boolean across = cur.getWidth() >= tw * 2 && cur.getWidth() >= 2;
+            boolean down = cur.getHeight() >= th * 2 && cur.getHeight() >= 2;
+            if (!across && !down) {
+                break;
+            }
+            int nw = across ? cur.getWidth() / 2 : cur.getWidth();
+            int nh = down ? cur.getHeight() / 2 : cur.getHeight();
             BufferedImage half = new BufferedImage(nw, nh, BufferedImage.TYPE_INT_ARGB);
             Graphics2D g = half.createGraphics();
             try {

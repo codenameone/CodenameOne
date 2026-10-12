@@ -59,6 +59,11 @@ public final class SVGText extends SVGShape {
         private Boolean bold;
         private Boolean italic;
 
+        private Float letterSpacing;
+        /// The `letter-spacing` a span sets, or null for the text's own.
+        public Float getLetterSpacing() { return letterSpacing; }
+        public void setLetterSpacing(Float letterSpacing) { this.letterSpacing = letterSpacing; }
+
         private Anchor anchor;
         /// The `text-anchor` a span sets, or null for the text's own.
         public Anchor getAnchor() { return anchor; }
@@ -135,6 +140,12 @@ public final class SVGText extends SVGShape {
 
     public boolean isItalic() { return italic; }
     public void setItalic(boolean italic) { this.italic = italic; }
+
+    private float letterSpacing;
+    /// How much further apart than the font has them the glyphs are set;
+    /// zero for `normal`. Only a renderer that reads the model applies it.
+    public float getLetterSpacing() { return letterSpacing; }
+    public void setLetterSpacing(float letterSpacing) { this.letterSpacing = letterSpacing; }
 
     public Anchor getAnchor() { return anchor; }
     public void setAnchor(Anchor anchor) { this.anchor = anchor == null ? Anchor.START : anchor; }

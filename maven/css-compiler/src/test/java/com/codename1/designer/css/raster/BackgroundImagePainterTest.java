@@ -251,6 +251,25 @@ class BackgroundImagePainterTest {
     }
 
     @Test
+    void aReductionOneWayOnlyAveragesTheSourceThatWay() {
+        // Columns of black and white, 256 of them, drawn 4 wide and no
+        // lower: grey, not whichever columns a few samples happen to hit.
+        BufferedImage stripes = new BufferedImage(256, 4, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < 4; y++) {
+            for (int x = 0; x < 256; x++) {
+                stripes.setRGB(x, y, (x & 1) == 0 ? 0xff000000 : 0xffffffff);
+            }
+        }
+        BufferedImage img = paint(BoxStyle.builder().size(4, 4)
+                .backgroundImage(new BackgroundImage(stripes).withSize(4, 4)));
+        for (int y = 0; y < 4; y++) {
+            for (int x = 0; x < 4; x++) {
+                assertPixelNear(0xff808080, img, x, y, 6);
+            }
+        }
+    }
+
+    @Test
     void imageIsClippedToTheRoundedBorderBoxAndPaintedOverTheGradient() {
         BufferedImage img = paint(BoxStyle.builder().size(30, 30).radii(10)
                 .gradient(GradientSpec.linear(90).addStop(WHITE).addStop(WHITE))

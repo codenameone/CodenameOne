@@ -97,13 +97,15 @@ public final class StyleParser {
         }
         out.setStrokeMiterLimit(toFloat(merged.get("stroke-miterlimit")));
         String fillRule = merged.get("fill-rule");
-        if (fillRule != null) {
+        // `inherit` and `unset` are the rule of what the element is in, which
+        // is what leaving it unset here hands down.
+        if (fillRule != null && !"inherit".equals(fillRule.trim()) && !"unset".equals(fillRule.trim())) {
             out.setFillEvenOdd(Boolean.valueOf("evenodd".equals(fillRule.trim())));
         }
         String effect = merged.get("vector-effect");
         out.setNonScalingStroke(effect != null && "non-scaling-stroke".equals(effect.trim()));
         String clipRule = merged.get("clip-rule");
-        if (clipRule != null) {
+        if (clipRule != null && !"inherit".equals(clipRule.trim()) && !"unset".equals(clipRule.trim())) {
             out.setClipEvenOdd(Boolean.valueOf("evenodd".equals(clipRule.trim())));
         }
         String mask = merged.get("mask");

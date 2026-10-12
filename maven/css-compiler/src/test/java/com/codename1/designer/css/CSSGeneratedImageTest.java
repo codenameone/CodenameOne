@@ -729,6 +729,21 @@ class CSSGeneratedImageTest {
     }
 
     @Test
+    void lengthsOfAGradientToACornerAreMeasuredAlongItsLine(@TempDir Path dir) throws Exception {
+        // Red up to 20px along the line and blue from 20px on. The line
+        // runs from the bottom left corner towards the top right, turned
+        // so that it is nearly straight up in a box this wide: 20px along
+        // it is 20px up from that corner, give or take.
+        Compiled c = compile(dir, "Banner { width: 50%; height: 10%;"
+                + " background: linear-gradient(to top right, #ff0000 20px, #0000ff 20px);"
+                + " box-shadow: 0 0 4px black; }");
+        BufferedImage img = stored(c.res, "Banner_1.png", Display.DENSITY_HD);
+        int bottom = img.getHeight() - 3;
+        assertEquals(0xffff0000, img.getRGB(2 + 2, bottom - 8), "under 20px along the line");
+        assertEquals(0xff0000ff, img.getRGB(2 + 2, bottom - 40), "past it");
+    }
+
+    @Test
     void aGradientCentreIsMeasuredFromTheEdgesItNames(@TempDir Path dir) throws Exception {
         // The page is 640x100, so 20px in from the right and 10px up from the
         // bottom is (620, 90).

@@ -498,6 +498,7 @@ public class CSSTheme {
                 return;
             }
             float angle = 180f; // CSS default for linear-gradient is "to bottom" (180deg)
+            boolean toCorner = false;
             // Optionally consume an angle or "to <side>" prefix terminated by comma.
             if (angleDegrees(p) != null) {
                 angle = angleDegrees(p).floatValue();
@@ -512,6 +513,8 @@ public class CSSTheme {
                 ScaledUnit nx2 = (ScaledUnit) nx.getNextLexicalUnit();
                 String side2 = (nx2 != null && isIdentLike(nx2)) ? identValue(nx2) : null;
                 angle = cssSideToAngle(side1, side2);
+                toCorner = side2 != null && ("left".equals(side1) || "right".equals(side1)) != ("left".equals(side2)
+                        || "right".equals(side2));
                 p = (side2 != null ? (ScaledUnit) nx2.getNextLexicalUnit() : (ScaledUnit) nx.getNextLexicalUnit());
                 if (p != null && p.getLexicalUnitType() == LexicalUnit.SAC_OPERATOR_COMMA) {
                     p = (ScaledUnit) p.getNextLexicalUnit();
@@ -521,6 +524,14 @@ public class CSSTheme {
             // whose length for a box is |w sin a| + |h cos a|.
             double radians = Math.toRadians(angle);
             double lineLength = Math.abs(rasterWidth * Math.sin(radians)) + Math.abs(rasterHeight * Math.cos(radians));
+            if (toCorner && rasterWidth > 0 && rasterHeight > 0) {
+                // To a corner the line is not at the 45 degrees the angle
+                // above stands for, unless the box is square: it is turned
+                // so that its half way line runs through the other two
+                // corners, and is then this long. The painter turns it the
+                // same way, so lengths along it have to be measured on it.
+                lineLength = 2.0 * rasterWidth * rasterHeight / Math.hypot(rasterWidth, rasterHeight);
+            }
             ParsedStops st = parseStops(p, lineLength);
             if (st == null || st.colors.length < 2) {
                 reason = "Could not parse stops for linear-gradient";

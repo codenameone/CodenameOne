@@ -1778,6 +1778,22 @@ public final class VectorImage {
     }
 
     private Paint gradient(SVGNode def, Rectangle2D bounds) {
+        // In linear light when the gradient asks for it, itself or through
+        // the one it takes after: black to white is then a light grey
+        // half way and not a mid one.
+        MultipleGradientPaint.ColorSpaceType space = MultipleGradientPaint.ColorSpaceType.SRGB;
+        SVGNode asks = def;
+        for (int depth = 0; depth < MAX_USE_DEPTH && asks != null; depth++) {
+            if (asks.isGiven("color-interpolation")) {
+                if (asks.isGiven("linearRGB")) {
+                    space = MultipleGradientPaint.ColorSpaceType.LINEAR_RGB;
+                }
+                break;
+            }
+            String href = asks instanceof SVGLinearGradient ? ((SVGLinearGradient) asks).getHref()
+                    : asks instanceof SVGRadialGradient ? ((SVGRadialGradient) asks).getHref() : null;
+            asks = href == null ? null : doc.getDefinitions().get(href);
+        }
         def = resolved(def);
         List<SVGGradientStop> stops = def instanceof SVGLinearGradient ? ((SVGLinearGradient) def).getStops()
                 : def instanceof SVGRadialGradient ? ((SVGRadialGradient) def).getStops() : null;
@@ -1869,8 +1885,7 @@ public final class VectorImage {
                 at.setTransform(bounds.getWidth(), 0, 0, bounds.getHeight(), bounds.getX(), bounds.getY());
             }
             at.concatenate(turned);
-            return new LinearGradientPaint(start, end, f, c, cycle,
-                    MultipleGradientPaint.ColorSpaceType.SRGB, at);
+            return new LinearGradientPaint(start, end, f, c, cycle, space, at);
         }
         if (def instanceof SVGLinearGradient) {
             SVGLinearGradient lg = (SVGLinearGradient) def;
@@ -1879,7 +1894,7 @@ public final class VectorImage {
             if (start.equals(end)) {
                 return c[c.length - 1];
             }
-            return new LinearGradientPaint(start, end, f, c, cycle);
+            return new LinearGradientPaint(start, end, f, c, cycle, space, new AffineTransform());
         }
         SVGRadialGradient rg = (SVGRadialGradient) def;
         if (rg.isUserSpace()) {
@@ -1887,8 +1902,7 @@ public final class VectorImage {
                 return c[c.length - 1];
             }
             return new RadialGradientPaint(new Point2D.Double(rg.getCx(), rg.getCy()), rg.getR(), focusOf(rg), f, c,
-                    cycle, MultipleGradientPaint.ColorSpaceType.SRGB,
-                    turned == null ? new AffineTransform() : turned);
+                    cycle, space, turned == null ? new AffineTransform() : turned);
         }
         if (rg.getR() <= 0 || bounds.getWidth() <= 0 || bounds.getHeight() <= 0) {
             return c[c.length - 1];
@@ -1902,7 +1916,7 @@ public final class VectorImage {
         }
         Point2D centre = new Point2D.Double(rg.getCx(), rg.getCy());
         return new RadialGradientPaint(centre, rg.getR(), focusOf(rg), f, c,
-                cycle, MultipleGradientPaint.ColorSpaceType.SRGB, toBox);
+                cycle, space, toBox);
     }
 
     /// Where a radial gradient's first colour starts: its focal point,
@@ -2300,10 +2314,23 @@ public final class VectorImage {
                 Font font = new Font(familyOf(family), (bold ? Font.BOLD : 0) | (italic ? Font.ITALIC : 0), 1)
                         .deriveFont(size);
                 java.awt.font.GlyphVector gv = font.createGlyphVector(context, run.getText());
+                // `letter-spacing`: that much more after every glyph.
+                float apart = spacingOf(text, run);
+                if (apart != 0f) {
+                    for (int j = 1; j <= gv.getNumGlyphs(); j++) {
+                        Point2D at = gv.getGlyphPosition(j);
+                        gv.setGlyphPosition(j, new Point2D.Double(at.getX() + j * apart, at.getY()));
+                    }
+                }
                 glyphs.add(gv);
                 xs[k - i] = cx;
                 ys[k - i] = cy;
                 cx += gv.getLogicalBounds().getWidth();
+                if (apart != 0f) {
+                    // The bounds stop at the last glyph; the space after it
+                    // is part of how far the text runs all the same.
+                    cx = xs[k - i] + gv.getGlyphPosition(gv.getNumGlyphs()).getX();
+                }
             }
             double advance = cx - startX;
             // The anchor of the piece is that of the stretch it starts
@@ -2388,7 +2415,7 @@ public final class VectorImage {
                     .deriveFont(size);
             java.awt.font.GlyphVector gv = font.createGlyphVector(context, run.getText());
             glyphs.add(gv);
-            advance += run.getDx() + gv.getLogicalBounds().getWidth();
+            advance += run.getDx() + gv.getLogicalBounds().getWidth() + gv.getNumGlyphs() * spacingOf(text, run);
         }
         SVGText.Run head = runs.get(from);
         double along = head.isStartOffsetShare() ? head.getStartOffset() * total : head.getStartOffset();
@@ -2404,7 +2431,7 @@ public final class VectorImage {
             for (int j = 0; j < gv.getNumGlyphs(); j++) {
                 double wide = gv.getGlyphMetrics(j).getAdvanceX();
                 double middle = along + wide / 2;
-                along += wide;
+                along += wide + spacingOf(text, run);
                 if (middle < 0 || middle > total) {
                     continue;
                 }
@@ -2432,6 +2459,12 @@ public final class VectorImage {
         }
         double[] last = pieces.get(pieces.size() - 1);
         return new double[] {last[2], last[3]};
+    }
+
+    /// How much further apart than the font has them the glyphs of a
+    /// stretch are set: its own `letter-spacing`, or the text's.
+    private static float spacingOf(SVGText text, SVGText.Run run) {
+        return run.getLetterSpacing() != null ? run.getLetterSpacing().floatValue() : text.getLetterSpacing();
     }
 
     /// The outlines of all the glyphs of a `<text>`, or null when it has no
