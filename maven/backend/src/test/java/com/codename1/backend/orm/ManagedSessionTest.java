@@ -76,6 +76,7 @@ class ManagedSessionTest {
         EntityManager em=manager(); Session s=em.openSession();
         try {
             Record row=seed(s);
+            assertNativeProjectionWidths(s);
             PersistenceException width=assertThrows(PersistenceException.class,()->
                     s.createNativeQuery("SELECT id,name FROM managed_record",Long.class).list());
             assertTrue(width.getCause().getMessage().contains("projection width"));
@@ -88,6 +89,15 @@ class ManagedSessionTest {
             assertEquals(Long.valueOf(1),query.setParameter("id",row.id).first());
             assertArrayEquals(row.bytes,s.createNativeQuery("SELECT bytes FROM managed_record WHERE bytes=:bytes",byte[].class).setParameter("bytes",row.bytes).first());
         } finally { s.close();em.close(); }
+    }
+
+    static void assertNativeProjectionWidths(Session session) {
+        for (String sql : new String[]{"SELECT 1 AS x, 2 AS x", "SELECT 1 AS x, 2 AS x FROM managed_record WHERE 1=0", "SELECT 1 AS x, 2 AS y FROM managed_record WHERE 1=0"}) {
+            PersistenceException error=assertThrows(PersistenceException.class,()->session.createNativeQuery(sql,Long.class).list());
+            assertTrue(error.getCause().getMessage().contains("projection width"));
+            assertEquals(Long.valueOf(1),session.createNativeQuery("SELECT 1 AS x",Long.class).first());
+        }
+        assertTrue(session.createNativeQuery("SELECT 1 AS x FROM managed_record WHERE 1=0",Long.class).list().isEmpty());
     }
 
     static class Record {

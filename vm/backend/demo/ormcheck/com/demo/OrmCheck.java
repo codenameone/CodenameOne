@@ -119,6 +119,15 @@ public class OrmCheck {
             RepositoryRecord first=new RepositoryRecord();first.name="repository";first.score=3;records.insert(first);
             RepositoryRecord second=new RepositoryRecord();second.name="repository";second.score=9;records.insert(second);
             s.commitTransaction();
+            for (String sql : new String[]{"SELECT id AS x, id AS x FROM repository_records", "SELECT id AS x, id AS x FROM repository_records WHERE 1=0"}) {
+                try {
+                    s.createNativeQuery(sql, Long.class).list();
+                    check("native duplicate labels", "rejected", "accepted");
+                } catch (com.codename1.orm.session.PersistenceException expected) {
+                    check("native duplicate labels", "true", ""+expected.getCause().getMessage().contains("projection width"));
+                }
+                check("native connection after rejection", "2", ""+records.nativeCount("repository"));
+            }
             check("repository count", "2", ""+records.count());
             check("repository exists", "true", ""+records.existsByName("repository"));
             check("repository native binding", "2", ""+records.nativeCount("repository"));

@@ -474,7 +474,8 @@ Derived methods support the following bounded grammar:
   `LessThanEqual`, `Like`, and `In`. No suffix means equality. `IsNull`,
   `IsNotNull`, `True`, and `False` consume no parameter. `In` takes an Iterable or
   object array whose concrete element type matches the property. Raw and wildcard
-  collections are rejected at build time. `True` and `False` require Boolean
+  collections are rejected at build time. `Like` requires String properties with
+  text storage. `True` and `False` require Boolean
   properties with Boolean storage. Use `IsNull` to match NULL; equality retains SQL NULL semantics.
 * Find methods can end with `OrderByScoreDescIdAsc`; every field needs an explicit
   `Asc` or `Desc`. Relationship paths and ambiguous property names containing
@@ -489,7 +490,9 @@ Derived methods support the following bounded grammar:
 interpolated. `@Modifying` is required for declared UPDATE/DELETE and forbidden
 for SELECT. Such methods return `int` or `void`. Native SQL uses
 `@Query(value="...", nativeSql=true)` with the same named parameters, including
-repeated occurrences. Native repository selects return one scalar column of
+repeated occurrences. Native parameters accept primitive and boxed scalar types,
+String, Date, BigInteger, BigDecimal, and `byte[]` BLOBs. Collections and other
+array types are rejected during generation. Native repository selects return one scalar column of
 String, Long, Integer, Double, or Boolean, or a List of that type. They don't hydrate
 entities. Native SQL is database-specific: use portable SQL or validate each
 engine. Only SELECT, UPDATE, and DELETE are accepted; comments, multiple

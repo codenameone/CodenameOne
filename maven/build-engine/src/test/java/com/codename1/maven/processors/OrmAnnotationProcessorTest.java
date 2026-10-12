@@ -49,6 +49,7 @@ import java.util.Set;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
 /// Verifies the `@Entity` processor produces a structurally sound dao for a
@@ -130,6 +131,41 @@ public class OrmAnnotationProcessorTest {
             ProcessorContext ctx=runProcessor(classes,backendClasspath());
             assertTrue(declaration+ctx.getErrors(),ctx.hasErrors());
             assertFalse(new File(classes,"badrepo/NotesCn1Repository.class").exists());
+        }
+    }
+
+    @Test
+    public void nativeRepositoryParametersMustBeBindableScalars() throws Exception {
+        for (boolean backend : new boolean[]{false,true}) {
+            for (String type : new String[]{"java.util.List<Long>","java.lang.Iterable<Long>","java.util.ArrayList<Long>","Long[]","int[]","byte[][]","byte[]","String","long"}) {
+                File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+                sources.put("nativeparams.Note","package nativeparams; import com.codename1.annotations.*; @Entity public class Note { @Id public long id; }");
+                sources.put("nativeparams.Notes","package nativeparams; import com.codename1.orm.repository.*; @Repository(entity=Note.class,key=Long.class) public interface Notes extends CrudRepository<Note,Long> { @Query(value=\"SELECT COUNT(*) FROM note WHERE id=:value\",nativeSql=true) Long lookup(@Param(\"value\") "+type+" value); }");
+                JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+                ProcessorContext ctx=runProcessor(classes,backend?backendClasspath():Collections.<String>emptyList());
+                boolean supported=type.equals("byte[]")||type.equals("String")||type.equals("long");
+                assertEquals(type+ctx.getErrors(),!supported,ctx.hasErrors());
+                if (!supported) assertTrue(ctx.getErrors().toString(),ctx.getErrors().toString().contains("Native query parameters"));
+                assertEquals(supported,new File(classes,"nativeparams/NotesCn1Repository.class").isFile());
+            }
+        }
+    }
+
+    @Test
+    public void repositoryLikeRequiresTextStorage() throws Exception {
+        for (boolean backend : new boolean[]{false,true}) {
+            for (String storage : new String[]{"Long","byte[]","String"}) {
+                File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+                sources.put("likeconverter.Converter","package likeconverter; public class Converter implements com.codename1.orm.session.AttributeConverter<String,"+storage+"> { public "+storage+" toDatabase(String value) { return null; } public String fromDatabase("+storage+" value) { return null; } }");
+                sources.put("likeconverter.Note","package likeconverter; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Note { @Id public long id; @Convert(converter=Converter.class,storageType="+storage+".class) public String code; }");
+                sources.put("likeconverter.Notes","package likeconverter; import com.codename1.orm.repository.*; @Repository(entity=Note.class,key=Long.class) public interface Notes extends CrudRepository<Note,Long> { java.util.List<Note> findByCodeLike(String value); }");
+                JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+                ProcessorContext ctx=runProcessor(classes,backend?backendClasspath():Collections.<String>emptyList());
+                boolean supported=storage.equals("String");
+                assertEquals(storage+ctx.getErrors(),!supported,ctx.hasErrors());
+                if (!supported) assertTrue(ctx.getErrors().toString(),ctx.getErrors().toString().contains("Like requires a String property with text storage"));
+                assertEquals(supported,new File(classes,"likeconverter/NotesCn1Repository.class").isFile());
+            }
         }
     }
 

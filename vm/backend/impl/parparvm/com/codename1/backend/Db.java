@@ -23,9 +23,9 @@
 package com.codename1.backend;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import com.codename1.backend.sql.QueryRows;
 import java.util.Map;
 
 /// SQLite persistence for server-side binaries, on the engine the translator
@@ -114,8 +114,8 @@ public final class Db {
     public synchronized List query(String sql, Object[] params) throws IOException {
         long stmt = prepare(sql, params);
         try {
-            List rows = new ArrayList();
             int columns = columnCountImpl(stmt);
+            List rows = new QueryRows(columns);
             String[] names = new String[columns];
             for (int iter = 0 ; iter < columns ; iter++) {
                 names[iter] = columnNameImpl(stmt, iter);

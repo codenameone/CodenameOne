@@ -145,6 +145,9 @@ final class RepositoryGenerator {
             boolean mutation = upper.matches("(?s)^(UPDATE|DELETE)\\s.*");
             if (mutation != modifying) throw invalid("UPDATE/DELETE requires @Modifying; SELECT must not use @Modifying");
             for (int i = 0; i < values; i++) {
+                if (nativeSql && !nativeParameter(args[i])) {
+                    throw invalid("Native query parameters must be scalar values or byte[] BLOBs: " + args[i].getClassName());
+                }
                 AnnotationValues param = method.getParameterAnnotations().size() > i
                         ? method.getParameterAnnotations().get(i).get(PREFIX + "Param;") : null;
                 String binding = param == null ? null : param.getString("value");
@@ -232,7 +235,8 @@ final class RepositoryGenerator {
         return body.append("}\n").toString();
     }
     private void checkArgument(String field, String suffix, Type argument, MethodInfo method, int parameter) {
-        String expected = domainType(property(field));
+        OrmAnnotationProcessor.PersistedField property = property(field);
+        String expected = domainType(property);
         if (suffix.equals("In")) {
             String element;
             if (argument.getSort() == Type.ARRAY) {
@@ -253,7 +257,19 @@ final class RepositoryGenerator {
             return;
         }
         if (!expected.equals(boxed(argument.getClassName()))) throw invalid("Argument for " + field + " must be " + expected);
-        if (suffix.equals("Like") && !expected.equals("java.lang.String")) throw invalid("Like requires a String property");
+        if (suffix.equals("Like") && (!expected.equals("java.lang.String") || property.dialectKind != OrmAnnotationProcessor.KIND_TEXT)) {
+            throw invalid("Like requires a String property with text storage");
+        }
+    }
+    private static boolean nativeParameter(Type argument) {
+        if (argument.getDescriptor().equals("[B")) return true;
+        String type = boxed(argument.getClassName());
+        return type.equals("java.lang.String") || type.equals("java.lang.Boolean")
+                || type.equals("java.lang.Character") || type.equals("java.lang.Byte")
+                || type.equals("java.lang.Short") || type.equals("java.lang.Integer")
+                || type.equals("java.lang.Long") || type.equals("java.lang.Float")
+                || type.equals("java.lang.Double") || type.equals("java.util.Date")
+                || type.equals("java.math.BigInteger") || type.equals("java.math.BigDecimal");
     }
     private static String collectionElement(MethodInfo method, int parameter, Type argument) {
         final List<org.objectweb.asm.signature.SignatureWriter> parameters =

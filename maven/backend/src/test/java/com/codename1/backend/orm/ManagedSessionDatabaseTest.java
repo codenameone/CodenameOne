@@ -81,6 +81,7 @@ class ManagedSessionDatabaseTest {
             ManagedSessionTest.assertBulkTextKeyBounds(db);
             ManagedSessionTest.assertMinimumLongLiteral(session);
             ManagedSessionTest.assertCaseAndNativeQueries(session);
+            ManagedSessionTest.assertNativeProjectionWidths(session);
             java.util.Map<String,com.codename1.impl.orm.EntityModel<?>> realModels=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();realModels.put(ManagedSessionTest.RealRecord.class.getName(),new ManagedSessionTest.RealModel());
             Session realSession=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),realModels);
             try { ManagedSessionTest.assertRealAssignments(realSession); } finally { realSession.close(); }

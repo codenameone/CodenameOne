@@ -37,6 +37,11 @@ class ManagedSessionTest {
         EntityManager em=manager(); Session s=em.openSession();
         try {
             Record row=seed(s);
+            for (String sql : new String[]{"SELECT 1 AS x, 2 AS x", "SELECT 1 AS x, 2 AS x FROM managed_record WHERE 1=0", "SELECT 1 AS x, 2 AS y FROM managed_record WHERE 1=0"}) {
+                assertThrows(PersistenceException.class,()->s.createNativeQuery(sql,Long.class).list());
+                assertEquals(Long.valueOf(1),s.createNativeQuery("SELECT 1 AS x",Long.class).first());
+            }
+            assertTrue(s.createNativeQuery("SELECT 1 AS x FROM managed_record WHERE 1=0",Long.class).list().isEmpty());
             PersistenceException width=assertThrows(PersistenceException.class,()->
                     s.createNativeQuery("SELECT id,name FROM managed_record",Long.class).list());
             assertTrue(width.getCause().getMessage().contains("projection width"));
