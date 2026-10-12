@@ -10696,7 +10696,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public String getNativeLogSnapshot() {
         java.io.BufferedReader reader = null;
-        Process proc = null;
+        java.lang.Process proc = null;
         try {
             proc = Runtime.getRuntime().exec(new String[]{
                 "logcat", "-d", "-t", "200", "-v", "threadtime"});

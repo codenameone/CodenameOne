@@ -7,6 +7,7 @@ case "$MODE" in jvm|native) ;; *) echo "usage: $0 [jvm|native]" >&2; exit 2 ;; e
 if [[ "$MODE" == native && -n "${CI:-}" ]]; then
     echo "Native process conformance is local-only." >&2; exit 2
 fi
+python3 "$ROOT/scripts/process/test_windows_clock.py"
 J8="${JDK_8_HOME:-${JAVA_HOME:-}}"
 if [[ -z "$J8" && -x /usr/libexec/java_home ]]; then J8="$(/usr/libexec/java_home -v 1.8)"; fi
 : "${J8:?Set JDK_8_HOME to Java 8}"

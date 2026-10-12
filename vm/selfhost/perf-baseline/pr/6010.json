@@ -1,0 +1,27 @@
+{
+ "pr": 6010,
+ "rebaseline": {
+  "windows-x64@intel64-family-6-model-173-genuineintel": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.94,
+      "time": 1.212,
+      "tolerance": {
+       "memory": 0.2,
+       "time": 0.5
+      }
+     },
+     "memory": 0.747,
+     "reason": "Windows x64 run 38241524753 measured WinHelloMain all-core RAM at 0.75x versus the 0.94x baseline; record the measured improvement. No causal attribution to the Process API; retain the existing memory tolerance.",
+     "runs": 1,
+     "time": 1.212,
+     "tolerance": {
+      "memory": 0.2,
+      "time": 0.5
+     }
+    }
+   }
+  }
+ }
+}
