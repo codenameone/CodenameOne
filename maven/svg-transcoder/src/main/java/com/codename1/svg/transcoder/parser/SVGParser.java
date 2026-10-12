@@ -262,6 +262,7 @@ public final class SVGParser {
         fontItalic = null;
         fontSpacing = null;
         wordSpacing = null;
+        textAnchor = null;
         inheritedColor = null;
         enterFont(a);
     }
@@ -360,7 +361,10 @@ public final class SVGParser {
 
     /** Takes in the font properties of a container; what is returned undoes it with {@link #leaveFont}. */
     private Object[] enterFont(Map<String, String> a) {
-        Object[] saved = {fontFamily, fontSize, fontBold, fontItalic, inheritedColor, fontSpacing, wordSpacing};
+        Object[] saved = {fontFamily, fontSize, fontBold, fontItalic, inheritedColor, fontSpacing, wordSpacing,
+            textAnchor};
+        SVGText.Anchor anchored = anchorOf(mergedValue(a, "text-anchor"));
+        if (anchored != null) textAnchor = anchored;
         Integer color = colorOf(a);
         if (color != null) inheritedColor = color;
         String family = mergedValue(a, "font-family");
@@ -380,6 +384,15 @@ public final class SVGParser {
 
     private Float fontSpacing;
     private Float wordSpacing;
+    private SVGText.Anchor textAnchor;
+
+    /** A text-anchor, or null when it is not written or not one of the three. */
+    private static SVGText.Anchor anchorOf(String value) {
+        if (value == null) return null;
+        String v = value.trim();
+        return "middle".equals(v) ? SVGText.Anchor.MIDDLE : "end".equals(v) ? SVGText.Anchor.END
+                : "start".equals(v) ? SVGText.Anchor.START : null;
+    }
 
     /** A letter-spacing: a length, zero for {@code normal}, null when it is not written or is inherited. */
     private Float spacingOf(String value) {
@@ -400,6 +413,7 @@ public final class SVGParser {
         inheritedColor = (Integer) saved[4];
         fontSpacing = (Float) saved[5];
         wordSpacing = (Float) saved[6];
+        textAnchor = (SVGText.Anchor) saved[7];
     }
 
     /** A font size, a relative one taken against the size around it; null when there is none to read. */
@@ -1087,18 +1101,16 @@ public final class SVGParser {
         // Each may be a list, one for each character: the first is where
         // the text starts and the rest are kept for the ones after it.
         glyphLists = new float[][] {lengths(a.get("x"), true), lengths(a.get("y"), false),
-            lengths(a.get("dx"), true), lengths(a.get("dy"), false)};
+            lengths(a.get("dx"), true), lengths(a.get("dy"), false), numbers(a.get("rotate"))};
         glyphIndex = 0;
         // With the first of `dx` and `dy`, which moves the first character
         // from there as the rest move the ones after it.
         t.setX((glyphLists[0].length > 0 ? glyphLists[0][0] : 0f) + (glyphLists[2].length > 0 ? glyphLists[2][0] : 0f));
         t.setY((glyphLists[1].length > 0 ? glyphLists[1][0] : 0f) + (glyphLists[3].length > 0 ? glyphLists[3][0] : 0f));
-        String anchor = mergedValue(a, "text-anchor");
-        if (anchor != null) {
-            String norm = anchor.trim().toLowerCase();
-            if ("middle".equals(norm)) t.setAnchor(SVGText.Anchor.MIDDLE);
-            else if ("end".equals(norm)) t.setAnchor(SVGText.Anchor.END);
-        }
+        // Its own, or that of the group or the drawing it is in.
+        SVGText.Anchor anchor = anchorOf(mergedValue(a, "text-anchor"));
+        if (anchor == null) anchor = textAnchor;
+        if (anchor != null) t.setAnchor(anchor);
         String family = mergedValue(a, "font-family");
         if (family != null) {
             t.setFontFamily(family.trim());
@@ -1166,7 +1178,35 @@ public final class SVGParser {
      * read. Only what comes after the first of each list is taken from
      * here: the first is where the text or the span itself starts.
      */
-    private float[][] glyphLists = new float[4][0];
+    private float[][] glyphLists = new float[5][0];
+
+    /** A list of plain numbers; empty when there is none or it cannot be read. */
+    private static float[] numbers(String value) {
+        if (value == null || value.trim().isEmpty()) return new float[0];
+        String[] parts = value.trim().split("[\\s,]+");
+        float[] out = new float[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            try {
+                out[i] = Float.parseFloat(parts[i]);
+            } catch (RuntimeException e) {
+                return java.util.Arrays.copyOf(out, i);
+            }
+        }
+        return out;
+    }
+
+    /** What is left of a list of turnings from one character on; its last goes on for every character after. */
+    private static float[] rotatesFrom(float[] list, int index) {
+        if (list.length == 0) return list;
+        int from = Math.min(index, list.length - 1);
+        return java.util.Arrays.copyOfRange(list, from, list.length);
+    }
+
+    /** How far the character at an index is turned: its own of the list, or the last of it. */
+    private float rotateAt(int index) {
+        float[] list = glyphLists[4];
+        return list.length == 0 ? 0f : list[Math.min(Math.max(0, index), list.length - 1)];
+    }
     private int glyphIndex;
     /** How many characters of the text being read have been read in all. */
     private int textRead;
@@ -1230,6 +1270,7 @@ public final class SVGParser {
                 shown.setLength(head);
                 SVGText.Run run = new SVGText.Run();
                 run.setText(shown.toString());
+                run.setRotate(rotateAt(from));
                 if (span != null) {
                     run.setStyle(span.getStyle());
                     run.setFontFamily(span.getFontFamily());
@@ -1266,6 +1307,7 @@ public final class SVGParser {
                         placed.setAnchor(run.getAnchor());
                         placed.setPathRef(run.getPathRef());
                         placed.setStartOffset(run.getStartOffset(), run.isStartOffsetShare());
+                        placed.setRotate(rotateAt(at));
                         if (at < glyphLists[0].length) placed.setX(Float.valueOf(glyphLists[0][at]));
                         if (at < glyphLists[1].length) placed.setY(Float.valueOf(glyphLists[1][at]));
                         if (at < glyphLists[2].length) placed.setDx(glyphLists[2][at]);
@@ -1338,11 +1380,15 @@ public final class SVGParser {
                 float[][] outerLists = glyphLists;
                 int outerIndex = glyphIndex;
                 int outerRead = textRead;
-                if (a.get("x") != null || a.get("y") != null || a.get("dx") != null || a.get("dy") != null) {
+                if (a.get("x") != null || a.get("y") != null || a.get("dx") != null || a.get("dy") != null
+                        || a.get("rotate") != null) {
                     // A span that places itself places its characters by
                     // its own lists, until it ends.
+                    // All but the turning, which a span that gives none
+                    // goes on taking from what it is in.
                     glyphLists = new float[][] {lengths(a.get("x"), true), lengths(a.get("y"), false),
-                        lengths(a.get("dx"), true), lengths(a.get("dy"), false)};
+                        lengths(a.get("dx"), true), lengths(a.get("dy"), false),
+                        a.get("rotate") != null ? numbers(a.get("rotate")) : rotatesFrom(glyphLists[4], glyphIndex)};
                     glyphIndex = 0;
                 }
                 Float dx = a.get("dx") == null ? null : firstLength(a.get("dx"), true);
@@ -1473,6 +1519,10 @@ public final class SVGParser {
         if (a.containsKey("r")) g.setR(gradCoord(a.get("r"), user, (float) diagonal()));
         if (a.containsKey("fx")) g.markGiven("fx");
         if (a.containsKey("fx")) g.setFx(Float.valueOf(gradCoord(a.get("fx"), user, viewportWidth)));
+        if (a.containsKey("fr")) {
+            g.markGiven("fr");
+            g.setFr(gradCoord(a.get("fr"), user, (float) diagonal()));
+        }
         if (a.containsKey("fy")) g.markGiven("fy");
         if (a.containsKey("fy")) g.setFy(Float.valueOf(gradCoord(a.get("fy"), user, viewportHeight)));
         if (a.get("gradientTransform") != null) g.setGradientTransform(TransformParser.parse(a.get("gradientTransform")));
@@ -1689,6 +1739,13 @@ public final class SVGParser {
             }
         }
         n.setStyle(StyleParser.parse(pres, a.get("style")));
+        if (a.get("pathLength") != null) {
+            try {
+                n.setPathLength(Math.max(0f, NumberParser.parseFloat(a.get("pathLength"))));
+            } catch (RuntimeException e) {
+                // Not a number: the outline is as long as it is.
+            }
+        }
         // The lengths of a stroke are read as plain numbers. One that is a
         // percentage is that share of the viewport's diagonal, evened out
         // between its sides, and one in the size of the font is that many

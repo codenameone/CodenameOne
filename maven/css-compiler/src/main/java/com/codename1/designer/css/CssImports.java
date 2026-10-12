@@ -537,7 +537,20 @@ public final class CssImports {
                     break;
                 }
                 String raw = unquote(text.substring(i + 4, close).trim());
-                out.append("url(\"").append(rewriter.rewrite(raw)).append("\")");
+                String rewritten = rewriter.rewrite(raw);
+                // In double quotes, as every url is written out, unless it
+                // holds one: an SVG written into a url is full of them, and
+                // would end at the first. It then goes in single quotes,
+                // which is how such a url is written to begin with, and
+                // where it holds both the double ones are escaped.
+                if (rewritten.indexOf('"') < 0) {
+                    out.append("url(\"").append(rewritten).append("\")");
+                } else if (rewritten.indexOf('\'') < 0) {
+                    out.append("url('").append(rewritten).append("')");
+                } else {
+                    out.append("url(\"").append(rewritten.replace("\\", "\\\\").replace("\"", "\\\""))
+                            .append("\")");
+                }
                 i = close + 1;
             } else if (c == '"' || c == '\'') {
                 int end = skipString(text, i);

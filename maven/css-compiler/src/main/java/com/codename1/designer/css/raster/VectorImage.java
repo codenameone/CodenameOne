@@ -338,7 +338,8 @@ public final class VectorImage {
                 return;
             }
             style.inherit(own);
-            style.setOpacity(own.getOpacity());
+            style.setOpacity(own.isOpacityInherited() && parentStyle != null ? parentStyle.getOpacity()
+                    : own.getOpacity());
             style.setClipPathRef(own.getClipPathRef());
             style.setNonScalingStroke(own.isNonScalingStroke());
         }
@@ -862,7 +863,7 @@ public final class VectorImage {
             } else if (node instanceof SVGImage) {
                 paintImage(g, (SVGImage) node);
             } else if (node instanceof SVGText) {
-                paintText(g, (SVGText) node, style);
+                paintText(g, (SVGText) node, style, w, h);
             } else {
                 Shape shape = outline(node);
                 if (shape != null) {
@@ -870,7 +871,7 @@ public final class VectorImage {
                         if ("fill".equals(layer)) {
                             fill(g, shape, style, true);
                         } else if ("stroke".equals(layer)) {
-                            stroke(g, shape, style);
+                            stroke(g, shape, style, node.getPathLength());
                         } else if (node instanceof SVGPath || node instanceof SVGLine
                                 || node instanceof SVGPolyline) {
                             paintMarkers(g, shape, style, w, h);
@@ -922,6 +923,13 @@ public final class VectorImage {
         }
     }
 
+    // The first vertex and the last are those of the whole element, not of
+    // each piece of a path made of several. The specification has
+    // `marker-start` "drawn at the first vertex of the given path element
+    // or basic shape", `marker-end` at its last, and `marker-mid` at "every
+    // vertex other than the first and last" (SVG 1.1, 11.6.3; SVG 2 says
+    // the same of "the given shape"). Where one piece ends and the next
+    // begins are therefore vertices in the middle.
     private void paintMarkers(Graphics2D g, Shape shape, SVGStyle style, SVGMarker start, SVGMarker mid,
             SVGMarker end, int w, int h) {
         // Each point: where it is, the way the line comes in and the way
@@ -1679,6 +1687,38 @@ public final class VectorImage {
     }
 
     private void stroke(Graphics2D g, Shape shape, SVGStyle style) {
+        stroke(g, shape, style, 0f);
+    }
+
+    /// How long the outline of `shape` is, every piece of it.
+    private static double lengthOf(Shape shape) {
+        double total = 0;
+        double[] seg = new double[6];
+        double px = 0;
+        double py = 0;
+        double sx = 0;
+        double sy = 0;
+        for (java.awt.geom.PathIterator it = new java.awt.geom.FlatteningPathIterator(shape.getPathIterator(null), 0.05);
+                !it.isDone(); it.next()) {
+            int kind = it.currentSegment(seg);
+            double nx = kind == java.awt.geom.PathIterator.SEG_CLOSE ? sx : seg[0];
+            double ny = kind == java.awt.geom.PathIterator.SEG_CLOSE ? sy : seg[1];
+            if (kind == java.awt.geom.PathIterator.SEG_MOVETO) {
+                sx = nx;
+                sy = ny;
+            } else {
+                total += Math.hypot(nx - px, ny - py);
+            }
+            px = nx;
+            py = ny;
+        }
+        return total;
+    }
+
+    /// `pathLength` is how long the author takes the outline to be, or zero:
+    /// the dashes are then written in that measure, and are made longer or
+    /// shorter by as much as the outline really is.
+    private void stroke(Graphics2D g, Shape shape, SVGStyle style, float pathLength) {
         SVGPaint stroke = style.getStroke();
         if (stroke != null && !stroke.isNone()) {
             float width = style.getStrokeWidth() == null ? 1f : style.getStrokeWidth().floatValue();
@@ -1693,6 +1733,19 @@ public final class VectorImage {
             if (dashes != null && dashes.length == 0) {
                 dashes = null;
             }
+            float measure = 1f;
+            if (dashes != null && pathLength > 0) {
+                measure = (float) (lengthOf(shape) / pathLength);
+                dashes = dashes.clone();
+                float sum = 0;
+                for (int i = 0; i < dashes.length; i++) {
+                    dashes[i] *= measure;
+                    sum += dashes[i];
+                }
+                if (!(sum > 0)) {
+                    dashes = null;
+                }
+            }
             float phase = 0f;
             if (dashes != null && style.getStrokeDashOffset() != null) {
                 // A negative offset moves the pattern the other way, which
@@ -1701,7 +1754,7 @@ public final class VectorImage {
                 for (float d : dashes) {
                     round += d;
                 }
-                phase = style.getStrokeDashOffset().floatValue() % round;
+                phase = (style.getStrokeDashOffset().floatValue() * measure) % round;
                 if (phase < 0f) {
                     phase += round;
                 }
@@ -1904,6 +1957,29 @@ public final class VectorImage {
             return new LinearGradientPaint(start, end, f, c, cycle, space, new AffineTransform());
         }
         SVGRadialGradient rg = (SVGRadialGradient) def;
+        if (rg.getFr() > 0 && rg.getFr() < rg.getR()) {
+            // The first stop fills a circle about the focal point, and the
+            // gradient runs from the edge of that one. With the focal
+            // point at the centre that is the same stops squeezed into
+            // what is left of the radius, which is how it is done; with
+            // the focal point elsewhere the inner circle is only nearly
+            // where it should be.
+            float inner = rg.getFr() / rg.getR();
+            for (int i = 0; i < f.length; i++) {
+                f[i] = inner + f[i] * (1 - inner);
+            }
+            for (int i = 1; i < f.length; i++) {
+                if (f[i] <= f[i - 1]) {
+                    f[i] = Math.nextUp(f[i - 1]);
+                }
+            }
+            if (f[f.length - 1] > 1f) {
+                f[f.length - 1] = 1f;
+                for (int i = f.length - 2; i >= 0 && f[i] >= f[i + 1]; i--) {
+                    f[i] = Math.nextDown(f[i + 1]);
+                }
+            }
+        }
         if (rg.isUserSpace()) {
             if (rg.getR() <= 0) {
                 return c[c.length - 1];
@@ -2046,6 +2122,10 @@ public final class VectorImage {
         from = giver(chain, "fx", SVGRadialGradient.class);
         if (from != null) {
             out.setFx(from.getFx());
+        }
+        from = giver(chain, "fr", SVGRadialGradient.class);
+        if (from != null) {
+            out.setFr(from.getFr());
         }
         from = giver(chain, "fy", SVGRadialGradient.class);
         if (from != null) {
@@ -2200,7 +2280,7 @@ public final class VectorImage {
                 : new Point2D.Double(bounds.getX() + x * bounds.getWidth(), bounds.getY() + y * bounds.getHeight());
     }
 
-    private void paintText(Graphics2D g, SVGText text, SVGStyle style) {
+    private void paintText(Graphics2D g, SVGText text, SVGStyle style, int w, int h) {
         List<SVGText.Run> runs = runsOf(text);
         List<Shape> outlines = textOutlines(text, runs, g.getFontRenderContext());
         for (int i = 0; i < runs.size(); i++) {
@@ -2228,6 +2308,36 @@ public final class VectorImage {
                 }
             }
             if (Boolean.FALSE.equals(runStyle.getVisible())) {
+                continue;
+            }
+            // A span that is not opaque is painted whole and then laid down
+            // at its opacity, like any element: its stroke does not show
+            // through its fill where they overlap.
+            float opacity = own == null || own.getOpacity() == null ? 1f : clamp(own.getOpacity().floatValue());
+            if (opacity <= 0f) {
+                continue;
+            }
+            if (opacity < 1f) {
+                BufferedImage layer = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+                Graphics2D lg = layer.createGraphics();
+                try {
+                    Pixels.hints(lg);
+                    lg.setTransform(g.getTransform());
+                    lg.setClip(g.getClip());
+                    fillAndStroke(lg, outline, runStyle, false);
+                } finally {
+                    lg.dispose();
+                }
+                AffineTransform at = g.getTransform();
+                java.awt.Composite composite = g.getComposite();
+                try {
+                    g.setTransform(new AffineTransform());
+                    g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, opacity));
+                    g.drawImage(layer, 0, 0, null);
+                } finally {
+                    g.setComposite(composite);
+                    g.setTransform(at);
+                }
                 continue;
             }
             // Filled and then stroked like any other shape: text with no
@@ -2351,8 +2461,25 @@ public final class VectorImage {
             double shift = anchor == SVGText.Anchor.MIDDLE ? -advance / 2.0
                     : anchor == SVGText.Anchor.END ? -advance : 0;
             for (int k = 0; k < glyphs.size(); k++) {
-                out.add(runs.get(i + k).getText().length() == 0 ? null
-                        : glyphs.get(k).getOutline((float) (xs[k] + shift), (float) ys[k]));
+                SVGText.Run drawn = runs.get(i + k);
+                java.awt.font.GlyphVector gv = glyphs.get(k);
+                if (drawn.getText().length() == 0) {
+                    out.add(null);
+                } else if (drawn.getRotate() == 0f) {
+                    out.add(gv.getOutline((float) (xs[k] + shift), (float) ys[k]));
+                } else {
+                    // `rotate`: each glyph turned about where it starts.
+                    Path2D.Double turned = new Path2D.Double();
+                    for (int j = 0; j < gv.getNumGlyphs(); j++) {
+                        Point2D at = gv.getGlyphPosition(j);
+                        double gx = xs[k] + shift + at.getX();
+                        double gy = ys[k] + at.getY();
+                        Shape glyph = gv.getGlyphOutline(j, (float) (xs[k] + shift), (float) ys[k]);
+                        turned.append(AffineTransform.getRotateInstance(Math.toRadians(drawn.getRotate()), gx, gy)
+                                .createTransformedShape(glyph), false);
+                    }
+                    out.add(turned);
+                }
             }
             cx += shift;
             i = end;
@@ -2434,7 +2561,9 @@ public final class VectorImage {
             }
         }
         SVGText.Run head = runs.get(from);
-        double along = head.isStartOffsetShare() ? head.getStartOffset() * total : head.getStartOffset();
+        double along = head.isStartOffsetShare() ? head.getStartOffset() * total
+                : target.getPathLength() > 0 ? head.getStartOffset() * total / target.getPathLength()
+                : head.getStartOffset();
         SVGText.Anchor anchor = head.getAnchor() != null ? head.getAnchor() : text.getAnchor();
         along += anchor == SVGText.Anchor.MIDDLE ? -advance / 2.0
                 : anchor == SVGText.Anchor.END ? -advance : 0;
@@ -2464,7 +2593,7 @@ public final class VectorImage {
                 double part = (middle - on[4]) / on[5];
                 AffineTransform place = AffineTransform.getTranslateInstance(on[0] + (on[2] - on[0]) * part,
                         on[1] + (on[3] - on[1]) * part);
-                place.rotate(Math.atan2(on[3] - on[1], on[2] - on[0]));
+                place.rotate(Math.atan2(on[3] - on[1], on[2] - on[0]) + Math.toRadians(run.getRotate()));
                 // `dy` lifts the glyph off the path, across the way it runs.
                 place.translate(-wide / 2, run.getDy());
                 Point2D origin = gv.getGlyphPosition(j);

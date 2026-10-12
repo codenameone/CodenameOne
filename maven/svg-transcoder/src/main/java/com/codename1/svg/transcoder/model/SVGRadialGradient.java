@@ -43,6 +43,11 @@ public final class SVGRadialGradient extends SVGNode {
     public void setR(float r) { this.r = r; }
 
     /** The focal point, where the first colour starts; null for the centre. */
+    private float fr;
+    /** The radius of the circle about the focal point the first stop fills; zero for the point itself. Only a renderer that reads the model applies it. */
+    public float getFr() { return fr; }
+    public void setFr(float fr) { this.fr = fr; }
+
     public Float getFx() { return fx; }
     public void setFx(Float fx) { this.fx = fx; }
     public Float getFy() { return fy; }

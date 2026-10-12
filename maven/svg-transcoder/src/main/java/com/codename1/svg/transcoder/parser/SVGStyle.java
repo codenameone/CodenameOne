@@ -131,6 +131,10 @@ public final class SVGStyle {
     public void setFillOpacity(Float v) { this.fillOpacity = v; }
     public Float getStrokeOpacity() { return strokeOpacity; }
     public void setStrokeOpacity(Float v) { this.strokeOpacity = v; }
+    private boolean opacityInherited;
+    /** Whether the opacity is written as {@code inherit}: that of the element this one is in, applied to it too. */
+    public boolean isOpacityInherited() { return opacityInherited; }
+    public void setOpacityInherited(boolean v) { this.opacityInherited = v; }
     public Float getOpacity() { return opacity; }
     public void setOpacity(Float v) { this.opacity = v; }
     public Float getStrokeWidth() { return strokeWidth; }

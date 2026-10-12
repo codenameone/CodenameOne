@@ -62,9 +62,16 @@ public final class DataUrl {
         }
         String kind = url.substring(5, comma);
         String payload = url.substring(comma + 1);
+        byte[] octets = unescaped(payload);
         if (kind.length() >= 7 && kind.regionMatches(true, kind.length() - 7, ";base64", 0, 7)) {
-            return new DataUrl(kind, java.util.Base64.getMimeDecoder().decode(payload));
+            // The escapes come off first: `%3D` is the `=` that pads it.
+            return new DataUrl(kind, java.util.Base64.getMimeDecoder()
+                    .decode(new String(octets, StandardCharsets.ISO_8859_1)));
         }
+        return new DataUrl(kind, octets);
+    }
+
+    private static byte[] unescaped(String payload) {
         ByteArrayOutputStream octets = new ByteArrayOutputStream();
         for (int i = 0; i < payload.length(); i++) {
             char c = payload.charAt(i);
@@ -78,7 +85,7 @@ public final class DataUrl {
                 octets.write(text, 0, text.length);
             }
         }
-        return new DataUrl(kind, octets.toByteArray());
+        return octets.toByteArray();
     }
 
     /// Whether it says it holds an SVG.

@@ -59,6 +59,12 @@ public final class SVGText extends SVGShape {
         private Boolean bold;
         private Boolean italic;
 
+        private float rotate;
+        /// How far each glyph of the stretch is turned about its own
+        /// starting point, in degrees.
+        public float getRotate() { return rotate; }
+        public void setRotate(float rotate) { this.rotate = rotate; }
+
         private Float wordSpacing;
         /// The `word-spacing` a span sets, or null for the text's own.
         public Float getWordSpacing() { return wordSpacing; }

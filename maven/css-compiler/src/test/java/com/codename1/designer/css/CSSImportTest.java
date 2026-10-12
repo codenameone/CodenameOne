@@ -190,4 +190,18 @@ class CSSImportTest {
                 "/* a note */\n@import \"late.css\";\n@import 'late.css';\nTitle { color: #333333; }\n");
         assertEquals(1, CssImports.collect(fine).size());
     }
+
+    @Test
+    void aRewrittenUrlThatHoldsDoubleQuotesIsNotCutShortByThem() throws Exception {
+        String svg = "data:image/svg+xml,<svg xmlns=\"http://www.w3.org/2000/svg\"/>";
+        String css = "A { background-image: url('" + svg + "'); } B { background-image: url(b.png); }";
+        String rewritten = CssImports.rewriteUrls(css, new CssImports.UrlRewriter() {
+            @Override
+            public String rewrite(String url) {
+                return url;
+            }
+        });
+        assertTrue(rewritten.contains("url('" + svg + "')"), rewritten);
+        assertTrue(rewritten.contains("url(\"b.png\")"), rewritten);
+    }
 }

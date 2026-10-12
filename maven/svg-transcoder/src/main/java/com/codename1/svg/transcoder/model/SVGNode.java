@@ -44,6 +44,15 @@ public abstract class SVGNode {
     public SVGTransform getTransform() { return transform; }
     public void setTransform(SVGTransform transform) { this.transform = transform; }
 
+    private float pathLength;
+    /// The length the author takes the outline of this shape to have, by
+    /// which distances along it are measured: the dashes of its stroke,
+    /// and where text set on it begins. Zero when none is given, and the
+    /// outline is then as long as it is. Only a renderer that reads the
+    /// model applies it.
+    public float getPathLength() { return pathLength; }
+    public void setPathLength(float pathLength) { this.pathLength = pathLength; }
+
     private java.util.Set<String> given;
 
     /**

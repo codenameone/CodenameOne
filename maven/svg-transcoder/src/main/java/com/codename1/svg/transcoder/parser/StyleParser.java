@@ -55,6 +55,10 @@ public final class StyleParser {
         // is in, which is what a property that is not set here does: it is
         // left for the inheriting to fill in, where it is one that is
         // inherited, and is at its usual value where it is not.
+        // Opacity is not inherited, so there `inherit` is not the same as
+        // leaving it out: it asks for the opacity of what the element is
+        // in, to be applied again to the element itself.
+        boolean opacityInherited = merged.get("opacity") != null && "inherit".equals(merged.get("opacity").trim());
         for (java.util.Iterator<Map.Entry<String, String>> it = merged.entrySet().iterator(); it.hasNext();) {
             String v = it.next().getValue();
             if (v != null && ("inherit".equals(v.trim()) || "unset".equals(v.trim()))) {
@@ -90,6 +94,7 @@ public final class StyleParser {
         out.setFillOpacity(toAlpha(merged.get("fill-opacity")));
         out.setStrokeOpacity(toAlpha(merged.get("stroke-opacity")));
         out.setOpacity(toAlpha(merged.get("opacity")));
+        out.setOpacityInherited(opacityInherited);
         out.setStrokeWidth(toFloat(merged.get("stroke-width")));
 
         String cap = merged.get("stroke-linecap");

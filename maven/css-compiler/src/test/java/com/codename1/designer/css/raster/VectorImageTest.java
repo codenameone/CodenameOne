@@ -1846,4 +1846,78 @@ class VectorImageTest {
         assertEquals(0xffff0000, img.getRGB(35, 50), "a dash of 40");
         assertEquals(0, alpha(img, 50, 50), "a gap of 20");
     }
+
+    @Test
+    void opacityThatInheritsIsAppliedAgain() throws Exception {
+        BufferedImage img = paint("<g opacity=\"0.5\"><rect width=\"50\" height=\"100\" fill=\"#ff0000\"/>"
+                + "<rect x=\"50\" width=\"50\" height=\"100\" fill=\"#ff0000\" opacity=\"inherit\"/></g>", 100, 100);
+        assertEquals(128, alpha(img, 25, 50), 2, "the group's half");
+        assertEquals(64, alpha(img, 75, 50), 2, "the group's half, and its own again");
+    }
+
+    @Test
+    void textIsAnchoredAsWhatItIsInSays() throws Exception {
+        String font = " font-family=\"monospace\" font-size=\"10\" fill=\"#ff0000\"";
+        BufferedImage own = paint("<text x=\"90\" y=\"30\" text-anchor=\"end\"" + font + ">III</text>", 100, 100);
+        BufferedImage group = paint("<g text-anchor=\"end\"><text x=\"90\" y=\"30\"" + font + ">III</text></g>", 100, 100);
+        assertEquals(inkRight(own), inkRight(group));
+        assertTrue(inkRight(group) <= 90);
+    }
+
+    @Test
+    void aGlyphCanBeTurnedAboutItsStart() throws Exception {
+        String font = " font-family=\"monospace\" font-size=\"30\" fill=\"#ff0000\"";
+        BufferedImage upright = paint("<text x=\"50\" y=\"50\"" + font + ">I</text>", 100, 100);
+        BufferedImage turned = paint("<text x=\"50\" y=\"50\" rotate=\"90\"" + font + ">I</text>", 100, 100);
+        int below = 0;
+        int belowTurned = 0;
+        for (int y = 52; y < 100; y++) {
+            for (int x = 0; x < 100; x++) {
+                below += alpha(upright, x, y) > 128 ? 1 : 0;
+                belowTurned += alpha(turned, x, y) > 128 ? 1 : 0;
+            }
+        }
+        assertEquals(0, below, "upright, it stands on its line");
+        assertTrue(belowTurned > 20, "turned a quarter, it hangs below it");
+    }
+
+    @Test
+    void aSpanCanBeLessOpaqueThanItsText() throws Exception {
+        BufferedImage img = paint("<text x=\"5\" y=\"70\" font-family=\"monospace\" font-size=\"60\" font-weight=\"bold\""
+                + " fill=\"#ff0000\"><tspan opacity=\"0.25\">M</tspan></text>", 100, 100);
+        int most = 0;
+        for (int y = 0; y < 100; y++) {
+            for (int x = 0; x < 100; x++) {
+                most = Math.max(most, alpha(img, x, y));
+            }
+        }
+        assertEquals(64, most, 3);
+    }
+
+    @Test
+    void aRadialGradientStartsFromItsFocalCircle() throws Exception {
+        BufferedImage img = paint("<defs><radialGradient id=\"g\" gradientUnits=\"userSpaceOnUse\" cx=\"50\" cy=\"50\""
+                + " r=\"40\" fr=\"20\"><stop offset=\"0\" stop-color=\"#ff0000\"/><stop offset=\"1\" stop-color=\"#0000ff\"/>"
+                + "</radialGradient></defs><rect width=\"100\" height=\"100\" fill=\"url(#g)\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(60, 50), "all the first colour inside the inner circle");
+        int half = img.getRGB(80, 50);
+        assertTrue(Math.abs(((half >> 16) & 0xff) - (half & 0xff)) < 24, "half way between the circles, was "
+                + Integer.toHexString(half));
+    }
+
+    @Test
+    void dashesAreMeasuredInThePathsOwnLength() throws Exception {
+        // A line of 100 that calls itself 1 long, dashed half on and half off.
+        BufferedImage img = paint("<path d=\"M 0 50 H 100\" pathLength=\"1\" stroke=\"#ff0000\" stroke-width=\"10\""
+                + " stroke-dasharray=\"0.5 0.5\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(25, 50), "one dash of fifty");
+        assertEquals(0xffff0000, img.getRGB(45, 50));
+        assertEquals(0, alpha(img, 75, 50), "and one gap of fifty");
+    }
+
+    @Test
+    void anEscapedPadInABase64PayloadIsRead() {
+        DataUrl held = DataUrl.parse("data:text/plain;base64,QQ%3D%3D");
+        assertEquals("A", new String(held.getBytes(), StandardCharsets.UTF_8));
+    }
 }
