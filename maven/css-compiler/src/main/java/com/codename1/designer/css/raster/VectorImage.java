@@ -2140,7 +2140,11 @@ public final class VectorImage {
             }
             if (drawn) {
                 for (SVGNode child : content.getChildren()) {
-                    paintNode(tg, child, content.getStyle(), iw, ih);
+                    // What a pattern has from another through `href` is
+                    // drawn as if it were written in this one, so it has
+                    // from this one what it does not set itself: a
+                    // `color`, say, for its `currentColor`.
+                    paintNode(tg, child, def.getStyle(), iw, ih);
                 }
             }
         } finally {

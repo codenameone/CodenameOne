@@ -1088,15 +1088,38 @@ final class SvgFilter {
             return result <= 0 ? result + 2147483647L : result;
         }
 
-        double noise(int channel, double x, double y) {
+        /// `stitch` is null, or for noise that meets itself at the edges
+        /// of a tile `{wrapX, wrapY, width, height}`: the lattice cell the
+        /// tile ends at each way, and how many cells wide and high it is.
+        double noise(int channel, double x, double y, int[] stitch) {
             double t = x + PERLIN_N;
-            int bx0 = ((int) t) & NOISE_MASK;
-            int bx1 = (bx0 + 1) & NOISE_MASK;
+            int bx0 = (int) t;
+            int bx1 = bx0 + 1;
             double rx0 = t - (long) t;
             double rx1 = rx0 - 1.0;
             t = y + PERLIN_N;
-            int by0 = ((int) t) & NOISE_MASK;
-            int by1 = (by0 + 1) & NOISE_MASK;
+            int by0 = (int) t;
+            int by1 = by0 + 1;
+            if (stitch != null) {
+                // Past the end of the tile the lattice starts over, so the
+                // far edge is made of the same cells as the near one.
+                if (bx0 >= stitch[0]) {
+                    bx0 -= stitch[2];
+                }
+                if (bx1 >= stitch[0]) {
+                    bx1 -= stitch[2];
+                }
+                if (by0 >= stitch[1]) {
+                    by0 -= stitch[3];
+                }
+                if (by1 >= stitch[1]) {
+                    by1 -= stitch[3];
+                }
+            }
+            bx0 &= NOISE_MASK;
+            bx1 &= NOISE_MASK;
+            by0 &= NOISE_MASK;
+            by1 &= NOISE_MASK;
             double ry0 = t - (long) t;
             double ry1 = ry0 - 1.0;
             int i = lattice[bx0];
@@ -1124,7 +1147,31 @@ final class SvgFilter {
         double fy = f.length > 1 ? f[1] : fx;
         int octaves = (int) number(p, "numOctaves", 1);
         boolean fractal = p.get("type") != null && "fractalNoise".equals(p.get("type").trim());
-        Noise noise = new Noise(Math.round(number(p, "seed", 0)));
+        // The seed is cut off at the point, not rounded: 1.9 is 1.
+        Noise noise = new Noise((long) number(p, "seed", 0));
+        // Noise that tiles: the frequencies are moved to the nearest that
+        // fit a whole number of cells into the effect's area, and the
+        // lattice is wrapped at its far edges, as the specification's
+        // reference code has it.
+        boolean stitched = p.get("stitchTiles") != null && "stitch".equals(p.get("stitchTiles").trim());
+        Rectangle2D tile = stitched ? area(p) : null;
+        int[] stitch = null;
+        if (tile != null && tile.getWidth() > 0 && tile.getHeight() > 0) {
+            if (fx != 0) {
+                double low = Math.floor(tile.getWidth() * fx) / tile.getWidth();
+                double high = Math.ceil(tile.getWidth() * fx) / tile.getWidth();
+                fx = low > 0 && fx / low < high / fx ? low : high;
+            }
+            if (fy != 0) {
+                double low = Math.floor(tile.getHeight() * fy) / tile.getHeight();
+                double high = Math.ceil(tile.getHeight() * fy) / tile.getHeight();
+                fy = low > 0 && fy / low < high / fy ? low : high;
+            }
+            int cellsX = (int) (tile.getWidth() * fx + 0.5);
+            int cellsY = (int) (tile.getHeight() * fy + 0.5);
+            stitch = new int[] {(int) (tile.getX() * fx + PERLIN_N + cellsX),
+                (int) (tile.getY() * fy + PERLIN_N + cellsY), cellsX, cellsY};
+        }
         Plane out = new Plane(w, h, linear);
         AffineTransform back;
         try {
@@ -1143,12 +1190,21 @@ final class SvgFilter {
                     double vx = point.x * fx;
                     double vy = point.y * fy;
                     double ratio = 1;
+                    int[] wrap = stitch == null ? null : stitch.clone();
                     for (int o = 0; o < octaves; o++) {
-                        double n = noise.noise(c, vx, vy);
+                        double n = noise.noise(c, vx, vy, wrap);
                         sum += (fractal ? n : Math.abs(n)) / ratio;
                         vx *= 2;
                         vy *= 2;
                         ratio *= 2;
+                        if (wrap != null) {
+                            // Twice as many cells in an octave up, and the
+                            // tile ends twice as far along the lattice.
+                            wrap[2] *= 2;
+                            wrap[0] = 2 * wrap[0] - PERLIN_N;
+                            wrap[3] *= 2;
+                            wrap[1] = 2 * wrap[1] - PERLIN_N;
+                        }
                     }
                     v[c] = clamp((float) (fractal ? (sum + 1) / 2 : sum));
                 }

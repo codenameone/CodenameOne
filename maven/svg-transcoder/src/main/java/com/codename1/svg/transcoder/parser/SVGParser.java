@@ -1027,8 +1027,10 @@ public final class SVGParser {
         glyphLists = new float[][] {lengths(a.get("x"), true), lengths(a.get("y"), false),
             lengths(a.get("dx"), true), lengths(a.get("dy"), false)};
         glyphIndex = 0;
-        t.setX(glyphLists[0].length > 0 ? glyphLists[0][0] : 0f);
-        t.setY(glyphLists[1].length > 0 ? glyphLists[1][0] : 0f);
+        // With the first of `dx` and `dy`, which moves the first character
+        // from there as the rest move the ones after it.
+        t.setX((glyphLists[0].length > 0 ? glyphLists[0][0] : 0f) + (glyphLists[2].length > 0 ? glyphLists[2][0] : 0f));
+        t.setY((glyphLists[1].length > 0 ? glyphLists[1][0] : 0f) + (glyphLists[3].length > 0 ? glyphLists[3][0] : 0f));
         String anchor = mergedValue(a, "text-anchor");
         if (anchor != null) {
             String norm = anchor.trim().toLowerCase();
@@ -1662,6 +1664,22 @@ public final class SVGParser {
             }
             m.put("style", (sheet == null ? "" : sheet[0]) + normal + (sheet == null ? "" : sheet[1]) + important);
         }
+        String written = m.get("style");
+        if (written != null) {
+            // Property names are the same in any case: `FILL` is `fill`,
+            // in a style attribute as in a rule. Every reader of the style
+            // looks a name up in lower case, so that is how it is kept.
+            StringBuilder named = new StringBuilder(written.length());
+            for (String decl : written.split(";")) {
+                int colon = decl.indexOf(':');
+                if (colon > 0) {
+                    named.append(asciiLower(decl.substring(0, colon))).append(decl, colon, decl.length()).append(';');
+                } else if (decl.trim().length() > 0) {
+                    named.append(decl).append(';');
+                }
+            }
+            m.put("style", named.toString());
+        }
         if (declaredValue(m, "font") != null) {
             // `font: italic bold 24px serif` is the four properties this
             // reads, written as one. Each is written out where the
@@ -1679,6 +1697,19 @@ public final class SVGParser {
             m.put("style", expanded.toString());
         }
         return m;
+    }
+
+    /** A name with its ASCII letters in lower case, whatever the locale. */
+    private static String asciiLower(String s) {
+        StringBuilder out = null;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c >= 'A' && c <= 'Z') {
+                if (out == null) out = new StringBuilder(s);
+                out.setCharAt(i, (char) (c + ('a' - 'A')));
+            }
+        }
+        return out == null ? s : out.toString();
     }
 
     /** The font shorthand as the declarations it stands for; empty when it cannot be read as one. */

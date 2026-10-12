@@ -694,7 +694,12 @@ public class CN1CSSCLI {
                     }  else {
                         long destMtime = destChild.lastModified();
                         long srcMTime = child.lastModified();
-                        if (destMtime < srcMTime) {
+                        // Newer, or not what the copy holds: a file put back
+                        // by a checkout is older than its copy and another
+                        // file all the same.
+                        if (destMtime < srcMTime || destChild.length() != child.length()
+                                || !Arrays.equals(Files.readAllBytes(destChild.toPath()),
+                                        Files.readAllBytes(child.toPath()))) {
                             Files.copy(child.toPath(), destChild.toPath(), StandardCopyOption.REPLACE_EXISTING);
                         }
                     }

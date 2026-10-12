@@ -1627,4 +1627,60 @@ class VectorImageTest {
         assertEquals(0, alpha(near, 46, 50));
         assertTrue(alpha(far, 46, 50) > 200, "fetched from eight to the right");
     }
+
+    @Test
+    void propertyNamesInAStyleAttributeAreInAnyCase() throws Exception {
+        BufferedImage img = paint("<rect width=\"50\" height=\"100\" style=\"FILL: #ff0000\"/>"
+                + "<rect x=\"50\" width=\"50\" height=\"100\" style=\"Fill:#00ff00 !important\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(25, 50));
+        assertEquals(0xff00ff00, img.getRGB(75, 50));
+    }
+
+    @Test
+    void theFirstOffsetOfATextMovesItsFirstCharacter() throws Exception {
+        String font = " font-family=\"monospace\" font-size=\"10\" fill=\"#ff0000\"";
+        BufferedImage plain = paint("<text x=\"5\" y=\"30\"" + font + ">I</text>", 100, 100);
+        BufferedImage moved = paint("<text x=\"5\" y=\"30\" dx=\"40\"" + font + ">I</text>", 100, 100);
+        assertEquals(inkRight(plain) + 40, inkRight(moved));
+    }
+
+    @Test
+    void aPatternDrawsWhatItTakesFromAnotherInItsOwnStyle() throws Exception {
+        BufferedImage img = paint("<defs><pattern id=\"base\" width=\"10\" height=\"10\" patternUnits=\"userSpaceOnUse\">"
+                + "<rect width=\"10\" height=\"10\" fill=\"currentColor\"/></pattern>"
+                + "<pattern id=\"derived\" href=\"#base\" color=\"#ff0000\"/></defs>"
+                + "<rect width=\"100\" height=\"100\" fill=\"url(#derived)\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(50, 50), "the colour of the pattern that is used");
+    }
+
+    @Test
+    void stitchedTurbulenceMeetsItselfAtTheEdgesOfItsTile() throws Exception {
+        String open = "<defs><filter id=\"f\" filterUnits=\"userSpaceOnUse\" x=\"0\" y=\"0\" width=\"100\" height=\"100\""
+                + " color-interpolation-filters=\"sRGB\"><feTurbulence type=\"fractalNoise\" baseFrequency=\"0.043\""
+                + " numOctaves=\"2\" seed=\"3\"";
+        String shape = "/></filter></defs><rect width=\"100\" height=\"100\" filter=\"url(#f)\"/>";
+        BufferedImage stitched = paint(open + " stitchTiles=\"stitch\"" + shape, 100, 100);
+        BufferedImage plain = paint(open + shape, 100, 100);
+        // How far the left column is from the one just past the right
+        // edge, which a tile laid beside this one would put there: with
+        // the noise stitched they are one step apart like any neighbours.
+        long seam = 0;
+        long seamPlain = 0;
+        for (int y = 0; y < 100; y++) {
+            seam += Math.abs((stitched.getRGB(0, y) & 0xff) - (stitched.getRGB(99, y) & 0xff));
+            seamPlain += Math.abs((plain.getRGB(0, y) & 0xff) - (plain.getRGB(99, y) & 0xff));
+        }
+        assertTrue(seam < seamPlain / 3, "stitched " + seam + " against " + seamPlain);
+    }
+
+    @Test
+    void aTurbulenceSeedIsCutOffNotRounded() throws Exception {
+        String open = "<defs><filter id=\"f\" x=\"0\" y=\"0\" width=\"1\" height=\"1\"><feTurbulence baseFrequency=\"0.1\"";
+        String shape = "/></filter></defs><rect width=\"100\" height=\"100\" filter=\"url(#f)\"/>";
+        BufferedImage one = paint(open + " seed=\"1\"" + shape, 100, 100);
+        BufferedImage almostTwo = paint(open + " seed=\"1.9\"" + shape, 100, 100);
+        for (int i = 5; i < 100; i += 9) {
+            assertEquals(one.getRGB(i, i), almostTwo.getRGB(i, i));
+        }
+    }
 }
