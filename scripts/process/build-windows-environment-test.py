@@ -22,6 +22,7 @@ source = r'''
 #include <stdlib.h>
 #include <string.h>
 #include <wchar.h>
+#define CN1_CONSERVATIVE_GC_ROOTS 1
 #define JAVA_OBJECT void *
 #define JAVA_ARRAY_CHAR uint16_t
 #define JAVA_NULL NULL

@@ -12,6 +12,8 @@ J8="${JDK_8_HOME:-${JAVA_HOME:-}}"
 if [[ -z "$J8" && -x /usr/libexec/java_home ]]; then J8="$(/usr/libexec/java_home -v 1.8)"; fi
 : "${J8:?Set JDK_8_HOME to Java 8}"
 export JAVA_HOME="$J8" PATH="$J8/bin:$PATH" JDK_8_HOME="$J8"
+python3 "$ROOT/scripts/process/test_scheduler_clock.py"
+python3 "$ROOT/scripts/process/test_environment_allocations.py"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/cn1-process.XXXXXX")"
 WORK="$(cd "$WORK" && pwd -P)"
 trap 'rm -rf "$WORK"' EXIT

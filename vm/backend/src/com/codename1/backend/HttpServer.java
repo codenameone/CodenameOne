@@ -3213,6 +3213,23 @@ public final class HttpServer {
         ringOrNap(me, handle);
     }
 
+    // Scheduler deadlines use elapsed time, including naps requested by native
+    // process polling. A wall-clock correction must not extend a relative wait.
+    private static final long SCHEDULER_START_NANOS = System.nanoTime();
+
+    private static long schedulerMillis() {
+        // Reserve zero for an unlimited descriptor wait, even at startup.
+        return (System.nanoTime() - SCHEDULER_START_NANOS) / 1000000L + 1;
+    }
+
+    private static long schedulerDeadline(long timeout) {
+        if (timeout < 0) {
+            return 0;
+        }
+        long now = schedulerMillis();
+        return timeout > Long.MAX_VALUE - now ? Long.MAX_VALUE : now + timeout;
+    }
+
     /// Parks a virtual thread that answered WAITING: its outbound descriptors go
     /// on this host's poller, and it comes back to the ring when one is ready or
     /// its timeout runs out. Until then this host runs everybody else -- which is
@@ -3224,7 +3241,7 @@ public final class HttpServer {
     private static void parkWaiter(VtHost me, long handle, boolean task) {
         int count = VirtualThread.waitCount(handle);
         long timeout = VirtualThread.waitTimeout(handle);
-        long deadline = timeout < 0 ? 0 : System.currentTimeMillis() + timeout;
+        long deadline = schedulerDeadline(timeout);
         if (count == 0) {
             if (deadline == 0) {
                 me.ringAdd(handle);
@@ -3328,7 +3345,7 @@ public final class HttpServer {
                 me.setArmed(fd, false);
             }
         }
-        long now = System.currentTimeMillis();
+        long now = schedulerMillis();
         int iter = 0;
         while (iter < me.waiterCount) {
             long at = me.waiterDeadlines[iter];
@@ -3353,7 +3370,11 @@ public final class HttpServer {
         long self = VirtualThread.current();
         if (self != 0) {
             synchronized (NAP_REQUESTS) {
-                NAP_REQUESTS.put(Long.valueOf(self), Long.valueOf(untilMillis));
+                // Convert the wall-clock API once, before yielding. Both sources
+                // of naps then use the same monotonic scheduler clock.
+                long wallNow = System.currentTimeMillis();
+                long remaining = untilMillis <= wallNow ? 0 : untilMillis - wallNow;
+                NAP_REQUESTS.put(Long.valueOf(self), Long.valueOf(schedulerDeadline(Math.max(0, remaining))));
             }
         }
         VirtualThread.yieldNow();
@@ -3366,7 +3387,7 @@ public final class HttpServer {
         synchronized (NAP_REQUESTS) {
             until = (Long) NAP_REQUESTS.remove(Long.valueOf(handle));
         }
-        if (until != null && until.longValue() > System.currentTimeMillis()) {
+        if (until != null && until.longValue() > schedulerMillis()) {
             me.napping.put(Long.valueOf(handle), until);
             return;
         }
@@ -4019,17 +4040,17 @@ public final class HttpServer {
             // network, so polling before running them would delay them by the
             // whole poll timeout.
             boolean ranSome = drainRunnable(me);
-            long nextNap = wakeNappers(me, System.currentTimeMillis());
+            long nextNap = wakeNappers(me, schedulerMillis());
             // Outbound waits whose timeout ran out go back to the ring, and the
             // poll below sleeps no longer than the next one is due.
-            nextNap = Math.min(nextNap, wakeExpiredWaiters(me, System.currentTimeMillis()));
+            nextNap = Math.min(nextNap, wakeExpiredWaiters(me, schedulerMillis()));
             int timeout = 250;
             if (ranSome || !me.ringEmpty()) {
                 timeout = 0;
             } else if (nextNap != Long.MAX_VALUE) {
                 // Sleep in the poll until the earliest nap is due, not the full
                 // idle interval: the napper wakes on time, and nothing spins.
-                timeout = (int) Math.max(0, Math.min(250, nextNap - System.currentTimeMillis()));
+                timeout = (int) Math.max(0, Math.min(250, nextNap - schedulerMillis()));
             }
             int n;
             try {

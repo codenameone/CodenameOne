@@ -72,29 +72,44 @@ static char **cn1p_strings(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array) {
 JAVA_OBJECT com_codename1_impl_process_NativeProcessSupport_environmentImpl___R_java_lang_String_1ARRAY(CODENAME_ONE_THREAD_STATE) {
     int count = 0, i;
     JAVA_OBJECT result;
+#ifndef CN1_CONSERVATIVE_GC_ROOTS
+    JAVA_BOOLEAN previousNativeAllocations = threadStateData->nativeAllocationMode;
+#endif
 #ifdef _WIN32
     wchar_t *block = GetEnvironmentStringsW(), *p;
     if (!block) return JAVA_NULL;
     for (p = block; *p; p += wcslen(p) + 1) ++count;
+#else
+    char **env = CN1P_ENVIRON;
+    while (env[count]) ++count;
+#endif
+    /* The array and its entries live only in C locals until this call returns. */
+    enteringNativeAllocations();
     result = allocArray(threadStateData, count, &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
+#ifdef _WIN32
     for (p = block, i = 0; *p; p += wcslen(p) + 1, ++i) {
         int size = WideCharToMultiByte(CP_UTF8, 0, p, -1, NULL, 0, NULL, NULL);
         char *utf8 = (char *)malloc((size_t)size);
-        if (!utf8) { FreeEnvironmentStringsW(block); return JAVA_NULL; }
+        if (!utf8) { result = JAVA_NULL; break; }
         WideCharToMultiByte(CP_UTF8, 0, p, -1, utf8, size, NULL, NULL);
         // The buffer is UTF-8, independent of the Windows active code page.
         JAVA_OBJECT entry = newStringFromUtf8Len(threadStateData, utf8, size - 1);
+        /* String helpers end their own non-nesting allocation bracket. Restore
+           ours before publishing the entry or making another VM call. */
+        enteringNativeAllocations();
         free(utf8); CN1_SET_ARRAY_ELEMENT_OBJECT(result, i, entry);
     }
     FreeEnvironmentStringsW(block);
 #else
-    char **env = CN1P_ENVIRON;
-    while (env[count]) ++count;
-    result = allocArray(threadStateData, count, &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
     for (i = 0; i < count; ++i) {
         JAVA_OBJECT entry = newStringFromNative(threadStateData, env[i]);
+        enteringNativeAllocations();
         CN1_SET_ARRAY_ELEMENT_OBJECT(result, i, entry);
     }
+#endif
+    finishedNativeAllocations();
+#ifndef CN1_CONSERVATIVE_GC_ROOTS
+    if (previousNativeAllocations) enteringNativeAllocations();
 #endif
     return result;
 }
