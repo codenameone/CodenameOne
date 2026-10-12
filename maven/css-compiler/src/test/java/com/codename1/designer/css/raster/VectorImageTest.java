@@ -1920,4 +1920,54 @@ class VectorImageTest {
         DataUrl held = DataUrl.parse("data:text/plain;base64,QQ%3D%3D");
         assertEquals("A", new String(held.getBytes(), StandardCharsets.UTF_8));
     }
+
+    private static int inkTop(BufferedImage img) {
+        for (int y = 0; y < img.getHeight(); y++) {
+            for (int x = 0; x < img.getWidth(); x++) {
+                if ((img.getRGB(x, y) >>> 24) > 128) {
+                    return y;
+                }
+            }
+        }
+        return -1;
+    }
+
+    @Test
+    void theCurrentColorCanStandInForAPaintThatIsNotThere() throws Exception {
+        BufferedImage img = paint("<rect width=\"100\" height=\"100\" color=\"#00ff00\""
+                + " fill=\"url(#missing) currentColor\"/>", 100, 100);
+        assertEquals(0xff00ff00, img.getRGB(50, 50));
+    }
+
+    @Test
+    void textHangsFromItsLineOrSitsAcrossItWhenItSaysSo() throws Exception {
+        String open = "<text x=\"5\" y=\"50\" font-family=\"monospace\" font-size=\"30\" fill=\"#ff0000\"";
+        BufferedImage standing = paint(open + ">H</text>", 100, 100);
+        BufferedImage hanging = paint(open + " dominant-baseline=\"hanging\">H</text>", 100, 100);
+        BufferedImage central = paint(open + " dominant-baseline=\"central\">H</text>", 100, 100);
+        assertTrue(inkTop(standing) < 35, "above its line, was " + inkTop(standing));
+        assertTrue(inkTop(hanging) >= 45, "below it, was " + inkTop(hanging));
+        assertTrue(inkTop(central) > inkTop(standing) && inkTop(central) < inkTop(hanging), "across it");
+        BufferedImage group = paint("<g dominant-baseline=\"hanging\">" + open + ">H</text></g>", 100, 100);
+        assertEquals(inkTop(hanging), inkTop(group), "inherited from the group");
+    }
+
+    @Test
+    void textNobodySizesIsMedium() throws Exception {
+        BufferedImage unsized = paint("<text x=\"5\" y=\"50\" font-family=\"monospace\">MMM</text>", 100, 100);
+        BufferedImage sixteen = paint("<text x=\"5\" y=\"50\" font-family=\"monospace\" font-size=\"16\">MMM</text>",
+                100, 100);
+        assertEquals(inkRight(sixteen), inkRight(unsized));
+    }
+
+    @Test
+    void aSwitchPassesOverABranchThatNeedsWhatIsNotHere() throws Exception {
+        BufferedImage img = paint("<switch>"
+                + "<rect requiredFeatures=\"http://www.w3.org/TR/SVG11/feature#Animation\" width=\"100\" height=\"100\""
+                + " fill=\"#0000ff\"/>"
+                + "<rect requiredFeatures=\"http://www.w3.org/TR/SVG11/feature#Shape\" width=\"50\" height=\"100\""
+                + " fill=\"#ff0000\"/><rect width=\"100\" height=\"100\" fill=\"#00ff00\"/></switch>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(25, 50), "the first branch that needs only what there is");
+        assertEquals(0, alpha(img, 75, 50));
+    }
 }

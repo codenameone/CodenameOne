@@ -95,6 +95,9 @@ public final class VectorImage {
     /// Whether the drawing is fitted to the viewport it is painted into.
     private final boolean scales;
     private static final int MAX_USE_DEPTH = 16;
+    /// The size of text whose font size nobody sets: CSS's `medium`, which
+    /// is 16 pixels.
+    private static final float INITIAL_FONT_SIZE = 16f;
     /// How many `<use>` elements deep the painting is. One image is painted
     /// by one thread at a time, which `paint` sees to.
     private int useDepth;
@@ -355,6 +358,14 @@ public final class VectorImage {
         }
         if (style.isStrokeCurrent()) {
             style.setStroke(SVGPaint.ofColor(current));
+        }
+        // The same word after a reference: what to paint with when nothing
+        // has that id.
+        if (style.getFill() != null && style.getFill().isFallbackCurrent()) {
+            style.setFill(style.getFill().withCurrent(current));
+        }
+        if (style.getStroke() != null && style.getStroke().isFallbackCurrent()) {
+            style.setStroke(style.getStroke().withCurrent(current));
         }
         // `context-fill` and `context-stroke` are the fill and the stroke
         // of the element a marker is drawn on, so that one arrowhead takes
@@ -2423,7 +2434,7 @@ public final class VectorImage {
                 cy += run.getDy();
                 float size = run.getFontSize() != null ? run.getFontSize().floatValue() : text.getFontSize();
                 if (!(size > 0)) {
-                    size = 12f;
+                    size = INITIAL_FONT_SIZE;
                 }
                 boolean bold = run.getBold() != null ? run.getBold().booleanValue() : text.isBold();
                 boolean italic = run.getItalic() != null ? run.getItalic().booleanValue() : text.isItalic();
@@ -2446,7 +2457,7 @@ public final class VectorImage {
                 }
                 glyphs.add(gv);
                 xs[k - i] = cx;
-                ys[k - i] = cy;
+                ys[k - i] = cy + baselineShift(text, run, font, context);
                 cx += gv.getLogicalBounds().getWidth();
                 if (apart != 0f || words != 0f) {
                     // The bounds stop at the last glyph; the space after it
@@ -2545,7 +2556,7 @@ public final class VectorImage {
             SVGText.Run run = runs.get(k);
             float size = run.getFontSize() != null ? run.getFontSize().floatValue() : text.getFontSize();
             if (!(size > 0)) {
-                size = 12f;
+                size = INITIAL_FONT_SIZE;
             }
             boolean bold = run.getBold() != null ? run.getBold().booleanValue() : text.isBold();
             boolean italic = run.getItalic() != null ? run.getItalic().booleanValue() : text.isItalic();
@@ -2595,7 +2606,7 @@ public final class VectorImage {
                         on[1] + (on[3] - on[1]) * part);
                 place.rotate(Math.atan2(on[3] - on[1], on[2] - on[0]) + Math.toRadians(run.getRotate()));
                 // `dy` lifts the glyph off the path, across the way it runs.
-                place.translate(-wide / 2, run.getDy());
+                place.translate(-wide / 2, run.getDy() + baselineShift(text, run, gv.getFont(), context));
                 Point2D origin = gv.getGlyphPosition(j);
                 Shape glyph = gv.getGlyphOutline(j, (float) -origin.getX(), (float) -origin.getY());
                 if (drawn == null) {
@@ -2607,6 +2618,41 @@ public final class VectorImage {
         }
         double[] last = pieces.get(pieces.size() - 1);
         return new double[] {last[2], last[3]};
+    }
+
+    /// How far below the `y` it is given the letters of a stretch stand:
+    /// nothing when `y` is the line they stand on, which it is unless
+    /// `dominant-baseline` makes it another line of the font -- its middle,
+    /// its top, its bottom.
+    private static double baselineShift(SVGText text, SVGText.Run run, Font font,
+            java.awt.font.FontRenderContext context) {
+        String line = run.getBaseline() != null ? run.getBaseline() : text.getBaseline();
+        if (line == null || "auto".equals(line) || "alphabetic".equals(line) || "baseline".equals(line)) {
+            return 0;
+        }
+        java.awt.font.LineMetrics metrics = font.getLineMetrics("x", context);
+        double ascent = metrics.getAscent();
+        double descent = metrics.getDescent();
+        if ("middle".equals(line)) {
+            // Half the height of a small letter above the line.
+            return font.createGlyphVector(context, "x").getVisualBounds().getHeight() / 2;
+        }
+        if ("central".equals(line)) {
+            return (ascent - descent) / 2;
+        }
+        if ("hanging".equals(line)) {
+            return ascent * 0.8;
+        }
+        if ("mathematical".equals(line)) {
+            return ascent / 2;
+        }
+        if ("text-before-edge".equals(line) || "text-top".equals(line)) {
+            return ascent;
+        }
+        if ("text-after-edge".equals(line) || "text-bottom".equals(line) || "ideographic".equals(line)) {
+            return -descent;
+        }
+        return 0;
     }
 
     /// Whether the character at `index` of `text` is a space between words.

@@ -59,6 +59,11 @@ public final class SVGText extends SVGShape {
         private Boolean bold;
         private Boolean italic;
 
+        private String baseline;
+        /// The `dominant-baseline` a span sets, or null for the text's own.
+        public String getBaseline() { return baseline; }
+        public void setBaseline(String baseline) { this.baseline = baseline; }
+
         private float rotate;
         /// How far each glyph of the stretch is turned about its own
         /// starting point, in degrees.
@@ -151,6 +156,13 @@ public final class SVGText extends SVGShape {
 
     public boolean isItalic() { return italic; }
     public void setItalic(boolean italic) { this.italic = italic; }
+
+    private String baseline;
+    /// The `dominant-baseline` as written: which line of the font `y` is,
+    /// in place of the one its letters stand on. Null when it is not set.
+    /// Only a renderer that reads the model applies it.
+    public String getBaseline() { return baseline; }
+    public void setBaseline(String baseline) { this.baseline = baseline; }
 
     private float wordSpacing;
     /// How much wider than the font has it a space between words is; zero

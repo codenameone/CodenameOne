@@ -263,6 +263,7 @@ public final class SVGParser {
         fontSpacing = null;
         wordSpacing = null;
         textAnchor = null;
+        textBaseline = null;
         inheritedColor = null;
         enterFont(a);
     }
@@ -315,7 +316,7 @@ public final class SVGParser {
         if (unit.endsWith("%")) return v / 100f * whole;
         // Lengths in the size of the font are in the one the element has
         // from what it is in: 2em under `font-size="20"` is 40.
-        float font = fontSize != null ? fontSize.floatValue() : 12f;
+        float font = fontSize != null ? fontSize.floatValue() : INITIAL_FONT_SIZE;
         if (unit.endsWith("rem")) return v * 16f;
         if (unit.endsWith("em")) return v * font;
         if (unit.endsWith("ex")) return v * font / 2;
@@ -344,6 +345,24 @@ public final class SVGParser {
     private static boolean conditionsHold(XMLStreamReader r) {
         String extensions = r.getAttributeValue(null, "requiredExtensions");
         if (extensions != null && !extensions.trim().isEmpty()) return false;
+        // Every feature it names has to be one of the drawing kind, which
+        // is what there is here: no animation, no scripts, no fonts or
+        // cursors of the file's own. A list of none holds for nothing.
+        String features = r.getAttributeValue(null, "requiredFeatures");
+        if (features != null) {
+            if (features.trim().isEmpty()) return false;
+            for (String feature : features.trim().split("\\s+")) {
+                String name = feature.startsWith("http://www.w3.org/TR/SVG11/feature#")
+                        ? feature.substring("http://www.w3.org/TR/SVG11/feature#".length())
+                        : "org.w3c.svg.static".equals(feature) ? "SVG-static" : null;
+                if (name == null || name.indexOf("Animation") >= 0 || name.indexOf("Script") >= 0
+                        || name.indexOf("Event") >= 0 || name.indexOf("Font") >= 0 || name.indexOf("Cursor") >= 0
+                        || name.indexOf("Extensibility") >= 0 || name.indexOf("View") >= 0
+                        || name.indexOf("dynamic") >= 0 || name.indexOf("DOM") >= 0 || "SVG".equals(name)) {
+                    return false;
+                }
+            }
+        }
         String languages = r.getAttributeValue(null, "systemLanguage");
         if (languages == null) return true;
         for (String language : languages.split(",")) {
@@ -352,6 +371,9 @@ public final class SVGParser {
         }
         return false;
     }
+
+    /** The size of a font nobody sets: CSS's {@code medium}, which is 16 pixels. */
+    private static final float INITIAL_FONT_SIZE = 16f;
 
     /** The font an element with none of its own takes from what it is in; null where nothing sets one. */
     private String fontFamily;
@@ -362,7 +384,9 @@ public final class SVGParser {
     /** Takes in the font properties of a container; what is returned undoes it with {@link #leaveFont}. */
     private Object[] enterFont(Map<String, String> a) {
         Object[] saved = {fontFamily, fontSize, fontBold, fontItalic, inheritedColor, fontSpacing, wordSpacing,
-            textAnchor};
+            textAnchor, textBaseline};
+        String based = mergedValue(a, "dominant-baseline");
+        if (based != null && !"inherit".equals(based.trim())) textBaseline = based.trim();
         SVGText.Anchor anchored = anchorOf(mergedValue(a, "text-anchor"));
         if (anchored != null) textAnchor = anchored;
         Integer color = colorOf(a);
@@ -385,6 +409,7 @@ public final class SVGParser {
     private Float fontSpacing;
     private Float wordSpacing;
     private SVGText.Anchor textAnchor;
+    private String textBaseline;
 
     /** A text-anchor, or null when it is not written or not one of the three. */
     private static SVGText.Anchor anchorOf(String value) {
@@ -414,6 +439,7 @@ public final class SVGParser {
         fontSpacing = (Float) saved[5];
         wordSpacing = (Float) saved[6];
         textAnchor = (SVGText.Anchor) saved[7];
+        textBaseline = (String) saved[8];
     }
 
     /** A font size, a relative one taken against the size around it; null when there is none to read. */
@@ -422,7 +448,7 @@ public final class SVGParser {
         try {
             float given = NumberParser.parseFloat(size);
             String unit = size.trim();
-            float around = fontSize != null ? fontSize.floatValue() : 12f;
+            float around = fontSize != null ? fontSize.floatValue() : INITIAL_FONT_SIZE;
             if (unit.endsWith("%")) return Float.valueOf(given / 100 * around);
             if (unit.endsWith("rem")) return Float.valueOf(given * 16f);
             if (unit.endsWith("em")) return Float.valueOf(given * around);
@@ -1111,6 +1137,8 @@ public final class SVGParser {
         SVGText.Anchor anchor = anchorOf(mergedValue(a, "text-anchor"));
         if (anchor == null) anchor = textAnchor;
         if (anchor != null) t.setAnchor(anchor);
+        String baseline = mergedValue(a, "dominant-baseline");
+        t.setBaseline(baseline != null && !"inherit".equals(baseline.trim()) ? baseline.trim() : textBaseline);
         String family = mergedValue(a, "font-family");
         if (family != null) {
             t.setFontFamily(family.trim());
@@ -1277,6 +1305,7 @@ public final class SVGParser {
                     run.setFontSize(span.getFontSize());
                     run.setBold(span.getBold());
                     run.setItalic(span.getItalic());
+                    run.setBaseline(span.getBaseline());
                     run.setLetterSpacing(span.getLetterSpacing());
                     run.setWordSpacing(span.getWordSpacing());
                     run.setAnchor(span.getAnchor());
@@ -1302,6 +1331,7 @@ public final class SVGParser {
                         placed.setFontSize(run.getFontSize());
                         placed.setBold(run.getBold());
                         placed.setItalic(run.getItalic());
+                        placed.setBaseline(run.getBaseline());
                         placed.setLetterSpacing(run.getLetterSpacing());
                         placed.setWordSpacing(run.getWordSpacing());
                         placed.setAnchor(run.getAnchor());
@@ -1322,6 +1352,7 @@ public final class SVGParser {
                 Map<String, String> a = attrs(r);
                 SVGText.Run child = new SVGText.Run();
                 if (span != null) {
+                    child.setBaseline(span.getBaseline());
                     child.setLetterSpacing(span.getLetterSpacing());
                     child.setWordSpacing(span.getWordSpacing());
                     child.setAnchor(span.getAnchor());
@@ -1330,6 +1361,11 @@ public final class SVGParser {
                 }
                 Float spanSpacing = spacingOf(mergedValue(a, "letter-spacing"));
                 if (spanSpacing != null) child.setLetterSpacing(spanSpacing);
+                String spanBaseline = mergedValue(a, "dominant-baseline");
+                if (spanBaseline == null) spanBaseline = mergedValue(a, "alignment-baseline");
+                if (spanBaseline != null && !"inherit".equals(spanBaseline.trim())) {
+                    child.setBaseline(spanBaseline.trim());
+                }
                 Float spanWords = spacingOf(mergedValue(a, "word-spacing"));
                 if (spanWords != null) child.setWordSpacing(spanWords);
                 String spanAnchor = mergedValue(a, "text-anchor");
@@ -1405,7 +1441,7 @@ public final class SVGParser {
                         // times it: half of 20 is 10, not 50.
                         String unit = size.trim();
                         float around = child.getFontSize() != null ? child.getFontSize().floatValue()
-                                : text.getFontSize() > 0 ? text.getFontSize() : 12f;
+                                : text.getFontSize() > 0 ? text.getFontSize() : INITIAL_FONT_SIZE;
                         if (unit.endsWith("%")) {
                             given = given / 100 * around;
                         } else if (unit.endsWith("rem")) {
@@ -1775,7 +1811,7 @@ public final class SVGParser {
     /** What the number of a stroke length is multiplied by to be in user units; 1 for a plain or absolute length. */
     private float strokeUnit(String value) {
         String v = value.trim();
-        float font = fontSize != null ? fontSize.floatValue() : 12f;
+        float font = fontSize != null ? fontSize.floatValue() : INITIAL_FONT_SIZE;
         if (v.endsWith("%")) return (float) (diagonal() / 100);
         if (v.endsWith("rem")) return 16f;
         if (v.endsWith("em")) return font;

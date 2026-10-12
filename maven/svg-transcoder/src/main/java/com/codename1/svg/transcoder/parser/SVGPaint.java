@@ -55,6 +55,21 @@ public final class SVGPaint {
      */
     public SVGPaint getFallback() { return fallback; }
 
+    private boolean fallbackCurrent;
+
+    /**
+     * Whether the fallback is written as {@code currentColor}: the
+     * {@code color} of the element the paint is on, which is known where it
+     * is painted and not here. {@link #getFallback} is then null until
+     * {@link #withCurrent} puts that colour in.
+     */
+    public boolean isFallbackCurrent() { return fallbackCurrent; }
+
+    /** This reference with its {@code currentColor} fallback made the colour given. */
+    public SVGPaint withCurrent(int argb) {
+        return new SVGPaint(none, color, reference, ofColor(argb));
+    }
+
     public static SVGPaint ofColor(int argb) {
         return new SVGPaint(false, argb, null);
     }
@@ -82,7 +97,9 @@ public final class SVGPaint {
                 // not a colour: no fallback
             }
         }
-        return new SVGPaint(false, 0, r, fallback);
+        SVGPaint out = new SVGPaint(false, 0, r, fallback);
+        out.fallbackCurrent = ColorParser.isCurrentColor(rest);
+        return out;
     }
 
     /**
