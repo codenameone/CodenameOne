@@ -111,7 +111,7 @@ public final class Transactions {
     }
 
     /// Runs a transaction with the same propagation and isolation rules as
-    /// @Transactional. Unlike annotation rollback rules, every body failure rolls back.
+    /// `@Transactional`. Unlike annotation rollback rules, every body failure rolls back.
     public static Object execute(Propagation propagation, boolean readOnly, int timeoutSeconds,
                                  Isolation isolation, Work work) throws Exception {
         if (propagation == null || work == null) {

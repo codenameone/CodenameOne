@@ -600,17 +600,7 @@ Register a `Transactions.Synchronization` within a thread-bound transaction:
 
 [source,java]
 ----
-Transactions.registerSynchronization(new Transactions.Synchronization() {
-    public void beforeCommit(boolean readOnly) {
-        // Validate application state before the ORM flush and database commit.
-    }
-    public void afterCommit() {
-        // Invalidate a cache or schedule an event only after a successful commit.
-    }
-    public void afterCompletion(Transactions.Outcome outcome) {
-        // Dispose resources on COMMITTED, ROLLED_BACK, or UNKNOWN.
-    }
-});
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/DatabaseSnippets.java[tag=backend-transaction-synchronization,indent=0]
 ----
 
 Hooks run synchronously in registration order within each phase. `beforeCommit`

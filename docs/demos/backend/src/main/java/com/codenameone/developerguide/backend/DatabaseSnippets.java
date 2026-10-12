@@ -24,6 +24,7 @@ package com.codenameone.developerguide.backend;
 
 import com.codename1.backend.DataSource;
 import com.codename1.backend.Database;
+import com.codename1.backend.Transactions;
 import com.codename1.backend.sql.Dialect;
 import java.io.IOException;
 import java.util.List;
@@ -63,6 +64,22 @@ db.inTransaction(new DataSource.Work() {
     }
 });
 // end::backend-database-transaction[]
+    }
+
+    public static void registerSynchronization() {
+// tag::backend-transaction-synchronization[]
+Transactions.registerSynchronization(new Transactions.Synchronization() {
+    public void beforeCommit(boolean readOnly) {
+        // Validate application state before the ORM flush and database commit.
+    }
+    public void afterCommit() {
+        // Invalidate a cache or schedule an event only after a successful commit.
+    }
+    public void afterCompletion(Transactions.Outcome outcome) {
+        // Dispose resources on COMMITTED, ROLLED_BACK, or UNKNOWN.
+    }
+});
+// end::backend-transaction-synchronization[]
     }
 
     public static String schema(DataSource db) {
