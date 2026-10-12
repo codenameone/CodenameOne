@@ -498,8 +498,8 @@ another application. From Swing code, `Desktop.getDesktop().open(file)` and
 |`javax.crypto`
 |The ciphers, MACs and key generators of `com.codename1.security`
 
-|`java.util.zip`
-|`com.codename1.io.gzip`
+|`java.util.zip.ZipFile`
+|`java.util.zip.ZipInputStream`, which reads the entries in order
 
 |`java.sql`
 |`com.codename1.db.Database`
@@ -663,8 +663,9 @@ Everything else the device lacks is reported by the compliance check, as
 * *Networking below `URL`*: `java.net.http`, `HttpURLConnection`,
   `URL.openConnection`, sockets and channels.
 * *Arithmetic, cryptography and archives*: `java.math`, `javax.crypto`,
-  `KeyStore`, `Signature` and `java.util.zip`, each of which has a
-  Codename One API listed in <<desktop-interop-porting>>.
+  `KeyStore`, `Signature` and `java.util.zip.ZipFile`, each of which has an
+  alternative listed in <<desktop-interop-porting>>. The zip and GZIP
+  streams of `java.util.zip` work unchanged.
 * *JDBC*: `java.sql`.
 * *Locks and pools beyond the executors*: `ReentrantLock`, `Semaphore`,
   `ForkJoinPool` and the blocking queues.
@@ -1741,7 +1742,7 @@ Both toolkits:
   errors: a device can't start one. Use `CN.execute(url)` to hand a URL or a
   file to the system.
 * `java.math.BigDecimal` and `BigInteger`, `java.net.http`,
-  `HttpURLConnection`, sockets, `javax.crypto`, `java.util.zip` archives,
+  `HttpURLConnection`, sockets, `javax.crypto`, `java.util.zip.ZipFile`,
   channels and JDBC. Use the Codename One APIs for networking, storage,
   encryption and databases.
 * Keyboard modifiers on phones. The state of Shift, Control, Alt and Meta

@@ -88,9 +88,8 @@ java.lang.System.Logger | com.codename1.io.Log#p | Use com.codename1.io.Log.
 javax.xml. | com.codename1.xml.XMLParser, com.codename1.xml.Element | Use com.codename1.xml.XMLParser, which answers a tree of Element.
 org.w3c.dom. | com.codename1.xml.XMLParser, com.codename1.xml.Element | Use com.codename1.xml.XMLParser, which answers a tree of Element.
 org.xml.sax. | com.codename1.xml.XMLParser | Use com.codename1.xml.XMLParser.
-java.util.zip.ZipFile | com.codename1.io.gzip.GZIPInputStream | No zip archives on a device out of the box. GZIP streams are in com.codename1.io.gzip; a zip needs a library written for Codename One.
-java.util.zip.ZipInputStream | com.codename1.io.gzip.GZIPInputStream | No zip archives on a device out of the box. GZIP streams are in com.codename1.io.gzip.
-java.util.zip. | com.codename1.io.gzip.GZIPInputStream, com.codename1.io.gzip.GZIPOutputStream | Use com.codename1.io.gzip for GZIP and deflate streams.
+java.util.zip.ZipFile | java.util.zip.ZipInputStream | No random access to a zip archive on a device. Read the entries in order with java.util.zip.ZipInputStream.
+java.util.zip. | java.util.zip.ZipInputStream, java.util.zip.ZipOutputStream, java.util.zip.GZIPInputStream, java.util.zip.GZIPOutputStream | A device has the streaming half of java.util.zip: the zip and GZIP streams, Inflater, Deflater and the checksums.
 java.util.jar. | | No equivalent: an application is not a jar on a device.
 java.text.SimpleDateFormat | com.codename1.l10n.SimpleDateFormat | Use com.codename1.l10n.SimpleDateFormat.
 java.text.MessageFormat | com.codename1.util.StringUtil#replaceAll | No MessageFormat on a device. Build the text with StringBuilder or StringUtil.replaceAll.
