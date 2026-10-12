@@ -35,6 +35,7 @@ import java.util.Map;
 /// @hidden
 @com.codename1.impl.SharedWithBackend
 public final class NativeProcessSupport extends ProcessSupport {
+    @Override
     public Map<String, String> environment() {
         Map<String, String> result = new HashMap<String, String>();
         String[] entries = environmentImpl();
@@ -51,6 +52,7 @@ public final class NativeProcessSupport extends ProcessSupport {
         }
         return result;
     }
+    @Override
     public Process start(String[] command, String directory, Map<String, String> environment, boolean mergeError)
             throws IOException {
         String[] env = null;
@@ -97,6 +99,7 @@ public final class NativeProcessSupport extends ProcessSupport {
             reaper.setDaemon(true);
             reaper.start();
         }
+        @Override
         public void run() {
             while (isAlive()) {
                 try {
@@ -105,15 +108,19 @@ public final class NativeProcessSupport extends ProcessSupport {
                 }
             }
         }
+        @Override
         public InputStream getInputStream() {
             return stdout;
         }
+        @Override
         public InputStream getErrorStream() {
             return stderr;
         }
+        @Override
         public OutputStream getOutputStream() {
             return stdin;
         }
+        @Override
         public synchronized int exitValue() {
             if (!exited) {
                 long result = poll(handle);
@@ -126,11 +133,13 @@ public final class NativeProcessSupport extends ProcessSupport {
             }
             return exitCode;
         }
+        @Override
         public synchronized void destroy() {
             if (handle != 0) {
                 terminate(handle, false);
             }
         }
+        @Override
         public synchronized Process destroyForcibly() {
             if (handle != 0) {
                 terminate(handle, true);
@@ -160,6 +169,7 @@ public final class NativeProcessSupport extends ProcessSupport {
             }
             return n;
         }
+        @Override
         protected synchronized void finalize() {
             // The reaper holds this object until the OS child is gone. Streams
             // hold it too; finalization cannot race a poll, I/O or termination.
@@ -176,6 +186,7 @@ public final class NativeProcessSupport extends ProcessSupport {
                 throw new IndexOutOfBoundsException();
             }
         }
+        @Override
         protected void pause(long millis) throws InterruptedException {
             if (Thread.interrupted()) {
                 throw new InterruptedException();
@@ -190,7 +201,9 @@ public final class NativeProcessSupport extends ProcessSupport {
                 pause(5);
             } catch (InterruptedException ex) {
                 Thread.currentThread().interrupt();
-                throw new InterruptedIOException("Interrupted process I/O");
+                InterruptedIOException error = new InterruptedIOException("Interrupted process I/O");
+                error.initCause(ex);
+                throw error;
             }
         }
         private final class PipeInput extends InputStream {
@@ -198,11 +211,13 @@ public final class NativeProcessSupport extends ProcessSupport {
             PipeInput(int index) {
                 this.index = index;
             }
+            @Override
             public int read() throws IOException {
                 byte[] one = new byte[1];
                 return read(one, 0, 1) < 0 ? -1 : one[0] & 255;
             }
             private boolean reading;
+            @Override
             public int read(byte[] bytes, int offset, int length) throws IOException {
                 bounds(bytes, offset, length);
                 if (length == 0) {
@@ -233,15 +248,18 @@ public final class NativeProcessSupport extends ProcessSupport {
                     }
                 }
             }
+            @Override
             public void close() {
                 closePipe(index);
             }
         }
         private final class PipeOutput extends OutputStream {
+            @Override
             public void write(int value) throws IOException {
                 write(new byte[] {(byte) value}, 0, 1);
             }
             private boolean writing;
+            @Override
             public void write(byte[] bytes, int offset, int length) throws IOException {
                 bounds(bytes, offset, length);
                 synchronized (this) {
@@ -272,6 +290,7 @@ public final class NativeProcessSupport extends ProcessSupport {
                     }
                 }
             }
+            @Override
             public void close() {
                 closePipe(0);
             }

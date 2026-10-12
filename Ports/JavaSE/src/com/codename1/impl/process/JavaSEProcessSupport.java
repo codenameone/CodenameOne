@@ -32,9 +32,11 @@ import java.util.Map;
 /// Host-JDK adapter, also compiled by the JVM backend. No UI dependencies.
 /// @hidden
 public final class JavaSEProcessSupport extends ProcessSupport {
+    @Override
     public Map<String, String> environment() {
         return new HashMap<String, String>(new java.lang.ProcessBuilder().environment());
     }
+    @Override
     public Process start(String[] command, String directory, Map<String, String> environment, boolean mergeError)
             throws IOException {
         java.lang.ProcessBuilder builder = new java.lang.ProcessBuilder(command);
@@ -53,21 +55,27 @@ public final class JavaSEProcessSupport extends ProcessSupport {
         Child(java.lang.Process child) {
             this.child = child;
         }
+        @Override
         public InputStream getInputStream() {
             return child.getInputStream();
         }
+        @Override
         public InputStream getErrorStream() {
             return child.getErrorStream();
         }
+        @Override
         public OutputStream getOutputStream() {
             return child.getOutputStream();
         }
+        @Override
         public int exitValue() {
             return child.exitValue();
         }
+        @Override
         public void destroy() {
             child.destroy();
         }
+        @Override
         public Process destroyForcibly() {
             child.destroyForcibly();
             return this;

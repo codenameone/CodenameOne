@@ -82,7 +82,8 @@ JAVA_OBJECT com_codename1_impl_process_NativeProcessSupport_environmentImpl___R_
         char *utf8 = (char *)malloc((size_t)size);
         if (!utf8) { FreeEnvironmentStringsW(block); return JAVA_NULL; }
         WideCharToMultiByte(CP_UTF8, 0, p, -1, utf8, size, NULL, NULL);
-        JAVA_OBJECT entry = newStringFromNative(threadStateData, utf8);
+        // The buffer is UTF-8, independent of the Windows active code page.
+        JAVA_OBJECT entry = newStringFromUtf8Len(threadStateData, utf8, size - 1);
         free(utf8); CN1_SET_ARRAY_ELEMENT_OBJECT(result, i, entry);
     }
     FreeEnvironmentStringsW(block);

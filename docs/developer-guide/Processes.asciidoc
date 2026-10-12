@@ -104,3 +104,9 @@ suite additionally covers waits, interrupts, and `close()`. Native mode also
 runs a backend with one virtual-thread host and verifies that a pending process
 read or wait permits another task to run. The OS test checks descriptor/handle
 counts across repeated launches, child reaping, and closed-stdin failure.
+
+To test Windows environment decoding independently of the active code page, run
+`python3 scripts/process/build-windows-environment-test.py OUTPUT.exe` with `CC` set to
+a Windows C compiler. Run the executable on Windows or Wine with a non-UTF-8
+active code page. It exercises the native environment binding and string decoder
+with Unicode names and values, including a supplementary character.

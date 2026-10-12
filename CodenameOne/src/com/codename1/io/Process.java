@@ -107,6 +107,7 @@ public abstract class Process implements AutoCloseable {
     }
     /// Forcibly terminates the child and releases all pipes, even if one close fails.
     /// The runtime reaps it independently; this does not wait for termination.
+    @Override
     public void close() throws IOException {
         destroyForcibly();
         IOException failure = null;
