@@ -2690,6 +2690,18 @@
         "url": "https://medium.com/p/c4a63ec4ef2a/edit",
         "syndicated_at": "2026-10-11T19:01:28+00:00"
       }
+    },
+    "gradle-smaller-projects": {
+      "hashnode": {
+        "url": "https://debugagent.com/do-you-prefer-gradle",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6acc230f71edc182b3423c82",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-12T00:01:10+00:00"
+      }
     }
   }
 }
