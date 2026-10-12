@@ -103,4 +103,8 @@ public class ImplementationFactory {
         
         return new JavaJMFSEPort();
     }
+    /** Internal process adapter; null means this port does not support processes. */
+    public Object createProcessSupport() {
+        return new com.codename1.impl.process.JavaSEProcessSupport();
+    }
 }

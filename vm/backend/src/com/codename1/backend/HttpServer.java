@@ -3356,8 +3356,11 @@ public final class HttpServer {
             Map.Entry e = (Map.Entry) it.next();
             long until = ((Long) e.getValue()).longValue();
             if (until <= now) {
+                // An entry is no longer valid after iterator.remove(); the
+                // native HashMap clears its key when the slot is removed.
+                long handle = ((Long) e.getKey()).longValue();
                 it.remove();
-                me.ringAdd(((Long) e.getKey()).longValue());
+                me.ringAdd(handle);
             } else if (until < earliest) {
                 earliest = until;
             }

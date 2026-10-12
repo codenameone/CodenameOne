@@ -1,0 +1,140 @@
+[[processes]]
+== Desktop and Backend Processes
+
+`com.codename1.io.ProcessBuilder` launches operating-system programs from shared
+application code. It returns `com.codename1.io.Process`, with stdin, stdout,
+stderr, exit status, timed waits, and termination. Neither class needs a running
+`Display` or backend server. Import `Process` explicitly: `java.lang.Process` has
+the same simple name.
+
+[cols="1,2",options="header"]
+|===
+|Target |Implementation
+|JavaSE desktop and simulator on Windows, macOS, Linux |Host JDK process API
+|Native Windows desktop |Win32 `CreateProcessW`, Unicode arguments, asynchronous pipes
+|Native macOS and Linux desktop |POSIX child processes and nonblocking pipes
+|JVM backend |The same adapter as JavaSE desktop
+|Packaged ParparVM backend on Linux |The same native adapter as desktop
+|Android, iOS, browser and ports without an adapter |Unsupported; shared code still compiles
+|===
+
+Call `ProcessBuilder.isSupported()` before offering process-dependent features.
+On unsupported ports, `start()` and `environment()` throw
+`UnsupportedOperationException`. A supported port can still deny a launch due
+to permissions, sandbox rules, or a missing executable. Those failures surface
+as `IOException` (or a host-JDK `SecurityException`), not a dummy process. Mobile
+ports deliberately do not promise execution even where an OS exposes limited
+process facilities.
+
+=== Compatibility with JavaSE
+
+[cols="1,2",options="header"]
+|===
+|Operation |Codename One behavior
+|Command |`ProcessBuilder(String...)`, `ProcessBuilder(List<String>)`, and mutable `command()` follow the JavaSE shape. Each argument is passed literally. No shell is inserted, including for executable scripts without an interpreter header on POSIX.
+|Working directory |`directory(String)` accepts a native OS path, not `java.io.File`, `com.codename1.io.File`, or a `file:` URL. Null inherits the parent directory.
+|Environment |`environment()` returns a mutable copy on first access. Until accessed, the child inherits the environment at launch. Invalid names/values (null, NUL, empty names, or `=` in names) are rejected at `start()`, including mutations through map entries. This validation timing and lazy snapshot differ from JavaSE.
+|Pipes |`getOutputStream()` writes child stdin; `getInputStream()` reads stdout; `getErrorStream()` reads stderr. `redirectErrorStream(true)` merges stderr into stdout and makes the stderr stream return EOF.
+|Redirection |File redirection, `inheritIO()`, pipelines, and `ProcessHandle` are outside this subset. Copy through the streams instead.
+|Waiting |`waitFor()`, `waitFor(long, TimeUnit)`, and the extra `waitFor(long timeoutMillis)` wait for the direct child. A timeout returns false and leaves it running. Interrupting a wait throws `InterruptedException` and also leaves it running.
+|Termination |`destroy()` requests SIGTERM on POSIX and terminates forcibly on Windows. `destroyForcibly()` requests SIGKILL on POSIX or Windows termination. Both return before termination completes; use a wait to observe completion. Neither terminates descendants.
+|Exit codes |Nonzero exit is a normal result. `exitValue()` throws `IllegalThreadStateException` while alive. POSIX signal termination yields `128 + signal`; Windows preserves the exit-code bits in a Java int.
+|Cleanup |`Process` implements `AutoCloseable`. `close()` requests forcible termination and closes all three streams, even if one close fails. It does not wait. The runtime independently reaps children, including when callers never wait. Closing streams after exit releases their resources; unread output is retained until read or closed.
+|Concurrency |Use one reader per output stream and one writer for stdin. The native adapter rejects overlapping reads or writes on the same stream. Closing a stream from another thread cancels native pipe I/O. Native interrupted pipe I/O throws `InterruptedIOException` and closes that pipe; JVM stream interruption follows the host JDK.
+|===
+
+Executable lookup follows the host OS. Prefer an absolute executable path for
+consistent behavior across operating systems. POSIX uses the child environment's
+`PATH` (or `/usr/bin:/bin` if absent); Windows uses `CreateProcessW` lookup rules,
+which do not use a replacement child `PATH`. Windows argument quoting targets
+the standard C runtime argument parser; programs with custom command-line parsers
+can interpret their command line differently. Use the existing capitalization
+of Windows environment names when editing the map, and avoid duplicate names
+that differ only in case.
+
+=== A Desktop Example
+
+Run process I/O and waits off the EDT. This example invokes a small version
+command, drains merged output concurrently, and enforces a wait timeout. Replace
+`my-tool` with an installed executable or its absolute path.
+
+[source,java]
+----
+import com.codename1.io.Process;
+import com.codename1.io.ProcessBuilder;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.concurrent.TimeUnit;
+
+// Check isSupported() before enabling this action in your UI.
+new Thread(() -> {
+    try (Process child = new ProcessBuilder("my-tool", "--version")
+            .redirectErrorStream(true).start()) {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        Thread reader = new Thread(() -> {
+            try {
+                byte[] buffer = new byte[4096];
+                int count;
+                while ((count = child.getInputStream().read(buffer)) != -1) {
+                    output.write(buffer, 0, count);
+                }
+            } catch (IOException error) {
+                // Closing the process also cancels an outstanding native read.
+                com.codename1.io.Log.e(error);
+            }
+        });
+        reader.start();
+        child.getOutputStream().close(); // No input; send EOF to the tool.
+        if (!child.waitFor(30, TimeUnit.SECONDS)) {
+            child.destroyForcibly();
+        }
+        child.waitFor();
+        reader.join();
+        String version = new String(output.toByteArray(), "UTF-8");
+        // Use Display.callSerially(...) for any UI update using version.
+    } catch (Exception error) {
+        com.codename1.io.Log.e(error);
+    }
+}).start();
+----
+
+For commands with substantial output, stream to a consumer or file rather than
+retaining everything in memory. Without stderr merging, start independent
+stdout and stderr readers. Waiting before draining can deadlock when a pipe
+fills. A child can also spawn descendants that keep pipes open after it exits;
+manage such tools explicitly rather than assuming child exit implies pipe EOF.
+
+=== Backend Ownership and Blocking
+
+A request owns the children it starts. Close them in `finally` or a
+try-with-resources block, including on cancellation and timeout. Server-wide
+children should belong to a managed bean whose `@PreDestroy` method closes them.
+The process API does not attach arbitrary children to a request or server, and
+server shutdown does not implicitly kill unrelated processes. Abrupt termination
+of the parent can leave children running, as with JavaSE.
+
+Native pipe reads/writes and exit checks are nonblocking OS operations. Between
+polls, unpinned backend virtual threads park through the backend scheduler;
+platform threads sleep briefly. Do not hold application monitors around these
+operations: a virtual thread holding a monitor is pinned to its host. Launch
+itself crosses the OS process-creation boundary synchronously and can occupy the
+calling host; use a platform task if executable lookup or launch can be slow.
+
+=== Local Validation
+
+`scripts/process/check-process.sh jvm` runs real-child tests against the shared
+JavaSE adapter and OS layer. `scripts/process/check-process.sh native` builds and
+executes the same Java conformance program with ParparVM. Set `JDK_8_HOME` to a
+Java 8 installation. Native tests are local-only; the script rejects native
+execution when `CI` is set.
+
+The portable `scripts/process/process_os_test.c` also builds on Windows alongside
+`process_child.c`. Pass the child executable and an existing absolute working
+directory to the test. With MinGW, compile both fixtures with `-municode` to
+use their Unicode entry points. Tests cover literal/Unicode arguments, environment,
+working directory, large simultaneous stdout/stderr, binary stdin round trips,
+merged stderr, launch errors, termination, and repeated launches. The Java
+suite additionally covers waits, interrupts, and `close()`. Native mode also
+runs a backend with one virtual-thread host and verifies that a pending process
+read or wait permits another task to run. The OS test checks descriptor/handle
+counts across repeated launches, child reaping, and closed-stdin failure.

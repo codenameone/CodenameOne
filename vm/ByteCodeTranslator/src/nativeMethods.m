@@ -5895,3 +5895,5 @@ JAVA_OBJECT java_lang_String_toLowerCase___R_java_lang_String(CODENAME_ONE_THREA
     return cn1StringConvertCase(threadStateData, __cn1ThisObject, 0);
 #endif
 }
+
+#include "cn1_process_vm.h"
