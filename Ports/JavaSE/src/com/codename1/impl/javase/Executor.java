@@ -312,8 +312,13 @@ public class Executor {
                                     timer.schedule(tt, 2000);
                                 }
 
+                            } else {
+                                // A project that uses CSS, launched without the
+                                // compiler (an Ant project, a hand-rolled launch):
+                                // one line, here rather than per theme prefix.
+                                CSSWatcher.reportIfUnavailable();
                             }
-                            
+
                             //if (isDebug && usingHotswapAgent) {
                             // A Gradle launch may carry none of the system
                             // properties isRunningInMaven() keys on; the project

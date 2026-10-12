@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.svg.transcoder.parser;
 
 import java.util.HashMap;
@@ -246,15 +268,22 @@ public final class ColorParser {
             throw new IllegalArgumentException("Bad rgb color: " + v);
         }
         String inside = v.substring(open + 1, close);
-        String[] parts = inside.split(",");
+        // With commas, or the newer way with spaces and the alpha after a
+        // slash: rgb(255 0 0 / 50%). Either function name takes an alpha.
+        String[] parts = inside.indexOf(',') >= 0 ? inside.split(",")
+                : inside.trim().replace("/", " ").trim().split("\\s+");
+        hasAlpha = hasAlpha || parts.length >= 4;
         if (parts.length < 3) throw new IllegalArgumentException("Bad rgb color: " + v);
         int r = component(parts[0]);
         int g = component(parts[1]);
         int b = component(parts[2]);
         int a = 0xFF;
         if (hasAlpha && parts.length >= 4) {
-            float af = Float.parseFloat(parts[3].trim());
-            a = Math.round(af * 255f) & 0xFF;
+            String alpha = parts[3].trim();
+            // A number from 0 to 1, or a percentage.
+            float af = alpha.endsWith("%") ? Float.parseFloat(alpha.substring(0, alpha.length() - 1)) / 100f
+                    : Float.parseFloat(alpha);
+            a = Math.round(Math.max(0f, Math.min(1f, af)) * 255f) & 0xFF;
         }
         return ((a & 0xFF) << 24) | ((r & 0xFF) << 16) | ((g & 0xFF) << 8) | (b & 0xFF);
     }

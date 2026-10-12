@@ -2,10 +2,10 @@
 ###
 # Compile the shipped platform native themes from CSS source.
 #
-# Uses the thin codenameone-css-compiler jar (no JavaFX / no CEF, depends only
-# on codenameone-core + flute + sac) so it runs fast and fails loudly if any
-# CSS rule would require CEF-backed rasterization (box-shadow, border-radius
-# with visible border, filter, complex gradients).
+# Runs the CSS compiler's command line (codenameone-css-cli) with -no-raster,
+# so the build fails loudly, naming the rule, if any rule would need a
+# generated image instead of a native primitive. A shipped platform theme must
+# stay resolution independent; see native-themes/README.md for the rules.
 #
 # Source layout:
 #   native-themes/
@@ -24,7 +24,7 @@ cd "$REPO_ROOT"
 
 log() { echo "[build-native-themes] $1" >&2; }
 
-CSS_COMPILER_MODULE="$REPO_ROOT/maven/css-compiler"
+CSS_COMPILER_MODULE="$REPO_ROOT/maven/css-cli"
 CSS_SRC_ROOT="$REPO_ROOT/native-themes"
 OUT_DIR="$REPO_ROOT/Themes"
 # JavaScriptPort's runtime serves themes out of its webapp assets folder;
@@ -38,7 +38,7 @@ JS_ASSETS_DIR="$REPO_ROOT/Ports/JavaScriptPort/src/main/webapp/assets"
 # when the module hasn't been rebuilt in this session.
 locate_jar() {
   local target_jar installed_jar version
-  target_jar="$(ls "$CSS_COMPILER_MODULE"/target/codenameone-css-compiler-*-jar-with-dependencies.jar 2>/dev/null | head -n1 || true)"
+  target_jar="$(ls "$CSS_COMPILER_MODULE"/target/codenameone-css-cli-*-jar-with-dependencies.jar 2>/dev/null | head -n1 || true)"
   if [ -n "$target_jar" ] && [ -f "$target_jar" ]; then
     echo "$target_jar"
     return
@@ -54,7 +54,7 @@ locate_jar() {
   # picks up differences no CSS diff can explain -- which is how a theme change
   # once moved screens that use none of its UIIDs. CI has no ~/.m2 and always
   # builds from source, so target/ above is the jar that matches the tree.
-  installed_jar="$HOME/.m2/repository/com/codenameone/codenameone-css-compiler/$version/codenameone-css-compiler-${version}-jar-with-dependencies.jar"
+  installed_jar="$HOME/.m2/repository/com/codenameone/codenameone-css-cli/$version/codenameone-css-cli-${version}-jar-with-dependencies.jar"
   if [ -f "$installed_jar" ]; then
     echo "$installed_jar"
     return
@@ -70,7 +70,7 @@ ensure_jar() {
       "$HOME"/.m2/*)
         log "WARNING: that jar comes from ~/.m2 and was built by another checkout."
         log "WARNING: it re-emits the whole theme its own way. Build the module first"
-        log "WARNING: (mvn -f maven/css-compiler/pom.xml package) to compile with this tree."
+        log "WARNING: (cd maven && mvn -pl css-cli -am -DskipTests package) to compile with this tree."
         ;;
     esac
     printf '%s\n' "$jar"
@@ -87,7 +87,7 @@ ensure_jar() {
   # would pollute stdout if we let it through.
   (
     cd "$REPO_ROOT/maven"
-    "$mvn" -pl css-compiler -am -q -DskipTests install
+    "$mvn" -pl css-cli -am -q -DskipTests install
   ) >&2
   if jar="$(locate_jar)"; then
     printf '%s\n' "$jar"
@@ -144,23 +144,6 @@ record_output() {
   printf '%s\n' "$1" >> "$NATIVE_THEMES_MANIFEST"
 }
 
-# @import is a SILENT no-op. CSSTheme's importStyle (see
-# maven/css-compiler/.../CSSTheme.java) has an EMPTY body: Flute parses the
-# at-rule, the compiler ignores it, and every rule in the imported file vanishes
-# from the .res with no error and no warning. Composition here is CONCATENATION
-# (see theme_parts), so an @import is always a bug and always a silent one.
-assert_no_import() {
-  local hits
-  hits="$(grep -rn --include='*.css' -E '^[[:space:]]*@import' "$CSS_SRC_ROOT" 2>/dev/null || true)"
-  if [ -n "$hits" ]; then
-    log "FAILED: @import is accepted by the CSS compiler and then ignored, so the"
-    log "        imported rules would be missing from the theme with no diagnostic."
-    log "        List the file in theme_parts() instead."
-    printf '%s\n' "$hits" >&2
-    exit 1
-  fi
-}
-
 # The CSS files a variant is built from, in CASCADE ORDER, repo-relative.
 #
 # A variant is a LOGICAL name, not necessarily a directory: ios-modern and
@@ -173,6 +156,20 @@ theme_parts() {
     ios-modern-27) printf '%s\n' ios-modern/common.css ios-modern/gen27.css ;;
     *)             printf '%s\n' "$1/theme.css" ;;
   esac
+}
+
+# A part's relative `@import` names a file beside THAT PART, and the compiler resolves an
+# import against the directory of the file it is reading -- which, for a theme, is the
+# concatenated copy under <theme>/target/. So the parts are not copied verbatim: each
+# relative import is re-pointed from the part's own directory, given here as the prefix
+# that leads back to it from target/. An absolute path or a URL with a scheme is left as
+# written, and so is every `url()` of an image, which the compiler finds from the theme's
+# res/ directory rather than from the stylesheet.
+#
+# scripts/verify-native-theme-split.sh concatenates the same parts and carries the same
+# expression; change both together.
+cat_part() {
+  sed -E "s#(@import[[:space:]]+(url\\([[:space:]]*)?[\"']?)([^\"'()/:;[:space:]][^\"'():;[:space:]]*)([\"');[:space:]])#\\1$2\\3\\4#g" "$1"
 }
 
 compile_theme() {
@@ -195,17 +192,27 @@ compile_theme() {
   [ "$missing" -eq 0 ] || return
   mkdir -p "$OUT_DIR" "$build_dir"
   : > "$css"
+  # The compiler refuses an `@import` that comes after a rule, as CSS has it,
+  # and set end to end the import of a second part would come after the rules
+  # of the first. So the imports of every part go first, in the order of the
+  # parts, and each part follows without its own. An import is taken to be a
+  # line that begins with one, which is how they are written here.
+  while IFS= read -r part; do
+    cat_part "$CSS_SRC_ROOT/$part" "../../$(dirname "$part")/" \
+      | { grep -E '^[[:space:]]*@import[[:space:]]' || true; } >> "$css"
+  done < <(theme_parts "$name")
   while IFS= read -r part; do
     # A provenance banner per part: parse errors report a line number in THIS
     # concatenated file, so without it an error in gen27.css points at a line of
     # a file nobody edited. Comments are inert here -- the dark-mode rewriter
     # uses indexOfOutsideComments and skips them.
     printf '/* ===== native-themes/%s ===== */\n' "$part" >> "$css"
-    cat "$CSS_SRC_ROOT/$part" >> "$css"
+    cat_part "$CSS_SRC_ROOT/$part" "../../$(dirname "$part")/" \
+      | { grep -v -E '^[[:space:]]*@import[[:space:]]' || true; } >> "$css"
     printf '\n' >> "$css"
   done < <(theme_parts "$name")
   log "Compiling $name -> $out"
-  java -jar "$jar" -input "$css" -output "$out"
+  java -Djava.awt.headless=true -jar "$jar" -no-raster -native-theme-units -input "$css" -output "$out"
   record_output "${out#"$REPO_ROOT"/}"
   if [ -d "$JS_ASSETS_DIR" ]; then
     cp "$out" "$JS_ASSETS_DIR/$basename"
@@ -227,7 +234,6 @@ main() {
     : > "$NATIVE_THEMES_MANIFEST"
   fi
   local jar
-  assert_no_import
   jar="$(ensure_jar)"
   compile_theme "$jar" ios-modern iOSModernTheme.res
   compile_theme "$jar" ios-modern-27 iOSModern27Theme.res

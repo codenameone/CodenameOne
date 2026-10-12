@@ -19,6 +19,7 @@ on:
       - 'scripts/ci/retry.sh'
       - 'native-themes/**'
       - 'maven/css-compiler/**'
+      - 'maven/css-cli/**'
       - 'scripts/build-native-themes.sh'
       - '.github/workflows/native-themes-sync.yml'
 
@@ -60,10 +61,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-m2
 
-      - name: Build css-compiler
+      - name: Build the CSS compiler CLI
         run: |
           cd maven
-          bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B -pl css-compiler -am install -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase
+          bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B -pl css-cli -am install -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase
 
       - name: Rebuild native themes
         env:
