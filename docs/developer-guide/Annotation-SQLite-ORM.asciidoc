@@ -492,11 +492,14 @@ interpolated. `@Modifying` is required for declared UPDATE/DELETE and forbidden
 for SELECT. Such methods return `int` or `void`. Native SQL uses
 `@Query(value="...", nativeSql=true)` with the same named parameters, including
 repeated occurrences. Native parameters accept primitive and boxed scalar types,
-String, Date, BigInteger, BigDecimal, and `byte[]` BLOBs. Collections and other
-array types are rejected during generation. Native repository selects return one scalar column of
+String, Date, BigInteger, BigDecimal, and `byte[]` BLOBs. Date values bind as epoch
+milliseconds and Character values as numeric code units on both client and backend.
+Collections and other array types are rejected during generation. Native repository
+selects return one scalar column of
 String, Long, Integer, Double, or Boolean, or a List of that type. They don't hydrate
-entities. Native SQL is database-specific: use portable SQL or validate each
-engine. Only SELECT, UPDATE, and DELETE are accepted; comments, multiple
+entities. Scalar conversion rejects fractional values requested as integers and
+integer values requested as String; it preserves SQL NULL. Native SQL is
+database-specific: use portable SQL or validate each engine. Only SELECT, UPDATE, and DELETE are accepted; comments, multiple
 statements, positional parameters, dollar quoting, and backtick quoting are
 unsupported. Use standard quotes and bind values containing backslashes.
 
@@ -504,7 +507,7 @@ Unsupported signatures, unmapped derived fields, and missing or surplus declared
 parameter names produce build errors naming the repository and method. JPQL syntax
 and mapped names are validated when the method creates its query, before SQL
 execution. Native SQL syntax beyond the supported envelope is checked by the
-database. Generic methods, additional superinterfaces, default methods, dynamic
+database. Generic methods, additional parent interfaces, default methods, dynamic
 sort arguments, and arbitrary DTO projections aren't supported.
 
 Repositories never open, commit, roll back, or close transactions or sessions.

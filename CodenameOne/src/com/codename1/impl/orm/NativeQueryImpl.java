@@ -139,7 +139,7 @@ public final class NativeQueryImpl<T> implements JpqlQuery<T> {
             if (!parameters.containsKey(name)) {
                 throw new IllegalArgumentException("Unbound named parameter: " + name);
             }
-            result[i] = parameters.get(name);
+            result[i] = Values.storage(parameters.get(name));
         }
         return result;
     }
@@ -162,10 +162,12 @@ public final class NativeQueryImpl<T> implements JpqlQuery<T> {
         if (max == 0) {
             return result;
         }
-        for (Object[] row : session.read(sql + session.limit(max, skip), args, new int[]{kind})) {
+        for (Object[] row : session.read(sql + session.limit(max, skip), args, new int[]{SqlAccess.NATIVE_SCALAR})) {
             Object value = row[0];
             try {
-                if (kind == Attribute.BOOLEAN) {
+                if (kind == Attribute.REAL && value instanceof Number) {
+                    value = Double.valueOf(((Number) value).doubleValue());
+                } else if (kind == Attribute.BOOLEAN) {
                     value = Values.asBooleanObject(value);
                 } else if (kind == Attribute.INTEGER) {
                     value = Values.asIntObject(value);

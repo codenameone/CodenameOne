@@ -2896,6 +2896,48 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void dependencyRepositoriesAreRegisteredByTheApplicationBootstrap() throws Exception {
+        for (boolean backend : new boolean[]{false,true}) {
+            for (boolean archive : new boolean[]{false,true}) {
+                File library=tmp.newFolder();
+                Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+                sources.put("dependency.Entry","package dependency; @com.codename1.annotations.Entity(table=\"dependency_repository_entry\") public class Entry { @com.codename1.annotations.Id public long id; public String name; }");
+                sources.put("dependency.Entries","package dependency; import com.codename1.orm.repository.*; @Repository(entity=Entry.class,key=Long.class) public interface Entries extends CrudRepository<Entry,Long> { long countByName(String name); }");
+                JavaSourceCompiler.compile(sources,library,Arrays.asList(testClassesDir()));
+                ProcessorContext lib=runProcessor(library,backend?backendClasspath():Collections.<String>emptyList());
+                assertFalse(lib.getErrors().toString(),lib.hasErrors());
+                File dependency=library;
+                if (archive) {
+                    dependency=tmp.newFile("repositories-"+backend+".jar");
+                    try (java.util.jar.JarOutputStream out=new java.util.jar.JarOutputStream(new java.io.FileOutputStream(dependency));
+                            java.util.stream.Stream<java.nio.file.Path> files=Files.walk(library.toPath())) {
+                        for (java.nio.file.Path file : (Iterable<java.nio.file.Path>)files.filter(Files::isRegularFile)::iterator) {
+                            addJarClass(out,library.toPath().relativize(file).toString().replace(File.separatorChar,'/'),file.toFile());
+                        }
+                    }
+                }
+                File app=tmp.newFolder();
+                sources.clear();
+                sources.put("consumer.Caller","package consumer; public class Caller { public static void run(com.codename1.orm.session.Session s) { dependency.Entries entries=com.codename1.orm.repository.Repositories.create(dependency.Entries.class,s); s.createTables(); s.beginTransaction(); dependency.Entry e=new dependency.Entry();e.name=\"shared\";entries.insert(e);s.commitTransaction(); if(entries.countByName(\"shared\")!=1 || entries.findById(e.id)!=e) throw new AssertionError(); } }");
+                JavaSourceCompiler.compile(sources,app,Arrays.asList(dependency,testClassesDir()));
+                List<String> cp=new ArrayList<String>(backend?backendClasspath():Collections.<String>emptyList());cp.add(dependency.getAbsolutePath());
+                for (int pass=0;pass<2;pass++) {
+                    ProcessorContext ctx=runProcessor(app,cp);
+                    assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+                }
+                try (java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{app.toURI().toURL(),dependency.toURI().toURL()},getClass().getClassLoader())) {
+                    loader.loadClass(backend?"cn1app.BackendDaoBootstrap":"cn1app.DaoBootstrap").newInstance();
+                    com.codename1.backend.orm.EntityManager server=backend?com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:")):null;
+                    com.codename1.orm.EntityManager client=backend?null:com.codename1.orm.EntityManager.open(new com.codename1.impl.javase.SEDatabase(java.sql.DriverManager.getConnection("jdbc:sqlite::memory:")));
+                    com.codename1.orm.session.Session session=backend?server.openSession():client.openSession();
+                    try { loader.loadClass("consumer.Caller").getMethod("run",com.codename1.orm.session.Session.class).invoke(null,session); }
+                    finally { session.close();if(server!=null)server.close();if(client!=null)client.close(); }
+                }
+            }
+        }
+    }
+
+    @Test
     public void generatesForAnEntityThatLivesInADependency() throws Exception {
         // The entity in a module BOTH halves of the application depend on, which
         // is where a shared one belongs -- and then the backend module's own

@@ -72,6 +72,35 @@ class ManagedSessionTest {
         s.beginTransaction();s.createQuery("delete from "+Record.class.getName()+"").executeUpdate();s.commitTransaction();
     }
 
+    @Test void nativeScalarsValidatePhysicalTypesAndNormalizeParameters() throws Exception {
+        EntityManager em=manager(); Session s=em.openSession();
+        try {
+            seed(s);
+            assertThrows(PersistenceException.class,()->s.createNativeQuery("SELECT 1.5",Long.class).first());
+            assertThrows(PersistenceException.class,()->s.createNativeQuery("SELECT 1.5",Integer.class).first());
+            assertThrows(PersistenceException.class,()->s.createNativeQuery("SELECT 1.5",Boolean.class).first());
+            assertThrows(PersistenceException.class,()->s.createNativeQuery("SELECT 1",String.class).first());
+            assertThrows(PersistenceException.class,()->s.createNativeQuery("SELECT 'text'",byte[].class).first());
+            assertThrows(PersistenceException.class,()->s.createNativeQuery("SELECT 2147483648",Integer.class).first());
+            assertEquals(Long.valueOf(2),s.createNativeQuery("SELECT 2.0",Long.class).first());
+            assertEquals(Double.valueOf(2),s.createNativeQuery("SELECT 2",Double.class).first());
+            assertEquals("text",s.createNativeQuery("SELECT 'text'",String.class).first());
+            assertEquals(Boolean.TRUE,s.createNativeQuery("SELECT 1",Boolean.class).first());
+            assertEquals(Long.valueOf(7),s.createNativeQuery("SELECT 7 AS cn1_native_scalar",Long.class).first());
+            for (Class type : new Class[]{Long.class,Integer.class,Double.class,Boolean.class,String.class,byte[].class}) {
+                assertNull(s.createNativeQuery("SELECT NULL",type).first());
+            }
+            assertEquals(Long.valueOf(12345),s.createNativeQuery("SELECT :value",Long.class).setParameter("value",new java.util.Date(12345)).first());
+            assertEquals(Long.valueOf(65),s.createNativeQuery("SELECT :value",Long.class).setParameter("value",Character.valueOf('A')).first());
+            s.beginTransaction();
+            assertEquals(1,s.createNativeQuery("UPDATE managed_record SET counter=:value",Object.class).setParameter("value",new java.util.Date(12345)).executeUpdate());
+            assertEquals(Long.valueOf(1),s.createNativeQuery("SELECT COUNT(*) FROM managed_record WHERE counter=:value",Long.class).setParameter("value",new java.util.Date(12345)).first());
+            assertEquals(1,s.createNativeQuery("UPDATE managed_record SET counter=:value",Object.class).setParameter("value",Character.valueOf('A')).executeUpdate());
+            assertEquals(Long.valueOf(1),s.createNativeQuery("SELECT COUNT(*) FROM managed_record WHERE counter=:value",Long.class).setParameter("value",Character.valueOf('A')).first());
+            s.rollbackTransaction();
+        } finally { s.close();em.close(); }
+    }
+
     @Test void nativeScalarsRejectExtraColumnsAndNonBlobArrays() throws Exception {
         EntityManager em=manager(); Session s=em.openSession();
         try {

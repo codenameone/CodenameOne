@@ -1922,6 +1922,20 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         if (cls == null || accepted.containsKey(cls.getBinaryName())) {
             return;
         }
+        if (cls.getClassAnnotation(RepositoryGenerator.REPOSITORY) != null) {
+            // Regenerate dependency repositories in this module, like its entity DAOs.
+            // The fixed-name application bootstrap shadows dependency bootstraps.
+            boolean found = false;
+            for (AnnotatedClass repository : repositories) {
+                if (repository.getBinaryName().equals(cls.getBinaryName())) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found && ctx.lookup(cls.getInternalName()) == null) {
+                repositories.add(cls);
+            }
+        }
         processClass(cls, ctx, false);
     }
 
