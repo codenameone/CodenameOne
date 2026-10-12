@@ -171,7 +171,10 @@ public final class BackendSqlAccess implements SqlAccess {
     public List<Object[]> query(String sql, Object[] params, int[] kinds) throws IOException {
         Database db = connection();
         try {
-            List rows = db.query(sql, params);
+            com.codename1.backend.sql.QueryRows rows = (com.codename1.backend.sql.QueryRows) db.query(sql, params);
+            if (rows.getColumnCount() != kinds.length) {
+                throw new IOException("Unexpected SQL projection width");
+            }
             List<Object[]> result = new ArrayList<Object[]>(rows.size());
             for (Object item : rows) {
                 Map row = (Map) item;

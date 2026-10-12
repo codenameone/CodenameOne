@@ -602,9 +602,9 @@ final class Inflate {
 
         if (this.mode == DICT0) {
             long adlerNeed = z.adler.getValue();
-            z.adler.reset();
-            z.adler.update(dictionary, 0, dictLength);
-            if (z.adler.getValue() != adlerNeed) {
+            Adler32 candidate = new Adler32();
+            candidate.update(dictionary, 0, dictLength);
+            if (candidate.getValue() != adlerNeed) {
                 return Z_DATA_ERROR;
             }
         }

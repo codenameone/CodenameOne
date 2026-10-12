@@ -130,6 +130,27 @@ public final class Http2 {
     public static void setMaxBodyBytes(long limit) {
     }
 
+    /// Starts a response with one bounded chunk supplied at a time by the server.
+    public boolean respondStream(int streamId, int status, String contentType, List headers)
+            throws IOException {
+        throw new IOException(UNSUPPORTED);
+    }
+
+    /// Supplies the next chunk after the previous one has drained.
+    public void streamChunk(int streamId, byte[] bytes, int length, boolean end) throws IOException {
+        throw new IOException(UNSUPPORTED);
+    }
+
+    /// Aborts a failed response without terminating other streams in the session.
+    public void resetStream(int streamId) throws IOException {
+        throw new IOException(UNSUPPORTED);
+    }
+
+    /// Unsent bytes, or -1 if the stream has closed or been reset.
+    public int streamPending(int streamId) {
+        return -1;
+    }
+
     public byte[] drain() throws IOException {
         throw new IOException(UNSUPPORTED);
     }

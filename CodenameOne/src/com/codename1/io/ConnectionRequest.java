@@ -1544,10 +1544,16 @@ public class ConnectionRequest implements IOProgressListener {
             // copies them before it calls runCurrentRequest -- so a traceparent the
             // app supplies as a default is seen here and kept, not replaced.
             try {
-                tracerAttempt = tracer.beforeRequest(this,
-                        tracer == tracerParentOwner ? tracerParent : null); //NOPMD CompareObjectsWithEquals
-                tracerOwner = tracerAttempt == null ? null : tracer;
-                tracerThread = Thread.currentThread();
+                Object parent;
+                synchronized (this) {
+                    parent = tracer == tracerParentOwner ? tracerParent : null; //NOPMD CompareObjectsWithEquals
+                }
+                Object attempt = tracer.beforeRequest(this, parent);
+                synchronized (this) {
+                    tracerAttempt = attempt;
+                    tracerOwner = attempt == null ? null : tracer;
+                    tracerThread = Thread.currentThread();
+                }
             } catch (Throwable t) {
                 Log.e(t);
             }

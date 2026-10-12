@@ -8,6 +8,10 @@ make several statements one unit of work. The last of those gets the most room,
 because declarative transactions are where a Spring developer's intuitions are
 most likely to be almost right.
 
+For generated CRUD interfaces, derived finders, paging, declared queries, and
+conditional aggregates over managed sessions, see
+<<generated-orm-repositories,Generated repositories>>.
+
 === Talking to a database
 
 The server opens a connection pool from `cn1.datasource.url` -- a SQLite path or
