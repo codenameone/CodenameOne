@@ -367,7 +367,7 @@ the executable at all -- it's in the frameworks beside it.
 |The artifact compressed, because that's what a store ships.
 
 |Cold start
-|Wall time from launching the process to the first frame being on screen,
+|Wall time from launching the process to the first frame being on the screen,
 measured from outside so neither runtime is trusted to time itself.
 
 |Memory at rest
@@ -384,7 +384,7 @@ alternative produced a flattering result:
 
 * *Start-up is a bracket where the two runtimes report different events.* On
   the web, Flutter's earliest marker fires before its first frame is
-  rasterized while Codename One's fires once the frame is on screen, so the
+  rasterized while Codename One's fires once the frame is on the screen, so the
   benchmark takes Flutter's figure as a range and computes the ratio from the
   end least favorable to Codename One.
 
