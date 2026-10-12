@@ -78,6 +78,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     /// The marker every generated source here carries, so that the class this
     /// processor wrote on a previous pass is not read as a name collision on
     /// the next one. See wouldReplaceAnExistingClass.
+    private static final String REPOSITORY_GENERATED_DESC = "Lcom/codename1/impl/orm/GeneratedRepository;";
     private static final String GENERATED_DESC = "Lcom/codename1/backend/annotations/Generated;";
 
     static final String BOOTSTRAP_BINARY = "cn1app.DaoBootstrap";
@@ -101,6 +102,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     static {
         Set<String> s = new LinkedHashSet<String>();
         s.add(ENTITY_DESC);
+        s.add(RepositoryGenerator.REPOSITORY);
         s.add(MIGRATION_DESC);
         DESCRIPTORS = Collections.unmodifiableSet(s);
     }
@@ -114,6 +116,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     /// Whether this module's daos go over the server-side backend runtime
     /// rather than over the Codename One core. Settled once in [#start].
     private boolean backend;
+    private final List<AnnotatedClass> repositories = new ArrayList<AnnotatedClass>();
 
     /// Set to skip the detection in [#start]. The native packaging goal knows
     /// the answer and the classpath cannot tell it: `cn1:backend-package`
@@ -138,6 +141,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     @Override
     public void start(ProcessorContext ctx) throws ProcessingException {
         accepted.clear();
+        repositories.clear();
         javaMigrations.clear();
         try { dependencyOverlays=OrmEnhancer.prepare(ctx); }
         catch(IOException error) { throw new ProcessingException("Could not refresh enhanced dependencies",error); }
@@ -271,6 +275,10 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
 
     @Override
     public void processClass(AnnotatedClass cls, ProcessorContext ctx) throws ProcessingException {
+        if (cls.getClassAnnotation(RepositoryGenerator.REPOSITORY) != null
+                && BuildHintAnnotationProcessor.hasBackingSource(cls, ctx.getCompileSourceRoots(), ctx.getSourceEncoding())) {
+            repositories.add(cls);
+        }
         processClass(cls, ctx, true);
     }
 
@@ -684,6 +692,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
 
     @Override
     public void finish(ProcessorContext ctx) throws ProcessingException {
+        removeStaleRepositories(ctx);
         {
             // BEFORE the emptiness check, because the entities need not be in
             // this module at all. An entity is the one class both halves of an
@@ -784,6 +793,17 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             sources.put(MigrationGenerator.BACKEND_CLI_BINARY,
                     MigrationGenerator.cliSource(librarySets, !migrations.isEmpty()));
         }
+        for (AnnotatedClass repository : repositories) {
+            try {
+                String name = repository.getBinaryName() + "Cn1Repository";
+                if (!wouldReplaceAnExistingClass(name, "repository for " + repository.getBinaryName(), ctx)) {
+                    sources.put(name, RepositoryGenerator.generate(repository, accepted));
+                }
+            } catch (IllegalArgumentException error) {
+                ctx.error(repository.getBinaryName() + ": " + error.getMessage());
+            }
+        }
+        if (ctx.hasErrors()) return;
         if (accepted.isEmpty() && migrations.isEmpty()) {
             removeAStaleBootstrap(ctx);
             if (!sources.isEmpty()) {
@@ -821,7 +841,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         // developer to rename a class they never wrote. It carries the marker
         // regardless, which is what makes its provenance readable.
         sources.put(backend ? BACKEND_BOOTSTRAP_BINARY : BOOTSTRAP_BINARY,
-                generateBootstrapSource(accepted.values(), backend, !migrations.isEmpty()));
+                generateBootstrapSource(accepted.values(), repositories, backend, !migrations.isEmpty()));
         compileGenerated(ctx, sources);
         try {
             OrmEnhancer.enhance(accepted, ctx);
@@ -1902,6 +1922,20 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         if (cls == null || accepted.containsKey(cls.getBinaryName())) {
             return;
         }
+        if (cls.getClassAnnotation(RepositoryGenerator.REPOSITORY) != null) {
+            // Regenerate dependency repositories in this module, like its entity DAOs.
+            // The fixed-name application bootstrap shadows dependency bootstraps.
+            boolean found = false;
+            for (AnnotatedClass repository : repositories) {
+                if (repository.getBinaryName().equals(cls.getBinaryName())) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found && ctx.lookup(cls.getInternalName()) == null) {
+                repositories.add(cls);
+            }
+        }
         processClass(cls, ctx, false);
     }
 
@@ -2313,6 +2347,23 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         }
     }
 
+    private void removeStaleRepositories(ProcessorContext ctx) throws ProcessingException {
+        Set<String> live = new LinkedHashSet<String>();
+        for (AnnotatedClass repository : repositories) live.add(repository.getBinaryName() + "Cn1Repository");
+        for (AnnotatedClass cls : ctx.getClassIndex().values()) {
+            String name = cls.getBinaryName();
+            if (!name.endsWith("Cn1Repository") || live.contains(name)
+                    || (cls.getClassAnnotation(GENERATED_DESC) == null
+                        && cls.getClassAnnotation(REPOSITORY_GENERATED_DESC) == null)) continue;
+            String owner = name.substring(0, name.length() - "Cn1Repository".length()).replace('.', '/');
+            if (!cls.getInterfaceInternalNames().contains(owner)) continue;
+            if (!deleteGenerated(ctx, name)) {
+                throw new ProcessingException("Could not remove stale generated repository " + name + "; run a clean build");
+            }
+            ctx.getLog().info("cn1: removed " + name + ", whose repository annotation or source was removed");
+        }
+    }
+
     /// Deletes a generated class and the classes nested in it from the output
     /// directory; whether the class itself was there and is gone.
     private static boolean deleteGenerated(ProcessorContext ctx, String binaryName) {
@@ -2367,7 +2418,9 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         if (existing == null) {
             return false;
         }
-        if (existing.getClassAnnotations().containsKey(GENERATED_DESC)) {
+        if (existing.getClassAnnotations().containsKey(GENERATED_DESC)
+                || (what.startsWith("repository for ")
+                    && existing.getClassAnnotations().containsKey(REPOSITORY_GENERATED_DESC))) {
             return false;
         }
         ctx.error(binaryName + " already exists, and the " + what + " generated here would "
@@ -2457,7 +2510,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         }
     }
 
-    private static String generateBootstrapSource(Iterable<EntityClass> classes, boolean backend,
+    private static String generateBootstrapSource(Iterable<EntityClass> classes, Iterable<AnnotatedClass> repositories, boolean backend,
             boolean migrations) {
         StringBuilder sb = new StringBuilder(1024);
         sb.append("package ").append(BOOTSTRAP_PACKAGE).append(";\n\n");
@@ -2489,6 +2542,9 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         sb.append("    public ").append(simple).append("() {\n");
         for (EntityClass ec : classes) {
             sb.append("        ").append(ec.daoBinaryName).append(".register();\n");
+        }
+        for (AnnotatedClass repository : repositories) {
+            sb.append("        ").append(repository.getBinaryName()).append("Cn1Repository.register();\n");
         }
         if (migrations) {
             // By direct reference, like the daos: nothing may look the set up by name.
