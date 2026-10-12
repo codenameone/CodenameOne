@@ -59,6 +59,11 @@ public final class SVGText extends SVGShape {
         private Boolean bold;
         private Boolean italic;
 
+        private Anchor anchor;
+        /// The `text-anchor` a span sets, or null for the text's own.
+        public Anchor getAnchor() { return anchor; }
+        public void setAnchor(Anchor anchor) { this.anchor = anchor; }
+
         private String pathRef;
         private float startOffset;
         private boolean startOffsetShare;

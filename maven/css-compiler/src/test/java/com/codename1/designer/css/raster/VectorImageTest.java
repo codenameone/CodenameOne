@@ -1507,4 +1507,74 @@ class VectorImageTest {
                 + " preserveAspectRatio=\"defer xMinYMin slice\"/>", 100, 100);
         assertEquals(0xffff0000, img.getRGB(20, 50), "the left of the picture, at the left of the box");
     }
+
+    @Test
+    void aFilterTakesTheSidesItLeavesOutFromTheOneItNames() throws Exception {
+        // Its own left edge, at 50, and the rest of the other's region.
+        BufferedImage img = paint("<defs><filter id=\"base\" filterUnits=\"userSpaceOnUse\" x=\"0\" y=\"0\" width=\"100\""
+                + " height=\"40\" color-interpolation-filters=\"sRGB\"><feFlood flood-color=\"#00ff00\"/></filter>"
+                + "<filter id=\"derived\" href=\"#base\" x=\"50\"/></defs>"
+                + "<rect width=\"100\" height=\"100\" fill=\"#ff0000\" filter=\"url(#derived)\"/>", 100, 100);
+        assertEquals(0xff00ff00, img.getRGB(75, 20), "inside both");
+        assertEquals(0, alpha(img, 25, 20), "left of its own edge");
+        assertEquals(0, alpha(img, 75, 60), "below the other's height");
+    }
+
+    @Test
+    void aUseOfNoWidthDrawsNothingOfANestedDrawing() throws Exception {
+        String defs = "<defs><svg id=\"icon\" width=\"40\" height=\"40\" viewBox=\"0 0 10 10\">"
+                + "<rect width=\"10\" height=\"10\" fill=\"#ff0000\"/></svg></defs>";
+        BufferedImage none = paint(defs + "<use href=\"#icon\" width=\"0\" height=\"20\"/>", 100, 100);
+        assertEquals(0, alpha(none, 10, 10), "a width of nothing");
+        BufferedImage own = paint(defs + "<use href=\"#icon\"/>", 100, 100);
+        assertEquals(0xffff0000, own.getRGB(10, 10), "left out, the drawing's own size");
+    }
+
+    @Test
+    void aResizedNestedDrawingIsMeasuredAtTheSizeItIsDrawn() throws Exception {
+        // Clipped to the left half of its box, which is 80 wide and not 10.
+        BufferedImage img = paint("<defs><svg id=\"icon\" width=\"10\" height=\"10\" viewBox=\"0 0 10 10\">"
+                + "<rect width=\"10\" height=\"10\" fill=\"#ff0000\"/></svg>"
+                + "<clipPath id=\"c\" clipPathUnits=\"objectBoundingBox\"><rect width=\"0.5\" height=\"1\"/></clipPath>"
+                + "</defs><use href=\"#icon\" width=\"80\" height=\"80\" clip-path=\"url(#c)\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(30, 40), "the left half of 80");
+        assertEquals(0, alpha(img, 60, 40), "the right half, cut off");
+    }
+
+    @Test
+    void aSpanCanBeAnchoredByItself() throws Exception {
+        String font = " font-family=\"monospace\" font-size=\"10\" fill=\"#ff0000\"";
+        BufferedImage img = paint("<text y=\"30\"" + font + "><tspan x=\"90\" text-anchor=\"end\">III</tspan></text>",
+                100, 100);
+        assertTrue(inkRight(img) <= 90, "ends where it says, was " + inkRight(img));
+        assertTrue(inkRight(img) > 70);
+    }
+
+    @Test
+    void aSpanThatIsNotDisplayedLeavesNoGap() throws Exception {
+        String font = " font-family=\"monospace\" font-size=\"10\" fill=\"#ff0000\"";
+        BufferedImage plain = paint("<text x=\"5\" y=\"30\"" + font + ">II</text>", 100, 100);
+        BufferedImage hidden = paint("<text x=\"5\" y=\"30\"" + font
+                + ">I<tspan display=\"none\">MMMMMM</tspan>I</text>", 100, 100);
+        assertEquals(inkRight(plain), inkRight(hidden));
+    }
+
+    @Test
+    void lengthsInInchesAndTheLikeAreInUserUnits() throws Exception {
+        BufferedImage img = paint("<rect width=\"0.5in\" height=\"10mm\" fill=\"#ff0000\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(46, 36), "48 by 37.8");
+        assertEquals(0, alpha(img, 50, 20));
+        assertEquals(0, alpha(img, 20, 40));
+    }
+
+    @Test
+    void rulesForAnotherSettingAreLeftOutAndNamesAreInAnyCase() throws Exception {
+        BufferedImage img = paint("<style>@media (prefers-color-scheme: dark) { .a { fill: #0000ff; } }"
+                + " @media screen and (max-width: 20px) { .a { fill: #0000ff; } }"
+                + " @media (prefers-color-scheme: light) { .b { FILL: #00ff00; } }</style>"
+                + "<rect class=\"a\" width=\"50\" height=\"100\" fill=\"#ff0000\"/>"
+                + "<rect class=\"b\" x=\"50\" width=\"50\" height=\"100\" fill=\"#ff0000\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(25, 50), "neither the dark rule nor the narrow one");
+        assertEquals(0xff00ff00, img.getRGB(75, 50), "the light one, with its name in capitals");
+    }
 }

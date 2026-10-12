@@ -277,6 +277,8 @@ public final class SVGParser {
 
     private float length(String value, float whole) {
         if (value == null) return 0f;
+        // Already in user units for a length in inches, millimetres,
+        // points and the like, which the number parser converts.
         float v = NumberParser.parseFloat(value);
         String unit = value.trim();
         if (unit.endsWith("%")) return v / 100f * whole;
@@ -653,6 +655,10 @@ public final class SVGParser {
         use.setY(lengthY(a.get("y")));
         use.setWidth(lengthX(a.get("width")));
         use.setHeight(lengthY(a.get("height")));
+        // Whether each was written, which a size of zero does not say by
+        // itself: written, zero is a size, and one that shows nothing.
+        if (a.containsKey("width")) use.markGiven("width");
+        if (a.containsKey("height")) use.markGiven("height");
         return use;
     }
 
@@ -1152,6 +1158,7 @@ public final class SVGParser {
                     run.setFontSize(span.getFontSize());
                     run.setBold(span.getBold());
                     run.setItalic(span.getItalic());
+                    run.setAnchor(span.getAnchor());
                     run.setPathRef(span.getPathRef());
                     run.setStartOffset(span.getStartOffset(), span.isStartOffsetShare());
                     if (spanUnplaced) {
@@ -1174,6 +1181,7 @@ public final class SVGParser {
                         placed.setFontSize(run.getFontSize());
                         placed.setBold(run.getBold());
                         placed.setItalic(run.getItalic());
+                        placed.setAnchor(run.getAnchor());
                         placed.setPathRef(run.getPathRef());
                         placed.setStartOffset(run.getStartOffset(), run.isStartOffsetShare());
                         if (at < glyphLists[0].length) placed.setX(Float.valueOf(glyphLists[0][at]));
@@ -1190,8 +1198,16 @@ public final class SVGParser {
                 Map<String, String> a = attrs(r);
                 SVGText.Run child = new SVGText.Run();
                 if (span != null) {
+                    child.setAnchor(span.getAnchor());
                     child.setPathRef(span.getPathRef());
                     child.setStartOffset(span.getStartOffset(), span.isStartOffsetShare());
+                }
+                String spanAnchor = mergedValue(a, "text-anchor");
+                if (spanAnchor != null) {
+                    String norm = spanAnchor.trim();
+                    child.setAnchor("middle".equals(norm) ? SVGText.Anchor.MIDDLE
+                            : "end".equals(norm) ? SVGText.Anchor.END
+                            : "start".equals(norm) ? SVGText.Anchor.START : child.getAnchor());
                 }
                 if (onPath) {
                     // Laid along the path it names, from as far along it as

@@ -761,15 +761,31 @@ public final class VectorImage {
                 out.getPrimitives().addAll(from.getPrimitives());
                 out.setSrgb(from.isSrgb());
             }
-            // A side is a length in the units it was written in, so the
-            // region is taken whole, with its units, or not at all.
-            if (!out.isGiven("x") && !out.isGiven("y") && !out.isGiven("width") && !out.isGiven("height")
-                    && !out.isGiven("filterUnits") && (from.isGiven("x") || from.isGiven("y")
-                    || from.isGiven("width") || from.isGiven("height") || from.isGiven("filterUnits"))) {
-                out.setRegion(from.getRegionX(), from.getRegionY(), from.getRegionWidth(), from.getRegionHeight());
+            // Each side it does not give, and the units when it gives
+            // none. A side is kept as the number written, which reads the
+            // same in either units, so one taken from here goes with the
+            // units taken from there.
+            float[] region = {out.getRegionX(), out.getRegionY(), out.getRegionWidth(), out.getRegionHeight()};
+            float[] theirs = {from.getRegionX(), from.getRegionY(), from.getRegionWidth(), from.getRegionHeight()};
+            String[] sides = {"x", "y", "width", "height"};
+            for (int k = 0; k < sides.length; k++) {
+                if (!out.isGiven(sides[k]) && from.isGiven(sides[k])) {
+                    region[k] = theirs[k];
+                    out.markGiven(sides[k]);
+                }
+            }
+            if (!out.isGiven("filterUnits") && from.isGiven("filterUnits")) {
                 out.setRegionUserSpace(from.isRegionUserSpace());
                 out.markGiven("filterUnits");
+                // The sides nobody gives are a tenth out all round, in
+                // those units: as the filter they come from has them.
+                for (int k = 0; k < sides.length; k++) {
+                    if (!out.isGiven(sides[k])) {
+                        region[k] = theirs[k];
+                    }
+                }
             }
+            out.setRegion(region[0], region[1], region[2], region[3]);
             if (!out.isGiven("primitiveUnits") && from.isGiven("primitiveUnits")) {
                 out.setPrimitiveObjectBoundingBox(from.isPrimitiveObjectBoundingBox());
                 out.markGiven("primitiveUnits");
@@ -1171,24 +1187,9 @@ public final class VectorImage {
         try {
             owner.useDepth = useDepth;
             g.transform(placing(use, target));
-            if (target instanceof SVGViewport && (use.getWidth() > 0 || use.getHeight() > 0)) {
-                // The size a `<use>` gives is the size of the `<svg>` it
-                // draws, in place of the one that element gives itself.
-                SVGViewport as = (SVGViewport) target;
-                SVGViewport sized = new SVGViewport();
-                sized.setStyle(as.getStyle());
-                sized.setTransform(as.getTransform());
-                sized.setX(as.getX());
-                sized.setY(as.getY());
-                sized.setWidth(use.getWidth() > 0 ? use.getWidth() : as.getWidth());
-                sized.setHeight(use.getHeight() > 0 ? use.getHeight() : as.getHeight());
-                sized.setViewBox(as.getViewBoxX(), as.getViewBoxY(), as.getViewBoxWidth(), as.getViewBoxHeight());
-                sized.setPreserveAspectRatio(as.getPreserveAspectRatio());
-                sized.setOverflowVisible(as.isOverflowVisible());
-                for (SVGNode child : as.getContent().getChildren()) {
-                    sized.getContent().addChild(child);
-                }
-                target = sized;
+            target = sized(use, target);
+            if (target == null) {
+                return;
             }
             owner.paintNode(g, target, style, w, h);
         } finally {
@@ -1251,6 +1252,38 @@ public final class VectorImage {
     /// Where a `<use>` puts the element it draws: at its offset, and a
     /// symbol with a view box fitted into the size the `<use>` gives, the
     /// way the symbol's `preserveAspectRatio` says.
+    /// What a `<use>` draws of `target`: the element itself, or for an
+    /// `<svg>` the same at the size the `<use>` gives, which takes the place
+    /// of the one that element gives itself. Null when the `<use>` gives an
+    /// `<svg>` or a symbol a width or a height of zero, which is a size, and
+    /// one at which nothing is drawn.
+    private static SVGNode sized(SVGUse use, SVGNode target) {
+        boolean wide = use.isGiven("width");
+        boolean high = use.isGiven("height");
+        if ((target instanceof SVGViewport || target instanceof SVGSymbol)
+                && ((wide && !(use.getWidth() > 0)) || (high && !(use.getHeight() > 0)))) {
+            return null;
+        }
+        if (!(target instanceof SVGViewport) || !(use.getWidth() > 0 || use.getHeight() > 0)) {
+            return target;
+        }
+        SVGViewport as = (SVGViewport) target;
+        SVGViewport sized = new SVGViewport();
+        sized.setStyle(as.getStyle());
+        sized.setTransform(as.getTransform());
+        sized.setX(as.getX());
+        sized.setY(as.getY());
+        sized.setWidth(use.getWidth() > 0 ? use.getWidth() : as.getWidth());
+        sized.setHeight(use.getHeight() > 0 ? use.getHeight() : as.getHeight());
+        sized.setViewBox(as.getViewBoxX(), as.getViewBoxY(), as.getViewBoxWidth(), as.getViewBoxHeight());
+        sized.setPreserveAspectRatio(as.getPreserveAspectRatio());
+        sized.setOverflowVisible(as.isOverflowVisible());
+        for (SVGNode child : as.getContent().getChildren()) {
+            sized.getContent().addChild(child);
+        }
+        return sized;
+    }
+
     private static AffineTransform placing(SVGUse use, SVGNode target) {
         AffineTransform at = AffineTransform.getTranslateInstance(use.getX(), use.getY());
         if (target instanceof SVGSymbol) {
@@ -1298,11 +1331,17 @@ public final class VectorImage {
             if (target == null || depth >= MAX_USE_DEPTH) {
                 return null;
             }
+            // Measured as it is drawn: at the size the `<use>` gives.
+            AffineTransform put = placing(use, target);
+            target = sized(use, target);
+            if (target == null) {
+                return null;
+            }
             Rectangle2D box = owner.boundsOf(target, depth + 1);
             if (box == null) {
                 return null;
             }
-            AffineTransform at = placing(use, target);
+            AffineTransform at = put;
             SVGTransform t = target.getTransform();
             if (t != null) {
                 at.concatenate(new AffineTransform(t.a, t.b, t.c, t.d, t.e, t.f));
@@ -2179,8 +2218,22 @@ public final class VectorImage {
     /// where it starts. `text-anchor` is about each piece that starts
     /// somewhere of its own: that piece, with the stretches that run on
     /// from it, begins, is centred or ends at the point given.
-    private List<Shape> textOutlines(SVGText text, List<SVGText.Run> runs,
+    private List<Shape> textOutlines(SVGText text, List<SVGText.Run> written,
             java.awt.font.FontRenderContext context) {
+        // A stretch that is not displayed takes no part: it has no width,
+        // moves nothing and starts nothing. It stays in the list, empty,
+        // so that the outlines still answer to the stretches one for one.
+        List<SVGText.Run> runs = new ArrayList<SVGText.Run>(written.size());
+        for (SVGText.Run run : written) {
+            if (run.getStyle() != null && run.getStyle().isDisplayNone()) {
+                SVGText.Run gone = new SVGText.Run();
+                gone.setPathRef(run.getPathRef());
+                gone.setStartOffset(run.getStartOffset(), run.isStartOffsetShare());
+                runs.add(gone);
+            } else {
+                runs.add(run);
+            }
+        }
         List<Shape> out = new ArrayList<Shape>();
         double cx = text.getX();
         double cy = text.getY();
@@ -2235,8 +2288,11 @@ public final class VectorImage {
                 cx += gv.getLogicalBounds().getWidth();
             }
             double advance = cx - startX;
-            double shift = text.getAnchor() == SVGText.Anchor.MIDDLE ? -advance / 2.0
-                    : text.getAnchor() == SVGText.Anchor.END ? -advance : 0;
+            // The anchor of the piece is that of the stretch it starts
+            // with, which is the text's own unless a span sets another.
+            SVGText.Anchor anchor = head.getAnchor() != null ? head.getAnchor() : text.getAnchor();
+            double shift = anchor == SVGText.Anchor.MIDDLE ? -advance / 2.0
+                    : anchor == SVGText.Anchor.END ? -advance : 0;
             for (int k = 0; k < glyphs.size(); k++) {
                 out.add(runs.get(i + k).getText().length() == 0 ? null
                         : glyphs.get(k).getOutline((float) (xs[k] + shift), (float) ys[k]));
@@ -2318,8 +2374,9 @@ public final class VectorImage {
         }
         SVGText.Run head = runs.get(from);
         double along = head.isStartOffsetShare() ? head.getStartOffset() * total : head.getStartOffset();
-        along += text.getAnchor() == SVGText.Anchor.MIDDLE ? -advance / 2.0
-                : text.getAnchor() == SVGText.Anchor.END ? -advance : 0;
+        SVGText.Anchor anchor = head.getAnchor() != null ? head.getAnchor() : text.getAnchor();
+        along += anchor == SVGText.Anchor.MIDDLE ? -advance / 2.0
+                : anchor == SVGText.Anchor.END ? -advance : 0;
         int piece = 0;
         for (int k = from; k < to; k++) {
             SVGText.Run run = runs.get(k);

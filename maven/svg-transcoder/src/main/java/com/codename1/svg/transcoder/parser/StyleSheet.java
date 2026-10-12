@@ -147,8 +147,7 @@ final class StyleSheet {
      * Whether a media query list takes in an image painted for a screen:
      * nothing at all, {@code all} or {@code screen}, with or without
      * {@code only}, and the opposite after {@code not}. A query that only
-     * tests a feature, {@code (min-width: 100px)}, is taken to hold, there
-     * being no window to measure.
+     * tests a feature holds as {@link #featuresHold} says.
      */
     static boolean mediaMatches(String media) {
         if (media == null || media.trim().isEmpty()) return true;
@@ -164,10 +163,49 @@ final class StyleSheet {
             int end = 0;
             while (end < q.length() && isIdentChar(q.charAt(end))) end++;
             String type = q.substring(0, end);
-            boolean ours = type.isEmpty() || "all".equalsIgnoreCase(type) || "screen".equalsIgnoreCase(type);
+            boolean ours = (type.isEmpty() || "all".equalsIgnoreCase(type) || "screen".equalsIgnoreCase(type))
+                    && featuresHold(q.substring(end));
             if (ours != not) return true;
         }
         return false;
+    }
+
+    /**
+     * Whether the features a query tests, {@code (max-width: 20px)}, hold.
+     * An image is drawn in the light scheme, which is the one thing that is
+     * known; a test of anything else -- a width, when the size the image
+     * will be drawn at is not known here -- does not hold, so that rules
+     * meant for some other setting are left out and not put in everywhere.
+     */
+    private static boolean featuresHold(String rest) {
+        int from = 0;
+        while (true) {
+            int open = rest.indexOf('(', from);
+            if (open < 0) return true;
+            int close = rest.indexOf(')', open);
+            if (close < 0) return false;
+            String feature = rest.substring(open + 1, close);
+            int colon = feature.indexOf(':');
+            String name = (colon < 0 ? feature : feature.substring(0, colon)).trim();
+            String value = colon < 0 ? "" : feature.substring(colon + 1).trim();
+            if (!("prefers-color-scheme".equalsIgnoreCase(name) && "light".equalsIgnoreCase(value))) {
+                return false;
+            }
+            from = close + 1;
+        }
+    }
+
+    /** A property name as it is looked up: its ASCII letters in lower case, whatever the locale. */
+    private static String asciiLower(String s) {
+        StringBuilder out = null;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c >= 'A' && c <= 'Z') {
+                if (out == null) out = new StringBuilder(s);
+                out.setCharAt(i, (char) (c + ('a' - 'A')));
+            }
+        }
+        return out == null ? s : out.toString();
     }
 
     private static boolean isSpace(char c) {
@@ -205,7 +243,8 @@ final class StyleSheet {
             for (String decl : text.substring(open + 1, close).split(";")) {
                 int colon = decl.indexOf(':');
                 if (colon <= 0) continue;
-                String k = decl.substring(0, colon).trim();
+                // Property names are the same in any case: `FILL` is `fill`.
+                String k = asciiLower(decl.substring(0, colon).trim());
                 String v = decl.substring(colon + 1).trim();
                 int bang = v.lastIndexOf('!');
                 boolean imp = bang >= 0 && "important".equalsIgnoreCase(v.substring(bang + 1).trim());

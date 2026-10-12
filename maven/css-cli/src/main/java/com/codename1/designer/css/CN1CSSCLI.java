@@ -526,8 +526,10 @@ public class CN1CSSCLI {
             // next poll instead of being absorbed into the baseline.
             PollingFileWatcher watcher = new PollingFileWatcher(watchedFiles(options), 1000);
             boolean failed = false;
+            boolean written = false;
             try {
-                if (compileOnce(options, !first) && first) {
+                written = compileOnce(options, !first);
+                if (written && first) {
                     System.out.println("CSS file successfully compiled.  " + options.outputFile);
                 }
             } catch (Throwable t) {
@@ -542,7 +544,10 @@ public class CN1CSSCLI {
             // is announced even when it writes nothing new.
             if (!failed) {
                 long now = options.outputFile.lastModified();
-                if (!first && now != reported) {
+                // Written by this compile, too, whatever its time says: on a
+                // file system that keeps times to the second a theme written
+                // twice in one has the same time and is not the same theme.
+                if (!first && (written || now != reported)) {
                     // Whoever wrote it: a build running beside the simulator can
                     // get there first, and the theme on screen is stale either way.
                     System.out.println(REFRESH_SIGNAL);
