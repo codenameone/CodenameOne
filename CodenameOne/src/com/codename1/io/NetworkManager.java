@@ -1242,7 +1242,11 @@ public final class NetworkManager {
     /// queued there, unless the request was queued again in the meantime.
     private static void scheduleTracerClear(final ConnectionRequest req, final int requeues) {
         if (!Display.isInitialized()) {
-            clearTracerState(req);
+            synchronized (req) {
+                if (req.tracerRequeues == requeues) {
+                    clearTracerState(req);
+                }
+            }
             return;
         }
         Display.getInstance().callSerially(new Runnable() {
@@ -1930,9 +1934,13 @@ public final class NetworkManager {
                 // Any tracer field, the owners included: a request queued outside an
                 // action holds only tracerParentOwner, and that alone pins the whole
                 // telemetry installation.
-                if (req.tracerRequeues == requeuesBefore && !req.authorizationPending
-                        && (req.tracerParent != null || req.tracerLastAttempt != null
-                        || req.tracerParentOwner != null || req.tracerLastOwner != null)) {
+                boolean clearTracer;
+                synchronized (req) {
+                    clearTracer = req.tracerRequeues == requeuesBefore && !req.authorizationPending
+                            && (req.tracerParent != null || req.tracerLastAttempt != null
+                            || req.tracerParentOwner != null || req.tracerLastOwner != null);
+                }
+                if (clearTracer) {
                     // Nothing queued this request again YET. Its tracer state has
                     // to go once it is done -- the parent and the last attempt are
                     // the tracer's own objects, a span and through it the whole
