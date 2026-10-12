@@ -4262,6 +4262,19 @@ public class CSSTheme {
 
     /// The SVG or Lottie file `url` names, or null when it names neither.
     private VectorImage readVectorImage(String url) {
+        if (com.codename1.designer.css.raster.DataUrl.is(url)) {
+            // An SVG written into the stylesheet itself. It is beside
+            // nothing, so it can name no file of its own.
+            try {
+                com.codename1.designer.css.raster.DataUrl held = com.codename1.designer.css.raster.DataUrl.parse(url);
+                return held == null || !held.isSvg() ? null
+                        : VectorImage.readSvg(new java.io.ByteArrayInputStream(held.getBytes()));
+            } catch (IOException ex) {
+                throw new IllegalArgumentException("Could not read the SVG in a data: url: " + ex.getMessage(), ex);
+            } catch (RuntimeException ex) {
+                throw new IllegalArgumentException("Could not read the SVG in a data: url: " + ex.getMessage(), ex);
+            }
+        }
         if (!isVectorAsset(url)) {
             return null;
         }
@@ -4288,9 +4301,23 @@ public class CSSTheme {
             // of a size no image can be allocated at.
             return vector.paint(vector.getWidth(), vector.getHeight(), MAX_VECTOR_SIDE);
         }
-        // A url is a file or an http address. A `data:` url is not decoded
-        // here because it is not decoded anywhere: the theme's own image
-        // loader refuses one before a rule gets as far as being painted.
+        // A picture written into the stylesheet itself, as a `data:` url,
+        // is read from there: Java has no such protocol to open.
+        if (com.codename1.designer.css.raster.DataUrl.is(url)) {
+            try {
+                com.codename1.designer.css.raster.DataUrl held = com.codename1.designer.css.raster.DataUrl.parse(url);
+                BufferedImage img = held == null ? null
+                        : javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(held.getBytes()));
+                if (img == null) {
+                    throw new IllegalArgumentException("The data: url of a background is not an image the compiler"
+                            + " can decode (PNG, JPEG, GIF, BMP or SVG).");
+                }
+                return img;
+            } catch (IOException ex) {
+                throw new IllegalArgumentException("Could not read the image in a data: url: " + ex.getMessage(), ex);
+            }
+        }
+        // Otherwise a url is a file or an http address.
         try {
             URL imgURL = url.startsWith("http://") || url.startsWith("https://") ? new URL(url) : new URL(baseURL, url);
             File multi = multiImageDirectory(url);

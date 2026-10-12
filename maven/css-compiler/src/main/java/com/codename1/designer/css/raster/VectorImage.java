@@ -219,7 +219,8 @@ public final class VectorImage {
         int h = (int) Math.max(1, Math.min(maxSide, Math.ceil(height * k)));
         BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
         SVGStyle root = doc.getStyle();
-        if (root != null && root.isDisplayNone()) {
+        if ((root != null && root.isDisplayNone()) || doc.isGiven("empty")) {
+            // Not displayed, or given a width or a height of nothing.
             return out;
         }
         Graphics2D g = out.createGraphics();
@@ -674,35 +675,13 @@ public final class VectorImage {
             byte[] data;
             boolean svg;
             java.net.URL at = null;
-            if (href.regionMatches(true, 0, "data:", 0, 5)) {
-                int comma = href.indexOf(',');
-                if (comma < 0) {
+            if (DataUrl.is(href)) {
+                DataUrl held = DataUrl.parse(href);
+                if (held == null) {
                     return null;
                 }
-                String kind = href.substring(5, comma);
-                svg = kind.regionMatches(true, 0, "image/svg", 0, 9);
-                String payload = href.substring(comma + 1);
-                if (kind.length() >= 7 && kind.regionMatches(true, kind.length() - 7, ";base64", 0, 7)) {
-                    data = java.util.Base64.getMimeDecoder().decode(payload);
-                } else {
-                    // The bytes themselves: %89 is the byte 0x89 of a
-                    // picture, not a character to be read and written
-                    // back as some other bytes. Anything not escaped is
-                    // text, and goes in as the text's own bytes.
-                    java.io.ByteArrayOutputStream octets = new java.io.ByteArrayOutputStream();
-                    for (int i = 0; i < payload.length(); i++) {
-                        char c = payload.charAt(i);
-                        int hi = c == '%' && i + 2 < payload.length() ? Character.digit(payload.charAt(i + 1), 16) : -1;
-                        int lo = hi >= 0 ? Character.digit(payload.charAt(i + 2), 16) : -1;
-                        if (hi >= 0 && lo >= 0) {
-                            octets.write((hi << 4) | lo);
-                            i += 2;
-                        } else {
-                            octets.write(String.valueOf(c).getBytes(java.nio.charset.StandardCharsets.UTF_8));
-                        }
-                    }
-                    data = octets.toByteArray();
-                }
+                svg = held.isSvg();
+                data = held.getBytes();
             } else {
                 // Only a file: an image baked into a theme is not something
                 // to fetch from a server named inside a picture.
@@ -833,6 +812,11 @@ public final class VectorImage {
             if (node instanceof SVGClipPath) {
                 // A definition. It is used through clip-path, never drawn.
                 return;
+            }
+            if (node.isGiven("transform-box")) {
+                throw new IllegalArgumentException("the SVG transforms an element about its own box"
+                        + " (transform-box), which is not supported here. Give transform-origin as a point of the"
+                        + " drawing, or write the transform out");
             }
             if (node instanceof com.codename1.svg.transcoder.model.SVGForeignObject) {
                 // What is in one is a page, HTML as a rule, and drawing it

@@ -309,6 +309,32 @@ class CSSGeneratedImageTest {
     }
 
     @Test
+    void aPictureWrittenIntoTheStylesheetIsPainted(@TempDir Path dir) throws Exception {
+        BufferedImage dot = new BufferedImage(4, 4, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < 4; y++) {
+            for (int x = 0; x < 4; x++) {
+                dot.setRGB(x, y, 0xffff0000);
+            }
+        }
+        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(dot, "png", bytes);
+        String png = "data:image/png;base64," + java.util.Base64.getEncoder().encodeToString(bytes.toByteArray());
+        Compiled c = compile(dir, "Banner { width: 50%; height: 10%; background-image: url(" + png + ");"
+                + " background-size: 100% 100%; background-repeat: no-repeat; box-shadow: 0 0 4px black; }");
+        BufferedImage img = stored(c.res, "Banner_1.png", Display.DENSITY_HD);
+        assertEquals(0xffff0000, img.getRGB(2 + 160, 2 + 40), "the picture, over the box");
+
+        String svg = "data:image/svg+xml;base64," + java.util.Base64.getEncoder().encodeToString(
+                ("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"8\" height=\"8\" viewBox=\"0 0 8 8\""
+                        + " preserveAspectRatio=\"none\"><rect width=\"8\" height=\"8\" fill=\"#00ff00\"/></svg>")
+                        .getBytes(StandardCharsets.UTF_8));
+        Compiled v = compile(dir, "Banner { width: 50%; height: 10%; background-image: url(" + svg + ");"
+                + " background-size: 100% 100%; background-repeat: no-repeat; box-shadow: 0 0 4px black; }");
+        BufferedImage drawn = stored(v.res, "Banner_1.png", Display.DENSITY_HD);
+        assertEquals(0xff00ff00, drawn.getRGB(2 + 160, 2 + 40), "the drawing, over the box");
+    }
+
+    @Test
     void anSvgKeepsItsShapeInATileOfAnotherShape(@TempDir Path dir) throws Exception {
         // A square drawing in a 320 by 100 tile is 100 by 100 in the middle
         // of it, as a browser fits one. The box starts at (2, 2).

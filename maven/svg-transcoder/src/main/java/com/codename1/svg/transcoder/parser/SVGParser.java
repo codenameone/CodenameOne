@@ -225,6 +225,10 @@ public final class SVGParser {
         // not a size anyone asked for.
         if (doc.getWidth() > 0) doc.markGiven("width");
         if (doc.getHeight() > 0) doc.markGiven("height");
+        // A side written as nothing is a size too, and one at which the
+        // drawing is not shown. It is not a side left open, which is what
+        // a zero means from here on, so it is told apart by name.
+        if (isZeroLength(a.get("width")) || isZeroLength(a.get("height"))) doc.markGiven("empty");
         doc.setPreserveAspectRatio(a.get("preserveAspectRatio"));
         String vb = a.get("viewBox");
         if (vb != null) {
@@ -258,6 +262,30 @@ public final class SVGParser {
         fontItalic = null;
         inheritedColor = null;
         enterFont(a);
+    }
+
+    /** One coordinate of a transform origin: a side by name, a share of the viewport, or a length. */
+    private static float originSide(String value, float whole, boolean across) {
+        String v = value.trim();
+        if ("center".equals(v)) return whole / 2;
+        if ((across ? "left" : "top").equals(v)) return 0f;
+        if ((across ? "right" : "bottom").equals(v)) return whole;
+        try {
+            float n = NumberParser.parseFloat(v);
+            return v.endsWith("%") ? n / 100f * whole : n;
+        } catch (RuntimeException e) {
+            return 0f;
+        }
+    }
+
+    /** Whether a length is written, as a length and not a share of something, and is zero. */
+    private static boolean isZeroLength(String value) {
+        if (value == null || value.trim().isEmpty() || value.trim().endsWith("%")) return false;
+        try {
+            return NumberParser.parseFloat(value) == 0f;
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     /** A horizontal length: a percentage is that share of the viewport's width. */
@@ -1555,6 +1583,35 @@ public final class SVGParser {
             } catch (RuntimeException e) {
                 // Not a transform this reads: the attribute stands.
             }
+        }
+        // Where a transform turns and scales about: the origin unless
+        // `transform-origin` names another point, in lengths, in shares of
+        // the viewport or by its sides. The transform is then that one
+        // done about the point, which is the same as moving the point to
+        // the origin, doing it, and moving back.
+        String origin = mergedValue(a, "transform-origin");
+        if (origin != null && n.getTransform() != null) {
+            String[] at = origin.trim().split("\\s+");
+            float ox = originSide(at[0], viewportWidth, true);
+            float oy = originSide(at.length > 1 ? at[1] : "center", viewportHeight, false);
+            if (at.length > 1 && ("top".equals(at[0]) || "bottom".equals(at[0])
+                    || "left".equals(at[1]) || "right".equals(at[1]))) {
+                // The two keywords the other way round.
+                ox = originSide(at[1], viewportWidth, true);
+                oy = originSide(at[0], viewportHeight, false);
+            } else if (at.length == 1 && ("top".equals(at[0]) || "bottom".equals(at[0]))) {
+                ox = viewportWidth / 2;
+                oy = originSide(at[0], viewportHeight, false);
+            }
+            n.setTransform(SVGTransform.translate(ox, oy).multiply(n.getTransform())
+                    .multiply(SVGTransform.translate(-ox, -oy)));
+        }
+        String box = mergedValue(a, "transform-box");
+        if (box != null && n.getTransform() != null && !"view-box".equals(box.trim())) {
+            // Measured against the element's own box, which is not known
+            // until it is drawn. It is marked for a renderer to refuse,
+            // not drawn turned about the wrong point.
+            n.markGiven("transform-box");
         }
         Map<String, String> pres = new HashMap<String, String>();
         for (Map.Entry<String, String> e : a.entrySet()) {

@@ -1740,4 +1740,33 @@ class VectorImageTest {
             assertEquals(0, alpha(img, 62, 50), angle);
         }
     }
+
+    @Test
+    void aDrawingOfNoWidthShowsNothing() throws Exception {
+        BufferedImage img = read("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"0\" height=\"20\""
+                + " viewBox=\"0 0 10 10\"><rect width=\"10\" height=\"10\" fill=\"#ff0000\"/></svg>").paint(20, 20);
+        assertEquals(0, alpha(img, 10, 10));
+    }
+
+    @Test
+    void aTransformTurnsAboutTheOriginItIsGiven() throws Exception {
+        // A square at the top left of a 40 by 40 block, turned half way
+        // about the middle of the block: it lands at the bottom right.
+        BufferedImage img = paint("<rect width=\"20\" height=\"20\" fill=\"#ff0000\""
+                + " style=\"transform: rotate(180deg); transform-origin: 20px 20px\"/>", 100, 100);
+        assertEquals(0xffff0000, img.getRGB(30, 30));
+        assertEquals(0, alpha(img, 10, 10));
+        BufferedImage centred = paint("<rect width=\"20\" height=\"20\" fill=\"#ff0000\""
+                + " transform=\"rotate(180)\" transform-origin=\"center\"/>", 100, 100);
+        assertEquals(0xffff0000, centred.getRGB(90, 90), "about the middle of the viewport");
+    }
+
+    @Test
+    void aTransformAboutTheElementsOwnBoxIsRefused() throws Exception {
+        IllegalArgumentException refused = org.junit.jupiter.api.Assertions.assertThrows(
+                IllegalArgumentException.class, () -> paint("<rect width=\"20\" height=\"20\""
+                        + " style=\"transform: rotate(45deg); transform-box: fill-box; transform-origin: center\"/>",
+                        100, 100));
+        assertTrue(refused.getMessage().contains("transform-box"), refused.getMessage());
+    }
 }
