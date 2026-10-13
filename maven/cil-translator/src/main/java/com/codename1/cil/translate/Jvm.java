@@ -135,12 +135,11 @@ final class Jvm implements Opcodes {
         }
     }
 
-    /// Boxes the primitive on top of the stack as its `java.lang` class.
+    /// Boxes the primitive on top of the stack as its box class.
     static void box(MethodVisitor mv, Names names, CilType type) {
         CilType p = names.norm(type);
         if (p.kind == CilType.Kind.U1) {
-            // Byte.valueOf indexes a cache with its argument: 200 has to
-            // arrive as -56.
+            // The parameter is a Java byte: 200 has to arrive as -56.
             mv.visitInsn(I2B);
         }
         String c = Names.boxClass(p);
@@ -184,8 +183,22 @@ final class Jvm implements Opcodes {
         }
     }
 
-    /// Suffix of the checked `Interop.unbox...` helper for a primitive.
+    /// Suffix of the checked `Interop.unbox...` helper for a primitive, and
+    /// of the `orDefault...` one. An unsigned type has helpers of its own,
+    /// because it has a box of its own: see [Names#boxClass].
     static String unboxSuffix(CilType primitive) {
+        switch (primitive.kind) {
+            case U1:
+                return "UByte";
+            case U2:
+                return "UShort";
+            case U4:
+                return "UInt";
+            case U8:
+                return "ULong";
+            default:
+                break;
+        }
         String m = unboxMethod(primitive);
         String stem = m.substring(0, m.length() - "Value".length());
         return Character.toUpperCase(stem.charAt(0)) + stem.substring(1);

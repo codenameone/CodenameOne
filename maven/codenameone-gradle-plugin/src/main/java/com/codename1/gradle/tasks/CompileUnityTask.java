@@ -37,6 +37,7 @@ import org.gradle.api.tasks.Optional;
 import org.gradle.api.tasks.OutputDirectory;
 import org.gradle.api.tasks.PathSensitive;
 import org.gradle.api.tasks.PathSensitivity;
+import org.gradle.api.tasks.StopExecutionException;
 import org.gradle.api.tasks.TaskAction;
 import org.gradle.work.DisableCachingByDefault;
 
@@ -57,6 +58,10 @@ import java.util.List;
 /// classpath for the generated scene source, and part of everything the
 /// source set's output goes into -- the simulator's classpath, the jar and
 /// every target's upload.
+///
+/// Without a Unity project the task is skipped, unless an earlier build of one
+/// left output behind: then it runs once more to remove it (see
+/// [#hasWork(File, File...)]).
 ///
 /// Not cacheable: the classes come out of whichever .NET SDK this machine has,
 /// and the generated main class depends on whether the project has its own.
@@ -127,14 +132,95 @@ public abstract class CompileUnityTask extends Cn1Task {
     public void compile() {
         List<File> roots = new ArrayList<File>(getSourceRoots().getFiles());
         List<File> tool = new ArrayList<File>(getToolClasspath().getFiles());
+        boolean built;
         try {
-            new UnityProjectBuilder(getUnityDirectory().get().getAsFile(), getOutputDirectory().get().getAsFile(),
-                    getClassesDirectory().get().getAsFile(), getStateDirectory().get().getAsFile(),
-                    runtimeJar(getRuntimeJar().getFiles()), single(getReferencesJar().getFiles()), tool,
-                    getDotnet().getOrNull(), getMainPackage().getOrNull(), getMainClass().getOrNull(), roots,
-                    log()).run();
+            built = build(new UnityProjectBuilder(getUnityDirectory().get().getAsFile(),
+                    getOutputDirectory().get().getAsFile(), getClassesDirectory().get().getAsFile(),
+                    getStateDirectory().get().getAsFile(), runtimeJar(getRuntimeJar().getFiles()),
+                    single(getReferencesJar().getFiles()), tool, getDotnet().getOrNull(),
+                    getMainPackage().getOrNull(), getMainClass().getOrNull(), roots, log()), owned());
         } catch (BuildException ex) {
             throw new GradleException(ex.getMessage(), ex.getCause() == null ? ex : ex.getCause());
+        }
+        if (!built) {
+            // Nothing was translated, so there is nothing for the actions
+            // after this one -- the compliance check of the translated classes
+            // -- to read. The task has still succeeded.
+            throw new StopExecutionException();
+        }
+    }
+
+    /// The three directories only this task writes.
+    private File[] owned() {
+        return new File[] {getOutputDirectory().get().getAsFile(), getClassesDirectory().get().getAsFile(),
+                getStateDirectory().get().getAsFile()};
+    }
+
+    /// Whether the task has anything to do: a Unity project to build, or the
+    /// output of one that is no longer there to remove. See [#hasWork(File, File...)].
+    public boolean hasWork() {
+        return hasWork(getUnityDirectory().get().getAsFile(), owned());
+    }
+
+    /// What `onlyIf` asks. A project that is there is built (or found up to
+    /// date). One that is not there leaves the task with work only while a
+    /// directory the task owns still holds something: the generated sources
+    /// are a source root of the main source set and the classes directory is
+    /// part of its output, so what a deleted project left in them would be
+    /// compiled and packaged until `clean`. Skipping on the sources alone, as
+    /// this did, is what left it there.
+    ///
+    /// For an application that never had a Unity project the answer is three
+    /// directory listings of directories that do not exist, and the task is
+    /// skipped before Gradle snapshots anything or creates them.
+    public static boolean hasWork(File unityDir, File... owned) {
+        if (UnityProjectBuilder.isUnityProject(unityDir)) {
+            return true;
+        }
+        for (File dir : owned) {
+            String[] children = dir.list();
+            if (children != null && children.length > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Runs the builder, and when there is no Unity project empties `owned`.
+    /// The builder has by then removed what its own record names, as the
+    /// Maven goal has it do in directories it shares with javac; here the
+    /// directories are this task's alone, so whatever else is in them is a
+    /// leftover of the same build and goes too -- and they are left empty, not
+    /// merely free of files, which is what [#hasWork(File, File...)] reads.
+    /// Returns whether a project was built.
+    static boolean build(UnityProjectBuilder builder, File... owned) throws BuildException {
+        if (builder.run()) {
+            return true;
+        }
+        for (File dir : owned) {
+            File[] children = dir.listFiles();
+            if (children != null) {
+                for (File child : children) {
+                    delete(child);
+                }
+            }
+        }
+        return false;
+    }
+
+    private static void delete(File f) throws BuildException {
+        File[] children = f.listFiles();
+        if (children != null) {
+            for (File child : children) {
+                delete(child);
+            }
+        }
+        try {
+            java.nio.file.Files.deleteIfExists(f.toPath());
+        } catch (java.io.IOException ex) {
+            // Not quietly: what stays here is compiled or shipped.
+            throw new BuildException("Cannot remove " + f + ", left by a Unity project that is no longer in"
+                    + " src/main/unity: " + ex.getMessage(), ex);
         }
     }
 

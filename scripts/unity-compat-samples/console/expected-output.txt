@@ -188,4 +188,140 @@ float -3141 3141
 before
 Order.cctor
 n=42 again=43 first=41
+== unsigned boxes
+a1: 3000000000
+a2: 200
+a3: 3000000000
+a4: 3000000000
+a5: x3000000000
+a6: 18446744073709551615 18446744073709551615|18446744073709551614
+a7: 65535 65 A
+a8: 200 -56 200 -56
+a9: 3000000000 200 18446744073709551615 65535
+a10: c3000000000 200 18446744073709551615 65535 -56 A
+a11: 3000000000/3000000000 200/200 18446744073709551615/18446744073709551615 65535/65535 A/A -56/-56
+a14: 300000000020065A
+b9: 1 199 1 True 1 1
+b16: a=3000000000 3000000000 [a, 3000000000]
+e1: True 3 3000000000 5 2147483648 2 2 4
+e2: 5,200,1,128,True 200 2 200 6
+e3: 3000000000=a,1=b,abTrue
+e4: 200=7,2007 True
+e5: 18446744073709551615 65535 65 -3 a 1844674407370955161565a
+e6: 3000000000 200 65 3000000000
+e7: 1 1 199 1 65534 True
+e8: 3000000000 3000000000 3000000000 200 200 True 3000000000 3000000000
+3000000000
+200
+65
+18446744073709551615
+200
+e9: 3000000000 200 3000000000
+e10: True False True -1294967296 200 65535 0 -56
+f1: High High True 200 True False High
+f2: Big Big 4000000000 True 3 True
+f3: ArgumentException
+f4: 65 65535 x True 65535 65y 65x
+f5: 18446744073709551615 200 18446744073709551615 200 1 200 200 18446744073709551615 4000000000 65
+f6: 0;0;0;3000000000;0;200;3000000000200
+f7: 200,TrueFalse,-3,FalseTrue
+ushort 65
+f8: 4000000000 200 3000000000
+f9: (3000000000, 200) True
+f10: True False True True
+f11: int:1 uint:1 long:1 ulong:1 byte:1 sbyte:1 short:1 ushort:1 char:x other:1 other:1 other:True other:s 
+f12: True 800000000 3 6148914691236517205 True 4 260 250000000 3705032704 4000000000
+c1: uint int ulong long byte sbyte ushort char short
+c2: uint 3000000000; int 5; ulong 18446744073709551615; long 5; byte 200; sbyte -56; ushort 65; char A
+d1: False False True False False False False
+d2: threw InvalidCastException
+d3: threw InvalidCastException
+d4: threw InvalidCastException
+d5: threw InvalidCastException
+d6: 4 int uint char ushort
+== delegate types
+combine mine+yours: threw ArgumentException
+combine action+func: threw ArgumentException
+combine action+action0: threw ArgumentException
+combine mine+action: threw ArgumentException
+combine same: TrueTrue
+combine null: TrueTrue
+combine multi+other: threw ArgumentException
+remove mine-yours: threw ArgumentException
+remove action-func: threw ArgumentException
+remove multi-other: threw ArgumentException
+remove null: TrueTrue
+remove same: TrueTrue
+equals mine/yours: FalseFalse
+== powers
+pow -1000000: -1000000 1000000 -1000000 1000000 -1000000 1000000 1000000 1000000 -1000000 1000000 1000000 -1000000 -1000000 1000000 1000000 -1000000 -1000000 -1000000 -1000000 1000000 NaN NaN NaN NaN 1000000 1000000 NaN 1000000 1000000 -1000000 -1000000 -1000000 -1000000 1000000 -1000000 -1000000 1000000 
+pow -500000: -e-309 e-309 -Inf +Inf -0 0 0 +Inf -0 0 0 -Inf -0 0 e-308 -e-308 -e308 -125000 -8000000 250000 NaN NaN NaN NaN 0 +Inf NaN 1000000 1000000 -500000 -0 -Inf -0 0 -0 -Inf 0 
+pow -2000000: -Inf +Inf -e-309 e-309 -Inf +Inf +Inf 0 -Inf +Inf +Inf -0 -Inf +Inf +Inf -e308 -e-308 -8000000 -125000 4000000 NaN NaN NaN NaN +Inf 0 NaN 1000000 1000000 -2000000 -Inf -0 -Inf +Inf -Inf -0 +Inf 
+pow -0: -0 0 -Inf +Inf -0 0 0 +Inf -0 0 0 -Inf -0 0 0 -0 -Inf -0 -Inf 0 0 +Inf 0 0 0 +Inf NaN 1000000 1000000 -0 -0 -Inf -0 0 -0 -Inf 0 
+pow -Inf: -Inf +Inf -0 0 -Inf +Inf +Inf 0 -Inf +Inf +Inf -0 -Inf +Inf +Inf -Inf -0 -Inf -0 +Inf +Inf 0 +Inf +Inf +Inf 0 NaN 1000000 1000000 -Inf -Inf -0 -Inf +Inf -Inf -0 +Inf 
+pow -1000000: -1000103 1000103 -999898 999897 -1000205 1000205 +Inf 0 -Inf +Inf +Inf -0 -Inf +Inf 1000102 -1000102 -999898 -1000000 -1000000 1000000 NaN NaN NaN NaN +Inf 0 NaN 1000000 1000000 -1000000 -1006575 -993468 -e93 e93 -e93 -e-93 +Inf 
+pow -3000000: -Inf +Inf -0 0 -Inf +Inf +Inf 0 -Inf +Inf +Inf -0 -Inf +Inf +Inf -Inf -0 -27000000 -37037 9000000 NaN NaN NaN NaN +Inf 0 NaN 1000000 1000000 -3000000 -Inf -0 -Inf +Inf -Inf -0 +Inf 
+pow 2000000: +Inf +Inf e-309 e-309 +Inf +Inf +Inf 0 +Inf +Inf +Inf 0 +Inf +Inf +Inf e308 e-308 8000000 125000 4000000 1414214 707107 +Inf 5656854 +Inf 0 NaN 1000000 1000000 2000000 +Inf 0 +Inf +Inf +Inf 0 +Inf 
+pow 0: 0 0 +Inf +Inf 0 0 0 +Inf 0 0 0 +Inf 0 0 0 0 +Inf 0 +Inf 0 0 +Inf 0 0 0 +Inf NaN 1000000 1000000 0 0 +Inf 0 0 0 +Inf 0 
+pow 1000000: 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 
+pow +Inf: +Inf +Inf 0 0 +Inf +Inf +Inf 0 +Inf +Inf +Inf 0 +Inf +Inf +Inf +Inf 0 +Inf 0 +Inf +Inf 0 +Inf +Inf +Inf 0 NaN 1000000 1000000 +Inf +Inf 0 +Inf +Inf +Inf 0 +Inf 
+pow NaN: NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN 1000000 1000000 NaN NaN NaN NaN NaN NaN NaN NaN 
+pow -1000000: -999898 999897 -1000103 1000103 -999795 999795 0 +Inf -0 0 0 -Inf -0 0 999898 -999898 -1000102 -1000000 -1000000 1000000 NaN NaN NaN NaN 0 +Inf NaN 1000000 1000000 -1000000 -993468 -1006575 -e-93 e-93 -e-93 -e93 0 
+powf -1000000: -1000000 1000000 -1000000 -1000000 1000000 1000000 -1000000 1000000 1000000 -1000000 1000000 NaN -1000000 1000000 -1000000 1000000 1000000 1000000 NaN 1000000 -1000000 NaN 
+powf -500000: -0 0 -Inf -0 0 0 -Inf 0 +Inf -125000 250000 NaN -e-39 e-39 -Inf +Inf 0 +Inf NaN 1000000 -0 NaN 
+powf -2000000: -Inf +Inf -0 -Inf +Inf +Inf -0 +Inf 0 -8000000 4000000 NaN -Inf +Inf -0 0 +Inf 0 NaN 1000000 -Inf NaN 
+powf -0: -0 0 -Inf -0 0 0 -Inf 0 +Inf -0 0 0 -0 0 -Inf +Inf 0 +Inf NaN 1000000 -0 0 
+powf -Inf: -Inf +Inf -0 -Inf +Inf +Inf -0 +Inf 0 -Inf +Inf +Inf -Inf +Inf -0 0 +Inf 0 NaN 1000000 -Inf +Inf 
+powf -3000000: -Inf +Inf -0 -Inf +Inf +Inf -0 +Inf 0 -27000000 9000000 NaN -Inf +Inf -0 0 +Inf 0 NaN 1000000 -Inf NaN 
+powf 2000000: +Inf +Inf 0 +Inf +Inf +Inf 0 +Inf 0 8000000 4000000 1414214 +Inf +Inf 0 0 +Inf 0 NaN 1000000 +Inf +Inf 
+powf 0: 0 0 +Inf 0 0 0 +Inf 0 +Inf 0 0 0 0 0 +Inf +Inf 0 +Inf NaN 1000000 0 0 
+powf 1000000: 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 1000000 
+powf NaN: NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN 1000000 NaN NaN 
+== rounding
+of e20: floor e20 ceiling e20 round e20 truncate e20 same TrueTrueTrueTrue
+of -e20: floor -e20 ceiling -e20 round -e20 truncate -e20 same TrueTrueTrueTrue
+of NaN: floor NaN ceiling NaN round NaN truncate NaN same FalseFalseFalseFalse
+of +Inf: floor +Inf ceiling +Inf round +Inf truncate +Inf same TrueTrueTrueTrue
+of -Inf: floor -Inf ceiling -Inf round -Inf truncate -Inf same TrueTrueTrueTrue
+of -0: floor -0 ceiling -0 round -0 truncate -0 same TrueTrueTrueTrue
+of 0: floor 0 ceiling 0 round 0 truncate 0 same TrueTrueTrueTrue
+of 2500000: floor 2000000 ceiling 3000000 round 2000000 truncate 2000000 same FalseFalseFalseFalse
+of -2500000: floor -3000000 ceiling -2000000 round -2000000 truncate -2000000 same FalseFalseFalseFalse
+of 500000: floor 0 ceiling 1000000 round 0 truncate 0 same FalseFalseFalseFalse
+of -500000: floor -1000000 ceiling -0 round -0 truncate -0 same FalseFalseFalseFalse
+of 1500000: floor 1000000 ceiling 2000000 round 2000000 truncate 1000000 same FalseFalseFalseFalse
+of -1500000: floor -2000000 ceiling -1000000 round -2000000 truncate -1000000 same FalseFalseFalseFalse
+of 3500000: floor 3000000 ceiling 4000000 round 4000000 truncate 3000000 same FalseFalseFalseFalse
+of -3500000: floor -4000000 ceiling -3000000 round -4000000 truncate -3000000 same FalseFalseFalseFalse
+of 200000: floor 0 ceiling 1000000 round 0 truncate 0 same FalseFalseFalseFalse
+of -200000: floor -1000000 ceiling -0 round -0 truncate -0 same FalseFalseFalseFalse
+of 700000: floor 0 ceiling 1000000 round 1000000 truncate 0 same FalseFalseFalseFalse
+of -700000: floor -1000000 ceiling -0 round -1000000 truncate -0 same FalseFalseFalseFalse
+of e19: floor e19 ceiling e19 round e19 truncate e19 same TrueTrueTrueTrue
+of -e19: floor -e19 ceiling -e19 round -e19 truncate -e19 same TrueTrueTrueTrue
+of e16: floor e16 ceiling e16 round e16 truncate e16 same TrueTrueTrueTrue
+of -e16: floor -e16 ceiling -e16 round -e16 truncate -e16 same TrueTrueTrueTrue
+of 500000: floor 0 ceiling 1000000 round 0 truncate 0 same FalseFalseFalseFalse
+of e300: floor e300 ceiling e300 round e300 truncate e300 same TrueTrueTrueTrue
+of -e300: floor -e300 ceiling -e300 round -e300 truncate -e300 same TrueTrueTrueTrue
+== arrays as enumerables
+local ints: 1,-2,
+local strings: a,b,
+local cells: Cell1,Cell2,
+local generic: 1,-2,a,b,
+local copies: Cell1 Cell2
+local sees writes: int:1 int:7 
+parameter: int:1 int:-2 other:a other:b other:Cell1 other:Cell2 
+field: int:1 int:-2 uint:3000000000 uint:1 
+returned: uint:3000000000 uint:1 
+element: byte:200 byte:1 other:a other:b 
+null: True
+cast: int:1 int:-2 other:a other:b TrueFalse
+cast list: int:4 True
+cast wrong: threw InvalidCastException
+unsigned local: uint:3000000000 uint:1 byte:200 byte:1 ushort:65535 ushort:65 ulong:18446744073709551615 ulong:1 sbyte:-56 sbyte:1 char:x char:y 
+unsigned parameter: uint:3000000000 uint:1 byte:200 byte:1 ushort:65535 ushort:65 ulong:18446744073709551615 ulong:1 sbyte:-56 sbyte:1 char:x char:y uint:0 uint:4000000000 
+unsigned direct: uint:3000000000 uint:1 byte:200 byte:1 ushort:65535 ushort:65 ulong:18446744073709551615 ulong:1 
+signed as Array: 2/sbyte:-56 sbyte:1 2/char:x char:y 2/int:1 int:-2 2/other:a other:b 
+generic cast: 3000000000,1,Cell1,Cell2,TrueTrueFalse
 done

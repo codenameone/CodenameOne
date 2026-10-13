@@ -36,6 +36,7 @@ import java.util.Arrays;
 import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -61,13 +62,52 @@ public class CompileUnityMojoTest {
     /// no repository system and no log, and any use of one would throw.
     @Test
     public void isANoOpWithoutUnitySources(@TempDir File dir) throws Exception {
-        CompileUnityMojo mojo = new CompileUnityMojo();
-        set(mojo, "unitySourceDir", new File(dir, "src/main/unity"));
+        CompileUnityMojo mojo = withoutProject(dir);
         mojo.executeImpl();
         // A directory of that name that is not a Unity project is no more one.
         assertTrue(new File(dir, "src/main/unity/Assets").mkdirs());
         mojo.executeImpl();
         assertEquals(1, dir.list().length, "nothing was written beside src");
+    }
+
+    private static CompileUnityMojo withoutProject(File dir) throws Exception {
+        CompileUnityMojo mojo = new CompileUnityMojo();
+        set(mojo, "unitySourceDir", new File(dir, "src/main/unity"));
+        set(mojo, "unityOutputDir", new File(dir, "target/generated-sources/unity"));
+        set(mojo, "classesDir", new File(dir, "target/classes"));
+        set(mojo, "buildDir", new File(dir, "target"));
+        return mojo;
+    }
+
+    private static File file(File dir, String path) throws Exception {
+        File f = new File(dir, path);
+        assertTrue(f.getParentFile().isDirectory() || f.getParentFile().mkdirs());
+        Files.write(f.toPath(), new byte[] {1});
+        return f;
+    }
+
+    /// `src/main/unity` deleted after a build: what that build installed in
+    /// the classes directory is not javac's to remove, and would be packaged
+    /// into every target until a clean build. The goal takes it out, by the
+    /// builder's own record, and leaves the application's classes alone.
+    @Test
+    public void removesTheOutputOfAProjectThatIsGone(@TempDir File dir) throws Exception {
+        File translated = file(dir, "target/classes/global/Player.class");
+        File image = file(dir, "target/classes/sheet.png");
+        File own = file(dir, "target/classes/com/acme/Own.class");
+        File scenes = file(dir, "target/generated-sources/unity/com/codename1/generated/unity/UnityAppImpl.java");
+        File sceneClass = file(dir, "target/classes/com/codename1/generated/unity/UnityAppImpl.class");
+        file(dir, "target/unity/state.txt");
+        Files.write(file(dir, "target/unity/installed.txt").toPath(),
+                "global/Player.class\nsheet.png\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        withoutProject(dir).executeImpl();
+        assertFalse(translated.exists());
+        assertFalse(translated.getParentFile().exists(), "no empty package is left for the jar");
+        assertFalse(image.exists());
+        assertFalse(scenes.exists());
+        assertFalse(sceneClass.exists());
+        assertFalse(new File(dir, "target/unity").exists());
+        assertTrue(own.isFile());
     }
 
     /// `-Dcn1.unity.skip` leaves a real project out of the build, again

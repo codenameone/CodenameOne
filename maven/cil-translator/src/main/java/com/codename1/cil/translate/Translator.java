@@ -1473,6 +1473,15 @@ public final class Translator implements Opcodes {
         mv.visitInsn(ARETURN);
         mv.visitMaxs(0, 0);
         mv.visitEnd();
+        // What `Delegate.Combine` asks before it joins two: only this
+        // class can say what delegate type it is.
+        mv = cw.visitMethod(ACC_PROTECTED, "$sameType", "(L" + Names.DELEGATE + ";)Z", null, null);
+        mv.visitCode();
+        mv.visitVarInsn(ALOAD, 1);
+        mv.visitTypeInsn(INSTANCEOF, name);
+        mv.visitInsn(IRETURN);
+        mv.visitMaxs(0, 0);
+        mv.visitEnd();
         cw.visitEnd();
         classes.put(name, cw.toByteArray());
 

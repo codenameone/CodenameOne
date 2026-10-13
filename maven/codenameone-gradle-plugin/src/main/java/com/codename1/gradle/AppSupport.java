@@ -661,9 +661,10 @@ final class AppSupport {
     /// Unity compatibility: `compileUnity` and everything that makes its
     /// output part of the application. Registered for every application and
     /// skipped without a Unity project, as `compileAndroidRes` is without an
-    /// Android one; only a project that has one gets the runtime, the tools and
-    /// the reference assemblies as dependencies, so no other build resolves
-    /// them.
+    /// Android one -- except for the one build after a project was deleted,
+    /// in which it removes that project's output. Only a project that has one
+    /// gets the runtime, the tools and the reference assemblies as
+    /// dependencies, so no other build resolves them.
     ///
     /// The runtime is an `implementation` dependency, not `compileOnly` like
     /// the Android compatibility jar: nothing copies it into the application's
@@ -713,7 +714,13 @@ final class AppSupport {
                     t.getOutputDirectory().set(new File(layout.buildDir(), "generated/sources/cn1-unity"));
                     t.getClassesDirectory().set(new File(layout.buildDir(), "cn1-unity/classes"));
                     t.getStateDirectory().set(new File(layout.buildDir(), "cn1-unity/state"));
-                    t.onlyIf(x -> com.codename1.maven.UnityProjectBuilder.isUnityProject(unityDir));
+                    // Not the project's presence alone: a project deleted since
+                    // the last build left generated sources and classes in
+                    // directories the main source set compiles and packages,
+                    // and a skipped task never removes them. The task itself is
+                    // asked, through the argument, so the spec holds no
+                    // reference to the task for the configuration cache to keep.
+                    t.onlyIf(x -> ((com.codename1.gradle.tasks.CompileUnityTask) x).hasWork());
                 });
         main.getJava().srcDir(unity.flatMap(com.codename1.gradle.tasks.CompileUnityTask::getOutputDirectory));
         // Providers of the task's output, so whatever reads them waits for it.

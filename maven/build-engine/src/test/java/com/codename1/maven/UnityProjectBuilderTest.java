@@ -133,9 +133,7 @@ public class UnityProjectBuilderTest {
     public void project() throws Exception {
         File root = tmp.newFolder("app");
         unity = new File(root, "src/main/unity");
-        write(new File(unity, "Assets/Scripts/Player.cs"), "class Player {}");
-        write(new File(unity, "Assets/Scenes/Main.unity"), "%YAML 1.1");
-        write(new File(unity, "ProjectSettings/EditorBuildSettings.asset"), "scenes");
+        project(unity);
         target = new File(root, "target");
         classes = new File(target, "classes");
         generated = new File(target, "generated-sources/unity");
@@ -145,6 +143,12 @@ public class UnityProjectBuilderTest {
         referencesJar = zip(new File(root, "codenameone-unity-compat-references.jar"), "netstandard.dll",
                 "UnityEngine.dll", "Codename1.UnityValues.dll");
         tools = new FakeToolchain();
+    }
+
+    private static void project(File unity) throws IOException {
+        write(new File(unity, "Assets/Scripts/Player.cs"), "class Player {}");
+        write(new File(unity, "Assets/Scenes/Main.unity"), "%YAML 1.1");
+        write(new File(unity, "ProjectSettings/EditorBuildSettings.asset"), "scenes");
     }
 
     private UnityProjectBuilder builder() {
@@ -192,6 +196,77 @@ public class UnityProjectBuilderTest {
         assertFalse(builder(null, null).run());
         assertEquals(0, tools.compiled);
         assertFalse(target.exists());
+    }
+
+    /// A project deleted from the sources takes its output with it. Nothing
+    /// else removes the translated classes and the images from the classes
+    /// directory -- no compiler put them there -- so without this they are
+    /// packaged into every target until somebody runs a clean build.
+    @Test
+    public void aDeletedProjectTakesItsOutputWithIt() throws Exception {
+        assertTrue(builder().run());
+        // What javac makes of the generated source, and classes that are the
+        // application's own, in the same directory.
+        write(new File(classes, "com/codename1/generated/unity/UnityAppImpl.class"), "scenes");
+        write(new File(classes, "com/acme/game/MyGame.class"), "main");
+        write(new File(classes, "com/acme/game/Score.class"), "own");
+        write(new File(classes, "global/Mine.class"), "own");
+        write(new File(generated, "com/acme/other/Kept.java"), "own");
+        assertTrue(new File(target, "unity/state.txt").isFile());
+
+        deleteTree(unity);
+        assertFalse(builder(null, null).run());
+
+        assertFalse(new File(classes, "global/Player.class").exists());
+        assertFalse(new File(classes, "global/Shot.class").exists());
+        assertFalse(new File(classes, "sheet.png").exists());
+        assertFalse(new File(classes, "com/codename1/generated").exists());
+        assertFalse(new File(classes, "com/acme/game/MyGame.class").exists());
+        assertFalse(new File(generated, "com/codename1").exists());
+        assertFalse(new File(generated, "com/acme/game").exists());
+        assertFalse("the state file goes too, or a project that comes back is not compiled",
+                new File(target, "unity").exists());
+        // Only what the build wrote: these are not in its record.
+        assertTrue(new File(classes, "com/acme/game/Score.class").isFile());
+        assertTrue(new File(classes, "global/Mine.class").isFile());
+        assertTrue(new File(generated, "com/acme/other/Kept.java").isFile());
+        // None of it needed a tool: the first build is the only one counted.
+        assertEquals(1, tools.compiled);
+        assertEquals(1, tools.translated);
+        assertEquals(1, tools.scenes);
+
+        // Nothing left to remove, and nothing made for having looked.
+        assertFalse(builder(null, null).removeOutput());
+        assertFalse(new File(target, "unity").exists());
+
+        // The project put back is built from nothing.
+        project(unity);
+        assertTrue(builder().run());
+        assertEquals(2, tools.compiled);
+        assertTrue(new File(classes, "global/Player.class").isFile());
+    }
+
+    /// Half a project is no project: `ProjectSettings` deleted alone leaves
+    /// `Assets` behind, and the output goes all the same.
+    @Test
+    public void aProjectLeftWithoutItsSettingsTakesItsOutputWithIt() throws Exception {
+        assertTrue(builder().run());
+        deleteTree(new File(unity, "ProjectSettings"));
+        assertFalse(builder().run());
+        assertFalse(new File(classes, "global/Player.class").exists());
+        assertFalse(new File(generated, "com/codename1/generated/unity/UnityAppImpl.java").exists());
+        assertFalse(new File(target, "unity").exists());
+        assertEquals(1, tools.compiled);
+    }
+
+    private static void deleteTree(File f) throws IOException {
+        File[] children = f.listFiles();
+        if (children != null) {
+            for (File c : children) {
+                deleteTree(c);
+            }
+        }
+        Files.deleteIfExists(f.toPath());
     }
 
     /// `Assets` alone is some other directory of that name: the scenes to

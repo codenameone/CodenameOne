@@ -32,6 +32,11 @@ public abstract class EventHandler_1 extends MulticastDelegate {
         return new Multi(list);
     }
 
+    @Override
+    protected boolean $sameType(Delegate other) {
+        return other instanceof EventHandler_1;
+    }
+
     private static final class Multi extends EventHandler_1 {
         Multi(Delegate[] list) {
             $list = list;

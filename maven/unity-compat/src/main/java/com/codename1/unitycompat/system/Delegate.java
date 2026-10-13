@@ -37,6 +37,27 @@ public abstract class Delegate {
     /// A multicast delegate of the same delegate type as this one.
     protected abstract Delegate $multi(Delegate[] list);
 
+    /// Whether `other` is of this delegate's type. A delegate type is an
+    /// abstract class here -- the runtime's own, or one the translator
+    /// writes -- and the class of a delegate is some subclass of it, one
+    /// for each method. Nothing but that abstract class knows its name
+    /// without reflection, so it answers, with an `instanceof` of itself.
+    ///
+    /// Type arguments are erased: an `Action<int>` and an `Action<string>`
+    /// are one type as far as this can tell.
+    protected abstract boolean $sameType(Delegate other);
+
+    /// What .NET throws from `Combine` and `Remove` alike when both are
+    /// there and are not one delegate type. `+=` and `-=` cannot get here:
+    /// C# only lets them join delegates of one type, and for them the test
+    /// is a virtual call and a type test beside the arrays and the delegate
+    /// `Combine` makes.
+    private static void sameType(Delegate a, Delegate b) {
+        if (!a.$sameType(b)) {
+            throw new ArgumentException("Delegates must be of the same type.");
+        }
+    }
+
     private Delegate[] invocationList() {
         return $list != null ? $list : new Delegate[] {this};
     }
@@ -48,6 +69,7 @@ public abstract class Delegate {
         if (b == null) {
             return a;
         }
+        sameType(a, b);
         Delegate[] x = a.invocationList();
         Delegate[] y = b.invocationList();
         Delegate[] all = new Delegate[x.length + y.length];
@@ -65,6 +87,7 @@ public abstract class Delegate {
         if (value == null) {
             return source;
         }
+        sameType(source, value);
         Delegate[] x = source.invocationList();
         Delegate[] y = value.invocationList();
         for (int at = x.length - y.length; at >= 0; at--) {

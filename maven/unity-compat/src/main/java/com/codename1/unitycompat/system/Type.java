@@ -70,11 +70,10 @@ public final class Type {
 
     /// The type of a class, struct or primitive.
     ///
-    /// A type is its .NET name, not its Java class: `int` and `uint` are
-    /// both an `Integer` here, as are `long` and `ulong`, `byte` and
-    /// `sbyte`, and `char` and `ushort`, and `typeof(int) == typeof(uint)`
-    /// is false. So the class alone finds a type only when the name agrees;
-    /// a second name for a class gets a type of its own, kept by that name.
+    /// A type is its .NET name, not its Java class: `IntPtr` and `int`
+    /// are both an `Integer` here, and `typeof(IntPtr) == typeof(int)` is
+    /// false. So the class alone finds a type only when the name agrees; a
+    /// second name for a class gets a type of its own, kept by that name.
     ///
     /// What erasure leaves the same stays the same: `List<int>` and
     /// `List<string>` are one class and arrive under one name, so their

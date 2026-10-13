@@ -38,11 +38,7 @@ public final class UInt16_ {
     }
 
     public static boolean Equals(char v, Object other) {
-        if (!(other instanceof Character)) {
-            return false;
-        }
-        char o = ((Character) other).charValue();
-        return v == o;
+        return other instanceof UInt16Box && ((UInt16Box) other).value == v;
     }
 
     public static int GetHashCode(char v) {

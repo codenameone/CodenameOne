@@ -846,19 +846,28 @@ final class MethodTranslator implements Opcodes {
                     helper = "toCharArray";
                     break;
                 case I1:
-                case U1:
                     helper = "toByteArray";
+                    break;
+                case U1:
+                    helper = "toUByteArray";
                     break;
                 case I2:
                     helper = "toShortArray";
                     break;
+                case U2:
+                    helper = "toUShortArray";
+                    break;
                 case I4:
-                case U4:
                     helper = "toIntArray";
                     break;
+                case U4:
+                    helper = "toUIntArray";
+                    break;
                 case I8:
-                case U8:
                     helper = "toLongArray";
+                    break;
+                case U8:
+                    helper = "toULongArray";
                     break;
                 case R4:
                     helper = "toFloatArray";
@@ -958,6 +967,7 @@ final class MethodTranslator implements Opcodes {
 
     private void storeVar(Var v) {
         Val value = pop();
+        viewIfArray(value, v.type);
         switch (v.mode) {
             case PLAIN:
                 mv.visitVarInsn(Jvm.storeOp(names.kind(v.type)), v.slot);
@@ -1589,12 +1599,16 @@ final class MethodTranslator implements Opcodes {
             case "stelem":
                 storeElement(asm.typeFromToken(ins.operand));
                 return;
-            case "stelem.ref":
+            case "stelem.ref": {
+                Val value = pop();
                 pop();
-                pop();
-                pop();
+                Val array = pop();
+                if (array.type != null && array.type.kind == CilType.Kind.SZARRAY) {
+                    viewIfArray(value, array.type.element);
+                }
                 mv.visitInsn(AASTORE);
                 return;
+            }
             case "ldobj":
                 loadIndirect(asm.typeFromToken(ins.operand));
                 return;
@@ -1659,13 +1673,13 @@ final class MethodTranslator implements Opcodes {
                 return;
             }
             case "castclass":
-                pop();
+                viewForCast(pop(), asm.typeFromToken(ins.operand));
                 checkedCast(asm.typeFromToken(ins.operand));
                 push(Val.ref(asm.typeFromToken(ins.operand), Val.HEAP));
                 return;
             case "isinst": {
                 CilType type = asm.typeFromToken(ins.operand);
-                pop();
+                viewForCast(pop(), type);
                 if (!Names.isTypeVariable(type) && type.kind != CilType.Kind.OBJECT) {
                     String c = names.instanceClass(type);
                     Label ok = new Label();
@@ -1731,6 +1745,7 @@ final class MethodTranslator implements Opcodes {
             mv.visitInsn(RETURN);
         } else {
             Val v = pop();
+            viewIfArray(v, rt);
             if (retSlot >= 0) {
                 if (forwardedReturn) {
                     // Already built where the caller asked for it.
@@ -1777,6 +1792,9 @@ final class MethodTranslator implements Opcodes {
                 && names.norm(array.type.element).isPrimitive() && names.norm(declared).isPrimitive()) {
             element = array.type.element;
         }
+        if (array.type != null && array.type.kind == CilType.Kind.SZARRAY) {
+            viewIfArray(value, array.type.element);
+        }
         if (names.isStruct(element) && value.own != Val.FRESH) {
             // Copy into the element already there: struct arrays are filled
             // when they are created.
@@ -1811,8 +1829,10 @@ final class MethodTranslator implements Opcodes {
         Val value = pop();
         Val address = pop();
         if (address.kind == Val.PAIR) {
+            viewIfArray(value, address.type);
             mv.visitInsn(Jvm.arrayStore(names.norm(address.type)));
         } else if (address.kind == Val.FIELD) {
+            viewIfArray(value, address.field.type);
             putField(address.field, address.staticField, value);
         } else if (address.kind == Val.REF && !address.valueAsAddress && names.isStruct(type)) {
             assignStruct(type);
@@ -1899,6 +1919,7 @@ final class MethodTranslator implements Opcodes {
         if (!isStatic) {
             pop();
         }
+        viewIfArray(value, ref.type);
         if (names.isStruct(ref.type) && value.own != Val.FRESH) {
             if (isConstructor) {
                 // Before the base constructor has run the object cannot be
@@ -2019,28 +2040,101 @@ final class MethodTranslator implements Opcodes {
             case FIX_FIELD_BYREF:
                 fieldByReference(v);
                 break;
-            case FIX_ARRAY_VIEW: {
-                // An array of structs is the one collection whose elements
-                // change in place (`a[0].x = 1` writes into the object the
-                // array holds), so its view hands out copies, as boxing an
-                // element does on .NET. The erased code behind the
-                // interface -- LINQ, a list's constructor -- passes what it
-                // is given straight on to a delegate or into a list, and
-                // would otherwise give away the element itself. The element
-                // type is known here and nowhere at run time, which is why
-                // it is said in the name of the factory: no other array
-                // pays for a test.
-                boolean structs = v.type.kind == CilType.Kind.SZARRAY && names.isStruct(v.type.element);
-                invoke(INVOKESTATIC, Names.RUNTIME + "system/ArrayView", structs ? "$ofStructs" : "$of",
-                        "(Ljava/lang/Object;)L" + Names.RUNTIME + "system/ArrayView;", false);
+            case FIX_ARRAY_VIEW:
+                arrayView(v.type);
                 break;
-            }
             case FIX_GENERIC_BYREF:
                 genericByReference(type);
                 break;
             default:
                 break;
         }
+    }
+
+    private static final String ARRAY_VIEW = Names.RUNTIME + "system/ArrayView";
+
+    /// What an [#ARRAY_VIEW] of an array of this static type has to do to
+    /// an element on its way out: 1 to copy a struct, 2 to box an unsigned
+    /// value as its own type, 0 for neither.
+    ///
+    /// An array of structs is the one collection whose elements change in
+    /// place (`a[0].x = 1` writes into the object the array holds), so its
+    /// view hands out copies, as boxing an element does on .NET. The erased
+    /// code behind the interface -- LINQ, a list's constructor -- passes
+    /// what it is given straight on to a delegate or into a list, and would
+    /// otherwise give away the element itself. The same for the unsigned
+    /// types, whose boxes are not the ones a `byte[]` or an `int[]` would
+    /// otherwise hand out. The element type is known here and nowhere at
+    /// run time, which is why it is said in the name of the factory: no
+    /// other array pays for a test.
+    private int viewKind(CilType arrayType) {
+        if (arrayType.kind == CilType.Kind.SZARRAY && names.isStruct(arrayType.element)) {
+            return 1;
+        }
+        return Names.isUnsignedBox(names.norm(arrayType.element)) ? 2 : 0;
+    }
+
+    /// Stack: an array of this static type. Leaves its view.
+    private void arrayView(CilType arrayType) {
+        int kind = viewKind(arrayType);
+        invoke(INVOKESTATIC, ARRAY_VIEW, kind == 1 ? "$ofStructs" : kind == 2 ? "$ofUnsigned" : "$of",
+                "(Ljava/lang/Object;)L" + ARRAY_VIEW + ";", false);
+    }
+
+    private static boolean isArray(CilType type) {
+        return type != null && (type.kind == CilType.Kind.SZARRAY || type.kind == CilType.Kind.ARRAY);
+    }
+
+    /// An array on top of the stack that is about to be kept somewhere
+    /// declared as one of the collection interfaces -- a local, a field, an
+    /// element, a return value -- becomes its view, as one passed to such a
+    /// parameter does. C# converts an array to `IEnumerable` without an
+    /// instruction, so the declared type of where it goes is all that says
+    /// so; the JVM's verifier lets any object into an interface type, and
+    /// the array then failed with IncompatibleClassChangeError where it was
+    /// enumerated, far from the assignment.
+    private void viewIfArray(Val value, CilType declared) {
+        if (declared != null && isArray(value.type) && isCollectionInterface(names.norm(declared))) {
+            arrayView(value.type);
+        }
+    }
+
+    /// `(IEnumerable) o`, `o as IEnumerable` and `o is IEnumerable`, before
+    /// the type test: an array is one on .NET, and here only its view is.
+    /// Where the value is known to be an array this is [#viewIfArray]. Where
+    /// it is an `object` or an `Array`, the runtime looks.
+    ///
+    /// What the elements are is then taken from the type cast to, the `uint`
+    /// of `IEnumerable<uint>`. A cast to the non-generic `IEnumerable` names
+    /// no element type and an `object` has lost the one its array was made
+    /// with -- a `uint[]` and an `int[]` are one Java class -- so that view
+    /// is of the signed type: `foreach (object x in (IEnumerable) (object)
+    /// uints)` gets `int` boxes. Nothing here can know better.
+    private void viewForCast(Val value, CilType target) {
+        CilType t = names.norm(target);
+        CilType open = t.kind == CilType.Kind.GENERICINST ? t.element : t;
+        String name = open.typeName();
+        boolean generic = "System.Collections.Generic.IEnumerable`1".equals(name);
+        if (!generic && !"System.Collections.IEnumerable".equals(name)) {
+            return;
+        }
+        if (isArray(value.type)) {
+            arrayView(value.type);
+            return;
+        }
+        CilType from = value.type == null ? null : names.norm(value.type);
+        if (from != null && from.kind != CilType.Kind.OBJECT && !Names.isTypeVariable(from)
+                && !"System.Array".equals(from.typeName())) {
+            // A class or an interface of the program: never a JVM array.
+            return;
+        }
+        int kind = 0;
+        if (generic && t.kind == CilType.Kind.GENERICINST && t.args.length == 1) {
+            CilType element = names.norm(t.args[0]);
+            kind = names.isStruct(element) ? 1 : Names.isUnsignedBox(element) ? 2 : 0;
+        }
+        Jvm.pushInt(mv, kind);
+        invoke(INVOKESTATIC, ARRAY_VIEW, "$viewIfArray", "(Ljava/lang/Object;I)Ljava/lang/Object;", false);
     }
 
     /// `ref obj.field` passed to a method. A by-reference parameter is an
@@ -2325,6 +2419,17 @@ final class MethodTranslator implements Opcodes {
                     name = "$clearStructs";
                 }
             }
+            if ("System.Array".equals(declaring) && "GetEnumerator".equals(name) && values.length == 1
+                    && isArray(values[0].type) && viewKind(values[0].type) == 2) {
+                // `foreach (object x in (Array) uints)`: the array is still
+                // known for what it is here, and only here. Once it has
+                // been kept in something declared `Array` -- a local, a
+                // parameter, a field -- it is a Java `int[]` like any other
+                // and Array_.GetEnumerator boxes its elements as `int`: an
+                // `Array` is the array itself, with nowhere to carry what a
+                // view carries.
+                name = "$getEnumeratorUnsigned";
+            }
         } else if ("System.IComparable`1".equals(declaring) || "System.IComparable".equals(declaring)
                 || "System.IEquatable`1".equals(declaring)) {
             // Strings and boxed primitives implement these on .NET and are
@@ -2368,6 +2473,10 @@ final class MethodTranslator implements Opcodes {
                     throw fail("call to " + ref + " through " + receiver);
                 }
                 fixes[0] = FIX_DEREF;
+            } else if (isArray(receiver.type) && isCollectionInterface(names.norm(ref.declaringType))) {
+                // `((IEnumerable) array).GetEnumerator()`: the cast of a
+                // value known to be an array is no instruction at all.
+                fixes[0] = FIX_ARRAY_VIEW;
             }
         }
         boolean quiet = host.isNonInterfering(ref);

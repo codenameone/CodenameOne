@@ -38,11 +38,7 @@ public final class UInt32_ {
     }
 
     public static boolean Equals(int v, Object other) {
-        if (!(other instanceof Integer)) {
-            return false;
-        }
-        int o = ((Integer) other).intValue();
-        return v == o;
+        return other instanceof UInt32Box && ((UInt32Box) other).value == v;
     }
 
     public static int GetHashCode(int v) {

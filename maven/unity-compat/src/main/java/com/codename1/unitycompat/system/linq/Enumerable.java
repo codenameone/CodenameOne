@@ -23,9 +23,13 @@
 package com.codename1.unitycompat.system.linq;
 
 import com.codename1.unitycompat.system.ArgumentNullException;
+import com.codename1.unitycompat.system.ByteBox;
 import com.codename1.unitycompat.system.Func_2;
 import com.codename1.unitycompat.system.Interop;
 import com.codename1.unitycompat.system.InvalidOperationException;
+import com.codename1.unitycompat.system.UInt16Box;
+import com.codename1.unitycompat.system.UInt32Box;
+import com.codename1.unitycompat.system.UInt64Box;
 import com.codename1.unitycompat.system.collections.generic.IEnumerable_1;
 import com.codename1.unitycompat.system.collections.generic.IEnumerator_1;
 import com.codename1.unitycompat.system.collections.generic.List_1;
@@ -92,6 +96,19 @@ public final class Enumerable {
         }
         if (type == Byte.class) {
             return Byte.valueOf((byte) 0);
+        }
+        // The unsigned types travel as their own boxes: see ByteBox.
+        if (type == ByteBox.class) {
+            return ByteBox.valueOf((byte) 0);
+        }
+        if (type == UInt32Box.class) {
+            return UInt32Box.valueOf(0);
+        }
+        if (type == UInt16Box.class) {
+            return UInt16Box.valueOf((char) 0);
+        }
+        if (type == UInt64Box.class) {
+            return UInt64Box.valueOf(0L);
         }
         return null;
     }

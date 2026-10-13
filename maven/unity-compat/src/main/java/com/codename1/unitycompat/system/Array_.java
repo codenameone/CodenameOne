@@ -67,11 +67,32 @@ public final class Array_ {
     /// `Array.GetEnumerator`, which is what `foreach` over something typed
     /// as `Array` calls -- the result of `Enum.GetValues` above all. The
     /// elements come boxed, as they do from a non-generic enumerator.
+    ///
+    /// Boxed as what the Java array says they are, that is: the elements
+    /// of a `uint[]` that got here through an `Array` local, parameter or
+    /// field come out as `int`, of a `byte[]` as `sbyte`, of a `ushort[]`
+    /// as `char` and of a `ulong[]` as `long`. The translator knew the
+    /// element type where the array was converted to `Array`, but that
+    /// conversion keeps the object -- it has to, `(uint[]) array` gives the
+    /// same array back -- and a Java array has no room for a note.
     public static com.codename1.unitycompat.system.collections.IEnumerator GetEnumerator(Object array) {
         if (array == null) {
             throw new NullReferenceException();
         }
         return ArrayView.$of(array).GetEnumerator();
+    }
+
+    /// [#GetEnumerator] of an array the translator knows to hold `byte`,
+    /// `ushort`, `uint` or `ulong`, because the call is made on a value
+    /// still typed as that array: the elements come in their own boxes.
+    /// An array reached through something declared `Array` comes to
+    /// [#GetEnumerator] instead and is boxed as the signed type, since a
+    /// `uint[]` and an `int[]` are one Java class.
+    public static com.codename1.unitycompat.system.collections.IEnumerator $getEnumeratorUnsigned(Object array) {
+        if (array == null) {
+            throw new NullReferenceException();
+        }
+        return ArrayView.$ofUnsigned(array).GetEnumerator();
     }
 
     public static int get_Length(Object array) {

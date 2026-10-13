@@ -36,6 +36,11 @@ public abstract class UnityAction extends MulticastDelegate {
         return new Multi(list);
     }
 
+    @Override
+    protected boolean $sameType(Delegate other) {
+        return other instanceof UnityAction;
+    }
+
     private static final class Multi extends UnityAction {
         Multi(Delegate[] list) {
             $list = list;

@@ -176,10 +176,7 @@ public final class Interop {
         if (boxed(o) instanceof Character) {
             return ((Character) o).charValue();
         }
-        if (o instanceof EnumBox) {
-            // An enum over `ushort`, which is a `char` here.
-            return (char) ((EnumBox) o).value;
-        }
+        // No enum is over `char`; one over `ushort` is unboxUShort's.
         throw new InvalidCastException();
     }
 
@@ -237,6 +234,51 @@ public final class Interop {
         throw new InvalidCastException();
     }
 
+    // The unsigned types and `byte` have boxes of their own (ByteBox and
+    // its neighbours), so that a boxed `uint` is not a boxed `int`: these
+    // are the same four helpers for them. An enum over one is an EnumBox,
+    // as it is above.
+
+    public static byte unboxUByte(Object o) {
+        if (boxed(o) instanceof ByteBox) {
+            return ((ByteBox) o).value;
+        }
+        if (o instanceof EnumBox) {
+            return (byte) ((EnumBox) o).value;
+        }
+        throw new InvalidCastException();
+    }
+
+    public static char unboxUShort(Object o) {
+        if (boxed(o) instanceof UInt16Box) {
+            return ((UInt16Box) o).value;
+        }
+        if (o instanceof EnumBox) {
+            return (char) ((EnumBox) o).value;
+        }
+        throw new InvalidCastException();
+    }
+
+    public static int unboxUInt(Object o) {
+        if (boxed(o) instanceof UInt32Box) {
+            return ((UInt32Box) o).value;
+        }
+        if (o instanceof EnumBox) {
+            return (int) ((EnumBox) o).value;
+        }
+        throw new InvalidCastException();
+    }
+
+    public static long unboxULong(Object o) {
+        if (boxed(o) instanceof UInt64Box) {
+            return ((UInt64Box) o).value;
+        }
+        if (o instanceof EnumBox) {
+            return ((EnumBox) o).value;
+        }
+        throw new InvalidCastException();
+    }
+
     // ------------------------------------------------- out of erased code
 
     // What a type argument that is a primitive comes back as from erased
@@ -276,6 +318,22 @@ public final class Interop {
 
     public static double orDefaultDouble(Object o) {
         return o == null ? 0d : ((Double) o).doubleValue();
+    }
+
+    public static byte orDefaultUByte(Object o) {
+        return o == null ? (byte) 0 : ((ByteBox) o).value;
+    }
+
+    public static char orDefaultUShort(Object o) {
+        return o == null ? (char) 0 : ((UInt16Box) o).value;
+    }
+
+    public static int orDefaultUInt(Object o) {
+        return o == null ? 0 : ((UInt32Box) o).value;
+    }
+
+    public static long orDefaultULong(Object o) {
+        return o == null ? 0L : ((UInt64Box) o).value;
     }
 
     // -------------------------------------------------------------- unsigned
@@ -592,6 +650,38 @@ public final class Interop {
         short[] to = new short[from.length];
         for (int i = 0; i < to.length; i++) {
             to[i] = unboxShort(from[i]);
+        }
+        return to;
+    }
+
+    public static byte[] toUByteArray(Object[] from) {
+        byte[] to = new byte[from.length];
+        for (int i = 0; i < to.length; i++) {
+            to[i] = unboxUByte(from[i]);
+        }
+        return to;
+    }
+
+    public static char[] toUShortArray(Object[] from) {
+        char[] to = new char[from.length];
+        for (int i = 0; i < to.length; i++) {
+            to[i] = unboxUShort(from[i]);
+        }
+        return to;
+    }
+
+    public static int[] toUIntArray(Object[] from) {
+        int[] to = new int[from.length];
+        for (int i = 0; i < to.length; i++) {
+            to[i] = unboxUInt(from[i]);
+        }
+        return to;
+    }
+
+    public static long[] toULongArray(Object[] from) {
+        long[] to = new long[from.length];
+        for (int i = 0; i < to.length; i++) {
+            to[i] = unboxULong(from[i]);
         }
         return to;
     }

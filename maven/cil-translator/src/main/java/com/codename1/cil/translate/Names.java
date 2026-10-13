@@ -200,28 +200,63 @@ final class Names {
         }
     }
 
-    /// The `java.lang` class a primitive is boxed as.
+    /// The class a primitive is boxed as: what it is in an `object`, in
+    /// erased generic storage, and what `is`, a cast from `object` and a
+    /// type argument's class token all name.
+    ///
+    /// A signed type, `char`, `bool` and the two floats are their
+    /// `java.lang` class. `byte`, `ushort`, `uint` and `ulong` are not:
+    /// each shares its Java primitive with another C# type (`sbyte`,
+    /// `char`, `int`, `long`), and sharing the box as well made a boxed
+    /// `byte` of 200 print as -56, a `uint` above `int.MaxValue` order below
+    /// zero and `o is int` true of a `uint`. So each has a box of the
+    /// runtime's (`ByteBox`, `UInt16Box`, `UInt32Box`, `UInt64Box`), with
+    /// its own text, order, equality and `Interop` helpers
+    /// ([Jvm#unboxSuffix]). The signed types pay nothing for it: their
+    /// box, and every helper they go through, is what it was.
+    ///
+    /// Still one box for two types: `IntPtr` and `UIntPtr` are an
+    /// `Integer`, as `int` is. Nothing prints or orders them differently.
     static String boxClass(CilType primitive) {
         switch (primitive.kind) {
             case BOOLEAN:
                 return "java/lang/Boolean";
             case CHAR:
-            case U2:
                 return "java/lang/Character";
+            case U2:
+                return RUNTIME + "system/UInt16Box";
             case I1:
-            case U1:
                 return "java/lang/Byte";
+            case U1:
+                return RUNTIME + "system/ByteBox";
             case I2:
                 return "java/lang/Short";
             case I8:
-            case U8:
                 return "java/lang/Long";
+            case U8:
+                return RUNTIME + "system/UInt64Box";
+            case U4:
+                return RUNTIME + "system/UInt32Box";
             case R4:
                 return "java/lang/Float";
             case R8:
                 return "java/lang/Double";
             default:
                 return "java/lang/Integer";
+        }
+    }
+
+    /// Whether a primitive is boxed as a class of the runtime's and not
+    /// as the JDK's box of its Java type.
+    static boolean isUnsignedBox(CilType primitive) {
+        switch (primitive.kind) {
+            case U1:
+            case U2:
+            case U4:
+            case U8:
+                return true;
+            default:
+                return false;
         }
     }
 

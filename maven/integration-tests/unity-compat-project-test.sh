@@ -323,4 +323,26 @@ run_gradle "$GAPP" classes "${GRADLE_DOTNET_ARG[@]}" > "$W/gradle-rebuild.log" 2
   || { tail -60 "$W/gradle-rebuild.log"; fail "the Gradle build after a changed script"; }
 grep -q 'Compiling the C# scripts' "$W/gradle-rebuild.log" || fail "Gradle did not compile the changed script once the SDK was back"
 
+echo "== gradle, project deleted"
+# The generated sources are a source root of the main source set and the
+# classes directory part of its output, so a project that is gone has to take
+# both with it: a task skipped for want of a project would leave them to be
+# compiled and packaged until `clean`. Only the task is run -- the
+# application's own main class extends the runtime's, and does not compile
+# once the runtime is no longer a dependency. Last, because nothing after this
+# has a Unity project to build.
+mv "$GAPP/src/main/unity" "$W/unity-deleted"
+gradle_without_dotnet compileUnity > "$W/gradle-deleted.log" 2>&1 \
+  || { tail -60 "$W/gradle-deleted.log"; fail "compileUnity failed on a deleted project"; }
+for left in build/cn1-unity/classes build/generated/sources/cn1-unity build/cn1-unity/state; do
+  if [ -d "$GAPP/$left" ] && [ -n "$(ls -A "$GAPP/$left")" ]; then
+    ls -A "$GAPP/$left" | head -10
+    fail "a deleted Unity project left output in $left"
+  fi
+done
+gradle_without_dotnet compileUnity > "$W/gradle-deleted-again.log" 2>&1 \
+  || { tail -60 "$W/gradle-deleted-again.log"; fail "compileUnity failed the build after a deleted project"; }
+grep -q ':compileUnity SKIPPED' "$W/gradle-deleted-again.log" \
+  || { grep compileUnity "$W/gradle-deleted-again.log"; fail "compileUnity was not skipped once the deleted project's output was gone"; }
+
 echo "unity-compat-project-test: OK"

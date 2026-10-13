@@ -43,18 +43,28 @@ public final class Math {
         return java.lang.Math.ceil(v);
     }
 
+    /// Toward zero. A result of zero keeps the argument's sign, as it does
+    /// on .NET: `Truncate(-0.5)` is `-0.0`.
+    public static double Truncate(double v) {
+        return v < 0 ? java.lang.Math.ceil(v) : java.lang.Math.floor(v);
+    }
+
     /// Rounds half to even, which is what .NET does and `java.lang.Math.round`
     /// does not.
     public static double Round(double v) {
         double floor = java.lang.Math.floor(v);
         double fraction = v - floor;
+        double rounded;
         if (fraction < 0.5) {
-            return floor;
+            rounded = floor;
+        } else if (fraction > 0.5) {
+            rounded = floor + 1;
+        } else {
+            rounded = floor % 2 == 0 ? floor : floor + 1;
         }
-        if (fraction > 0.5) {
-            return floor + 1;
-        }
-        return floor % 2 == 0 ? floor : floor + 1;
+        // A zero takes the sign of what was rounded: -0.2 and -0.5 round
+        // to -0.0 on .NET, and going up from a floor of -1 lost that.
+        return rounded == 0 ? v * 0.0 : rounded;
     }
 
     /// The smallest `int` has no positive counterpart, and .NET documents
@@ -279,18 +289,38 @@ public final class Math {
         return Log(v) / 2.302585092994046;
     }
 
+    /// `Math.Pow`, case by case as IEEE 754 has it, which is what .NET
+    /// answers. The sign of a negative base's power is its exponent's
+    /// parity, and every whole exponent has one: it used to be asked only
+    /// up to 1024, so that `Pow(-1, 1025)` was NaN.
     public static double Pow(double a, double b) {
-        if (b == 0) {
+        if (b == 0 || a == 1) {
+            // Even of NaN: anything to the power zero is one, and so is
+            // one to any power.
             return 1;
         }
         if (a != a || b != b) {
             return 0.0 / 0.0;
         }
-        double whole = java.lang.Math.floor(b);
-        if (whole == b && b >= -1024 && b <= 1024) {
+        // An infinity is the one number its own difference is not zero for
+        // (NaN is gone by now): asked that way so that nothing is compared
+        // with a constant.
+        boolean infiniteBase = a - a != 0;
+        double size = a < 0 ? -a : a;
+        if (b - b != 0) {
+            if (size == 1) {
+                return 1;
+            }
+            return (size > 1) == (b > 0) ? 1.0 / 0.0 : 0;
+        }
+        double steps = b < 0 ? -b : b;
+        boolean whole = java.lang.Math.floor(b) == b;
+        // And one of 2^53 or more is a multiple of two.
+        boolean odd = whole && steps < 9007199254740992.0 && (((long) steps) & 1L) != 0;
+        if (whole && steps <= 1024) {
             // A whole power is repeated multiplication, which is exact
             // wherever the true result is.
-            int n = (int) (b < 0 ? -b : b);
+            int n = (int) steps;
             double result = 1;
             double square = a;
             while (n > 0) {
@@ -300,14 +330,35 @@ public final class Math {
                 square *= square;
                 n >>= 1;
             }
-            return b < 0 ? 1 / result : result;
+            if (b > 0) {
+                return result;
+            }
+            if (infiniteBase || result - result == 0) {
+                return 1 / result;
+            }
+            // The product overflowed, and its inverse may still be a
+            // number, down among the denormals: 2 to the power -1030.
         }
-        if (a < 0) {
+        if (size == 0) {
+            // The sign of a zero survives an odd power and no other.
+            if (b > 0) {
+                return odd ? a : 0;
+            }
+            return odd ? 1 / a : 1.0 / 0.0;
+        }
+        boolean negative = a < 0 && odd;
+        if (infiniteBase) {
+            // Each answer is the base, its size or an inverse of the base:
+            // a negative zero is made, and not written as a constant.
+            if (b > 0) {
+                return negative ? a : size;
+            }
+            return negative ? 1 / a : 0;
+        }
+        if (a < 0 && !whole) {
             return 0.0 / 0.0;
         }
-        if (a == 0) {
-            return b > 0 ? 0 : 1.0 / 0.0;
-        }
-        return Exp(b * Log(a));
+        double power = Exp(b * Log(size));
+        return negative ? -power : power;
     }
 }

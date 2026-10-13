@@ -46,6 +46,8 @@ import java.util.List;
 /// which is added as a source root. From there the project is ordinary
 /// Codename One code, and every target builds it. A silent no-op for a project
 /// without `src/main/unity`: nothing is resolved and no .NET SDK is looked for.
+/// A project that had one and no longer does has what its last build left in
+/// the classes directory and the generated sources removed.
 ///
 /// The translator and the reference assemblies are not dependencies of the
 /// plugin. They are resolved here, at the version of the application's
@@ -71,9 +73,32 @@ public class CompileUnityMojo extends AbstractCN1Mojo {
     @Parameter(property = "cn1.unity.skip", defaultValue = "false")
     private boolean skipUnity;
 
+    /// The classes directory and the build directory, as parameters so the
+    /// goal can remove a deleted project's output without a resolved project.
+    @Parameter(defaultValue = "${project.build.outputDirectory}", readonly = true, required = true)
+    private File classesDir;
+
+    @Parameter(defaultValue = "${project.build.directory}", readonly = true, required = true)
+    private File buildDir;
+
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
+        String pkg = null;
+        String main = null;
+        if (isCN1ProjectDir() && properties != null) {
+            pkg = properties.getProperty("codename1.packageName");
+            main = properties.getProperty("codename1.mainName");
+        }
         if (!UnityProjectBuilder.isUnityProject(unitySourceDir)) {
+            // Not quite nothing: a project that was here for an earlier build
+            // installed its classes and images in the classes directory, and
+            // only `mvn clean` would take them out again. javac never wrote
+            // them, so its own stale-class handling does not know them, and
+            // every target packages that directory. The builder removes what
+            // its record says it installed; without a record it looks at three
+            // paths and leaves, and still nothing is resolved.
+            new UnityProjectBuilder(unitySourceDir, unityOutputDir, classesDir, buildDir, null, null, null, null,
+                    pkg, main, null, MavenLog.of(getLog())).removeOutput();
             return;
         }
         if (skipUnity) {
@@ -99,14 +124,7 @@ public class CompileUnityMojo extends AbstractCN1Mojo {
             roots.add(new File(o.toString()));
         }
         roots.add(new File(project.getBasedir(), "src/main/kotlin"));
-        String pkg = null;
-        String main = null;
-        if (isCN1ProjectDir() && properties != null) {
-            pkg = properties.getProperty("codename1.packageName");
-            main = properties.getProperty("codename1.mainName");
-        }
-        UnityProjectBuilder builder = new UnityProjectBuilder(unitySourceDir, unityOutputDir,
-                new File(project.getBuild().getOutputDirectory()), new File(project.getBuild().getDirectory()),
+        UnityProjectBuilder builder = new UnityProjectBuilder(unitySourceDir, unityOutputDir, classesDir, buildDir,
                 runtimeJar, references, tool, dotnet, pkg, main, roots, MavenLog.of(getLog()));
         try {
             builder.run();

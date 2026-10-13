@@ -214,12 +214,14 @@ public class UnityProjectBuilder {
     }
 
     /// Builds the project unless nothing changed since the last run. Returns
-    /// false when there is no Unity project.
+    /// false when there is no Unity project, after removing what a build of
+    /// one that used to be there left behind (see [#removeOutput()]).
     public boolean run() throws BuildException {
         if (!isUnityProject(unityDir)) {
             if (unityDir != null && unityDir.isDirectory()) {
                 log.warn(unityDir + " is not a Unity project (it needs both Assets and ProjectSettings); ignored");
             }
+            removeOutput();
             return false;
         }
         if (runtimeJar == null || !runtimeJar.isFile()) {
@@ -265,6 +267,89 @@ public class UnityProjectBuilder {
         install(staged, resources, runtimeClasses);
         writeMainClass();
         return true;
+    }
+
+    /// Removes what a build of a Unity project left behind, for a module
+    /// whose project is gone -- `src/main/unity` deleted, or one of its two
+    /// directories. Returns whether there was anything to remove.
+    ///
+    /// Without this the output outlives its sources until a clean build. The
+    /// translated classes and the images are in the classes directory, where
+    /// no compiler put them and so none takes them out again, and every
+    /// target's packaging reads that directory: a game deleted from the
+    /// sources would go on being shipped. The generated scenes would go on
+    /// being compiled wherever the directory is a source root.
+    ///
+    /// Only what a build of ours wrote is touched, by the same record
+    /// `install` removes a deleted script's class by: the classes directory
+    /// is shared with javac, and the generated sources directory may be one
+    /// the developer configured. A module that never had a Unity project is
+    /// answered from three file checks, and nothing is created for it.
+    public boolean removeOutput() {
+        String generatedPackage = GENERATED_PACKAGE.replace('.', File.separatorChar);
+        File scenes = new File(javaOut, generatedPackage);
+        boolean named = mainPackage != null && mainClass != null && mainPackage.length() > 0
+                && mainClass.length() > 0;
+        File main = named ? generatedMainClass() : null;
+        boolean mainGenerated = main != null && main.isFile();
+        if (!workDir.exists() && !scenes.exists() && !mainGenerated) {
+            return false;
+        }
+        String recorded = read(new File(workDir, "installed.txt"));
+        if (recorded != null) {
+            for (String rel : recorded.split("\n")) {
+                // A record is only ever written by install(), but it is a file
+                // in the build directory: a line that climbs out of the classes
+                // directory is not followed.
+                if (rel.length() > 0 && !rel.contains("..")) {
+                    deleteAndPrune(new File(classesOut, rel), classesOut);
+                }
+            }
+        }
+        // What javac made of the generated scenes. In a build that keeps the
+        // translated classes in a directory of their own there is none here.
+        File sceneClasses = new File(classesOut, generatedPackage);
+        delete(sceneClasses);
+        prune(sceneClasses.getParentFile(), classesOut);
+        delete(scenes);
+        prune(scenes.getParentFile(), javaOut);
+        if (mainGenerated) {
+            // A main class in the generated sources is ours: the build deletes
+            // it as soon as the application has its own. Its class goes with
+            // it, or the application would still start a game it no longer has
+            // -- and fail on the generated class that was just removed.
+            deleteAndPrune(main, javaOut);
+            deleteAndPrune(new File(classesOut, mainPackage.replace('.', File.separatorChar) + File.separator
+                    + mainClass + ".class"), classesOut);
+        }
+        // The state file with everything else: a project that comes back is
+        // compiled again, not matched against a staging directory of before.
+        delete(workDir);
+        if (log != null) {
+            log.info("There is no Unity project in " + unityDir + " any more; removed what an earlier build of it"
+                    + " left in " + classesOut + " and " + javaOut);
+        }
+        return true;
+    }
+
+    private static void deleteAndPrune(File f, File root) {
+        deleteQuietly(f);
+        prune(f.getParentFile(), root);
+    }
+
+    /// Deletes `dir` and its parents while they are empty, up to and not
+    /// including `root`: a directory left in the classes directory is an
+    /// entry in the application's jar.
+    private static void prune(File dir, File root) {
+        File d = dir;
+        while (d != null && !d.equals(root) && d.toPath().startsWith(root.toPath())) {
+            String[] children = d.list();
+            if (children == null || children.length > 0) {
+                return;
+            }
+            deleteQuietly(d);
+            d = d.getParentFile();
+        }
     }
 
     /// What to say about compiled output that is present and cannot be used,

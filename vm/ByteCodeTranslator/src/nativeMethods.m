@@ -1986,16 +1986,19 @@ JAVA_LONG java_lang_Math_abs___long_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG 
     return a;
 }
 
+// Both went through a JAVA_LONG, which a double from 2^63 up, an infinity and a
+// NaN do not fit: that conversion is undefined in C, so floor(1e20) was not
+// 1e20 and floor(NaN) was a number, whichever the CPU made of it. The trip
+// through an integer also lost the sign of zero, where the JDK specifies
+// ceil(-0.5) and floor(-0.0) as -0.0. The C library's functions round to an
+// integral value as IEEE 754 defines it, which is the JDK's definition too.
+// Math.round is Java over floor and a saturating D2L, so it follows.
 JAVA_DOUBLE java_lang_Math_ceil___double_R_double(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE a) {
-    JAVA_LONG la = (JAVA_LONG)a;
-    if ( a == la || a < 0) return la;
-    return la+1;
+    return ceil(a);
 }
 
 JAVA_DOUBLE java_lang_Math_floor___double_R_double(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE a) {
-    JAVA_LONG la = (JAVA_LONG)a;
-    if ( a >= 0 || a == la ) return la;
-    return la-1;
+    return floor(a);
 }
 
 JAVA_DOUBLE java_lang_Math_max___double_double_R_double(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE a, JAVA_DOUBLE b){

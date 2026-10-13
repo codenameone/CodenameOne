@@ -44,11 +44,23 @@ public final class ArrayView implements IEnumerable_1 {
     private final Object array;
     private final int length;
     private final boolean structs;
+    private final boolean unsigned;
 
-    private ArrayView(Object array, int length, boolean structs) {
+    private ArrayView(Object array, int length, boolean structs, boolean unsigned) {
         this.array = array;
         this.length = length;
         this.structs = structs;
+        this.unsigned = unsigned;
+    }
+
+    /// The view of an array the translator knows to hold `byte`, `ushort`,
+    /// `uint` or `ulong`, or null for null. A `uint[]` and an `int[]` are
+    /// one Java class, and the erased code on the other side is handed
+    /// boxes, of which the unsigned types have their own (see ByteBox): as
+    /// with structs, only the translator knows which this array wants.
+    public static ArrayView $ofUnsigned(Object array) {
+        ArrayView signed = $of(array);
+        return signed == null ? null : new ArrayView(array, signed.length, false, true);
     }
 
     /// The view of a one-dimensional array the translator knows to hold
@@ -57,9 +69,35 @@ public final class ArrayView implements IEnumerable_1 {
     /// `object[]` may hold boxed structs that are not to be copied.
     public static ArrayView $ofStructs(Object array) {
         if (array instanceof Object[]) {
-            return new ArrayView(array, ((Object[]) array).length, true);
+            return new ArrayView(array, ((Object[]) array).length, true, false);
         }
         return $of(array);
+    }
+
+    /// What a cast to `IEnumerable` or `IEnumerable<T>` is given first, and
+    /// an `is` or `as` of them: the view of `o` if it is an array, as one
+    /// is enumerable on .NET, and `o` itself if it is anything else. `kind`
+    /// is what the translator could read off the type cast to: 1 for an
+    /// element type that is a struct, 2 for an unsigned one, 0 for any
+    /// other and for the non-generic interface, which names none -- so an
+    /// `object` holding a `uint[]`, cast to `IEnumerable`, is walked as the
+    /// `int[]` it is here.
+    public static Object $viewIfArray(Object o, int kind) {
+        // First, because it is what most things cast to it are.
+        if (o == null || o instanceof com.codename1.unitycompat.system.collections.IEnumerable) {
+            return o;
+        }
+        if (o instanceof Object[]) {
+            return kind == 1 ? $ofStructs(o) : $of(o);
+        }
+        if (o instanceof MdArray || o instanceof int[] || o instanceof float[] || o instanceof boolean[]
+                || o instanceof char[] || o instanceof byte[] || o instanceof short[] || o instanceof long[]
+                || o instanceof double[]) {
+            // Only four of them have an unsigned reading.
+            return kind == 2 && !(o instanceof float[] || o instanceof boolean[] || o instanceof short[]
+                    || o instanceof double[]) ? $ofUnsigned(o) : $of(o);
+        }
+        return o;
     }
 
     /// Whether every struct this view hands out is already a copy, so that
@@ -99,7 +137,7 @@ public final class ArrayView implements IEnumerable_1 {
         } else {
             throw new InvalidCastException();
         }
-        return new ArrayView(array, n, false);
+        return new ArrayView(array, n, false, false);
     }
 
     public int get_Count() {
@@ -114,6 +152,9 @@ public final class ArrayView implements IEnumerable_1 {
     public Object get_Item(int i) {
         if (i < 0 || i >= length) {
             throw new IndexOutOfRangeException();
+        }
+        if (unsigned) {
+            return unsignedItem(i);
         }
         if (array instanceof MdArray) {
             return ((MdArray) array).boxed(i);
@@ -146,6 +187,34 @@ public final class ArrayView implements IEnumerable_1 {
             return Long.valueOf(((long[]) array)[i]);
         }
         return Double.valueOf(((double[]) array)[i]);
+    }
+
+    private Object unsignedItem(int i) {
+        if (array instanceof int[]) {
+            return UInt32Box.valueOf(((int[]) array)[i]);
+        }
+        if (array instanceof byte[]) {
+            return ByteBox.valueOf(((byte[]) array)[i]);
+        }
+        if (array instanceof char[]) {
+            return UInt16Box.valueOf(((char[]) array)[i]);
+        }
+        if (array instanceof long[]) {
+            return UInt64Box.valueOf(((long[]) array)[i]);
+        }
+        // An array of several dimensions boxes its own elements, as the
+        // signed type: the one case that makes two boxes for an element.
+        Object signed = ((MdArray) array).boxed(i);
+        if (signed instanceof Integer) {
+            return UInt32Box.valueOf(((Integer) signed).intValue());
+        }
+        if (signed instanceof Byte) {
+            return ByteBox.valueOf(((Byte) signed).byteValue());
+        }
+        if (signed instanceof Character) {
+            return UInt16Box.valueOf(((Character) signed).charValue());
+        }
+        return UInt64Box.valueOf(((Long) signed).longValue());
     }
 
     @Override

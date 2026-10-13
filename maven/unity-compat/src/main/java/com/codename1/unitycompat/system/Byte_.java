@@ -33,12 +33,16 @@ public final class Byte_ {
         return Integer.toString(v & 0xFF);
     }
 
+    // A `byte` argument arrives from translated code as the number it is,
+    // 0 to 255, and not narrowed to a Java byte, while a box holds the
+    // narrowed one: 200 and -56 are the same value, so only the low eight
+    // bits are compared.
     public static boolean Equals(byte v, byte o) {
-        return v == o;
+        return ((v ^ o) & 0xFF) == 0;
     }
 
     public static boolean Equals(byte v, Object other) {
-        return other instanceof Byte && ((Byte) other).byteValue() == v;
+        return other instanceof ByteBox && ((((ByteBox) other).value ^ v) & 0xFF) == 0;
     }
 
     public static int GetHashCode(byte v) {

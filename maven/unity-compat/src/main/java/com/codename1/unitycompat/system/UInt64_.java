@@ -38,11 +38,7 @@ public final class UInt64_ {
     }
 
     public static boolean Equals(long v, Object other) {
-        if (!(other instanceof Long)) {
-            return false;
-        }
-        long o = ((Long) other).longValue();
-        return v == o;
+        return other instanceof UInt64Box && ((UInt64Box) other).value == v;
     }
 
     public static int GetHashCode(long v) {

@@ -2720,7 +2720,22 @@ public final class SceneCompiler {
         }
     }
 
-    private static String boxed(String primitive) {
+    /// The class whose `valueOf` boxes an element for a list, as the
+    /// translator's `Names.boxClass` has it: the unsigned types have boxes
+    /// of the runtime's, and a script reading the list expects those.
+    private static String boxed(CilType.Kind kind, String primitive) {
+        switch (kind) {
+            case U1:
+                return "com.codename1.unitycompat.system.ByteBox";
+            case U2:
+                return "com.codename1.unitycompat.system.UInt16Box";
+            case U4:
+                return "com.codename1.unitycompat.system.UInt32Box";
+            case U8:
+                return "com.codename1.unitycompat.system.UInt64Box";
+            default:
+                break;
+        }
         if ("int".equals(primitive)) {
             return "Integer";
         }
@@ -2849,7 +2864,7 @@ public final class SceneCompiler {
                         line(sb, element + " " + temporary + (types.isStruct(types.storage(type.args[0]))
                                 ? " = new " + element + "();" : ";"));
                         assign(origin, temporary, type.args[0], item, nodes, sb);
-                        String box = boxed(element);
+                        String box = boxed(types.storage(type.args[0]).kind, element);
                         line(sb, target + ".Add(" + (box == null ? temporary : box + ".valueOf(" + temporary + ")")
                                 + ");");
                     }

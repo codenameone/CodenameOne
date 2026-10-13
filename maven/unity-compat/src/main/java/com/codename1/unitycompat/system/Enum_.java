@@ -46,7 +46,8 @@ public final class Enum_ {
 
     private static boolean isInteger(Object value) {
         return value instanceof Integer || value instanceof Long || value instanceof Short || value instanceof Byte
-                || value instanceof Character;
+                || value instanceof ByteBox || value instanceof UInt16Box || value instanceof UInt32Box
+                || value instanceof UInt64Box;
     }
 
     /// The number in a boxed enum or a boxed integer.
@@ -66,9 +67,17 @@ public final class Enum_ {
         if (value instanceof Byte) {
             return ((Byte) value).byteValue();
         }
-        if (value instanceof Character) {
-            // A `ushort` is a `char` here, and boxes as one.
-            return ((Character) value).charValue();
+        if (value instanceof ByteBox) {
+            return ((ByteBox) value).value;
+        }
+        if (value instanceof UInt16Box) {
+            return ((UInt16Box) value).value;
+        }
+        if (value instanceof UInt32Box) {
+            return ((UInt32Box) value).value;
+        }
+        if (value instanceof UInt64Box) {
+            return ((UInt64Box) value).value;
         }
         if (value == null) {
             throw new ArgumentNullException();
@@ -77,21 +86,25 @@ public final class Enum_ {
                 "The value passed in must be an enum base or an underlying type for an enum, such as an Int32.");
     }
 
-    /// True if a boxed integer is of the type the enum is stored as, as
-    /// far as that survives here: an `int` and a `uint` are both an
-    /// `Integer`, and so on for each width.
+    /// True if a boxed integer is of the type the enum is stored as. Each
+    /// of the eight has a box of its own: the signed ones the JDK's, the
+    /// unsigned ones the runtime's.
     private static boolean isUnderlying(Type t, Object value) {
         switch (t.underlying) {
             case Type.I1:
-            case Type.U1:
                 return value instanceof Byte;
+            case Type.U1:
+                return value instanceof ByteBox;
             case Type.I2:
                 return value instanceof Short;
             case Type.U2:
-                return value instanceof Character;
+                return value instanceof UInt16Box;
             case Type.I8:
-            case Type.U8:
                 return value instanceof Long;
+            case Type.U8:
+                return value instanceof UInt64Box;
+            case Type.U4:
+                return value instanceof UInt32Box;
             default:
                 return value instanceof Integer;
         }

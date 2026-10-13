@@ -34,6 +34,11 @@ public abstract class Action_1 extends MulticastDelegate {
         return new Multi(list);
     }
 
+    @Override
+    protected boolean $sameType(Delegate other) {
+        return other instanceof Action_1;
+    }
+
     private static final class Multi extends Action_1 {
         Multi(Delegate[] list) {
             $list = list;

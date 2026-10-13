@@ -285,6 +285,14 @@ namespace Spike
         }
     }
 
+    public enum Pitch : byte { Low = 1, High = 200 }
+
+    public enum Span : uint { Small = 1, Big = 4000000000 }
+
+    public delegate void Mine(int x);
+
+    public delegate void Yours(int x);
+
     public static class Program
     {
         public static void Log(string s)
@@ -1884,6 +1892,311 @@ namespace Spike
             Log("n=" + n + " again=" + Order.Next() + " first=" + Order.First);
         }
 
+        // ---- unsigned values in an object ------------------------------------
+
+        private static void Try(string label, Func<string> f)
+        {
+            string r;
+            try
+            {
+                r = f();
+            }
+            catch (InvalidCastException)
+            {
+                r = "threw InvalidCastException";
+            }
+            catch (ArgumentException)
+            {
+                r = "threw ArgumentException";
+            }
+            catch (Exception)
+            {
+                r = "threw another exception";
+            }
+            Log(label + ": " + r);
+        }
+
+        private static string BoxText(object o)
+        {
+            return "" + o;
+        }
+
+        private static string BoxKind(object o)
+        {
+            if (o is uint) return "uint";
+            if (o is int) return "int";
+            if (o is ulong) return "ulong";
+            if (o is long) return "long";
+            if (o is byte) return "byte";
+            if (o is sbyte) return "sbyte";
+            if (o is ushort) return "ushort";
+            if (o is char) return "char";
+            if (o is short) return "short";
+            return "other";
+        }
+
+        private static string BoxSwitch(object o)
+        {
+            switch (o)
+            {
+                case int i: return "int " + i;
+                case uint u: return "uint " + u;
+                case char c: return "char " + c;
+                case ushort s: return "ushort " + s;
+                case sbyte s: return "sbyte " + s;
+                case byte b: return "byte " + b;
+                case long l: return "long " + l;
+                case ulong l: return "ulong " + l;
+                default: return "other";
+            }
+        }
+
+        private static string BoxGeneric<T>(T v)
+        {
+            return v.ToString() + "/" + BoxText(v);
+        }
+
+        // A `byte`, a `ushort`, a `uint` and a `ulong` each share a Java
+        // primitive with another C# type, and must not share its box: boxed,
+        // each still prints, orders and answers `is` as itself.
+        private static void UnsignedBoxes()
+        {
+            Section("unsigned boxes");
+            uint big = 3000000000;
+            byte b = 200;
+            sbyte sb = -56;
+            ulong ul = 18446744073709551615UL;
+            ushort us = 65535;
+            ushort us65 = 65;
+            char ch = 'A';
+            // Text: what a format argument, a concatenation and ToString print.
+            Try("a1", () => string.Format("{0}", big));
+            Try("a2", () => $"{b}");
+            Try("a3", () => BoxText(big));
+            Try("a4", () => ((object)big).ToString());
+            Try("a5", () => "x" + (object)big);
+            Try("a6", () => BoxText(ul) + " " + string.Format("{0}|{1}", ul, ul - 1));
+            Try("a7", () => BoxText(us) + " " + BoxText(us65) + " " + BoxText(ch));
+            Try("a8", () => BoxText(b) + " " + BoxText(sb) + " " + string.Format("{0} {1}", b, sb));
+            Try("a9", () => big.ToString() + " " + b.ToString() + " " + ul.ToString() + " " + us.ToString());
+            Try("a10", () => "c" + big + " " + b + " " + ul + " " + us + " " + sb + " " + ch);
+            Try("a11", () => BoxGeneric(big) + " " + BoxGeneric(b) + " " + BoxGeneric(ul) + " " + BoxGeneric(us) + " " + BoxGeneric(ch) + " " + BoxGeneric(sb));
+            Try("a14", () => string.Concat(big, b) + string.Concat((object)us65, (object)ch));
+            // Order and generic storage.
+            Try("b9", () => big.CompareTo(1u) + " " + b.CompareTo((byte)1) + " " + ul.CompareTo(1ul) + " " + big.Equals(big) + " " + ((IComparable)big).CompareTo((object)1u) + " " + ((IComparable<uint>)big).CompareTo(1u));
+            Try("b16", () => { var d = new Dictionary<string, uint>(); d["a"] = big; uint v; d.TryGetValue("a", out v); foreach (var kv in d) return kv.Key + "=" + kv.Value + " " + v + " " + kv; return ""; });
+
+            Try("e1", () => { var l = new List<uint> { 5, 3000000000, 1, 2147483648 }; return l.Contains(3000000000) + " " + l.IndexOf(2147483648) + " " + l[1] + " " + l.First() + " " + l.Last() + " " + l.Count(x => x > 2147483647) + " " + l.Where(x => x > 5).Count() + " " + l.Distinct().Count(); });
+            Try("e2", () => { var l = new List<byte> { 5, 200, 1, 128 }; string s = ""; foreach (byte x in l) s += x + ","; return s + l.Contains(200) + " " + l[1] + " " + l.Count(x => x > 127) + " " + l.ToArray()[1] + " " + l.Select(x => x + 1).First(); });
+            Try("e3", () => { var d = new Dictionary<uint, string>(); d[3000000000] = "a"; d[1] = "b"; string s = ""; foreach (var kv in d) s += kv.Key + "=" + kv.Value + ","; return s + d[3000000000] + d[1] + d.ContainsKey(3000000000); });
+            Try("e4", () => { var d = new Dictionary<byte, int>(); d[200] = 7; string s = ""; foreach (var kv in d) s += kv.Key + "=" + kv.Value + ","; foreach (byte k in d.Keys) s += k; return s + d[200] + " " + d.ContainsKey(200); });
+            Try("e5", () => { var l = new List<ulong> { 5, 18446744073709551615UL }; var m = new List<ushort> { 65535, 65 }; var n = new List<sbyte> { -3 }; var c = new List<char> { 'a' }; return l[1] + " " + m[0] + " " + m[1] + " " + n[0] + " " + c[0] + " " + BoxText(l[1]) + BoxText(m[1]) + BoxText(c[0]); });
+            Try("e6", () => { var t = (big, b, us65); object o = t.Item1; return t.Item1 + " " + t.Item2 + " " + t.Item3 + " " + BoxText(o); });
+            Try("e7", () => ((IComparable)big).CompareTo((object)1u) + " " + ((IComparable<uint>)big).CompareTo(1u) + " " + ((IComparable)b).CompareTo((object)(byte)1) + " " + ((IComparable)ul).CompareTo((object)1ul) + " " + ((IComparable)us).CompareTo((object)(ushort)1) + " " + ((IEquatable<uint>)big).Equals(big));
+            Try("e8", () => { uint[] a = { 5, 3000000000, 1 }; byte[] bs = { 200 }; object o = a[1]; return a[1] + " " + BoxText(a[1]) + " " + o + " " + bs[0] + " " + BoxText(bs[0]) + " " + a.Contains(3000000000u) + " " + a.First(x => x > 5) + " " + a.ToList()[1]; });
+            Try("e9", () => { Func<uint> f = () => big; Func<byte, string> g = x => "" + x; Action<object> h = x => Console.WriteLine(x); h(big); h(b); h(us65); h(ul); Console.WriteLine((object)b); return f() + " " + g(b) + " " + BoxText(f()); });
+            Try("e10", () => big.Equals((object)big) + " " + big.Equals((object)(int)5) + " " + b.Equals((object)b) + " " + ((object)big).GetHashCode() + " " + ((object)b).GetHashCode() + " " + ((object)us).GetHashCode() + " " + ((object)ul).GetHashCode()+ " " + ((object)sb).GetHashCode());
+
+            Try("f1", () => { var l = new List<Pitch> { Pitch.High, Pitch.Low }; object o = l[0]; return l[0] + " " + o + " " + l.Contains(Pitch.High) + " " + (int)l[0] + " " + Enum.IsDefined(typeof(Pitch), (byte)200) + " " + Enum.IsDefined(typeof(Pitch), (byte)7) + " " + (Pitch)(object)Pitch.High; });
+            Try("f2", () => { var l = new List<Span> { Span.Big }; object o = Span.Big; var d = new Dictionary<Span, int>(); d[Span.Big] = 3; return l[0] + " " + o + " " + (uint)l[0] + " " + Enum.IsDefined(typeof(Span), 4000000000u) + " " + d[Span.Big] + " " + l.Contains(Span.Big); });
+            Try("f3", () => { try { return "" + Enum.IsDefined(typeof(Pitch), 200); } catch (ArgumentException) { return "ArgumentException"; } });
+            Try("f4", () => { ushort[] a = { 65, 65535 }; char[] c = { 'x', 'y' }; var l = new List<ushort>(a); var m = new List<char>(c); return l[0] + " " + l[1] + " " + m[0] + " " + a.Contains((ushort)65) + " " + a.ToList()[1] + " " + BoxText(l[0]) + BoxText(m[1]) + " " + a.First() + c.First(); });
+            Try("f5", () => { ulong[] a = { 1, 18446744073709551615UL }; byte[] bs = { 1, 200 }; var l = new List<ulong>(a); var m = new List<byte>(bs); return l[1] + " " + m[1] + " " + a.ToList()[1] + " " + bs.ToList()[1] + " " + bs.Count(x => x > 127) + " " + bs.Select(x => (int)x).First(x => x > 1) + " " + m.ToArray()[1] + " " + l.ToArray()[1] + " " + new List<uint> { 4000000000 }.ToArray()[0] + " " + new List<ushort> { 65 }.ToArray()[0]; });
+            Try("f6", () => { uint[,] g = new uint[2, 2]; g[1, 1] = 3000000000; byte[,] h = new byte[1, 2]; h[0, 1] = 200; string s = ""; foreach (uint v in g) s += v + ";"; foreach (byte v in h) s += v + ";"; object o = g[1, 1]; object p = h[0, 1]; return s + o + p; });
+            Try("f7", () => { byte[] bs = { 1, 200 }; sbyte[] ss = { -3 }; object o = bs[1]; object q = ss[0]; return o + "," + (o is byte) + (o is sbyte) + "," + q + "," + (q is byte) + (q is sbyte); });
+            Try("f8", () => { Func<uint, uint> twice = x => x * 2; Func<byte> two = () => 200; Action<ushort> act = x => Console.WriteLine("ushort " + x); act(65); Func<object> boxed = () => (uint)3000000000; return twice(2000000000) + " " + two() + " " + boxed(); });
+            Try("f9", () => { var t = (a: (uint)3000000000, b: (byte)200); var u = t; return u.ToString() + " " + (t.a == u.a); });
+            Try("f10", () => { object o = (uint)5; object p = (uint)5; object q = (byte)5; return o.Equals(p) + " " + o.Equals(q) + " " + (o.GetHashCode() == p.GetHashCode()) + " " + Equals(o, p); });
+            Try("f11", () => { object[] mixed = { 1, 1u, 1L, 1UL, (byte)1, (sbyte)1, (short)1, (ushort)1, 'x', 1f, 1d, true, "s" }; string s = ""; foreach (object o in mixed) s += BoxKind(o) + ":" + o + " "; return s; });
+            Try("f12", () => { uint a = 4000000000; uint c = 5; ulong x = 18446744073709551615UL; byte m = 250; return (a > c) + " " + (a / c) + " " + (a % 7) + " " + (x / 3) + " " + (x > 1) + " " + (byte)(m + 10) + " " + (m + 10) + " " + (a >> 4) + " " + (uint)(a + a) + " " + (long)a; });
+            // Type tests.
+            Try("c1", () => BoxKind(big) + " " + BoxKind(5) + " " + BoxKind(ul) + " " + BoxKind(5L) + " " + BoxKind(b) + " " + BoxKind(sb) + " " + BoxKind(us) + " " + BoxKind(ch) + " " + BoxKind((short)3));
+            Try("c2", () => BoxSwitch(big) + "; " + BoxSwitch(5) + "; " + BoxSwitch(ul) + "; " + BoxSwitch(5L) + "; " + BoxSwitch(b) + "; " + BoxSwitch(sb) + "; " + BoxSwitch(us65) + "; " + BoxSwitch(ch));
+            // A boxed value is of one type only.
+            Try("d1", () => ((object)1).Equals((object)1u) + " " + ((object)1u).Equals((object)1) + " " + ((object)1u).Equals((object)1u) + " " + ((object)(byte)1).Equals((object)(sbyte)1) + " " + ((object)'A').Equals((object)us65) + " " + ((object)1L).Equals((object)1UL) + " " + object.Equals(1, 1u));
+            Try("d2", () => { object o = 1; return "" + (uint)o; });
+            Try("d3", () => { object o = 1u; return "" + (int)o; });
+            Try("d4", () => { object o = ch; return "" + (ushort)o; });
+            Try("d5", () => { object o = (byte)1; return "" + (sbyte)o; });
+            Try("d6", () => { var d = new Dictionary<object, string>(); d[1] = "int"; d[1u] = "uint"; d['A'] = "char"; d[us65] = "ushort"; return d.Count + " " + d[1] + " " + d[1u] + " " + d['A'] + " " + d[us65]; });
+        }
+
+        // ---- delegate types --------------------------------------------------
+
+        private static void TakesInt(int x)
+        {
+        }
+
+        // Combine and Remove refuse two delegates of different delegate
+        // types, whatever their signatures.
+        private static void DelegateTypes()
+        {
+            Section("delegate types");
+            Mine m = TakesInt; Yours y = TakesInt; Action<int> a = TakesInt; Action<int> a2 = x => { }; Func<int> f = () => 1; Action n = () => { };
+            Try("combine mine+yours", () => "" + (Delegate.Combine(m, y) != null));
+            Try("combine action+func", () => "" + (Delegate.Combine(a, f) != null));
+            Try("combine action+action0", () => "" + (Delegate.Combine(a, n) != null));
+            Try("combine mine+action", () => "" + (Delegate.Combine(m, a) != null));
+            Try("combine same", () => "" + (Delegate.Combine(a, a2) != null) + (Delegate.Combine(m, m) != null));
+            Try("combine null", () => "" + (Delegate.Combine(null, f) == (Delegate)f) + (Delegate.Combine(a, null) == (Delegate)a));
+            Try("combine multi+other", () => "" + (Delegate.Combine(Delegate.Combine(m, m), y) != null));
+            Try("remove mine-yours", () => "" + (Delegate.Remove(m, y) == (Delegate)m));
+            Try("remove action-func", () => "" + (Delegate.Remove(a, f) == (Delegate)a));
+            Try("remove multi-other", () => "" + (Delegate.Remove(Delegate.Combine(m, m), y) != null));
+            Try("remove null", () => "" + (Delegate.Remove(null, f) == null) + (Delegate.Remove(a, null) == (Delegate)a));
+            Try("remove same", () => "" + (Delegate.Remove(m, m) == null) + (Delegate.Remove(a, a2) == (Delegate)a));
+            Try("equals mine/yours", () => "" + m.Equals(y) + ((Delegate)m == (Delegate)y));
+        }
+
+        // ---- powers ----------------------------------------------------------
+
+        private static string Power(double d)
+        {
+            if (!(d >= 0) && !(d < 0))
+            {
+                return "NaN";
+            }
+            if (d > double.MaxValue)
+            {
+                return "+Inf";
+            }
+            if (d < -double.MaxValue)
+            {
+                return "-Inf";
+            }
+            if (d == 0)
+            {
+                return 1 / d < 0 ? "-0" : "0";
+            }
+            // Too large or too small to scale to an int: its sign and its
+            // order of magnitude.
+            if (Math.Abs(d) > 1e15 || Math.Abs(d) < 1e-6)
+            {
+                return (d < 0 ? "-" : "") + "e" + (int)Math.Floor(Math.Log10(Math.Abs(d)) + 0.5);
+            }
+            return "" + (long)Math.Round(d * 1000000);
+        }
+
+        // The sign of a negative base's power is the parity of its exponent,
+        // however large the exponent is; a double of 2^53 or more is even.
+        private static void Powers()
+        {
+            Section("powers");
+            double[] bases = { -1, -0.5, -2, -0.0, double.NegativeInfinity, -1.0000001, -3, 2, 0.0, 1, double.PositiveInfinity, double.NaN, -0.9999999 };
+            double[] exps = { 1025, 1026, -1025, -1026, 2047, 2048, 1e20, -1e20, 9007199254740991, 9007199254740992, 9007199254740993, -9007199254740991, 4503599627370497, 4503599627370496.5, 1024, 1023, -1023, 3, -3, 2, 0.5, -0.5, 1024.5, 2.5, double.PositiveInfinity, double.NegativeInfinity, double.NaN, 0, -0.0, 1, 65537, -65537, 2147483647, 2147483648, 2147483649, -2147483649 , 1e300};
+            foreach (double b in bases)
+            {
+                string row = "";
+                foreach (double e in exps) row += Power(Math.Pow(b, e)) + " ";
+                Log("pow " + Power(b) + ": " + row);
+            }
+            float[] fb = { -1f, -0.5f, -2f, -0f, float.NegativeInfinity, -3f, 2f, 0f, 1f, float.NaN };
+            float[] fe = { 1025f, 1026f, -1025f, 16777215f, 16777216f, 16777217f, -16777215f, 1e20f, -1e20f, 3f, 2f, 0.5f, 129f, 128f, -151f, -150f, float.PositiveInfinity, float.NegativeInfinity, float.NaN, 0f, 8388609f, 8388607.5f };
+            foreach (float b in fb)
+            {
+                string row = "";
+                foreach (float e in fe) row += Power((float)Math.Pow(b, e)) + " ";
+                Log("powf " + Power(b) + ": " + row);
+            }
+        }
+
+        // ---- rounding --------------------------------------------------------
+
+        // Past 2^63 a double has no `long` to go through, an infinity and a
+        // NaN have none either, and a result of zero keeps its argument's
+        // sign: each of these once came back as another number on a device.
+        private static void Rounding()
+        {
+            Section("rounding");
+            double[] values = { 1e20, -1e20, double.NaN, double.PositiveInfinity, double.NegativeInfinity, -0.0, 0.0, 2.5, -2.5, 0.5, -0.5, 1.5, -1.5, 3.5, -3.5, 0.2, -0.2, 0.7, -0.7, 9223372036854775808.0, -9223372036854775808.0, 4503599627370497.0, -4503599627370497.0, 0.49999999999999994, 1e300, -1e300 };
+            foreach (double v in values)
+            {
+                double f = Math.Floor(v), c = Math.Ceiling(v), r = Math.Round(v), t = Math.Truncate(v);
+                Log("of " + Power(v) + ": floor " + Power(f) + " ceiling " + Power(c) + " round " + Power(r) + " truncate " + Power(t)
+                    + " same " + (f == v) + (c == v) + (r == v) + (t == v));
+            }
+        }
+
+        // ---- arrays as enumerables -------------------------------------------
+
+        private struct Cell
+        {
+            public int n;
+
+            public override string ToString()
+            {
+                return "Cell" + n;
+            }
+        }
+
+        private static System.Collections.IEnumerable keptEnumerable;
+
+        private static string Walk(System.Collections.IEnumerable e)
+        {
+            string s = "";
+            foreach (object o in e) s += BoxKind(o) + ":" + o + " ";
+            return s;
+        }
+
+        private static string WalkArray(Array a)
+        {
+            string s = a.Length + "/";
+            foreach (object o in a) s += BoxKind(o) + ":" + o + " ";
+            return s;
+        }
+
+        private static System.Collections.IEnumerable AsEnumerable(uint[] a)
+        {
+            return a;
+        }
+
+        // An array is an IEnumerable wherever it is put, not only where it is
+        // passed; and what comes out of an array of an unsigned type is that
+        // type's box, whichever of the types an array is known by it was
+        // reached through.
+        private static void ArraysAsEnumerables()
+        {
+            Section("arrays as enumerables");
+            int[] ints = { 1, -2 };
+            string[] strings = { "a", "b" };
+            Cell[] cells = { new Cell { n = 1 }, new Cell { n = 2 } };
+            uint[] uints = { 3000000000, 1 };
+            byte[] bytes = { 200, 1 };
+            sbyte[] sbytes = { -56, 1 };
+            ushort[] ushorts = { 65535, 65 };
+            char[] chars = { 'x', 'y' };
+            ulong[] ulongs = { 18446744073709551615UL, 1 };
+            uint[,] grid = new uint[1, 2];
+            grid[0, 1] = 4000000000;
+            // A local.
+            Try("local ints", () => { System.Collections.IEnumerable e = ints; string s = ""; foreach (object o in e) s += o + ","; return s; });
+            Try("local strings", () => { System.Collections.IEnumerable e = strings; string s = ""; foreach (object o in e) s += o + ","; return s; });
+            Try("local cells", () => { System.Collections.IEnumerable e = cells; string s = ""; foreach (object o in e) s += o + ","; return s; });
+            Try("local generic", () => { IEnumerable<int> e = ints; string s = ""; foreach (int o in e) s += o + ","; IEnumerable<string> t = strings; foreach (string o in t) s += o + ","; return s; });
+            Try("local copies", () => { System.Collections.IEnumerable e = cells; foreach (object o in e) { Cell c = (Cell)o; c.n = 9; } return cells[0] + " " + cells[1]; });
+            Try("local sees writes", () => { int[] a = { 1, 2 }; System.Collections.IEnumerable e = a; a[1] = 7; return Walk(e); });
+            // A parameter, a field, a return value and an element.
+            Try("parameter", () => Walk(ints) + Walk(strings) + Walk(cells));
+            Try("field", () => { keptEnumerable = ints; string s = Walk(keptEnumerable); keptEnumerable = uints; return s + Walk(keptEnumerable); });
+            Try("returned", () => Walk(AsEnumerable(uints)));
+            Try("element", () => { var all = new System.Collections.IEnumerable[2]; all[0] = bytes; all[1] = strings; return Walk(all[0]) + Walk(all[1]); });
+            Try("null", () => { int[] none = null; System.Collections.IEnumerable e = none; return "" + (e == null); });
+            // Through object, where only the cast says what is wanted.
+            Try("cast", () => { object o = ints; var e = (System.Collections.IEnumerable)o; object p = strings; var q = p as System.Collections.IEnumerable; return Walk(e) + Walk(q) + (o is System.Collections.IEnumerable) + (((object)5) is System.Collections.IEnumerable); });
+            Try("cast list", () => { object o = new List<int> { 4 }; return Walk((System.Collections.IEnumerable)o) + (o is System.Collections.IEnumerable); });
+            Try("cast wrong", () => { object o = 5; return Walk((System.Collections.IEnumerable)o); });
+            // The unsigned types, by each road.
+            Try("unsigned local", () => { System.Collections.IEnumerable a = uints, b = bytes, c = ushorts, d = ulongs, e = sbytes, f = chars; return Walk(a) + Walk(b) + Walk(c) + Walk(d) + Walk(e) + Walk(f); });
+            Try("unsigned parameter", () => Walk(uints) + Walk(bytes) + Walk(ushorts) + Walk(ulongs) + Walk(sbytes) + Walk(chars) + Walk(grid));
+            // As an Array too, while the array is still known for what it is.
+            Try("unsigned direct", () => { string s = ""; foreach (object o in (Array)uints) s += BoxKind(o) + ":" + o + " "; foreach (object o in (Array)bytes) s += BoxKind(o) + ":" + o + " "; foreach (object o in (System.Collections.IEnumerable)ushorts) s += BoxKind(o) + ":" + o + " "; foreach (object o in (System.Collections.IEnumerable)ulongs) s += BoxKind(o) + ":" + o + " "; return s; });
+            // Kept as an Array, an array of a signed type still is one. (One
+            // of an unsigned type is not told from it there: a known gap,
+            // said where Array_.GetEnumerator is.)
+            Try("signed as Array", () => WalkArray(sbytes) + WalkArray(chars) + WalkArray(ints) + WalkArray(strings));
+            Try("generic cast", () => { object o = uints; string s = ""; foreach (uint u in (IEnumerable<uint>)o) s += u + ","; object p = cells; foreach (Cell c in (IEnumerable<Cell>)p) s += c + ","; return s + (o is IEnumerable<uint>) + (p is IEnumerable<Cell>) + (((object)"s") is IEnumerable<uint>); });
+        }
+
         public static void Main(string[] args)
         {
             ValueTypes();
@@ -1907,6 +2220,11 @@ namespace Spike
             ErasedStructValues();
             Angles();
             StaticInit();
+            UnsignedBoxes();
+            DelegateTypes();
+            Powers();
+            Rounding();
+            ArraysAsEnumerables();
             Console.WriteLine("done");
         }
     }

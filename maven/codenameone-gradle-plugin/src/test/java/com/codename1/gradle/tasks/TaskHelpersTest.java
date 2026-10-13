@@ -87,6 +87,49 @@ class TaskHelpersTest {
         assertNull(CompileUnityTask.runtimeJar(Collections.singletonList(references)));
     }
 
+    /// `compileUnity` used to be skipped whenever `src/main/unity` held no
+    /// project, which also skipped it on the build after the project was
+    /// deleted: its generated sources stayed a source root and its classes
+    /// stayed in the application's output until `clean`. It now has work while
+    /// a directory it owns holds anything, and that work empties all three.
+    @Test
+    void aDeletedUnityProjectLeavesTheTaskWorkUntilItsOutputIsGone() throws Exception {
+        File unity = new File(tmp.toFile(), "src/main/unity");
+        File generated = new File(tmp.toFile(), "build/generated/sources/cn1-unity");
+        File classes = new File(tmp.toFile(), "build/cn1-unity/classes");
+        File state = new File(tmp.toFile(), "build/cn1-unity/state");
+        // Never had one: nothing to do, and no directory is made to find out.
+        assertFalse(CompileUnityTask.hasWork(unity, generated, classes, state));
+        assertFalse(new File(tmp.toFile(), "build").exists());
+
+        // What a build of a project leaves, the project itself now deleted.
+        touch("build/generated/sources/cn1-unity/com/codename1/generated/unity/UnityAppImpl.java");
+        touch("build/generated/sources/cn1-unity/a/b/Main.java");
+        touch("build/cn1-unity/classes/global/Player.class");
+        touch("build/cn1-unity/classes/sheet.png");
+        touch("build/cn1-unity/classes/unrecorded/Old.class");
+        touch("build/cn1-unity/state/unity/state.txt");
+        touch("build/cn1-unity/state/unity/app/global/Player.class");
+        Files.write(new File(state, "unity/installed.txt").toPath(),
+                "global/Player.class\nsheet.png\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        assertTrue(CompileUnityTask.hasWork(unity, generated, classes, state));
+
+        assertFalse(CompileUnityTask.build(new com.codename1.maven.UnityProjectBuilder(unity, generated, classes,
+                state, null, null, Collections.<File>emptyList(), null, "a.b", "Main",
+                Collections.<File>emptyList(), null), generated, classes, state));
+        assertEquals(0, generated.list().length, "no generated source is left to compile");
+        assertEquals(0, classes.list().length, "no class or image is left to package");
+        assertEquals(0, state.list().length, "no state is left to match a project that comes back");
+        assertFalse(CompileUnityTask.hasWork(unity, generated, classes, state), "and the next build skips the task");
+
+        // Half a project is none, and is treated the same.
+        touch("src/main/unity/Assets/Player.cs");
+        touch("build/cn1-unity/classes/global/Player.class");
+        assertTrue(CompileUnityTask.hasWork(unity, generated, classes, state));
+        touch("src/main/unity/ProjectSettings/ProjectSettings.asset");
+        assertTrue(CompileUnityTask.hasWork(unity, new File(tmp.toFile(), "none")), "a project is always work");
+    }
+
     /// The task fails with the builder's own message when the project is there
     /// and the runtime is not, rather than translating against nothing: this is
     /// the path a build takes when the dependency was excluded by hand.
