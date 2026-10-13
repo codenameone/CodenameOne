@@ -15,26 +15,6 @@
     }
    }
   },
-  "linux-x64@amd-epyc-7763-64-core-processor": {
-   "translator": {
-    "all": {
-     "from": {
-      "memory": 0.519,
-      "time": 0.515,
-      "tolerance": {
-       "time": 0.2
-      }
-     },
-     "memory": 0.44,
-     "reason": "MethodDependencyGraph.getCallers returns a read-only view instead of copying the caller set on every lookup (a4254d5453): the translator allocates ~3.26GB instead of ~3.84GB translating the hello suite, and its RSS falls accordingly (hello x64 RAM 1.02x -> 0.88x in the same run); run 38140307782 at 7ed5047ffe",
-     "runs": 1,
-     "time": 0.515,
-     "tolerance": {
-      "time": 0.2
-     }
-    }
-   }
-  },
   "linux-x64@amd-epyc-9v45-96-core-processor": {
    "arrayRandom": {
     "all": {
