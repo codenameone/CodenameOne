@@ -69,8 +69,20 @@ public class OverlayState {
         if (newEntries == null) {
             return;
         }
+        // insert() resolves `above` to index(above) + 1 FRESH on every call, and an
+        // anchor already in the list does not move just because something lands
+        // AFTER it -- so looping with the same `above` put every new entry at the
+        // same slot, reversing the caller's order (anchor, b, a instead of anchor,
+        // a, b). `below`'s own index DOES shift forward as each entry lands just
+        // before it, so that anchor already chains correctly on its own; only
+        // `above` needs to be walked forward to whatever was just placed, so the
+        // NEXT entry lands above THAT one instead of back at the original anchor.
+        OverlayEntry anchor = above;
         for (OverlayEntry e : newEntries) {
-            insert(e, below, above);
+            insert(e, below, anchor);
+            if (above != null && entries.contains(e)) {
+                anchor = e;
+            }
         }
     }
 

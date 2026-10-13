@@ -350,6 +350,15 @@ public class AnimationController extends Animation<Double> {
         repeatMin = min != null ? min : lowerBound;
         repeatMax = max != null ? max : upperBound;
         currentValue = repeatMin;
+        // Detaches whatever run's completer was installed (an active forward/reverse/
+        // animateTo, superseded here) the same way forward()/reverse()/animateTo() do
+        // before their own beginRun: newRun() swaps in a fresh Completer, so the
+        // superseded one is simply orphaned -- never completed, which is exactly a
+        // canceled TickerFuture's contract. Without this, repeat() left the SUPERSEDED
+        // run's completer installed, and a later stop(canceled: false) -- meant to
+        // settle THIS repeat -- completed that old, unrelated future successfully
+        // instead, even though the run it belonged to never reached its target.
+        newRun();
         beginRun(repeatMax, d, AnimationStatus.forward);
     }
 

@@ -69,6 +69,17 @@ public class TextFieldRenderElement extends RenderElement {
     /// The icon-plus-editor container, when the decoration has a prefix icon.
     /// The decoration's surface belongs to this, not to the editor inside it.
     private com.codename1.ui.Container decoratedRow;
+    /// The SAME row as {@link #decoratedRow}, but also set when the row exists only
+    /// for an OUTSIDE icon or a suffix icon (decoratedRow stays null in those cases,
+    /// since the decoration's surface then belongs to the field, not the row). Null
+    /// when {@link #decorated} took the bare-field branch -- no row was built at all.
+    private com.codename1.ui.Container iconRow;
+    /// The WEST glyph label built by {@link #decorated}, when the decoration has a
+    /// prefix (or outside) icon; see {@link #syncDecorationChildren}.
+    private com.codename1.ui.Label prefixGlyphLabel;
+    /// The EAST glyph label built by {@link #decorated}, when the decoration has a
+    /// suffix icon; see {@link #syncDecorationChildren}.
+    private com.codename1.ui.Label suffixGlyphLabel;
 
     public TextFieldRenderElement(TextField widget) {
         super(widget);
@@ -170,18 +181,20 @@ public class TextFieldRenderElement extends RenderElement {
         }
         com.codename1.ui.Container row =
                 new com.codename1.ui.Container(new com.codename1.ui.layouts.BorderLayout());
+        iconRow = row;
         if (chosen != null && chosen.getIcon() != null) {
-            row.add(com.codename1.ui.layouts.BorderLayout.WEST, glyphLabel(chosen));
+            prefixGlyphLabel = glyphLabel(chosen);
+            row.add(com.codename1.ui.layouts.BorderLayout.WEST, prefixGlyphLabel);
         }
         if (suffix != null) {
             // suffixIcon: the trailing glyph INSIDE the decoration -- the demo's
             // password field is a visibility toggle and had none at all.
-            com.codename1.ui.Label glyph = glyphLabel(suffix);
+            suffixGlyphLabel = glyphLabel(suffix);
             // An IconButton suffix keeps its button: a tap on the glyph runs the
             // CURRENT widget's onPressed, looked up at tap time so a rebuilt
             // callback is never stale. Drawing only the glyph left the password
             // visibility toggle showing and doing nothing.
-            glyph.addPointerReleasedListener(new ActionListener<ActionEvent>() {
+            suffixGlyphLabel.addPointerReleasedListener(new ActionListener<ActionEvent>() {
                 @Override
                 public void actionPerformed(ActionEvent evt) {
                     IconButton b = suffixButton();
@@ -195,7 +208,7 @@ public class TextFieldRenderElement extends RenderElement {
                     }
                 }
             });
-            row.add(com.codename1.ui.layouts.BorderLayout.EAST, glyph);
+            row.add(com.codename1.ui.layouts.BorderLayout.EAST, suffixGlyphLabel);
         }
         row.add(com.codename1.ui.layouts.BorderLayout.CENTER, tf);
         if (inside != null) {
@@ -214,6 +227,62 @@ public class TextFieldRenderElement extends RenderElement {
             row.getAllStyles().setBgTransparency(0);
         }
         return withHelper(tf, row);
+    }
+
+    /**
+     * Keeps the prefix/suffix glyphs {@link #decorated} built in step with the
+     * CURRENT decoration, on every {@link #apply}.
+     *
+     * <p>{@code decorated()} only runs once, on mount ({@code createComponent()}),
+     * and {@code updateComponent} used to call only {@link #apply} -- never
+     * touching the row it built. So a rebuild that swapped the decoration's icon
+     * -- the demo's password field toggling between {@code Icons.visibility} and
+     * {@code Icons.visibility_off} -- kept drawing whichever glyph happened to be
+     * current the one time the row was built, and an {@code IconButton} that
+     * appears or disappears across rebuilds did nothing either way.</p>
+     *
+     * <p>Limited to the slots {@code decorated()} actually built: a field created
+     * with NEITHER a prefix nor a suffix icon has no row at all (the bare-field
+     * branch), and growing one after mount would mean restructuring the already
+     * mounted component tree, which this element does not support. A field built
+     * WITH a row can freely change, swap or clear either glyph thereafter.</p>
+     */
+    private void syncDecorationChildren() {
+        if (iconRow == null) {
+            return;
+        }
+        com.codename1.flutter.widgets.Icon inside = iconAt(true);
+        com.codename1.flutter.widgets.Icon outside = iconAt(false);
+        com.codename1.flutter.widgets.Icon chosen = inside != null ? inside : outside;
+        syncGlyph(prefixGlyphLabel, chosen);
+        syncGlyph(suffixGlyphLabel, suffixIcon());
+    }
+
+    /// Pushes `icon`'s current glyph/colour onto an already-built label, or clears
+    /// it when the decoration no longer names one. See syncDecorationChildren.
+    private void syncGlyph(com.codename1.ui.Label label, com.codename1.flutter.widgets.Icon icon) {
+        if (label == null) {
+            // This slot was never built (see syncDecorationChildren) -- nothing to sync.
+            return;
+        }
+        if (icon == null || icon.getIcon() == null) {
+            label.setIcon(null);
+            return;
+        }
+        com.codename1.ui.plaf.Style glyphStyle =
+                new com.codename1.ui.plaf.Style(label.getUnselectedStyle());
+        com.codename1.flutter.Color tint = iconColor(icon);
+        if (tint != null) {
+            glyphStyle.setFgColor(tint.rgb());
+            label.getAllStyles().setFgColor(tint.rgb());
+        }
+        glyphStyle.setBgTransparency(0);
+        try {
+            label.setIcon(com.codename1.ui.FontImage.createMaterial(
+                    icon.getIcon().codePoint(), glyphStyle, Dp.mm(PREFIX_ICON_LP)));
+        } catch (Exception headlessOrNoFont) {
+            // keep whatever glyph is already showing
+        }
     }
 
     /// The decoration's inside ({@code prefixIcon}) or outside ({@code icon})
@@ -302,6 +371,14 @@ public class TextFieldRenderElement extends RenderElement {
                 // single emoji can be eleven units. It is therefore only a generous upper
                 // bound; userEdited enforces the real limit on character boundaries.
                 tf.setMaxSize((int) Math.min(Integer.MAX_VALUE, w.getMaxLength().longValue() * 16));
+            } else {
+                // null or negative (Flutter's noMaxLength, -1) both mean UNLIMITED. Without
+                // this, a field whose maxLength was never set kept TextArea's constructor
+                // default of 124 -- not Flutter's unlimited -- and a rebuild from a finite
+                // limit down to unlimited kept the OLD finite cap forever, since nothing
+                // ever asked setMaxSize() to raise it back. There is no "unlimited" sentinel
+                // on TextArea; the cap is just an int, so the largest one stands in for it.
+                tf.setMaxSize(Integer.MAX_VALUE);
             }
             // maxLines was stored and never read, so the demo's "Life story"
             // field -- which asks for three lines -- came up one line tall and
@@ -320,6 +397,7 @@ public class TextFieldRenderElement extends RenderElement {
             }
             tf.setEditable(w.isEnabled());
             tf.setEnabled(w.isEnabled());
+            syncDecorationChildren();
             InputDecoration d = w.getDecoration();
             if (d != null) {
                 String hint = d.getLabelText() != null ? d.getLabelText() : d.getHintText();
@@ -886,6 +964,24 @@ public class TextFieldRenderElement extends RenderElement {
      */
     String componentText() {
         return field == null ? null : field.getText();
+    }
+
+    /// Seam for MaxLengthNativeCapTest: the native TextArea's own cap, without a
+    /// public API surface that exists only for tests. -1 when headless (no field).
+    int nativeMaxSizeForTest() {
+        return field == null ? -1 : field.getMaxSize();
+    }
+
+    /// Seam for DecorationIconSyncTest: the actual Image baked into the suffix
+    /// glyph slot, or null when there is no such slot at all.
+    Object suffixGlyphIconForTest() {
+        return suffixGlyphLabel == null ? null : suffixGlyphLabel.getIcon();
+    }
+
+    /// Seam for DecorationIconSyncTest: the actual Image baked into the prefix
+    /// glyph slot, or null when there is no such slot at all.
+    Object prefixGlyphIconForTest() {
+        return prefixGlyphLabel == null ? null : prefixGlyphLabel.getIcon();
     }
 
     /**

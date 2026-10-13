@@ -386,8 +386,18 @@ public class ImageRenderElement extends RenderElement {
         if (full == null) {
             return null;
         }
-        Long tw = image().getResizeWidthPx();
-        Long th = image().getResizeHeightPx();
+        // getResizeWidthPx/Height (a wrapping ResizeImage) and cacheWidth/cacheHeight
+        // (Image.asset's own decode-size parameters) are the SAME hint: Flutter's own
+        // Image.asset wraps its provider in ResizeImage.resizeIfNeeded(cacheWidth,
+        // cacheHeight, ...), so cacheWidth/cacheHeight on an asset mean exactly what
+        // ResizeImage's own width/height do. Consulting only getResizeWidthPx/Height
+        // left Image.asset(..., cacheWidth: w, cacheHeight: h) decoding and RETAINING
+        // the picture at full resolution -- performLayout/sourceSizeForFit already read
+        // cacheWidth/cacheHeight for the on-screen SIZE, so the box shrank to the hint
+        // while the bitmap behind it stayed huge, the exact memory bug ResizeImage
+        // exists to prevent.
+        Long tw = image().getResizeWidthPx() != null ? image().getResizeWidthPx() : image().cacheWidth;
+        Long th = image().getResizeHeightPx() != null ? image().getResizeHeightPx() : image().cacheHeight;
         if (tw == null && th == null) {
             return full;
         }
@@ -409,6 +419,12 @@ public class ImageRenderElement extends RenderElement {
         } catch (Throwable t) {
             return full;
         }
+    }
+
+    /// Seam for CacheHintsDownsampleTest: downsample()'s real decision, without
+    /// decoding an actual asset or network stream.
+    com.codename1.ui.Image downsampleForTest(com.codename1.ui.Image full) {
+        return downsample(full);
     }
 
     @Override

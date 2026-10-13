@@ -63,6 +63,14 @@ public class OverlayEntry {
 
     void attach(OverlayState state) {
         this.owner = state;
+        // A re-insert (remove(), then insert() again, which OverlayState.insert
+        // allows) must come back visible. remove() sets mounted false explicitly
+        // -- the simplified stand-in for Flutter's own `mounted`, which tracks the
+        // overlay widget's attached state and so starts fresh on every insert --
+        // and nothing undid that, so OverlayElement.build()'s "!entry.mounted()"
+        // check skipped a re-inserted entry FOREVER, even though attach() is
+        // exactly the signal that it is back in an overlay and about to be built.
+        mounted = true;
     }
 
     /** Marks the entry as needing to rebuild its content on the next frame. */

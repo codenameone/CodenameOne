@@ -28,6 +28,7 @@ import com.codename1.flutter.ComposedElement;
 import com.codename1.flutter.Element;
 import com.codename1.flutter.StackFit;
 import com.codename1.flutter.Widget;
+import com.codename1.flutter.foundation.FlutterError;
 
 import dart.core.DartList;
 
@@ -79,10 +80,29 @@ public class Overlay extends Widget {
         return o;
     }
 
-    /** Flutter's {@code Overlay.of} — the nearest ancestor overlay's state. */
+    /**
+     * Flutter's {@code Overlay.of} -- the nearest ancestor overlay's state.
+     *
+     * <p>With no ancestor {@link Overlay}, Flutter throws a {@link FlutterError}
+     * ("No Overlay widget found..."), not a usable fallback -- {@code insert()} on a
+     * fresh, detached {@link OverlayState} used to silently do nothing, so a dialog or
+     * coach mark built above a route with no {@code Navigator}/{@code MaterialApp}
+     * ancestor simply never appeared, with no sign anything had gone wrong. Throwing
+     * here is what Flutter does; a caller that only wants to know whether one exists
+     * uses {@link #maybeOf}, which still answers null.</p>
+     */
     public static OverlayState of(BuildContext context, boolean rootOverlay, Object debugRequiredFor) {
         OverlayState s = maybeOf(context, rootOverlay);
-        return s == null ? new OverlayState() : s;
+        if (s == null) {
+            throw new FlutterError("No Overlay widget found. "
+                    + (debugRequiredFor != null
+                            ? debugRequiredFor.getClass().getName() + " widgets"
+                            : "Some widgets")
+                    + " require an Overlay widget ancestor for correct operation. The most"
+                    + " common way to add an Overlay to an application is to include a"
+                    + " MaterialApp, CupertinoApp or Navigator widget in the runApp() call.");
+        }
+        return s;
     }
 
     /** Flutter's {@code Overlay.maybeOf}. */

@@ -238,18 +238,34 @@ public class Image extends Widget {
      * across in-place widget updates.
      */
     public String sourceKey() {
+        String base;
         if (assetName != null) {
-            return "asset:" + assetName;
+            base = "asset:" + assetName;
+        } else if (memoryBytes != null) {
+            base = memoryKey;
+        } else {
+            // The headers are part of what was asked for: a refreshed token must
+            // fetch again rather than be answered by the load made with the old one.
+            // Content-derived, the same SHA-256 the storage cache keys by: the header map's
+            // hashCode is identity-based for a Dart map and 32 bits for any other, so a
+            // mutated map or a collision kept the key and the old credentials' bytes.
+            base = headers == null ? "url:" + url
+                    : "url:" + url + "#" + ImageRenderElement.storageKey(url, headers);
         }
-        if (memoryBytes != null) {
-            return memoryKey;
-        }
-        // The headers are part of what was asked for: a refreshed token must
-        // fetch again rather than be answered by the load made with the old one.
-        // Content-derived, the same SHA-256 the storage cache keys by: the header map's
-        // hashCode is identity-based for a Dart map and 32 bits for any other, so a
-        // mutated map or a collision kept the key and the old credentials' bytes.
-        return headers == null ? "url:" + url : "url:" + url + "#" + ImageRenderElement.storageKey(url, headers);
+        return base + decodeHintSuffix();
+    }
+
+    /// Folds the decode-size hints into the source identity: a rebuild that only
+    /// changes cacheWidth/cacheHeight (or a wrapping ResizeImage's width/height) on
+    /// the SAME asset/url/buffer must still be treated as a new source, or
+    /// ImageRenderElement.loadImage's "source.equals(loadedSource)" short-circuit
+    /// keeps showing the bitmap decoded for the OLD size forever. Empty when neither
+    /// hint is set, so an image with no decode hints keeps its bare sourceKey (an
+    /// existing test pins the exact string for that case).
+    private String decodeHintSuffix() {
+        Long w = resizeWidthPx != null ? resizeWidthPx : cacheWidth;
+        Long h = resizeHeightPx != null ? resizeHeightPx : cacheHeight;
+        return w == null && h == null ? "" : "@" + w + "x" + h;
     }
 
     /// Request headers for a network image, or null.
