@@ -126,6 +126,17 @@ public class DesktopPomUpdaterTest {
         assertFalse(again.changed);
         assertTrue(again.addedLibraries.isEmpty(), again.addedLibraries.toString());
         assertEquals(u.pom, again.pom);
+
+        // The same artifact somewhere that compiles nothing for the module
+        // -- here another group's artifact of that name, in a profile -- is
+        // not the module's dependency.
+        String elsewhere = current.replace("<profiles>", "<profiles>\n<profile><id>other</id><dependencies>"
+                + "<dependency><groupId>org.other</groupId><artifactId>miglayout-swing</artifactId>"
+                + "<version>1</version></dependency></dependencies></profile>");
+        assertTrue(elsewhere.length() > current.length());
+        DesktopPomUpdater third = new DesktopPomUpdater(elsewhere, false, libraries);
+        assertTrue(third.addedLibraries.contains("com.miglayout:miglayout-swing:5.3 (compile)"),
+                third.addedLibraries.toString());
     }
 
     @Test

@@ -31,6 +31,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 /// `java.util.concurrent.Executors` for the Codename One runtime: executor
 /// services that run their tasks on Codename One background threads.
@@ -113,6 +114,8 @@ public final class Executors {
 
         private final Runnable task;
         private final AtomicInteger state = new AtomicInteger(QUEUED);
+        /// The job submitted before this one, set before the job is published.
+        private Job below;
 
         Job(Runnable task) {
             this.task = task;
@@ -135,14 +138,42 @@ public final class Executors {
     }
 
     private static final class Pool implements ExecutorService {
-        private final EasyThread[] workers;
+        /// One cell per worker, filled when the worker is first needed. The
+        /// list itself never changes after the constructor.
+        private final List<AtomicReference<EasyThread>> workers;
         private final AtomicBoolean shutdown = new AtomicBoolean();
-        /// Jobs that may not have started yet, for `shutdownNow` to drop.
-        private final List<Job> outstanding = new ArrayList<Job>();
-        private int next;
+        /// Jobs that may not have started yet, for `shutdownNow` to drop: a
+        /// stack linked through [Job#below], newest first.
+        ///
+        /// An executor is submitted to from any thread -- a task that submits
+        /// the next one does it from a worker while the EDT submits its own
+        /// -- so nothing here is a plain field. Two `ArrayList.add` calls at
+        /// once could lose a job from the bookkeeping, and `shutdownNow`
+        /// then let it run.
+        private final AtomicReference<Job> outstanding = new AtomicReference<Job>();
+        private final AtomicInteger next = new AtomicInteger();
 
         Pool(int size) {
-            workers = new EasyThread[size];
+            List<AtomicReference<EasyThread>> cells = new ArrayList<AtomicReference<EasyThread>>(size);
+            for (int i = 0; i < size; i++) {
+                cells.add(new AtomicReference<EasyThread>());
+            }
+            workers = cells;
+        }
+
+        private EasyThread worker(int slot) {
+            AtomicReference<EasyThread> cell = workers.get(slot);
+            EasyThread worker = cell.get();
+            if (worker == null) {
+                EasyThread started = EasyThread.start("cn1-executor-" + slot);
+                if (cell.compareAndSet(null, started)) {
+                    return started;
+                }
+                // Another submitter started this slot's worker first.
+                started.kill();
+                worker = cell.get();
+            }
+            return worker;
         }
 
         @Override
@@ -153,20 +184,31 @@ public final class Executors {
             if (shutdown.get()) {
                 throw new RejectedExecutionException("The executor has been shut down");
             }
-            // Forget the jobs that have started since the last call.
-            for (int i = outstanding.size() - 1; i >= 0; i--) {
-                if (!outstanding.get(i).isQueued()) {
-                    outstanding.remove(i);
+            Job job = new Job(command);
+            for (;;) {
+                // Forget the newest jobs that have started since the last
+                // call. One still queued keeps the started ones under it
+                // until it starts too, which a queue drains in order.
+                Job seen = outstanding.get();
+                Job top = seen;
+                while (top != null && !top.isQueued()) {
+                    top = top.below;
+                }
+                job.below = top;
+                if (outstanding.compareAndSet(seen, job)) {
+                    break;
                 }
             }
-            Job job = new Job(command);
-            outstanding.add(job);
-            int slot = next;
-            next = (next + 1) % workers.length;
-            if (workers[slot] == null) {
-                workers[slot] = EasyThread.start("cn1-executor-" + slot);
+            if (shutdown.get()) {
+                // A shutdown arrived between the check above and the push.
+                if (job.drop()) {
+                    throw new RejectedExecutionException("The executor has been shut down");
+                }
+                // shutdownNow found the job and answered it as never run.
+                return;
             }
-            workers[slot].run(job);
+            int slot = (next.getAndIncrement() & 0x7fffffff) % workers.size();
+            worker(slot).run(job);
         }
 
         @Override
@@ -211,7 +253,12 @@ public final class Executors {
         @Override
         public void shutdown() {
             shutdown.set(true);
-            for (EasyThread worker : workers) {
+            killWorkersWhenIdle();
+        }
+
+        private void killWorkersWhenIdle() {
+            for (AtomicReference<EasyThread> cell : workers) {
+                EasyThread worker = cell.get();
                 if (worker != null) {
                     worker.killWhenIdle();
                 }
@@ -222,20 +269,17 @@ public final class Executors {
         public List<Runnable> shutdownNow() {
             shutdown.set(true);
             List<Runnable> dropped = new ArrayList<Runnable>();
-            for (Job job : outstanding) {
+            for (Job job = outstanding.getAndSet(null); job != null; job = job.below) {
                 if (job.drop()) {
                     if (job.task instanceof Task) {
                         ((Task<?>) job.task).cancel(false);
                     }
-                    dropped.add(job.task);
+                    // The stack is newest first; the answer is in the order
+                    // the tasks were submitted.
+                    dropped.add(0, job.task);
                 }
             }
-            outstanding.clear();
-            for (EasyThread worker : workers) {
-                if (worker != null) {
-                    worker.killWhenIdle();
-                }
-            }
+            killWorkersWhenIdle();
             return dropped;
         }
 
@@ -249,7 +293,8 @@ public final class Executors {
             if (!shutdown.get()) {
                 return false;
             }
-            for (EasyThread worker : workers) {
+            for (AtomicReference<EasyThread> cell : workers) {
+                EasyThread worker = cell.get();
                 if (worker != null && !worker.isFinished()) {
                     return false;
                 }

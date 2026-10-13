@@ -233,6 +233,18 @@ public class NioPathDifferentialTest {
                 Paths.get(java.net.URI.create("file:///var/data/app/notes.txt")).toString());
     }
 
+    /// A name with a character a URI escapes still has a URI, and the
+    /// escaped one: the storage path as typed is not a legal URI.
+    @Test
+    public void aPathWithASpaceOrAHashHasAnEscapedUri() {
+        java.net.URI uri = Paths.get("file:///var/data/my notes#1 50%.txt").toUri();
+        assertEquals("file", uri.getScheme());
+        assertEquals("/var/data/my%20notes%231%2050%25.txt", uri.getRawPath());
+        assertEquals("/var/data/my notes#1 50%.txt", uri.getPath());
+        assertEquals(uri, new File("file:///var/data/my notes#1 50%.txt").toURI());
+        assertEquals("/var/data/app/notes.txt", Paths.get("file:///var/data/app/notes.txt").toUri().getPath());
+    }
+
     private static String ofUri(boolean jdk, String uri) {
         try {
             return jdk ? java.nio.file.Paths.get(java.net.URI.create(uri)).toString()

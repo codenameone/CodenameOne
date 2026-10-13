@@ -290,6 +290,11 @@ public class File implements Comparable<File>, java.io.Serializable {
         return roots == null || roots.length == 0 ? 0L : fs().getRootSizeBytes(roots[0]);
     }
 
+    /// Not atomic, unlike the JDK's: the check and the create are two calls,
+    /// because no port's file system has an exclusive create. Two threads
+    /// racing on one path can both be answered true. A lock file guards
+    /// against another process, and an application on a device is one
+    /// process; code that uses one between its own threads needs a monitor.
     public boolean createNewFile() throws IOException {
         if (exists()) {
             return false;

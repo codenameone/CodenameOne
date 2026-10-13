@@ -400,9 +400,16 @@ final class PathImpl implements Path {
 
     @Override
     public URI toUri() {
+        // The storage path is "file://" and an absolute path, as typed: a
+        // space, '#' or '%' in a file's name is not legal in a URI as it
+        // stands. Handing the path over as a component has it escaped.
         String storage = toFile().storagePath();
+        int at = storage.indexOf(':') + 1;
+        while (at + 1 < storage.length() && storage.charAt(at) == '/' && storage.charAt(at + 1) == '/') {
+            at++;
+        }
         try {
-            return new URI(storage);
+            return new URI("file", null, storage.substring(at), null, null);
         } catch (URISyntaxException e) {
             throw new IllegalArgumentException(e.getMessage());
         }

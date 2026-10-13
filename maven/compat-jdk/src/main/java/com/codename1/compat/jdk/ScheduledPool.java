@@ -109,6 +109,7 @@ final class ScheduledPool implements ScheduledExecutorService {
         }
 
         private void once() {
+            boolean rearm = false;
             try {
                 V value;
                 try {
@@ -122,10 +123,18 @@ final class ScheduledPool implements ScheduledExecutorService {
                 if (!periodic) {
                     outcome.complete(value);
                 } else if (delayAfter > 0 && !outcome.isDone() && !shutdown.get()) {
-                    again();
+                    rearm = true;
                 }
             } finally {
                 running.set(false);
+            }
+            if (rearm) {
+                // Only once the flag is down. Armed before it, a short delay
+                // let the timer fire while this run still held the flag: the
+                // next run saw a run in progress and returned, nothing armed
+                // another, and the task stopped for good with its future
+                // never completing.
+                again();
             }
         }
 

@@ -68,15 +68,18 @@ final class PomWiring {
     }
 
     /// Adds `dependency` as the last of the module's own dependencies, unless
-    /// the pom names `artifactId` anywhere already; answers whether it was
+    /// that list holds `groupId:artifactId` already; answers whether it was
     /// added. The module's own are the `<dependencies>` that precede every
     /// section which may hold another list -- managed versions, the build's
     /// plugins, the profiles -- which is where an archetype-generated common
     /// pom has them.
-    boolean addDependency(String artifactId, String dependency) {
-        if (has("<artifactId>" + artifactId + "</artifactId>")) {
-            return false;
-        }
+    ///
+    /// Only that list counts. The same artifact under
+    /// `<dependencyManagement>`, as a plugin's dependency, or under another
+    /// group does not put it on the module's compile class path, and taking
+    /// it for present left the imported sources without their library and
+    /// reported nothing to do.
+    boolean addDependency(String groupId, String artifactId, String dependency) {
         int limit = pom.length();
         for (String section : new String[] {"<dependencyManagement>", "<build>", "<profiles>"}) {
             int at = pom.indexOf(section);
@@ -90,6 +93,21 @@ final class PomWiring {
             manual.add("the dependency the imported sources are compiled against, in the module's own "
                     + "<dependencies>:\n" + dependency);
             return false;
+        }
+        String group = "<groupId>" + groupId + "</groupId>";
+        String artifact = "<artifactId>" + artifactId + "</artifactId>";
+        int at = open;
+        while (true) {
+            int start = pom.indexOf("<dependency>", at);
+            int end = start < 0 || start > close ? -1 : pom.indexOf("</dependency>", start);
+            if (end < 0 || end > close) {
+                break;
+            }
+            String declared = pom.substring(start, end);
+            if (declared.indexOf(group) >= 0 && declared.indexOf(artifact) >= 0) {
+                return false;
+            }
+            at = end;
         }
         int lineStart = pom.lastIndexOf('\n', close) + 1;
         pom = pom.substring(0, lineStart) + dependency + pom.substring(lineStart);

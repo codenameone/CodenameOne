@@ -59,7 +59,13 @@ public class FileOutputStream extends OutputStream {
             FileSystemStorage fs = FileSystemStorage.getInstance();
             String p = file.storagePath();
             if (append && fs.exists(p)) {
-                out = fs.openOutputStream(p, (int) fs.getLength(p));
+                long length = fs.getLength(p);
+                if (length > Integer.MAX_VALUE) {
+                    // The storage API takes the offset as an int. Narrowed,
+                    // it wraps, and the write lands inside the file.
+                    throw new FileNotFoundException(file.getPath() + " (Too large to append to)");
+                }
+                out = fs.openOutputStream(p, (int) length);
             } else {
                 out = fs.openOutputStream(p);
             }

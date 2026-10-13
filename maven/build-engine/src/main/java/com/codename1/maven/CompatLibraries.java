@@ -41,6 +41,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -165,7 +166,7 @@ public final class CompatLibraries {
             File jar = lib.file();
             String key = key(after, jar.getName());
             Entry old = before.get(key);
-            Entry entry = new Entry(jar.length() + "\t" + jar.lastModified());
+            Entry entry = new Entry(stamp(jar));
             entry.describe(lib);
             Set<String> shipped = lib.shipped();
             if (!shipped.isEmpty()) {
@@ -290,6 +291,29 @@ public final class CompatLibraries {
             out.append(out.length() == 0 ? "" : " or ").append(r.name());
         }
         return out.toString();
+    }
+
+    /// What says a jar is the build of it an earlier run unpacked: its
+    /// length, its time, and a checksum of what its directory lists -- every
+    /// entry's name, size and CRC. Length and time alone call a jar rebuilt
+    /// in place unchanged when a reproducible build, or a file system with
+    /// coarse times, gives the new one the same two numbers, and the stale
+    /// relocated classes then stay in the application. The directory is read
+    /// without inflating an entry.
+    private static String stamp(File jar) throws IOException {
+        CRC32 listing = new CRC32();
+        ZipFile zip = new ZipFile(jar);
+        try {
+            Enumeration<? extends ZipEntry> entries = zip.entries();
+            while (entries.hasMoreElements()) {
+                ZipEntry e = entries.nextElement();
+                listing.update((e.getName() + "\n" + e.getSize() + "\n" + e.getCrc() + "\n")
+                        .getBytes(StandardCharsets.UTF_8));
+            }
+        } finally {
+            zip.close();
+        }
+        return jar.length() + "\t" + jar.lastModified() + "\t" + Long.toHexString(listing.getValue());
     }
 
     /// Unpacks `jar` -- all of it when `classes` is null, else those classes

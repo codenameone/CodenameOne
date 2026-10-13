@@ -396,4 +396,63 @@ public class ExecutorsTest {
         second.complete("value");
         assertEquals("value", follows.toCompletableFuture().get(10, TimeUnit.SECONDS));
     }
+
+    /// An executor is submitted to from several threads at once, and none of
+    /// the submissions may be lost: every task runs, and the pool still
+    /// knows each one that did not when it is told to stop.
+    @Test
+    public void submissionsFromSeveralThreadsAreAllAccounted() throws Exception {
+        final ExecutorService pool = Executors.newFixedThreadPool(3);
+        final AtomicInteger ran = new AtomicInteger();
+        final AtomicInteger failed = new AtomicInteger();
+        Thread[] submitters = new Thread[8];
+        for (int t = 0; t < submitters.length; t++) {
+            submitters[t] = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        for (int i = 0; i < 500; i++) {
+                            pool.execute(new Runnable() {
+                                @Override
+                                public void run() {
+                                    ran.incrementAndGet();
+                                }
+                            });
+                        }
+                    } catch (Throwable e) {
+                        failed.incrementAndGet();
+                    }
+                }
+            });
+            submitters[t].start();
+        }
+        for (Thread submitter : submitters) {
+            submitter.join(20000);
+        }
+        assertEquals(0, failed.get());
+        terminate(pool);
+        assertEquals(4000, ran.get());
+    }
+
+    /// A fixed delay shorter than the time a run takes to wind up must not
+    /// end the repetition: the next run is armed only once this one is over.
+    @Test
+    public void aVeryShortFixedDelayKeepsRepeating() throws Exception {
+        ScheduledExecutorService pool = Executors.newScheduledThreadPool(1);
+        final AtomicInteger runs = new AtomicInteger();
+        ScheduledFuture<?> spaced = pool.scheduleWithFixedDelay(new Runnable() {
+            @Override
+            public void run() {
+                runs.incrementAndGet();
+            }
+        }, 0, 1, TimeUnit.MILLISECONDS);
+        long deadline = System.currentTimeMillis() + 15000;
+        while (runs.get() < 300 && System.currentTimeMillis() < deadline) {
+            Thread.sleep(10);
+        }
+        assertTrue("stopped after " + runs.get() + " runs", runs.get() >= 300);
+        assertFalse(spaced.isDone());
+        spaced.cancel(false);
+        pool.shutdownNow();
+    }
 }

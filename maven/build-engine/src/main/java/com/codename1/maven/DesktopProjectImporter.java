@@ -533,10 +533,21 @@ public final class DesktopProjectImporter {
             String cls = ext.group(1);
             candidate(out, prefix + (cls.equals(fileClass) ? cls : fileClass + "$" + cls)).javafx = true;
         }
-        if (JAVA_MAIN.matcher(code).find()) {
-            candidate(out, prefix + fileClass);
+        Matcher main = JAVA_MAIN.matcher(code);
+        while (main.find()) {
+            // The class is the one the method is written in: a static nested
+            // class compiles to Outer$Nested, and a file can hold a second
+            // top-level class. Recording the file's name for either leaves
+            // an entry the build then rejects for having no main.
+            String declared = declaration(code, main.start(), JAVA_DECLARATION);
+            candidate(out, prefix + (declared == null ? fileClass : declared));
         }
     }
+
+    /// A Java type declaration, in the two groups [#declaration] reads.
+    /// `X.class` is not one.
+    private static final Pattern JAVA_DECLARATION = Pattern.compile(
+            "(?<![.\\w])(class|interface|enum|record)\\s+(\\w+)");
 
     private static final Pattern KOTLIN_DECLARATION = Pattern.compile(
             "(?<!:)\\b(companion\\s+object|object|class|interface)\\b(?:\\s+(\\w+))?");
@@ -552,6 +563,12 @@ public final class DesktopProjectImporter {
     /// `code` has its comments and string literals blanked, so every brace
     /// in it is a block's.
     static String kotlinDeclaration(String code, int at) {
+        return declaration(code, at, KOTLIN_DECLARATION);
+    }
+
+    /// The same walk for either language. `declaration` matches a type
+    /// declaration with its kind in group 1 and its name in group 2.
+    private static String declaration(String code, int at, Pattern declaration) {
         // What each open block is: a declaration's name, "" for a companion
         // object, null for anything else (a function body, a lambda).
         List<String> open = new ArrayList<String>();
@@ -560,7 +577,7 @@ public final class DesktopProjectImporter {
             char c = code.charAt(i);
             if (c == '{') {
                 String name = null;
-                Matcher m = KOTLIN_DECLARATION.matcher(code.substring(header, i));
+                Matcher m = declaration.matcher(code.substring(header, i));
                 // The last one before the brace: a property or a function
                 // without a body can stand between two blocks. `X::class`
                 // is not a declaration.

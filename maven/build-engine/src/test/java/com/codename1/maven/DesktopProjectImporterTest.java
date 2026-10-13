@@ -447,6 +447,26 @@ public class DesktopProjectImporterTest {
         assertFalse(new File(common(), "src/main/desktop/java/com/acme/Core.java").exists());
     }
 
+    /// A file that was in the tree before any import is the developer's: an
+    /// import does not write over it, and never takes it for its own.
+    @Test
+    public void aFileNoImportWroteIsNotOverwritten() throws Exception {
+        File source = javafxMavenProject();
+        File common = common();
+        File desktop = new File(common, "src/main/desktop");
+        File mine = write(desktop, "java/com/acme/fx/Model.java",
+                "package com.acme.fx;\n\npublic class Model {\n    int mine;\n}\n");
+        new DesktopProjectImporter(log).importProject(source, null, common, null);
+        assertTrue(read(mine).contains("int mine;"));
+        assertTrue(logged.toString(), logged.toString().contains("Kept " + mine));
+
+        // Not on the record, so a later import leaves it too, and one from
+        // a project that dropped the path does not remove it.
+        assertTrue(new File(source, "src/main/java/com/acme/fx/Model.java").delete());
+        new DesktopProjectImporter(log).importProject(source, null, common, null);
+        assertTrue(read(mine).contains("int mine;"));
+    }
+
     /// Importing again updates what the first import wrote and nothing else:
     /// the developer's edits and additions stay, and a file that left the
     /// source project is removed.
@@ -527,6 +547,21 @@ public class DesktopProjectImporterTest {
                 + "public class Outer {\n    public static class Inner extends Application {\n    }\n"
                 + "    void main(String[] a) {\n    }\n}\n", out);
         assertEquals(Collections.singleton("Outer$Inner"), out.keySet());
+
+        // The class a main is written in, not the one the file is named for.
+        out.clear();
+        DesktopProjectImporter.scanJava("Outer", "package a;\npublic class Outer {\n    int[] sizes = {1, 2};\n"
+                + "    static class Launcher {\n        public static void main(String[] args) {\n        }\n    }\n}\n",
+                out);
+        assertEquals(Collections.singleton("a.Outer$Launcher"), out.keySet());
+        out.clear();
+        DesktopProjectImporter.scanJava("Model", "package a;\npublic class Model {\n    Class<?> c = Model.class;\n}\n"
+                + "class Start {\n    public static void main(String... args) {\n    }\n}\n", out);
+        assertEquals(Collections.singleton("a.Start"), out.keySet());
+        out.clear();
+        DesktopProjectImporter.scanJava("Plain", "package a;\npublic class Plain {\n"
+                + "    public static void main(String[] args) {\n    }\n}\n", out);
+        assertEquals(Collections.singleton("a.Plain"), out.keySet());
 
         out.clear();
         DesktopProjectImporter.scanJava("Q", "package q;\npublic class Q extends javafx.application.Application {\n}\n",

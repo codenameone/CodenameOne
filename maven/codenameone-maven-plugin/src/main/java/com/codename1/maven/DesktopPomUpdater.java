@@ -104,7 +104,7 @@ final class DesktopPomUpdater {
                         + "            <version>" + lib.version + "</version>\n"
                         + "            <scope>" + scope + "</scope>\n"
                         + "        </dependency>\n";
-                if (w.addDependency(lib.artifactId, xml)) {
+                if (w.addDependency(lib.groupId, lib.artifactId, xml)) {
                     addedLibraries.add(lib.coordinate() + ":" + lib.version + " (" + scope + ")");
                 }
             }

@@ -105,7 +105,8 @@ final class ImportedFiles {
     /// files copied.
     ///
     /// A file an earlier import wrote and the developer changed since (its
-    /// bytes no longer match the earlier record) is kept, as
+    /// bytes no longer match the earlier record) is kept, and so is a file no
+    /// import wrote that differs from the copy on offer. The first is kept as
     /// [#removeStale] keeps one: it is recorded with its earlier hash, so the
     /// next import still recognizes the edit, and deleting it lets an import
     /// copy it afresh.
@@ -131,6 +132,16 @@ final class ImportedFiles {
             log.warn("Kept " + dest + ": it was changed after the earlier import, so " + sourceName + "'s copy "
                     + "was not imported; delete it and import again to take that copy");
             imported.put(path, recorded);
+            return 0;
+        }
+        if (recorded == null && dest.isFile()
+                && !java.util.Arrays.equals(Files.readAllBytes(src.toPath()), Files.readAllBytes(dest.toPath()))) {
+            // No import wrote this file, so it is the developer's: one that
+            // was in the tree before the first import, or one added at a path
+            // the imported project grew later. It is left out of the record,
+            // which keeps removeStale from ever taking it for an import's.
+            log.warn("Kept " + dest + ": it was not written by an import, so " + sourceName + "'s copy "
+                    + "was not imported; delete it and import again to take that copy");
             return 0;
         }
         File parent = dest.getParentFile();
