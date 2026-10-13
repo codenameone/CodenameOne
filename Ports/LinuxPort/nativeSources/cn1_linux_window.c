@@ -1676,11 +1676,10 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_accessibilityEnd___int(CODENAME_O
 }
 
 JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_pumpMessages___R_boolean(CODENAME_ONE_THREAD_STATE) {
-    /* Process all pending GTK events, then block briefly for the next one so the
-     * loop yields the CPU. Returns false once the window has been closed. */
-    while (gtk_events_pending()) {
-        gtk_main_iteration_do(FALSE);
-    }
+    /* Dispatch one main-context iteration, then return to Java's drainInput().
+     * Draining GTK first and then blocking again strands the input just queued
+     * by those callbacks until an unrelated event arrives. A continuously ready
+     * source can also keep that drain loop from returning at all. */
     if (!cn1WindowOpen) {
         return JAVA_FALSE;
     }
