@@ -1,6 +1,26 @@
 {
  "pr": 6010,
  "rebaseline": {
+  "linux-x64@amd-epyc-9v74-80-core-processor": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.43,
+      "time": 0.628,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.463,
+     "reason": "Recalibrate translator RAM from the two documented EPYC 9V74 runs: original baseline run 37661853941 (0.430 median, preserved in cf048eaaca^:vm/selfhost/perf-baseline/pr/5941.json) and run 38338248984 (0.497 median). Their median is 0.463. The earlier native peaks were 238-243 MB versus 249-253 MB now; JDK 25 peaks varied from 529-581 MB to 497-570 MB. Pool the run medians instead of treating the reference-JVM variation as an intentional native memory cost. Keep the existing memory tolerance and time baseline.",
+     "runs": 2,
+     "time": 0.628,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   }
+  },
   "windows-x64@amd64-family-26-model-2-authenticamd": {
    "stringBuilding": {
     "all": {
