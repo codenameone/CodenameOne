@@ -171,6 +171,11 @@ layout, scrolls with it and is styled by the same theme. It doesn't install the
 Material base theme, so a Dart screen dropped into an existing form won't
 restyle the rest of it.
 
+A wrapped widget isn't inside a navigator, so it has no `Overlay` of its own.
+Dart code that calls `Overlay.of(context)` from inside it gets the same error
+it would get outside a `Navigator` on Flutter; show such a screen as a route
+of its own instead.
+
 [[flutter-java-dart-calls]]
 === Calling between Java and Dart
 

@@ -1,6 +1,20 @@
 {
  "pr": 5883,
  "rebaseline": {
+  "linux-arm64@neoverse-n2": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.447,
+      "time": 0.698
+     },
+     "memory": 0.377,
+     "reason": "MethodDependencyGraph.getCallers returns a read-only view instead of copying the caller set on every lookup (a4254d5453): ~3.26GB allocated instead of ~3.84GB translating the hello suite; linux-arm64 translator RAM 0.45x -> 0.38x, run 38270623132 at bb9ede3d55",
+     "runs": 1,
+     "time": 0.698
+    }
+   }
+  },
   "linux-x64@amd-epyc-7763-64-core-processor": {
    "translator": {
     "all": {
