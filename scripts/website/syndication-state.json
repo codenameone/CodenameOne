@@ -2706,6 +2706,22 @@
         "id": 4840318,
         "url": "https://dev.to/codenameone/do-you-prefer-gradle-46ko",
         "syndicated_at": "2026-10-12T21:43:37+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/ccdecd997079/edit",
+        "syndicated_at": "2026-10-13T00:01:09+00:00"
+      }
+    },
+    "native-backend-observability": {
+      "hashnode": {
+        "url": "https://debugagent.com/connect-your-app-to-your-enterprise-traces",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6acd74d16ca1f2b74b0c39e1",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-13T00:02:15+00:00"
       }
     }
   }
