@@ -21,6 +21,20 @@
     }
    }
   },
+  "windows-arm64@armv8-64-bit-family-8-model-d49-microsoft-corporation": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.451,
+      "time": 0.838
+     },
+     "memory": 0.513,
+     "reason": "Recalibrate Windows ARM64 D49 translator RAM from four matching-CPU runs: 38290890489 (0.510x), 38328925998 (0.485x), 38338248979 (0.516x), and 38387632437 (0.524x). The median of these run medians is 0.513x. Native peaks remain stable: 257.1-274.7 MB in run 38338248979 versus 259.2-265.3 MB now; the JDK 25 reference ranged from 491.9-558.7 MB versus 476.9-539.0 MB now. Retain the existing 15% memory tolerance and timing baseline; this records repeated measurements, not a new native memory allowance.",
+     "runs": 4,
+     "time": 0.838
+    }
+   }
+  },
   "windows-arm64@armv8-64-bit-family-8-model-d84-microsoft-corporation": {
    "translator": {
     "all": {
