@@ -153,16 +153,26 @@ public class PageViewRenderElement extends ScrollRenderElement {
         com.codename1.ui.Container pane = pane();
         if (!initialScrollApplied) {
             initialScrollApplied = true;
-            // A PageView opens ON its initialPage; the pane starts at zero, so the
-            // first layout that knows the page extent is where that is realized.
-            if (attached.initialPage() != 0) {
-                scrollToPage(attached.initialPage(), false);
+            // A PageView opens ON its initialPage, UNLESS an animateToPage/jumpToPage
+            // reached the controller before this view had dimensions to apply it
+            // against -- Flutter caches that request (_pageToUseOnStartup) and
+            // applies it, untracked, as the starting page the moment dimensions are
+            // known: the same silent correction initialPage itself gets. reportedPage
+            // is seeded here, to whichever one actually wins, rather than left at the
+            // initialPage attachController() guessed before this view had a page to
+            // open on -- otherwise the jump to a pending page fired onPageChanged for
+            // a page nobody scrolled to, on the very first frame.
+            Long pending = attached.takePendingPage();
+            long startPage = pending != null ? pending.longValue() : attached.initialPage();
+            reportedPage = startPage;
+            if (startPage != 0) {
+                scrollToPage(startPage, false);
             }
         }
         // Headless there is no pane and therefore no scrolling: the view simply
-        // sits on its initial page.
+        // sits on whichever page it opened on.
         double pixels = pane == null
-                ? attached.initialPage() * extent
+                ? reportedPage * extent
                 : (horizontal() ? pane.getScrollX() : pane.getScrollY());
         double viewportDim = horizontal() ? viewportW : viewportH;
         attached.applyMetrics(pixels, extent, viewportDim, 0, Math.max(0, maxScroll()));

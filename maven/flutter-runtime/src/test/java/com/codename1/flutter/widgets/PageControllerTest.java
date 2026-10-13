@@ -220,4 +220,45 @@ class PageControllerTest {
         assertEquals(0, reported.size(),
                 "starting on page 3 is not a page CHANGE");
     }
+
+    /**
+     * {@code animateToPage}/{@code jumpToPage} called before any {@link PageView}
+     * attaches used to complete (or return) immediately and drop the requested page
+     * entirely -- the view then always opened on {@code initialPage} regardless of
+     * what was asked for. Flutter caches that request ({@code _pageToUseOnStartup})
+     * and applies it as the starting page the moment the view's dimensions are
+     * known, same as {@code initialPage} itself.
+     */
+    @Test
+    void anAnimateToPageBeforeAttachmentOpensOnThatPageInstead() {
+        PageController c = new PageController();
+        c.animateToPage(3, null, null);
+        assertFalse(c.hasClients(), "nothing to attach to yet");
+
+        final List<Long> reported = new ArrayList<Long>();
+        mountAndLayout(carousel(c, 6, null, new Funcs.VoidFunc1<RefLong>() {
+            @Override
+            public void call(RefLong v) {
+                reported.add(v.v);
+            }
+        }), 500, 200);
+
+        assertEquals(3.0, c.page(), 0.0001,
+                "the page requested before attachment must be where the view opens, "
+                + "not dropped in favour of initialPage");
+        assertEquals(0, reported.size(), "opening on the requested page is not a page CHANGE");
+    }
+
+    @Test
+    void aJumpToPageBeforeAttachmentOpensOnThatPageInstead() {
+        PageController c = new PageController();
+        c.jumpToPage(4);
+        assertFalse(c.hasClients(), "nothing to attach to yet");
+
+        mountAndLayout(carousel(c, 6, null, null), 500, 200);
+
+        assertEquals(4.0, c.page(), 0.0001,
+                "the page requested before attachment must be where the view opens, "
+                + "not dropped in favour of initialPage");
+    }
 }

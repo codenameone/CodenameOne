@@ -59,6 +59,14 @@ public class PageController implements Listenable {
     private double pageValue;
     private boolean livePage;
 
+    /// A page requested by {@link #animateToPage}/{@link #jumpToPage} before any
+    /// {@link PageViewRenderElement} was attached to apply it to -- Flutter's
+    /// {@code _pageToUseOnStartup}. Null when there is no such request pending.
+    /// Consumed once, by {@link #takePendingPage()}, the first time the attached
+    /// view knows its viewport dimensions (the same moment it would otherwise open
+    /// on {@link #initialPage}).
+    private Long pendingPage;
+
     public PageController() {
     }
 
@@ -110,6 +118,13 @@ public class PageController implements Listenable {
     public Object animateToPage(long page, Object duration, Object curve) {
         dart.async.Completer<Object> done = new dart.async.Completer<Object>();
         if (view == null) {
+            // Flutter's _pageToUseOnStartup: with no view attached yet there is
+            // nothing to animate FROM, so the request becomes the page the view
+            // opens on instead -- applied once its dimensions are known, not
+            // animated, duration and curve included, same as Flutter's own early
+            // return here (PageController.animateToPage, the !hasViewportDimension
+            // branch).
+            pendingPage = page;
             done.complete(null);
             return done.future();
         }
@@ -125,6 +140,8 @@ public class PageController implements Listenable {
     public void jumpToPage(long page) {
         if (view != null) {
             view.scrollToPage(page, false);
+        } else {
+            pendingPage = page;
         }
     }
 
@@ -165,6 +182,15 @@ public class PageController implements Listenable {
             this.view = null;
             this.livePage = false;
         }
+    }
+
+    /// Hands back whatever page an animateToPage/jumpToPage cached while unattached,
+    /// clearing it -- a one-shot read, so the SAME request is not re-applied on a
+    /// later layout. Null when there was no such request.
+    Long takePendingPage() {
+        Long p = pendingPage;
+        pendingPage = null;
+        return p;
     }
 
     /**

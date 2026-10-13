@@ -116,6 +116,8 @@ public class TransformRenderElement extends EffectRenderElement {
         try {
             if (rotates) {
                 paintRotated(g, pane, rendered, sx, sy, angle.doubleValue());
+            } else if (sx < 0 || sy < 0) {
+                paintMirrored(g, pane, rendered, sx, sy);
             } else {
                 paintScaled(g, pane, rendered, sx, sy);
             }
@@ -226,6 +228,55 @@ public class TransformRenderElement extends EffectRenderElement {
             return;
         }
         g.drawImage(layer, pane.getX() + (w - dw) / 2, pane.getY() + (h - dh) / 2, dw, dh);
+    }
+
+    /// Draws the layer scaled and MIRRORED about the pane's centre -- a negative
+    /// scaleX/scaleY, Flutter's way of flipping a subtree (`Transform.scale(scaleX:
+    /// -1)`).
+    ///
+    /// A destination rectangle has no way to say "flip": {@link #paintScaled} builds
+    /// one from `w * sx`, so a negative factor produced a negative width/height, which
+    /// every port treats the same as the already-collapsed (zero) case and paints
+    /// nothing -- silently turning a mirrored card invisible instead of mirroring it.
+    /// Where the port has a 2D transform (the same one {@link #paintRotated} already
+    /// uses for a turned-and-scaled layer), `Transform.scale` takes a signed factor
+    /// directly and the mirror falls out of the matrix. Where it does not, flipping the
+    /// rasterised layer itself and drawing the flipped copy through the ordinary
+    /// destination-rectangle path reproduces the same picture without needing one.
+    private static void paintMirrored(Graphics g, Container pane, com.codename1.ui.Image layer,
+            double sx, double sy) {
+        int w = pane.getWidth();
+        int h = pane.getHeight();
+        int dw = (int) Math.round(w * Math.abs(sx));
+        int dh = (int) Math.round(h * Math.abs(sy));
+        if (dw <= 0 || dh <= 0) {
+            // Scaled away to nothing, same as the non-mirrored case.
+            return;
+        }
+        if (g.isTransformSupported()) {
+            com.codename1.ui.Transform saved = g.getTransform();
+            com.codename1.ui.Transform t = saved.copy();
+            float cx = pane.getX() + pane.getWidth() / 2f;
+            float cy = pane.getY() + pane.getHeight() / 2f;
+            t.translate(cx, cy);
+            t.scale((float) sx, (float) sy);
+            t.translate(-cx, -cy);
+            g.setTransform(t);
+            try {
+                g.drawImage(layer, pane.getX(), pane.getY());
+            } finally {
+                g.setTransform(saved);
+            }
+            return;
+        }
+        com.codename1.ui.Image flipped = layer;
+        if (sx < 0) {
+            flipped = flipped.flipHorizontally(true);
+        }
+        if (sy < 0) {
+            flipped = flipped.flipVertically(true);
+        }
+        g.drawImage(flipped, pane.getX() + (w - dw) / 2, pane.getY() + (h - dh) / 2, dw, dh);
     }
 
     /// Draws the layer rotated (and possibly scaled) about the pane's centre.

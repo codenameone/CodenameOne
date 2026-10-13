@@ -73,9 +73,15 @@ public class DismissibleRenderElement extends RenderElement {
     private RenderElement secondary;
     private RenderElement child;
 
+    /// The drag distance on each axis. Only one is ever live for a given gesture --
+    /// {@link #directionIsXAxis()} says which -- but both exist so a direction change
+    /// between gestures (the widget's own property, not expected to change, but no
+    /// gesture is left reading the wrong one) never reads stale data from the other.
     private double dragX;
-    /// The offset currently applied to the child's components.
-    private int appliedX;
+    private double dragY;
+    /// The offset currently applied to the child's components, on whichever axis
+    /// {@link #directionIsXAxis()} selects.
+    private int appliedOffset;
     private boolean pressedInside;
     private boolean owning;
     private boolean decided;
@@ -178,22 +184,45 @@ public class DismissibleRenderElement extends RenderElement {
             child.position(x, y);
         }
         // Layout has just re-placed everything at rest, so whatever was applied is gone.
-        appliedX = 0;
+        appliedOffset = 0;
         applyDrag();
         attach();
         applyVisibility();
     }
 
+    /// Whether this Dismissible's configured direction drags (and animates, and
+    /// reports dismissal) along X -- horizontal, endToStart, startToEnd, or unstated,
+    /// which is Flutter's own default -- rather than Y: vertical, up or down.
+    ///
+    /// This is what {@code DismissDirection.vertical}/{@code up}/{@code down} used to
+    /// fall straight through to the horizontal handling below: every method here
+    /// read {@code dragX} and compared the finger's horizontal movement alone, so a
+    /// vertical Dismissible measured, animated and reported the wrong axis entirely.
+    ///
+    /// Package visible for DismissibleAxisTest.
+    boolean directionIsXAxis() {
+        Object d = dismissible().getDirection();
+        return d != DismissDirection.vertical && d != DismissDirection.up && d != DismissDirection.down;
+    }
+
+    /// The live drag distance, on whichever axis {@link #directionIsXAxis()} selects.
+    private double dragExtent() {
+        return directionIsXAxis() ? dragX : dragY;
+    }
+
     /// Only the background the swipe is heading towards is shown; both at rest would
-    /// paint one over the other and the wrong one would win.
+    /// paint one over the other and the wrong one would win. Flutter's convention:
+    /// `background` for a positive extent (startToEnd or down), `secondaryBackground`
+    /// for a negative one (endToStart or up).
     private void applyVisibility() {
+        double extent = dragExtent();
         Component b = background == null ? null : background.component();
         Component s = secondary == null ? null : secondary.component();
         if (b != null) {
-            b.setVisible(dragX > 0);
+            b.setVisible(extent > 0);
         }
         if (s != null) {
-            s.setVisible(dragX < 0);
+            s.setVisible(extent < 0);
         }
     }
 
@@ -241,20 +270,26 @@ public class DismissibleRenderElement extends RenderElement {
         }
     }
 
-    /// Slides the child to the current drag offset, by the DIFFERENCE since last time.
+    /// Slides the child to the current drag offset, by the DIFFERENCE since last time,
+    /// along whichever axis {@link #directionIsXAxis()} selects.
     /// Re-placing it from the element's own origin does not work: a render element inside
     /// a scrolling list reports (0,0), so that put the row in the corner.
     private void applyDrag() {
-        int want = (int) Math.round(dragX);
-        int delta = want - appliedX;
+        int want = (int) Math.round(dragExtent());
+        int delta = want - appliedOffset;
         if (delta != 0) {
             java.util.List<Component> tops = new java.util.ArrayList<Component>();
             topComponents(child, tops);
+            boolean xAxis = directionIsXAxis();
             for (int i = 0; i < tops.size(); i++) {
                 Component c = tops.get(i);
-                c.setX(c.getX() + delta);
+                if (xAxis) {
+                    c.setX(c.getX() + delta);
+                } else {
+                    c.setY(c.getY() + delta);
+                }
             }
-            appliedX = want;
+            appliedOffset = want;
         }
     }
 
@@ -333,19 +368,28 @@ public class DismissibleRenderElement extends RenderElement {
                 }
                 double dx = evt.getX() - pressX;
                 double dy = evt.getY() - pressY;
+                boolean xAxis = directionIsXAxis();
                 if (!decided) {
                     double slop = Dp.px(SLOP_LP);
                     if (Math.abs(dx) < slop && Math.abs(dy) < slop) {
                         return;
                     }
-                    // Decided ONCE, and for the whole gesture.
+                    // Decided ONCE, and for the whole gesture. The dominant axis has to
+                    // agree with the configured direction -- a vertical Dismissible owns
+                    // a vertical-dominant drag, never a horizontal one, same as Flutter's
+                    // GestureDetector only wires up one axis's recognizer.
                     decided = true;
-                    owning = Math.abs(dx) > Math.abs(dy) && allows(dx);
+                    boolean dominant = xAxis ? Math.abs(dx) > Math.abs(dy) : Math.abs(dy) > Math.abs(dx);
+                    owning = dominant && allows(xAxis ? dx : dy);
                 }
                 if (!owning) {
                     return;
                 }
-                dragX = dx;
+                if (xAxis) {
+                    dragX = dx;
+                } else {
+                    dragY = dy;
+                }
                 evt.consume();
                 repaintRow();
             }
@@ -380,24 +424,43 @@ public class DismissibleRenderElement extends RenderElement {
         listeningOn = null;
     }
 
-    /// Whether the widget accepts a swipe going this way at all.
-    private boolean allows(double dx) {
+    /// Whether the widget accepts a swipe going this way at all. {@code delta} is dx
+    /// for an X-axis direction and dy for a Y-axis one -- see
+    /// {@link #directionIsXAxis()} -- and the sign conventions below match
+    /// Flutter's own {@code _extentToDirection}: a positive extent is startToEnd or
+    /// down, a negative one is endToStart or up.
+    ///
+    /// Package visible for DismissibleAxisTest.
+    boolean allows(double delta) {
         Object d = dismissible().getDirection();
         if (d == DismissDirection.none) {
             return false;
         }
         if (d == DismissDirection.startToEnd) {
-            return dx > 0;
+            return delta > 0;
         }
         if (d == DismissDirection.endToStart) {
-            return dx < 0;
+            return delta < 0;
         }
-        // horizontal, or unstated: Flutter's default is horizontal.
+        if (d == DismissDirection.up) {
+            return delta < 0;
+        }
+        if (d == DismissDirection.down) {
+            return delta > 0;
+        }
+        // horizontal, vertical, or unstated (Flutter's default is horizontal): either
+        // way along the configured axis is allowed.
         return true;
     }
 
-    private DismissDirection directionOf(double dx) {
-        return dx < 0 ? DismissDirection.endToStart : DismissDirection.startToEnd;
+    /// {@code delta} is dx for an X-axis direction, dy for a Y-axis one.
+    ///
+    /// Package visible for DismissibleAxisTest.
+    DismissDirection directionOf(double delta) {
+        if (directionIsXAxis()) {
+            return delta < 0 ? DismissDirection.endToStart : DismissDirection.startToEnd;
+        }
+        return delta < 0 ? DismissDirection.up : DismissDirection.down;
     }
 
     /// The fraction of the width this direction must cross, from {@code dismissThresholds}.
@@ -413,19 +476,29 @@ public class DismissibleRenderElement extends RenderElement {
     }
 
     private void settle() {
+        boolean xAxis = directionIsXAxis();
         int[] b = rowBounds();
-        double width = b == null ? (size() == null ? 0 : size().width()) : (b[2] - b[0]);
-        if (width <= 0) {
+        double extentSize;
+        if (b != null) {
+            // Flutter's _overallDragAxisExtent: the size along the drag axis, width
+            // for X, height for Y.
+            extentSize = xAxis ? (b[2] - b[0]) : (b[3] - b[1]);
+        } else {
+            Size sz = size();
+            extentSize = sz == null ? 0 : (xAxis ? sz.width() : sz.height());
+        }
+        if (extentSize <= 0) {
             animateTo(0, RESTORE_MS, false, null);
             return;
         }
-        final DismissDirection dir = directionOf(dragX);
-        boolean past = Math.abs(dragX) / width >= thresholdFor(dir);
+        double dragged = dragExtent();
+        final DismissDirection dir = directionOf(dragged);
+        boolean past = Math.abs(dragged) / extentSize >= thresholdFor(dir);
         if (!past) {
             animateTo(0, RESTORE_MS, false, null);
             return;
         }
-        final double target = dragX < 0 ? -width : width;
+        final double target = dragged < 0 ? -extentSize : extentSize;
         confirm(dir, new dart.runtime.Funcs.VoidFunc1<Boolean>() {
             @Override
             public void call(Boolean ok) {
@@ -496,7 +569,7 @@ public class DismissibleRenderElement extends RenderElement {
     }
 
     private void animateTo(double target, int duration, boolean dismiss, DismissDirection dir) {
-        slideFrom = dragX;
+        slideFrom = dragExtent();
         slideTo = target;
         dismissing = dismiss;
         dismissingTo = dir;
@@ -519,7 +592,12 @@ public class DismissibleRenderElement extends RenderElement {
                     return false;
                 }
                 double t = slide.getValue() / 1000.0;
-                dragX = slideFrom + (slideTo - slideFrom) * t;
+                double value = slideFrom + (slideTo - slideFrom) * t;
+                if (directionIsXAxis()) {
+                    dragX = value;
+                } else {
+                    dragY = value;
+                }
                 repaintRow();
                 if (slide.isFinished()) {
                     slide = null;
@@ -561,26 +639,38 @@ public class DismissibleRenderElement extends RenderElement {
     /// gone, and the provider lookup inside it returned null: "Cannot invoke
     /// EmailStore.isEmailStarred because emailStore is null". Handing it to the next
     /// frame lets this one finish first.
-    private void fireDismissed(final DismissDirection dir) {
-        final dart.runtime.Funcs.VoidFunc1<DismissDirection> cb =
-                dismissible().getOnDismissed();
-        if (cb == null) {
-            return;
-        }
+    ///
+    /// Package visible for DismissibleNoCallbackTest.
+    void fireDismissed(final DismissDirection dir) {
+        // Flutter runs a resizeDuration animation to zero between the slide and
+        // onDismissed; this milestone defers it (Dismissible.resizeDuration is a
+        // no-op setter), so the slide that already ran is the whole dismiss. That
+        // has to enter the gone/detached state whether or not the widget gave an
+        // onDismissed -- returning before this when there is no callback left the
+        // row mounted and still listening, dragged fully off-screen: an invisible
+        // full-size gap that neither repainted nor let a tap through to whatever
+        // the list underneath.
         gone = true;
         detach();
+        final dart.runtime.Funcs.VoidFunc1<DismissDirection> cb =
+                dismissible().getOnDismissed();
         com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
-                try {
-                    cb.call(dir);
-                } catch (Throwable t) {
-                    com.codename1.flutter.FlutterErrorReport.record(t);
+                if (cb != null) {
+                    try {
+                        cb.call(dir);
+                    } catch (Throwable t) {
+                        com.codename1.flutter.FlutterErrorReport.record(t);
+                    }
                 }
                 // A frame later again, and a REVALIDATE rather than a repaint. Removing
                 // the item schedules its own rebuild, so repainting here paints the list
                 // as it still is; and the rows that move up leave their old pixels behind,
-                // which only a full re-layout and repaint clears.
+                // which only a full re-layout and repaint clears. With no callback at all
+                // nothing else will ever ask for that re-layout, so it still has to happen
+                // here -- it is what actually collapses this row to the zero size `gone`
+                // now makes it report.
                 com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
                     @Override
                     public void run() {
