@@ -44,6 +44,26 @@
      }
     }
    }
+  },
+  "windows-x64@intel64-family-6-model-207-genuineintel": {
+   "recursion": {
+    "all": {
+     "from": {
+      "memory": 0.059,
+      "time": 1.212,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.059,
+     "reason": "Windows x64 run 38328925998 on Intel Family 6 Model 207 measured all-core recursion time at 0.945x versus the 1.212x baseline across five rounds (0.931x to 0.955x). Record the measured improvement without attributing it to the Process API; retain the existing timing tolerance and memory baseline.",
+     "runs": 1,
+     "time": 0.945,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   }
   }
  }
 }
