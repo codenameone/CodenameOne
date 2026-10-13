@@ -180,7 +180,9 @@ public class EdtAndGraphicsTest extends KernelTestBase {
         Thread.sleep(120);
         MainThreadRule.drain();
         timer.stop();
-        assertEquals(1, fired[0]);
+        // Some sixty periods went by. A period that ends while the queue
+        // is being drained is a new event, so the count is not exactly one.
+        assertTrue("fired " + fired[0], fired[0] >= 1 && fired[0] <= 4);
 
         fired[0] = 0;
         Timer each = new Timer(2, count);
@@ -189,7 +191,7 @@ public class EdtAndGraphicsTest extends KernelTestBase {
         Thread.sleep(120);
         MainThreadRule.drain();
         each.stop();
-        assertTrue("fired " + fired[0], fired[0] > 3);
+        assertTrue("fired " + fired[0], fired[0] >= 10);
     }
 
     /// Whether the timer repeats is asked when it fires, not when it starts.
