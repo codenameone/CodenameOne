@@ -2766,17 +2766,32 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     @Override
     public void setClip(Object graphics, Shape shape) {
         lastClipShape = shape;
+        TestGraphics g = (TestGraphics) graphics;
         if (shape == null) {
-            setClip(graphics, 0, 0, getDisplayWidth(), getDisplayHeight());
+            g.clipShape = null;
+            g.clipX = 0;
+            g.clipY = 0;
+            g.clipWidth = getDisplayWidth();
+            g.clipHeight = getDisplayHeight();
             return;
         }
+        // Track the shape itself (not just its bounds) so pushClip/popClip
+        // can round-trip a nonrectangular clip exactly, the way a real
+        // shape-clip-capable port does. A plain rectangular clip operation
+        // (setClip(int...) / clipRect) abandons this -- it is only ever
+        // brought back by popClip restoring a pushed state.
+        g.clipShape = shape;
         Rectangle bounds = shape.getBounds();
-        setClip(graphics, bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());
+        g.clipX = bounds.getX();
+        g.clipY = bounds.getY();
+        g.clipWidth = bounds.getWidth();
+        g.clipHeight = bounds.getHeight();
     }
 
     @Override
     public void setClip(Object graphics, int x, int y, int width, int height) {
         TestGraphics g = (TestGraphics) graphics;
+        g.clipShape = null;
         g.clipX = x;
         g.clipY = y;
         g.clipWidth = width;
@@ -2786,6 +2801,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     @Override
     public void clipRect(Object graphics, int x, int y, int width, int height) {
         TestGraphics g = (TestGraphics) graphics;
+        g.clipShape = null;
         int newX = Math.max(g.clipX, x);
         int newY = Math.max(g.clipY, y);
         int newW = Math.max(0, Math.min(g.clipX + g.clipWidth, x + width) - newX);
@@ -2794,6 +2810,34 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         g.clipY = newY;
         g.clipWidth = newW;
         g.clipHeight = newH;
+    }
+
+    @Override
+    public void pushClip(Object graphics) {
+        TestGraphics g = (TestGraphics) graphics;
+        g.clipStack.push(new TestClipState(g.clipX, g.clipY, g.clipWidth, g.clipHeight, g.clipShape));
+    }
+
+    @Override
+    public void popClip(Object graphics) {
+        TestGraphics g = (TestGraphics) graphics;
+        if (g.clipStack.isEmpty()) {
+            return;
+        }
+        TestClipState state = g.clipStack.pop();
+        g.clipX = state.x;
+        g.clipY = state.y;
+        g.clipWidth = state.width;
+        g.clipHeight = state.height;
+        g.clipShape = state.shape;
+    }
+
+    /// The current effective clip shape for `graphics`, as tracked by
+    /// `#pushClip`/`#popClip`: non-null only when the last operation to
+    /// touch the clip was `#setClip(Object, Shape)` (directly, or restored
+    /// by `popClip`); a plain `setClip(int...)` or `clipRect` abandons it.
+    public Shape getClipShapeState(Object graphics) {
+        return ((TestGraphics) graphics).clipShape;
     }
 
     @Override
@@ -5299,6 +5343,24 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         }
     }
 
+    /// One clip state saved by `#pushClip(Object)`, restored by
+    /// `#popClip(Object)`.
+    private static final class TestClipState {
+        final int x;
+        final int y;
+        final int width;
+        final int height;
+        final Shape shape;
+
+        TestClipState(int x, int y, int width, int height, Shape shape) {
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+            this.shape = shape;
+        }
+    }
+
     public static final class TestGraphics {
         int color = 0x000000;
         int alpha = 0xff;
@@ -5306,6 +5368,8 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         int clipY;
         int clipWidth;
         int clipHeight;
+        Shape clipShape;
+        final Deque<TestClipState> clipStack = new ArrayDeque<TestClipState>();
         int translateX;
         int translateY;
         final TestTransform transform = new TestTransform();

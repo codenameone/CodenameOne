@@ -26,11 +26,14 @@ package dart.async;
 /**
  * Dart's {@code StreamSubscription<T>}, returned by {@link Stream#listen}.
  *
- * <p>Not implemented: {@link #pause()} does not buffer events raised while
- * paused (they are dropped, not queued -- see {@link Stream}'s class
- * comment), {@code pause(Future resumeSignal)} is not available (use the
- * no-arg {@link #pause()} / {@link #resume()} pair), and {@code asFuture()}
- * is not provided.</p>
+ * <p>{@link #pause()} buffers events (data, errors and "done") raised while
+ * paused and delivers them, in order, once {@link #resume()} runs; a
+ * {@link #cancel()} issued while paused discards whatever was buffered
+ * instead of delivering it.</p>
+ *
+ * <p>Not implemented: {@code pause(Future resumeSignal)} (use the no-arg
+ * {@link #pause()} / {@link #resume()} pair) and {@code asFuture()} are not
+ * provided.</p>
  */
 public interface StreamSubscription<T> {
 
@@ -55,7 +58,7 @@ public interface StreamSubscription<T> {
     /** Replaces the done handler installed when this subscription was created. */
     void onDone(Object handleDone);
 
-    /** Pauses delivery; events raised while paused are dropped, not buffered. */
+    /** Pauses delivery; events raised while paused are buffered, not dropped. */
     void pause();
 
     /** Resumes delivery after {@link #pause()}. */

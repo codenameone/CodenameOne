@@ -63,12 +63,31 @@ import java.util.List;
  * {@code take}/{@code skip}/{@code timeout}/{@code expand}; and multiple
  * independent "listen sessions" are not distinguished from multiple
  * listeners on one session -- {@link #listen} always adds to the same
- * listener set.</p>
+ * listener set. A {@link #listen} on a stream that already emitted "done"
+ * does start a new listen session -- it is handed an already-cancelled
+ * subscription and completed with {@code onDone} straight away, matching
+ * real Dart's own "listen after done" behaviour, rather than reopening a
+ * closed source (an {@code EventChannel}'s platform handler, for one).</p>
  */
 public class Stream<T> {
 
     private final List<Sub> subs = new ArrayList<Sub>();
     private boolean closed;
+
+    /** One event buffered by a paused subscription, delivered in order on resume(). */
+    private static final class QueuedEvent {
+        static final int DATA = 0;
+        static final int ERROR = 1;
+        static final int DONE = 2;
+
+        final int kind;
+        final Object value;
+
+        QueuedEvent(int kind, Object value) {
+            this.kind = kind;
+            this.value = value;
+        }
+    }
 
     /** Holds one subscriber's handlers and paused state. */
     private static final class Sub {
@@ -78,6 +97,10 @@ public class Stream<T> {
         boolean cancelOnError;
         boolean paused;
         boolean cancelled;
+        /// Events raised while `paused`, delivered in order by `#drain` on
+        /// resume(); `null` until the first one is queued. `#cancelSub`
+        /// discards it, matching Dart's own pause()/cancel() interaction.
+        List<QueuedEvent> pending;
     }
 
     /**
@@ -130,6 +153,23 @@ public class Stream<T> {
         sub.onError = onError;
         sub.onDone = onDone;
         sub.cancelOnError = cancelOnError != null && cancelOnError.booleanValue();
+        if (closed) {
+            // The stream already finished (emitDone() already ran, from
+            // StreamController#close or an EventSink's endOfStream). subs
+            // is empty by now (emitDone() clears it), so treating this
+            // like a normal first listener would call onFirstListener()
+            // again -- for an EventChannel-backed stream, re-installing
+            // the platform handler that the close already tore down.
+            // Real Dart still hands back a subscription and completes it
+            // with onDone; it never restarts listening. Deliver onDone
+            // the same way #emitDone delivers it to everyone else
+            // (synchronously -- this runtime has no microtask queue, see
+            // Future#onComplete) and leave the sub out of `subs` so no
+            // listen session starts.
+            sub.cancelled = true;
+            deliverVoid(sub.onDone);
+            return new Handle(sub);
+        }
         boolean first = subs.isEmpty();
         subs.add(sub);
         if (first) {
@@ -143,23 +183,37 @@ public class Stream<T> {
         return !subs.isEmpty();
     }
 
-    /** Delivers a data event to every live, non-paused subscriber. */
+    /**
+     * Delivers a data event to every live subscriber; one that is paused has
+     * it queued instead, for {@link #drain} to deliver, in order, on resume().
+     */
     @SuppressWarnings("unchecked")
     protected final void emit(T value) {
         for (Sub s : new ArrayList<Sub>(subs)) {
-            if (!s.cancelled && !s.paused) {
+            if (s.cancelled) {
+                continue;
+            }
+            if (s.paused) {
+                queue(s, QueuedEvent.DATA, value);
+            } else {
                 deliverData(s.onData, value);
             }
         }
     }
 
     /**
-     * Delivers an error to every live, non-paused subscriber; a subscriber
-     * whose {@code cancelOnError} was set is then cancelled.
+     * Delivers an error to every live subscriber (queued instead while
+     * paused, like {@link #emit}); a subscriber whose {@code cancelOnError}
+     * was set is then cancelled -- at delivery time, so a queued error only
+     * cancels it once {@link #drain} actually delivers that error on resume().
      */
     protected final void emitError(Object error) {
         for (Sub s : new ArrayList<Sub>(subs)) {
-            if (s.cancelled || s.paused) {
+            if (s.cancelled) {
+                continue;
+            }
+            if (s.paused) {
+                queue(s, QueuedEvent.ERROR, error);
                 continue;
             }
             deliverError(s.onError, error);
@@ -169,13 +223,23 @@ public class Stream<T> {
         }
     }
 
-    /** Delivers "done" to every live subscriber, then clears the listener set. */
+    /**
+     * Delivers "done" to every live subscriber (queued instead while paused,
+     * like {@link #emit}), then clears the listener set. The stream is done
+     * either way -- a paused subscriber's queued done is still the last thing
+     * {@link #drain} ever delivers to it.
+     */
     protected final void emitDone() {
         closed = true;
         List<Sub> snapshot = new ArrayList<Sub>(subs);
         subs.clear();
         for (Sub s : snapshot) {
-            if (!s.cancelled) {
+            if (s.cancelled) {
+                continue;
+            }
+            if (s.paused) {
+                queue(s, QueuedEvent.DONE, null);
+            } else {
                 deliverVoid(s.onDone);
             }
         }
@@ -186,9 +250,51 @@ public class Stream<T> {
             return;
         }
         s.cancelled = true;
+        s.pending = null;
         subs.remove(s);
         if (subs.isEmpty() && !closed) {
             onNoListeners();
+        }
+    }
+
+    private static void queue(Sub s, int kind, Object value) {
+        if (s.pending == null) {
+            s.pending = new ArrayList<QueuedEvent>();
+        }
+        s.pending.add(new QueuedEvent(kind, value));
+    }
+
+    /**
+     * Delivers whatever {@link #emit}/{@link #emitError}/{@link #emitDone}
+     * queued for {@code s} while it was paused, in the order it arrived.
+     * Called by {@link Handle#resume}. Stops early if a handler run from
+     * inside this loop re-pauses or cancels the subscription (cancelling
+     * already discards the rest of the queue, via {@link #cancelSub}); the
+     * remaining queued events simply stay queued for a later resume().
+     */
+    private void drain(Sub s) {
+        while (!s.cancelled && !s.paused && s.pending != null && !s.pending.isEmpty()) {
+            QueuedEvent e = s.pending.remove(0);
+            switch (e.kind) {
+                case QueuedEvent.DATA:
+                    deliverData(s.onData, e.value);
+                    break;
+                case QueuedEvent.ERROR:
+                    deliverError(s.onError, e.value);
+                    if (s.cancelOnError) {
+                        cancelSub(s);
+                    }
+                    break;
+                case QueuedEvent.DONE:
+                    deliverVoid(s.onDone);
+                    s.cancelled = true;
+                    break;
+                default:
+                    break;
+            }
+        }
+        if (s.pending != null && s.pending.isEmpty()) {
+            s.pending = null;
         }
     }
 
@@ -383,6 +489,7 @@ public class Stream<T> {
         @Override
         public void resume() {
             sub.paused = false;
+            drain(sub);
         }
 
         @Override

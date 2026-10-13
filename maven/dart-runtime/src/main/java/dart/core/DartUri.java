@@ -682,17 +682,30 @@ public final class DartUri {
         return out == null ? s : new String(out);
     }
 
+    /// Dart's own scheme grammar (RFC 3986): an ASCII letter, then ASCII
+    /// letters/digits/`+`/`-`/`.`. `Character.isLetter`/`isLetterOrDigit`
+    /// answer true for any Unicode letter, so an accented Latin letter
+    /// (a letter, but not ASCII) would otherwise be accepted as part of
+    /// a scheme -- check the ASCII ranges by hand instead.
     private static boolean isScheme(String s) {
-        if (s.isEmpty() || !Character.isLetter(s.charAt(0))) {
+        if (s.isEmpty() || !isAsciiAlpha(s.charAt(0))) {
             return false;
         }
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
-            if (!Character.isLetterOrDigit(c) && c != '+' && c != '-' && c != '.') {
+            if (!isAsciiAlpha(c) && !isAsciiDigit(c) && c != '+' && c != '-' && c != '.') {
                 return false;
             }
         }
         return true;
+    }
+
+    private static boolean isAsciiAlpha(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+    }
+
+    private static boolean isAsciiDigit(char c) {
+        return c >= '0' && c <= '9';
     }
 
     /** Dart's {@code Uri.scheme} — lower-cased, empty when absent. */

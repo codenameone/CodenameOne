@@ -124,6 +124,53 @@ public final class DateTime {
         return sum;
     }
 
+    /**
+     * {@code a + b}, checked for overflow the same way {@link #checkedMicros} checks
+     * its sum (both operands share a sign the result lacks -- no Math.addExact, which
+     * the device class libraries do not all provide). Used by {@link #build}, whose
+     * inputs are raw constructor arguments -- not yet known to be anywhere near Dart's
+     * valid range -- rather than an already-checked instant plus a bounded delta.
+     */
+    private static long checkedAdd(long a, long b) {
+        long sum = a + b;
+        if (((a ^ sum) & (b ^ sum)) < 0) {
+            throw new ArgumentError("DateTime is outside valid range");
+        }
+        return sum;
+    }
+
+    /**
+     * {@code a * b}, checked for overflow by hand (no Math.multiplyExact, for the same
+     * reason as {@link #checkedAdd}): a nonzero {@code a} whose product divides back
+     * to {@code b} did not overflow, except for the one case division cannot catch --
+     * {@code Long.MIN_VALUE * -1}, which "divides back" cleanly only because
+     * {@code Long.MIN_VALUE / -1} overflows the identical way -- so that pair is
+     * rejected outright, in either argument order.
+     */
+    private static long checkedMultiply(long a, long b) {
+        if ((a == -1L && b == Long.MIN_VALUE) || (a == Long.MIN_VALUE && b == -1L)) {
+            throw new ArgumentError("DateTime is outside valid range");
+        }
+        long product = a * b;
+        if (a != 0 && product / a != b) {
+            throw new ArgumentError("DateTime is outside valid range");
+        }
+        return product;
+    }
+
+    /**
+     * A ceiling on the year {@link #build} will hand to {@link #daysFromCivil}, well
+     * short of where that method's own arithmetic (era * 146097) would overflow a long.
+     * Every OTHER caller of {@code daysFromCivil} already passes a year inside Dart's
+     * real valid range (+/-100,000,000 days, about +/-273,785 years) and so never needs
+     * this -- {@code build} is the one call site fed raw, unvalidated constructor
+     * arguments, where a huge year (say {@code DateTime.utc(Long.MAX_VALUE, 1, 1, 0, 0,
+     * 0, 0, 0)}) used to overflow silently through that multiply and wrap into a value
+     * that looked like a plausible date instead of failing. This bound is still an order
+     * of magnitude looser than Dart's real range, so no legitimate date trips it.
+     */
+    private static final long MAX_BUILD_YEAR = 3_000_000L;
+
     /** Milliseconds since the epoch, rounded toward negative infinity as Dart does. */
     private long epochMillis() {
         long q = epochMicros / 1000L;
@@ -149,10 +196,22 @@ public final class DateTime {
         // previous December. They are normalized here arithmetically. An omitted
         // month or day arrives as 1, not 0, because the dart:core stub declares
         // Dart's own defaults.
-        long y = year + floorDiv(month - 1, 12);
+        long y = checkedAdd(year, floorDiv(month - 1, 12));
         long m = floorMod(month - 1, 12) + 1;
-        long wall = (daysFromCivil(y, m, 1) + day - 1) * DAY_MS
-                + hour * 3600000L + minute * 60000L + second * 1000L + millisecond;
+        if (y > MAX_BUILD_YEAR || y < -MAX_BUILD_YEAR) {
+            throw new ArgumentError("DateTime is outside valid range: year " + year);
+        }
+        // Every operation from here on is checked: a huge day, hour, minute,
+        // second or millisecond either combines into the true (and then
+        // out-of-range) result, which the caller's own range check rejects,
+        // or overflows a long outright, which these throw on directly --
+        // either way, never a silent wraparound into something plausible.
+        long days = checkedAdd(daysFromCivil(y, m, 1), checkedAdd(day, -1L));
+        long wall = checkedMultiply(days, DAY_MS);
+        wall = checkedAdd(wall, checkedMultiply(hour, 3600000L));
+        wall = checkedAdd(wall, checkedMultiply(minute, 60000L));
+        wall = checkedAdd(wall, checkedMultiply(second, 1000L));
+        wall = checkedAdd(wall, millisecond);
         if (utc) {
             return wall;
         }

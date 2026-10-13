@@ -1075,10 +1075,19 @@ public final class Graphics {
         int fh = (int) Math.round(h / (double) dv);
         int fx = x - (int) Math.round(u0 * (double) fw);
         int fy = y - (int) Math.round(v0 * (double) fh);
-        int[] clip = getClip();
-        clipRect(x, y, w, h);
-        drawImage(img, fx, fy, fw, fh);
-        setClip(clip[0], clip[1], clip[2], clip[3]);
+        // pushClip()/popClip() restore the exact clip that was in force,
+        // shape and all. getClip()/setClip(int,int,int,int) only round-trip
+        // the current clip's bounding rectangle, so a caller painting
+        // through a nonrectangular clip (a shape clip set via
+        // #setClip(Shape)) would have it permanently replaced by its
+        // bounding box once this fallback ran.
+        pushClip();
+        try {
+            clipRect(x, y, w, h);
+            drawImage(img, fx, fy, fw, fh);
+        } finally {
+            popClip();
+        }
     }
 
     public void drawImage(Image img, int x, int y, int w, int h) {

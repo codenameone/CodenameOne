@@ -285,7 +285,7 @@ public class StreamTest {
     }
 
     @Test
-    public void pauseStopsDeliveryUntilResume() {
+    public void pauseBuffersDataAndDeliversItInOrderOnResume() {
         StreamController<String> c = new StreamController<String>();
         final List<String> seen = new ArrayList<String>();
         StreamSubscription<String> sub = c.stream().listen(new Funcs.VoidFunc1<String>() {
@@ -297,10 +297,107 @@ public class StreamTest {
         c.add("one");
         sub.pause();
         assertTrue(sub.isPaused());
-        c.add("dropped while paused");
+        c.add("queued while paused");
+        assertEquals(java.util.Arrays.asList("one"), seen,
+                "a paused subscription must not receive data while paused");
         sub.resume();
         assertFalse(sub.isPaused());
         c.add("two");
-        assertEquals(java.util.Arrays.asList("one", "two"), seen);
+        assertEquals(java.util.Arrays.asList("one", "queued while paused", "two"), seen,
+                "resume() must deliver what was buffered while paused, in order, before later events");
+    }
+
+    @Test
+    public void pauseBuffersErrorsAndDeliversThemOnResume() {
+        StreamController<String> c = new StreamController<String>();
+        final List<Object> errors = new ArrayList<Object>();
+        StreamSubscription<String> sub = c.stream().listen(new Funcs.VoidFunc1<String>() {
+            @Override
+            public void call(String v) {
+            }
+        }, new Funcs.VoidFunc1<Object>() {
+            @Override
+            public void call(Object e) {
+                errors.add(e);
+            }
+        });
+        sub.pause();
+        c.addError("boom");
+        assertTrue(errors.isEmpty(), "a paused subscription must not receive errors while paused");
+        sub.resume();
+        assertEquals(java.util.Arrays.asList((Object) "boom"), errors,
+                "resume() must deliver an error that was buffered while paused");
+    }
+
+    @Test
+    public void pauseBuffersDoneAndDeliversItOnResume() {
+        StreamController<String> c = new StreamController<String>();
+        final boolean[] done = {false};
+        StreamSubscription<String> sub = c.stream().listen(new Funcs.VoidFunc1<String>() {
+            @Override
+            public void call(String v) {
+            }
+        }, null, new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                done[0] = true;
+            }
+        });
+        sub.pause();
+        c.close();
+        assertFalse(done[0], "a paused subscription must not receive done while paused");
+        sub.resume();
+        assertTrue(done[0], "resume() must deliver a done event that was buffered while paused");
+    }
+
+    @Test
+    public void cancelWhilePausedDiscardsTheBufferedQueue() {
+        StreamController<String> c = new StreamController<String>();
+        final List<String> seen = new ArrayList<String>();
+        StreamSubscription<String> sub = c.stream().listen(new Funcs.VoidFunc1<String>() {
+            @Override
+            public void call(String v) {
+                seen.add(v);
+            }
+        });
+        sub.pause();
+        c.add("queued then cancelled");
+        sub.cancel();
+        sub.resume();
+        assertTrue(seen.isEmpty(), "cancel() while paused must discard the buffered queue, not deliver it");
+    }
+
+    @Test
+    public void listenAfterCloseCompletesWithDoneAndDoesNotRestartTheListenSession() {
+        StreamController<String> c = new StreamController<String>();
+        final int[] onListenCalls = {0};
+        c.onListen(new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                onListenCalls[0]++;
+            }
+        });
+        c.stream().listen(new Funcs.VoidFunc1<String>() {
+            @Override
+            public void call(String v) {
+            }
+        });
+        assertEquals(1, onListenCalls[0]);
+        c.close();
+
+        final boolean[] done = {false};
+        c.stream().listen(new Funcs.VoidFunc1<String>() {
+            @Override
+            public void call(String v) {
+            }
+        }, null, new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                done[0] = true;
+            }
+        });
+        assertTrue(done[0], "listen() on an already-done stream must complete with onDone");
+        assertEquals(1, onListenCalls[0],
+                "listen() on an already-done stream must not run onListen/onFirstListener again");
     }
 }

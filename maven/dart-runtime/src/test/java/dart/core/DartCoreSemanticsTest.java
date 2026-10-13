@@ -61,6 +61,50 @@ public class DartCoreSemanticsTest {
         assertEquals(31, new DateTime(2024, 1, 0, 0, 0, 0, 0, 0).day());
     }
 
+    // --- DateTime rejects a huge component instead of wrapping it into a --------
+    // --- plausible-looking epoch -------------------------------------------------
+
+    @Test
+    public void hugeYearThrowsInsteadOfWrappingIntoAPlausibleDate() {
+        // Recorded regression: build()'s arithmetic used to be plain long
+        // add/multiply, so this overflowed (most sharply inside
+        // daysFromCivil's era * 146097) and silently wrapped into some
+        // value millisToMicros' range check accepted as a normal date,
+        // instead of failing the way Dart itself does.
+        assertThrows(ArgumentError.class,
+                () -> DateTime.utc(Long.MAX_VALUE, 1, 1, 0, 0, 0, 0, 0));
+        assertThrows(ArgumentError.class,
+                () -> DateTime.utc(Long.MIN_VALUE, 1, 1, 0, 0, 0, 0, 0));
+        assertThrows(ArgumentError.class,
+                () -> new DateTime(Long.MAX_VALUE, 1, 1, 0, 0, 0, 0, 0));
+    }
+
+    @Test
+    public void hugeNonYearComponentsAlsoThrowInsteadOfWrapping() {
+        assertThrows(ArgumentError.class,
+                () -> DateTime.utc(2024, 1, Long.MAX_VALUE, 0, 0, 0, 0, 0),
+                "a huge day must not silently overflow through the *DAY_MS multiply");
+        assertThrows(ArgumentError.class,
+                () -> DateTime.utc(2024, 1, 1, Long.MAX_VALUE, 0, 0, 0, 0),
+                "a huge hour must not silently overflow");
+    }
+
+    @Test
+    public void ordinaryDatesAreUnaffectedByTheOverflowCheck() {
+        // The fix must not touch Dart's own out-of-range calendar-arithmetic
+        // idiom (month 0, day 0, a day offset of thousands) or any ordinary
+        // date.
+        DateTime d = DateTime.utc(2024, 3, 1, 0, 0, 0, 0, 0);
+        assertEquals(2024, d.year());
+        assertEquals(3, d.month());
+        assertEquals(1, d.day());
+
+        // 1970-01-01 plus a 10,000-day offset through the `day` component
+        // (a large but entirely sane calendar-arithmetic use) lands in 1997.
+        DateTime offset = DateTime.utc(1970, 1, 1 + 10000, 0, 0, 0, 0, 0);
+        assertEquals(1997, offset.year());
+    }
+
     // --- Uri query components decode '+' as a space; path segments do not -----
 
     @Test
@@ -361,6 +405,20 @@ public class DartCoreSemanticsTest {
         assertEquals("https://User@example.com:8080/Path?Q=V#Frag", u.toString(),
                 "the path, query, fragment and user info keep their case");
         assertEquals("fe80::1", DartUri.parse("http://[FE80::1]:80/").host());
+    }
+
+    @Test
+    public void schemeIsRestrictedToAsciiLetters() {
+        // Dart's scheme grammar (RFC 3986) is ASCII letter, then ASCII
+        // letters/digits/+/-/. only. Character.isLetter/isLetterOrDigit
+        // accept any Unicode letter, so a non-ASCII letter used to be
+        // accepted as (part of) a scheme; written with a backslash-u escape
+        // so the source file itself stays pure ASCII.
+        assertThrows(FormatException.class, () -> DartUri.parse("\u00e9:x"));
+        assertEquals(null, DartUri.tryParse("\u00e9:x"));
+        assertThrows(FormatException.class, () -> DartUri.parse("h\u00e9ttp://example.com/"));
+        assertEquals("https", DartUri.parse("https://example.com/").scheme(),
+                "a plain ASCII scheme must keep working");
     }
 
     @Test
