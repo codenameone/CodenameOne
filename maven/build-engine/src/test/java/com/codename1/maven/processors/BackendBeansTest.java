@@ -1912,6 +1912,27 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void declarativeIsolationIsWovenAndMethodOverridesClassDefault() throws Exception {
+        Map<String, String> sources = new LinkedHashMap<String, String>();
+        sources.put("com.example.Isolated", PKG
+                + "@Component @Transactional(isolation = Isolation.SERIALIZABLE) public class Isolated {\n"
+                + "    public String outer() {\n"
+                + "        try { inner(); return \"wrong\"; }\n"
+                + "        catch (TransactionException.IllegalState expected) { return \"checked\"; }\n"
+                + "    }\n"
+                + "    @Transactional(isolation = Isolation.READ_COMMITTED) public void inner() { }\n"
+                + "}\n");
+        File classes = compile(sources);
+        assertNoErrors(process(classes));
+        try (URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
+                getClass().getClassLoader())) {
+            Object bean = loader.loadClass("com.example.Isolated").newInstance();
+            assertEquals("checked", bean.getClass().getMethod("outer").invoke(bean));
+        }
+        assertFalse(com.codename1.backend.Transactions.isActive());
+    }
+
+    @Test
     public void duplicateToolAndManagedNamesAreBuildErrors() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.a.Stats", "package com.example.a;\n"

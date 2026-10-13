@@ -560,6 +560,100 @@ reported with `TransactionException.TimedOut`. It doesn't interrupt a statement
 that's running, so it bounds how long a transaction can take to commit rather than
 how long any one query may run.
 
+==== Transaction isolation
+
+`@Transactional(isolation = Isolation.SERIALIZABLE)` selects isolation for the
+physical transaction. Import `com.codename1.backend.annotations.Isolation`.
+`DEFAULT` preserves the database's configured default. An explicit isolation
+request in a joined `REQUIRED`, `SUPPORTS`, `MANDATORY`, or `NESTED` call must match
+the outer transaction's explicit level. Joining a `DEFAULT` transaction with an
+explicit level fails, even if that database happens to use the requested default.
+Choose the level on the outer method, or use `REQUIRES_NEW` for an independent one.
+Isolation on a scope that runs without a transaction is rejected.
+
+[cols="1,3",options="header"]
+|===
+| Engine | Explicit levels
+| SQLite | `SERIALIZABLE`. A connection configured with `PRAGMA read_uncommitted`
+is rejected for that request. Other explicit levels are unsupported.
+| PostgreSQL | `READ_COMMITTED`, `REPEATABLE_READ`, `SERIALIZABLE`.
+`READ_UNCOMMITTED` is rejected instead of mapping it to `READ_COMMITTED`.
+| MySQL/MariaDB | `READ_UNCOMMITTED`, `READ_COMMITTED`, `REPEATABLE_READ`, `SERIALIZABLE`.
+Use transactional tables such as InnoDB.
+|===
+
+Support is checked when the lazy transaction first borrows a connection, before
+application SQL executes. A failure to acquire a connection or start a transaction
+marks the scope rollback-only.
+PostgreSQL uses transaction-local `BEGIN` characteristics; MySQL uses a
+next-transaction setting. Neither changes the session default. SQLite's supported
+level requires no setting change. Commit and rollback therefore leave pooled
+connections with their original defaults; connections with uncertain state are
+discarded. This also applies to read-only transactions.
+
+These choices follow the engines' transaction controls:
+https://www.postgresql.org/docs/current/sql-set-transaction.html[PostgreSQL],
+https://dev.mysql.com/doc/refman/8.4/en/set-transaction.html[MySQL], and
+https://www.sqlite.org/isolation.html[SQLite].
+
+For programmatic work, `Transactions.execute(Propagation.REQUIRED, false, -1,
+Isolation.SERIALIZABLE, work)` provides the same thread-bound scope. Its
+`Transactions.Work.run()` body returns a value and may throw an exception; every
+body exception or `Error` rolls back. `Transactions.execute(work)` uses `REQUIRED`
+and default isolation. `DataSource.inTransaction(Isolation, Work)` also creates or
+joins this scope, and pool operations within its body join it.
+
+For a connection-local transaction, `Database.beginTransaction(boolean, Isolation)`
+and `Database.transaction(Isolation, Work)` select isolation without creating a
+thread-bound scope. The existing `DataSource.inTransaction(Work)` retains its
+connection-local behavior when called outside a declarative transaction. Use
+`Transactions.execute` or the isolation overload when callbacks/resources are needed.
+
+==== Completion hooks and transaction resources
+
+Register a `Transactions.Synchronization` within a thread-bound transaction:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/DatabaseSnippets.java[tag=backend-transaction-synchronization,indent=0]
+----
+
+Hooks run synchronously in registration order within each phase. `beforeCommit`
+runs before the session flush; it may use the transaction's database connection.
+It receives the physical transaction's read-only flag, including for read-only
+transactions. Read-only scopes still run all phases. Registration closes when
+completion starts, so a callback can't register further hooks on that scope.
+A before-commit exception or `Error` aborts the remaining before hooks and rolls
+back. Rollback-only and timeout checks run again after before hooks.
+
+`afterCommit` runs only after the database acknowledges commit. A failure in one
+hook doesn't stop later after-commit hooks or completion hooks; the caller gets
+`TransactionException` reporting that the transaction committed but its callback
+failed. Don't retry the whole transaction based on that exception alone.
+`afterCompletion` runs once per registration at the end of each physical scope,
+including one that never needed a connection. Its failures are logged, and later
+cleanup still runs. Exception-driven rollback preserves the body's original
+exception. A commit failure or failed rollback reports `UNKNOWN` because database
+durability can't be established; no after-commit hooks run in that case.
+
+The session closes and the connection returns to the pool before after-commit
+and completion hooks. During those hooks `Transactions.isActive()` is false;
+database work must use `REQUIRES_NEW` or an explicitly suspended scope.
+
+`Transactions.bindResource(key, value)` binds a non-null value under a non-null
+key. Duplicate bindings fail. `getResource(key)` returns the binding or null;
+`unbindResource(key)` removes it. Bindings remain available to all completion
+hooks and are cleared afterward, even if a hook fails. Values aren't implicitly
+closed: use a completion hook for disposal.
+
+`REQUIRED` participants share the physical scope's hooks and bindings.
+`REQUIRES_NEW` suspends both and restores them when its independent scope ends,
+even after failure. `NESTED` shares the physical bindings: savepoint rollback does
+not undo arbitrary Java objects. Hooks registered inside a rolled-back nested
+scope skip their before/after-commit phases, but still receive the physical
+transaction's final outcome in `afterCompletion`. Successful nested hooks wait
+for the outer commit; releasing a savepoint never triggers a commit hook.
+
 ==== Savepoints
 
 `NESTED` runs a method inside the open transaction, behind a savepoint. A failure

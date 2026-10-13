@@ -140,7 +140,9 @@ final class BackendSources {
         sb.append("        Object cn1Tx = com.codename1.impl.backend.BackendAccess.get().begin(")
           .append("com.codename1.impl.backend.BackendAccess.").append(propagation).append(", ")
           .append(tx.getBoolOrDefault("readOnly", false)).append(", ")
-          .append(tx.getIntOrDefault("timeout", -1)).append(");\n");
+          .append(tx.getIntOrDefault("timeout", -1)).append(", ")
+          .append("com.codename1.backend.annotations.Isolation.")
+          .append(BackendBeans.enumName(tx.get("isolation"), "DEFAULT")).append(");\n");
         if (!isVoid) {
             sb.append("        ").append(retType).append(" cn1Result;\n");
         }
