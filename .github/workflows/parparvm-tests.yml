@@ -181,7 +181,14 @@ jobs:
     # The full suite takes about an hour before the bounded GC benchmark arms.
     # Android compatibility and Kotlin translation add time; leave room for
     # both phases while each GC workload retains its own timeout.
-    timeout-minutes: 120
+    #
+    # Measured: passing runs took 108 to 113 minutes against a limit of 120,
+    # and two runs in a row were cancelled inside their last test class with
+    # nothing hung -- the suite was simply within a slow runner's variance of
+    # the limit. The tests of the runtime library no longer run once per JDK
+    # (CompilerHelper.getBookendCompilers), which gives back about five
+    # minutes; the rest of the margin is here.
+    timeout-minutes: 150
     # The two database engines the backend speaks a wire protocol to.
     #
     # BackendDatabaseTest and BackendOrmTest run one body of assertions against

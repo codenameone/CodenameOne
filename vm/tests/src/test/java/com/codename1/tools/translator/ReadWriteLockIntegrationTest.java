@@ -38,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ReadWriteLockIntegrationTest {
 
     @ParameterizedTest
-    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideRuntimeCompilerConfigs")
     void verifiesReadWriteLockBehavior(CompilerHelper.CompilerConfig config) throws Exception {
         Parser.cleanup();
 

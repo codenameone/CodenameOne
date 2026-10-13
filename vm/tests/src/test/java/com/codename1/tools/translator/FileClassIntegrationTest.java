@@ -40,7 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class FileClassIntegrationTest {
 
     @ParameterizedTest
-    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideRuntimeCompilerConfigs")
     public void testFileClassMethods(CompilerHelper.CompilerConfig config) throws Exception {
         Parser.cleanup();
 

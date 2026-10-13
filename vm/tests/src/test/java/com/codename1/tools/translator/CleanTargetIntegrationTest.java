@@ -127,7 +127,7 @@ class CleanTargetIntegrationTest {
     }
 
     @ParameterizedTest
-    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideRuntimeCompilerConfigs")
     void scientificFloatToStringOutputIsTerminated(CompilerHelper.CompilerConfig config) throws Exception {
         Parser.cleanup();
 

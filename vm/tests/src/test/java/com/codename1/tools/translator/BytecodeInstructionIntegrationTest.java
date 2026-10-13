@@ -70,6 +70,12 @@ class BytecodeInstructionIntegrationTest {
         return CompilerHelper.getDiagonalCompilers().stream();
     }
 
+    // For the tests of the runtime library, which do not depend on which javac
+    // compiled them. See CompilerHelper.getBookendCompilers.
+    static Stream<CompilerHelper.CompilerConfig> provideRuntimeCompilerConfigs() {
+        return CompilerHelper.getBookendCompilers().stream();
+    }
+
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("provideCompilerConfigs")
     void translatesOptimizedBytecodeToLLVMExecutable(CompilerHelper.CompilerConfig config) throws Exception {

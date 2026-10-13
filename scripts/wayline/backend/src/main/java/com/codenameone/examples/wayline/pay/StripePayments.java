@@ -24,6 +24,7 @@ package com.codenameone.examples.wayline.pay;
 
 import com.codename1.backend.Json;
 import com.codename1.backend.Web;
+import com.codenameone.examples.wayline.Ids;
 import com.codenameone.examples.wayline.api.CardDto;
 import com.codenameone.examples.wayline.geo.UrlText;
 
@@ -81,8 +82,17 @@ public class StripePayments implements PaymentProvider {
 
     @Override
     public String createCustomer(String username, String displayName) throws IOException {
+        // Two first cards started together both find the account without a
+        // customer and both ask for one. Only one reference is kept, and the
+        // other would be left at the processor with nothing pointing at it.
+        // With the same key the second request is answered with the first
+        // one's customer. The key is a digest, since the header is logged in
+        // places an address should not be, and it covers the name too: the
+        // processor refuses a key it has seen with other fields, and a rider
+        // who renamed themselves between two attempts must not be refused.
+        String key = "customer-" + Ids.sha256(username + "\n" + displayName);
         Map made = ask("POST", "/v1/customers", form("email", username, "name", displayName,
-                "metadata[wayline_user]", username), "");
+                "metadata[wayline_user]", username), key);
         return id(made);
     }
 

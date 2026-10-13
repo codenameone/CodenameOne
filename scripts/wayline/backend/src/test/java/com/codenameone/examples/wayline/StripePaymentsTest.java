@@ -85,6 +85,16 @@ class StripePaymentsTest {
         has(form, "email=ada%40wayline.example");
         has(form, "name=Ada%20%26%20Co");
         has(form, "metadata%5Bwayline_user%5D=ada%40wayline.example");
+        // The same request made twice makes one customer: the same key, which
+        // does not spell the address out.
+        String key = script.keys.get(0);
+        assertTrue(key.startsWith("customer-") && key.indexOf("ada") < 0, key);
+        script.reply(200, "{\"id\":\"cus_123\",\"object\":\"customer\"}");
+        stripe.createCustomer("ada@wayline.example", "Ada & Co");
+        assertEquals(key, script.keys.get(1));
+        script.reply(200, "{\"id\":\"cus_124\",\"object\":\"customer\"}");
+        stripe.createCustomer("ada@wayline.example", "Ada");
+        assertTrue(!key.equals(script.keys.get(2)), "another name is another request");
     }
 
     @Test
