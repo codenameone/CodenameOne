@@ -434,6 +434,42 @@ public class ExecutorsTest {
         assertEquals(4000, ran.get());
     }
 
+    /// A submission racing a shutdown may start a worker after the shutdown
+    /// has looked for workers to stop; the pool must still terminate.
+    @Test
+    public void aPoolShutDownWhileItIsSubmittedToTerminates() throws Exception {
+        for (int round = 0; round < 40; round++) {
+            final ExecutorService pool = Executors.newFixedThreadPool(4);
+            Thread[] submitters = new Thread[4];
+            for (int t = 0; t < submitters.length; t++) {
+                submitters[t] = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            for (int i = 0; i < 4; i++) {
+                                pool.execute(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                    }
+                                });
+                            }
+                        } catch (RejectedExecutionException expected) {
+                            return;
+                        }
+                    }
+                });
+            }
+            for (Thread t : submitters) {
+                t.start();
+            }
+            pool.shutdown();
+            for (Thread t : submitters) {
+                t.join();
+            }
+            assertTrue("round " + round, pool.awaitTermination(5, TimeUnit.SECONDS));
+        }
+    }
+
     /// A fixed delay shorter than the time a run takes to wind up must not
     /// end the repetition: the next run is armed only once this one is over.
     @Test

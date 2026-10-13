@@ -46,7 +46,7 @@ import java.util.List;
 /// A no-op for a project that depends on none of the layers' runtimes, so it
 /// is bound unconditionally.
 @Mojo(name = "remap-compat", defaultPhase = LifecyclePhase.PROCESS_CLASSES,
-        requiresDependencyResolution = ResolutionScope.COMPILE)
+        requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME)
 public class RemapCompatMojo extends AbstractCN1Mojo {
 
     @Parameter(property = "cn1.desktop.sourceDir", defaultValue = "${project.basedir}/src/main/desktop")
@@ -69,8 +69,7 @@ public class RemapCompatMojo extends AbstractCN1Mojo {
         for (Artifact artifact : project.getArtifacts()) {
             if (artifact.getFile() != null) {
                 classpath.add(artifact.getFile());
-                if (Artifact.SCOPE_COMPILE.equals(artifact.getScope()) && "jar".equals(artifact.getType())
-                        && !"com.codenameone".equals(artifact.getGroupId())) {
+                if (ships(artifact.getScope(), artifact.getType(), artifact.getGroupId())) {
                     libraries.add(artifact.getFile());
                 }
             }
@@ -108,6 +107,18 @@ public class RemapCompatMojo extends AbstractCN1Mojo {
         } catch (com.codename1.builders.BuildException ex) {
             throw new MojoFailureException(ex.getMessage(), ex);
         }
+    }
+
+    /// Whether a dependency is a library the application ships, and so one
+    /// to relocate when it is written against Swing or JavaFX. A `runtime`
+    /// one is shipped exactly as a `compile` one is -- the application just
+    /// does not name it in source, which is how a Swing library reached
+    /// through another one is usually declared. Left as it was, its
+    /// `javax.swing` references reached the device unrelocated. The Gradle
+    /// build takes the runtime classpath for the same reason.
+    static boolean ships(String scope, String type, String groupId) {
+        return (Artifact.SCOPE_COMPILE.equals(scope) || Artifact.SCOPE_RUNTIME.equals(scope))
+                && "jar".equals(type) && !"com.codenameone".equals(groupId);
     }
 
     /// The project's main class, which the entry point of a desktop

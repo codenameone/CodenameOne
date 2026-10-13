@@ -208,7 +208,24 @@ public final class Executors {
                 return;
             }
             int slot = (next.getAndIncrement() & 0x7fffffff) % workers.size();
-            worker(slot).run(job);
+            try {
+                worker(slot).run(job);
+            } catch (IllegalStateException stopped) {
+                // The shutdown reached this worker after the check above,
+                // and a stopping thread refuses work.
+                if (job.drop()) {
+                    throw new RejectedExecutionException("The executor has been shut down");
+                }
+                return;
+            }
+            if (shutdown.get()) {
+                // The shutdown may have swept the workers before this call
+                // started the slot's: nothing would ever stop that thread,
+                // and the pool would never report itself terminated. Either
+                // the sweep saw the worker or this sees the flag, since the
+                // flag is set before the sweep and read after the start.
+                killWorkersWhenIdle();
+            }
         }
 
         @Override

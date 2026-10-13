@@ -576,6 +576,34 @@ public class NioFilesDifferentialTest {
         assertTrue(Files.isSameFile(settings, Paths.get("settings/../settings/app.properties")));
     }
 
+    /// A move that has to copy must not answer normally with the source
+    /// still in place.
+    @Test
+    public void aMoveThatCannotDeleteTheSourceFails() throws Exception {
+        java.io.File locked = new java.io.File(deviceRoot, "locked");
+        assertTrue(new java.io.File(locked, "tree").mkdirs());
+        assertTrue(new java.io.File(locked, "tree/a.txt").createNewFile());
+        assertTrue(locked.setWritable(false));
+        try {
+            boolean writable;
+            try {
+                writable = new java.io.File(locked, "probe").createNewFile();
+            } catch (IOException refused) {
+                writable = false;
+            }
+            // A user who may write anywhere cannot be refused.
+            org.junit.Assume.assumeFalse(writable);
+            try {
+                Files.move(Paths.get("/locked/tree"), Paths.get("/unlocked"));
+                org.junit.Assert.fail("The source directory is still there");
+            } catch (IOException expected) {
+                assertTrue(new java.io.File(locked, "tree").isDirectory());
+            }
+        } finally {
+            locked.setWritable(true);
+        }
+    }
+
     @Test
     public void aTemporaryFileIsCreatedAndUnique() throws Exception {
         Path a = Files.createTempFile("pre", ".bin");

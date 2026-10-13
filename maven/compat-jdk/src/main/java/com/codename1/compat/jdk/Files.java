@@ -622,7 +622,10 @@ public final class Files {
         }
     }
 
-    private static void deleteTree(File f) {
+    /// Deletes what a move has copied. An entry that will not go is an
+    /// error: answering normally would report a move that left the source,
+    /// or half of it, where it was.
+    private static void deleteTree(File f) throws IOException {
         if (f.isDirectory()) {
             String[] names = f.list();
             if (names != null) {
@@ -631,7 +634,9 @@ public final class Files {
                 }
             }
         }
-        f.delete();
+        if (!f.delete() && f.exists()) {
+            throw new IOException("Moved " + f.getPath() + " but could not delete the original");
+        }
     }
 
     /// Moves a file or a directory with everything in it. Where the device

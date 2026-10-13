@@ -621,7 +621,10 @@ public final class DesktopProjectImporter {
             if (ext.group(2).indexOf('.') < 0 && !imported) {
                 continue;
             }
-            candidate(out, prefix + ext.group(1)).javafx = true;
+            // A nested class compiles to Outer$Nested, whatever the file
+            // is called; the walk answers null at the top level.
+            String outer = kotlinDeclaration(code, ext.start());
+            candidate(out, prefix + (outer == null ? "" : outer + "$") + ext.group(1)).javafx = true;
         }
         Matcher staticMain = KOTLIN_STATIC_MAIN.matcher(code);
         while (staticMain.find()) {

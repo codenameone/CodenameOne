@@ -27,6 +27,7 @@ import com.codename1.desktopcompat.java.awt.event.ActionEvent;
 import com.codename1.desktopcompat.java.awt.event.ActionListener;
 import com.codename1.desktopcompat.javax.swing.event.EventListenerList;
 import java.util.TimerTask;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /// Fires action events on the event dispatch thread after a delay, once
 /// or repeatedly. Start and stop it from the event dispatch thread.
@@ -126,32 +127,38 @@ public class Timer {
         }
         run++;
         final int mine = run;
+        final AtomicInteger pending = new AtomicInteger();
         final Runnable tick = new Runnable() {
             @Override
             public void run() {
-                tick(mine);
+                tick(mine, pending.getAndSet(0));
             }
         };
-        TimerTask task = new Hop(tick);
+        TimerTask task = new Hop(tick, pending);
         timer = new java.util.Timer();
-        if (repeats) {
-            timer.schedule(task, initialDelay, Math.max(1, delay));
-        } else {
-            timer.schedule(task, initialDelay);
-        }
+        // Always periodic: whether the timer repeats is asked at each
+        // firing, so setRepeats(true) on a running one-shot timer takes
+        // effect, as it does in Swing. A timer that does not repeat stops
+        // itself at its first tick.
+        timer.schedule(task, initialDelay, Math.max(1, delay));
     }
 
     /// Runs on the event dispatch thread; a tick queued before the timer
-    /// was stopped or restarted is dropped.
-    private void tick(int ticket) {
-        if (timer == null || ticket != run) {
-            return;
+    /// was stopped or restarted is dropped. `due` is how many periods
+    /// elapsed since the last one ran: a busy event dispatch thread gets
+    /// one event for all of them unless coalescing is off.
+    private void tick(int ticket, int due) {
+        int fire = coalesce ? 1 : due;
+        for (int i = 0; i < fire; i++) {
+            if (timer == null || ticket != run) {
+                return;
+            }
+            if (!repeats) {
+                stop();
+            }
+            fireActionPerformed(new ActionEvent(this, ActionEvent.ACTION_PERFORMED, actionCommand,
+                    System.currentTimeMillis(), 0));
         }
-        if (!repeats) {
-            stop();
-        }
-        fireActionPerformed(new ActionEvent(this, ActionEvent.ACTION_PERFORMED, actionCommand,
-                System.currentTimeMillis(), 0));
     }
 
     public void stop() {
@@ -167,16 +174,24 @@ public class Timer {
     }
 
     /// Carries a tick from the timer's thread to the event dispatch thread.
+    /// It counts the periods that elapsed and queues one runnable for all
+    /// of those the event dispatch thread has not got to yet, so a slow
+    /// listener cannot build a backlog. The count is the only state the
+    /// two threads share.
     private static final class Hop extends TimerTask {
         private final Runnable tick;
+        private final AtomicInteger pending;
 
-        Hop(Runnable tick) {
+        Hop(Runnable tick, AtomicInteger pending) {
             this.tick = tick;
+            this.pending = pending;
         }
 
         @Override
         public void run() {
-            EventQueue.invokeLater(tick);
+            if (pending.getAndIncrement() == 0) {
+                EventQueue.invokeLater(tick);
+            }
         }
     }
 }

@@ -31,6 +31,6 @@ import org.apache.maven.plugins.annotations.ResolutionScope;
 /// and through it they relocate every layer the project switches on, without
 /// being edited. See [RemapCompatMojo].
 @Mojo(name = "remap-android", defaultPhase = LifecyclePhase.PROCESS_CLASSES,
-        requiresDependencyResolution = ResolutionScope.COMPILE)
+        requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME)
 public class RemapAndroidMojo extends RemapCompatMojo {
 }

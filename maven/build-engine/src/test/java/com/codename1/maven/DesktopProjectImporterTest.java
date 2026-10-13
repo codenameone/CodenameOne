@@ -705,6 +705,15 @@ public class DesktopProjectImporterTest {
                 + "        @JvmStatic fun main(a: Array<String>) {\n        }\n    }\n}\n", out);
         assertEquals(Collections.singleton("Outer$Inner"), out.keySet());
 
+        // A JavaFX application nested in another class is Outer$Nested.
+        out.clear();
+        DesktopProjectImporter.scanKotlin("Start", "package k\n\nimport javafx.application.Application\n\n"
+                + "class Host {\n    fun other() { }\n    class App : Application() {\n"
+                + "        override fun start(s: javafx.stage.Stage) { }\n    }\n}\n"
+                + "class Top : Application() {\n}\n", out);
+        assertEquals(new java.util.TreeSet<String>(java.util.Arrays.asList("k.Host$App", "k.Top")),
+                new java.util.TreeSet<String>(out.keySet()));
+
         // In no declaration this can read: the file's name, as before.
         out.clear();
         DesktopProjectImporter.scanKotlin("Odd", "package k\n@JvmStatic fun main(a: Array<String>) {\n}\n", out);

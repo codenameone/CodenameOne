@@ -897,7 +897,7 @@ What holds it together:
   method on one needs the generator and the placeholder changed together.
 - A desktop layer is active only when its jar is present **and** the compiled
   classes name its API, so a Swing app does not ship the JavaFX runtime.
-  Compile-scope dependency jars that name a layer are unpacked and relocated as
+  Compile- and runtime-scope dependency jars that name a layer are unpacked and relocated as
   application code (`CompatLibraries`).
 
 - **Library mode: desktop sources inside a Codename One app.** No

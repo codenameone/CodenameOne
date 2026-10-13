@@ -160,6 +160,68 @@ public class EdtAndGraphicsTest extends KernelTestBase {
         assertFalse(single.isRunning());
     }
 
+    /// Periods that elapse while the event dispatch thread is busy are one
+    /// event, unless coalescing is switched off.
+    @Test
+    public void aBusyEventDispatchThreadGetsOneCoalescedTimerEvent() throws Exception {
+        final int[] fired = new int[1];
+        ActionListener count = new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                fired[0]++;
+            }
+        };
+        Timer timer = new Timer(2, count);
+        timer.start();
+        // Nothing drains the queue: the event dispatch thread is "busy".
+        Thread.sleep(120);
+        timer.stop();
+        timer.start();
+        Thread.sleep(120);
+        MainThreadRule.drain();
+        timer.stop();
+        assertEquals(1, fired[0]);
+
+        fired[0] = 0;
+        Timer each = new Timer(2, count);
+        each.setCoalesce(false);
+        each.start();
+        Thread.sleep(120);
+        MainThreadRule.drain();
+        each.stop();
+        assertTrue("fired " + fired[0], fired[0] > 3);
+    }
+
+    /// Whether the timer repeats is asked when it fires, not when it starts.
+    @Test
+    public void aRunningTimerHonoursAChangeOfRepeats() throws Exception {
+        final int[] fired = new int[1];
+        Timer timer = new Timer(2, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                fired[0]++;
+            }
+        });
+        timer.setRepeats(false);
+        timer.start();
+        timer.setRepeats(true);
+        for (int i = 0; i < 400 && fired[0] < 3; i++) {
+            MainThreadRule.drain();
+            Thread.sleep(5);
+        }
+        assertTrue(timer.isRunning());
+        assertTrue(fired[0] >= 3);
+
+        timer.setRepeats(false);
+        int before = fired[0];
+        for (int i = 0; i < 400 && timer.isRunning(); i++) {
+            MainThreadRule.drain();
+            Thread.sleep(5);
+        }
+        assertFalse(timer.isRunning());
+        assertEquals(before + 1, fired[0]);
+    }
+
     @Test
     public void userSpaceStartsAtThePeerOriginScaledToDevicePixels() {
         G2D g = graphics();
