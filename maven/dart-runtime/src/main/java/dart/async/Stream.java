@@ -399,10 +399,14 @@ public class Stream<T> {
 
     @SuppressWarnings("unchecked")
     static void deliverData(Object onData, Object value) {
-        if (onData instanceof Funcs.VoidFunc1) {
-            ((Funcs.VoidFunc1<Object>) onData).call(value);
-        } else if (onData instanceof Funcs.Func1) {
-            ((Funcs.Func1<Object, Object>) onData).call(value);
+        try {
+            if (onData instanceof Funcs.VoidFunc1) {
+                ((Funcs.VoidFunc1<Object>) onData).call(value);
+            } else if (onData instanceof Funcs.Func1) {
+                ((Funcs.Func1<Object, Object>) onData).call(value);
+            }
+        } catch (Throwable t) {
+            reportUncaught(t);
         }
     }
 
@@ -428,27 +432,60 @@ public class Stream<T> {
     static void deliverError(Object onError, Object error) {
         Object err = error instanceof Throwable
                 ? dart.runtime.DartRuntime.caught((Throwable) error) : error;
-        if (onError instanceof Funcs.VoidFunc1) {
-            ((Funcs.VoidFunc1<Object>) onError).call(err);
-        } else if (onError instanceof Funcs.Func1) {
-            ((Funcs.Func1<Object, Object>) onError).call(err);
-        } else if (onError instanceof Funcs.VoidFunc2) {
-            ((Funcs.VoidFunc2<Object, Object>) onError).call(err, null);
-        } else if (onError instanceof Funcs.Func2) {
-            ((Funcs.Func2<Object, Object, Object>) onError).call(err, null);
-        } else if (onError == null) {
-            // No handler installed: Dart's default behaviour is to forward the
-            // error to the subscription's zone, which for a headless runtime
-            // has nowhere else to go but the log.
-            com.codename1.io.Log.e(err instanceof Throwable ? (Throwable) err : new RuntimeException(String.valueOf(err)));
+        try {
+            if (onError instanceof Funcs.VoidFunc1) {
+                ((Funcs.VoidFunc1<Object>) onError).call(err);
+            } else if (onError instanceof Funcs.Func1) {
+                ((Funcs.Func1<Object, Object>) onError).call(err);
+            } else if (onError instanceof Funcs.VoidFunc2) {
+                ((Funcs.VoidFunc2<Object, Object>) onError).call(err, null);
+            } else if (onError instanceof Funcs.Func2) {
+                ((Funcs.Func2<Object, Object, Object>) onError).call(err, null);
+            } else if (onError == null) {
+                // No handler installed: Dart's default behaviour is to forward the
+                // error to the subscription's zone, which for a headless runtime
+                // has nowhere else to go but the log.
+                reportUncaught(err instanceof Throwable ? (Throwable) err : new RuntimeException(String.valueOf(err)));
+            }
+        } catch (Throwable t) {
+            reportUncaught(t);
         }
     }
 
     static void deliverVoid(Object cb) {
-        if (cb instanceof Funcs.VoidFunc0) {
-            ((Funcs.VoidFunc0) cb).call();
-        } else if (cb instanceof Funcs.Func0) {
-            ((Funcs.Func0<?>) cb).call();
+        try {
+            if (cb instanceof Funcs.VoidFunc0) {
+                ((Funcs.VoidFunc0) cb).call();
+            } else if (cb instanceof Funcs.Func0) {
+                ((Funcs.Func0<?>) cb).call();
+            }
+        } catch (Throwable t) {
+            reportUncaught(t);
+        }
+    }
+
+    /**
+     * Reports an exception a listener callback threw, the way Dart itself
+     * does: {@code Zone.runUnaryGuarded}/{@code runGuarded} wrap every
+     * {@code onData}/{@code onError}/{@code onDone} call, catch whatever it
+     * throws, and hand it to the zone's uncaught-error handler instead of
+     * letting it propagate out of the event that triggered it -- so a
+     * throwing listener never unwinds {@code add()}/{@code emit()} and never
+     * stops the remaining listeners (or a later, unrelated event) from being
+     * delivered. This runtime has no zone to hand it to, so -- like
+     * {@code deliverError}'s own "no handler installed" case and
+     * {@link Future}'s uncaught-error path -- it goes to the log.
+     *
+     * <p>{@code Log.e} itself is swallowed too: it reaches down to
+     * {@code CodenameOneImplementation}, which a headless unit test never
+     * installs, and reporting an error must never itself throw a new one --
+     * that would be exactly the failure this method exists to prevent.</p>
+     */
+    static void reportUncaught(Throwable t) {
+        try {
+            com.codename1.io.Log.e(t);
+        } catch (Throwable loggingFailed) {
+            // No implementation to log through (headless test); nothing more to do.
         }
     }
 

@@ -48,6 +48,15 @@ import java.util.NoSuchElementException;
 public final class RegExp {
 
     private final String source;
+    // The pattern's DECLARED capturing-group count, not the count a given match
+    // reaches. RE.getParenCount() only covers groups the match actually opened --
+    // for "(a)|(b)" matching "a", group 2 never opens, so the engine's own count
+    // is 1 (just the whole match). Dart's groupCount/group() are keyed off the
+    // pattern instead: groupCount answers 2 and group(2) answers null, while
+    // group(3) -- past what the pattern declares -- throws RangeError. Computed
+    // once from the source text rather than from RE, which has no public accessor
+    // for the compiler's own paren count.
+    private final int declaredGroupCount;
     private boolean multiLine;
     private boolean caseSensitive = true;
     private boolean unicode;
@@ -56,6 +65,7 @@ public final class RegExp {
 
     public RegExp(String source) {
         this.source = source == null ? "" : source;
+        this.declaredGroupCount = countCapturingGroups(this.source);
         // Compiled now, as Dart does: RegExp('[') throws FormatException from the
         // constructor. Compiling on first match moved the throw out of a try around
         // the construction -- or dropped it, for a pattern never used.
@@ -65,11 +75,69 @@ public final class RegExp {
     public RegExp(String source, boolean multiLine, boolean caseSensitive,
                   boolean unicode, boolean dotAll) {
         this.source = source == null ? "" : source;
+        this.declaredGroupCount = countCapturingGroups(this.source);
         this.multiLine = multiLine;
         this.caseSensitive = caseSensitive;
         this.unicode = unicode;
         this.dotAll = dotAll;
         engine();   // a malformed pattern throws here, as in Dart
+    }
+
+    /**
+     * Counts the capturing groups a pattern source declares -- the opening
+     * {@code (} of every group that is not one of the non-capturing forms.
+     * Skips an escaped {@code \(}, anything inside an unescaped {@code [...]}
+     * character class (a literal {@code (} there is not a group), and the
+     * non-capturing / lookaround forms {@code (?:} {@code (?=} {@code (?!}
+     * {@code (?<=} {@code (?<!}. A named group, {@code (?<name>...)}, is none
+     * of those and still counts -- the {@code <} is followed by a name, not
+     * {@code =} or {@code !}.
+     *
+     * <p>Package-private (rather than {@code private}) so the parsing rules
+     * can be unit-tested directly: {@link com.codename1.util.regex.RE} itself
+     * has no support for lookaround or named groups, so a pattern using them
+     * cannot be driven through a real {@link RE} match to exercise this
+     * method's handling of them.</p>
+     */
+    static int countCapturingGroups(String pattern) {
+        int count = 0;
+        int len = pattern.length();
+        boolean inClass = false;
+        for (int i = 0; i < len; i++) {
+            char c = pattern.charAt(i);
+            if (c == '\\') {
+                i++;   // skip the escaped character, in or out of a class
+                continue;
+            }
+            if (inClass) {
+                if (c == ']') {
+                    inClass = false;
+                }
+                continue;
+            }
+            if (c == '[') {
+                inClass = true;
+                continue;
+            }
+            if (c != '(') {
+                continue;
+            }
+            if (i + 1 < len && pattern.charAt(i + 1) == '?') {
+                char after = i + 2 < len ? pattern.charAt(i + 2) : '\0';
+                if (after == ':' || after == '=' || after == '!') {
+                    continue;   // (?: (?= (?!
+                }
+                if (after == '<' && i + 3 < len) {
+                    char afterLt = pattern.charAt(i + 3);
+                    if (afterLt == '=' || afterLt == '!') {
+                        continue;   // (?<= (?<!
+                    }
+                    // else (?<name> ...) -- a named capturing group; falls through to count++.
+                }
+            }
+            count++;
+        }
+        return count;
     }
 
     // Named-argument setters (used when the transpiler lowers named ctor args
@@ -145,7 +213,7 @@ public final class RegExp {
             return null;
         }
         RE re = engine();
-        return re.match(input) ? snapshot(re, input) : null;
+        return re.match(input) ? snapshot(re, input, declaredGroupCount) : null;
     }
 
     /** Dart's {@code RegExp.stringMatch(input)} — the matched substring or null. */
@@ -217,16 +285,23 @@ public final class RegExp {
             hook.run();
         }
         RE re = engine();
-        return re.match(input, from) ? snapshot(re, input) : null;
+        return re.match(input, from) ? snapshot(re, input, declaredGroupCount) : null;
     }
 
     /**
      * Copies the engine's current match out of it: group text plus offsets.
      * The engine reuses its state on the next match, so a Match that read
      * through to it would change under the caller.
+     *
+     * <p>Sized from {@code declaredGroupCount}, not {@link RE#getParenCount()}:
+     * the latter is only the groups this particular match opened. {@link RE}
+     * answers null/-1 for a paren index at or past its own {@code parenCount}
+     * (see {@link RE#getParen}), so asking it for an index between the two
+     * counts correctly comes back as an unmatched group rather than stale
+     * data from an earlier match.</p>
      */
-    private static RegExpMatch snapshot(RE re, String input) {
-        int count = Math.max(1, re.getParenCount());
+    private static RegExpMatch snapshot(RE re, String input, int declaredGroupCount) {
+        int count = Math.max(declaredGroupCount + 1, re.getParenCount());
         String[] groups = new String[count];
         int[] starts = new int[count];
         int[] ends = new int[count];

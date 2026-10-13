@@ -1315,6 +1315,70 @@ public class DartCoreSemanticsTest {
         assertThrows(RangeError.class, () -> m.group(2L));
     }
 
+    // --- RegExpMatch's groupCount is the PATTERN's declared count ---------------
+
+    @Test
+    public void groupCountIsDeclaredNotJustWhatTheMatchReached() {
+        // "(a)|(b)" matching "a" only ever opens group 1; group 2 never runs.
+        // Dart (verified against `dart run` on the installed Flutter SDK):
+        // groupCount answers 2, group(1) is "a", group(2) is null (in range,
+        // just unmatched), and group(3) -- past the pattern's own two groups --
+        // throws RangeError.
+        RegExpMatch m = new RegExp("(a)|(b)").firstMatch("a");
+        assertEquals(2, m.groupCount());
+        assertEquals("a", m.group(1));
+        assertNull(m.group(2));
+        assertThrows(RangeError.class, () -> m.group(3));
+
+        // Three alternatives, only the last one taken: groups 1 and 2 are both
+        // in range and both unmatched.
+        RegExpMatch m2 = new RegExp("(a)|(b)|(c)").firstMatch("c");
+        assertEquals(3, m2.groupCount());
+        assertNull(m2.group(1));
+        assertNull(m2.group(2));
+        assertEquals("c", m2.group(3));
+
+        // A non-capturing group and a character-class paren are not groups.
+        RegExpMatch m3 = new RegExp("(?:a)(b)[(]").firstMatch("ab(");
+        assertEquals(1, m3.groupCount());
+        assertEquals("b", m3.group(1));
+
+        // An escaped paren is not a group either.
+        RegExpMatch m4 = new RegExp("\\(a\\)(b)").firstMatch("(a)b");
+        assertEquals(1, m4.groupCount());
+        assertEquals("b", m4.group(1));
+    }
+
+    // --- The declared-group-count parser itself, incl. forms RE cannot run ------
+
+    @Test
+    public void countCapturingGroupsSkipsNonCapturingFormsAndCountsNamedGroups() {
+        // com.codename1.util.regex.RE has no support for lookaround or named
+        // groups at all -- a pattern using them never compiles, so these
+        // forms can only be exercised against the parser directly, not
+        // through a real RegExp match.
+        assertEquals(0, RegExp.countCapturingGroups(""));
+        assertEquals(0, RegExp.countCapturingGroups("abc"));
+        assertEquals(2, RegExp.countCapturingGroups("(a)|(b)"));
+        assertEquals(0, RegExp.countCapturingGroups("(?:a)"));
+        assertEquals(1, RegExp.countCapturingGroups("(?:a)(b)"));
+        assertEquals(0, RegExp.countCapturingGroups("(?=a)"));
+        assertEquals(0, RegExp.countCapturingGroups("(?!a)"));
+        assertEquals(0, RegExp.countCapturingGroups("(?<=a)"));
+        assertEquals(0, RegExp.countCapturingGroups("(?<!a)"));
+        assertEquals(1, RegExp.countCapturingGroups("(?=a)(b)(?!c)(?<=d)(?<!e)"));
+        // A named group still captures -- its '<' is followed by a name, not '=' or '!'.
+        assertEquals(1, RegExp.countCapturingGroups("(?<name>a)"));
+        assertEquals(2, RegExp.countCapturingGroups("(?<name>a)(b)"));
+        // Parens inside a character class are literal, not groups.
+        assertEquals(0, RegExp.countCapturingGroups("[()]"));
+        assertEquals(1, RegExp.countCapturingGroups("[()](a)"));
+        // An escaped paren, in or out of a class, is not a group.
+        assertEquals(0, RegExp.countCapturingGroups("\\(a\\)"));
+        assertEquals(1, RegExp.countCapturingGroups("\\(a\\)(b)"));
+        assertEquals(0, RegExp.countCapturingGroups("[\\]()]"));
+    }
+
     // --- const collection literals refuse every write ---------------------------
 
     @Test

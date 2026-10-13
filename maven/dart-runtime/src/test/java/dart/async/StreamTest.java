@@ -400,4 +400,154 @@ public class StreamTest {
         assertEquals(1, onListenCalls[0],
                 "listen() on an already-done stream must not run onListen/onFirstListener again");
     }
+
+    // --- A throwing listener callback is reported, not left to unwind emission --
+    //
+    // Dart's own broadcast delivery (stream_impl.dart's _sendData/_sendError/
+    // _sendDone) runs every callback through Zone.runUnaryGuarded/runGuarded,
+    // which catches whatever the callback throws and hands it to the zone's
+    // uncaught-error handler instead of letting it escape the add()/emit()
+    // that triggered it. A listener that throws must therefore neither stop
+    // the remaining listeners from seeing the event nor make add()/addError()/
+    // close()/resume() throw to their caller.
+
+    @Test
+    public void aThrowingOnDataDoesNotStopLaterListenersOrEscapeAdd() {
+        StreamController<String> c = new StreamController<String>();
+        final List<String> seenB = new ArrayList<String>();
+        c.stream().listen(new Funcs.VoidFunc1<String>() {
+            @Override
+            public void call(String v) {
+                throw new RuntimeException("boom from listener A");
+            }
+        });
+        c.stream().listen(new Funcs.VoidFunc1<String>() {
+            @Override
+            public void call(String v) {
+                seenB.add(v);
+            }
+        });
+        c.add("one"); // must not throw out to the caller
+        c.add("two");
+        assertEquals(java.util.Arrays.asList("one", "two"), seenB,
+                "listener A throwing must not stop listener B from receiving every event");
+    }
+
+    @Test
+    public void aThrowingOnErrorDoesNotEscapeAddError() {
+        StreamController<String> c = new StreamController<String>();
+        final List<Object> seenB = new ArrayList<Object>();
+        c.stream().listen(new Funcs.VoidFunc1<String>() {
+            @Override
+            public void call(String v) {
+            }
+        }, new Funcs.VoidFunc1<Object>() {
+            @Override
+            public void call(Object e) {
+                throw new RuntimeException("boom from error handler A");
+            }
+        });
+        c.stream().listen(new Funcs.VoidFunc1<String>() {
+            @Override
+            public void call(String v) {
+            }
+        }, new Funcs.VoidFunc1<Object>() {
+            @Override
+            public void call(Object e) {
+                seenB.add(e);
+            }
+        });
+        c.addError("boom"); // must not throw out to the caller
+        assertEquals(1, seenB.size(),
+                "listener A's error handler throwing must not stop listener B from receiving the error");
+    }
+
+    @Test
+    public void aThrowingOnDoneDoesNotEscapeClose() {
+        StreamController<String> c = new StreamController<String>();
+        final boolean[] doneB = {false};
+        c.stream().listen(new Funcs.VoidFunc1<String>() {
+            @Override
+            public void call(String v) {
+            }
+        }, null, new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                throw new RuntimeException("boom from done handler A");
+            }
+        });
+        c.stream().listen(new Funcs.VoidFunc1<String>() {
+            @Override
+            public void call(String v) {
+            }
+        }, null, new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                doneB[0] = true;
+            }
+        });
+        c.close(); // must not throw out to the caller
+        assertTrue(doneB[0], "listener A's done handler throwing must not stop listener B from seeing done");
+    }
+
+    @Test
+    public void aThrowingCallbackOnTheDrainPathDoesNotEscapeResume() {
+        // Exercises deliverData/deliverError/deliverVoid via drain(), the
+        // paused-subscription queue -- a separate call site from emit()/
+        // emitError()/emitDone()'s own live-delivery loop.
+        StreamController<String> c = new StreamController<String>();
+        final List<String> seen = new ArrayList<String>();
+        final boolean[] done = {false};
+        StreamSubscription<String> sub = c.stream().listen(new Funcs.VoidFunc1<String>() {
+            @Override
+            public void call(String v) {
+                seen.add(v);
+                if ("boom".equals(v)) {
+                    throw new RuntimeException("boom while draining");
+                }
+            }
+        }, new Funcs.VoidFunc1<Object>() {
+            @Override
+            public void call(Object e) {
+                throw new RuntimeException("boom from queued error handler");
+            }
+        }, new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                done[0] = true;
+                throw new RuntimeException("boom from queued done handler");
+            }
+        });
+        sub.pause();
+        c.add("boom");
+        c.addError("queued error");
+        c.close();
+        sub.resume(); // must not throw out to the caller, and must still drain the whole queue
+        assertEquals(java.util.Arrays.asList("boom"), seen);
+        assertTrue(done[0], "a throwing data/error callback earlier in the queue must not stop done from draining");
+    }
+
+    @Test
+    public void aThrowingOnDoneForListenAfterCloseDoesNotEscapeListen() {
+        StreamController<String> c = new StreamController<String>();
+        c.stream().listen(new Funcs.VoidFunc1<String>() {
+            @Override
+            public void call(String v) {
+            }
+        });
+        c.close();
+        // listen() on an already-done stream delivers onDone synchronously,
+        // through deliverVoid() directly rather than through emitDone()'s loop.
+        StreamSubscription<String> sub = c.stream().listen(new Funcs.VoidFunc1<String>() {
+            @Override
+            public void call(String v) {
+            }
+        }, null, new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                throw new RuntimeException("boom from onDone on an already-closed stream");
+            }
+        }); // must not throw out to the caller
+        assertFalse(sub.isPaused());
+    }
 }

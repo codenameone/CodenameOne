@@ -40,23 +40,50 @@ public class ScaffoldMessengerState {
 
     private String lastMessage;
     private long lastDurationMillis;
+    // The ToastBar.Status showSnackBar() last showed, if any -- retained so
+    // hideCurrentSnackBar/removeCurrentSnackBar and a later showSnackBar can
+    // clear() it. Without this, clearing only lastMessage left the Status
+    // itself in ToastBar's own status list, where it stayed visible/pending
+    // until its own expiry timer eventually fired.
+    private ToastBar.Status activeStatus;
 
     ScaffoldMessengerState() {
     }
 
     /**
-     * {@code hideCurrentSnackBar}: dismisses the visible SnackBar. This runtime
-     * shows SnackBars through the auto-expiring {@link ToastBar}, so there is no
-     * retained handle to hide; the call clears the recorded message.
+     * {@code hideCurrentSnackBar}: dismisses the visible SnackBar. Real
+     * Flutter (scaffold.dart) runs the SnackBar's exit animation and then
+     * completes it with {@code SnackBarClosedReason.hide}; this runtime has
+     * no exit animation, so the ToastBar status is cleared immediately --
+     * {@link #removeCurrentSnackBar} behaves the same way here.
      */
     public void hideCurrentSnackBar(Object reason) {
         lastMessage = null;
+        clearActiveStatus();
+    }
+
+    /**
+     * {@code removeCurrentSnackBar}: real Flutter's variant of
+     * {@link #hideCurrentSnackBar} that skips the exit animation. This
+     * runtime never animates a SnackBar out, so the two are identical here.
+     */
+    public void removeCurrentSnackBar(Object reason) {
+        lastMessage = null;
+        clearActiveStatus();
     }
 
     public void showSnackBar(SnackBar snackBar) {
         if (snackBar == null) {
             return;
         }
+        // Real Flutter queues a SnackBar shown while another is up, and only
+        // starts it once the current one finishes hiding (scaffold.dart's
+        // showSnackBar/_handleSnackBarStatusChanged). This runtime shows at
+        // most one SnackBar at a time with no queue, so a new showSnackBar
+        // instead replaces the current one outright -- which still needs the
+        // superseded Status cleared, the same as an explicit hide/remove,
+        // or its ToastBar entry and expiry timer would outlive it.
+        clearActiveStatus();
         String msg = consumeMessage(snackBar.getContent());
         long ms = snackBar.durationMillis();
         lastMessage = msg;
@@ -67,7 +94,15 @@ public class ScaffoldMessengerState {
         ToastBar.Status status = ToastBar.getInstance().createStatus();
         status.setMessage(msg);
         status.setExpires((int) ms);
+        activeStatus = status;
         status.show();
+    }
+
+    private void clearActiveStatus() {
+        if (activeStatus != null) {
+            activeStatus.clear();
+            activeStatus = null;
+        }
     }
 
     private static String consumeMessage(Widget content) {
