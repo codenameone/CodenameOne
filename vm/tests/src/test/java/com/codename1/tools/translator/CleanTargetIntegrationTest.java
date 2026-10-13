@@ -39,7 +39,6 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -2019,16 +2018,44 @@ class CleanTargetIntegrationTest {
     static String runCommand(List<String> command, Path workingDir) throws Exception {
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.directory(workingDir.toFile());
+        return runCommand(builder, 600, java.util.concurrent.TimeUnit.SECONDS);
+    }
+
+    static String runCommand(ProcessBuilder builder, long timeout, java.util.concurrent.TimeUnit unit) throws Exception {
+        Path workingDir = builder.directory().toPath();
+        Path log = Files.createTempFile(workingDir, "command-", ".log");
+        String command = String.join(" ", builder.command());
+        System.out.println("Running command: " + command + " (output: " + log + ")");
         builder.redirectErrorStream(true);
-        Process process = builder.start();
-        String output;
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-            output = reader.lines().collect(Collectors.joining("\n"));
+        // A pipe read before waitFor() can block forever, bypassing the timeout.
+        builder.redirectOutput(log.toFile());
+        Process process = null;
+        boolean succeeded = false;
+        try {
+            process = builder.start();
+            // None of these commands receives input. Supply EOF instead of keeping
+            // a child that reads stdin waiting for the test runner indefinitely.
+            process.getOutputStream().close();
+            boolean finished = process.waitFor(timeout, unit);
+            if (!finished) {
+                process.destroyForcibly();
+                process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS);
+            }
+            String output = new String(Files.readAllBytes(log), StandardCharsets.UTF_8);
+            String diagnostic = "Command: " + command + "\nFull output: " + log
+                    + "\nOutput (tail):\n" + tailOf(output) + sourceRootSummary(workingDir);
+            assertTrue(finished, "Command timed out after " + timeout + " " + unit + "\n" + diagnostic);
+            assertEquals(0, process.exitValue(), diagnostic);
+            succeeded = true;
+            return output;
+        } finally {
+            if (process != null && process.isAlive()) {
+                process.destroyForcibly();
+            }
+            if (succeeded) {
+                Files.deleteIfExists(log);
+            }
         }
-        int exit = process.waitFor();
-        assertEquals(0, exit, "Command failed: " + String.join(" ", command)
-                + "\nOutput (tail):\n" + tailOf(output) + sourceRootSummary(workingDir));
-        return output;
     }
 
     /// What the generated project's source roots held when its build failed.
@@ -2183,12 +2210,7 @@ class CleanTargetIntegrationTest {
         pb.directory(buildDir.toFile());
         pb.redirectErrorStream(true);
         pb.environment().put("CN1_UTF8_PROBE", arg);
-        Process p = pb.start();
-        String out;
-        try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
-            out = r.lines().collect(Collectors.joining("\n"));
-        }
-        assertEquals(0, p.waitFor(), "Utf8ArgsApp failed:\n" + out);
+        String out = runCommand(pb, 600, java.util.concurrent.TimeUnit.SECONDS);
         assertTrue(out.contains("ARG=99,97,102,233,8364"),
                 "argv must decode to the right code points, got:\n" + out);
         assertTrue(out.contains("ENV=99,97,102,233,8364"),

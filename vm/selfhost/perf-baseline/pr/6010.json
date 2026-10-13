@@ -21,6 +21,26 @@
     }
    }
   },
+  "windows-arm64@armv8-64-bit-family-8-model-d84-microsoft-corporation": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.57,
+      "time": 0.775,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.467,
+     "reason": "Windows ARM64 run 38347196405 on D84 measured translator RAM at 0.467x against the 0.570x reference across five rounds (0.424x to 0.491x). Record the measured improvement without attributing it to the Process API; retain the existing memory tolerance and timing baseline.",
+     "runs": 1,
+     "time": 0.775,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   }
+  },
   "windows-x64@amd64-family-26-model-2-authenticamd": {
    "stringBuilding": {
     "all": {
