@@ -53,10 +53,16 @@ public class PhoneCodeRepository {
     /// guesses sent at once only as many as are left are let through; nothing
     /// is read and written back. Answers false when none is left, or when the
     /// account has no code to guess at.
-    public boolean takeGuess(String username, int most) {
+    ///
+    /// The guess is taken of the code whose hash is `codeHash`, and of no
+    /// other: a new code sent between reading the hash and taking the guess
+    /// has another hash, the update changes nothing, and the caller is not
+    /// left comparing what was typed with a code that has been replaced.
+    public boolean takeGuess(String username, String codeHash, int most) {
         return session.createQuery("update PhoneCode c set c.attempts = c.attempts + 1 "
-                + "where c.username = :username and c.attempts < :most")
-                .setParameter("username", username).setParameter("most", Integer.valueOf(most))
+                + "where c.username = :username and c.codeHash = :hash and c.attempts < :most")
+                .setParameter("username", username).setParameter("hash", codeHash)
+                .setParameter("most", Integer.valueOf(most))
                 .executeUpdate() == 1;
     }
 }

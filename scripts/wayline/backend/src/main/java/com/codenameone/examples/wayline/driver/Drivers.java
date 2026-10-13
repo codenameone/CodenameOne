@@ -100,6 +100,11 @@ public class Drivers {
 
     @Transactional
     private Report store(String driver, DriverStatusDto status) throws IOException {
+        // Two reports from one driver take turns, before anything is read: read together,
+        // both would count the same stretch since the last one as time on
+        // line. The clock is read after the wait, so reports are also stored
+        // in the order they were let through and none moves the time back.
+        drivers.hold(driver);
         // The role lets a driver into this part of the API; the approval is
         // what lets them take rides. They are granted together, but they are
         // kept apart, and it is the approval that is asked for here.

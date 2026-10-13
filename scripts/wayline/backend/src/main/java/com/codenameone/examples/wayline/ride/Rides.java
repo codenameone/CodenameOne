@@ -805,8 +805,15 @@ public class Rides {
         RideDto dto = new RideDto();
         dto.id = ride.id;
         dto.state = ride.state;
-        dto.riderUsername = ride.rider;
-        Profile rider = profile(dto.riderUsername, cache);
+        // An account's name is the e-mail it signs in with. The other party
+        // to a ride is shown a display name, and a phone number while the two
+        // are meeting; the address is for its owner and for an admin.
+        boolean asRider = !party || (viewer != null && viewer.equals(ride.rider));
+        boolean asDriver = !party || (viewer != null && viewer.equals(ride.driver));
+        if (asRider) {
+            dto.riderUsername = ride.rider;
+        }
+        Profile rider = profile(ride.rider, cache);
         dto.riderName = rider == null ? "" : rider.displayName;
         dto.pickupLat = ride.pickupLat;
         dto.pickupLng = ride.pickupLng;
@@ -839,7 +846,9 @@ public class Rides {
         // An offer is between the server and one driver. Until it is taken the
         // rider has no driver, and is not shown who was asked.
         if (driver.length() > 0 && (!offered || driver.equals(viewer))) {
-            dto.driverUsername = driver;
+            if (asDriver) {
+                dto.driverUsername = driver;
+            }
             Profile who = profile(driver, cache);
             if (who != null) {
                 dto.driverName = who.displayName;
@@ -851,7 +860,7 @@ public class Rides {
                     || RideStates.ARRIVED.equals(dto.state)
                     || RideStates.IN_PROGRESS.equals(dto.state);
             if (party && meeting && viewer != null) {
-                if (viewer.equals(dto.riderUsername) && who != null) {
+                if (viewer.equals(ride.rider) && who != null) {
                     dto.driverPhone = who.phone;
                 } else if (viewer.equals(driver) && rider != null) {
                     dto.riderPhone = rider.phone;

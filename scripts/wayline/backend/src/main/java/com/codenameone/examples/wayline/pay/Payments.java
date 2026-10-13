@@ -157,6 +157,10 @@ public class Payments {
     /// while this one was asking for it.
     @Transactional
     private String keepCustomer(String username, String reference) {
+        // Two first cards started together both find no row. Taking turns on
+        // the account lets the second see the first's row and use it, where
+        // it would otherwise insert a second and fail on the key.
+        profiles.hold(username);
         PaymentCustomer row = repository.customer(username);
         if (row == null) {
             row = new PaymentCustomer();
@@ -249,6 +253,9 @@ public class Payments {
     /// Makes a method the one rides are paid with unless they say otherwise.
     @Transactional
     public PaymentMethodDto makeDefault(String username, String id) throws IOException {
+        // One at a time for an account: two choices made together would each
+        // clear the cards it had read and mark its own, and leave two marked.
+        profiles.hold(username);
         PaymentMethod chosen = CASH.equals(id) ? null : owned(username, id);
         // The cards are few, and each is written only if its mark changed.
         List<PaymentMethod> rows = repository.cards(username);
@@ -270,6 +277,10 @@ public class Payments {
         if (CASH.equals(id)) {
             throw new ResponseStatusException(400, "Cash is always available");
         }
+        // Asking for a ride holds the same row before it picks its card. So a
+        // ride and a removal sent together take turns: either the ride is
+        // there to be seen below, or it no longer finds the card.
+        profiles.hold(username);
         PaymentMethod row = owned(username, id);
         PaymentMethodDto dto = card(row);
         if (repository.paysForRideUnderWay(username, id)) {

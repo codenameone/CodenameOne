@@ -27,6 +27,7 @@ import com.codenameone.examples.wayline.Prefs;
 import com.codenameone.examples.wayline.api.PlaceDto;
 import com.codenameone.examples.wayline.api.PreferencesDto;
 import com.codenameone.examples.wayline.api.ProfileDto;
+import com.codenameone.examples.wayline.api.UserDto;
 
 /// Keeps what the user chose in Settings with their account.
 ///
@@ -73,10 +74,15 @@ public final class Account {
             return;
         }
         profile = null;
+        final String owner = Session.user().username;
         Api.account().preferences(Net.to(preferences -> {
-            apply(preferences);
+            if (signedInAs(owner)) {
+                apply(preferences);
+            }
             Api.account().profile(Net.to(described -> {
-                apply(described);
+                if (signedInAs(owner)) {
+                    apply(described);
+                }
                 done.run();
             }, (status, message) -> done.run()));
         }, (status, message) -> done.run()));
@@ -93,9 +99,13 @@ public final class Account {
         ProfileDto wanted = described();
         wanted.name = name;
         wanted.gender = gender;
+        final String owner = Session.user() == null ? null : Session.user().username;
         Api.account().saveProfile(wanted, Net.to(user -> {
-            profile = wanted;
-            Session.setUser(user);
+            // The answer is about the account that asked; see send().
+            if (signedInAs(owner)) {
+                profile = wanted;
+                Session.setUser(user);
+            }
             done.run();
         }, failed));
     }
@@ -149,8 +159,24 @@ public final class Account {
         if (profileChanged) {
             profileChanged = false;
             final ProfileDto wanted = described();
-            Api.account().saveProfile(wanted, Net.to(user -> profile = wanted, QUIET));
+            final String owner = Session.user().username;
+            Api.account().saveProfile(wanted, Net.to(user -> {
+                // Signing out sends what is waiting and does not wait for the
+                // answer. If somebody else has signed in by the time it comes,
+                // this profile is not theirs: kept, its name and gender would
+                // go out with their next change and overwrite their own.
+                if (signedInAs(owner)) {
+                    profile = wanted;
+                }
+            }, QUIET));
         }
+    }
+
+    /// Whether the account signed in now is `username`: an answer that comes
+    /// back after the session it was asked in has ended is not acted on.
+    private static boolean signedInAs(String username) {
+        UserDto now = Session.user();
+        return now != null && username != null && username.equals(now.username);
     }
 
     private static PreferencesDto preferences() {

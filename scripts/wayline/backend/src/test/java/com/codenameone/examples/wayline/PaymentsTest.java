@@ -310,10 +310,19 @@ class PaymentsTest {
         // for again and the tip's charge has a paid ride to land on.
         mvc.perform(People.asRider(get("/api/rides/" + id), rider))
                 .andExpect(jsonPath("$.paymentStatus").value("PAID"));
+        // Nor is it the driver's to cash out: nobody knows it was charged.
+        Map before = Trips.json(mvc, People.asDriver(get("/api/driver/earnings/summary"),
+                driver));
+        assertEquals(0L, Trips.number(before, "tips"));
+        long fareOnly = Trips.number(before, "balance");
 
         // The charge came back.
         db.execute("UPDATE wl_payment SET tip_ref = 'sim_ch_tip' WHERE ride_id = ?",
                 new Object[] {id});
+        Map after = Trips.json(mvc, People.asDriver(get("/api/driver/earnings/summary"),
+                driver));
+        assertEquals(300L, Trips.number(after, "tips"));
+        assertEquals(fareOnly + 300L, Trips.number(after, "balance"));
         mvc.perform(admin(Trips.body(post("/api/admin/rides/" + id + "/refund"),
                         "{\"reason\":\"Now\"}")))
                 .andExpect(status().isOk())

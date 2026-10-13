@@ -359,8 +359,10 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
     /// Puts the driver's car where the ride says it is, and says in the chip
     /// how long until it gets where it is going.
     private void car() {
-        boolean assigned = ride != null && ride.driverUsername != null
-                && ride.driverUsername.length() > 0 && RideStates.isActive(ride.state)
+        // By the driver's name: the server keeps the driver's sign-in address
+        // to the driver.
+        boolean assigned = ride != null && ride.driverName != null
+                && ride.driverName.length() > 0 && RideStates.isActive(ride.state)
                 && !RideStates.OFFERED.equals(ride.state)
                 && (ride.driverLat != 0 || ride.driverLng != 0);
         if (!assigned) {

@@ -98,6 +98,10 @@ public class PhoneVerification {
     /// when the one before it was sent a moment ago.
     @Transactional
     void store(String username, String codeHash, long now) throws IOException {
+        // Before the code is read: two requests for one account take turns,
+        // so the second finds the code the first just stored and is told to
+        // wait. Otherwise both pass the check below and both send a text.
+        accounts.hold(username);
         PhoneCode pending = codes.find(username);
         if (pending != null && now - pending.sentAt < RESEND_SECONDS * 1000L) {
             throw new ResponseStatusException(429, "Wait a moment before asking for another code");
@@ -159,7 +163,8 @@ public class PhoneVerification {
         // the limit: the count read above is what it was when this request
         // arrived, and any number of requests arriving together all read the
         // same one. Only a request that is given a guess has its code looked at.
-        if (!codes.takeGuess(username, MAX_ATTEMPTS)) {
+        // And only of the code read above: one sent meanwhile is not this one.
+        if (!codes.takeGuess(username, expected, MAX_ATTEMPTS)) {
             throw new ResponseStatusException(429, "Too many wrong codes. Ask for a new one");
         }
         String typed = code == null ? "" : code.trim();

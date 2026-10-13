@@ -400,6 +400,12 @@ public class Accounts {
     /// user store works on the same database and so takes part in it.
     @Transactional(rollbackFor = IOException.class)
     UserDto erase(String username, String password) throws IOException {
+        // Before anything is read. Asking for a ride holds the same row, so
+        // of a ride and a closure sent together one waits for the other: the
+        // closure then sees the ride and is refused, or the ride finds no
+        // profile. Without it both could pass, leaving a ride under way that
+        // belongs to nobody who can cancel it.
+        profiles.hold(username);
         UserDetails signIn = load(username);
         if (password == null || !encoder.matches(password, signIn.getPassword())) {
             throw new ResponseStatusException(403, "That is not your current password");
@@ -427,6 +433,12 @@ public class Accounts {
         // Last: the tokens in hand stop working when the sign-in is gone.
         users.deleteUser(username);
         return was;
+    }
+
+    /// Makes the rest of the caller's transaction take its turn with any other
+    /// that holds the same account. See [ProfileRepository#hold].
+    public void hold(String username) {
+        profiles.hold(username);
     }
 
     @Transactional(rollbackFor = IOException.class)

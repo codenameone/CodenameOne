@@ -386,6 +386,18 @@ That write must come first in the transaction: a transaction that reads
 first may go on seeing the database as it was at that read. That's why choosing
 a driver and offering them the ride are two transactions.
 
+The same hold serializes everything else that reads an account and then
+writes for it. Closing an account, removing a card and choosing the default
+card hold the profile, so each takes turns with a ride being asked for.
+Sending a phone code holds it too, so two requests can't both pass the wait
+between codes. A driver's position report holds the driver's state row, so two
+reports sent together don't count the same minutes on line twice.
+
+A ride's two parties see each other's display name, and each other's phone
+number while they're meeting. The e-mail address an account signs in with is
+its username, and `Rides.toDto` gives it only to its owner and to an admin. A
+tip paid by card counts toward a driver's balance once its charge is recorded.
+
 A payout has no single row to claim, so
 `Earnings.cashOut` commits the payout, reads the balance again, and takes its
 own row back when the balance has gone below zero.

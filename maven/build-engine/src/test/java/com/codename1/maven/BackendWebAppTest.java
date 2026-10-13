@@ -246,8 +246,29 @@ class BackendWebAppTest {
         Files.write(new File(module, "application.properties").toPath(),
                 "server.port=8081\n".getBytes("UTF-8"));
         assertFalse(BackendWebApp.rootIsConfigured(module, none, null));
+        // A profile's file counts only when that profile is the one running.
         Files.write(new File(module, "application-dev.properties").toPath(),
                 "cn1.webapp.root=../site\n".getBytes("UTF-8"));
+        assertFalse(BackendWebApp.rootIsConfigured(module, none, null));
+        assertFalse(BackendWebApp.rootIsConfigured(module, none, "-Dcn1.profile=prod"));
+        assertTrue(BackendWebApp.rootIsConfigured(module, none, "-Xmx1g -Dcn1.profile=dev"));
+        Map<String, String> dev = new HashMap<String, String>();
+        dev.put("CN1_PROFILE", "dev");
+        assertTrue(BackendWebApp.rootIsConfigured(module, dev, null));
+        // The base file names the profile, as itself or with a fallback.
+        Files.write(new File(module, "application.properties").toPath(),
+                "cn1.profile=dev\n".getBytes("UTF-8"));
+        assertTrue(BackendWebApp.rootIsConfigured(module, none, null));
+        assertFalse(BackendWebApp.rootIsConfigured(module, none, "-Dcn1.profile=prod"));
+        Files.write(new File(module, "application.properties").toPath(),
+                "cn1.profile=${WHICH:dev}\n".getBytes("UTF-8"));
+        assertTrue(BackendWebApp.rootIsConfigured(module, none, null));
+        Map<String, String> prod = new HashMap<String, String>();
+        prod.put("WHICH", "prod");
+        assertFalse(BackendWebApp.rootIsConfigured(module, prod, null));
+        // A name this cannot work out: any profile's declaration counts.
+        Files.write(new File(module, "application.properties").toPath(),
+                "cn1.profile=${A}-${B}\n".getBytes("UTF-8"));
         assertTrue(BackendWebApp.rootIsConfigured(module, none, null));
     }
 

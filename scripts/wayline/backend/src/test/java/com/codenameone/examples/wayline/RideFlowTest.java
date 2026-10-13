@@ -124,7 +124,15 @@ class RideFlowTest {
         Map driversView = json(People.asDriver(get("/api/driver/active"), driver));
         assertEquals("+15550111", driversView.get("riderPhone"));
         assertEquals(null, driversView.get("driverPhone"));
+        // A name is the e-mail its account signs in with. Each is given their
+        // own and not the other's; the admin is given both.
+        assertEquals(rider, ridersView.get("riderUsername"));
+        assertEquals(null, ridersView.get("driverUsername"));
+        assertEquals(driver, driversView.get("driverUsername"));
+        assertEquals(null, driversView.get("riderUsername"));
         Map adminsView = json(People.asAdmin(get("/api/rides/" + id), DemoAccounts.ADMIN));
+        assertEquals(rider, adminsView.get("riderUsername"));
+        assertEquals(driver, adminsView.get("driverUsername"));
         assertEquals(null, adminsView.get("driverPhone"));
         assertEquals(null, adminsView.get("riderPhone"));
         // A driver on a ride stays on line.

@@ -76,6 +76,8 @@ public final class BackendWebApp {
 
     /// The setting the server reads its application's directory from.
     public static final String ROOT_PROPERTY = "cn1.webapp.root";
+    /// The setting that names the profile a server runs on.
+    static final String PROFILE_PROPERTY = "cn1.profile";
 
     /// Extensions worth a compressed copy: text, and the formats that are text
     /// in all but name. Images, fonts in a compressed container and archives
@@ -179,31 +181,95 @@ public final class BackendWebApp {
         if (environment != null && environment.get("CN1_WEBAPP_ROOT") != null) {
             return true;
         }
-        File[] files = moduleDir.listFiles();
-        if (files == null) {
+        // Only the files this run will read: application.properties and the
+        // active profile's. A root declared in application-dev.properties says
+        // nothing about a server started on the default profile, which never
+        // loads that file -- treating it as configured withheld the staged
+        // application and left the server answering 404 for its own pages.
+        Properties base = declaredIn(new File(moduleDir, "application.properties"));
+        if (base.getProperty(ROOT_PROPERTY) != null) {
+            return true;
+        }
+        String profile = activeProfile(base, environment, jvmArgs);
+        if (profile == null) {
+            // Named in a way this cannot follow. Fall back to the careful
+            // answer: a root declared in any profile file counts.
+            File[] files = moduleDir.listFiles();
+            if (files == null) {
+                return false;
+            }
+            for (File file : files) {
+                String name = file.getName();
+                if (file.isFile() && name.startsWith("application-") && name.endsWith(".properties")
+                        && declaredIn(file).getProperty(ROOT_PROPERTY) != null) {
+                    return true;
+                }
+            }
             return false;
         }
-        for (File file : files) {
-            String name = file.getName();
-            if (!file.isFile() || !name.startsWith("application") || !name.endsWith(".properties")) {
-                continue;
+        return declaredIn(new File(moduleDir, "application-" + profile + ".properties"))
+                .getProperty(ROOT_PROPERTY) != null;
+    }
+
+    /// The profile the server will run on, settled the way the server settles
+    /// it: a `-Dcn1.profile` argument, then `CN1_PROFILE`, then `cn1.profile`
+    /// in `application.properties`, then `default`. Null when the file names
+    /// it through a placeholder this cannot resolve.
+    static String activeProfile(Properties base, Map<String, String> environment, String jvmArgs) {
+        String flag = "-D" + PROFILE_PROPERTY + "=";
+        int at = jvmArgs == null ? -1 : jvmArgs.lastIndexOf(flag);
+        if (at >= 0) {
+            int end = at + flag.length();
+            while (end < jvmArgs.length() && !Character.isWhitespace(jvmArgs.charAt(end))) {
+                end++;
             }
-            Properties declared = new Properties();
-            try {
-                InputStream in = new FileInputStream(file);
-                try {
-                    declared.load(in);
-                } finally {
-                    in.close();
-                }
-            } catch (IOException err) {
-                throw new BuildExecutionException("Could not read " + file, err);
-            }
-            if (declared.getProperty(ROOT_PROPERTY) != null) {
-                return true;
+            String named = jvmArgs.substring(at + flag.length(), end);
+            if (named.length() > 0) {
+                return named;
             }
         }
-        return false;
+        String fromEnvironment = environment == null ? null : environment.get("CN1_PROFILE");
+        if (fromEnvironment != null && fromEnvironment.length() > 0) {
+            return fromEnvironment;
+        }
+        String named = base.getProperty(PROFILE_PROPERTY);
+        if (named == null) {
+            return "default";
+        }
+        named = named.trim();
+        if (named.startsWith("${") && named.endsWith("}") && named.indexOf("${", 2) < 0) {
+            // ${NAME:fallback}, the one form a profile is usually written in.
+            String inner = named.substring(2, named.length() - 1);
+            int colon = inner.indexOf(':');
+            String variable = colon < 0 ? inner : inner.substring(0, colon);
+            String value = environment == null ? null : environment.get(variable);
+            if (value == null || value.length() == 0) {
+                value = colon < 0 ? "" : inner.substring(colon + 1);
+            }
+            named = value;
+        }
+        if (named.indexOf("${") >= 0) {
+            return null;
+        }
+        return named.length() == 0 ? "default" : named;
+    }
+
+    private static Properties declaredIn(File file) throws BuildExecutionException {
+        Properties declared = new Properties();
+        if (!file.isFile()) {
+            return declared;
+        }
+        try {
+            InputStream in = new FileInputStream(file);
+            try {
+                declared.load(in);
+            } finally {
+                in.close();
+            }
+        } catch (IOException err) {
+            throw new BuildExecutionException("Could not read " + file, err);
+        }
+        return declared;
     }
 
     /// Replaces `output` with the application in `bundle`, which is the archive

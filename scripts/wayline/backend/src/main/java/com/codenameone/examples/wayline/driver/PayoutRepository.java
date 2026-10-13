@@ -107,11 +107,24 @@ public class PayoutRepository {
                 .setParameter("driver", driver).first().longValue();
     }
 
-    /// The tips of every ride a driver completed.
+    /// The tips a driver has been given: those handed over in cash, and those
+    /// put on a card whose charge has come back.
+    ///
+    /// A card tip sits on its ride from the moment it is asked for, and stays
+    /// there with no charge recorded when the processor did not answer. It is
+    /// not money yet -- the card may never have been charged -- so it is not
+    /// counted, and so cannot be cashed out, until the charge is on record.
     public long tips(String driver) {
-        return session.createQuery("select coalesce(sum(r.tipCents), 0) from Ride r "
-                + "where r.driver = :driver and r.state = 'COMPLETED'", Long.class)
+        long cash = session.createQuery("select coalesce(sum(r.tipCents), 0) from Ride r "
+                + "where r.driver = :driver and r.state = 'COMPLETED' "
+                + "and r.methodId = 'cash'", Long.class)
                 .setParameter("driver", driver).first().longValue();
+        long charged = session.createQuery("select coalesce(sum(r.tipCents), 0) from Ride r "
+                + "where r.driver = :driver and r.state = 'COMPLETED' "
+                + "and r.methodId <> 'cash' and r.id in "
+                + "(select p.rideId from Payment p where p.tipRef <> '')", Long.class)
+                .setParameter("driver", driver).first().longValue();
+        return cash + charged;
     }
 
     /// How long a driver was on line on one day, in milliseconds.
