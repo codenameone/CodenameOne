@@ -5710,17 +5710,14 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         File manifestFile = new File(projectDir + "/src/main", "AndroidManifest.xml");
+        int intVersion = computeVersionCode(request);
+        // android:versionName (below, at the "versionName" build.gradle line) wants the
+        // raw float, independent of the android.versionCode override that intVersion
+        // may have taken -- unchanged from before computeVersionCode was extracted.
         float version = 1.0f;
-        int intVersion = 1;
         try {
             version = Float.parseFloat(request.getVersion());
-            String vcOverride = request.getArg("android.versionCode", null);
-            if (vcOverride != null && vcOverride.length() > 0) {
-                intVersion = Integer.parseInt(vcOverride);
-            } else {
-                intVersion = Math.round(100 * version);
-            }
-        } catch (Throwable thrown) {
+        } catch (Throwable notAFloat) {
         }
 
         String locationServices = "<activity android:name=\"com.codename1.location.CodenameOneBackgroundLocationActivity\" android:theme=\"@android:style/Theme.NoDisplay\" android:exported=\"true\"/>\n"
@@ -9746,6 +9743,38 @@ public class AndroidGradleBuilder extends Executor {
                 + "artifact beside the phone one.");
     }
 
+
+    /**
+     * The phone APK's {@code android:versionCode}: the {@code android.versionCode}
+     * build hint (BuildHintsAndroid) when set, otherwise {@code Math.round(100 *
+     * Float.parseFloat(request.getVersion()))}, or {@code 1} when neither parses.
+     *
+     * <p>The override and the version-derived default used to share one
+     * {@code try}/{@code catch (Throwable)}: {@code request.getVersion()} failing
+     * {@link Float#parseFloat} -- any 3-segment semver such as {@code "1.0.0"}, or a
+     * Flutter {@code pubspec.yaml}'s {@code "marketing+buildNumber"} after the build
+     * number is stripped -- threw on the FIRST statement, before the override was
+     * even read. A developer-supplied {@code android.versionCode} was therefore
+     * silently discarded too, and {@code intVersion} fell back to the hardcoded
+     * default of 1 regardless of what the override said. Reading the override first,
+     * independent of whether the project's version string is float-parseable, fixes
+     * that: the two failure modes no longer share a catch block.</p>
+     */
+    static int computeVersionCode(BuildRequest request) {
+        String vcOverride = request.getArg("android.versionCode", null);
+        if (vcOverride != null && vcOverride.length() > 0) {
+            try {
+                return Integer.parseInt(vcOverride);
+            } catch (NumberFormatException invalidOverride) {
+                // Not a whole number: fall through to the version-derived default.
+            }
+        }
+        try {
+            return Math.round(100 * Float.parseFloat(request.getVersion()));
+        } catch (Throwable notAFloat) {
+            return 1;
+        }
+    }
 
     /**
      * The Wear artifact's version code, which must outrank the phone's.

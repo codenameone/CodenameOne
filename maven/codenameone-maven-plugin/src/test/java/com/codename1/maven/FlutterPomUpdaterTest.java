@@ -112,4 +112,52 @@ public class FlutterPomUpdaterTest {
         assertFalse(u.changed);
         assertEquals(2, u.manual.size(), u.manual.toString());
     }
+
+    /// A pom that pins transitive versions declares <dependencyManagement>
+    /// (with its own nested <dependencies>) before its real, top-level
+    /// <dependencies> -- legal, and common. The runtime dependency must land
+    /// in the top-level one: a plain indexOf("<dependencies>") matches
+    /// whichever comes first in the file, which spliced it into
+    /// dependencyManagement, where Maven never adds it to the classpath.
+    @Test
+    public void insertsIntoTopLevelDependenciesNotDependencyManagement() {
+        String pom = "<project>\n"
+                + "    <dependencyManagement>\n"
+                + "        <dependencies>\n"
+                + "            <dependency>\n"
+                + "                <groupId>other</groupId>\n"
+                + "                <artifactId>other-artifact</artifactId>\n"
+                + "                <version>1.0</version>\n"
+                + "            </dependency>\n"
+                + "        </dependencies>\n"
+                + "    </dependencyManagement>\n"
+                + "    <dependencies>\n"
+                + "    </dependencies>\n"
+                + "    <build>\n"
+                + "        <plugins>\n"
+                + "            <plugin>\n"
+                + "                <groupId>com.codenameone</groupId>\n"
+                + "                <artifactId>codenameone-maven-plugin</artifactId>\n"
+                + "                <executions>\n"
+                + "                </executions>\n"
+                + "            </plugin>\n"
+                + "        </plugins>\n"
+                + "    </build>\n"
+                + "</project>\n";
+        FlutterPomUpdater u = new FlutterPomUpdater(pom);
+        assertTrue(u.manual.isEmpty(), u.manual.toString());
+        assertTrue(u.changed);
+
+        int dependencyManagementEnd = u.pom.indexOf("</dependencyManagement>");
+        int runtimeDependency = u.pom.indexOf("codenameone-flutter-runtime");
+        assertTrue(dependencyManagementEnd > 0 && runtimeDependency > 0, u.pom);
+        assertTrue(runtimeDependency > dependencyManagementEnd,
+                "the runtime dependency must land in the top-level <dependencies>, "
+                        + "after </dependencyManagement> closes, not inside it:\n" + u.pom);
+
+        String managementBlock = u.pom.substring(u.pom.indexOf("<dependencyManagement>"), dependencyManagementEnd);
+        assertFalse(managementBlock.contains("codenameone-flutter-runtime"),
+                "dependencyManagement must be left untouched:\n" + managementBlock);
+        assertTrue(managementBlock.contains("other-artifact"));
+    }
 }

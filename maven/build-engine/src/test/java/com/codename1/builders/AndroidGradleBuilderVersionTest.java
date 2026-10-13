@@ -310,4 +310,46 @@ class AndroidGradleBuilderVersionTest {
                 + "com.codename1.impl.CodenameOneImplementation.getPushCallback(), this)"));
         assertFalse(legacyReplay.contains("PushClient.dispatch"));
     }
+
+    @Test
+    void versionCodeOverrideWinsEvenWhenTheProjectVersionIsNotAFloat() {
+        // The override and the version-derived default used to share one
+        // try/catch(Throwable): Float.parseFloat("1.0.0") throws on the FIRST
+        // statement, before android.versionCode was even read, so the override
+        // was silently discarded and intVersion fell back to the hardcoded
+        // default of 1 regardless of what the developer asked for.
+        BuildRequest threeSegment = new BuildRequest();
+        threeSegment.setVersion("1.0.0");
+        threeSegment.putArgument("android.versionCode", "42");
+        assertEquals(42, AndroidGradleBuilder.computeVersionCode(threeSegment),
+                "an explicit android.versionCode must be honoured even when codename1.version "
+                        + "is not Float.parseFloat-compatible");
+
+        // Same failure mode from a Flutter import: pubspec's "marketing+build"
+        // convention left codename1.version with a '+' after splitting at the
+        // marketing part was skipped, but the marketing part itself can still be
+        // a 3-segment semver.
+        BuildRequest fromFlutterImport = new BuildRequest();
+        fromFlutterImport.setVersion("2.10.2");
+        fromFlutterImport.putArgument("android.versionCode", "021002");
+        assertEquals(21002, AndroidGradleBuilder.computeVersionCode(fromFlutterImport));
+
+        // No override: falls back to the version-derived default, unchanged.
+        BuildRequest noOverride = new BuildRequest();
+        noOverride.setVersion("1.5");
+        assertEquals(150, AndroidGradleBuilder.computeVersionCode(noOverride));
+
+        // Neither a usable override nor a float-parseable version: the
+        // long-standing default of 1, not an exception.
+        BuildRequest neither = new BuildRequest();
+        neither.setVersion("1.0.0");
+        assertEquals(1, AndroidGradleBuilder.computeVersionCode(neither));
+
+        // An override that is not itself a whole number falls back to the
+        // version-derived default rather than propagating.
+        BuildRequest malformedOverride = new BuildRequest();
+        malformedOverride.setVersion("1.5");
+        malformedOverride.putArgument("android.versionCode", "not-a-number");
+        assertEquals(150, AndroidGradleBuilder.computeVersionCode(malformedOverride));
+    }
 }

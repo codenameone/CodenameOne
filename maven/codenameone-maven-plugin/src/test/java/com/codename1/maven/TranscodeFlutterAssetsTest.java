@@ -130,6 +130,59 @@ public class TranscodeFlutterAssetsTest {
     }
 
     /**
+     * Flutter allows an asset or font declared anywhere project-relative, not
+     * only under {@code assets/} or {@code packages/} -- {@code fonts/MyFont.ttf}
+     * is exactly the shape a font-only pubspec entry takes. Only
+     * {@code cn1:import-flutter-project} ever writes
+     * {@code FlutterProjectImporter.ASSET_KEYS_RECORD}: a hand-wired tree with no
+     * such record must keep relying on the two legacy roots alone, unchanged.
+     */
+    @Test
+    public void declaredAssetKeysOutsideTheLegacyRootsAreFlattenedToo() throws Exception {
+        File fontFile = new File(flutter, "fonts/MyFont.ttf");
+        fontFile.getParentFile().mkdirs();
+        Files.write(fontFile.toPath(), new byte[] {9});
+        declareAssetKeys("fonts/MyFont.ttf");
+
+        mojo.copyAssets();
+
+        assertTrue("a declared key outside assets/+packages must still be flattened",
+                flat("fonts/MyFont.ttf").isFile());
+    }
+
+    @Test
+    public void aDeclaredDirectoryKeyIsFlattenedRecursively() throws Exception {
+        asset("images/logo.png");
+        asset("images/2x/logo.png");
+        declareAssetKeys("images");
+
+        mojo.copyAssets();
+
+        assertTrue(flat("images/logo.png").isFile());
+        assertTrue(flat("images/2x/logo.png").isFile());
+    }
+
+    @Test
+    public void handWiredProjectsWithNoDeclaredAssetKeysRecordAreUnaffected() throws Exception {
+        // No ASSET_KEYS_RECORD file at all -- never imported -- so a file outside
+        // assets/+packages must stay invisible to the mojo, exactly as before.
+        asset("fonts/MyFont.ttf");
+
+        mojo.copyAssets();
+
+        assertFalse(flat("fonts/MyFont.ttf").exists());
+    }
+
+    private void declareAssetKeys(String... keys) throws Exception {
+        File record = new File(flutter, FlutterProjectImporter.ASSET_KEYS_RECORD);
+        StringBuilder b = new StringBuilder();
+        for (String k : keys) {
+            b.append(k).append('\n');
+        }
+        Files.write(record.toPath(), b.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    /**
      * The same vectors as the runtime's FlutterAssetsTest and the benchmark's
      * stage_assets.py: the three encoders must agree name for name, or an asset
      * the build writes is one the runtime never finds.

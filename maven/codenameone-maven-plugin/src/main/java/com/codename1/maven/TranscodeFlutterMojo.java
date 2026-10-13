@@ -60,6 +60,12 @@ import java.util.Set;
  *       bundled assets, flattened into the
  *       build output (Codename One resources are flat on every port) so
  *       {@code Image.asset(...)} resolves</li>
+ *   <li>Any other pubspec {@code assets:}/{@code fonts:} key --
+ *       {@code fonts/MyFont.ttf}, {@code images/logo.png} -- is flattened the
+ *       same way, but only when {@code cn1:import-flutter-project} recorded it
+ *       declared (see {@code FlutterProjectImporter.ASSET_KEYS_RECORD}); a
+ *       hand-wired tree with no such record relies on the two roots above
+ *       alone</li>
  * </ul>
  *
  * <p>When the directory does not exist the goal is a silent no-op. When it
@@ -197,6 +203,20 @@ public class TranscodeFlutterMojo extends AbstractCN1Mojo {
                 // the root stays in the Flutter asset key, matching pubspec paths
                 count += flattenInto(dir, root, outDir, written, keys);
             }
+            // Flutter allows an asset or font declared anywhere project-relative --
+            // fonts/MyFont.ttf, images/logo.png -- not only under assets/ or
+            // packages/, so the scan above missed every one of those: the key
+            // resolved to nothing on every port. cn1:import-flutter-project records
+            // exactly which keys it copied, in FlutterProjectImporter.ASSET_KEYS_RECORD;
+            // a hand-wired project (no import, so no such record) is unaffected --
+            // it keeps relying on the scan above alone, as before.
+            for (String key : readDeclaredAssetKeys()) {
+                if (ASSET_ROOTS_SET.contains(topSegment(key))) {
+                    continue; // already copied by the scan above
+                }
+                Files.createDirectories(outDir.toPath());
+                count += flattenDeclaredAsset(key, outDir, written, keys);
+            }
             if (count > 0) {
                 writeAssetManifest(outDir, keys, written);
                 getLog().info("Flattened " + count + " Flutter asset(s) into the build output");
@@ -205,6 +225,54 @@ public class TranscodeFlutterMojo extends AbstractCN1Mojo {
             throw new MojoExecutionException("Failed copying Flutter assets", e);
         }
         removeStaleAssets(written);
+    }
+
+    /// The `FlutterProjectImporter.ASSET_KEYS_RECORD` keys a previous
+    /// `cn1:import-flutter-project` wrote beside `src/main/flutter`, or
+    /// empty when the project was hand-wired (never imported) or predates
+    /// the record. `FlutterProjectImporter` is package-private but lives in
+    /// `build-engine`, which this plugin already depends on and already
+    /// invokes directly (`ImportFlutterProjectMojo`) -- so its record
+    /// filename is read from that one constant rather than duplicated here.
+    private List<String> readDeclaredAssetKeys() throws IOException {
+        File f = new File(flutterSourceDir, FlutterProjectImporter.ASSET_KEYS_RECORD);
+        if (!f.isFile()) {
+            return java.util.Collections.emptyList();
+        }
+        List<String> out = new ArrayList<String>();
+        for (String line : Files.readAllLines(f.toPath(), java.nio.charset.StandardCharsets.UTF_8)) {
+            line = line.trim();
+            if (line.length() > 0) {
+                out.add(line);
+            }
+        }
+        return out;
+    }
+
+    private static String topSegment(String key) {
+        int slash = key.indexOf('/');
+        return slash < 0 ? key : key.substring(0, slash);
+    }
+
+    /// Flattens one declared asset key outside {@link #ASSET_ROOTS}: a file,
+    /// or a directory (pubspec allows declaring a whole directory), rooted
+    /// at {@code flutterSourceDir}. Missing on disk is not an error here --
+    /// {@code FlutterProjectImporter} already warned about that key when it
+    /// could not resolve it.
+    private int flattenDeclaredAsset(String key, File outDir, Set<String> written, List<String> keys)
+            throws IOException {
+        File node = new File(flutterSourceDir, key.replace('/', File.separatorChar));
+        if (node.isDirectory()) {
+            return flattenInto(node, key, outDir, written, keys);
+        }
+        if (!node.isFile()) {
+            return 0;
+        }
+        String flat = flatAssetName(key);
+        Files.copy(node.toPath(), new File(outDir, flat).toPath(), StandardCopyOption.REPLACE_EXISTING);
+        written.add(flat);
+        keys.add(key);
+        return 1;
     }
 
     /**
@@ -260,6 +328,8 @@ public class TranscodeFlutterMojo extends AbstractCN1Mojo {
 
     /** The directory names under {@code src/main/flutter} that hold bundled assets. */
     private static final String[] ASSET_ROOTS = {"assets", "packages"};
+    private static final Set<String> ASSET_ROOTS_SET =
+            new HashSet<String>(java.util.Arrays.asList(ASSET_ROOTS));
 
     /**
      * The bundled list of asset keys, one per line, which the runtime's

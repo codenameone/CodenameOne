@@ -22,7 +22,9 @@
  */
 package com.codename1.maven;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -88,11 +90,20 @@ final class FlutterPomUpdater {
                 p = p.substring(0, commented.start()) + commented.group(1) + p.substring(commented.end());
                 changed = true;
             } else {
-                int deps = p.indexOf("<dependencies>");
-                if (deps < 0) {
+                // Issue: a plain indexOf("<dependencies>") matches whichever
+                // <dependencies> element comes FIRST in the file -- and a pom
+                // that pins transitive versions commonly declares
+                // <dependencyManagement> (its own nested <dependencies>)
+                // before its real, top-level one. The runtime dependency was
+                // then spliced into dependencyManagement, which only sets a
+                // default version/scope for a dependency declared elsewhere;
+                // it never puts the artifact on the classpath, so Maven could
+                // not find the Flutter runtime at all. Locate the
+                // <dependencies> that is a direct child of <project> instead.
+                int at = topLevelDependenciesInsertionPoint(p);
+                if (at < 0) {
                     manual.add("the codenameone-flutter-runtime dependency:\n" + DEPENDENCY);
                 } else {
-                    int at = deps + "<dependencies>".length();
                     p = p.substring(0, at) + "\n" + DEPENDENCY.substring(0, DEPENDENCY.length() - 1)
                             + p.substring(at);
                     changed = true;
@@ -129,5 +140,81 @@ final class FlutterPomUpdater {
 
     private static String stripComments(String xml) {
         return xml.replaceAll("(?s)<!--.*?-->", "");
+    }
+
+    /// The index right after the opening tag of the `<dependencies>` element
+    /// whose immediate parent is `<project>` -- i.e. the project's own
+    /// top-level dependency list, never one nested inside
+    /// `<dependencyManagement>`, `<profiles>`, `<plugins>` or `<build>` -- or
+    /// -1 when the pom has none. A light XML-aware scan of element nesting
+    /// depth (tags only; attributes, comments, CDATA and PIs are skipped
+    /// without being parsed), kept deliberately small rather than pulling in
+    /// a real XML parser for one lookup.
+    static int topLevelDependenciesInsertionPoint(String xml) {
+        Deque<String> stack = new ArrayDeque<String>();
+        int i = 0;
+        int n = xml.length();
+        while (i < n) {
+            int lt = xml.indexOf('<', i);
+            if (lt < 0) {
+                break;
+            }
+            if (xml.startsWith("<!--", lt)) {
+                int end = xml.indexOf("-->", lt + 4);
+                i = end < 0 ? n : end + 3;
+                continue;
+            }
+            if (xml.startsWith("<![CDATA[", lt)) {
+                int end = xml.indexOf("]]>", lt + 9);
+                i = end < 0 ? n : end + 3;
+                continue;
+            }
+            if (xml.startsWith("<?", lt)) {
+                int end = xml.indexOf("?>", lt + 2);
+                i = end < 0 ? n : end + 2;
+                continue;
+            }
+            if (xml.startsWith("<!", lt)) {
+                int end = xml.indexOf('>', lt + 2);
+                i = end < 0 ? n : end + 1;
+                continue;
+            }
+            int gt = xml.indexOf('>', lt + 1);
+            if (gt < 0) {
+                break;
+            }
+            String tag = xml.substring(lt + 1, gt);
+            boolean closing = tag.startsWith("/");
+            boolean selfClosing = tag.endsWith("/");
+            if (closing) {
+                String name = tag.substring(1).trim();
+                if (!stack.isEmpty() && stack.peek().equals(name)) {
+                    stack.pop();
+                }
+            } else {
+                String body = selfClosing ? tag.substring(0, tag.length() - 1) : tag;
+                String name = tagName(body);
+                if ("dependencies".equals(name) && stack.size() == 1 && "project".equals(stack.peek())) {
+                    return gt + 1;
+                }
+                if (!selfClosing) {
+                    stack.push(name);
+                }
+            }
+            i = gt + 1;
+        }
+        return -1;
+    }
+
+    /// The element name at the start of an opening tag's body (everything
+    /// between `<`/`</` and `>`/`/>`), stopping at the first whitespace so a
+    /// tag carrying attributes (`<project xmlns="...">`) is still named
+    /// correctly.
+    private static String tagName(String tagBody) {
+        int end = 0;
+        while (end < tagBody.length() && !Character.isWhitespace(tagBody.charAt(end))) {
+            end++;
+        }
+        return tagBody.substring(0, end);
     }
 }

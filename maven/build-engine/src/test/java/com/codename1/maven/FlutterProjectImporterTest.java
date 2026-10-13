@@ -217,6 +217,104 @@ public class FlutterProjectImporterTest {
     }
 
     @Test
+    public void setOrAppendPropertyAddsAMissingKeyButUpdatesAnExistingOneInPlace() {
+        String props = "codename1.version=1.0\n";
+        // Not declared yet (the archetype's settings file never ships either build-number
+        // hint by default) -- so it is appended, unlike setProperty's "leave it alone".
+        String withNew = FlutterProjectImporter.setOrAppendProperty(props, "codename1.arg.android.versionCode", "4");
+        assertTrue(withNew, withNew.contains("codename1.arg.android.versionCode=4"));
+        assertTrue(withNew, withNew.contains("codename1.version=1.0"));
+
+        // Declared now: re-running (as a second import would) updates it in place,
+        // never appending a second line for the same key.
+        String updated = FlutterProjectImporter.setOrAppendProperty(withNew, "codename1.arg.android.versionCode",
+                "9");
+        assertEquals(2, updated.split("codename1\\.arg\\.android\\.versionCode=", -1).length);
+        assertTrue(updated, updated.contains("codename1.arg.android.versionCode=9"));
+    }
+
+    @Test
+    public void importSplitsPubspecVersionIntoMarketingAndBuildNumberHints() throws Exception {
+        // Flutter's own template ships "1.0.0+1": PUBSPEC's "1.2.3+4" is the same
+        // marketing+buildNumber shape. Copied in whole, "+4" is not
+        // Float.parseFloat-compatible (AndroidGradleBuilder's default versionCode)
+        // and is invalid inside CFBundleShortVersionString (IPhoneBuilder).
+        File root = Files.createTempDirectory("flutter-version-split").toFile();
+        File flutterProject = new File(root, "demo");
+        write(new File(flutterProject, "pubspec.yaml"), PUBSPEC);
+        write(new File(flutterProject, "lib/main.dart"), "void main() {}\n");
+        write(new File(flutterProject, "assets/images/logo.png"), "PNGDATA");
+        write(new File(flutterProject, "assets/icons/a.png"), "ICONA");
+        write(new File(flutterProject, "assets/fonts/Custom-Regular.ttf"), "FONTDATA");
+
+        File common = new File(root, "common");
+        write(new File(common, "codenameone_settings.properties"),
+                "codename1.version=1.0\ncodename1.displayName=Old Name\n");
+
+        new FlutterProjectImporter(new com.codename1.build.SystemStreamLog())
+                .importProject(flutterProject, common, null, null);
+
+        String settings = read(new File(common, "codenameone_settings.properties"));
+        assertTrue(settings, settings.contains("codename1.version=1.2.3"));
+        assertFalse("the marketing version must not carry the build number",
+                settings.contains("codename1.version=1.2.3+4"));
+        assertTrue(settings, settings.contains("codename1.arg.android.versionCode=4"));
+        assertTrue(settings, settings.contains("codename1.arg.ios.bundleVersion=4"));
+        assertTrue(settings, settings.contains("codename1.displayName=demo_app"));
+    }
+
+    @Test
+    public void importWithNoBuildNumberLeavesTheVersionHintsUnset() throws Exception {
+        File root = Files.createTempDirectory("flutter-version-no-build-number").toFile();
+        File flutterProject = new File(root, "demo");
+        write(new File(flutterProject, "pubspec.yaml"), "name: demo\nversion: 1.0.0\n"
+                + "dependencies:\n  flutter:\n    sdk: flutter\n");
+        write(new File(flutterProject, "lib/main.dart"), "void main() {}\n");
+
+        File common = new File(root, "common");
+        write(new File(common, "codenameone_settings.properties"), "codename1.version=1.0\n");
+
+        new FlutterProjectImporter(new com.codename1.build.SystemStreamLog())
+                .importProject(flutterProject, common, null, null);
+
+        String settings = read(new File(common, "codenameone_settings.properties"));
+        assertTrue(settings, settings.contains("codename1.version=1.0.0"));
+        assertFalse(settings, settings.contains("android.versionCode"));
+        assertFalse(settings, settings.contains("ios.bundleVersion"));
+    }
+
+    /// Flutter allows an asset or font declared anywhere project-relative, not
+    /// only under `assets/` or `packages/` -- `fonts/MyFont.ttf` is exactly the
+    /// shape a font-only pubspec entry takes. The importer must both copy the
+    /// file (already true) and record the key in ASSET_KEYS_RECORD, which is
+    /// what lets TranscodeFlutterMojo find it outside the two roots it scans.
+    @Test
+    public void recordsDeclaredAssetKeysOutsideTheLegacyRootsForTheMojoToFlatten() throws Exception {
+        File root = Files.createTempDirectory("flutter-declared-asset-keys").toFile();
+        File flutterProject = new File(root, "demo");
+        write(new File(flutterProject, "pubspec.yaml"), "name: demo\nversion: 1.0.0\n"
+                + "dependencies:\n  flutter:\n    sdk: flutter\n"
+                + "flutter:\n  assets:\n    - images/logo.png\n"
+                + "  fonts:\n    - family: Custom\n      fonts:\n        - asset: fonts/Custom-Regular.ttf\n");
+        write(new File(flutterProject, "lib/main.dart"), "void main() {}\n");
+        write(new File(flutterProject, "images/logo.png"), "PNGDATA");
+        write(new File(flutterProject, "fonts/Custom-Regular.ttf"), "FONTDATA");
+
+        File common = new File(root, "common");
+        new FlutterProjectImporter(new com.codename1.build.SystemStreamLog())
+                .importProject(flutterProject, common, null, null);
+
+        File flutterDir = new File(common, "src/main/flutter");
+        assertTrue(new File(flutterDir, "images/logo.png").isFile());
+        assertTrue(new File(flutterDir, "fonts/Custom-Regular.ttf").isFile());
+
+        File record = new File(flutterDir, FlutterProjectImporter.ASSET_KEYS_RECORD);
+        assertTrue(record.isFile());
+        assertEquals(java.util.Arrays.asList("fonts/Custom-Regular.ttf", "images/logo.png"),
+                Files.readAllLines(record.toPath(), java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    @Test
     public void aTrailingCommentIsNotPartOfAPubspecValue() {
         assertEquals("2.10.2+021002", FlutterProjectImporter.Pubspec.unquote("2.10.2+021002 # See README.md"));
         assertEquals("a#b", FlutterProjectImporter.Pubspec.unquote("a#b"));

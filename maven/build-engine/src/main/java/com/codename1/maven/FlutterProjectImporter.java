@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -150,6 +151,9 @@ public final class FlutterProjectImporter {
             Map<String, String> lockVersions = readLockVersions(source);
             Map<String, File> resolvedPackageLibDirs = new HashMap<String, File>();
             Set<String> packagesWithCopiedAssets = new LinkedHashSet<String>();
+            // Every declared key that resolved to real content, recorded for
+            // TranscodeFlutterMojo -- see ASSET_KEYS_RECORD.
+            Set<String> declaredAssetKeys = new TreeSet<String>();
 
             Set<String> assetKeys = new LinkedHashSet<String>();
             assetKeys.addAll(pubspec.assets);
@@ -189,6 +193,7 @@ public final class FlutterProjectImporter {
                     r.missingAssets.add(key);
                     continue;
                 }
+                declaredAssetKeys.add(clean);
                 int before = r.copiedAssets;
                 r.copiedAssets += copy(assetSrc, new File(target, clean.replace('/', File.separatorChar)), clean,
                         previous, imported);
@@ -202,6 +207,7 @@ public final class FlutterProjectImporter {
 
             removeStaleImports(target, previous, imported);
             writeImportRecord(target, imported);
+            writeDeclaredAssetKeys(target, declaredAssetKeys);
 
             if (mainPackage != null && mainClass != null) {
                 writeEntryPoint(new File(commonDir, "src/main/java"), mainPackage, mainClass);
@@ -255,6 +261,23 @@ public final class FlutterProjectImporter {
     /// when the project already declares that key -- this never introduces a
     /// setting the developer did not already have, the same caution
     /// [AndroidProjectImporter] applies to `codename1.packageName`.
+    ///
+    /// Flutter's `version:` is `marketing[+buildNumber]` (its own template
+    /// ships `1.0.0+1`), and the two halves mean different things to the two
+    /// native builders: AndroidGradleBuilder parses `codename1.version` with
+    /// `Float.parseFloat` for its default `versionCode`, and IPhoneBuilder
+    /// writes it straight into `CFBundleShortVersionString` (the marketing
+    /// string App Review shows). Copying `"1.0.0+1"` there whole is wrong
+    /// twice over: the `+1` is not `Float.parseFloat`-compatible --
+    /// `AndroidGradleBuilder.computeVersionCode` falls back to a hardcoded
+    /// `1` -- and `CFBundleShortVersionString` must not contain a `+` at
+    /// all. The marketing half (before `+`) goes to `codename1.version`
+    /// alone; the build number (after `+`) goes to the hints the builders
+    /// actually read for their OWN build-number concept --
+    /// `android.versionCode` (`BuildHintsAndroid`) and `ios.bundleVersion`
+    /// (`CodenameOne/src/.../buildhints/Ios.java`, which backs
+    /// `CFBundleVersion`) -- added rather than updated-if-present, since the
+    /// archetype's settings file never declares either by default.
     private void updateSettings(File commonDir, Pubspec pubspec) throws IOException {
         File settings = new File(commonDir, "codenameone_settings.properties");
         if (!settings.isFile()) {
@@ -263,7 +286,14 @@ public final class FlutterProjectImporter {
         String s = new String(Files.readAllBytes(settings.toPath()), Charset.forName("UTF-8"));
         String updated = s;
         if (pubspec.version != null) {
-            updated = setProperty(updated, "codename1.version", pubspec.version);
+            int plus = pubspec.version.indexOf('+');
+            String marketing = plus < 0 ? pubspec.version : pubspec.version.substring(0, plus);
+            updated = setProperty(updated, "codename1.version", marketing);
+            if (plus >= 0 && plus < pubspec.version.length() - 1) {
+                String buildNumber = pubspec.version.substring(plus + 1);
+                updated = setOrAppendProperty(updated, "codename1.arg.android.versionCode", buildNumber);
+                updated = setOrAppendProperty(updated, "codename1.arg.ios.bundleVersion", buildNumber);
+            }
         }
         if (pubspec.name != null) {
             updated = setProperty(updated, "codename1.displayName", pubspec.name);
@@ -283,6 +313,21 @@ public final class FlutterProjectImporter {
             return properties;
         }
         return m.replaceFirst(Matcher.quoteReplacement(key + "=" + value));
+    }
+
+    /// Like [#setProperty], but appends `key=value` as a new line when the
+    /// file does not already declare `key`, instead of leaving it alone --
+    /// used for the `android.versionCode`/`ios.bundleVersion` build hints,
+    /// which (unlike `codename1.version`/`codename1.displayName`) the
+    /// archetype's settings file never declares by default, so "update only
+    /// if present" would silently drop the pubspec build number every time.
+    static String setOrAppendProperty(String properties, String key, String value) {
+        Matcher m = Pattern.compile("(?m)^" + Pattern.quote(key) + "\\s*=.*$").matcher(properties);
+        if (m.find()) {
+            return m.replaceFirst(Matcher.quoteReplacement(key + "=" + value));
+        }
+        String separator = properties.length() == 0 || properties.endsWith("\n") ? "" : "\n";
+        return properties + separator + key + "=" + value + "\n";
     }
 
     private void writeEntryPoint(File javaDir, String pkg, String cls) throws IOException {
@@ -346,6 +391,32 @@ public final class FlutterProjectImporter {
         }
         target.mkdirs();
         Files.write(new File(target, IMPORT_RECORD).toPath(), b.toString().getBytes(Charset.forName("UTF-8")));
+    }
+
+    /// File (beside [#IMPORT_RECORD], directly under `src/main/flutter`)
+    /// listing every pubspec `assets:`/`fonts:` key this import resolved to
+    /// real content, one per line, `/` separated -- exactly the path each
+    /// key was copied to under `src/main/flutter`, whether its source was
+    /// the Flutter project itself or a resolved pub package.
+    ///
+    /// `TranscodeFlutterMojo.copyAssets()` reads this to flatten keys
+    /// outside the two roots it otherwise scans (`assets/`, `packages/`):
+    /// Flutter allows an asset or font declared anywhere project-relative
+    /// (`fonts/MyFont.ttf`, `images/logo.png`), and without this record the
+    /// mojo had no way to learn such a key exists, so it silently packaged
+    /// nothing for it on every port. Rewritten whole on every import, even
+    /// to empty, so a key removed from pubspec.yaml stops being flattened
+    /// too. A hand-wired project (no import, so no such file) is unaffected
+    /// -- the mojo falls back to its existing assets/+packages scan alone.
+    static final String ASSET_KEYS_RECORD = ".flutter-asset-keys";
+
+    private static void writeDeclaredAssetKeys(File target, Set<String> keys) throws IOException {
+        StringBuilder b = new StringBuilder();
+        for (String k : keys) {
+            b.append(k).append('\n');
+        }
+        target.mkdirs();
+        Files.write(new File(target, ASSET_KEYS_RECORD).toPath(), b.toString().getBytes(Charset.forName("UTF-8")));
     }
 
     /// Copies `src` to `dest` (recursing when `src` is a directory), recording
