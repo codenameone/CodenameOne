@@ -1,0 +1,19 @@
+{
+ "pr": 6014,
+ "rebaseline": {
+  "windows-arm64@armv8-64-bit-family-8-model-d49-microsoft-corporation": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.451,
+      "time": 0.838
+     },
+     "memory": 0.493,
+     "reason": "Recalibrate D49 self-translation RAM from four existing five-round runs on the same CPU: master d519cd4e6f in runs 38346386877 (0.506752) and 38374316533 (0.472079), PR head 3bf9697606 in run 38366775431 (0.479469), and head 16176db0ad in run 38379531262 (0.541133). The two PR heads have identical VM and translator production sources; only JVM test mocks changed between them. Relative to the earlier PR run, median native peak RAM moved from 259.8 MB to 270.9 MB while median JDK peak RAM moved from 541.9 MB to 485.1 MB. This captures current run variability around a baseline whose RAM value came from one older run, rather than attributing the ratio shift to the Linux fix. Use the median of these four run medians (0.493), retaining the 15 percent RAM tolerance, 0.05 absolute floor, 0.838 time baseline, and every other benchmark.",
+     "runs": 4,
+     "time": 0.838
+    }
+   }
+  }
+ }
+}
