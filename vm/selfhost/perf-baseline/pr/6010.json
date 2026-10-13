@@ -41,6 +41,28 @@
     }
    }
   },
+  "windows-x64@amd64-family-25-model-17-authenticamd": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.766,
+      "time": 1.375,
+      "tolerance": {
+       "memory": 0.2,
+       "time": 0.5
+      }
+     },
+     "memory": 0.828,
+     "reason": "Recalibrate Windows AMD Family 25 Model 17 hello RAM from runs 38292660169 (0.725x median) and 38372408580 (0.931x median). Native peaks overlap: 1005-1153 MB in the earlier run versus 1021-1166 MB now; the JDK 25 reference shifted from 1496-1791 MB to 1023-1514 MB. The reference revision f8e878ece6 has the same collector and translator implementation apart from this PR Process API and monotonic-clock changes. Pool the two run medians (0.828x) to account for the observed reference-JVM variation; retain the 20% memory tolerance and the timing baseline.",
+     "runs": 2,
+     "time": 1.375,
+     "tolerance": {
+      "memory": 0.2,
+      "time": 0.5
+     }
+    }
+   }
+  },
   "windows-x64@amd64-family-26-model-2-authenticamd": {
    "stringBuilding": {
     "all": {
