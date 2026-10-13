@@ -172,6 +172,12 @@ final class AppSupport {
             // Maven build does (CssCompiler.localizationSibling).
             t.getSources().from(layout.cssDir(), layout.l10nDir(),
                     new File(layout.l10nDir().getParentFile(), "i18n"), layout.settingsFile());
+            // A stylesheet imported from outside src/main/css is an input too:
+            // an edit to it changes the theme without touching that directory.
+            // Resolved when the inputs are read, so an import added since the
+            // last build is seen.
+            t.getSources().from(project.provider(
+                    () -> com.codename1.maven.CssImportDependencies.outside(layout.cssDir())));
             t.getCompilerClasspath().from(cssCompiler);
             t.getOutputDirectory().set(new File(layout.buildDir(), "generated/resources/cn1-css"));
             t.getWorkDirectory().set(cssWorkDir(layout));

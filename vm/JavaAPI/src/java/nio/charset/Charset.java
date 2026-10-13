@@ -39,6 +39,10 @@ public class Charset implements Comparable<Charset> {
         return name.compareTo(another.name);
     }
     
+    public final String name() {
+        return name;
+    }
+
     public String displayName() {
         return name;
     }

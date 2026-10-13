@@ -23,6 +23,8 @@
 package com.codename1.backend;
 
 import java.io.IOException;
+import com.codename1.backend.annotations.Isolation;
+import com.codename1.backend.annotations.Propagation;
 
 import com.codename1.backend.orm.EntityManager;
 
@@ -32,10 +34,9 @@ import com.codename1.backend.orm.EntityManager;
 /// The build rewrites every `@Transactional` method into a call to
 /// [#begin], the original body, then [#commit] -- or
 /// [#afterThrow] with the rollback decision it worked out from the
-/// annotation. The propagation, the read-only flag and the timeout arrive as
-/// constants, so this class interprets nothing: it holds the one piece of state
-/// that has to exist at run time, which is which connection the thread's
-/// transaction is on.
+/// annotation. Propagation, isolation, read-only and timeout arrive as constants.
+/// This class binds the connection, completion hooks and scoped resources to
+/// the physical transaction on the calling thread.
 ///
 /// ## Joining
 ///
@@ -45,7 +46,7 @@ import com.codename1.backend.orm.EntityManager;
 /// [EntityManager]'s daos and a managed session all join it. The connection
 /// is borrowed, and BEGIN sent, only when the transaction first needs it: a
 /// `@Transactional` method that returns before touching the database costs
-/// a thread-local write and nothing else.
+/// only an in-memory scope, with no database round trip.
 ///
 /// A thread that has never begun a transaction does not even read the
 /// thread-local: [#used] is set by the first [#begin] of the process,
@@ -84,11 +85,114 @@ public final class Transactions {
     private Transactions() {
     }
 
+    /// Final outcome. UNKNOWN means a commit or rollback failed and durability
+    /// cannot be established; it must never be treated as a successful commit.
+    public enum Outcome { COMMITTED, ROLLED_BACK, UNKNOWN }
+
+    /// Hooks run synchronously in registration order, once per physical
+    /// transaction (including a scope that never borrowed a connection).
+    /// Override only the hooks needed. Before-commit failures prevent commit;
+    /// after-commit failures are reported after all completion hooks run.
+    /// Completion failures are logged and do not replace the original failure.
+    public abstract static class Synchronization {
+        public void beforeCommit(boolean readOnly) { }
+        public void afterCommit() { }
+        public void afterCompletion(Outcome outcome) { }
+    }
+
+    /// A programmatic transaction body. Any exception or Error rolls it back.
+    public interface Work {
+        Object run() throws Exception;
+    }
+
+    /// Runs a REQUIRED transaction with the engine's default isolation.
+    public static Object execute(Work work) throws Exception {
+        return execute(Propagation.REQUIRED, false, -1, Isolation.DEFAULT, work);
+    }
+
+    /// Runs a transaction with the same propagation and isolation rules as
+    /// `@Transactional`. Unlike annotation rollback rules, every body failure rolls back.
+    public static Object execute(Propagation propagation, boolean readOnly, int timeoutSeconds,
+                                 Isolation isolation, Work work) throws Exception {
+        if (propagation == null || work == null) {
+            throw new IllegalArgumentException("Propagation and work are required");
+        }
+        Transaction tx = begin(propagation.ordinal(), readOnly, timeoutSeconds, isolation);
+        Object result;
+        try {
+            result = work.run();
+        } catch (Exception err) {
+            afterThrow(tx, true);
+            throw err;
+        } catch (Error err) {
+            afterThrow(tx, true);
+            throw err;
+        }
+        commit(tx);
+        return result;
+    }
+
+    /// Registers hooks on the current physical transaction. Registration is
+    /// closed when completion begins. A rolled-back NESTED scope suppresses its
+    /// before/after-commit hooks, but its completion hook still runs at physical end.
+    public static void registerSynchronization(Synchronization synchronization) {
+        Physical p = required();
+        if (synchronization == null || p.completing) {
+            throw new TransactionException.IllegalState("Cannot register synchronization during completion or null");
+        }
+        p.synchronizations.add(new Registration(synchronization));
+    }
+
+    /// Binds a non-null value to a non-null key; duplicate bindings are refused.
+    /// Bindings belong to the physical transaction, not to a savepoint. They are
+    /// cleared after all completion hooks; dispose values in afterCompletion.
+    public static void bindResource(Object key, Object value) {
+        Physical p = required();
+        if (key == null || value == null || p.completed || p.resources.containsKey(key)) {
+            throw new TransactionException.IllegalState("Invalid or already bound transaction resource");
+        }
+        p.resources.put(key, value);
+    }
+
+    /// Returns the current binding, or null outside a transaction or for a missing key.
+    /// Bindings remain visible to completion callbacks until all have finished.
+    public static Object getResource(Object key) {
+        Physical p = used ? (Physical) CURRENT.get() : null;
+        return p == null ? null : p.resources.get(key);
+    }
+
+    /// Removes a binding, returning its previous value (or null).
+    public static Object unbindResource(Object key) {
+        return required().resources.remove(key);
+    }
+
+    private static Physical required() {
+        Physical p = used ? (Physical) CURRENT.get() : null;
+        if (p == null) {
+            throw new TransactionException.IllegalState("No transaction is active");
+        }
+        return p;
+    }
+
+    private static final class Registration {
+        final Synchronization synchronization;
+        boolean commitEligible = true;
+
+        Registration(Synchronization synchronization) {
+            this.synchronization = synchronization;
+        }
+    }
+
     /// One database transaction, which any number of joined methods share.
     static final class Physical {
         DataSource pool;
         Database db;
         final boolean readOnly;
+        final Isolation isolation;
+        final java.util.List synchronizations = new java.util.ArrayList();
+        final java.util.Map resources = new java.util.HashMap();
+        boolean completing;
+        boolean completed;
         final long deadline;
         /// Set by a participant that failed: the outer commit must refuse loudly.
         boolean rollbackOnly;
@@ -109,9 +213,10 @@ public final class Transactions {
         java.util.List pendingSavepoints;
         com.codename1.orm.session.Session session;
 
-        Physical(DataSource pool, boolean readOnly, int timeoutSeconds) {
+        Physical(DataSource pool, boolean readOnly, int timeoutSeconds, Isolation isolation) {
             this.pool = pool;
             this.readOnly = readOnly;
+            this.isolation = isolation;
             this.deadline = timeoutSeconds > 0
                     ? System.currentTimeMillis() + timeoutSeconds * 1000L : 0;
         }
@@ -128,6 +233,7 @@ public final class Transactions {
         final boolean suspends;
         final String savepoint;
         boolean completed;
+        final int synchronizationStart;
         /// A NESTED call asked, by setRollbackOnly(), to undo its own work.
         boolean rollbackRequested;
 
@@ -138,6 +244,7 @@ public final class Transactions {
             this.suspended = suspended;
             this.suspends = suspends;
             this.savepoint = savepoint;
+            this.synchronizationStart = physical == null ? 0 : physical.synchronizations.size();
         }
 
         /// Whether this call began the physical transaction it runs in.
@@ -148,13 +255,14 @@ public final class Transactions {
 
     /// Whether the calling thread is inside a transaction.
     public static boolean isActive() {
-        return used && CURRENT.get() != null;
+        Physical p = used ? (Physical) CURRENT.get() : null;
+        return p != null && !p.completed;
     }
 
     /// Whether the calling thread's transaction has been marked rollback-only.
     public static boolean isRollbackOnly() {
         Physical p = used ? (Physical) CURRENT.get() : null;
-        if (p == null) {
+        if (p == null || p.completed) {
             return false;
         }
         Transaction top = innermost(p);
@@ -170,7 +278,7 @@ public final class Transactions {
     /// return a value and still undo its work.
     public static void setRollbackOnly() {
         Physical p = used ? (Physical) CURRENT.get() : null;
-        if (p == null) {
+        if (p == null || p.completed) {
             throw new TransactionException.IllegalState("setRollbackOnly() outside a "
                     + "transaction: there is nothing to roll back");
         }
@@ -201,16 +309,37 @@ public final class Transactions {
     ///
     /// - `timeoutSeconds`: the annotation's timeout, zero or less for none
     static Transaction begin(int propagation, boolean readOnly, int timeoutSeconds) {
+        return begin(propagation, readOnly, timeoutSeconds, Isolation.DEFAULT);
+    }
+
+    static Transaction begin(int propagation, boolean readOnly, int timeoutSeconds, Isolation isolation) {
+        if (isolation == null) {
+            throw new IllegalArgumentException("Isolation is required");
+        }
         used = true;
-        Transaction tx = open(propagation, readOnly, timeoutSeconds);
+        Transaction tx = open(propagation, readOnly, timeoutSeconds, isolation);
         if (tx.physical != null && (tx.kind == KIND_JOINED || tx.kind == KIND_SAVEPOINT)) {
             tx.physical.calls.add(tx);
         }
         return tx;
     }
 
-    private static Transaction open(int propagation, boolean readOnly, int timeoutSeconds) {
+    private static Transaction open(int propagation, boolean readOnly, int timeoutSeconds, Isolation isolation) {
         Physical current = (Physical) CURRENT.get();
+        if (current != null && propagation != REQUIRES_NEW && propagation != NOT_SUPPORTED
+                && propagation != NEVER) {
+            if (current.completed) {
+                throw new TransactionException.IllegalState("Transaction has completed; use REQUIRES_NEW for callback database work");
+            }
+            if (isolation != Isolation.DEFAULT && isolation != current.isolation) {
+                throw new TransactionException.IllegalState("Isolation " + isolation
+                        + " cannot join transaction with isolation " + current.isolation);
+            }
+        }
+        if (isolation != Isolation.DEFAULT && (propagation == NOT_SUPPORTED || propagation == NEVER
+                || (propagation == SUPPORTS && current == null))) {
+            throw new TransactionException.IllegalState("Isolation requires a physical transaction");
+        }
         switch (propagation) {
             case SUPPORTS:
                 return current == null ? new Transaction(KIND_NONE, null, null, false, null)
@@ -232,23 +361,23 @@ public final class Transactions {
                 CURRENT.set(null);
                 return new Transaction(KIND_NONE, null, current, true, null);
             case REQUIRES_NEW:
-                return fresh(readOnly, timeoutSeconds, current, true);
+                return fresh(readOnly, timeoutSeconds, isolation, current, true);
             case NESTED:
                 if (current == null) {
-                    return fresh(readOnly, timeoutSeconds, null, false);
+                    return fresh(readOnly, timeoutSeconds, isolation, null, false);
                 }
                 return nested(current);
             default:
                 if (current != null) {
                     return new Transaction(KIND_JOINED, current, null, false, null);
                 }
-                return fresh(readOnly, timeoutSeconds, null, false);
+                return fresh(readOnly, timeoutSeconds, isolation, null, false);
         }
     }
 
-    private static Transaction fresh(boolean readOnly, int timeoutSeconds, Physical suspended,
+    private static Transaction fresh(boolean readOnly, int timeoutSeconds, Isolation isolation, Physical suspended,
                                      boolean suspends) {
-        Physical p = new Physical(null, readOnly, timeoutSeconds);
+        Physical p = new Physical(null, readOnly, timeoutSeconds, isolation);
         CURRENT.set(p);
         return new Transaction(KIND_NEW, p, suspended, suspends, null);
     }
@@ -294,6 +423,9 @@ public final class Transactions {
         leave(tx);
         switch (tx.kind) {
             case KIND_SAVEPOINT:
+                if (tx.rollbackRequested) {
+                    discardNestedCommitHooks(tx);
+                }
                 if (dropPending(tx)) {
                     // Never set: the nested method did not touch the database.
                     return;
@@ -342,7 +474,7 @@ public final class Transactions {
         if (!rollback) {
             try {
                 commit(tx);
-            } catch (RuntimeException err) {
+            } catch (Throwable err) {
                 System.err.println("A transaction ended by a checked exception could not "
                         + "commit: " + err);
             }
@@ -355,6 +487,7 @@ public final class Transactions {
                 tx.physical.rollbackOnly = true;
                 return;
             case KIND_SAVEPOINT:
+                discardNestedCommitHooks(tx);
                 if (dropPending(tx)) {
                     // Never set, so nothing ran after it: nothing to undo.
                     return;
@@ -370,6 +503,12 @@ public final class Transactions {
                 return;
             default:
                 restore(tx);
+        }
+    }
+
+    private static void discardNestedCommitHooks(Transaction tx) {
+        for (int i = tx.synchronizationStart; i < tx.physical.synchronizations.size(); i++) {
+            ((Registration) tx.physical.synchronizations.get(i)).commitEligible = false;
         }
     }
 
@@ -411,11 +550,47 @@ public final class Transactions {
     }
 
     private static void finishNew(Physical p) {
+        p.completing = true;
+        checkCommitAllowed(p);
+        if (p.completed) {
+            return;
+        }
+        boolean commitAttempted = false;
+        try {
+            for (int i = 0; i < p.synchronizations.size(); i++) {
+                Registration r = (Registration) p.synchronizations.get(i);
+                if (r.commitEligible) {
+                    r.synchronization.beforeCommit(p.readOnly);
+                }
+            }
+            checkCommitAllowed(p);
+            if (p.completed) {
+                return;
+            }
+            if (p.session != null) {
+                p.session.commitTransaction();
+            }
+            if (p.db != null) {
+                commitAttempted = true;
+                p.db.commitTransaction();
+            }
+        } catch (Error err) {
+            rollbackPhysical(p, commitAttempted);
+            throw err;
+        } catch (TransactionException err) {
+            rollbackPhysical(p, commitAttempted);
+            throw err;
+        } catch (Throwable err) {
+            rollbackPhysical(p, commitAttempted);
+            throw new TransactionException("Transaction could not commit: " + err.getMessage(), err);
+        }
+        complete(p, Outcome.COMMITTED);
+    }
+
+    private static void checkCommitAllowed(Physical p) {
         if (p.rollbackOnly) {
             rollbackPhysical(p);
-            throw new TransactionException.UnexpectedRollback("The transaction was rolled "
-                    + "back because a method that joined it failed. Its own method returned "
-                    + "normally, so this is what tells its caller the work was not saved.");
+            throw new TransactionException.UnexpectedRollback("A joined call marked the transaction rollback-only");
         }
         if (p.localRollback) {
             rollbackPhysical(p);
@@ -423,54 +598,81 @@ public final class Transactions {
         }
         if (p.deadline != 0 && System.currentTimeMillis() > p.deadline) {
             rollbackPhysical(p);
-            throw new TransactionException.TimedOut("The transaction ran past its timeout "
-                    + "and was rolled back.");
+            throw new TransactionException.TimedOut("The transaction ran past its timeout and was rolled back");
         }
-        if (p.db == null) {
-            // Never touched the database: nothing began, so nothing commits.
-            closeSession(p);
-            return;
-        }
-        try {
-            if (p.session != null) {
-                // Flushes the session's pending changes INTO the transaction
-                // before it commits; the adapter it runs on joined this
-                // transaction, so the session's own commit sends no COMMIT.
-                p.session.commitTransaction();
-            }
-            p.db.commitTransaction();
-        } catch (Exception err) {
-            rollbackPhysical(p);
-            throw new TransactionException("Commit failed; the transaction was rolled "
-                    + "back: " + err.getMessage(), err);
-        }
-        closeSession(p);
-        release(p, false);
     }
 
     private static void rollbackPhysical(Physical p) {
-        boolean broken = false;
+        rollbackPhysical(p, false);
+    }
+
+    private static void rollbackPhysical(Physical p, boolean uncertainCommit) {
+        if (p.completed) {
+            return;
+        }
+        p.completing = true;
+        boolean broken = uncertainCommit;
         if (p.session != null) {
             try {
                 if (p.session.isTransactionActive()) {
                     p.session.rollbackTransaction();
                 }
-            } catch (Exception err) {
+            } catch (Throwable err) {
                 System.err.println("Could not roll back the transaction's session: " + err);
             }
         }
-        closeSession(p);
         if (p.db != null) {
             try {
                 if (p.db.isInTransaction()) {
                     p.db.rollbackTransaction();
                 }
-            } catch (Exception err) {
+            } catch (Throwable err) {
                 broken = true;
-                System.err.println("Rollback failed; closing the connection so the pool "
-                        + "cannot reuse it: " + err);
+                System.err.println("Rollback failed; closing the connection: " + err);
             }
-            release(p, broken);
+            if (broken) {
+                p.db.close();
+            }
+        }
+        complete(p, broken ? Outcome.UNKNOWN : Outcome.ROLLED_BACK);
+    }
+
+    private static void complete(Physical p, Outcome outcome) {
+        p.completed = true;
+        Throwable failure = null;
+        try {
+            closeSession(p);
+            release(p);
+            if (outcome == Outcome.COMMITTED) {
+                for (int i = 0; i < p.synchronizations.size(); i++) {
+                    Registration r = (Registration) p.synchronizations.get(i);
+                    if (r.commitEligible) {
+                        try {
+                            r.synchronization.afterCommit();
+                        } catch (Throwable err) {
+                            if (failure == null) {
+                                failure = err;
+                            }
+                        }
+                    }
+                }
+            }
+        } finally {
+            try {
+                for (int i = 0; i < p.synchronizations.size(); i++) {
+                    try {
+                        ((Registration) p.synchronizations.get(i)).synchronization.afterCompletion(outcome);
+                    } catch (Throwable err) {
+                        System.err.println("Transaction completion callback failed: " + err);
+                    }
+                }
+            } finally {
+                p.resources.clear();
+                p.synchronizations.clear();
+            }
+        }
+        if (failure != null) {
+            throw new TransactionException("Transaction committed, but an after-commit callback failed", failure);
         }
     }
 
@@ -482,20 +684,17 @@ public final class Transactions {
         p.session = null;
         try {
             session.close();
-        } catch (Exception err) {
+        } catch (Throwable err) {
             System.err.println("Could not close the transaction's session: " + err);
         }
     }
 
-    private static void release(Physical p, boolean broken) {
+    private static void release(Physical p) {
         Database db = p.db;
         DataSource pool = p.pool;
         p.db = null;
         if (db == null || pool == null) {
             return;
-        }
-        if (broken) {
-            db.close();
         }
         pool.releaseToPool(db);
     }
@@ -525,6 +724,9 @@ public final class Transactions {
     }
 
     private static Database materialize(Physical p, DataSource pool) throws IOException {
+        if (p.completed) {
+            throw new TransactionException.IllegalState("Transaction has completed; use REQUIRES_NEW for callback database work");
+        }
         if (p.pool == null) {
             if (pool == null) {
                 return null;
@@ -547,14 +749,15 @@ public final class Transactions {
             throw new IOException("The transaction ran past its timeout before it used the "
                     + "database");
         }
-        Database db = p.pool.borrowFromPool();
+        Database db = null;
         try {
+            db = p.pool.borrowFromPool();
             if ("sqlite".equals(db.dialect().getName())) {
                 // The ORM relies on it and sets it outside a transaction, which is
                 // the only place SQLite honours it: inside one it is ignored.
                 db.execute("PRAGMA foreign_keys = ON", null);
             }
-            db.beginTransaction(p.readOnly);
+            db.beginTransaction(p.readOnly, p.isolation);
             if (p.pendingSavepoints != null) {
                 for (int iter = 0 ; iter < p.pendingSavepoints.size() ; iter++) {
                     db.savepoint((String) p.pendingSavepoints.get(iter));
@@ -562,14 +765,17 @@ public final class Transactions {
                 p.pendingSavepoints = null;
             }
         } catch (IOException err) {
-            try {
-                if (db.isInTransaction()) {
-                    db.rollbackTransaction();
+            p.rollbackOnly = true;
+            if (db != null) {
+                try {
+                    if (db.isInTransaction()) {
+                        db.rollbackTransaction();
+                    }
+                } catch (IOException ignored) {
+                    db.close();
                 }
-            } catch (IOException ignored) {
-                db.close();
+                p.pool.releaseToPool(db);
             }
-            p.pool.releaseToPool(db);
             throw err;
         }
         p.db = db;

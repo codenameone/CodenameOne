@@ -22,6 +22,8 @@
  */
 package com.codename1.backend;
 
+import com.codename1.backend.annotations.Isolation;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -917,6 +919,59 @@ public final class Database {
         }
     }
 
+    /// Begins a transaction with explicit isolation. Settings are transaction-local,
+    /// so commit/rollback restore the connection's defaults without session SETs.
+    /// SQLite accepts only SERIALIZABLE and refuses a connection configured with
+    /// read_uncommitted. PostgreSQL refuses READ_UNCOMMITTED instead of upgrading it.
+    public void beginTransaction(boolean readOnly,
+                                 Isolation isolation) throws IOException {
+        if (isolation == null) {
+            throw new IllegalArgumentException("Isolation is required");
+        }
+        enter();
+        try {
+            awaitTransactionOwner();
+            if (managedTransaction) {
+                throw new IOException("Transaction already active");
+            }
+            if (isolation == Isolation.DEFAULT) {
+                beginTransaction(readOnly);
+                return;
+            }
+            if (sqlite != null) {
+                if (isolation != Isolation.SERIALIZABLE) {
+                    throw new IOException("SQLite supports only SERIALIZABLE isolation");
+                }
+                Map row = queryOne("PRAGMA read_uncommitted", null);
+                if (((Number) row.get("read_uncommitted")).intValue() != 0) {
+                    throw new IOException("SERIALIZABLE is incompatible with SQLite PRAGMA read_uncommitted");
+                }
+                beginTransaction(readOnly);
+                return;
+            }
+            if (mysql != null) {
+                try {
+                    mysql.begin(readOnly, isolation);
+                } catch (IOException err) {
+                    // A failed START may leave the next-transaction setting armed.
+                    // Discard the connection rather than lend that setting to another caller.
+                    close();
+                    throw err;
+                }
+            } else {
+                if (isolation == Isolation.READ_UNCOMMITTED) {
+                    throw new IOException("PostgreSQL does not provide READ_UNCOMMITTED isolation");
+                }
+                execute("BEGIN ISOLATION LEVEL " + isolation.name().replace('_', ' ')
+                        + (readOnly ? " READ ONLY" : " READ WRITE"), null);
+            }
+            managedTransaction = true;
+            transactionOwner = caller();
+        } finally {
+            exit();
+        }
+    }
+
     /// Marks a savepoint inside the open transaction, which
     /// [#rollbackToSavepoint] can return to without ending the transaction.
     /// The name must be a plain identifier; it is written into the statement.
@@ -993,9 +1048,15 @@ public final class Database {
     }
 
     public Object transaction(Work body) throws Exception {
+        return transaction(Isolation.DEFAULT, body);
+    }
+
+    /// Runs a connection-local transaction at the requested isolation. For scoped
+    /// resources and synchronization hooks, use Transactions.execute instead.
+    public Object transaction(Isolation isolation, Work body) throws Exception {
         enter();
         try {
-            beginTransaction();
+            beginTransaction(false, isolation);
             boolean committed = false;
             try {
                 Object result = body.run(this);

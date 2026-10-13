@@ -63,6 +63,7 @@ name: Desktop theme fidelity
       # Sync's GITHUB_TOKEN commit does not trigger another workflow. Score generator
       # changes from the original master push; this job rebuilds CSS before scoring.
       - 'maven/css-compiler/**'
+      - 'maven/css-cli/**'
       - 'scripts/build-native-themes.sh'
       - 'scripts/fidelity-app/desktop-runner/**'
       - 'scripts/fidelity-app/common/src/main/resources/fidelity-tests.yaml'
@@ -164,11 +165,9 @@ jobs:
           java-version: '8'
           architecture: ${{ matrix.platform == 'windows' && 'x64' || '' }}
 
-      # Needed by the BUILD as well as by the run. The fidelity app is a Codename One
-      # application, so its build runs the cn1 css goal, which rasterizes through CEF and
-      # needs a display -- it fails with "An error occurred while compiling the CSS files"
-      # on a bare runner. Installed before the build for that reason, not only before the
-      # simulator starts.
+      # Needed by the run only: run-desktop-fidelity-tests.sh starts the simulator under
+      # xvfb-run to render the tiles. The build below needs no display -- the cn1 css goal
+      # the fidelity app's build runs is headless.
       - name: Install display and native reference font
         if: matrix.platform == 'gnome'
         run: bash scripts/ci/apt-get-install.sh xvfb fonts-cantarell
@@ -195,11 +194,7 @@ jobs:
           # needs, so this half runs on the 21 installed first ("invalid target release:
           # 17" otherwise). Two JDKs in one job is the reason both setup-java steps exist.
           cd ../scripts/fidelity-app
-          XVFB=()
-          if [ "$(uname -s)" = "Linux" ]; then
-            XVFB=(xvfb-run -a)
-          fi
-          JAVA_HOME="$JDK21" "${XVFB[@]}" ./mvnw -B -q -pl common,desktop-runner -DskipTests install
+          JAVA_HOME="$JDK21" ./mvnw -B -q -pl common,desktop-runner -DskipTests install
 
       - name: Regenerate the desktop themes from CSS
         shell: bash

@@ -1210,18 +1210,23 @@ public final class NetworkManager {
     /// attempt by the time this one reaches its finally, and that attempt is
     /// not this thread's to end.
     static void endTracerAttempt(ConnectionRequest req, Throwable failure) {
-        Object attempt = req.tracerAttempt;
-        NetworkTracer owner = req.tracerOwner;
-        if (attempt == null || owner == null
-                || req.tracerThread != Thread.currentThread()) { //NOPMD CompareObjectsWithEquals
-            return;
+        Object attempt;
+        NetworkTracer owner;
+        synchronized (req) {
+            attempt = req.tracerAttempt;
+            owner = req.tracerOwner;
+            if (attempt == null || owner == null
+                    || req.tracerThread != Thread.currentThread()) { //NOPMD CompareObjectsWithEquals
+                return;
+            }
+            // Publish the ended attempt atomically with clearing the active one.
+            // An EDT retry must never observe a gap between the two states.
+            req.tracerLastAttempt = attempt;
+            req.tracerLastOwner = owner;
+            req.tracerAttempt = null;
+            req.tracerOwner = null;
+            req.tracerThread = null;
         }
-        req.tracerAttempt = null;
-        req.tracerOwner = null;
-        req.tracerThread = null;
-        // Kept for a retry of a request queued with no parent: see addToQueue.
-        req.tracerLastAttempt = attempt;
-        req.tracerLastOwner = owner;
         try {
             // Only a status THIS attempt received: a reused request still holds
             // the last one's.
@@ -1237,14 +1242,20 @@ public final class NetworkManager {
     /// queued there, unless the request was queued again in the meantime.
     private static void scheduleTracerClear(final ConnectionRequest req, final int requeues) {
         if (!Display.isInitialized()) {
-            clearTracerState(req);
+            synchronized (req) {
+                if (req.tracerRequeues == requeues) {
+                    clearTracerState(req);
+                }
+            }
             return;
         }
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
-                if (req.tracerRequeues == requeues) {
-                    clearTracerState(req);
+                synchronized (req) {
+                    if (req.tracerRequeues == requeues) {
+                        clearTracerState(req);
+                    }
                 }
             }
         });
@@ -1252,11 +1263,13 @@ public final class NetworkManager {
 
     /// Forgets every tracer object a finished request holds.
     static void clearTracerState(ConnectionRequest req) {
-        req.tracerParent = null;
-        req.tracerParentOwner = null;
-        req.tracerParentChained = false;
-        req.tracerLastAttempt = null;
-        req.tracerLastOwner = null;
+        synchronized (req) {
+            req.tracerParent = null;
+            req.tracerParentOwner = null;
+            req.tracerParentChained = false;
+            req.tracerLastAttempt = null;
+            req.tracerLastOwner = null;
+        }
     }
 
     /// Adds the given network connection to the queue of execution
@@ -1282,33 +1295,35 @@ public final class NetworkManager {
             // here, on the thread that ran it, before the request is visible to
             // anyone else.
             endTracerAttempt(request, null);
-            request.tracerRequeues++;
-            // A request queued with no context -- the usual case for a generated
-            // client used outside Telemetry.run -- would start a NEW trace on every
-            // attempt: a 302 and the 200 it led to, or a failure and the retry that
-            // succeeded, came out as unrelated traces with separate sampling
-            // decisions, and the logical request could not be followed. So the
-            // attempt that just ended becomes the next one's parent: one trace,
-            // one decision, each attempt still its own span. A request that WAS
-            // queued inside an action keeps that action as every attempt's parent.
-            // A parent some OTHER tracer captured is as good as none: the tracer
-            // that ran this attempt will not use it (it only takes its own), and
-            // keeping it blocked the chain, so every retry started a new root.
-            // The attempt to continue from is the last one that ENDED -- or, when a
-            // listener retries from the EDT before the network thread has finished
-            // the attempt it is reacting to, that attempt, still in flight. Waiting
-            // for "ended" alone lost the race on a fast EDT, and the retry started
-            // an unrelated trace.
-            Object previous = request.tracerAttempt != null
-                    ? request.tracerAttempt : request.tracerLastAttempt;
-            NetworkTracer previousOwner = request.tracerAttempt != null
-                    ? request.tracerOwner : request.tracerLastOwner;
-            if ((request.tracerParent == null || request.tracerParentChained
-                    || request.tracerParentOwner != previousOwner) //NOPMD CompareObjectsWithEquals
-                    && previous != null) {
-                request.tracerParent = previous;
-                request.tracerParentOwner = previousOwner;
-                request.tracerParentChained = true;
+            synchronized (request) {
+                request.tracerRequeues++;
+                // A request queued with no context -- the usual case for a generated
+                // client used outside Telemetry.run -- would start a NEW trace on every
+                // attempt: a 302 and the 200 it led to, or a failure and the retry that
+                // succeeded, came out as unrelated traces with separate sampling
+                // decisions, and the logical request could not be followed. So the
+                // attempt that just ended becomes the next one's parent: one trace,
+                // one decision, each attempt still its own span. A request that WAS
+                // queued inside an action keeps that action as every attempt's parent.
+                // A parent some OTHER tracer captured is as good as none: the tracer
+                // that ran this attempt will not use it (it only takes its own), and
+                // keeping it blocked the chain, so every retry started a new root.
+                // The attempt to continue from is the last one that ENDED -- or, when a
+                // listener retries from the EDT before the network thread has finished
+                // the attempt it is reacting to, that attempt, still in flight. Waiting
+                // for "ended" alone lost the race on a fast EDT, and the retry started
+                // an unrelated trace.
+                Object previous = request.tracerAttempt != null
+                        ? request.tracerAttempt : request.tracerLastAttempt;
+                NetworkTracer previousOwner = request.tracerAttempt != null
+                        ? request.tracerOwner : request.tracerLastOwner;
+                if ((request.tracerParent == null || request.tracerParentChained
+                        || request.tracerParentOwner != previousOwner) //NOPMD CompareObjectsWithEquals
+                        && previous != null) {
+                    request.tracerParent = previous;
+                    request.tracerParentOwner = previousOwner;
+                    request.tracerParentChained = true;
+                }
             }
         }
         // Captured HERE, on the thread that asked for the request, so the span it
@@ -1368,17 +1383,19 @@ public final class NetworkManager {
                         return;
                     }
                 }
-                request.tracerParent = queuedParent;
-                request.tracerParentOwner = queuedBy;
-                // A fresh enqueue is a new logical request, not a retry of the last.
-                // It advances the generation too: a cleanup the previous run queued
-                // on the EDT would otherwise still match, and clear the parent this
-                // enqueue just captured -- a listener can reuse a finished request
-                // with addToQueue before that cleanup runs.
-                request.tracerRequeues++;
-                request.tracerParentChained = false;
-                request.tracerLastAttempt = null;
-                request.tracerLastOwner = null;
+                synchronized (request) {
+                    request.tracerParent = queuedParent;
+                    request.tracerParentOwner = queuedBy;
+                    // A fresh enqueue is a new logical request, not a retry of the last.
+                    // It advances the generation too: a cleanup the previous run queued
+                    // on the EDT would otherwise still match, and clear the parent this
+                    // enqueue just captured -- a listener can reuse a finished request
+                    // with addToQueue before that cleanup runs.
+                    request.tracerRequeues++;
+                    request.tracerParentChained = false;
+                    request.tracerLastAttempt = null;
+                    request.tracerLastOwner = null;
+                }
                 // And nothing of the last run's dealings with its authorizer: a request the
                 // application queues again gets its one renewal again. A retry mark the last
                 // run left unread goes too -- with nobody waiting on that run it was never
@@ -1917,9 +1934,13 @@ public final class NetworkManager {
                 // Any tracer field, the owners included: a request queued outside an
                 // action holds only tracerParentOwner, and that alone pins the whole
                 // telemetry installation.
-                if (req.tracerRequeues == requeuesBefore && !req.authorizationPending
-                        && (req.tracerParent != null || req.tracerLastAttempt != null
-                        || req.tracerParentOwner != null || req.tracerLastOwner != null)) {
+                boolean clearTracer;
+                synchronized (req) {
+                    clearTracer = req.tracerRequeues == requeuesBefore && !req.authorizationPending
+                            && (req.tracerParent != null || req.tracerLastAttempt != null
+                            || req.tracerParentOwner != null || req.tracerLastOwner != null);
+                }
+                if (clearTracer) {
                     // Nothing queued this request again YET. Its tracer state has
                     // to go once it is done -- the parent and the last attempt are
                     // the tracer's own objects, a span and through it the whole
@@ -1929,7 +1950,7 @@ public final class NetworkManager {
                     // call retry(), which needs the last attempt to continue its
                     // trace. So the clear is queued on the EDT behind those
                     // listener callbacks, and skipped if one of them retried.
-                    scheduleTracerClear(req, req.tracerRequeues);
+                    scheduleTracerClear(req, requeuesBefore);
                 }
                 NetworkGuard guard = getNetworkGuard();
                 if (guard != null && req.hasGuardResponse()) {
