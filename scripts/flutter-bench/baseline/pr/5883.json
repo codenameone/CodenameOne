@@ -124,12 +124,12 @@
      "from": {
       "value": 12910326
      },
-     "reason": "+460 bytes (fe482ff7e8 lifecycle fix), +15,693 (1f97b4f6da, 358604f9b7 const collections and typed fields), then master merge 6ebf543f41 (JavaScript text selection and startup #5952, classic Android apps #5941, backend security #5961): +148,467 code bytes (+1.16%) in the shared JavaScript port and core; run 37824086148. Tolerance is 0.5%, as for Android code: the JavaScript bundle is the shared port and core, so every master merge and runtime fix moves it by a few KB.",
+     "reason": "+460 bytes (fe482ff7e8 lifecycle fix), +15,693 (1f97b4f6da, 358604f9b7 const collections and typed fields), then master merge 6ebf543f41 (JavaScript text selection and startup #5952, classic Android apps #5941, backend security #5961): +148,467 code bytes (+1.16%) in the shared JavaScript port and core; run 37824086148. Tolerance is 0.5%, as for Android code: the JavaScript bundle is the shared port and core, so every master merge and runtime fix moves it by a few KB; then runtime and Dart library growth on this branch since the last JavaScript record: platform channels (MethodChannel/EventChannel, dart:async Stream), the import goal's runtime-side additions, the gallery fidelity fixes (Cupertino buttons, text fields, TabBar, elevation shadows, FAB) and two rounds of review fixes; code +0.54% (12,985,262 -> 13,055,202); run 38350608623 at 441cc7b188",
      "runs": 1,
      "tolerance": {
       "value": 0.005
      },
-     "value": 12985262
+     "value": 13055202
     },
     "install_bytes": {
      "from": {

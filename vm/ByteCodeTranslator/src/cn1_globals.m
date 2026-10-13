@@ -14578,16 +14578,23 @@ static JAVA_BOOLEAN cn1GcVerifyPublishedLate(CN1BibopPage* p, int idx, int bump,
     if(CN1_OBJ_MARK_LOAD(o, __ATOMIC_ACQUIRE) != -1) {
         return JAVA_FALSE;
     }
-    struct clazz* c = CN1_OBJ_CLASS(o);
-    if(c == 0 || !cn1ClazzRegistryContains((uintptr_t)c)) {
-        return JAVA_FALSE;
-    }
+    // The CLASS is in flight the same way, so it is waited for inside the bound rather
+    // than tested once. An init-before-publish NEW (CN1_FAST_NEW_NOZERO) bumps the slot
+    // with class index 0 and stores the class (CN1_OBJ_PUBLISH_CLASS, a plain store)
+    // only after the constructor body -- and nothing orders that store before the one
+    // that puts the object into a field either. Tested once, an arm64 core showing the
+    // field first read class 0 here and reported the live object as a recycled slot:
+    // "Object[] mark=epoch -> Filler mark=-1 heapPos=-3, RECYCLED page slot", the class
+    // name visible again by the time the report printed it. Moving GcResumeWindowApp's
+    // class store after its sink store reproduces that report on every run.
     // Bounded: a store in flight is visible within nanoseconds; a millisecond is far
     // beyond any store buffer and still nothing next to a verify pass.
     long long deadline = cn1MonotonicNanos() + 1000000LL;
     do {
         __atomic_thread_fence(__ATOMIC_SEQ_CST);
-        if(atomic_load_explicit(&p->bumpIndex, memory_order_acquire) > idx) {
+        struct clazz* c = CN1_OBJ_CLASS(o);
+        if(c != 0 && cn1ClazzRegistryContains((uintptr_t)c)
+           && atomic_load_explicit(&p->bumpIndex, memory_order_acquire) > idx) {
             cn1GcVerifyLatePublishes++;
             return JAVA_TRUE;
         }
