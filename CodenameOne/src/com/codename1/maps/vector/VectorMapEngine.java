@@ -778,8 +778,7 @@ public final class VectorMapEngine {
                 Piece piece = (Piece) pieces.get(i);
                 if (piece.pass != pass) {
                     pieces.remove(i);
-                    if (waitingPieces.get(piece.key) == piece) {
-                        waitingPieces.remove(piece.key);
+                    if (stopWaiting(piece)) {
                         Object wanted = pending.get(piece.key);
                         if (wanted instanceof Integer
                                 && ((Integer) wanted).intValue() == piece.generation) {
@@ -1124,6 +1123,20 @@ public final class VectorMapEngine {
     // say which of them the view still shows.
     private final Map waitingPieces = new HashMap();
     private boolean piecesScheduled;
+    private int pieceSerial;
+
+    // Takes a piece off the map of those waiting, when it is the one waiting
+    // under its key: a tile dropped and asked for again has a newer piece
+    // there, which this one must not remove. False for a piece that had
+    // already been replaced.
+    private boolean stopWaiting(Piece piece) {
+        Piece waiting = (Piece) waitingPieces.get(piece.key);
+        if (waiting == null || waiting.serial != piece.serial) {
+            return false;
+        }
+        waitingPieces.remove(piece.key);
+        return true;
+    }
 
     private void queuePiece(VectorTile parent, int parentZ, int[] address, int requestGeneration) {
         Piece piece = new Piece();
@@ -1133,6 +1146,7 @@ public final class VectorMapEngine {
         piece.generation = requestGeneration;
         piece.key = TileUtil.key(address[0], address[1], address[2]);
         piece.pass = pass;
+        piece.serial = ++pieceSerial;
         pieces.add(piece);
         waitingPieces.put(piece.key, piece);
         schedulePieces();
@@ -1158,9 +1172,7 @@ public final class VectorMapEngine {
         while (!pieces.isEmpty()) {
             Piece piece = (Piece) pieces.remove(0);
             String key = piece.key;
-            if (waitingPieces.get(key) == piece) {
-                waitingPieces.remove(key);
-            }
+            stopWaiting(piece);
             Object wanted = pending.get(key);
             // Dropped since -- the view moved on before its turn -- or asked
             // for by a map that has been reset.
@@ -1188,6 +1200,8 @@ public final class VectorMapEngine {
         // The tile this will draw, and the last pass that asked for it.
         private String key;
         private int pass;
+        // Which piece this is, counted as they are queued.
+        private int serial;
     }
 
     private void renderOverzoomed(VectorTile parent, int parentZ, int[] address, int requestGeneration) {

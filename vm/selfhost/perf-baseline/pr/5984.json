@@ -67,6 +67,24 @@
       "time": 0.5
      }
     }
+   },
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.551,
+      "time": 0.777,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.551,
+     "reason": "Not a change in the translator: on this runner its self-translation time comes out in two groups, about 0.79 and about 0.58, and a run's median is whichever group three of its five rounds fell in. Runs for 3d3119ed9d (rounds 0.79 0.82 0.79 0.52 0.58, median 0.79) and 95738c7ece (0.66 0.61 0.59 0.56 0.85, median 0.61) are the same code as far as the translator goes. The baseline of 0.78 sat on the upper group, so the lower one read as an improvement past tolerance; taken from both runs it sits between them. Tolerance is kept.",
+     "runs": 2,
+     "time": 0.701,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
    }
   }
  }
