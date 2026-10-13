@@ -437,6 +437,7 @@ public final class DataSource {
                                 final Work body) throws Exception {
         return Transactions.execute(Propagation.REQUIRED,
                 false, -1, isolation, new Transactions.Work() {
+                    @Override
                     public Object run() throws Exception {
                         return body.run(borrow());
                     }

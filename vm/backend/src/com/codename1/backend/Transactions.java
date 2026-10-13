@@ -574,16 +574,14 @@ public final class Transactions {
                 commitAttempted = true;
                 p.db.commitTransaction();
             }
+        } catch (Error err) {
+            rollbackPhysical(p, commitAttempted);
+            throw err;
+        } catch (TransactionException err) {
+            rollbackPhysical(p, commitAttempted);
+            throw err;
         } catch (Throwable err) {
-            if (!p.completed) {
-                rollbackPhysical(p, commitAttempted);
-            }
-            if (err instanceof Error) {
-                throw (Error) err;
-            }
-            if (err instanceof TransactionException) {
-                throw (TransactionException) err;
-            }
+            rollbackPhysical(p, commitAttempted);
             throw new TransactionException("Transaction could not commit: " + err.getMessage(), err);
         }
         complete(p, Outcome.COMMITTED);

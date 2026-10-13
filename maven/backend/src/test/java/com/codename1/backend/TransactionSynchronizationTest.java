@@ -148,6 +148,27 @@ class TransactionSynchronizationTest {
         } finally { pool.close(); }
     }
 
+    @Test void beforeCommitErrorIsRethrownAfterRollbackAndCleanup() throws Exception {
+        final DataSource pool = pool();
+        final List<String> events = new ArrayList<String>();
+        final AssertionError failure = new AssertionError("before");
+        try {
+            assertSame(failure, assertThrows(AssertionError.class, () -> Transactions.execute(() -> {
+                pool.execute("INSERT INTO t VALUES (1)", null);
+                Transactions.bindResource("key", "value");
+                Transactions.registerSynchronization(new Transactions.Synchronization() {
+                    public void beforeCommit(boolean readOnly) { throw failure; }
+                });
+                Transactions.registerSynchronization(hook(events, "later"));
+                return null;
+            })));
+            assertEquals(Arrays.asList("later:ROLLED_BACK"), events);
+            assertNull(Transactions.getResource("key"));
+            assertFalse(Transactions.isActive());
+            assertEquals(0, ((Number) pool.queryOne("SELECT COUNT(*) AS n FROM t", null).get("n")).intValue());
+        } finally { pool.close(); }
+    }
+
     @Test void afterCommitAndCompletionErrorsCannotPreventLaterCleanup() throws Exception {
         final List<String> events = new ArrayList<String>();
         TransactionException failure = assertThrows(TransactionException.class, () -> Transactions.execute(() -> {
