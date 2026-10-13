@@ -1,20 +1,6 @@
 {
  "pr": 5883,
  "rebaseline": {
-  "linux-arm64@neoverse-n2": {
-   "translator": {
-    "all": {
-     "from": {
-      "memory": 0.447,
-      "time": 0.698
-     },
-     "memory": 0.377,
-     "reason": "MethodDependencyGraph.getCallers returns a read-only view instead of copying the caller set on every lookup (a4254d5453): ~3.26GB allocated instead of ~3.84GB translating the hello suite; linux-arm64 translator RAM 0.45x -> 0.38x, run 38270623132 at bb9ede3d55",
-     "runs": 1,
-     "time": 0.698
-    }
-   }
-  },
   "linux-x64@amd-epyc-9v45-96-core-processor": {
    "arrayRandom": {
     "all": {
@@ -197,6 +183,26 @@
      "reason": "PR #5883: linux-x64 AMD EPYC 9V45 calibrated from this branch's runs, measured with its VM changes",
      "runs": 1,
      "time": 1.577,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   }
+  },
+  "linux-x64@intel-xeon-6973p-c": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.52,
+      "time": 0.537,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.399,
+     "reason": "Time: #6006 (merged) grew the self-translation JavaAPI corpus from 471 to 512 classes and recalibrated only the EPYC 7763/9V74 rows for it (+22%); this Xeon 6973P-C row moved the same +22.5%. Memory: MethodDependencyGraph.getCallers returns a read-only view instead of a copy per lookup (a4254d5453), -23%. Run 38389329844 at 2d78fb33bd",
+     "runs": 1,
+     "time": 0.658,
      "tolerance": {
       "time": 0.2
      }
