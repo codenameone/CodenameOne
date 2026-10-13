@@ -13,6 +13,18 @@
      "runs": 1,
      "time": 0.931
     }
+   },
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.447,
+      "time": 0.698
+     },
+     "memory": 0.507,
+     "reason": "The same cause as the hello rows: fewer objects are retired when their frame ends, so the translator's own peak RAM rises. Linux arm64 runs for 3d3119ed9d (rounds 0.48 0.49 0.47 0.52 0.53, median 0.49) and c21af4429b (0.51 0.57 0.46 0.52 0.53, median 0.52) against 0.45, one inside the 15% tolerance and one just past it; Windows arm64 moved from 0.45 to 0.51 the same way. Timing and tolerances are kept.",
+     "runs": 2,
+     "time": 0.698
+    }
    }
   },
   "windows-arm64@armv8-64-bit-family-8-model-d49-microsoft-corporation": {
