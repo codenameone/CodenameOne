@@ -459,7 +459,9 @@ image::img/wayline-settings-dark.png[The settings screen in the dark theme,scale
 | Account
 | The profile, which is the name, gender, an emergency contact and the saved
   home and work addresses. The mobile number and whether it's verified.
-  Changing the password, which asks for the current one.
+  Changing the password, which asks for the current one. Every other device
+  signed in to the account has to sign in again with the new password; the
+  device you changed it on stays signed in.
 
 | Ride preferences
 | Any driver or women only, a quiet ride, an accessible vehicle, and a

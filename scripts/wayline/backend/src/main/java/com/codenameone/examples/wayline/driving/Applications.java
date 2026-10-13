@@ -155,6 +155,9 @@ public class Applications {
         if (form == null) {
             throw new ResponseStatusException(400, "Nothing to save");
         }
+        // Held first, as an upload holds it: what is saved here must not land
+        // on an application that was handed in after it was read.
+        applications.hold(username);
         DriverApplication application = editable(username);
         String birth = date(form.dateOfBirth, "your date of birth");
         String expiry = date(form.licenceExpiry, "the licence's expiry date");
@@ -227,6 +230,12 @@ public class Applications {
         } else {
             throw new ResponseStatusException(400, "Send a JPEG or a PNG picture");
         }
+        // Held before it is read. The check below says the application may
+        // still be changed, and the picture is stored after it: without the
+        // hold, an application handed in between the two had a document
+        // replaced while it was under review, perhaps after an admin had
+        // looked at the one it replaced.
+        applications.hold(username);
         editable(username);
         long now = System.currentTimeMillis();
         // Replaced with a statement where there is one already, so the picture

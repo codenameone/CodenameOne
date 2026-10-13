@@ -70,12 +70,14 @@ public class Accounts {
     private final Payments payments;
     private final LiveHub live;
     private final ClosedAccountRepository closed;
+    private final Grants grants;
 
     public Accounts(ProfileRepository profiles, AccountCleanupRepository cleanup,
             JdbcUserDetailsManager users, PasswordEncoder encoder, Applications applications,
             Moderation moderation, Payments payments, LiveHub live,
-            ClosedAccountRepository closed) {
+            ClosedAccountRepository closed, Grants grants) {
         this.closed = closed;
+        this.grants = grants;
         this.profiles = profiles;
         this.cleanup = cleanup;
         this.users = users;
@@ -360,7 +362,8 @@ public class Accounts {
     }
 
     /// Changes a password, for someone who knows the one it replaces. A token
-    /// in hand is not enough: it is what a borrowed phone has.
+    /// in hand is not enough: it is what a borrowed phone has. The account's
+    /// other sign-ins end with the old password.
     @Transactional(rollbackFor = IOException.class)
     public UserDto changePassword(String username, String current, String replacement)
             throws IOException {
@@ -370,6 +373,10 @@ public class Accounts {
         }
         password(replacement);
         users.updatePassword(signIn, encoder.encode(replacement));
+        // A password is changed, as often as not, because someone else may
+        // have the old one or a device that was signed in with it. A refresh
+        // token asks for no password, so every sign-in but this one ends here.
+        grants.endOthers(username);
         return describe(username);
     }
 
@@ -432,6 +439,7 @@ public class Accounts {
         closed.close(username);
         // Last: the tokens in hand stop working when the sign-in is gone.
         users.deleteUser(username);
+        grants.endAll(username);
         return was;
     }
 

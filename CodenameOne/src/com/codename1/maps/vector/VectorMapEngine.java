@@ -81,7 +81,12 @@ public final class VectorMapEngine {
     private double pixelRatio = 1.0;
 
     private final TileCache rendered;
-    private final Map labels = new HashMap();
+    // The labels of each tile, bounded like the tiles themselves: a plain map
+    // kept the labels of every tile a long session had ever shown, long after
+    // the tile's picture was evicted. Twice the tiles' bound, so the labels of
+    // a tile still drawn are never the ones to go: every set of labels newer
+    // than a tile's came with at least one tile newer than it.
+    private final TileCache labels = new TileCache(512);
     private final Map pending = new HashMap();
     private final Map failed = new HashMap();
     private final LabelEngine labelEngine = new LabelEngine();
@@ -162,6 +167,7 @@ public final class VectorMapEngine {
         queued.clear();
         inFlight = 0;
         pieces.clear();
+        waitingPieces.clear();
     }
 
     /// The active tile source.
@@ -683,6 +689,10 @@ public final class VectorMapEngine {
             if (overzoomed) {
                 int depth = z - source.getMaxZoom();
                 stillWanted(TileUtil.key(source.getMaxZoom(), x >> depth, y >> depth));
+                Piece waiting = (Piece) waitingPieces.get(key);
+                if (waiting != null) {
+                    waiting.pass = pass;
+                }
             } else {
                 stillWanted(key);
             }
@@ -754,6 +764,28 @@ public final class VectorMapEngine {
                     FetchJob job = (FetchJob) o;
                     queued.remove(job.key);
                     forget(job.key);
+                }
+            }
+        }
+        // The pieces of an overzoomed tile whose parent was already decoded
+        // never were in the queue above: they wait here to be drawn. One the
+        // pass did not ask for has left the view, and left waiting it stayed
+        // wanted for good -- a fast drag across a deep zoom queued every tile
+        // it crossed and then drew them all, on the event thread, pushing the
+        // tiles now in view out of the cache.
+        if (!pieces.isEmpty()) {
+            for (int i = pieces.size() - 1; i >= 0; i--) {
+                Piece piece = (Piece) pieces.get(i);
+                if (piece.pass != pass) {
+                    pieces.remove(i);
+                    if (waitingPieces.get(piece.key) == piece) {
+                        waitingPieces.remove(piece.key);
+                        Object wanted = pending.get(piece.key);
+                        if (wanted instanceof Integer
+                                && ((Integer) wanted).intValue() == piece.generation) {
+                            pending.remove(piece.key);
+                        }
+                    }
                 }
             }
         }
@@ -1088,6 +1120,9 @@ public final class VectorMapEngine {
     // in between.
     private static final int PIECE_BUDGET_MILLIS = 6;
     private final List pieces = new ArrayList();
+    // The same pieces by the key of the tile each will draw, so a pass can
+    // say which of them the view still shows.
+    private final Map waitingPieces = new HashMap();
     private boolean piecesScheduled;
 
     private void queuePiece(VectorTile parent, int parentZ, int[] address, int requestGeneration) {
@@ -1096,7 +1131,10 @@ public final class VectorMapEngine {
         piece.parentZ = parentZ;
         piece.address = address;
         piece.generation = requestGeneration;
+        piece.key = TileUtil.key(address[0], address[1], address[2]);
+        piece.pass = pass;
         pieces.add(piece);
+        waitingPieces.put(piece.key, piece);
         schedulePieces();
     }
 
@@ -1119,7 +1157,10 @@ public final class VectorMapEngine {
         boolean drew = false;
         while (!pieces.isEmpty()) {
             Piece piece = (Piece) pieces.remove(0);
-            String key = TileUtil.key(piece.address[0], piece.address[1], piece.address[2]);
+            String key = piece.key;
+            if (waitingPieces.get(key) == piece) {
+                waitingPieces.remove(key);
+            }
             Object wanted = pending.get(key);
             // Dropped since -- the view moved on before its turn -- or asked
             // for by a map that has been reset.
@@ -1144,6 +1185,9 @@ public final class VectorMapEngine {
         private int parentZ;
         private int[] address;
         private int generation;
+        // The tile this will draw, and the last pass that asked for it.
+        private String key;
+        private int pass;
     }
 
     private void renderOverzoomed(VectorTile parent, int parentZ, int[] address, int requestGeneration) {
@@ -1166,7 +1210,7 @@ public final class VectorMapEngine {
             // any ordinary tile.
             String labelKey = depth == 0 ? key : overzoomLabelKey(address[0],
                     TileUtil.key(parentZ, address[1] >> depth, address[2] >> depth));
-            if (!labels.containsKey(labelKey)) {
+            if (!labels.contains(labelKey)) {
                 labels.put(labelKey, TileRenderer.extractLabels(parent, style, address[0], parentZ,
                         address[1] >> depth, address[2] >> depth, tileSize));
             }

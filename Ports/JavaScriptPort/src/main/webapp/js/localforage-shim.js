@@ -248,10 +248,12 @@
       } catch (_l) {}
       throw e;
     }
+    // The key and the length, never the value: what is stored here includes
+    // the app's sign-in tokens, and a prefix of the serialised form is a
+    // prefix of the token for anyone reading the console or a captured log.
     try {
       console.log("LF-SHIM:set-ok key=" + nk + " valType=" + valCtor
-              + " serLen=" + (serialised == null ? "null" : serialised.length)
-              + " serPrefix=" + (serialised == null ? "null" : serialised.substring(0, Math.min(60, serialised.length))));
+              + " serLen=" + (serialised == null ? "null" : serialised.length));
     } catch (_l) {}
     return value;
   }
@@ -259,7 +261,7 @@
     var nk = namespacedKey(key);
     var raw = window.localStorage.getItem(nk);
     try {
-      console.log("LF-SHIM:get key=" + nk + " raw=" + (raw == null ? "null" : ("len=" + raw.length + " prefix=" + raw.substring(0, Math.min(40, raw.length)))));
+      console.log("LF-SHIM:get key=" + nk + " raw=" + (raw == null ? "null" : ("len=" + raw.length)));
     } catch (_l) {}
     if (raw == null) {
       return null;

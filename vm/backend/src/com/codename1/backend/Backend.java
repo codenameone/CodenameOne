@@ -1180,6 +1180,11 @@ public final class Backend {
                     status = chosen.getStatus();
                     failed(request, attempted, startedMillis,
                             status >= 500 ? chosen : null, status);
+                    // Thrown on past the policies below, and still answered
+                    // with them: the listener builds the status-only answer
+                    // and hands it to decorateFallback above, which puts the
+                    // CORS and security headers on it. Compression is the one
+                    // policy it does without, on a body of a few words.
                     throw chosen;
                 } catch (Exception err) {
                     // The handler's response is replaced by a 500; a

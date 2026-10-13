@@ -157,6 +157,32 @@ class SettingsTest {
     }
 
     @Test
+    void aChangedPasswordSignsTheOtherDevicesOut() throws Exception {
+        String who = People.rider(accounts, "two-devices");
+        Map phone = SignIn.tokens(mvc, who, People.PASSWORD);
+        Map tablet = SignIn.tokens(mvc, who, People.PASSWORD);
+
+        mvc.perform(Trips.body(post("/api/account/password"),
+                        "{\"current\":\"" + People.PASSWORD
+                                + "\",\"replacement\":\"another-long-one\"}")
+                        .header("Host", SignIn.HOST)
+                        .header("Authorization", "Bearer " + phone.get("access_token")))
+                .andExpect(status().isOk());
+
+        // The tablet's refresh token asked for no password, and would have
+        // gone on working for whoever held the tablet.
+        mvc.perform(SignIn.formPost("/oauth2/token", "grant_type", "refresh_token",
+                        "refresh_token", (String) tablet.get("refresh_token"),
+                        "client_id", SecurityConfig.CLIENT_ID).header("Host", SignIn.HOST))
+                .andExpect(status().isBadRequest());
+        // The device the password was changed on stays signed in.
+        mvc.perform(SignIn.formPost("/oauth2/token", "grant_type", "refresh_token",
+                        "refresh_token", (String) phone.get("refresh_token"),
+                        "client_id", SecurityConfig.CLIENT_ID).header("Host", SignIn.HOST))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void anAccountIsClosedForGood() throws Exception {
         // Warsaw, where nobody drives.
         String who = People.rider(accounts, "leaving");

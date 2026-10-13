@@ -393,7 +393,15 @@ Sending a phone code holds it too, so two requests can't both pass the wait
 between codes. A driver's position report holds the driver's state row, so two
 reports sent together don't count the same online minutes twice. Cashing out
 holds the driver's payout account, so two requests sent together pay the
-balance once and the second is told there's nothing left.
+balance once and the second is told there's nothing left. Saving a driving
+application or uploading one of its documents holds the application, so
+neither can land on one that was handed in a moment earlier.
+
+Changing a password ends the account's other sign-ins. A refresh token asks
+for no password, so `account.Grants` removes every grant in the authorization
+server's table except the one the request came with, and closing an account
+removes them all. An access token already issued isn't recalled: it's checked
+by its signature and runs out on its own.
 
 A ride's two parties see each other's display name, and each other's phone
 number while they're meeting. The e-mail address an account signs in with is

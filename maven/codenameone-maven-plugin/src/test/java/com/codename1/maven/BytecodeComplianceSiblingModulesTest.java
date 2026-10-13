@@ -22,6 +22,9 @@
  */
 package com.codename1.maven;
 
+import org.apache.maven.artifact.Artifact;
+import org.apache.maven.artifact.DefaultArtifact;
+import org.apache.maven.artifact.handler.DefaultArtifactHandler;
 import org.apache.maven.project.MavenProject;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -30,7 +33,9 @@ import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -56,9 +61,18 @@ class BytecodeComplianceSiblingModulesTest {
         MavenProject library = sibling(tmp, "lib", "jar", true);
         assertTrue(new File(library.getBasedir(), "codenameone_library_appended.properties")
                 .createNewFile());
-        for (MavenProject sibling : new MavenProject[] {shared, uncompiled, parent, application, library}) {
+        // Named by the application for its tests alone: never shipped, so
+        // free to use what a device does not have.
+        MavenProject fixtures = sibling(tmp, "fixtures", "jar", true);
+        Set<Artifact> artifacts = new LinkedHashSet<Artifact>();
+        for (MavenProject sibling : new MavenProject[] {shared, uncompiled, parent, application, library,
+                fixtures}) {
             app.addProjectReference(sibling);
+            artifacts.add(new DefaultArtifact("com.example", sibling.getArtifactId(), "1.0",
+                    sibling == fixtures ? Artifact.SCOPE_TEST : Artifact.SCOPE_COMPILE, "jar", null,
+                    new DefaultArtifactHandler("jar")));
         }
+        app.setArtifacts(artifacts);
 
         assertEquals(Collections.singletonList(new File(shared.getBuild().getOutputDirectory())),
                 plainSiblingModules(app));

@@ -131,6 +131,16 @@ public class ApplicationRepository {
                 .setParameter("username", username).setParameter("from", from).executeUpdate();
     }
 
+    /// Makes the rest of the transaction wait its turn behind any other that
+    /// holds, or moves, the same application: handing it in and reviewing it
+    /// are statements on this row too. Does nothing for an account that has
+    /// no application yet, which nothing can hand in either.
+    public void hold(String username) {
+        session.createQuery("update DriverApplication a set a.status = a.status "
+                + "where a.username = :username").setParameter("username", username)
+                .executeUpdate();
+    }
+
     public int delete(String username) {
         return session.createQuery("delete from DriverApplication a where a.username = :username")
                 .setParameter("username", username).executeUpdate();
