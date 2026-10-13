@@ -51,7 +51,9 @@ public final class Base64 {
         }
         for (int i = 0; i < lineSeparator.length; i++) {
             int b = lineSeparator[i] & 0xFF;
-            if (BASIC.indexOf((char) b) >= 0) {
+            // The padding character too, as on the JDK: a '=' between two
+            // groups reads as the end of the data.
+            if (b == '=' || BASIC.indexOf((char) b) >= 0) {
                 throw new IllegalArgumentException("Illegal base64 line separator character 0x"
                         + Integer.toString(b, 16));
             }

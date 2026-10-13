@@ -321,6 +321,12 @@ public class RegexDifferentialTest {
                     }
                 }));
         assertEquals(2L, Pattern.compile("\\d").matcher("a1b2c").results().count());
+        // results() goes on from where the matcher is and stays in its
+        // region. (The JDK this is built with has no results() to ask.)
+        Matcher consumed = Pattern.compile("\\d").matcher("a1b2c3");
+        assertTrue(consumed.find());
+        assertEquals(2L, consumed.results().count());
+        assertEquals(1L, Pattern.compile("\\d").matcher("a1b2c3").region(2, 4).results().count());
         assertEquals(3L, Pattern.compile(",").splitAsStream("a,b,c").count());
         assertEquals(0L, Pattern.compile(",").splitAsStream("").count());
         assertTrue(Pattern.compile("b").asPredicate().test("abc"));

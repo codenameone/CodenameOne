@@ -386,10 +386,12 @@ public final class Matcher implements MatchResult {
         }
     }
 
-    /// Every match from here on, each as its own result.
+    /// Every match from here on, each as its own result: after the last
+    /// match found, or from the start of the region when there is none.
+    /// The matcher is not reset, so a match already consumed is not
+    /// answered again and a region stays in force.
     public Stream<MatchResult> results() {
         List<MatchResult> all = new ArrayList<MatchResult>();
-        reset();
         while (find()) {
             all.add(toMatchResult());
         }

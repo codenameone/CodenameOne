@@ -194,6 +194,12 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     // ------------------------------------------------------------------
 
     /// Waits for completion, for `millis` at most when that is not negative.
+    ///
+    /// The wait is not interruptible, and that is the device's limit rather
+    /// than this class's: `Thread.interrupt()` on ParparVM sets a flag and
+    /// wakes nobody, and the device library has no `Thread.interrupted()`
+    /// to poll it with. A waiter is released by completing or cancelling
+    /// the future, which is how the executors here stop.
     private Object await(long millis) throws InterruptedException, TimeoutException {
         Object outcome = result.get();
         if (outcome != null) {

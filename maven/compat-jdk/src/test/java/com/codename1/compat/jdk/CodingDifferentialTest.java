@@ -80,6 +80,20 @@ public class CodingDifferentialTest {
 
     @Test
     public void base64IsTheJdks() {
+        // The padding character is no line separator, on the JDK or here.
+        for (byte[] separator : new byte[][] {{'='}, {'\r', '='}, {'A'}}) {
+            try {
+                java.util.Base64.getMimeEncoder(4, separator);
+                org.junit.Assert.fail("the JDK takes " + (char) separator[separator.length - 1]);
+            } catch (IllegalArgumentException expected) {
+                try {
+                    Base64.getMimeEncoder(4, separator);
+                    org.junit.Assert.fail("took " + (char) separator[separator.length - 1]);
+                } catch (IllegalArgumentException same) {
+                    continue;
+                }
+            }
+        }
         final java.util.Base64.Encoder[] jdkEncoders = {java.util.Base64.getEncoder(),
             java.util.Base64.getUrlEncoder(), java.util.Base64.getMimeEncoder(),
             java.util.Base64.getEncoder().withoutPadding(), java.util.Base64.getUrlEncoder().withoutPadding(),

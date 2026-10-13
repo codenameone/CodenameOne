@@ -455,6 +455,34 @@ public class MemberGapsDifferentialTest {
     private static final String[] PATTERNS = {"HH:mm:ss", "yyyy-MM-dd HH:mm", "dd.MM.yyyy", "yyyy-MM-dd'T'HH:mm:ss"};
     private static final long[] SECONDS = {0L, 1L, 86399L, 1700000000L, 951782400L, 1711846800L, -1L};
 
+    /// An `ISO_` constant given a zone keeps its own shape: the offset, the
+    /// `Z`, the zone in brackets and the fraction of a second.
+    @Test
+    public void anIsoConstantWithAZoneKeepsItsOwnFormat() {
+        DateTimeFormatter[] constants = {DateTimeFormatter.ISO_INSTANT, DateTimeFormatter.ISO_OFFSET_DATE_TIME,
+            DateTimeFormatter.ISO_ZONED_DATE_TIME, DateTimeFormatter.ISO_LOCAL_DATE_TIME,
+            DateTimeFormatter.ISO_LOCAL_DATE, DateTimeFormatter.ISO_LOCAL_TIME};
+        String[] names = {"instant", "offset", "zoned", "localDateTime", "localDate", "localTime"};
+        for (int c = 0; c < constants.length; c++) {
+            for (String id : ZONES) {
+                java.time.ZoneId zone = java.time.ZoneId.of(id);
+                DateTimeFormatter zoned = JdkTime.withZone(constants[c], zone);
+                assertEquals(zone, JdkTime.getZone(zoned));
+                for (long s : SECONDS) {
+                    java.time.Instant at = java.time.Instant.ofEpochSecond(s, 123000000);
+                    String what = names[c] + " " + id + " " + s;
+                    assertEquals(what, constants[c].withZone(zone).format(at), JdkTime.format(zoned, at));
+                    java.time.ZonedDateTime elsewhere = java.time.ZonedDateTime.ofInstant(at,
+                            java.time.ZoneId.of("Asia/Kolkata"));
+                    assertEquals(what, constants[c].withZone(zone).format(elsewhere),
+                            JdkTime.format(zoned, elsewhere));
+                    java.time.OffsetDateTime offset = at.atOffset(java.time.ZoneOffset.ofHours(-3));
+                    assertEquals(what, constants[c].withZone(zone).format(offset), JdkTime.format(zoned, offset));
+                }
+            }
+        }
+    }
+
     @Test
     public void aZonedFormatterShowsAnInstantInItsZone() {
         for (String pattern : PATTERNS) {

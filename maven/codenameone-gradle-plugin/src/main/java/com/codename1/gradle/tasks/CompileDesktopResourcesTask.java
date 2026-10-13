@@ -64,6 +64,13 @@ public abstract class CompileDesktopResourcesTask extends Cn1Task {
 
     /// The `**/*.fxml` and `**/*.css` files under the desktop resources.
     /// The task is skipped when there are none.
+    ///
+    /// Skipped is not "left as it was": when the last source goes, Gradle
+    /// itself deletes what the task wrote on its previous run into the two
+    /// output directories before reporting `NO-SOURCE`, so no stale
+    /// `FxmlDocuments.java` or `.cn1css` is left for the build to pick up.
+    /// The compiler's own cleanup is for the Maven goal, which has no such
+    /// bookkeeping.
     @InputFiles
     @SkipWhenEmpty
     @PathSensitive(PathSensitivity.RELATIVE)

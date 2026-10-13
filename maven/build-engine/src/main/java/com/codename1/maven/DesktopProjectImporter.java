@@ -854,9 +854,12 @@ public final class DesktopProjectImporter {
     /// expanded; this is the dependencies a POM spells out, not the
     /// effective model.
     static List<String> pomChain(File moduleDir, Result r) throws IOException {
+        // Read without their comments: a dependency, a parent or a property
+        // kept commented out is not part of the project, and the patterns
+        // here would match it all the same.
         List<String> chain = new ArrayList<String>();
         File dir = moduleDir.getAbsoluteFile();
-        String pom = read(new File(dir, "pom.xml"));
+        String pom = withoutXmlComments(read(new File(dir, "pom.xml")));
         if (pom.length() == 0) {
             return chain;
         }
@@ -876,7 +879,7 @@ public final class DesktopProjectImporter {
                     file = new File(file, "pom.xml");
                 }
             }
-            String text = file == null ? "" : read(file);
+            String text = file == null ? "" : withoutXmlComments(read(file));
             // Maven takes the file only when it is the POM asked for.
             String own = element(POM_PARENT.matcher(text).replaceAll(" "), "artifactId");
             if (text.length() == 0 || own == null || !own.equals(element(parent.group(1), "artifactId"))) {
@@ -890,6 +893,12 @@ public final class DesktopProjectImporter {
             dir = file.getAbsoluteFile().getParentFile();
         }
         return chain;
+    }
+
+    private static final Pattern XML_COMMENT = Pattern.compile("(?s)<!--.*?-->");
+
+    static String withoutXmlComments(String xml) {
+        return xml.indexOf("<!--") < 0 ? xml : XML_COMMENT.matcher(xml).replaceAll(" ");
     }
 
     static void readDependencies(File moduleDir, Result r) throws IOException {

@@ -35,6 +35,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAccessor;
 import java.util.ArrayList;
 import java.util.Locale;
+import java.util.concurrent.atomic.AtomicReference;
 
 /// The members of the `java.time` classes a desktop application names and
 /// the device's classes do not have.
@@ -259,19 +260,19 @@ public final class JdkTime {
         }
     }
 
-    private static final ArrayList<Known> KNOWN = new ArrayList<Known>();
+    /// Replaced whole, never changed in place: formatters are made and used
+    /// on whatever thread an application formats a date on, and a reader
+    /// must not meet a table another thread is half way through pruning.
+    private static final AtomicReference<Known[]> KNOWN = new AtomicReference<Known[]>(new Known[0]);
     private static final String ISO_DATE_PATTERN = "yyyy-MM-dd";
     private static final String ISO_TIME_PATTERN = "HH:mm:ss";
     private static final String ISO_DATE_TIME_PATTERN = "yyyy-MM-dd'T'HH:mm:ss";
 
     private static Known known(DateTimeFormatter formatter) {
-        for (int i = KNOWN.size() - 1; i >= 0; i--) {
-            Known k = KNOWN.get(i);
-            DateTimeFormatter f = k.formatter.get();
-            if (f == null) {
-                KNOWN.remove(i);
-            } else if (f == formatter) {
-                return k;
+        Known[] all = KNOWN.get();
+        for (int i = all.length - 1; i >= 0; i--) {
+            if (all[i].formatter.get() == formatter) {
+                return all[i];
             }
         }
         return null;
@@ -279,10 +280,21 @@ public final class JdkTime {
 
     private static DateTimeFormatter remember(DateTimeFormatter formatter, String pattern, Locale locale,
             DateTimeFormatter base, ZoneId zone) {
-        // The scan drops the entries whose formatter is gone.
-        known(null);
-        KNOWN.add(new Known(formatter, pattern, locale, base, zone));
-        return formatter;
+        Known added = new Known(formatter, pattern, locale, base, zone);
+        for (;;) {
+            Known[] all = KNOWN.get();
+            // The copy drops the entries whose formatter is gone.
+            ArrayList<Known> kept = new ArrayList<Known>(all.length + 1);
+            for (Known k : all) {
+                if (k.formatter.get() != null) {
+                    kept.add(k);
+                }
+            }
+            kept.add(added);
+            if (KNOWN.compareAndSet(all, kept.toArray(new Known[kept.size()]))) {
+                return formatter;
+            }
+        }
     }
 
     /// `DateTimeFormatter.ofPattern(pattern)`, remembered with its pattern.
@@ -310,8 +322,9 @@ public final class JdkTime {
     /// answers a formatter with no override, as the JDK does.
     ///
     /// What comes back formats a local date or time exactly as `formatter`
-    /// does. Made from one of the `ISO_` constants it is a formatter of the
-    /// constant's pattern without the fraction of a second.
+    /// does. Made from one of the `ISO_` constants it is a handle that
+    /// [#format] reads the constant and the zone from, so the offset, the
+    /// `Z` and the fraction of a second are the constant's own.
     public static DateTimeFormatter withZone(DateTimeFormatter formatter, ZoneId zone) {
         Known k = known(formatter);
         DateTimeFormatter base = k != null && k.base != null ? k.base : formatter;
@@ -362,6 +375,13 @@ public final class JdkTime {
         if (k == null || k.zone == null) {
             return formatter.format(temporal);
         }
+        if (k.base != null && known(k.base) == null) {
+            // Made from an ISO_ constant, which no pattern stands for.
+            String iso = formatIso(k.base, k.zone, temporal);
+            if (iso != null) {
+                return iso;
+            }
+        }
         if (temporal instanceof Instant) {
             return formatter.format(ZonedDateTime.ofInstant((Instant) temporal, k.zone));
         }
@@ -375,6 +395,49 @@ public final class JdkTime {
             return formatter.format(ZonedDateTime.of((LocalDateTime) temporal, k.zone));
         }
         return formatter.format(temporal);
+    }
+
+    /// What the `ISO_` constant `iso` prints for `temporal` seen in `zone`,
+    /// or null when `iso` is not one of the constants or `temporal` is not
+    /// a point in time. Each constant formats one class and no other, so
+    /// the value is turned into that class first.
+    private static String formatIso(DateTimeFormatter iso, ZoneId zone, TemporalAccessor temporal) {
+        Instant at;
+        LocalDateTime local;
+        if (temporal instanceof Instant) {
+            at = (Instant) temporal;
+            local = ZonedDateTime.ofInstant(at, zone).toLocalDateTime();
+        } else if (temporal instanceof ZonedDateTime) {
+            at = ((ZonedDateTime) temporal).toInstant();
+            local = ZonedDateTime.ofInstant(at, zone).toLocalDateTime();
+        } else if (temporal instanceof OffsetDateTime) {
+            at = ((OffsetDateTime) temporal).toInstant();
+            local = ZonedDateTime.ofInstant(at, zone).toLocalDateTime();
+        } else if (temporal instanceof LocalDateTime) {
+            local = (LocalDateTime) temporal;
+            at = ZonedDateTime.of(local, zone).toInstant();
+        } else {
+            return null;
+        }
+        if (iso == DateTimeFormatter.ISO_INSTANT) {
+            return iso.format(at);
+        }
+        if (iso == DateTimeFormatter.ISO_OFFSET_DATE_TIME) {
+            return iso.format(OffsetDateTime.ofInstant(at, zone));
+        }
+        if (iso == DateTimeFormatter.ISO_ZONED_DATE_TIME) {
+            return iso.format(ZonedDateTime.ofInstant(at, zone));
+        }
+        if (iso == DateTimeFormatter.ISO_LOCAL_DATE_TIME) {
+            return iso.format(local);
+        }
+        if (iso == DateTimeFormatter.ISO_LOCAL_DATE) {
+            return iso.format(local.toLocalDate());
+        }
+        if (iso == DateTimeFormatter.ISO_LOCAL_TIME) {
+            return iso.format(local.toLocalTime());
+        }
+        return null;
     }
 
     /// The pattern letters a date alone can answer, and those a time alone

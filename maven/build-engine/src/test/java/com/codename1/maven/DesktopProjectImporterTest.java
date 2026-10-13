@@ -648,6 +648,15 @@ public class DesktopProjectImporterTest {
         DesktopProjectImporter.readDependencies(new File(source, "ui/app"), all);
         assertTrue(all.unresolved.toString(), all.unresolved.isEmpty());
 
+        // A dependency kept commented out is not one of the project's.
+        write(source, "commented/pom.xml", "<project>\n<dependencies>\n"
+                + "<!-- <dependency><groupId>org.old</groupId><artifactId>gone</artifactId>"
+                + "<version>1.0</version></dependency> -->\n"
+                + "<dependency><groupId>com.formdev</groupId><artifactId>flatlaf</artifactId>"
+                + "<version>3.4</version></dependency>\n<!--\n<dependency>\n<groupId>org.old</groupId>\n"
+                + "<artifactId>other</artifactId>\n</dependency>\n-->\n</dependencies>\n</project>\n");
+        assertEquals("com.formdev:flatlaf:3.4 compile\n", libraries(new File(source, "commented")));
+
         // A parent named somewhere else in the tree.
         write(source, "elsewhere/pom.xml", "<project>\n<parent><groupId>com.acme</groupId>"
                 + "<artifactId>ui-parent</artifactId><version>1</version>"

@@ -69,13 +69,25 @@ public class ImportDesktopProjectMojo extends AbstractCN1Mojo {
         }
         DesktopProjectImporter.Result r;
         String declared;
+        // The POM is wired first, since a POM that cannot be wired is a
+        // reason to import nothing. An import that then fails -- several
+        // entry points and none chosen -- has imported nothing either, so
+        // the POM goes back to what it was.
+        File pomFile = new File(common, "pom.xml");
+        byte[] original = readOrNull(pomFile);
+        boolean imported = false;
         try {
             declared = wireDesktopCompat(common, DesktopProjectImporter.moduleDir(source, module));
             r = new DesktopProjectImporter(MavenLog.of(getLog())).importProject(source, module, common, mainClass,
                     properties == null ? null : properties.getProperty("codename1.packageName"),
                     properties == null ? null : properties.getProperty("codename1.mainName"));
+            imported = true;
         } catch (com.codename1.builders.BuildException e) {
             throw new MojoFailureException(e.getMessage(), e);
+        } finally {
+            if (!imported) {
+                restore(pomFile, original);
+            }
         }
         getLog().info("Imported " + r.copiedFiles + " files into " + new File(common, "src/main/desktop"));
         if (r.mainClass != null) {
@@ -119,6 +131,30 @@ public class ImportDesktopProjectMojo extends AbstractCN1Mojo {
         String level = DesktopImportReport.javaLevelWarning(r.javaLevel);
         if (level != null) {
             getLog().warn(level);
+        }
+    }
+
+    private static byte[] readOrNull(File file) {
+        try {
+            return file.isFile() ? java.nio.file.Files.readAllBytes(file.toPath()) : null;
+        } catch (java.io.IOException e) {
+            return null;
+        }
+    }
+
+    /// Writes `original` back to `file` if the file has changed since it
+    /// was read.
+    private void restore(File file, byte[] original) {
+        if (original == null) {
+            return;
+        }
+        try {
+            if (!java.util.Arrays.equals(original, java.nio.file.Files.readAllBytes(file.toPath()))) {
+                java.nio.file.Files.write(file.toPath(), original);
+                getLog().info("Restored " + file + ": nothing was imported");
+            }
+        } catch (java.io.IOException e) {
+            getLog().warn("Could not restore " + file + ": " + e.getMessage());
         }
     }
 
