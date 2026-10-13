@@ -93,6 +93,27 @@ public class PayoutRepository {
                 .setParameter("driver", driver).setParameter("since", Long.valueOf(since)).list();
     }
 
+    /// The ids of a driver's rides, among those [#completedSince] answers,
+    /// whose tip was put on a card and whose charge has come back. The other
+    /// half of what [#tips] counts, by ride, for the sums that are by day.
+    public List<String> tipChargedSince(String driver, long since) {
+        return session.createQuery("select r.id from Ride r where r.driver = :driver "
+                + "and r.state = 'COMPLETED' and r.updatedAt >= :since "
+                + "and r.methodId <> 'cash' and r.id in "
+                + "(select p.rideId from Payment p where p.tipRef <> '')", String.class)
+                .setParameter("driver", driver).setParameter("since", Long.valueOf(since)).list();
+    }
+
+    /// Makes the rest of the transaction wait its turn behind any other that
+    /// holds the same driver's payout account.
+    ///
+    /// @return false for a driver who has not said where to be paid
+    public boolean holdAccount(String driver) {
+        return session.createQuery("update PayoutAccount a set a.last4 = a.last4 "
+                + "where a.username = :driver").setParameter("driver", driver)
+                .executeUpdate() == 1;
+    }
+
     /// How many rides a driver has completed.
     public long trips(String driver) {
         return session.createQuery("select count(r) from Ride r where r.driver = :driver "

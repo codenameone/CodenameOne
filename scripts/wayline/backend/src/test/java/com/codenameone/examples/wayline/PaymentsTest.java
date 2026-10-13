@@ -230,9 +230,9 @@ class PaymentsTest {
         assertEquals(earned, Trips.number(today, "amount"));
         assertEquals(1L, Trips.number(today, "trips"));
         assertEquals(0L, Trips.number((Map) daily.get(0), "amount"));
-        // What the older call reports is unchanged: the fare.
+        // The older call reports the same share, without the tip.
         mvc.perform(People.asDriver(get("/api/driver/earnings"), driver))
-                .andExpect(jsonPath("$.totalCents").value((int) fare));
+                .andExpect(jsonPath("$.totalCents").value((int) (earned - 300L)));
 
         // Cashing out needs somewhere to send it, and empties the balance.
         mvc.perform(People.asDriver(get("/api/driver/payouts"), driver))
@@ -315,6 +315,9 @@ class PaymentsTest {
                 driver));
         assertEquals(0L, Trips.number(before, "tips"));
         long fareOnly = Trips.number(before, "balance");
+        // Nor earned today: the day's total is what the balance grew by.
+        assertEquals(fareOnly, Trips.number(before, "today"));
+        assertEquals(fareOnly, Trips.number(before, "month"));
 
         // The charge came back.
         db.execute("UPDATE wl_payment SET tip_ref = 'sim_ch_tip' WHERE ride_id = ?",
@@ -323,6 +326,7 @@ class PaymentsTest {
                 driver));
         assertEquals(300L, Trips.number(after, "tips"));
         assertEquals(fareOnly + 300L, Trips.number(after, "balance"));
+        assertEquals(fareOnly + 300L, Trips.number(after, "today"));
         mvc.perform(admin(Trips.body(post("/api/admin/rides/" + id + "/refund"),
                         "{\"reason\":\"Now\"}")))
                 .andExpect(status().isOk())

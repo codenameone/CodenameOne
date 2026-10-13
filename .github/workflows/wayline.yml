@@ -36,9 +36,11 @@ on:
       - 'CodenameOne/src/com/codename1/maps/**'
       - 'CodenameOne/src/com/codename1/io/oidc/**'
       - 'CodenameOne/src/com/codename1/io/rest/**'
-      # What the hosted web app runs on: the browser side of the JavaScript
-      # port, which no test here reached before the `web` job.
-      - 'Ports/JavaScriptPort/src/main/webapp/**'
+      # What the hosted web app runs on: the JavaScript port, both the
+      # browser side and the Java the app is compiled with (its network
+      # connection, its implementation class). The `web` job is the only
+      # test here that signs in through either.
+      - 'Ports/JavaScriptPort/src/main/**'
       - 'scripts/build-android-app.sh'
       - 'scripts/build-ios-app.sh'
       - 'scripts/sync-initializr-wayline.py'

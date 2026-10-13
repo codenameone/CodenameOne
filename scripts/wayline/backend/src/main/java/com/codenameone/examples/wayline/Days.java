@@ -82,8 +82,24 @@ public final class Days {
                 return false;
             }
         }
+        int year = 0;
+        for (int iter = 0; iter < 4; iter++) {
+            year = year * 10 + (text.charAt(iter) - '0');
+        }
         int month = (text.charAt(5) - '0') * 10 + (text.charAt(6) - '0');
         int day = (text.charAt(8) - '0') * 10 + (text.charAt(9) - '0');
-        return month >= 1 && month <= 12 && day >= 1 && day <= 31;
+        // The day is held to its own month: these strings are compared as
+        // text and never parsed, so a 31st of February accepted here would be
+        // stored, and approved, as somebody's date of birth.
+        return month >= 1 && month <= 12 && day >= 1 && day <= length(year, month);
+    }
+
+    // How many days a month has, by the Gregorian rule for leap years.
+    private static int length(int year, int month) {
+        if (month == 2) {
+            boolean leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+            return leap ? 29 : 28;
+        }
+        return month == 4 || month == 6 || month == 9 || month == 11 ? 30 : 31;
     }
 }

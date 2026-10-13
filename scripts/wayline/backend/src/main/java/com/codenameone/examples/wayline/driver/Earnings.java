@@ -40,7 +40,9 @@ import com.codenameone.examples.wayline.ride.Fares;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /// What a driver has earned, and what has been paid out to them.
 ///
@@ -84,10 +86,17 @@ public class Earnings {
         long monthStart = today - 29 * Days.MILLIS;
         long weekStart = today - 6 * Days.MILLIS;
         List<Ride> rides = repository.completedSince(driver, monthStart);
+        // A card tip is on its ride from the moment it is asked for, and is
+        // still there when the processor never answered. Only one whose charge
+        // is on record is earned, here as in the balance: otherwise a day's
+        // total would show money that cannot be cashed out.
+        Set<String> charged = new HashSet<String>(
+                repository.tipChargedSince(driver, monthStart));
         for (int iter = 0; iter < rides.size(); iter++) {
             Ride ride = rides.get(iter);
             long at = ride.updatedAt;
-            long earned = ride.driverCents + ride.tipCents;
+            boolean tipped = "cash".equals(ride.methodId) || charged.contains(ride.id);
+            long earned = ride.driverCents + (tipped ? ride.tipCents : 0L);
             dto.month += earned;
             if (at >= weekStart) {
                 dto.week += earned;
@@ -127,25 +136,19 @@ public class Earnings {
     /// Pays out the whole balance to the driver's account. Answers 409 when
     /// there is no account to pay it to, or nothing to pay.
     ///
-    /// Not one transaction, on purpose. Two requests at once both read the
-    /// same balance, and neither would see the other's payout before it was
-    /// committed. So the payout is committed first, and the ledger, which is
-    /// what is true, is then read again: the request that finds it overdrawn
-    /// takes its own row back.
-    public PayoutDto cashOut(String driver) throws IOException {
-        PayoutDto paid = pay(driver);
-        if (takeBackIfOverdrawn(driver, paid.id)) {
-            throw new ResponseStatusException(409, "There is nothing to cash out");
-        }
-        return paid;
-    }
-
+    /// Two requests at once would both read the same balance and both pay
+    /// it. So the first thing the transaction does is hold the driver's
+    /// payout account, the one row every cash-out of theirs needs: the second
+    /// request waits there until the first has committed, then reads a
+    /// balance that already has the first payout taken off it, and is told
+    /// there is nothing left. The hold has to come before any read, or the
+    /// second request would have looked at the ledger before it waited.
     @Transactional
-    private PayoutDto pay(String driver) throws IOException {
-        PayoutAccount account = repository.account(driver);
-        if (account == null) {
+    public PayoutDto cashOut(String driver) throws IOException {
+        if (!repository.holdAccount(driver)) {
             throw new ResponseStatusException(409, "Add the account to be paid into first");
         }
+        PayoutAccount account = repository.account(driver);
         long amount = balance(driver);
         if (amount <= 0L) {
             throw new ResponseStatusException(409, "There is nothing to cash out");
@@ -159,18 +162,6 @@ public class Earnings {
         row.destination = account.bankName + " ****" + account.last4;
         repository.add(row);
         return toDto(row);
-    }
-
-    @Transactional
-    private boolean takeBackIfOverdrawn(String driver, String payoutId) {
-        if (balance(driver) >= 0L) {
-            return false;
-        }
-        Payout row = repository.payout(payoutId);
-        if (row != null) {
-            repository.remove(row);
-        }
-        return true;
     }
 
     /// Where a driver is paid; every field empty until they have said.

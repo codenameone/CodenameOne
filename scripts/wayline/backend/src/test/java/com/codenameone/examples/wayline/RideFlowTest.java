@@ -172,8 +172,12 @@ class RideFlowTest {
                 .andExpect(jsonPath("$[0].id").value(id))
                 .andExpect(jsonPath("$[0].state").value("COMPLETED"));
         Map earned = json(People.asDriver(get("/api/driver/earnings"), driver));
-        assertEquals(fare, ((Number) earned.get("totalCents")).longValue());
-        assertEquals(fare, ((Number) earned.get("todayCents")).longValue());
+        // The driver's share, not the fare: the service keeps a fifth, and
+        // the driving screen must not show it as earned.
+        long share = fare - Math.round(fare * 20d / 100d);
+        assertEquals(share, ((Number) earned.get("totalCents")).longValue());
+        assertEquals(share, ((Number) earned.get("todayCents")).longValue());
+        assertEquals(share, ((Number) earned.get("weekCents")).longValue());
         assertEquals(1L, ((Number) earned.get("rides")).longValue());
     }
 

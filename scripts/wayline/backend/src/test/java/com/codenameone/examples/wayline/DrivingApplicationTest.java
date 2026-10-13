@@ -99,6 +99,19 @@ class DrivingApplicationTest {
         mvc.perform(People.asRider(Trips.body(put("/api/driving/application"),
                         "{\"dateOfBirth\":\"17/05/1990\"}"), who))
                 .andExpect(status().isBadRequest());
+        // Written the right way, and no day that ever was.
+        mvc.perform(People.asRider(Trips.body(put("/api/driving/application"),
+                        "{\"dateOfBirth\":\"1990-02-30\"}"), who))
+                .andExpect(status().isBadRequest());
+        mvc.perform(People.asRider(Trips.body(put("/api/driving/application"),
+                        "{\"dateOfBirth\":\"1991-02-29\"}"), who))
+                .andExpect(status().isBadRequest());
+        mvc.perform(People.asRider(Trips.body(put("/api/driving/application"),
+                        "{\"dateOfBirth\":\"1992-04-31\"}"), who))
+                .andExpect(status().isBadRequest());
+        mvc.perform(People.asRider(Trips.body(put("/api/driving/application"),
+                        "{\"dateOfBirth\":\"1992-02-29\"}"), who))
+                .andExpect(status().isOk());
         mvc.perform(People.asRider(post("/api/driving/application/submit"), who))
                 .andExpect(status().isBadRequest());
 

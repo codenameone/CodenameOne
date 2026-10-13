@@ -212,8 +212,9 @@ public class Drivers {
         return out;
     }
 
-    /// What a driver's completed, paid rides came to. "Today" is the day in
-    /// UTC; a service in one city would use that city's midnight.
+    /// What a driver's completed, paid rides earned them: their share of
+    /// each fare, without tips. "Today" is the day in UTC; a service in one
+    /// city would use that city's midnight.
     @Transactional(readOnly = true)
     public EarningsDto earnings(String driver) throws IOException {
         long now = System.currentTimeMillis();

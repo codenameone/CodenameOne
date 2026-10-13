@@ -871,23 +871,36 @@ public final class VectorMapEngine {
         scheduleRetry(wait);
     }
 
-    // Whether a timer is already waiting to look at the failed tiles again.
-    private boolean retryPending;
+    // When the timer that looks at the failed tiles again is due, or 0 when
+    // none is waiting.
+    private long retryAt;
+
+    // Which timer that is. One replaced by an earlier one still fires, and
+    // must then do nothing.
+    private int retryTimer;
 
     // A tile is only asked for by a paint, and a map nobody is touching does
     // not paint: without this, the delay above ran out with nothing left to
     // notice, and the hole stayed until the user happened to move the map.
-    // One timer at a time, set for the tile that may be retried soonest.
+    // One timer counts at a time, set for the tile that may be retried
+    // soonest. A tile that has failed many times waits up to a minute, so a
+    // timer already waiting says nothing about a tile that failed just now:
+    // when the new moment is the earlier one, the timer is replaced.
     private void scheduleRetry(long wait) {
-        if (retryPending) {
+        long due = System.currentTimeMillis() + wait;
+        if (retryAt != 0L && retryAt <= due) {
             return;
         }
-        retryPending = true;
+        retryAt = due;
+        final int timer = ++retryTimer;
         // A little past the moment, so the paint finds the tile retryable.
         com.codename1.ui.CN.setTimeout((int) wait + RETRY_SLACK_MILLIS, new Runnable() {
             @Override
             public void run() {
-                retryPending = false;
+                if (timer != retryTimer) {
+                    return;
+                }
+                retryAt = 0L;
                 long now = System.currentTimeMillis();
                 long soonest = Long.MAX_VALUE;
                 for (Object value : failed.values()) {

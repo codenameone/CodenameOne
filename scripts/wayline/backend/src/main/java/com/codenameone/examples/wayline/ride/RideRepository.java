@@ -225,10 +225,14 @@ public class RideRepository {
                 .setParameter("completed", RideStates.COMPLETED).list());
     }
 
-    /// How many of a driver's completed rides were paid for, and what their
-    /// fares came to, in that order.
+    /// How many of a driver's completed rides were paid for, and what the
+    /// driver's share of their fares came to, in that order.
+    ///
+    /// The share and not the fare: this is the figure the driving screen
+    /// shows as earned, and the fare includes the service's commission, which
+    /// the driver never sees and cannot cash out.
     public long[] paidTotals(String driver) {
-        Object[] row = session.createQuery("select count(r), coalesce(sum(r.fareCents), 0) "
+        Object[] row = session.createQuery("select count(r), coalesce(sum(r.driverCents), 0) "
                 + "from Ride r where r.driver = :driver and r.state = :completed "
                 + "and r.paymentStatus = :paid", Object[].class)
                 .setParameter("driver", driver).setParameter("completed", RideStates.COMPLETED)
@@ -236,9 +240,10 @@ public class RideRepository {
         return row == null ? new long[2] : new long[] {number(row[0]), number(row[1])};
     }
 
-    /// What the fares of a driver's completed, paid rides came to since a time.
+    /// What the driver's share of their completed, paid rides came to since
+    /// a time.
     public long paidSince(String driver, long since) {
-        Long cents = session.createQuery("select coalesce(sum(r.fareCents), 0) from Ride r "
+        Long cents = session.createQuery("select coalesce(sum(r.driverCents), 0) from Ride r "
                 + "where r.driver = :driver and r.state = :completed "
                 + "and r.paymentStatus = :paid and r.updatedAt >= :since", Long.class)
                 .setParameter("driver", driver).setParameter("completed", RideStates.COMPLETED)
