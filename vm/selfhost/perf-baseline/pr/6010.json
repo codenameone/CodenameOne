@@ -1,6 +1,28 @@
 {
  "pr": 6010,
  "rebaseline": {
+  "windows-x64@amd64-family-26-model-2-authenticamd": {
+   "stringBuilding": {
+    "all": {
+     "from": {
+      "memory": 0.297,
+      "time": 1.386,
+      "tolerance": {
+       "memory": 0.35,
+       "time": 0.2
+      }
+     },
+     "memory": 0.175,
+     "reason": "Windows x64 run 38290890489 on AMD Family 26 Model 2 measured all-core stringBuilding RAM at 0.175x versus the 0.297x baseline across five rounds. Record the measured improvement without attributing it to the Process API; retain the existing memory tolerance and time baseline.",
+     "runs": 1,
+     "time": 1.386,
+     "tolerance": {
+      "memory": 0.35,
+      "time": 0.2
+     }
+    }
+   }
+  },
   "windows-x64@intel64-family-6-model-173-genuineintel": {
    "hello": {
     "all": {
