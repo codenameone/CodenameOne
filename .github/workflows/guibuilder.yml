@@ -23,6 +23,7 @@ on:
       - 'CodenameOne/src/**'
       - 'Ports/JavaSE/src/**'
       - 'maven/css-compiler/**'
+      - 'maven/css-cli/**'
       - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/**'
       - 'maven/build-engine/src/main/java/com/codename1/maven/**'
   push:
@@ -40,6 +41,7 @@ on:
       - 'CodenameOne/src/**'
       - 'Ports/JavaSE/src/**'
       - 'maven/css-compiler/**'
+      - 'maven/css-cli/**'
       - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/**'
       - 'maven/build-engine/src/main/java/com/codename1/maven/**'
 

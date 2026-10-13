@@ -229,6 +229,10 @@ public abstract class BackendAccess {
     /// [#commit] or [#afterThrow].
     public abstract Object begin(int propagation, boolean readOnly, int timeoutSeconds);
 
+    /// Begins a transaction with an explicit isolation requirement.
+    public abstract Object begin(int propagation, boolean readOnly, int timeoutSeconds,
+                                 com.codename1.backend.annotations.Isolation isolation);
+
     /// Ends a transaction [#begin] returned, normally.
     public abstract void commit(Object transaction);
 

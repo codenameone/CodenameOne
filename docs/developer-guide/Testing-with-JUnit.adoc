@@ -146,7 +146,7 @@ Without `@RunOnEdt`, the test body runs on the Surefire worker thread — fine f
 
 This is why the framework's internal `CodenameOneExtensionTest` (in the Codename One sources) carries `@DisabledIfSystemProperty(named = "java.awt.headless", matches = "true")`. The extension catches the headless case AWT detects automatically (Linux without DISPLAY); the annotation catches the explicit `-Djava.awt.headless=true` case. Together they let the test class skip cleanly on a headless runner.
 
-Pure-logic tests (no UI, no `@CodenameOneTest`) can run on any headless runner without configuration.
+Pure-logic tests (no UI, no `@CodenameOneTest`) can run on any headless runner without configuration. The rest of the build runs there too: compiling the project's CSS needs no display, so `xvfb-run` is only needed around the step that runs `@CodenameOneTest` classes.
 
 === Coexistence with `cn1:test`
 

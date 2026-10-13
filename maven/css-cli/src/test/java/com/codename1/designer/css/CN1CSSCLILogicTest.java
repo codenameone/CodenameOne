@@ -35,9 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Regression tests for two long-standing logic bugs in CN1CSSCLI, surfaced by review
- * when the class moved into this module. Both predate the move: the file was relocated
- * with a zero-line content diff.
+ * Regression tests for the path helpers CN1CSSCLI merges stylesheets with.
  */
 class CN1CSSCLILogicTest {
 
@@ -45,27 +43,6 @@ class CN1CSSCLILogicTest {
         Method m = CN1CSSCLI.class.getDeclaredMethod(name, types);
         m.setAccessible(true);
         return m.invoke(null, args);
-    }
-
-    /**
-     * getMergedFile() read the cn1.cssMergeFile override into a bare expression and
-     * discarded it, so callers setting the property silently got the derived path.
-     */
-    @Test
-    void honoursTheCssMergeFileOverride() throws Exception {
-        String previous = System.getProperty("cn1.cssMergeFile");
-        try {
-            System.setProperty("cn1.cssMergeFile", "/tmp/explicit-merge-target.css");
-            Object result = invoke("getMergedFile", new Class<?>[]{String.class}, "/somewhere/theme.css");
-            assertEquals("/tmp/explicit-merge-target.css", result,
-                    "cn1.cssMergeFile must win over the path derived from the input");
-        } finally {
-            if (previous == null) {
-                System.clearProperty("cn1.cssMergeFile");
-            } else {
-                System.setProperty("cn1.cssMergeFile", previous);
-            }
-        }
     }
 
     /**

@@ -23,6 +23,7 @@
 package com.codename1.backend;
 
 import com.codename1.impl.backend.Scheduler;
+import com.codename1.backend.annotations.Isolation;
 
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -67,6 +68,79 @@ class ServerEngineTransactionsTest {
 
     private static void insert(DataSource pool, String v) throws IOException {
         pool.execute("INSERT INTO cn1_tx_probe (v) VALUES (?)", new Object[] {v});
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"POSTGRES", "MYSQL"})
+    void explicitIsolationDoesNotLeakIntoPooledConnections(String engine) throws Exception {
+        DataSource pool = open(engine);
+        Database db = pool.borrow();
+        try {
+            String query = "POSTGRES".equals(engine) ? "SHOW transaction_isolation"
+                    : "SELECT @@session.transaction_isolation AS transaction_isolation";
+            Object baseline;
+            try {
+                baseline = db.queryOne(query, null).get("transaction_isolation");
+            } catch (IOException oldMySqlOrMariaDb) {
+                if (!"MYSQL".equals(engine)) { throw oldMySqlOrMariaDb; }
+                query = "SELECT @@session.tx_isolation AS transaction_isolation";
+                baseline = db.queryOne(query, null).get("transaction_isolation");
+            }
+            for (Isolation isolation : new Isolation[] {
+                    Isolation.READ_COMMITTED,
+                    Isolation.REPEATABLE_READ,
+                    Isolation.SERIALIZABLE}) {
+                for (boolean rollback : new boolean[] {false, true}) {
+                    db.beginTransaction(false, isolation);
+                    if ("POSTGRES".equals(engine)) {
+                        assertEquals(isolation.name().toLowerCase(java.util.Locale.ROOT).replace('_', ' '),
+                                db.queryOne(query, null).get("transaction_isolation"));
+                    }
+                    db.execute("INSERT INTO cn1_tx_probe VALUES ('isolation')", null);
+                    if (rollback) { db.rollbackTransaction(); } else { db.commitTransaction(); }
+                    pool.release(db);
+                    Database next = pool.borrow();
+                    org.junit.jupiter.api.Assertions.assertSame(db, next);
+                    assertFalse(next.isInTransaction());
+                    assertEquals(baseline, next.queryOne(query, null).get("transaction_isolation"));
+                }
+            }
+            if ("POSTGRES".equals(engine)) {
+                final Database connection = db;
+                assertThrows(IOException.class, () -> connection.beginTransaction(false,
+                        Isolation.READ_UNCOMMITTED));
+                assertFalse(db.isInTransaction());
+            }
+        } finally {
+            if (db.isInTransaction()) { db.rollbackTransaction(); }
+            pool.release(db);
+            pool.execute("DROP TABLE IF EXISTS cn1_tx_probe", null);
+            pool.close();
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"POSTGRES", "MYSQL"})
+    void explicitRepeatableReadKeepsSnapshotAndReadCommittedSeesNewRows(String engine) throws Exception {
+        DataSource pool = open(engine);
+        Database observer = pool.borrow();
+        try {
+            for (Isolation isolation : new Isolation[] {
+                    Isolation.READ_COMMITTED,
+                    Isolation.REPEATABLE_READ}) {
+                observer.beginTransaction(true, isolation);
+                int before = ((Number) observer.queryOne("SELECT COUNT(*) AS n FROM cn1_tx_probe", null).get("n")).intValue();
+                insert(pool, "other-connection");
+                int after = ((Number) observer.queryOne("SELECT COUNT(*) AS n FROM cn1_tx_probe", null).get("n")).intValue();
+                assertEquals(before + (isolation == Isolation.READ_COMMITTED ? 1 : 0), after);
+                observer.commitTransaction();
+            }
+        } finally {
+            if (observer.isInTransaction()) { observer.rollbackTransaction(); }
+            pool.release(observer);
+            pool.execute("DROP TABLE IF EXISTS cn1_tx_probe", null);
+            pool.close();
+        }
     }
 
     @ParameterizedTest

@@ -81,15 +81,15 @@ jobs:
           set -e
           # No explicit index refresh here: apt-get-install.sh does one itself, and doing it
           # twice doubles the time a stalling mirror can take before anything is installed.
-          # xvfb: the CN1 CSS compiler (codenameone-maven-plugin css goal) renders
-          # via CEF/AWT and throws HeadlessException without a display, so the
-          # hellocodenameone-common build below runs under a virtual X server.
+          # No xvfb: nothing in this job opens a window. The sample build's css
+          # goal compiles theme.css headless, and the PE this job produces is
+          # run by the Windows jobs downstream, not here.
           # Every network call here is bounded and retried. On 2026-08-19 this step sat in
           # its first line for a full hour and was cancelled having installed nothing, which
           # then failed the screenshot-comment job downstream for a missing artifact. That is
           # the same hang apt-get-install.sh was written for -- a hung mirror should cost one
           # attempt, not the job -- and this workflow had never adopted it.
-          bash scripts/ci/apt-get-install.sh cmake ninja-build unzip xvfb
+          bash scripts/ci/apt-get-install.sh cmake ninja-build unzip
           # apt.llvm.org is a single host with no mirror, and llvm.sh both adds its repo and
           # installs from it, so it is the likeliest thing in this step to stall forever.
           RETRY_ATTEMPTS=3 bash scripts/ci/retry.sh \
@@ -199,10 +199,6 @@ jobs:
         run: |
           set -e
           export JAVA_HOME="$JDK_17_HOME"
-          # Headful virtual display for the CSS compiler's CEF/AWT rendering.
-          Xvfb :99 -screen 0 1600x1200x24 >/tmp/xvfb.log 2>&1 &
-          export DISPLAY=:99
-          sleep 2
           mkdir -p "$HOME/.codenameone"
           [ -f "$HOME/.codenameone/guibuilder.jar" ] || : > "$HOME/.codenameone/guibuilder.jar"
           RETRY_ONLY_MATCHING=transient bash scripts/ci/retry.sh \

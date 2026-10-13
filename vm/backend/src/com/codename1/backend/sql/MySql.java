@@ -22,6 +22,8 @@
  */
 package com.codename1.backend.sql;
 
+import com.codename1.backend.annotations.Isolation;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.LinkedHashMap;
@@ -424,6 +426,15 @@ public final class MySql {
     /// Opens a transaction that refuses writes.
     public void beginReadOnly() throws IOException {
         command("START TRANSACTION READ ONLY");
+    }
+
+    /// Uses a next-transaction setting, never a session default. The enum keeps
+    /// arbitrary SQL out of the text-protocol transaction control path.
+    public void begin(boolean readOnly, Isolation isolation) throws IOException {
+        if (isolation != Isolation.DEFAULT) {
+            command("SET TRANSACTION ISOLATION LEVEL " + isolation.name().replace('_', ' '));
+        }
+        command(readOnly ? "START TRANSACTION READ ONLY" : "START TRANSACTION READ WRITE");
     }
 
     /// Savepoint control, through the text protocol for the same reason as
