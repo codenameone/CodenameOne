@@ -68,6 +68,10 @@ public final class AudioSource extends Behaviour {
     /// moment it started, or the last time it was moved or changed speed.
     private float startedAt;
     private float pausedAt;
+    /// Where the next `Play` starts the clip, in seconds: what `time` was
+    /// set to while nothing played. Zero once a `Play` has used it or a
+    /// `Stop` has dropped it.
+    private float pendingFrom;
     private boolean autoPlayed;
 
     /// Installs what makes the sound, or null for silence.
@@ -350,9 +354,18 @@ public final class AudioSource extends Behaviour {
     /// from where it was while the script was told otherwise.
     ///
     /// On a source that is not playing there is no voice to move, and the
-    /// next `Play` starts the clip from its beginning.
+    /// place is kept for the next `Play` to start from: "Setting this
+    /// property while the audio source is not playing will update the
+    /// playback position, but it will only take effect once playback
+    /// begins", as Unity's page for `time` has it, and until then `time`
+    /// reads zero as that page says it does. It is held to the clip when it
+    /// is used and not here, since a script may set the clip afterwards. A
+    /// voice that has run out counts as not playing, which [#expire] finds
+    /// out first.
     public void set_time(float value) {
+        expire();
         if (!playing || clip == null) {
+            pendingFrom = value > 0f ? value : 0f; // a NaN is not greater than zero either
             return;
         }
         float length = clip.get_length();
@@ -378,29 +391,48 @@ public final class AudioSource extends Behaviour {
         if (playing && output != null) {
             output.stop(voice);
         }
+        // From the place `time` was set to while the source was silent, if
+        // it was; a `Play` over a voice that is sounding has no such place
+        // and restarts the clip. The account and the sound start together,
+        // so `time` read on the next line answers that place.
+        float length = clip.get_length();
+        float from = pendingFrom > length ? length : pendingFrom;
+        pendingFrom = 0f;
         voice = newVoice();
         playing = true;
         paused = false;
-        startedFrom = 0f;
+        startedFrom = from;
         startedAt = now();
         record(loop ? "loop" : "play", clip);
         if (output != null) {
             output.play(voice, clip, level(1f), pitch, loop);
         }
+        if (from > 0f) {
+            if (logging) {
+                log.add("seek " + clip.name + " " + (int) (from * 1000f + 0.5f));
+            }
+            if (output != null) {
+                output.seek(voice, from);
+            }
+        }
     }
 
     /// The delay is not kept: the sound starts now. It is a deviation a
-    /// fraction of a second long, and said here so that it is known.
+    /// fraction of a second long, and said here so that it is known. A
+    /// place set with `time` beforehand is where it starts, as for `Play`.
     public void PlayDelayed(float delay) {
         Play();
     }
 
+    /// "The Audio clip plays from the beginning the next time you play it",
+    /// so a place set with `time` and not yet used is dropped as well.
     public void Stop() {
         if (playing && output != null) {
             output.stop(voice);
         }
         playing = false;
         paused = false;
+        pendingFrom = 0f;
     }
 
     public void Pause() {

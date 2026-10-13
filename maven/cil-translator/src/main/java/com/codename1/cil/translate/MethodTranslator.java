@@ -1694,7 +1694,15 @@ final class MethodTranslator implements Opcodes {
             case "isinst": {
                 CilType type = asm.typeFromToken(ins.operand);
                 viewForCast(pop(), type);
-                if (!Names.isTypeVariable(type) && type.kind != CilType.Kind.OBJECT) {
+                if (host.hasEnumType(type)) {
+                    // A boxed enum is the runtime's one class for all of
+                    // them, and it is the box that knows which: a test of
+                    // the class would answer for the integer underneath,
+                    // true of a boxed `int` and false of the enum itself.
+                    mv.visitFieldInsn(GETSTATIC, names.className(type.name), "$TYPE", Translator.TYPE_DESCRIPTOR);
+                    invoke(INVOKESTATIC, Translator.TYPE, "$as", "(Ljava/lang/Object;" + Translator.TYPE_DESCRIPTOR
+                            + ")Ljava/lang/Object;", false);
+                } else if (!Names.isTypeVariable(type) && type.kind != CilType.Kind.OBJECT) {
                     String c = names.instanceClass(type);
                     Label ok = new Label();
                     mv.visitInsn(DUP);

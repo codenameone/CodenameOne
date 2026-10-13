@@ -344,4 +344,9 @@ null receiver NullReference NullReference NullReference NullReference
 null argument False False
 static False False True True True
 capacity ArgumentOutOfRange 0 ArgumentOutOfRange ArgumentOutOfRange 0
+== unboxing enums
+same storage 2 One 2 Two 200 A 1 Low 5000000000 3 High Small
+other storage InvalidCast InvalidCast InvalidCast InvalidCast InvalidCast InvalidCast InvalidCast InvalidCast InvalidCast InvalidCast InvalidCast InvalidCast InvalidCast InvalidCast InvalidCast InvalidCast InvalidCast
+generic 2 One 2 InvalidCast InvalidCast 200
+tests False False False True False False
 done

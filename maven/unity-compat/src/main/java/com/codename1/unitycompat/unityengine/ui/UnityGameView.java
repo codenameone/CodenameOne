@@ -452,6 +452,7 @@ public class UnityGameView extends GameView {
         Display display = Display.getInstance();
         UnityRuntime.platform(platform(display.getPlatformName()));
         UnityRuntime.touchSupported(display.isTouchScreenDevice());
+        UnityRuntime.desktop(display.isDesktop());
     }
 
     /// Unity's `RuntimePlatform` for a Codename One platform name.
@@ -660,6 +661,7 @@ public class UnityGameView extends GameView {
             return;
         }
         UnityRuntime.touchSupported(Display.getInstance().isTouchScreenDevice());
+        UnityRuntime.desktop(Display.getInstance().isDesktop());
         if (heldBack != null) {
             report(heldBack, height);
             heldBack = null;

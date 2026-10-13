@@ -280,7 +280,14 @@ public final class GameObject extends Object {
     public java.lang.Object AddComponent(Class type) {
         Component c = UnityRuntime.newComponent(type);
         if (c == null) {
-            throw new IllegalArgumentException("AddComponent: no way to create a " + type.getName());
+            // What is left is a type nothing can be an instance of by
+            // itself: `Collider2D`, `Renderer`, `Behaviour`, a script's own
+            // abstract base. Unity refuses those as well, and answers null
+            // with an error in its log; here it is said where it happens,
+            // since the null would only fail later, on a line that does not
+            // name the type.
+            throw new IllegalArgumentException("AddComponent<" + type.getName() + ">() on " + name + ": this is"
+                    + " a base type, or one with nothing to create it; add a component that derives from it");
         }
         $attach(c);
         return c;

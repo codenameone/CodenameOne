@@ -87,12 +87,24 @@ public final class Random {
 
     /// From `minInclusive` up to but not including `maxExclusive`; when the
     /// two are equal, that value.
+    ///
+    /// Given the wrong way round, each end keeps what its place in the call
+    /// made it, as Unity documents: "the input parameters are swapped but
+    /// retain their inclusivity or exclusivity based on their original
+    /// positions, which means the method becomes Random.Range(minExclusive,
+    /// maxInclusive)". `Range(10, 0)` is therefore 1 to 10 and never 0, where
+    /// sorting the two first gave 0 to 9: a script that counts down from a
+    /// length with it then read one before the start of its array.
     public static int Range(int minInclusive, int maxExclusive) {
-        int lo = minInclusive < maxExclusive ? minInclusive : maxExclusive;
-        int hi = minInclusive < maxExclusive ? maxExclusive : minInclusive;
-        long span = (long) hi - (long) lo;
-        if (span <= 0L) {
-            return lo;
+        // In `long`, since the two may be the whole of `int` apart.
+        long lo = minInclusive;
+        long span = (long) maxExclusive - lo;
+        if (span < 0L) {
+            lo = (long) maxExclusive + 1L;
+            span = -span;
+        }
+        if (span == 0L) {
+            return minInclusive;
         }
         long r = next() & 0xffffffffL;
         return (int) (lo + r % span);

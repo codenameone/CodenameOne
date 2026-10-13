@@ -185,6 +185,15 @@ public final class Type {
         return new EnumBox(type, type.held(value));
     }
 
+    /// `value as E`, and the test of `value is E`, for an enum: the box
+    /// when it is one of this enum, null when it is anything else. A box of
+    /// another enum is not one, and neither is the integer the enum is
+    /// stored as -- `(object)1 is Rank` is false on .NET, though the same
+    /// object unboxes as a `Rank`.
+    public static Object $as(Object value, Type type) {
+        return value instanceof EnumBox && ((EnumBox) value).type == type ? value : null; // NOPMD CompareObjectsWithEquals
+    }
+
     public static String $name(int value, Type type) {
         return type.nameOf(value);
     }

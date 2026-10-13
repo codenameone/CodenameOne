@@ -710,6 +710,16 @@ public final class UnityRuntime {
     /// then `OnApplicationPause(true)` on the way out,
     /// `OnApplicationPause(false)` then `OnApplicationFocus(true)` on the
     /// way back. Called by the host from the thread that steps the game.
+    ///
+    /// A script that is switched off is told too, when its object is active.
+    /// Unity lists what the `enabled` checkbox stops -- `Start`, `Update`,
+    /// `FixedUpdate`, `LateUpdate`, `OnGUI`, `OnDisable`, `OnEnable` -- and
+    /// these two are not on the list; the page of each says "Sent to all
+    /// GameObjects", and of pause that "All MonoBehaviours receive this
+    /// event". A script that saves on pause and is switched off between
+    /// levels still has to save. One on an object that is not active is told
+    /// nothing: it is out of the scene for now, and may never have been
+    /// woken.
     public static void applicationPaused(boolean paused) {
         if (!running) {
             return;
@@ -718,7 +728,8 @@ public final class UnityRuntime {
             boolean focus = (pass == 0) == paused;
             for (int i = 0; i < behaviours.size(); i++) { // NOPMD ForLoopCanBeForeach
                 MonoBehaviour b = (MonoBehaviour) behaviours.get(i);
-                if (b.destroyed || !b.awake || !b.live()) {
+                if (b.destroyed || !b.awake || b.gameObject == null || !b.gameObject.registered
+                        || !b.gameObject.activeInHierarchy()) {
                     continue;
                 }
                 if (focus) {
@@ -766,6 +777,12 @@ public final class UnityRuntime {
     /// `Input.touchSupported` answers.
     public static void touchSupported(boolean supported) {
         Input.touchSupported(supported);
+    }
+
+    /// Says whether the device is a desktop one, which is what stands in
+    /// for a plugged-in mouse where `Input.mousePresent` would look for one.
+    public static void desktop(boolean isDesktop) {
+        Input.desktop(isDesktop);
     }
 
     /// Where every finger on the screen now is, in Unity's screen
@@ -971,6 +988,15 @@ public final class UnityRuntime {
         }
         if (type == PolygonCollider2D.class) {
             return new PolygonCollider2D();
+        }
+        if (type == CapsuleCollider2D.class) {
+            return new CapsuleCollider2D();
+        }
+        if (type == EdgeCollider2D.class) {
+            return new EdgeCollider2D();
+        }
+        if (type == AudioSource.class) {
+            return new AudioSource();
         }
         if (type == SpriteRenderer.class) {
             return new SpriteRenderer();
@@ -1684,11 +1710,22 @@ public final class UnityRuntime {
         c.routine = routine;
         // Unity runs a coroutine up to its first yield before StartCoroutine
         // returns.
-        advance(c);
+        boolean ended = advance(c);
         if (!c.done) {
             coroutines.add(c);
         }
-        return c;
+        // A routine that came to its end without one yield never was a
+        // coroutine to wait for or to stop, and Unity documents the answer:
+        // "If the coroutine runs to completion without yielding ...
+        // StartCoroutine returns null". A script tells the two apart with
+        // `if (StartCoroutine(...) != null)`. One that yielded and stopped
+        // itself on the way (`StopAllCoroutines` before its first yield) did
+        // yield, and is answered as an object, done.
+        //
+        // `yield return StartCoroutine(Empty())` is then a `yield return
+        // null`: the next frame, which is also when waiting for a coroutine
+        // that is already over resumed.
+        return ended ? null : c;
     }
 
     static void stopCoroutines(MonoBehaviour owner) {
@@ -1723,19 +1760,22 @@ public final class UnityRuntime {
     /// once for a coroutine. Any yield of something else ends the pass, so only such a loop
     /// gets there; and the count is of children and not of time, so it is
     /// the same on every target.
-    private static void advance(Coroutine c) {
+    ///
+    /// The answer is whether the routine came to its end in this pass, as
+    /// opposed to waiting for something or having been stopped from inside.
+    private static boolean advance(Coroutine c) {
         int children = 0;
         for (;;) {
             boolean more = c.routine.MoveNext();
             if (c.done) {
                 // It stopped itself from inside the step.
-                return;
+                return false;
             }
             if (more) {
                 java.lang.Object yielded = c.routine.get_Current();
                 if (!(yielded instanceof IEnumerator)) {
                     waitFor(c, yielded);
-                    return;
+                    return false;
                 }
                 children++;
                 if (children == EMPTY_CHILDREN) {
@@ -1748,14 +1788,14 @@ public final class UnityRuntime {
                     }
                     push(c, (IEnumerator) yielded);
                     waitFor(c, null);
-                    return;
+                    return false;
                 }
                 push(c, (IEnumerator) yielded);
                 continue;
             }
             if (c.depth == 0) {
                 c.done = true;
-                return;
+                return true;
             }
             c.routine = c.outer[--c.depth];
             c.outer[c.depth] = null;

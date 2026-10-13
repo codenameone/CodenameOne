@@ -51,8 +51,10 @@ public class Fingers : MonoBehaviour
         frame++;
         if (frame == 100)
         {
+            // Whether there is a mouse is not whether fingers stand in for one.
+            bool before = Input.mousePresent;
             Input.simulateMouseWithTouches = false;
-            Debug.Log("mouse emulation off");
+            Debug.Log("mouse emulation off, a mouse present " + before + " then " + Input.mousePresent);
         }
         if (frame == 120)
         {

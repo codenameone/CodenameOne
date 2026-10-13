@@ -55,6 +55,9 @@ public class Keeper : MonoBehaviour
         Debug.Log("keeper platform=" + Application.platform + " mobile=" + Application.isMobilePlatform
             + " iphone=" + (Application.platform == RuntimePlatform.IPhonePlayer) + " editor="
             + Application.isEditor + " best=" + PlayerPrefs.GetInt("best", -1));
+        // A fact about the device, whatever fingers are taken for: an iPhone
+        // has no mouse while its touches still press mouse button 0.
+        Debug.Log("keeper mouse=" + Input.mousePresent + " simulated=" + Input.simulateMouseWithTouches);
         PlayerPrefs.SetInt("best", PlayerPrefs.GetInt("best", -1) + 1);
         if (Bridge.Host != null)
         {

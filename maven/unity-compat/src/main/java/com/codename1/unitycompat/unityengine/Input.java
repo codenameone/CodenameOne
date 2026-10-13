@@ -138,6 +138,9 @@ public final class Input {
     private static final boolean[] pointTaken = new boolean[FINGERS];
     private static Touch[] frameTouches = new Touch[0];
     private static boolean touchHost;
+    /// Whether the host said the device is a desktop one; see
+    /// [#get_mousePresent()], the one thing that asks.
+    private static boolean desktopHost;
     private static boolean multiTouch = true;
     private static boolean simulateMouse = true;
     private static float clock;
@@ -175,6 +178,7 @@ public final class Input {
         reportLength = 0;
         frameTouches = new Touch[0];
         touchHost = false;
+        desktopHost = false;
         multiTouch = true;
         simulateMouse = true;
         clock = 0f;
@@ -323,6 +327,10 @@ public final class Input {
 
     static void touchSupported(boolean supported) {
         touchHost = supported;
+    }
+
+    static void desktop(boolean isDesktop) {
+        desktopHost = isDesktop;
     }
 
     /// Where every finger on the screen now is; `count` zero when the last
@@ -743,9 +751,31 @@ public final class Input {
         return ret;
     }
 
-    /// A mouse, or a finger standing in for one.
+    /// Whether the device has a mouse. It is a fact about the device and
+    /// not about how fingers are read: this used to answer from
+    /// `simulateMouseWithTouches`, so every phone had a mouse until a script
+    /// switched the simulation off, and a game that shows a cursor or hover
+    /// hints "when there is a mouse" showed them on a touch screen.
+    ///
+    /// Unity documents the answer by platform: "On Windows, Android and
+    /// Metro platforms, this function does actual mouse presence detection,
+    /// so may return true or false. On Linux, Mac, WebGL, this function will
+    /// always return true. On iOS and console platforms, this function will
+    /// always return false." Codename One has nothing that says a mouse is
+    /// plugged in, so where Unity detects, the form factor stands in:
+    /// a desktop has one (`Display.isDesktop()`, which the host passes on),
+    /// and a phone or a tablet is taken to have none. Windows is always a
+    /// desktop here. A run with no host is the Linux player the runtime
+    /// says it is until told otherwise, and has one.
     public static boolean get_mousePresent() {
-        return !mouseIgnored();
+        int platform = Application.get_platform();
+        if (platform == UnityRuntime.PLATFORM_IOS) {
+            return false;
+        }
+        if (platform == UnityRuntime.PLATFORM_ANDROID) {
+            return desktopHost;
+        }
+        return true;
     }
 
     // -------------------------------------------------------------- touches

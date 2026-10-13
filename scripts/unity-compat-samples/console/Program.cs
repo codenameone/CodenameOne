@@ -2299,6 +2299,50 @@ namespace Spike
                 + " " + Named(() => "" + new Dictionary<string, int>(0).Count));
         }
 
+        // ---- unboxing enums ---------------------------------------------------
+
+        private static T Cast<T>(object o)
+        {
+            return (T)o;
+        }
+
+        private static string Unboxed(Func<object> f)
+        {
+            try
+            {
+                return "" + f();
+            }
+            catch (InvalidCastException)
+            {
+                return "InvalidCast";
+            }
+        }
+
+        // An unboxing goes by what the box is stored as and by nothing else:
+        // an enum and the integer under it unbox as each other, and so do two
+        // enums over one integer type. Another width, or the other
+        // signedness of the same width, is refused.
+        private static void UnboxingEnums()
+        {
+            Section("unboxing enums");
+            object rank = Rank.Two, one = 1, tiny = Tiny.A, unsigned = Unsigned.Low, big = Big.Huge, wide = Wide.B;
+            Log("same storage " + Unboxed(() => (int)rank) + " " + Unboxed(() => (Rank)one) + " " + Unboxed(() => (Phase)rank)
+                + " " + Unboxed(() => (Rank)rank) + " " + Unboxed(() => (byte)tiny) + " " + Unboxed(() => (Tiny)(object)(byte)200)
+                + " " + Unboxed(() => (uint)unsigned) + " " + Unboxed(() => (Unsigned)(object)1u) + " " + Unboxed(() => (long)big)
+                + " " + Unboxed(() => (ushort)wide) + " " + Unboxed(() => (Pitch)tiny) + " " + Unboxed(() => (Span)unsigned));
+            Log("other storage " + Unboxed(() => (uint)rank) + " " + Unboxed(() => (long)rank) + " " + Unboxed(() => (short)rank)
+                + " " + Unboxed(() => (byte)rank) + " " + Unboxed(() => (int)unsigned) + " " + Unboxed(() => (Unsigned)one)
+                + " " + Unboxed(() => (sbyte)tiny) + " " + Unboxed(() => (int)tiny) + " " + Unboxed(() => (Rank)(object)1L)
+                + " " + Unboxed(() => (Rank)(object)1u) + " " + Unboxed(() => (int)big) + " " + Unboxed(() => (ulong)big)
+                + " " + Unboxed(() => (short)wide) + " " + Unboxed(() => (char)wide) + " " + Unboxed(() => (Rank)unsigned)
+                + " " + Unboxed(() => (Tiny)rank) + " " + Unboxed(() => (Big)rank));
+            Log("generic " + Unboxed(() => Cast<int>(rank)) + " " + Unboxed(() => Cast<Rank>(one)) + " "
+                + Unboxed(() => Cast<Phase>(rank)) + " " + Unboxed(() => Cast<uint>(rank)) + " " + Unboxed(() => Cast<Tiny>(rank))
+                + " " + Unboxed(() => Cast<byte>(tiny)));
+            Log("tests " + (rank is int) + " " + (one is Rank) + " " + (rank is Phase) + " " + (rank is Rank) + " "
+                + (tiny is byte) + " " + (unsigned is uint));
+        }
+
         public static void Main(string[] args)
         {
             ValueTypes();
@@ -2329,6 +2373,7 @@ namespace Spike
             ArraysAsEnumerables();
             StructArraysFromGenerics();
             BoxesAndReceivers();
+            UnboxingEnums();
             Console.WriteLine("done");
         }
     }

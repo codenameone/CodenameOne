@@ -102,6 +102,30 @@ public class Ball : MonoBehaviour
         }
         Listener(since);
         Loop(since);
+        Placed(since);
+    }
+
+    // `time` set on a silent source is where the next Play starts, and reads
+    // zero until then; Stop forgets it, and a second Play starts at the start.
+    private void Placed(int since)
+    {
+        if (since == 72)
+        {
+            source.Stop();
+            source.time = 0.06f;
+            string silent = Voice();
+            source.Play();
+            Debug.Log("placed while silent: " + silent + ", played from " + Voice());
+        }
+        else if (since == 74)
+        {
+            Debug.Log("placed 2 frames on: " + Voice());
+            source.Stop();
+            source.time = 0.06f;
+            source.Stop();
+            source.Play();
+            Debug.Log("placed then stopped: " + Voice());
+        }
     }
 
     private string Voice()

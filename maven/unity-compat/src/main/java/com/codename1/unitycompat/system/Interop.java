@@ -165,6 +165,25 @@ public final class Interop {
         return o;
     }
 
+    /// The number in a boxed enum that is stored as the integer type asked
+    /// for, which is one of `Type`'s kinds.
+    ///
+    /// .NET unboxes on the storage and nothing else: `(int)(object)Rank.One`
+    /// is 1, `(Rank)(object)1` is `Rank.One` and a box of one enum unboxes as
+    /// another enum of the same storage, none of them an error -- `dotnet`
+    /// says so, and generic code that turns an enum `T` into its number
+    /// relies on it. What it refuses is another width or signedness:
+    /// `(uint)(object)Rank.One`, `(long)(object)Rank.One` and
+    /// `(sbyte)(object)ByteEnum.X` are each an InvalidCastException. The enum
+    /// asked for needs no part in this, so the call site passes nothing: an
+    /// enum type and its underlying type unbox through the one helper.
+    private static long enumValue(Object o, int kind) {
+        if (o instanceof EnumBox && ((EnumBox) o).type.underlying == kind) {
+            return ((EnumBox) o).value;
+        }
+        throw new InvalidCastException();
+    }
+
     public static boolean unboxBoolean(Object o) {
         if (boxed(o) instanceof Boolean) {
             return ((Boolean) o).booleanValue();
@@ -184,40 +203,28 @@ public final class Interop {
         if (boxed(o) instanceof Byte) {
             return ((Byte) o).byteValue();
         }
-        if (o instanceof EnumBox) {
-            return (byte) ((EnumBox) o).value;
-        }
-        throw new InvalidCastException();
+        return (byte) enumValue(o, Type.I1);
     }
 
     public static short unboxShort(Object o) {
         if (boxed(o) instanceof Short) {
             return ((Short) o).shortValue();
         }
-        if (o instanceof EnumBox) {
-            return (short) ((EnumBox) o).value;
-        }
-        throw new InvalidCastException();
+        return (short) enumValue(o, Type.I2);
     }
 
     public static int unboxInt(Object o) {
         if (boxed(o) instanceof Integer) {
             return ((Integer) o).intValue();
         }
-        if (o instanceof EnumBox) {
-            return (int) ((EnumBox) o).value;
-        }
-        throw new InvalidCastException();
+        return (int) enumValue(o, Type.I4);
     }
 
     public static long unboxLong(Object o) {
         if (boxed(o) instanceof Long) {
             return ((Long) o).longValue();
         }
-        if (o instanceof EnumBox) {
-            return (long) ((EnumBox) o).value;
-        }
-        throw new InvalidCastException();
+        return (long) enumValue(o, Type.I8);
     }
 
     public static float unboxFloat(Object o) {
@@ -237,46 +244,35 @@ public final class Interop {
     // The unsigned types and `byte` have boxes of their own (ByteBox and
     // its neighbours), so that a boxed `uint` is not a boxed `int`: these
     // are the same four helpers for them. An enum over one is an EnumBox,
-    // as it is above.
+    // as it is above, and is told from an enum over the signed type of the
+    // same width by its storage.
 
     public static byte unboxUByte(Object o) {
         if (boxed(o) instanceof ByteBox) {
             return ((ByteBox) o).value;
         }
-        if (o instanceof EnumBox) {
-            return (byte) ((EnumBox) o).value;
-        }
-        throw new InvalidCastException();
+        return (byte) enumValue(o, Type.U1);
     }
 
     public static char unboxUShort(Object o) {
         if (boxed(o) instanceof UInt16Box) {
             return ((UInt16Box) o).value;
         }
-        if (o instanceof EnumBox) {
-            return (char) ((EnumBox) o).value;
-        }
-        throw new InvalidCastException();
+        return (char) enumValue(o, Type.U2);
     }
 
     public static int unboxUInt(Object o) {
         if (boxed(o) instanceof UInt32Box) {
             return ((UInt32Box) o).value;
         }
-        if (o instanceof EnumBox) {
-            return (int) ((EnumBox) o).value;
-        }
-        throw new InvalidCastException();
+        return (int) enumValue(o, Type.U4);
     }
 
     public static long unboxULong(Object o) {
         if (boxed(o) instanceof UInt64Box) {
             return ((UInt64Box) o).value;
         }
-        if (o instanceof EnumBox) {
-            return ((EnumBox) o).value;
-        }
-        throw new InvalidCastException();
+        return enumValue(o, Type.U8);
     }
 
     // ------------------------------------------------- out of erased code
@@ -287,53 +283,60 @@ public final class Interop {
     // tuple's item nobody assigned, what a generic method of a script answers
     // when it has nothing -- it is a null, since that code cannot know that
     // its T is an `int`. The caller does, and reads the null as zero here.
+    //
+    // Anything else is unboxed as `unbox.any` unboxes it, by what it is: a
+    // generic `(T)value` is erased to nothing, so `Convert<int>(Rank.One)`
+    // hands back the boxed enum, which .NET reads as 1, and
+    // `Convert<float>(1)` an `Integer`, which .NET refuses. A bare cast to the
+    // box expected would read the one and, where a cast is not checked, take
+    // the other for a `Float`.
 
     public static boolean orDefaultBoolean(Object o) {
-        return o != null && ((Boolean) o).booleanValue();
+        return o != null && unboxBoolean(o);
     }
 
     public static char orDefaultChar(Object o) {
-        return o == null ? (char) 0 : ((Character) o).charValue();
+        return o == null ? (char) 0 : unboxChar(o);
     }
 
     public static byte orDefaultByte(Object o) {
-        return o == null ? (byte) 0 : ((Byte) o).byteValue();
+        return o == null ? (byte) 0 : unboxByte(o);
     }
 
     public static short orDefaultShort(Object o) {
-        return o == null ? (short) 0 : ((Short) o).shortValue();
+        return o == null ? (short) 0 : unboxShort(o);
     }
 
     public static int orDefaultInt(Object o) {
-        return o == null ? 0 : ((Integer) o).intValue();
+        return o == null ? 0 : unboxInt(o);
     }
 
     public static long orDefaultLong(Object o) {
-        return o == null ? 0L : ((Long) o).longValue();
+        return o == null ? 0L : unboxLong(o);
     }
 
     public static float orDefaultFloat(Object o) {
-        return o == null ? 0f : ((Float) o).floatValue();
+        return o == null ? 0f : unboxFloat(o);
     }
 
     public static double orDefaultDouble(Object o) {
-        return o == null ? 0d : ((Double) o).doubleValue();
+        return o == null ? 0d : unboxDouble(o);
     }
 
     public static byte orDefaultUByte(Object o) {
-        return o == null ? (byte) 0 : ((ByteBox) o).value;
+        return o == null ? (byte) 0 : unboxUByte(o);
     }
 
     public static char orDefaultUShort(Object o) {
-        return o == null ? (char) 0 : ((UInt16Box) o).value;
+        return o == null ? (char) 0 : unboxUShort(o);
     }
 
     public static int orDefaultUInt(Object o) {
-        return o == null ? 0 : ((UInt32Box) o).value;
+        return o == null ? 0 : unboxUInt(o);
     }
 
     public static long orDefaultULong(Object o) {
-        return o == null ? 0L : ((UInt64Box) o).value;
+        return o == null ? 0L : unboxULong(o);
     }
 
     // -------------------------------------------------------------- unsigned

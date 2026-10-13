@@ -28,6 +28,12 @@ using UnityEngine.SceneManagement;
 // null comes back: in the frame after the one it was started in, whether that
 // was from Start or from Update, and at the end of the same frame when it
 // waits for that instead.
+//
+// Then what the engine answers at its edges: a routine that ends before it
+// yields is no coroutine, a range given backwards keeps which end it leaves
+// out, and the built-in components can be added by type. After its first
+// Update the script switches itself off, and is still told when the
+// application is paused, as a script on an active object is.
 public class Marker : MonoBehaviour
 {
     private bool updated;
@@ -37,8 +43,64 @@ public class Marker : MonoBehaviour
         Debug.Log("marker start in " + SceneManager.GetActiveScene().name + " keeper=" + (Keeper.Instance != null)
             + " total=" + Keeper.Instance.total + " keepers=" + FindObjectsOfType<Keeper>().Length
             + " frame " + Time.frameCount);
-        StartCoroutine(Next("start", null));
+        Coroutine waits = StartCoroutine(Next("start", null));
         Debug.Log("marker " + Roots());
+        Debug.Log("marker " + Edges(waits));
+        StartCoroutine(AfterEmpty());
+    }
+
+    private string Edges(Coroutine waits)
+    {
+        string s = "empty coroutine null=" + (StartCoroutine(Empty()) == null) + " waiting null=" + (waits == null);
+        StopCoroutine(null);
+        // Nothing else in this project draws a random number, so these take
+        // none from anybody.
+        int low = int.MaxValue, high = int.MinValue;
+        float lowF = float.MaxValue, highF = float.MinValue;
+        for (int i = 0; i < 400; i++)
+        {
+            int n = Random.Range(10, 0);
+            low = Mathf.Min(low, n);
+            high = Mathf.Max(high, n);
+            float f = Random.Range(2f, 1f);
+            lowF = Mathf.Min(lowF, f);
+            highF = Mathf.Max(highF, f);
+        }
+        s += " range(10,0)=" + low + ".." + high + " same=" + Random.Range(5, 5) + " floats "
+            + (lowF >= 1f && highF <= 2f && lowF < 1.1f && highF > 1.9f) + " same="
+            + Random.Range(3f, 3f);
+        GameObject parts = new GameObject("parts");
+        CapsuleCollider2D capsule = parts.AddComponent<CapsuleCollider2D>();
+        EdgeCollider2D edge = parts.AddComponent<EdgeCollider2D>();
+        AudioSource source = parts.AddComponent<AudioSource>();
+        s += " added " + (parts.GetComponent<Collider2D>() == capsule) + " " + edge.pointCount + " "
+            + (source != null && !source.isPlaying) + " of " + parts.GetComponents<Component>().Length;
+        Destroy(parts);
+        return s;
+    }
+
+    private IEnumerator Empty()
+    {
+        yield break;
+    }
+
+    // Waiting for a routine that was over before it yielded is waiting for
+    // nothing, which is a frame.
+    private IEnumerator AfterEmpty()
+    {
+        int began = Time.frameCount;
+        yield return StartCoroutine(Empty());
+        Debug.Log("marker after an empty coroutine began " + began + " resumed " + Time.frameCount);
+    }
+
+    private void OnApplicationPause(bool paused)
+    {
+        Debug.Log("marker pause=" + paused + " enabled=" + enabled + " frame " + Time.frameCount);
+    }
+
+    private void OnApplicationFocus(bool focus)
+    {
+        Debug.Log("marker focus=" + focus + " enabled=" + enabled + " frame " + Time.frameCount);
     }
 
     // An object with no parent has a place among the roots of its scene,
@@ -74,6 +136,8 @@ public class Marker : MonoBehaviour
             updated = true;
             StartCoroutine(Next("update", null));
             StartCoroutine(Next("update end of frame", new WaitForEndOfFrame()));
+            // Its coroutines go on: they belong to the object's being active.
+            enabled = false;
         }
     }
 

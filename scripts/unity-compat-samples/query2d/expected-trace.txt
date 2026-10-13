@@ -144,7 +144,7 @@ moved synced Disc d=370 p=370,90 n=-60,80 f=37
 stopped ticks=9 fixed clock dt=200 unscaled=200 fixedUnscaled=200 ahead=TrueTrue
 fixed clock half dt=200 unscaled=400 fixedUnscaled=400
 update clock dt=83 unscaled=167 fixed=200 fixedUnscaled=400
-mouse emulation off
+mouse emulation off, a mouse present True then True
 input frame=105 touch=100,100
 frame 105 touches=1 [0 began 100,200 d=0,0 taps=1] array=1 mouse=none at 120,210 axis=0,0
 frame 106 touches=1 [0 stationary 100,200 d=0,0 taps=1] array=1 mouse=none at 120,210 axis=0,0

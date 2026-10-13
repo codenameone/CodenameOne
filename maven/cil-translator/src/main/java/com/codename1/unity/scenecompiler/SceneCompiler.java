@@ -517,37 +517,74 @@ public final class SceneCompiler {
 
     /// The scenes that make the build, in the order of their indexes.
     private List<File> buildScenes(List<File> found) throws IOException {
+        return buildScenes(project, found, warnings, notes);
+    }
+
+    /// The scenes the build settings choose out of `found`, every scene
+    /// under Assets in order of path.
+    ///
+    /// Unity builds the scenes that are listed and enabled, and when there
+    /// is none it builds the scene that is open in the editor. Which scene
+    /// that is, is not in the project: it is the editor's own state. So
+    /// what stands in for it depends on why there is none.
+    ///
+    /// - No settings file, or one with an empty list, is a project nobody
+    ///   has set a build up for: one made a minute ago, with its one scene
+    ///   open. Every scene is compiled and the first by path starts, and a
+    ///   note says which, since with several it is a guess.
+    /// - A list that has entries, every one of them switched off or naming a
+    ///   file that is gone, is a decision somebody made about those scenes.
+    ///   Starting some other scene of the project in their place would ship
+    ///   content the list never named, and an application of no scene is a
+    ///   blank screen with nothing to say why. The build stops instead and
+    ///   names each entry and what is wrong with it.
+    static List<File> buildScenes(File project, List<File> found, List<String> warnings, List<String> notes)
+            throws IOException {
         File settings = new File(project, "ProjectSettings/EditorBuildSettings.asset");
         if (!settings.isFile()) {
             return found;
         }
         List<File> listed = new ArrayList<File>();
+        List<String> refused = new ArrayList<String>();
         for (UnityYaml.Document d : UnityYaml.parse(read(settings))) {
             if (d.properties == null) {
                 continue;
             }
             for (Object entry : list(d.properties.get("m_Scenes"))) {
                 Map<String, Object> scene = map(entry);
-                File f = new File(project, text(scene.get("path")));
+                String path = text(scene.get("path"));
+                File f = new File(project, path);
                 if ("0".equals(text(scene.get("enabled")))) {
+                    refused.add(path + " (switched off)");
                     continue;
                 }
                 if (f.isFile()) {
                     listed.add(f);
                 } else {
-                    warnings.add("the build settings list the scene " + text(scene.get("path"))
+                    refused.add(path + " (not in the project)");
+                    warnings.add("the build settings list the scene " + path
                             + ", which is not in the project; it was left out");
                 }
             }
         }
-        if (listed.isEmpty()) {
-            if (!found.isEmpty()) {
-                notes.add("the build settings list no scene; every scene under Assets was compiled, in order of"
-                        + " path");
-            }
-            return found;
+        if (!listed.isEmpty()) {
+            return listed;
         }
-        return listed;
+        if (!refused.isEmpty()) {
+            StringBuilder why = new StringBuilder();
+            for (int i = 0; i < refused.size(); i++) {
+                why.append(i == 0 ? "" : ", ").append(refused.get(i));
+            }
+            throw new SceneException("ProjectSettings/EditorBuildSettings.asset lists no scene that can be built: "
+                    + why + ". Unity would build whichever scene is open in the editor, which the project does not"
+                    + " record; switch on the scene the application starts with, or correct its path, in the build"
+                    + " settings");
+        }
+        if (!found.isEmpty()) {
+            notes.add("the build settings list no scene; every scene under Assets was compiled, in order of"
+                    + " path, and the application starts with " + relative(project, found.get(0)));
+        }
+        return found;
     }
 
     /// A physics material is a file of one document with two numbers.

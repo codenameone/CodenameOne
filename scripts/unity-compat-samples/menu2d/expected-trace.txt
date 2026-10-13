@@ -108,6 +108,12 @@ played while paused: 0ms playing=True
 audio frame=164 listener resumed
 and 2 frames after: 33ms playing=True
 tick, frame 166 clicks=1 selected=True
+placed while silent: 0ms playing=False, played from 60ms playing=True
+audio frame=172 play beep
+audio frame=172 seek beep 60
+placed 2 frames on: 93ms playing=True
+placed then stopped: 0ms playing=True
+audio frame=174 play beep
 frame 180 objects=19 Ledge=1 drawn=10 text="hard" text="Best: 1 Hard"
 bounce 2 on Floor at y=-220 frame 186
 audio frame=186 shot beep
