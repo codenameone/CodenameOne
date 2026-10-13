@@ -73,12 +73,13 @@ public class PhoneVerification {
     public PhoneChallengeDto start(String username) throws IOException {
         UserDto user = accounts.describe(username);
         String code = newCode();
-        store(username, hash(username, code), System.currentTimeMillis());
+        String codeHash = hash(username, code);
+        store(username, codeHash, System.currentTimeMillis());
         try {
             sms.send(user.phone, "Your Wayline code is " + code);
         } catch (IOException failed) {
             System.err.println("could not send a verification code: " + failed.getMessage());
-            discard(username);
+            discard(username, codeHash);
             throw new ResponseStatusException(503, "We could not send the code. Try again shortly");
         }
         PhoneChallengeDto challenge = new PhoneChallengeDto();
@@ -115,11 +116,14 @@ public class PhoneVerification {
         }
     }
 
-    /// Takes back a code that could not be sent.
+    /// Takes back a code that could not be sent, if it is still the one the
+    /// account is waiting on. A send can take longer to fail than the wait
+    /// between two codes, and by then a later request may have stored a code
+    /// of its own and had it delivered: that one is the user's, and stays.
     @Transactional
-    void discard(String username) throws IOException {
+    void discard(String username, String codeHash) throws IOException {
         PhoneCode pending = codes.find(username);
-        if (pending != null) {
+        if (pending != null && codeHash.equals(pending.codeHash)) {
             codes.remove(pending);
         }
     }

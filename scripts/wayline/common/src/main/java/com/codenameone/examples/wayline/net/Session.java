@@ -37,6 +37,7 @@ import com.codename1.io.oidc.TokenStore;
 import com.codename1.ui.CN;
 import com.codename1.util.SuccessCallback;
 import com.codenameone.examples.wayline.AppConfig;
+import com.codenameone.examples.wayline.Prefs;
 import com.codenameone.examples.wayline.api.UserDto;
 
 import java.io.ByteArrayInputStream;
@@ -159,6 +160,10 @@ public final class Session {
 
     public static void setUser(UserDto described) {
         user = described;
+        if (described != null && described.username != null) {
+            // What the device keeps about one person is not the next one's.
+            Prefs.ownedBy(described.username);
+        }
     }
 
     /// Picks up the session a previous run left, if it is still good.
@@ -195,7 +200,7 @@ public final class Session {
     /// the app offers, so it is asked again whenever that could have changed.
     public static void refreshUser(final Runnable done, Net.Failed failed) {
         Api.account().me(Net.to(described -> {
-            user = described;
+            setUser(described);
             done.run();
         }, failed));
     }

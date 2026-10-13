@@ -60,6 +60,8 @@ public final class Prefs {
     public static final String HOME = "home";
     public static final String WORK = "work";
     public static final String RECENTS = "recents";
+    /// Whose the recent destinations are: see [#ownedBy].
+    private static final String RECENTS_OWNER = "recentsOwner";
 
     public static final String THEME_SYSTEM = "system";
     public static final String THEME_LIGHT = "light";
@@ -277,6 +279,23 @@ public final class Prefs {
         for (int iter = 0; iter < RECENT_LIMIT; iter++) {
             store(RECENTS + "." + iter, iter < all.size() ? all.get(iter) : null);
         }
+        changed(RECENTS);
+    }
+
+    /// Says whose device this is now, by the name they signed in with; empty
+    /// for nobody. The recent destinations are kept on the device only, and
+    /// they say where a person goes: when the account changes, the last
+    /// one's are dropped and not shown to the next. The same account signing
+    /// in again finds its own still there.
+    public static void ownedBy(String username) {
+        String owner = username == null ? "" : username;
+        if (owner.equals(text(RECENTS_OWNER, ""))) {
+            return;
+        }
+        for (int iter = 0; iter < RECENT_LIMIT; iter++) {
+            store(RECENTS + "." + iter, null);
+        }
+        Preferences.set(PREFIX + RECENTS_OWNER, owner);
         changed(RECENTS);
     }
 

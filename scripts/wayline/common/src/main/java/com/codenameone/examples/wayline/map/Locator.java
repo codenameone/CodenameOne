@@ -123,14 +123,26 @@ public final class Locator {
             return;
         }
         if (!started) {
-            start();
+            start(true);
         } else if (state != SEARCHING) {
             watcher.located(state, here());
         }
     }
 
+    /// Stops following. When nobody is left the platform is told to stop
+    /// too: a location listener left in place keeps the receiver running, and
+    /// the battery paying for it, on every screen without a map and after
+    /// signing out. The position it found is kept for [#here], and the next
+    /// [#watch] starts the search again.
     public static void unwatch(Watcher watcher) {
         WATCHERS.remove(watcher);
+        if (started && WATCHERS.isEmpty()) {
+            started = false;
+            // Whatever the listener or the patience of this search still has
+            // to say is about a search nobody is following.
+            search++;
+            LocationManager.getLocationManager().setLocationListener(null);
+        }
     }
 
     /// Asks again, after a refusal or a failure.
@@ -139,13 +151,16 @@ public final class Locator {
             return;
         }
         LocationManager.getLocationManager().setLocationListener(null);
-        start();
+        start(false);
     }
 
-    private static void start() {
+    private static void start(final boolean resumed) {
         started = true;
         final int mine = ++search;
-        set(SEARCHING);
+        // A search taken up again -- one screen with a map left, the next
+        // arrived -- already knows where the device is, and says so, where
+        // a first search has only that it is looking.
+        set(resumed && found != null ? FOUND : SEARCHING);
         LocationManager.getLocationManager().setLocationListener(new LocationListener() {
             @Override
             public void locationUpdated(Location location) {

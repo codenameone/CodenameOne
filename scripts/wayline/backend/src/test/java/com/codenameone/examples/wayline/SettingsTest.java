@@ -168,12 +168,23 @@ class SettingsTest {
         // Not with a ride under way: somebody may be driving to it.
         String ride = (String) Trips.json(mvc, People.asRider(Trips.body(post("/api/rides"),
                 People.ride(52.2297, 21.0122, 52.2400, 21.0300)), who)).get("id");
-        mvc.perform(People.asRider(post("/api/account/delete"), who))
+        String closure = "{\"password\":\"" + People.PASSWORD + "\"}";
+        mvc.perform(People.asRider(Trips.body(post("/api/account/delete"), closure), who))
                 .andExpect(status().isConflict());
         mvc.perform(People.asRider(post("/api/rides/" + ride + "/cancel"), who))
                 .andExpect(status().isOk());
 
+        // Not on the strength of a token: the password is asked for again.
         mvc.perform(People.asRider(post("/api/account/delete"), who))
+                .andExpect(status().isBadRequest());
+        mvc.perform(People.asRider(Trips.body(post("/api/account/delete"), "{}"), who))
+                .andExpect(status().isForbidden());
+        mvc.perform(People.asRider(Trips.body(post("/api/account/delete"),
+                        "{\"password\":\"not-the-password\"}"), who))
+                .andExpect(status().isForbidden());
+        mvc.perform(People.asRider(get("/api/me"), who)).andExpect(status().isOk());
+
+        mvc.perform(People.asRider(Trips.body(post("/api/account/delete"), closure), who))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.username").value(who));
         // Gone: the token, the password, and the account an admin would look up.
@@ -185,18 +196,17 @@ class SettingsTest {
                 .andExpect(status().isNotFound());
         mvc.perform(People.asAdmin(get("/api/admin/applications/" + who), DemoAccounts.ADMIN))
                 .andExpect(status().isNotFound());
-        // And the address is free for whoever wants an account with it next,
-        // who starts with nothing of the last one's.
-        String again = People.rider(accounts, "leaving");
-        assertEquals(who, again);
-        mvc.perform(People.asRider(get("/api/payments/methods"), again))
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].id").value("cash"));
-        mvc.perform(People.asRider(get("/api/driving/application"), again))
-                .andExpect(jsonPath("$.status").value("none"));
+        // And the address is retired with it. The rides the account took are
+        // kept under it, so whoever registered it next would be handed them.
+        mvc.perform(post("/api/account/register").contentType("application/json")
+                        .content("{\"email\":\"" + who + "\",\"password\":\"" + People.PASSWORD
+                                + "\",\"displayName\":\"Somebody else\","
+                                + "\"phone\":\"+15550112\"}"))
+                .andExpect(status().isConflict());
 
         // An admin's account is not closed this way.
-        mvc.perform(People.asAdmin(post("/api/account/delete"), DemoAccounts.ADMIN))
+        mvc.perform(People.asAdmin(Trips.body(post("/api/account/delete"),
+                        "{\"password\":\"" + DemoAccounts.PASSWORD + "\"}"), DemoAccounts.ADMIN))
                 .andExpect(status().isConflict());
     }
 }

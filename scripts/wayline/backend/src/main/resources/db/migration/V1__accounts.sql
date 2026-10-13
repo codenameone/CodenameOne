@@ -45,6 +45,14 @@ CREATE TABLE wl_preferences (
     share_trips_with VARCHAR(32) NOT NULL
 );
 
+-- The e-mails of accounts that were closed, as hashes. A closed account's rides
+-- stay under its e-mail, so the address is never registered again; the hash is
+-- enough to refuse it without keeping a list of who has left.
+CREATE TABLE wl_closed_account (
+    username_hash VARCHAR(64) NOT NULL PRIMARY KEY,
+    closed_at BIGINT NOT NULL
+);
+
 -- The verification code an account is waiting on. Only its hash is kept.
 CREATE TABLE wl_phone_code (
     username VARCHAR(190) NOT NULL PRIMARY KEY,

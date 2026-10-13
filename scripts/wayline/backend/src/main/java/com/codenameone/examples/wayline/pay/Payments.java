@@ -490,7 +490,7 @@ public class Payments {
         if (CASH.equals(ride.methodId)) {
             throw new ResponseStatusException(409, "A ride paid in cash has nothing to refund");
         }
-        if (!claimed) {
+        if (!claimed && !refundUnfinished(ride)) {
             throw new ResponseStatusException(409, "That ride has no payment to refund");
         }
         if (ride.tipCents > 0L) {
@@ -501,6 +501,21 @@ public class Payments {
             }
         }
         return ride;
+    }
+
+    /// Whether `ride` was marked refunded by a request that never recorded
+    /// the refund: the server stopped between asking the processor and
+    /// writing the answer down, so neither [#keepRefund] nor [#releaseRefund]
+    /// ran. Such a ride would otherwise be refunded in name only and refused
+    /// for good. It is refunded again instead, which is safe because a refund
+    /// is keyed by the charge it returns: the processor answers a repeat with
+    /// the refund it already made, and makes one if it never did.
+    private boolean refundUnfinished(Ride ride) {
+        if (!REFUNDED.equals(ride.paymentStatus)) {
+            return false;
+        }
+        Payment payment = repository.payment(ride.id);
+        return payment != null && !REFUNDED.equals(payment.status);
     }
 
     @Transactional(readOnly = true)

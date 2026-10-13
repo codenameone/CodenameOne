@@ -371,6 +371,13 @@ public class SecurityConfig {
             .rateLimit("/api/account/password",
                     RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
                     new InMemoryRateLimiter(10, 3600))
+            // Every search and every dropped pin is a request this server
+            // makes of somebody else's geocoder, in the service's name. A
+            // person typing an address makes a few a second at most; a client
+            // in a loop would get the whole service refused by the provider.
+            .rateLimit("/api/geo/**",
+                    RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
+                    new InMemoryRateLimiter(120, 60))
             .rateLimit("/api/driving/application/documents",
                     RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
                     new InMemoryRateLimiter(60, 3600))

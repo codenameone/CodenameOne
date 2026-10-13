@@ -69,10 +69,13 @@ public class Accounts {
     private final Moderation moderation;
     private final Payments payments;
     private final LiveHub live;
+    private final ClosedAccountRepository closed;
 
     public Accounts(ProfileRepository profiles, AccountCleanupRepository cleanup,
             JdbcUserDetailsManager users, PasswordEncoder encoder, Applications applications,
-            Moderation moderation, Payments payments, LiveHub live) {
+            Moderation moderation, Payments payments, LiveHub live,
+            ClosedAccountRepository closed) {
+        this.closed = closed;
         this.profiles = profiles;
         this.cleanup = cleanup;
         this.users = users;
@@ -132,6 +135,13 @@ public class Accounts {
         }
         if (users.userExists(username)) {
             throw new ResponseStatusException(409, "That e-mail already has an account");
+        }
+        // An address whose account was closed is not given to anyone again:
+        // the rides that account took are still filed under it. See
+        // ClosedAccountRepository.
+        if (closed.closed(username)) {
+            throw new ResponseStatusException(409,
+                    "That e-mail belonged to an account that was closed. Use another");
         }
         // Every account opens as a rider. Asking to drive -- `driver` is how an
         // older app asks -- begins an application, and the role waits for an
@@ -233,6 +243,7 @@ public class Accounts {
     @Transactional(rollbackFor = IOException.class)
     public UserDto setRoles(String by, String username, boolean driver, boolean admin)
             throws IOException {
+        actingAdmin(by, username);
         UserDetails signIn = load(username);
         if (!admin && username.equals(by)) {
             throw new ResponseStatusException(400, "You cannot withdraw your own admin role");
@@ -265,6 +276,7 @@ public class Accounts {
     @Transactional(rollbackFor = IOException.class)
     public UserDto suspend(String by, String username, boolean suspended, String reason)
             throws IOException {
+        actingAdmin(by, username);
         UserDetails signIn = load(username);
         if (suspended && username.equals(by)) {
             throw new ResponseStatusException(400, "You cannot suspend your own account");
@@ -368,8 +380,13 @@ public class Accounts {
     ///
     /// Refused while a ride is under way, which has a driver or a rider waiting
     /// on it, and for an admin, so that a service is not left with none.
-    public UserDto close(String username) throws IOException {
-        UserDto was = erase(username);
+    ///
+    /// `password` is the account's own, asked for again as a change of
+    /// password asks for it. A token alone is not enough for something that
+    /// cannot be undone: a phone left unlocked, or a token that leaked, would
+    /// otherwise be all it takes to destroy an account.
+    public UserDto close(String username, String password) throws IOException {
+        UserDto was = erase(username, password);
         // After the commit and not inside it: what is said over a live
         // connection is acted on at once, and must not be said about a change
         // that could still be rolled back.
@@ -382,7 +399,11 @@ public class Accounts {
     /// account is gone from every table or it is in all of them still. The
     /// user store works on the same database and so takes part in it.
     @Transactional(rollbackFor = IOException.class)
-    UserDto erase(String username) throws IOException {
+    UserDto erase(String username, String password) throws IOException {
+        UserDetails signIn = load(username);
+        if (password == null || !encoder.matches(password, signIn.getPassword())) {
+            throw new ResponseStatusException(403, "That is not your current password");
+        }
         UserDto was = describe(username);
         if (was.admin) {
             throw new ResponseStatusException(409, "Hand the admin role on before closing");
@@ -400,6 +421,9 @@ public class Accounts {
         if (profile != null) {
             profiles.remove(profile);
         }
+        // The address is retired with the account, in the same transaction:
+        // nobody can register it and inherit the rides kept under it.
+        closed.close(username);
         // Last: the tokens in hand stop working when the sign-in is gone.
         users.deleteUser(username);
         return was;
@@ -410,6 +434,36 @@ public class Accounts {
         Profile profile = profiles.find(username);
         if (profile != null) {
             profile.phoneVerified = true;
+        }
+    }
+
+    /// Makes a change one admin is making to an account take its turn with any
+    /// other touching either of the two, and then checks `by` still is an
+    /// admin. Call it before anything is read.
+    ///
+    /// Without it two admins could each take the other's role, or block each
+    /// other, at the same moment. Each request was authorized before the other
+    /// committed and neither touches its own account, so both would go through
+    /// and the service would be left with nobody to administer it. Both
+    /// profiles are held, in the order of their names so that the two requests
+    /// queue and cannot deadlock; whichever comes second then reads what the
+    /// first left, finds it is no longer an admin, and is refused.
+    private void actingAdmin(String by, String username) {
+        if (by == null || username == null) {
+            return;
+        }
+        String first = by.compareTo(username) <= 0 ? by : username;
+        String second = first.equals(by) ? username : by;
+        profiles.hold(first);
+        if (!second.equals(first)) {
+            profiles.hold(second);
+        }
+        if (!users.userExists(by)) {
+            throw new ResponseStatusException(403, "You are no longer an admin");
+        }
+        UserDetails acting = users.loadUserByUsername(by);
+        if (!acting.isEnabled() || !authorities(acting).contains("ROLE_ADMIN")) {
+            throw new ResponseStatusException(403, "You are no longer an admin");
         }
     }
 

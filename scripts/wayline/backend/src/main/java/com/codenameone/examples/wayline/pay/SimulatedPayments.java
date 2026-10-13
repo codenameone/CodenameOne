@@ -119,7 +119,10 @@ public class SimulatedPayments implements PaymentProvider {
 
     @Override
     public String refund(String chargeReference, long amountCents) throws IOException {
-        return "sim_re_" + Ids.next();
+        // Named after the charge, as a real processor's refund is keyed by
+        // it: asking twice is one refund, which is what lets a refund whose
+        // answer was lost be asked for again.
+        return "sim_re_" + chargeReference;
     }
 
     /// The digits of what was typed, with the spaces and dashes people put in a

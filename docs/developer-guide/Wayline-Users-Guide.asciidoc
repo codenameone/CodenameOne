@@ -513,7 +513,14 @@ Three of these settings are stored and do nothing more in the sample:
   The server doesn't check the gender of the rider who asks.
 
 Deleting the account removes the sign-in, the profile, the saved cards and any
-driving application. The server refuses while a ride is under way.
+driving application. The app asks for the password again first, and the server
+refuses while a ride is under way. The e-mail address of a deleted account
+can't be registered again, because the rides that account took stay in the
+service's records under it.
+
+The recent destinations are kept on the device and belong to the account that
+chose them. When a different account signs in on the same device, the list
+starts empty.
 
 === In a browser
 

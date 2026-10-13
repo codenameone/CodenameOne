@@ -34,6 +34,7 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codenameone.examples.wayline.Prefs;
 import com.codenameone.examples.wayline.Telemetry;
+import com.codenameone.examples.wayline.api.AccountClosureDto;
 import com.codenameone.examples.wayline.api.PasswordChangeDto;
 import com.codenameone.examples.wayline.api.UserDto;
 import com.codenameone.examples.wayline.net.Api;
@@ -287,12 +288,19 @@ public final class SettingsForm {
                 "Your sign-in, your profile, your saved cards and your settings are removed "
                 + "for good. Rides you took stay in the service's records without your name.",
                 "WlBannerIconBad"));
+        // Asked for again, as changing the password asks: being signed in is
+        // what a borrowed phone is, too, and the server refuses without it.
+        final TextField password = Ui.field(page, "Current password", "password", "",
+                TextArea.PASSWORD);
         final SpanLabel error = Ui.text("", "WlError");
+        error.setName("error");
         page.add(error);
         final Button go = Ui.danger("Delete my account", "confirmDelete", null);
         go.addActionListener(e -> {
             go.setEnabled(false);
-            Api.account().deleteAccount(Net.to(gone -> Nav.deleted(), (status, message) -> {
+            AccountClosureDto closure = new AccountClosureDto();
+            closure.password = password.getText();
+            Api.account().deleteAccount(closure, Net.to(gone -> Nav.deleted(), (status, message) -> {
                 go.setEnabled(true);
                 error.setText(message);
                 Ui.refresh(form);

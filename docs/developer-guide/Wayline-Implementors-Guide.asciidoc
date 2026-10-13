@@ -362,7 +362,17 @@ guesses sent together only as many as are left are looked at. `PaymentRepository
 the same way before the payment provider is asked for anything, so of two
 requests only one charges or refunds. Both claims update the ride's row, so a
 refund that arrives while a tip is still being charged sees the tip and answers
-409 until the charge has been recorded or given up.
+409 until the charge has been recorded or given up. A server that stops after
+claiming a refund leaves the ride marked refunded with no refund recorded.
+The next request for that ride finds the payment row unchanged and asks the
+provider again. That's safe because a refund carries a key made from the
+charge it returns, so the provider answers a repeat with the refund it made.
+
+`Accounts.setRoles` and `Accounts.suspend` hold two rows: the profile of the
+admin who asks and the profile of the account being changed, in the order of
+their names. The admin's own role is then read again inside the transaction.
+Without that, two admins could remove or block each other in the same moment
+and leave the service with nobody to administer it.
 
 A conditional update settles a race over one row. Two races here are over a
 row that doesn't exist yet: a rider asking for two rides at once, and two rides
@@ -1610,7 +1620,7 @@ starts. <<backend-schema-migrations>> describes the rules.
 
 | `V1__accounts.sql`
 | The profile, the preferences, the pending phone codes, the live-channel
-  tickets and the moderation history.
+  tickets, the moderation history and the hashed addresses of closed accounts.
 
 | `V2__drivers.sql`
 | A driver's state and position, the driving applications and the hours
@@ -1842,6 +1852,12 @@ needs nothing. An installed app takes the address from **Server address** on
 the welcome screen. To build an app that needs no such step, change the
 address `AppConfig` falls back to, and remove the Android clear-text
 attribute listed in <<_before_its_a_product,Before it's a product>>.
+
+*What's rate limited.* `SecurityConfig` limits registration, the phone codes,
+the password change, the document uploads and the address search under
+`/api/geo`. Each search is a request the server makes of the geocoder you
+configured, so the limit protects that service's allowance and not only this
+server.
 
 *Before a second instance.* A change of ride state, the matching job and the
 migrations are each safe with several processes on one database.

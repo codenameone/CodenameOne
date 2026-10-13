@@ -72,7 +72,9 @@ public interface AccountApi {
     @POST("/api/account/password")
     void changePassword(@Body PasswordChangeDto change, OnComplete<Response<UserDto>> callback);
 
-    /// Closes the account for good. Refused while a ride is under way.
+    /// Closes the account for good. Refused while a ride is under way, and
+    /// without the account's password: a token is what a borrowed phone
+    /// holds too, and this cannot be taken back.
     @POST("/api/account/delete")
-    void deleteAccount(OnComplete<Response<UserDto>> callback);
+    void deleteAccount(@Body AccountClosureDto closure, OnComplete<Response<UserDto>> callback);
 }

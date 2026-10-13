@@ -25,6 +25,7 @@ package com.codenameone.examples.wayline.account;
 import com.codename1.backend.annotations.Component;
 import com.codenameone.examples.wayline.Caller;
 import com.codenameone.examples.wayline.api.AccountApiServer;
+import com.codenameone.examples.wayline.api.AccountClosureDto;
 import com.codenameone.examples.wayline.api.PasswordChangeDto;
 import com.codenameone.examples.wayline.api.PhoneChallengeDto;
 import com.codenameone.examples.wayline.api.PhoneCodeDto;
@@ -107,7 +108,7 @@ public class AccountEndpoint implements AccountApiServer {
     }
 
     @Override
-    public UserDto deleteAccount() throws Exception {
-        return accounts.close(Caller.name());
+    public UserDto deleteAccount(AccountClosureDto closure) throws Exception {
+        return accounts.close(Caller.name(), closure == null ? null : closure.password);
     }
 }

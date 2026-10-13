@@ -22,6 +22,7 @@
  */
 package com.codenameone.examples.wayline;
 
+import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.test.BackendTest;
 import com.codename1.backend.test.MockMvc;
@@ -38,7 +39,9 @@ import static com.codename1.backend.test.MockMvcRequestBuilders.post;
 import static com.codename1.backend.test.MockMvcResultMatchers.jsonPath;
 import static com.codename1.backend.test.MockMvcResultMatchers.status;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /// What an admin does about an account or a ride: flag it, block it, cancel
 /// it, and the record that is kept of each.
@@ -123,6 +126,32 @@ class ModerationTest {
                 .andExpect(jsonPath("$.events[1].action").value("unblock"));
         mvc.perform(admin(get("/api/admin/users/nobody@test.example")))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void anAdminWhoWasJustRemovedChangesNobody() throws Exception {
+        // Two admins taking each other's role at the same moment were both
+        // authorized before either committed. The one whose turn comes second
+        // is looked at again inside its transaction, and by then is no admin.
+        String first = People.rider(accounts, "admin-one");
+        String second = People.rider(accounts, "admin-two");
+        accounts.setRoles(DemoAccounts.ADMIN, first, false, true);
+        accounts.setRoles(DemoAccounts.ADMIN, second, false, true);
+        accounts.setRoles(first, second, false, false);
+        try {
+            accounts.setRoles(second, first, false, false);
+            fail("an admin who lost the role still withdrew another's");
+        } catch (ResponseStatusException refused) {
+            assertEquals(403, refused.getStatus());
+        }
+        try {
+            accounts.suspend(second, first, true, "");
+            fail("an admin who lost the role still blocked another");
+        } catch (ResponseStatusException refused) {
+            assertEquals(403, refused.getStatus());
+        }
+        assertTrue(accounts.describe(first).admin, "the first admin is one still");
+        assertFalse(accounts.describe(first).suspended, "and is not blocked");
     }
 
     @Test

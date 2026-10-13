@@ -26,6 +26,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codenameone.examples.wayline.AppConfig;
+import com.codenameone.examples.wayline.Prefs;
 import com.codenameone.examples.wayline.Telemetry;
 import com.codenameone.examples.wayline.admin.AdminForm;
 import com.codenameone.examples.wayline.api.UserDto;
@@ -160,6 +161,8 @@ public final class Nav {
     public static void deleted() {
         leave("deleted");
         Telemetry.forget();
+        // Nobody is coming back for where that account went.
+        Prefs.ownedBy("");
     }
 
     private static void leave(String reason) {

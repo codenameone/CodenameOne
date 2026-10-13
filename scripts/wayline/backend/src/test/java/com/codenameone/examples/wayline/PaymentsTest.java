@@ -322,6 +322,31 @@ class PaymentsTest {
     }
 
     @Test
+    void aRefundTheServerNeverRecordedIsAskedForAgain() throws Exception {
+        // Bergen.
+        String rider = People.rider(accounts, "bgo-rider");
+        String driver = People.driver(accounts, "bgo-driver");
+        Trips.addCard(mvc, rider, Trips.VISA);
+        Trips.online(mvc, driver, 60.3913, 5.3221);
+        String id = (String) Trips.complete(mvc, rider, driver, People.ride(60.3913, 5.3221,
+                60.4013, 5.3321)).get("id");
+
+        // A refund as a server that stopped half way leaves it: the ride
+        // marked, the processor perhaps asked, and nothing written down.
+        db.execute("UPDATE wl_ride SET payment_status = 'REFUNDED' WHERE id = ?",
+                new Object[] {id});
+        mvc.perform(admin(Trips.body(post("/api/admin/rides/" + id + "/refund"),
+                        "{\"reason\":\"Again\"}")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("refunded"));
+        // And once it is recorded, it is refunded once like any other.
+        mvc.perform(admin(Trips.body(post("/api/admin/rides/" + id + "/refund"),
+                        "{\"reason\":\"Twice\"}")))
+                .andExpect(status().isConflict());
+        Trips.offline(mvc, driver);
+    }
+
+    @Test
     void aRideLeftCompletedAndUnpaidIsSettledLater() throws Exception {
         // Lisbon.
         String rider = People.rider(accounts, "lis-rider");
