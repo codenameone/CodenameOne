@@ -38,9 +38,10 @@ public final class Int32_ {
     }
 
     public static boolean Equals(int v, Object other) {
-        if (other instanceof EnumBox) {
-            return ((EnumBox) other).value == v;
-        }
+        // An enum in an `object` is an EnumBox, never an Integer, so this
+        // refuses it as .NET does: `1.Equals((object) Side.Left)` is false
+        // whatever number Left is. `Side.Left.Equals(...)` does not come
+        // here; it is Type.$equals, which has the enum.
         if (!(other instanceof Integer)) {
             return false;
         }

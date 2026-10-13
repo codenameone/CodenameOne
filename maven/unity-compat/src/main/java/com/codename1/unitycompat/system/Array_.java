@@ -128,6 +128,13 @@ public final class Array_ {
         return GetLength(array, dimension) - 1;
     }
 
+    /// `Array.Empty<T>()`. The translator makes the `T[]` the caller
+    /// declared out of this, as it does for every generic member that
+    /// answers an array, so the element class it passes is not needed.
+    public static Object[] Empty(Class t) {
+        return new Object[0];
+    }
+
     /// `Array.Clone()` of anything but a one-dimensional array of structs,
     /// which goes to [#$cloneStructs]: a shallow copy.
     public static Object Clone(Object array) {

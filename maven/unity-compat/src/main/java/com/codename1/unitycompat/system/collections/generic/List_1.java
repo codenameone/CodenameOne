@@ -22,6 +22,7 @@
  */
 package com.codename1.unitycompat.system.collections.generic;
 
+import com.codename1.unitycompat.system.ArgumentException;
 import com.codename1.unitycompat.system.ArgumentNullException;
 import com.codename1.unitycompat.system.ArgumentOutOfRangeException;
 import com.codename1.unitycompat.system.ArrayView;
@@ -43,6 +44,9 @@ public class List_1 implements ICollection_1 {
     }
 
     public List_1(int capacity) {
+        if (capacity < 0) {
+            throw new ArgumentOutOfRangeException();
+        }
         items = new Object[capacity < 4 ? 4 : capacity];
     }
 
@@ -134,6 +138,29 @@ public class List_1 implements ICollection_1 {
         Object[] copy = new Object[size];
         System.arraycopy(items, 0, copy, 0, size);
         return copy;
+    }
+
+    /// `CopyTo(T[])`: the elements, from the start of the array.
+    public void CopyTo(Object[] array) {
+        CopyTo(array, 0);
+    }
+
+    /// `CopyTo(T[], int)`. A struct is a value, so the array is given a
+    /// copy of each: `array[0].x = 1` afterwards must not reach the list.
+    public void CopyTo(Object[] array, int arrayIndex) {
+        if (array == null) {
+            throw new ArgumentNullException();
+        }
+        if (arrayIndex < 0) {
+            throw new ArgumentOutOfRangeException();
+        }
+        if (array.length - arrayIndex < size) {
+            throw new ArgumentException("Destination array was not long enough.");
+        }
+        for (int i = 0; i < size; i++) {
+            Object v = items[i];
+            array[arrayIndex + i] = v instanceof Struct ? ((Struct) v).$copyValue() : v;
+        }
     }
 
     public void AddRange(IEnumerable_1 values) {

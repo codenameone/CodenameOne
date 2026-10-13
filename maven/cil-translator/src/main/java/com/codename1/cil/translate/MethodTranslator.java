@@ -884,8 +884,22 @@ final class MethodTranslator implements Opcodes {
             return;
         }
         if (names.isStruct(e)) {
-            throw new TranslationException(method + ": an array of the struct " + e + " returned by a generic"
-                    + " member is not supported yet");
+            // An array of values: each element is a copy, so that writing
+            // `array[0].x` leaves the list the array came from as it was,
+            // and the array is one of the struct's own class. The runtime
+            // copies through the Struct interface, since it cannot name the
+            // class; the fresh value that goes with the call is what an
+            // element erased code left null -- its `default(T)` -- becomes.
+            mv.visitInsn(DUP);
+            mv.visitInsn(ARRAYLENGTH);
+            typeInsn(ANEWARRAY, names.classRef(e));
+            newStruct(e);
+            String copy = "([Ljava/lang/Object;[Ljava/lang/Object;L" + Names.RUNTIME + "system/Struct;)"
+                    + "[Ljava/lang/Object;";
+            host.index.requireMethod(interop, "copyStructArray", copy, where());
+            mv.visitMethodInsn(INVOKESTATIC, interop, "copyStructArray", copy, false);
+            typeInsn(CHECKCAST, names.descriptor(array));
+            return;
         }
         mv.visitInsn(DUP);
         mv.visitInsn(ARRAYLENGTH);
@@ -2277,6 +2291,17 @@ final class MethodTranslator implements Opcodes {
             fixes[i] = FIX_ARRAY_VIEW;
             return;
         }
+        if (erased && declared.kind == CilType.Kind.SZARRAY && Names.isTypeVariable(declared.element)
+                && s.kind == CilType.Kind.SZARRAY && names.norm(s.element).isPrimitive()) {
+            // `List<int>.CopyTo(int[])`: the erased callee takes an
+            // `Object[]`, which an `int[]` is not, and it would have to
+            // write boxes into it. Said here, with the method and the line,
+            // rather than left to the verifier of whichever target loads
+            // the class first -- ParparVM has none and would write object
+            // references into an array of numbers.
+            throw fail("passing an array of " + names.norm(s.element) + " where a generic member declares T[]"
+                    + " is not supported");
+        }
         if (Names.isTypeVariable(declared) && erased) {
             if (s.isPrimitive()) {
                 fixes[i] = FIX_BOX;
@@ -2409,6 +2434,14 @@ final class MethodTranslator implements Opcodes {
             target = Names.helperClass(declaring);
             name = Names.sanitize(ref.name) + names.enumSuffix(sig);
             descriptor = names.methodDescriptor(sig, sig.hasThis ? names.descriptor(ref.declaringType) : null);
+            if ("System.Object".equals(declaring) && sig.hasThis && "Equals".equals(name)) {
+                // `a.Equals(b)` and the static `object.Equals(a, b)` are one
+                // descriptor once the receiver is a parameter, and they
+                // differ: the first throws for a null `a`, the second
+                // answers. The instance call gets a method of its own, so
+                // the static one pays for no test it does not need.
+                name = "$equals";
+            }
             if ("System.Array".equals(declaring) && values.length > 0 && values[0].type != null
                     && values[0].type.kind == CilType.Kind.SZARRAY && names.isStruct(values[0].type.element)) {
                 // The runtime cannot tell an array of structs from an array

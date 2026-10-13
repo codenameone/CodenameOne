@@ -324,4 +324,24 @@ unsigned parameter: uint:3000000000 uint:1 byte:200 byte:1 ushort:65535 ushort:6
 unsigned direct: uint:3000000000 uint:1 byte:200 byte:1 ushort:65535 ushort:65 ulong:18446744073709551615 ulong:1 
 signed as Array: 2/sbyte:-56 sbyte:1 2/char:x char:y 2/int:1 int:-2 2/other:a other:b 
 generic cast: 3000000000,1,Cell1,Cell2,TrueTrueFalse
+== struct arrays from generic members
+ToArray 2: 9,2 6,8 list 1,2 3,4 
+list written 9,2 6,8 
+Enumerable.ToArray 1,2 7,5 list 1,2 7,8 
+ToList.ToArray 1,6 7,8 list 1,2 7,8 
+Where.ToArray 0,8 list 1,2 7,8 
+CopyTo 4,2 7,8 0,0 list 1,2 7,8 
+CopyTo at 1 4,2 1,2 7,1 list 1,2 7,8 
+CopyTo short Argument Argument
+CopyTo strings Trueab
+empty 0 0 0
+user struct Cell4 Cell2 Cell4 Cell8
+pairs 1 a1
+== boxes and receivers
+int and enum False False False True False True
+others and enum False False False False False
+null receiver NullReference NullReference NullReference NullReference
+null argument False False
+static False False True True True
+capacity ArgumentOutOfRange 0 ArgumentOutOfRange ArgumentOutOfRange 0
 done

@@ -67,6 +67,12 @@ public class Transform extends Component implements IEnumerable {
     float rotationZ;
     Transform parent;
     ArrayList children;
+    /// Where this is among the roots of its scene, for a transform with no
+    /// parent: a number to compare with another root's, not an index, and
+    /// meaningless under a parent. The runtime keeps no list of roots --
+    /// nothing in a frame walks one -- so `GetSiblingIndex` counts the
+    /// roots with a lower number and `SetSiblingIndex` numbers them again.
+    int rootOrder;
 
     private boolean stale = true;
     float wx;
@@ -342,14 +348,23 @@ public class Transform extends Component implements IEnumerable {
         set_rotation(rotation);
     }
 
-    /// The place of this transform among its parent's children. Among the
-    /// roots of a scene there is no such list here, and the answer is 0.
+    /// The place of this transform among its parent's children, or among
+    /// the roots of its scene when it has no parent.
     public int GetSiblingIndex() {
-        return parent == null || parent.children == null ? 0 : parent.children.indexOf(this);
+        if (parent == null) {
+            return gameObject != null && gameObject.registered ? UnityRuntime.rootIndex(this) : 0;
+        }
+        return parent.children == null ? 0 : parent.children.indexOf(this);
     }
 
     public void SetSiblingIndex(int index) {
-        if (parent == null || parent.children == null) {
+        if (parent == null) {
+            if (gameObject != null && gameObject.registered) {
+                UnityRuntime.placeRoot(this, index);
+            }
+            return;
+        }
+        if (parent.children == null) {
             return;
         }
         ArrayList list = parent.children;
@@ -521,6 +536,9 @@ public class Transform extends Component implements IEnumerable {
                 p.children = new ArrayList();
             }
             p.children.add(this);
+        } else {
+            // Taken from under its parent, it is the last root.
+            rootOrder = UnityRuntime.lastRootOrder();
         }
         if (worldPositionStays) {
             if (p == null) {

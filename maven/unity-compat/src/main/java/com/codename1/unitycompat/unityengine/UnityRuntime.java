@@ -135,6 +135,8 @@ public final class UnityRuntime {
     public static final int PLATFORM_WEB = 17;
 
     private static final ArrayList objects = new ArrayList();
+    /// The next [Transform#rootOrder] to hand out.
+    private static int rootOrders;
     private static final ArrayList behaviours = new ArrayList();
     private static final ArrayList unstarted = new ArrayList();
     private static final ArrayList renderers = new ArrayList();
@@ -226,6 +228,7 @@ public final class UnityRuntime {
         delayed.clear();
         pending.clear();
         copies.clear();
+        rootOrders = 0;
         depth = 0;
         app = null;
         scene = -1;
@@ -345,8 +348,60 @@ public final class UnityRuntime {
         register(go);
     }
 
+    // ------------------------------------------------------- order of roots
+
+    /// The next place at the end of the roots: see [Transform#rootOrder].
+    static int lastRootOrder() {
+        return rootOrders++;
+    }
+
+    /// Whether `go` is a root in the scene `of` is a root of. The objects
+    /// `DontDestroyOnLoad` keeps are a scene of their own, as in Unity.
+    private static boolean rootBeside(GameObject go, GameObject of) {
+        return !go.destroyed && go.transform.parent == null && go.keptOnLoad == of.keptOnLoad;
+    }
+
+    /// `GetSiblingIndex` of a root: how many roots of its scene come
+    /// before it.
+    static int rootIndex(Transform t) {
+        int before = 0;
+        for (int i = 0; i < objects.size(); i++) { // NOPMD ForLoopCanBeForeach
+            GameObject go = (GameObject) objects.get(i);
+            if (go.transform.rootOrder < t.rootOrder && rootBeside(go, t.gameObject)) {
+                before++;
+            }
+        }
+        return before;
+    }
+
+    /// `SetSiblingIndex` of a root. The roots of its scene are put in their
+    /// order with `t` at `index`, and numbered again from 0; `rootOrders`
+    /// has counted every object ever registered, so what is created next
+    /// still comes after all of them. `objects` itself is left in the order
+    /// of creation: `Awake`, the `Find` family and the lists the frame walks
+    /// go by it, and a root moved among its siblings changes none of those.
+    static void placeRoot(Transform t, int index) {
+        ArrayList roots = new ArrayList();
+        for (int i = 0; i < objects.size(); i++) { // NOPMD ForLoopCanBeForeach
+            GameObject go = (GameObject) objects.get(i);
+            if (go.transform == t || !rootBeside(go, t.gameObject)) { // NOPMD CompareObjectsWithEquals
+                continue;
+            }
+            int at = roots.size();
+            while (at > 0 && ((Transform) roots.get(at - 1)).rootOrder > go.transform.rootOrder) {
+                at--;
+            }
+            roots.add(at, go.transform);
+        }
+        roots.add(index < 0 ? 0 : index > roots.size() ? roots.size() : index, t);
+        for (int i = 0; i < roots.size(); i++) { // NOPMD ForLoopCanBeForeach
+            ((Transform) roots.get(i)).rootOrder = i;
+        }
+    }
+
     private static void register(GameObject go) {
         go.registered = true;
+        go.transform.rootOrder = rootOrders++;
         objects.add(go);
         int n = go.components.size();
         for (int i = 0; i < n; i++) {
@@ -586,7 +641,11 @@ public final class UnityRuntime {
                     + go.name + " has a parent and was not kept");
             return;
         }
-        go.keptOnLoad = true;
+        if (!go.keptOnLoad) {
+            go.keptOnLoad = true;
+            // It has moved to the scene of the kept objects, as its last root.
+            go.transform.rootOrder = rootOrders++;
+        }
     }
 
     // ------------------------------------------------- from outside the frame
@@ -1476,8 +1535,13 @@ public final class UnityRuntime {
         int bestOrder = 0;
         for (int i = 0; i < canvases.size(); i++) { // NOPMD ForLoopCanBeForeach
             Canvas canvas = (Canvas) canvases.get(i);
+            // A canvas answers the pointer through its GraphicRaycaster, and
+            // a disabled one is how a script makes a whole canvas deaf: its
+            // controls get nothing and, not being found, take nothing from
+            // the canvas or the collider behind them.
+            java.lang.Object raycaster = canvas.gameObject.GetComponent(GraphicRaycaster.class); // NOPMD UnnecessaryFullyQualifiedName
             if (canvas.destroyed || !canvas.live() || canvas.renderMode == 2
-                    || canvas.gameObject.GetComponent(GraphicRaycaster.class) == null
+                    || !(raycaster instanceof Behaviour) || !((Behaviour) raycaster).live()
                     || (canvas.gameObject.transform.parent != null
                     && canvas.gameObject.transform.parent.gameObject.GetComponentInParent(Canvas.class) != null)) {
                 continue;

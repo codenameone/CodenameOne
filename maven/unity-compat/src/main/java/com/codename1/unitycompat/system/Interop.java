@@ -590,6 +590,18 @@ public final class Interop {
         return to;
     }
 
+    /// The same for an array of structs, whose elements are values: each
+    /// is copied, so the array shares nothing with the collection it came
+    /// from. `zero` is a value of the element type with every field at its
+    /// default, which stands for an element erased code left null.
+    public static Object[] copyStructArray(Object[] from, Object[] to, Struct zero) {
+        for (int i = 0; i < from.length; i++) {
+            Object v = from[i];
+            to[i] = v instanceof Struct ? ((Struct) v).$copyValue() : zero.$copyValue();
+        }
+        return to;
+    }
+
     public static int[] toIntArray(Object[] from) {
         int[] to = new int[from.length];
         for (int i = 0; i < to.length; i++) {

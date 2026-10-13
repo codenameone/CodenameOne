@@ -38,6 +38,33 @@ public class Marker : MonoBehaviour
             + " total=" + Keeper.Instance.total + " keepers=" + FindObjectsOfType<Keeper>().Length
             + " frame " + Time.frameCount);
         StartCoroutine(Next("start", null));
+        Debug.Log("marker " + Roots());
+    }
+
+    // An object with no parent has a place among the roots of its scene,
+    // which it can read and change as a child can among its siblings.
+    private string Roots()
+    {
+        Transform t = transform;
+        string s = "root " + t.GetSiblingIndex();
+        t.SetAsFirstSibling();
+        s += " first " + t.GetSiblingIndex();
+        Transform made = new GameObject("made").transform;
+        int last = made.GetSiblingIndex();
+        s += " made " + last;
+        t.SetSiblingIndex(2);
+        s += " at two " + t.GetSiblingIndex() + " made " + made.GetSiblingIndex();
+        t.SetAsLastSibling();
+        s += " last " + (t.GetSiblingIndex() == last) + " made " + (made.GetSiblingIndex() == last - 1);
+        made.SetParent(t);
+        s += " under " + made.GetSiblingIndex() + " last " + (t.GetSiblingIndex() == last - 1);
+        made.SetParent(null);
+        s += " out " + (made.GetSiblingIndex() == last);
+        made.SetSiblingIndex(-3);
+        t.SetSiblingIndex(1000);
+        s += " ends " + made.GetSiblingIndex() + " " + (t.GetSiblingIndex() == last);
+        Destroy(made.gameObject);
+        return s;
     }
 
     private void Update()

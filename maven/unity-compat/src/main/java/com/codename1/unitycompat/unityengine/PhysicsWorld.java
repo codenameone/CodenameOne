@@ -86,6 +86,8 @@ final class PhysicsWorld {
     static int positionIterations = 3;
     /// For each layer, a bit for every layer it collides with.
     static final int[] layerMask = new int[32];
+    /// The built-in layer "Ignore Raycast".
+    private static final int IGNORE_RAYCAST = 2;
 
     /// Objects that have a body, in the order the bodies were created.
     private static final ArrayList owners = new ArrayList();
@@ -310,6 +312,11 @@ final class PhysicsWorld {
     /// The collider a point of the world is inside, or null. Of several,
     /// the one whose object is nearest a camera looking along z: the least
     /// z, and among equals the first created.
+    ///
+    /// This is the mouse's question and no script's, so it has the mouse's
+    /// rule: an object on the Ignore Raycast layer is not there. Unity sends
+    /// it no `OnMouseDown`, and since it is passed over rather than found
+    /// and then refused, what lies behind it gets the press.
     static Collider2D at(float x, float y) {
         flush();
         scratch.x = x;
@@ -324,7 +331,7 @@ final class PhysicsWorld {
             }
             for (int j = 0; j < colliders.size(); j++) { // NOPMD ForLoopCanBeForeach
                 Collider2D c = (Collider2D) colliders.get(j);
-                if (!covers(c)) {
+                if (c.gameObject.layer == IGNORE_RAYCAST || !covers(c)) {
                     continue;
                 }
                 Transform t = c.gameObject.transform;

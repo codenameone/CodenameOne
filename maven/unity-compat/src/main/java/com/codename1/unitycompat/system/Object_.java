@@ -47,8 +47,20 @@ public final class Object_ {
         return o.toString();
     }
 
-    /// Both `a.Equals(b)` and the static `Object.Equals(a, b)`.
+    /// The static `Object.Equals(a, b)`, which takes a null on either side.
     public static boolean Equals(Object a, Object b) {
+        return Interop.areEqual(a, b);
+    }
+
+    /// `a.Equals(b)`, where the translator sends the instance call: a
+    /// method called on nothing throws, as [#ToString] and [#GetHashCode]
+    /// do. It is thrown here and not left to a Java null pointer exception
+    /// because nothing below dereferences `a` -- two nulls are equal to
+    /// [Interop#areEqual].
+    public static boolean $equals(Object a, Object b) {
+        if (a == null) {
+            throw new NullReferenceException();
+        }
         return Interop.areEqual(a, b);
     }
 

@@ -2197,6 +2197,108 @@ namespace Spike
             Try("generic cast", () => { object o = uints; string s = ""; foreach (uint u in (IEnumerable<uint>)o) s += u + ","; object p = cells; foreach (Cell c in (IEnumerable<Cell>)p) s += c + ","; return s + (o is IEnumerable<uint>) + (p is IEnumerable<Cell>) + (((object)"s") is IEnumerable<uint>); });
         }
 
+        // ---- arrays of structs from generic members ---------------------------
+
+        private enum Rank { One = 1, Two = 2 }
+
+        private static string Named(Func<string> f)
+        {
+            try
+            {
+                return f();
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                return "ArgumentOutOfRange";
+            }
+            catch (NullReferenceException)
+            {
+                return "NullReference";
+            }
+            catch (ArgumentException)
+            {
+                return "Argument";
+            }
+            catch (Exception)
+            {
+                return "another exception";
+            }
+        }
+
+        private static string Xs(Vec2[] a)
+        {
+            string s = "";
+            foreach (Vec2 v in a) s += (int)v.x + "," + (int)v.y + " ";
+            return s;
+        }
+
+        // A T[] a generic member answers is a new array of values: writing
+        // to one of its elements changes nothing the collection holds, and
+        // the other way round.
+        private static void StructArraysFromGenerics()
+        {
+            Section("struct arrays from generic members");
+            var list = new List<Vec2> { new Vec2(1, 2), new Vec2(3, 4) };
+            Vec2[] a = list.ToArray();
+            a[0].x = 9;
+            a[1].Scale(2);
+            Log("ToArray " + a.Length + ": " + Xs(a) + "list " + Xs(list.ToArray()));
+            list[1] = new Vec2(7, 8);
+            Log("list written " + Xs(a));
+            Vec2[] b = ((IEnumerable<Vec2>)list).ToArray();
+            b[1].y = 5;
+            Log("Enumerable.ToArray " + Xs(b) + "list " + Xs(list.ToArray()));
+            Vec2[] c = list.ToList().ToArray();
+            c[0].y = 6;
+            Log("ToList.ToArray " + Xs(c) + "list " + Xs(list.ToArray()));
+            Vec2[] d = list.Where(v => v.x > 1).ToArray();
+            d[0].x = 0;
+            Log("Where.ToArray " + Xs(d) + "list " + Xs(list.ToArray()));
+            Vec2[] e = new Vec2[3];
+            list.CopyTo(e);
+            e[0].x = 4;
+            Log("CopyTo " + Xs(e) + "list " + Xs(list.ToArray()));
+            list.CopyTo(e, 1);
+            e[2].y = 1;
+            Log("CopyTo at 1 " + Xs(e) + "list " + Xs(list.ToArray()));
+            Log("CopyTo short " + Named(() => { list.CopyTo(new Vec2[1]); return "copied"; })
+                + " " + Named(() => { list.CopyTo(null); return "copied"; }));
+            string[] names = new string[3];
+            new List<string> { "a", "b" }.CopyTo(names, 1);
+            Log("CopyTo strings " + (names[0] == null) + names[1] + names[2]);
+            Log("empty " + Array.Empty<Vec2>().Length + " " + new List<Vec2>().ToArray().Length + " " + Array.Empty<Cell>().Length);
+            Cell[] cells = new List<Cell> { new Cell { n = 1 }, new Cell { n = 2 } }.ToArray();
+            cells[0].n = 4;
+            Cell[] again = cells.ToList().ToArray();
+            again[1].n = 8;
+            Log("user struct " + cells[0] + " " + cells[1] + " " + again[0] + " " + again[1]);
+            var pairs = new Dictionary<string, int> { { "a", 1 } }.ToArray();
+            Log("pairs " + pairs.Length + " " + pairs[0].Key + pairs[0].Value);
+        }
+
+        // ---- boxes, null receivers and capacities ------------------------------
+
+        private static void BoxesAndReceivers()
+        {
+            Section("boxes and receivers");
+            // A boxed enum is not the integer under it, from either side.
+            Log("int and enum " + 1.Equals((object)Rank.One) + " " + ((object)1).Equals(Rank.One) + " " + Rank.One.Equals(1)
+                + " " + Rank.One.Equals(Rank.One) + " " + object.Equals(1, Rank.One) + " " + 1.Equals((object)1));
+            Log("others and enum " + 5000000000L.Equals((object)Big.Huge) + " " + ((byte)200).Equals((object)Tiny.A)
+                + " " + ((ushort)3).Equals((object)Wide.B) + " " + 1u.Equals((object)Unsigned.Low) + " " + ((short)1).Equals((object)Rank.One));
+            // A method of object called on nothing throws; the static
+            // Equals takes a null on either side.
+            object none = null, one = 1;
+            Log("null receiver " + Named(() => "" + none.Equals(one)) + " " + Named(() => "" + none.Equals(null))
+                + " " + Named(() => "" + none.GetHashCode()) + " " + Named(() => none.ToString()));
+            Log("null argument " + one.Equals(none) + " " + "s".Equals(none));
+            Log("static " + object.Equals(none, one) + " " + object.Equals(one, none) + " " + object.Equals(none, none)
+                + " " + object.Equals(one, 1) + " " + object.ReferenceEquals(none, none));
+            Log("capacity " + Named(() => "" + new List<int>(-1).Count) + " " + Named(() => "" + new List<int>(0).Count)
+                + " " + Named(() => "" + new List<Vec2>(int.MinValue).Count) + " " + Named(() => "" + new Dictionary<string, int>(-1).Count)
+                + " " + Named(() => "" + new Dictionary<string, int>(0).Count));
+        }
+
         public static void Main(string[] args)
         {
             ValueTypes();
@@ -2225,6 +2327,8 @@ namespace Spike
             Powers();
             Rounding();
             ArraysAsEnumerables();
+            StructArraysFromGenerics();
+            BoxesAndReceivers();
             Console.WriteLine("done");
         }
     }

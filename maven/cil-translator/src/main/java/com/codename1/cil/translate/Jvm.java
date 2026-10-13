@@ -136,6 +136,18 @@ final class Jvm implements Opcodes {
     }
 
     /// Boxes the primitive on top of the stack as its box class.
+    ///
+    /// Through `valueOf`, which hands out one shared object for a small
+    /// value. That differs from .NET, where every boxing conversion makes a
+    /// new object: `object a = 1, b = 1;` and then
+    /// `ReferenceEquals(a, b)` is false there and true here (and `lock` on
+    /// a box would share a monitor). It is left so on purpose. Boxing is
+    /// what every `string.Format` argument, every element of a collection
+    /// of numbers and every `object` parameter goes through, in code that
+    /// runs each frame, and an allocation for each of those is a cost every
+    /// script would pay for an identity comparison of two boxes, which no
+    /// ordinary script makes.
+    /// `Equals` and `==` on the unboxed values are unaffected.
     static void box(MethodVisitor mv, Names names, CilType type) {
         CilType p = names.norm(type);
         if (p.kind == CilType.Kind.U1) {
