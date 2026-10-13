@@ -317,6 +317,51 @@ public class StreamDifferentialTest {
         assertEquals(Collections.singletonList("it 1"), myClosed);
     }
 
+    /// Closing any stage closes the pipeline: a stage made from the closed
+    /// one, before or after, runs nothing.
+    @Test
+    public void aClosedPipelineRefusesEveryStage() {
+        Stream<Integer> closedItself = Stream.of(1).map(x -> x);
+        closedItself.close();
+        Stream<Integer> source = Stream.of(1);
+        Stream<Integer> madeBefore = source.map(x -> x);
+        source.close();
+        Stream<Integer> early = Stream.of(1);
+        Stream<Integer> later = early.filter(x -> true).map(x -> x);
+        later.close();
+        java.util.stream.Stream<Integer> jdkSource = java.util.stream.Stream.of(1);
+        java.util.stream.Stream<Integer> jdkMadeBefore = jdkSource.map(x -> x);
+        jdkSource.close();
+        try {
+            jdkMadeBefore.count();
+            fail("the JDK runs a stage of a closed pipeline");
+        } catch (IllegalStateException expected) {
+            assertTrue(expected.getMessage() != null);
+        }
+        Runnable[] attempts = {
+            () -> closedItself.count(),
+            () -> madeBefore.count(),
+            () -> madeBefore.filter(x -> true),
+            () -> madeBefore.onClose(() -> { }),
+            () -> later.iterator()
+        };
+        for (int i = 0; i < attempts.length; i++) {
+            try {
+                attempts[i].run();
+                fail("attempt " + i + " ran on a closed pipeline");
+            } catch (IllegalStateException expected) {
+                assertTrue(expected.getMessage() != null);
+            }
+        }
+        // Closing again is allowed, and runs nothing twice.
+        List<String> ran = new ArrayList<String>();
+        Stream<Integer> once = Stream.of(1).onClose(() -> ran.add("closed"));
+        Stream<Integer> mapped = once.map(x -> x);
+        mapped.close();
+        mapped.close();
+        assertEquals(Collections.singletonList("closed"), ran);
+    }
+
     // ---- terminal operations ----
 
     @Test

@@ -30,6 +30,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAccessor;
@@ -503,13 +504,107 @@ public final class JdkTime {
         return format(formatter, offset);
     }
 
-    /// `ZonedDateTime.parse(text, formatter)`: with the zone of
-    /// [#withZone], the date and time read are those of that zone.
+    /// `ZonedDateTime.parse(text, formatter)` with the zone of [#withZone].
+    ///
+    /// Text that names no offset is a date and time of that zone. Text that
+    /// does name one is a moment, and the override zone is only where that
+    /// moment is then shown: `2020-01-01T12:00:00+02:00` read by
+    /// `ISO_OFFSET_DATE_TIME.withZone(UTC)` is `10:00Z`, not noon. (Java 8
+    /// answered noon; that was a defect of its parser and every later
+    /// release answers the moment.)
     public static ZonedDateTime parseZoned(CharSequence text, DateTimeFormatter formatter) {
         Known k = known(formatter);
         if (k == null || k.zone == null) {
             return ZonedDateTime.parse(text, formatter);
         }
-        return ZonedDateTime.of(localDateTimeFrom(formatter.parse(text)), k.zone);
+        if (k.base != null && known(k.base) == null) {
+            // Made from an ISO_ constant, whose own parser reads the offset,
+            // the zone and the fraction of a second; the pattern standing
+            // in for it here reads none of them.
+            ZonedDateTime iso = parseIso(text, k.base, k.zone);
+            if (iso != null) {
+                return iso;
+            }
+        }
+        TemporalAccessor parsed = formatter.parse(text);
+        if (parsed instanceof LocalDateTime) {
+            // The device's formatter: it has already applied an offset it
+            // read, and answers the moment as a date and time at UTC.
+            LocalDateTime local = (LocalDateTime) parsed;
+            if (readsOffset(k.pattern)) {
+                return ZonedDateTime.ofInstant(local.toInstant(ZoneOffset.UTC), k.zone);
+            }
+            return ZonedDateTime.of(local, k.zone);
+        }
+        LocalDateTime local = localDateTimeFrom(parsed);
+        ZoneOffset offset = offsetOf(parsed);
+        if (offset != null) {
+            return ZonedDateTime.ofInstant(local.toInstant(offset), k.zone);
+        }
+        return ZonedDateTime.of(local, k.zone);
+    }
+
+    private static ZonedDateTime parseIso(CharSequence text, DateTimeFormatter iso, ZoneId zone) {
+        if (iso == DateTimeFormatter.ISO_OFFSET_DATE_TIME) {
+            return ZonedDateTime.ofInstant(OffsetDateTime.parse(text, iso).toInstant(), zone);
+        }
+        if (iso == DateTimeFormatter.ISO_ZONED_DATE_TIME) {
+            ZonedDateTime read = ZonedDateTime.parse(text, iso);
+            // A region the text names is kept; a bare offset is not a zone
+            // of its own, so the override takes its place.
+            return read.getZone() instanceof ZoneOffset ? ZonedDateTime.ofInstant(read.toInstant(), zone) : read;
+        }
+        if (iso == DateTimeFormatter.ISO_INSTANT) {
+            return ZonedDateTime.ofInstant(Instant.parse(text), zone);
+        }
+        if (iso == DateTimeFormatter.ISO_LOCAL_DATE_TIME) {
+            return ZonedDateTime.of(LocalDateTime.parse(text, iso), zone);
+        }
+        return null;
+    }
+
+    /// Whether `pattern` has an offset letter (`X`, `x`, `Z` or `O`) outside
+    /// its quoted text.
+    private static boolean readsOffset(String pattern) {
+        if (pattern == null) {
+            return false;
+        }
+        boolean quoted = false;
+        for (int i = 0; i < pattern.length(); i++) {
+            char c = pattern.charAt(i);
+            if (c == '\'') {
+                quoted = !quoted;
+            } else if (!quoted && (c == 'X' || c == 'x' || c == 'Z' || c == 'O')) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// The offset a formatter of the desktop's own class library read, or
+    /// null when it read none. As with [#resolved], its text is the one
+    /// face of what it parsed that both class libraries have.
+    private static ZoneOffset offsetOf(TemporalAccessor parsed) {
+        String text = String.valueOf(parsed);
+        String mark = "OffsetSeconds=";
+        int at = text.indexOf(mark);
+        if (at < 0) {
+            return null;
+        }
+        int from = at + mark.length();
+        int to = from;
+        while (to < text.length() && (text.charAt(to) == '-' || (text.charAt(to) >= '0' && text.charAt(to) <= '9'))) {
+            to++;
+        }
+        if (to == from) {
+            return null;
+        }
+        int seconds;
+        try {
+            seconds = Integer.parseInt(text.substring(from, to));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+        return ZoneOffset.ofTotalSeconds(seconds);
     }
 }

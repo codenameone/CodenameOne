@@ -68,7 +68,10 @@ public final class UUID implements Comparable<UUID>, java.io.Serializable {
 
     /// Parses the text form [#toString()] writes: five groups of hexadecimal
     /// digits separated by `-`. As in the JDK, a group may be shorter than
-    /// its full width.
+    /// its full width, and one that is longer is not refused either: the
+    /// digits past its width are dropped, so `100000000-0-0-0-0` is the
+    /// nil UUID there and here. Only a group of more than sixteen digits,
+    /// which no `long` holds, is an error.
     ///
     /// #### Throws
     ///

@@ -95,6 +95,12 @@ final class StreamState {
         handlers.add(handler);
     }
 
+    /// Whether some stage of the pipeline was closed. The stages share this
+    /// state, so each of them can tell.
+    boolean isClosed() {
+        return closed;
+    }
+
     /// Runs every handler, in the order they were added, even when one
     /// throws; the first exception is thrown once all have run.
     void close() {

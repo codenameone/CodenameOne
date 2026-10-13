@@ -137,7 +137,9 @@ final class ObjPipeline<T> implements Stream<T> {
 
     /// The iterator of this stage, which the caller now owns.
     private Iterator<T> take() {
-        if (used) {
+        // Closing any stage closes the pipeline, so a stage made before an
+        // earlier one was closed is refused as well as the closed one.
+        if (used || state.isClosed()) {
             throw new IllegalStateException(USED);
         }
         used = true;
@@ -673,7 +675,7 @@ final class ObjPipeline<T> implements Stream<T> {
 
     @Override
     public Stream<T> onClose(Runnable closeHandler) {
-        if (used) {
+        if (used || state.isClosed()) {
             throw new IllegalStateException(USED);
         }
         state.onClose(closeHandler);

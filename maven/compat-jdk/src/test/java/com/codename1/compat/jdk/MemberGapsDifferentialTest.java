@@ -455,6 +455,61 @@ public class MemberGapsDifferentialTest {
     private static final String[] PATTERNS = {"HH:mm:ss", "yyyy-MM-dd HH:mm", "dd.MM.yyyy", "yyyy-MM-dd'T'HH:mm:ss"};
     private static final long[] SECONDS = {0L, 1L, 86399L, 1700000000L, 951782400L, 1711846800L, -1L};
 
+    /// Text with an offset is a moment, and the override zone is where it
+    /// is shown. The expected values are written out, not asked of the JDK
+    /// the test runs on: Java 8 kept the wall clock here, a defect of its
+    /// parser that every later release fixed.
+    @Test
+    public void aParsedOffsetIsKeptUnderAnOverrideZone() {
+        java.time.ZoneId newYork = java.time.ZoneId.of("America/New_York");
+        DateTimeFormatter utc = JdkTime.withZone(DateTimeFormatter.ISO_OFFSET_DATE_TIME, java.time.ZoneOffset.UTC);
+        assertEquals("2020-01-01T10:00Z", JdkTime.parseZoned("2020-01-01T12:00:00+02:00", utc).toString());
+        assertEquals("2020-01-01T05:00-05:00[America/New_York]", JdkTime.parseZoned("2020-01-01T12:00:00+02:00",
+                JdkTime.withZone(DateTimeFormatter.ISO_OFFSET_DATE_TIME, newYork)).toString());
+        assertEquals("2020-01-01T05:00-05:00[America/New_York]", JdkTime.parseZoned("2020-01-01T12:00:00+02:00",
+                JdkTime.withZone(DateTimeFormatter.ISO_ZONED_DATE_TIME, newYork)).toString());
+        assertEquals("2020-01-01T07:00-05:00[America/New_York]", JdkTime.parseZoned("2020-01-01T12:00:00Z",
+                JdkTime.withZone(DateTimeFormatter.ISO_INSTANT, newYork)).toString());
+        assertEquals("2020-01-01T05:00-05:00[America/New_York]", JdkTime.parseZoned("2020-01-01 12:00 +02:00",
+                JdkTime.withZone(JdkTime.ofPattern("yyyy-MM-dd HH:mm XXX"), newYork)).toString());
+        // With no offset in the text the date and time are the zone's own.
+        assertEquals("2020-01-01T12:00-05:00[America/New_York]", JdkTime.parseZoned("2020-01-01T12:00:00",
+                JdkTime.withZone(DateTimeFormatter.ISO_LOCAL_DATE_TIME, newYork)).toString());
+        assertEquals("2020-01-01T12:00-05:00[America/New_York]", JdkTime.parseZoned("2020-01-01 12:00",
+                JdkTime.withZone(JdkTime.ofPattern("yyyy-MM-dd HH:mm"), newYork)).toString());
+    }
+
+    /// The hour the clocks go back over happens twice. A value in its
+    /// second pass stays in the second pass when a day, a month or a year
+    /// is added and the result is in that hour again.
+    @Test
+    public void zonedDateArithmeticKeepsTheOffsetInAnOverlap() {
+        java.time.ZoneId newYork = java.time.ZoneId.of("America/New_York");
+        // 01:30 on 2021-11-07 is both -04:00 and, an hour later, -05:00.
+        java.time.ZonedDateTime second = java.time.ZonedDateTime.ofInstant(
+                java.time.Instant.parse("2021-11-07T06:30:00Z"), newYork);
+        java.time.ZonedDateTime first = java.time.ZonedDateTime.ofInstant(
+                java.time.Instant.parse("2021-11-07T05:30:00Z"), newYork);
+        java.time.ZonedDateTime[] starts = {second, first, second.minusDays(1), second.plusDays(1),
+            first.minusYears(1), second.minusMonths(1)};
+        for (java.time.ZonedDateTime start : starts) {
+            for (long n = -2; n <= 2; n++) {
+                String what = start + " " + n;
+                assertEquals(what, start.plusDays(n), JdkDates.plusDays(start, n));
+                assertEquals(what, start.minusDays(n), JdkDates.minusDays(start, n));
+                assertEquals(what, start.plusWeeks(n), JdkDates.plusWeeks(start, n));
+                assertEquals(what, start.plusMonths(n), JdkDates.plusMonths(start, n));
+                assertEquals(what, start.plusYears(n), JdkDates.plusYears(start, n));
+            }
+        }
+        assertEquals(java.time.ZoneOffset.ofHours(-5), JdkDates.plusDays(second, 0).getOffset());
+        assertEquals(java.time.ZoneOffset.ofHours(-4), JdkDates.plusDays(first, 0).getOffset());
+        // Into the hour the clocks skip: both answer the time after it.
+        java.time.ZonedDateTime beforeGap = java.time.ZonedDateTime.of(
+                java.time.LocalDateTime.of(2021, 3, 13, 2, 30), newYork);
+        assertEquals(beforeGap.plusDays(1), JdkDates.plusDays(beforeGap, 1));
+    }
+
     /// An `ISO_` constant given a zone keeps its own shape: the offset, the
     /// `Z`, the zone in brackets and the fraction of a second.
     @Test

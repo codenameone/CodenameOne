@@ -196,6 +196,12 @@ public class JdkGapsDifferentialTest {
             previous = actual;
         }
         assertEquals(java.util.UUID.fromString("1-2-3-4-5").toString(), UUID.fromString("1-2-3-4-5").toString());
+        // A group longer than its width is not an error in the JDK: the
+        // digits past the width are dropped. (Only the groups Java 8 drops
+        // them from the same way are compared; it let the last one spill.)
+        for (String wide : new String[] {"100000000-0-0-0-0", "1-10000-0-0-0", "123456789abc-2-3-4-5"}) {
+            assertEquals(wide, java.util.UUID.fromString(wide).toString(), UUID.fromString(wide).toString());
+        }
         for (String bad : new String[] {"", "not-a-uuid", "1-2-3-4", "g-2-3-4-5"}) {
             try {
                 UUID.fromString(bad);

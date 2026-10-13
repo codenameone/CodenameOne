@@ -387,6 +387,15 @@ final class AppSupport {
             // Kotlin's directory ships them instead. An Android module always
             // has Java (its generated R classes), so nothing changes for it.
             final org.gradle.api.file.FileCollection javaSources = desktopProject ? main.getJava().getAsFileTree() : null;
+            // That pass is then the whole of javac's, so it is handed what
+            // javac's is: the jars the application ships, which are unpacked
+            // and relocated with it, and the directory its FXML is compiled
+            // into. Left out, a Kotlin-only application shipped classes
+            // naming a library that was never bundled. Both are ignored
+            // while this action only relocates.
+            final org.gradle.api.file.FileCollection shippedJars = !desktopProject ? null
+                    : main.getRuntimeClasspath().filter(f -> f.getName().endsWith(".jar"));
+            final File fxmlSources = new File(layout.buildDir(), "generated/cn1-fxml");
             // The Swing layer's classes exist only under their relocated
             // names, so Kotlin's classes cannot be checked as Kotlin wrote
             // them (see the compileKotlin actions below): for a module with
@@ -400,6 +409,7 @@ final class AppSupport {
                     kotlinRelocation(t -> new com.codename1.gradle.tasks.RemapCompatAction(
                             kotlinDir.get(), compileClasspath, onClickNames, true, null)
                             .withDesktopEntryRecord(desktopEntry).withApplicationMain(desktopMain)
+                            .withFxmlSourceDirectory(fxmlSources).withApplicationLibraries(shippedJars)
                             .shippingWhenEmpty(javaSources).execute(t),
                             kotlinCompliance));
         });

@@ -630,8 +630,27 @@ public final class JdkDates {
     // the instant: across a change of offset the two differ, as they do in
     // the JDK.
 
+    /// `local` in the zone of `value`, at the offset `value` has when the
+    /// zone gives `local` two of them. An hour the clocks go back over
+    /// happens twice, and the JDK keeps a value that was in the second
+    /// pass in the second pass after a day, a month or a year is added;
+    /// `ZonedDateTime.of` alone always answers the first.
+    private static ZonedDateTime sameOffset(ZonedDateTime value, LocalDateTime local) {
+        ZoneId zone = value.getZone();
+        ZonedDateTime first = ZonedDateTime.of(local, zone);
+        ZoneOffset preferred = value.getOffset();
+        if (preferred == null || preferred.equals(first.getOffset())) {
+            return first;
+        }
+        // The offset is only kept where it is one the zone really uses for
+        // this wall clock: in a gap, or anywhere outside an overlap, the
+        // instant it names reads as some other local time.
+        ZonedDateTime other = ZonedDateTime.ofInstant(local.toInstant(preferred), zone);
+        return other.toLocalDateTime().equals(local) ? other : first;
+    }
+
     public static ZonedDateTime plusDays(ZonedDateTime value, long days) {
-        return ZonedDateTime.of(value.toLocalDateTime().plusDays(days), value.getZone());
+        return sameOffset(value, value.toLocalDateTime().plusDays(days));
     }
 
     public static ZonedDateTime minusDays(ZonedDateTime value, long days) {
@@ -647,7 +666,7 @@ public final class JdkDates {
     }
 
     public static ZonedDateTime plusMonths(ZonedDateTime value, long months) {
-        return ZonedDateTime.of(plusMonths(value.toLocalDateTime(), months), value.getZone());
+        return sameOffset(value, plusMonths(value.toLocalDateTime(), months));
     }
 
     public static ZonedDateTime minusMonths(ZonedDateTime value, long months) {
@@ -655,7 +674,7 @@ public final class JdkDates {
     }
 
     public static ZonedDateTime plusYears(ZonedDateTime value, long years) {
-        return ZonedDateTime.of(plusYears(value.toLocalDateTime(), years), value.getZone());
+        return sameOffset(value, plusYears(value.toLocalDateTime(), years));
     }
 
     public static ZonedDateTime minusYears(ZonedDateTime value, long years) {
