@@ -551,7 +551,8 @@ final class AppSupport {
                     .map(Boolean::parseBoolean).orElse(Boolean.FALSE));
             t.getOpen().set(ext.getOpenGeneratedProjects());
             t.getFrameworkJars().from(framework);
-            t.getSourceRoots().set(Collections.singletonList(layout.javaSourceDir().getAbsolutePath()));
+            // Resolve after build-script configuration, including Kotlin and added/generated roots.
+            t.getSourceRoots().set(project.provider(() -> sourceRoots(main, layout)));
             t.getFinalName().set(project.getName());
             t.getGroupId().set(project.provider(() -> String.valueOf(project.getGroup())));
             // A Maven platform module declares codename1.projectPlatform, and the

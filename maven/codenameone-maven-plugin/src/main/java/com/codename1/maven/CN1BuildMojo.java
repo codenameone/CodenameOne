@@ -30,6 +30,7 @@ import com.codename1.builders.BuildRequest;
 import com.codename1.builders.Executor;
 import org.apache.maven.RepositoryUtils;
 import org.apache.maven.artifact.Artifact;
+import org.apache.maven.project.MavenProject;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.DependencyManagement;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -156,6 +157,33 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         }
     }
 
+    /** Map common-module JARs and output directories back to their actual reactor sources. */
+    protected AnnotationBuildHints.Sources mainClassSources() {
+        return new AnnotationBuildHints.Sources() {
+            private MavenProject owner(File element) {
+                MavenProject owner = moduleProducing(element);
+                if (owner == null && project.getBuild().getOutputDirectory() != null
+                        && element.getAbsoluteFile().equals(new File(project.getBuild().getOutputDirectory()).getAbsoluteFile())) {
+                    owner = project;
+                }
+                return owner;
+            }
+
+            @Override
+            public List<String> rootsFor(File element) {
+                MavenProject owner = owner(element);
+                return owner == null ? java.util.Collections.<String>emptyList()
+                        : compileSourceRoots(owner, userProperties());
+            }
+
+            @Override
+            public String encodingFor(File element) {
+                MavenProject owner = owner(element);
+                return owner == null ? null : sourceEncodingOf(owner, userProperties());
+            }
+        };
+    }
+
     /**
      * {@link AppBuilder} over this mojo's {@link MavenProjectHost}. The annotation merge,
      * the command-line overlay and the updater go through the mojo's own methods, which
@@ -164,6 +192,11 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     private final class MavenAppBuilder extends AppBuilder {
         MavenAppBuilder() {
             super(projectHost());
+        }
+
+        @Override
+        protected AnnotationBuildHints.Sources mainClassSources() {
+            return CN1BuildMojo.this.mainClassSources();
         }
 
         @Override
