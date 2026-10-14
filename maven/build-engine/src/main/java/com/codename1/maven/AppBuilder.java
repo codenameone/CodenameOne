@@ -58,7 +58,7 @@ import static com.codename1.maven.PathUtil.path;
 /// This is the build-tool independent body of what used to be all of
 /// `CN1BuildMojo`: staging the jar-with-dependencies, the class closure and
 /// icon checks, merging the settings a build is submitted with (annotations,
-/// command-line overrides, cn1lib properties), both preflights, and handing the
+/// command-line overrides, cn1lib properties), preflight checks, and handing the
 /// result to the cloud or to a local builder. A build tool subclasses it and
 /// answers the handful of questions only it can -- where the build directory
 /// is, what the resolved dependencies are, how to attach an output -- through
@@ -195,6 +195,29 @@ public class AppBuilder {
                 new File(buildDirectory(), "codenameone"), getCN1ProjectDir(), CodenameOneUpdater.buildClientJar());
     }
 
+    /** Source metadata only for outputs owned by this project; binary dependencies are unknown. */
+    protected AnnotationBuildHints.Sources mainClassSources() {
+        return new AnnotationBuildHints.Sources() {
+            @Override
+            public List<String> rootsFor(File element) {
+                try {
+                    if (element.isDirectory() && (element.getCanonicalFile().equals(host.outputDirectory().getCanonicalFile())
+                            || element.getCanonicalFile().toPath().startsWith(host.buildDirectory().getCanonicalFile().toPath()))) {
+                        return host.compileSourceRoots();
+                    }
+                } catch (IOException ex) {
+                    getLog().debug("Could not identify source roots for " + element, ex);
+                }
+                return Collections.emptyList();
+            }
+
+            @Override
+            public String encodingFor(File element) {
+                return projectProperties().getProperty("project.build.sourceEncoding");
+            }
+        };
+    }
+
     /// Overlays the build hints declared as annotations on the main class.
     protected void mergeAnnotationBuildHints(Properties target, List<String> classpathElements)
             throws BuildFailureException {
@@ -328,6 +351,7 @@ public class AppBuilder {
             getLog().info("BuildTarget is None.  Skipping cn1build goal");
             return;
         }
+        androidApkProduced = false;
         cn1MavenPluginVersion = pluginVersion() == null ? "" : pluginVersion();
         cn1MavenVersion = codenameOneVersion() == null ? "" : codenameOneVersion();
 
@@ -354,30 +378,6 @@ public class AppBuilder {
         // cloud build slot to discover. See applyIOSProvisioningPreflight.
         applyIOSProvisioningPreflight();
 
-        // stageOnly builds no APK, so it must neither short-circuit on a cached one (it would
-        // then stage nothing) nor, below, stamp that cached APK as matching this configuration.
-        if (platform.contains("android") && !stageOnly) {
-            if (!BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
-                File apkFile = androidApkFile();
-                try {
-                    // Up-to-date only when the APK is newer than the sources AND was built with the SAME
-                    // hardening outcome, recorded in the marker beside it. The source-timestamp check cannot
-                    // see a hardening change made through a build hint, so a change in EITHER direction --
-                    // enabling hardening (a stale unhardened APK) or disabling it (a stale hardened APK) --
-                    // must invalidate the cache and rebuild, rather than publish an APK that contradicts the
-                    // current configuration.
-                    if (apkFile.exists()
-                            && hardeningCacheKey.equals(readTextFileOrNull(androidHardeningCacheMarker()))
-                            && apkFile.lastModified() >= getSourcesModificationTime()) {
-                        getLog().info("Sources have not been modified since APK at " + apkFile + " was created.  Skipping Android build");
-                        return;
-                    }
-                } catch (IOException ex) {
-                    throw new BuildExecutionException("Failed to check sources modification time", ex);
-                }
-            }
-        }
-
         try {
             createAntProject();
         } catch (IOException ex) {
@@ -388,9 +388,9 @@ public class AppBuilder {
             throw new BuildExecutionException("Failed to merge properties from library "+ex.libName+".  " + ex.getMessage(), ex);
         }
 
-        // Record the hardening outcome this APK was built with, so a later invocation that changes
-        // hardening (in either direction) invalidates the timestamp-only up-to-date cache above.
-        if (platform.contains("android") && !stageOnly && !BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
+        // Stamp only an APK returned by this build. An asynchronous submission may leave an
+        // older APK on disk; it must never acquire the new configuration's cache key.
+        if (androidApkProduced) {
             File marker = androidHardeningCacheMarker();
             if (androidApkFile().exists()) {
                 try {
@@ -408,7 +408,7 @@ public class AppBuilder {
         return new File(buildDirectory() + File.separator + apkName);
     }
 
-    /** The marker recording the hardening outcome the cached APK was built with, beside the APK. */
+    /** The marker recording the cached APK's hardening outcome and selected main class. */
     private File androidHardeningCacheMarker() {
         File apk = androidApkFile();
         return new File(apk.getParentFile(), apk.getName() + ".cn1hardenkey");
@@ -497,6 +497,7 @@ public class AppBuilder {
      * hardening change made through a build hint -- is invalidated when the outcome changes in EITHER
      * direction (enabling or disabling hardening), not just off-&gt;on. */
     private String hardeningCacheKey = "unhardened";
+    private boolean androidApkProduced;
 
     /** Injects the pre-flight hardening decisions into this build's request (per-build, not global). */
     private void applyHardeningRequestArgs(BuildRequest r) {
@@ -1883,17 +1884,17 @@ public class AppBuilder {
         verifyApplicationClassClosure(jarWithDependencies, cpElements);
 
         if (stageOnly) {
+            Properties settings = new Properties();
+            try (InputStream in = new FileInputStream(codenameOneSettingsCopy)) {
+                settings.load(in);
+            }
+            overlayCommandLineBuildHints(settings);
+            MainClassPreflight.validate(jarWithDependencies, settings, jarsToMerge, mainClassSources());
             getLog().info("codename1.stageOnly is set: staged " + jarWithDependencies + " ("
                     + jarWithDependencies.length() + " bytes) for " + buildTarget + " and stopped before building");
             return;
         }
 
-        try {
-            updateCodenameOne(false);
-        } catch (BuildExecutionException ex) {
-            getLog().error("Failed to update Codename One");
-            throw new IOException("Failed to update Codename One", ex);
-        }
         File antDistDir = new File(antProject, "dist");
         File antDistJar = new File(antDistDir, finalName() + "-"+buildTarget+"-jar-with-dependencies.jar");
         antDistDir.mkdirs();
@@ -1997,6 +1998,43 @@ public class AppBuilder {
         // have been merged -- an early refusal would reject a build the merge was about to fix.
         applyIOSProvisioningPreflight(cn1SettingsProps);
 
+        // Validate the exact settings and classes sent to every cloud/local target before
+        // invoking the build client. A renamed entry point must not cost a cloud build.
+        MainClassPreflight.validate(jarWithDependencies, cn1SettingsProps, jarsToMerge, mainClassSources());
+        hardeningCacheKey += ":main=" + cn1SettingsProps.getProperty("codename1.packageName")
+                + "." + cn1SettingsProps.getProperty("codename1.mainName");
+
+        // Reuse an APK only after validating the staged classes against the merged settings.
+        // Settings-file edits and command-line overrides do not change source timestamps and
+        // must not bypass the main-class preflight. stageOnly has already returned above.
+        if (platform.contains("android")) {
+            if (!BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
+                File apkFile = androidApkFile();
+                try {
+                    // Up-to-date only when the APK is newer than the sources AND was built with the SAME
+                    // hardening outcome and main class, recorded beside it. The source-timestamp check cannot
+                    // see a hardening change made through a build hint, so a change in EITHER direction --
+                    // enabling hardening (a stale unhardened APK) or disabling it (a stale hardened APK) --
+                    // must invalidate the cache and rebuild, rather than publish an APK that contradicts the
+                    // current configuration.
+                    if (apkFile.exists()
+                            && hardeningCacheKey.equals(readTextFileOrNull(androidHardeningCacheMarker()))
+                            && apkFile.lastModified() >= getSourcesModificationTime()) {
+                        getLog().info("Sources have not been modified since APK at " + apkFile + " was created.  Skipping Android build");
+                        return;
+                    }
+                } catch (IOException ex) {
+                    throw new BuildExecutionException("Failed to check sources modification time", ex);
+                }
+            }
+        }
+
+        try {
+            updateCodenameOne(false);
+        } catch (BuildExecutionException ex) {
+            getLog().error("Failed to update Codename One");
+            throw new IOException("Failed to update Codename One", ex);
+        }
 
         cn1SettingsProps.setProperty("codename1.arg.hyp.beamId", logPasskey);
         cn1SettingsProps.setProperty("codename1.arg.maven.codenameone-core.version", cn1MavenVersion);
@@ -2205,6 +2243,9 @@ public class AppBuilder {
                 String roleSuffix = roleSuffixFor(base, extension, basesByExtension);
                 File copyTo = new File(buildDirectory() + File.separator + finalName() + roleSuffix + extension);
                 FileUtils.copyFile(child, copyTo);
+                if (platform.contains("android") && copyTo.equals(androidApkFile())) {
+                    androidApkProduced = true;
+                }
                 if (roleSuffix.length() > 0) {
                     // Attached with a classifier so the companion artifact is installed and
                     // deployed beside the primary one rather than being an orphan in target/.

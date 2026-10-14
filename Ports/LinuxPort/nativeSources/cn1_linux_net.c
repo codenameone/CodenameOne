@@ -40,6 +40,71 @@
 #include <unistd.h> /* usleep -- explicit so strict/clang toolchains (zig, iOS) compile this */
 #include <time.h>
 #include <curl/curl.h>
+#include <dlfcn.h>
+#include <pthread.h>
+
+/* Debian/Ubuntu's libcurl exports CURL_OPENSSL_4 versions, whereas Alma/RHEL
+ * exports the same libcurl.so.4 ABI without those tags. Linking on Debian bakes
+ * its tags into the app and produces a loader warning on AlmaLinux. Resolve the
+ * stable ABI by name instead, using the installed library and its TLS defaults.
+ * Keep the handle open for the lifetime of the process and initialize once,
+ * before any network thread creates an easy handle. */
+static __typeof__(curl_global_init)* p_curl_global_init;
+static __typeof__(curl_easy_init)* p_curl_easy_init;
+static __typeof__(curl_easy_setopt)* p_curl_easy_setopt;
+static __typeof__(curl_easy_getinfo)* p_curl_easy_getinfo;
+static __typeof__(curl_easy_perform)* p_curl_easy_perform;
+static __typeof__(curl_easy_strerror)* p_curl_easy_strerror;
+static __typeof__(curl_easy_cleanup)* p_curl_easy_cleanup;
+static __typeof__(curl_slist_append)* p_curl_slist_append;
+static __typeof__(curl_slist_free_all)* p_curl_slist_free_all;
+static pthread_once_t cn1CurlOnce = PTHREAD_ONCE_INIT;
+static int cn1CurlAvailable;
+
+static void cn1InitCurl(void) {
+    void* library = dlopen("libcurl.so.4", RTLD_NOW | RTLD_LOCAL);
+    if (library == NULL) {
+        fprintf(stderr, "Codename One: unable to load libcurl.so.4: %s\n", dlerror());
+        return;
+    }
+#define CN1_CURL_SYMBOL(name) do { \
+    *(void**)(&p_##name) = dlsym(library, #name); \
+    if (p_##name == NULL) { \
+        fprintf(stderr, "Codename One: libcurl.so.4 is missing %s\n", #name); \
+        dlclose(library); \
+        return; \
+    } \
+} while (0)
+    CN1_CURL_SYMBOL(curl_global_init);
+    CN1_CURL_SYMBOL(curl_easy_init);
+    CN1_CURL_SYMBOL(curl_easy_setopt);
+    CN1_CURL_SYMBOL(curl_easy_getinfo);
+    CN1_CURL_SYMBOL(curl_easy_perform);
+    CN1_CURL_SYMBOL(curl_easy_strerror);
+    CN1_CURL_SYMBOL(curl_easy_cleanup);
+    CN1_CURL_SYMBOL(curl_slist_append);
+    CN1_CURL_SYMBOL(curl_slist_free_all);
+#undef CN1_CURL_SYMBOL
+    CURLcode result = p_curl_global_init(CURL_GLOBAL_DEFAULT);
+    if (result != CURLE_OK) {
+        fprintf(stderr, "Codename One: libcurl initialization failed: %s\n", p_curl_easy_strerror(result));
+        dlclose(library);
+        return;
+    }
+    cn1CurlAvailable = 1;
+}
+
+/* curl's headers can define type-checking macros for these two entry points. */
+#undef curl_easy_setopt
+#undef curl_easy_getinfo
+#define curl_easy_init p_curl_easy_init
+#define curl_easy_setopt p_curl_easy_setopt
+#define curl_easy_getinfo p_curl_easy_getinfo
+#define curl_easy_perform p_curl_easy_perform
+#define curl_easy_strerror p_curl_easy_strerror
+#define curl_easy_cleanup p_curl_easy_cleanup
+#define curl_slist_append p_curl_slist_append
+#define curl_slist_free_all p_curl_slist_free_all
 
 extern JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char* str);
 extern const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str);
@@ -286,7 +351,16 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_httpOpen___java_lang_String_boole
     if (!u) {
         return 0;
     }
+    CN1_YIELD_THREAD;
+    pthread_once(&cn1CurlOnce, cn1InitCurl);
+    CN1_RESUME_THREAD;
+    if (!cn1CurlAvailable) {
+        return 0;
+    }
     c = (CN1Http*) calloc(1, sizeof(CN1Http));
+    if (c == NULL) {
+        return 0;
+    }
     c->easy = curl_easy_init();
     if (c->easy == 0) {
         free(c);
