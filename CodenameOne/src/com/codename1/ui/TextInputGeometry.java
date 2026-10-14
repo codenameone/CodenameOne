@@ -60,7 +60,9 @@ public final class TextInputGeometry {
     /// Captures a bounded visible range for clients that do not provide a specialized snapshot.
     /// Large editors can override TextInputGeometry.Provider to walk visual lines once.
     public static TextInputGeometry capture(TextInputClient client) {
-        if (client instanceof Provider) return ((Provider) client).getGeometrySnapshot();
+        if (client instanceof Provider) {
+            return ((Provider) client).getGeometrySnapshot();
+        }
         TextInputState state = client.getEditingState();
         int caret = state.getSelectionEnd(), first = caret, last = caret;
         if (client instanceof Component) {
@@ -70,7 +72,10 @@ public final class TextInputGeometry {
                 client.offsetAtPoint(x + c.getWidth(), y),
                 client.offsetAtPoint(x, y + c.getHeight()),
                 client.offsetAtPoint(x + c.getWidth(), y + c.getHeight())};
-            for (int offset : offsets) { first = Math.min(first, offset); last = Math.max(last, offset); }
+            for (int offset : offsets) {
+                first = Math.min(first, offset);
+                last = Math.max(last, offset);
+            }
         }
         first = Math.max(0, first - 1);
         last = Math.min(client.getTextLength(), last + 1);
@@ -83,7 +88,9 @@ public final class TextInputGeometry {
         for (int i = first; i <= last; i++) {
             int[] rect = client.rectForOffset(i);
             points[n++] = i;
-            for (int j = 0; j < 4; j++) points[n++] = rect[j];
+            for (int j = 0; j < 4; j++) {
+                points[n++] = rect[j];
+            }
         }
         return new TextInputGeometry(points, state.getSelectionStart(), caret,
             client.selectionRects(state.getSelectionStart(), caret), client.getCaretRect());
@@ -91,8 +98,11 @@ public final class TextInputGeometry {
 
     /// Returns the last captured caret rectangle for an offset, or the active caret offscreen.
     public int[] rectForOffset(int offset) {
-        for (int i = 0; i + 4 < carets.length; i += 5)
-            if (carets[i] == offset) return new int[]{carets[i+1], carets[i+2], carets[i+3], carets[i+4]};
+        for (int i = 0; i + 4 < carets.length; i += 5) {
+            if (carets[i] == offset) {
+                return new int[]{carets[i + 1], carets[i + 2], carets[i + 3], carets[i + 4]};
+            }
+        }
         return copy(fallback);
     }
 
@@ -101,10 +111,12 @@ public final class TextInputGeometry {
         int best = end;
         long bestY = Long.MAX_VALUE, bestX = Long.MAX_VALUE;
         for (int i = 0; i + 4 < carets.length; i += 5) {
-            long dy = Math.max(0, Math.max((long) carets[i+2] - y, (long) y - carets[i+2] - carets[i+4]));
-            long dx = Math.abs((long) x - carets[i+1]);
+            long dy = Math.max(0, Math.max((long) carets[i + 2] - y, (long) y - carets[i + 2] - carets[i + 4]));
+            long dx = Math.abs((long) x - carets[i + 1]);
             if (dy < bestY || dy == bestY && dx < bestX) {
-                bestY = dy; bestX = dx; best = carets[i];
+                bestY = dy;
+                bestX = dx;
+                best = carets[i];
             }
         }
         return best;
@@ -114,20 +126,34 @@ public final class TextInputGeometry {
     /// rectangles for other native queries without touching a live editor off the EDT.
     public int[] selectionRects(int a, int b) {
         int low = Math.min(a, b), high = Math.max(a, b);
-        if (low == high) return new int[0];
-        if (low == start && high == end) return copy(selection);
+        if (low == high) {
+            return new int[0];
+        }
+        if (low == start && high == end) {
+            return copy(selection);
+        }
         int[] out = new int[carets.length];
         int n = 0;
         for (int i = 0; i + 9 < carets.length; i += 5) {
-            if (carets[i] < low || carets[i] >= high) continue;
-            int x = carets[i+1], y = carets[i+2], h = carets[i+4], w = carets[i+3];
-            if (carets[i+7] == y) {
-                x = Math.min(x, carets[i+6]);
-                w = Math.max(w, Math.abs(carets[i+6] - carets[i+1]));
+            if (carets[i] < low || carets[i] >= high) {
+                continue;
             }
-            if (n >= 4 && out[n-3] == y && out[n-1] == h && out[n-4] + out[n-2] == x) out[n-2] += w;
-            else { out[n++] = x; out[n++] = y; out[n++] = w; out[n++] = h; }
+            int x = carets[i + 1], y = carets[i + 2], h = carets[i + 4], w = carets[i + 3];
+            if (carets[i + 7] == y) {
+                x = Math.min(x, carets[i + 6]);
+                w = Math.max(w, Math.abs(carets[i + 6] - carets[i + 1]));
+            }
+            if (n >= 4 && out[n - 3] == y && out[n - 1] == h && out[n - 4] + out[n - 2] == x) {
+                out[n - 2] += w;
+            } else {
+                out[n++] = x;
+                out[n++] = y;
+                out[n++] = w;
+                out[n++] = h;
+            }
         }
-        int[] result = new int[n]; System.arraycopy(out, 0, result, 0, n); return result;
+        int[] result = new int[n];
+        System.arraycopy(out, 0, result, 0, n);
+        return result;
     }
 }
