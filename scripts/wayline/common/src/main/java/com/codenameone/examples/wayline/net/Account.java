@@ -52,6 +52,11 @@ public final class Account {
     private static boolean preferencesChanged;
     private static boolean profileChanged;
     private static boolean waiting;
+    /// Whether each half of the account's values has arrived since it signed
+    /// in. Until one has, the device's copy of it is not the account's -- it
+    /// is the defaults, or what an earlier session left -- and is not sent.
+    private static boolean preferencesLoaded;
+    private static boolean profileLoaded;
     /// The profile as the server last gave it: the name and the gender are
     /// part of it, and are sent back as they were with the rest.
     private static ProfileDto profile;
@@ -67,25 +72,46 @@ public final class Account {
     }
 
     /// Fetches the account's settings and profile into `Prefs`, then runs
-    /// `done` -- also when the server did not answer, with what the device had.
+    /// `done` -- also when the server did not answer, with what the device
+    /// had. Each half is asked for whether or not the other came, and one that
+    /// did not come is asked for again before anything of it is saved.
     public static void load(final Runnable done) {
         if (Session.user() == null) {
             done.run();
             return;
         }
         profile = null;
+        preferencesLoaded = false;
+        profileLoaded = false;
+        fetch(done);
+    }
+
+    private static void fetch(final Runnable done) {
         final String owner = Session.user().username;
-        Api.account().preferences(Net.to(preferences -> {
-            if (signedInAs(owner)) {
-                apply(preferences);
+        final Runnable thenProfile = () -> {
+            if (profileLoaded || !signedInAs(owner)) {
+                done.run();
+                return;
             }
             Api.account().profile(Net.to(described -> {
                 if (signedInAs(owner)) {
                     apply(described);
+                    profileLoaded = described != null;
                 }
                 done.run();
             }, (status, message) -> done.run()));
-        }, (status, message) -> done.run()));
+        };
+        if (preferencesLoaded) {
+            thenProfile.run();
+            return;
+        }
+        Api.account().preferences(Net.to(preferences -> {
+            if (signedInAs(owner)) {
+                apply(preferences);
+                preferencesLoaded = preferences != null;
+            }
+            thenProfile.run();
+        }, (status, message) -> thenProfile.run()));
     }
 
     /// The profile last fetched or saved, or null before there is one.
@@ -94,8 +120,20 @@ public final class Account {
     }
 
     /// Saves the name and the gender, which only the profile screen changes.
-    public static void saveProfile(String name, String gender, final Runnable done,
-            Net.Failed failed) {
+    public static void saveProfile(final String name, final String gender, final Runnable done,
+            final Net.Failed failed) {
+        if (!profileLoaded) {
+            // The rest of the profile goes out with the name, and it has not
+            // been seen yet; see send().
+            fetch(() -> {
+                if (profileLoaded) {
+                    saveProfile(name, gender, done, failed);
+                } else {
+                    failed.failed(0, "Could not reach the server. Check your connection.");
+                }
+            });
+            return;
+        }
         ProfileDto wanted = described();
         wanted.name = name;
         wanted.gender = gender;
@@ -150,6 +188,16 @@ public final class Account {
             preferencesChanged = false;
             profileChanged = false;
             return;
+        }
+        if (preferencesChanged && !preferencesLoaded || profileChanged && !profileLoaded) {
+            // The account's values never arrived, so what the device holds in
+            // their place is not known to be this account's: sent, it would
+            // replace on the server what was never seen here. They are asked
+            // for again instead, and the change that brought this about gives
+            // way to them. A later change is saved as usual once they are in.
+            preferencesChanged = preferencesChanged && preferencesLoaded;
+            profileChanged = profileChanged && profileLoaded;
+            fetch(() -> { });
         }
         if (preferencesChanged) {
             preferencesChanged = false;

@@ -98,6 +98,27 @@ class StripePaymentsTest {
     }
 
     @Test
+    void aCustomerIsDeletedAndOneAlreadyGoneCountsAsDeleted() throws Exception {
+        Script script = new Script().reply(200, "{\"id\":\"cus_123\",\"deleted\":true}")
+                .reply(404, "{\"error\":{\"type\":\"invalid_request_error\","
+                        + "\"code\":\"resource_missing\"}}")
+                .reply(500, "{}");
+        StripePayments stripe = new StripePayments(script, RETURN);
+        stripe.forgetCustomer("cus_123");
+        assertEquals("DELETE /v1/customers/cus_123", script.asked.get(0));
+        assertEquals(null, script.forms.get(0));
+        // Asked again after an answer that was lost.
+        stripe.forgetCustomer("cus_123");
+        // Anything else is not a deletion, and the closure it is part of fails.
+        try {
+            stripe.forgetCustomer("cus_123");
+            throw new AssertionError("A processor that failed must not read as deleted");
+        } catch (IOException expected) {
+            assertTrue(expected.getMessage().indexOf("500") >= 0, expected.getMessage());
+        }
+    }
+
+    @Test
     void aCardIsAddedOnAHostedPageAndReadBack() throws Exception {
         Script script = new Script()
                 .reply(200, "{\"id\":\"cs_test_1\",\"object\":\"checkout.session\","

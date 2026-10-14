@@ -118,6 +118,11 @@ public class SimulatedPayments implements PaymentProvider {
     }
 
     @Override
+    public void forgetCustomer(String customer) {
+        // Nothing is kept of one here.
+    }
+
+    @Override
     public String refund(String chargeReference, long amountCents) throws IOException {
         // Named after the charge, as a real processor's refund is keyed by
         // it: asking twice is one refund, which is what lets a refund whose

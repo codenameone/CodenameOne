@@ -64,6 +64,9 @@ import java.util.Map;
 @Component
 public class Payments {
     public static final String PENDING = "PENDING";
+    /// How long a completed ride's charge goes on being asked for. Short of
+    /// the day a processor remembers the key a charge was first sent under.
+    public static final long RETRY_MILLIS = 23L * 60L * 60L * 1000L;
     public static final String PAID = "PAID";
     public static final String FAILED = "FAILED";
     public static final String REFUNDED = "REFUNDED";
@@ -286,6 +289,14 @@ public class Payments {
         if (repository.paysForRideUnderWay(username, id)) {
             throw new ResponseStatusException(409, "That card is paying for a ride under way");
         }
+        // A ride that ended with nobody able to say whether its card was
+        // charged is asked about again, by the card's token. With the card
+        // gone the question could not be put: the ride would be written down
+        // as unpaid, whether or not the first attempt took the money.
+        if (repository.awaitsCharge(username, id, retriedSince())) {
+            throw new ResponseStatusException(409,
+                    "That card is still paying for a ride. Try again in a few minutes");
+        }
         repository.remove(row);
         dto.isDefault = false;
         return dto;
@@ -309,12 +320,38 @@ public class Payments {
         return new String[] {id, label(row)};
     }
 
-    /// Everything of a user's that this class keeps, for an account being closed.
-    @Transactional
+    /// Everything of a user's that this class keeps, for an account being
+    /// closed, here and at the processor. Answers 409 while a ride of theirs
+    /// is still to be charged; see [#remove].
+    ///
+    /// The processor is asked last, and inside the transaction that deletes
+    /// the rest. It holds the rider's address, their name and their cards, and
+    /// the reference deleted here is the only way back to them: forgotten
+    /// first, a request that then failed would leave that record with nothing
+    /// pointing at it. So a processor that cannot be reached fails the closure
+    /// whole and the account stays as it was, to be closed again. The other
+    /// way round -- the processor has deleted and the commit then fails -- is
+    /// mended by the same second attempt, since a customer already gone counts
+    /// as deleted. A closure is rare enough to wait on a request with a row
+    /// held, which nothing else in this class does.
+    @Transactional(rollbackFor = IOException.class)
     public void forget(String username) throws IOException {
+        if (repository.awaitsCharge(username, null, retriedSince())) {
+            throw new ResponseStatusException(409,
+                    "A ride is still being paid for. Try again in a few minutes");
+        }
+        PaymentCustomer customer = repository.customer(username);
+        String reference = customer == null ? "" : customer.reference;
         repository.removeCards(username);
         repository.removeSetups(username);
         repository.removeCustomer(username);
+        if (reference != null && reference.length() > 0) {
+            provider.forgetCustomer(reference);
+        }
+    }
+
+    private static long retriedSince() {
+        return System.currentTimeMillis() - RETRY_MILLIS;
     }
 
     // --------------------------------------------------------------- charges

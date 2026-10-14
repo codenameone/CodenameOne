@@ -102,6 +102,12 @@ public class Preferences {
         if (wanted == null) {
             throw new ResponseStatusException(400, "Nothing to save");
         }
+        // First, before anything is read: two saves sent together for an
+        // account with no row of settings yet would each find none and each
+        // insert one, and the second insert fails on the key. The profile is
+        // there from registration, so held, one save waits and finds the
+        // other's row.
+        profiles.hold(username);
         int tip = wanted.defaultTipPercent;
         if (tip != 0 && tip != 10 && tip != 15 && tip != 20) {
             throw new ResponseStatusException(400, "A default tip is 0, 10, 15 or 20 percent");

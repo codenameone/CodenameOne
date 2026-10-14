@@ -97,6 +97,18 @@ public class StripePayments implements PaymentProvider {
     }
 
     @Override
+    public void forgetCustomer(String customer) throws IOException {
+        // Deleting a customer detaches its payment methods too. 404 is the
+        // answer for one deleted by a request whose answer never arrived.
+        Reply reply = transport.send("DELETE", "/v1/customers/" + UrlText.encode(customer), null,
+                "");
+        if (reply.status != 404 && (reply.status < 200 || reply.status >= 300)) {
+            throw new IOException("The payment processor answered " + reply.status
+                    + " to deleting a customer");
+        }
+    }
+
+    @Override
     public Setup startCardSetup(String customer, String setupId) throws IOException {
         Map session = ask("POST", "/v1/checkout/sessions", form("mode", "setup",
                 "customer", customer, "payment_method_types[0]", "card",

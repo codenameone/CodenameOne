@@ -879,6 +879,17 @@ ride, and any other failure leaves it there with no charge recorded, so the
 rider can send the same tip again under the same key. The ride can't be
 refunded until then.
 
+While a ride's charge is being asked about, the card it was sent to can't be
+removed and the account can't be closed: `Payments.remove` and
+`Payments.forget` answer 409. The retry looks the card up by its token, so
+with the card gone it couldn't ask.
+
+Closing an account also deletes the rider's record at the provider, through
+`PaymentProvider.forgetCustomer`, in the same transaction that deletes the
+rest. A provider that can't be reached fails the closure and leaves the
+account as it was. A record that's already gone counts as deleted, so closing
+again finishes a closure that was interrupted.
+
 Two implementations come with the sample:
 
 * `SimulatedPayments` is used when no key is configured. It accepts any card

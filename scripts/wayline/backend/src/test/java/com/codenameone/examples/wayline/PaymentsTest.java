@@ -413,6 +413,13 @@ class PaymentsTest {
         // paid, and not failed either.
         assertEquals("COMPLETED", done.get("state"));
         assertEquals("PENDING", done.get("paymentStatus"));
+        // The card is what the ride will be asked about with, so it stays,
+        // and so does the account it belongs to.
+        mvc.perform(People.asRider(post("/api/payments/methods/" + card + "/remove"), rider))
+                .andExpect(status().isConflict());
+        mvc.perform(People.asRider(Trips.body(post("/api/account/delete"),
+                        "{\"password\":\"" + People.PASSWORD + "\"}"), rider))
+                .andExpect(status().isConflict());
         db.execute("UPDATE wl_ride SET updated_at = ? WHERE id = ?",
                 new Object[] {Long.valueOf(System.currentTimeMillis() - 5L * 60L * 1000L), id});
         rides.settleLeftBehind();
@@ -426,6 +433,9 @@ class PaymentsTest {
         mvc.perform(People.asRider(get("/api/rides/" + id), rider))
                 .andExpect(jsonPath("$.paymentStatus").value("PAID"));
         assertEquals(total, Trips.number(Trips.receipt(mvc, rider, id), "total"));
+        // Settled, and the card can go.
+        mvc.perform(People.asRider(post("/api/payments/methods/" + card + "/remove"), rider))
+                .andExpect(status().isOk());
         Trips.offline(mvc, driver);
     }
 

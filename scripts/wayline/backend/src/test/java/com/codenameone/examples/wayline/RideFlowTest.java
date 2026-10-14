@@ -159,6 +159,18 @@ class RideFlowTest {
         // The ride is over, and so is the reason to have each other's number.
         assertEquals(null, json(People.asRider(get("/api/rides/" + id), rider)).get("driverPhone"));
         assertEquals(null, json(People.asDriver(get("/api/rides/" + id), driver)).get("riderPhone"));
+        // And to know where the driver is, who goes on reporting it for the
+        // next ride: not from the ride, and not from the history it stays in.
+        mvc.perform(People.asDriver(body(post("/api/driver/status"),
+                        People.position(true, 38.7300, -9.1500)), driver))
+                .andExpect(status().isOk());
+        mvc.perform(People.asRider(get("/api/rides/" + id), rider))
+                .andExpect(jsonPath("$.driverName").value("lis-driver"))
+                .andExpect(jsonPath("$.driverLat").value(0.0))
+                .andExpect(jsonPath("$.driverLng").value(0.0));
+        mvc.perform(People.asRider(get("/api/rides/history"), rider))
+                .andExpect(jsonPath("$[0].driverLat").value(0.0))
+                .andExpect(jsonPath("$[0].driverLng").value(0.0));
         mvc.perform(People.asRider(body(post("/api/rides/" + id + "/rate"), "{\"stars\":9}"), rider))
                 .andExpect(status().isBadRequest());
         mvc.perform(People.asRider(body(post("/api/rides/" + id + "/rate"), "{\"stars\":4}"), rider))

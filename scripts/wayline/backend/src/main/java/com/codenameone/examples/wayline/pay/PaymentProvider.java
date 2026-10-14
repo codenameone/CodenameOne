@@ -42,6 +42,11 @@ public interface PaymentProvider {
     /// Opens the processor's record of a rider and returns its reference.
     String createCustomer(String username, String displayName) throws IOException;
 
+    /// Deletes the processor's record of a rider, and the cards saved to it
+    /// with it. A record that is already gone is deleted: this is asked again
+    /// when the first answer was lost.
+    void forgetCustomer(String customer) throws IOException;
+
     /// Begins saving a card to `customer`. `setupId` is the server's own id
     /// for the attempt, for the processor to hand back.
     Setup startCardSetup(String customer, String setupId) throws IOException;

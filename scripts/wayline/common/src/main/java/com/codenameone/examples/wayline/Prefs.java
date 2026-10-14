@@ -74,6 +74,10 @@ public final class Prefs {
     public static final String PAYMENT_CASH = "cash";
 
     private static final String PREFIX = "wayline.pref.";
+    /// The plain values that are a copy of the account's; see [#ownedBy].
+    private static final String[] ACCOUNT_OWNED = {NOTIFY_RIDE_UPDATES, NOTIFY_RECEIPTS,
+        NOTIFY_PROMOTIONS, DRIVER_GENDER, QUIET_RIDE, ACCESSIBLE_VEHICLE, PET_FRIENDLY,
+        PAYMENT_METHOD, TIP_PERCENT, SHARE_TRIPS, EMERGENCY_NAME, EMERGENCY_PHONE};
     /// How many destinations are remembered.
     private static final int RECENT_LIMIT = 4;
 
@@ -283,10 +287,20 @@ public final class Prefs {
     }
 
     /// Says whose device this is now, by the name they signed in with; empty
-    /// for nobody. The recent destinations are kept on the device only, and
-    /// they say where a person goes: when the account changes, the last
-    /// one's are dropped and not shown to the next. The same account signing
-    /// in again finds its own still there.
+    /// for nobody. When the account changes, what the device holds of the
+    /// last one is dropped and not shown to the next: the recent
+    /// destinations, which are kept here only and say where a person goes,
+    /// and the copy of everything the account keeps on the server -- home,
+    /// work, the emergency contact, the card paid with, the ride options.
+    /// That copy is replaced when the new account's values arrive, but they
+    /// may not arrive, and then the last person's would be on screen and go
+    /// out with the next save as the new person's own. How the app looks
+    /// (language, theme, units) is the device's and stays. The same account
+    /// signing in again finds its own still there.
+    ///
+    /// The listener is told of the recent destinations alone. It sends what
+    /// it is told of to the server, and values dropped here were not changed
+    /// by anyone: reported, they would be saved over the new account's.
     public static void ownedBy(String username) {
         String owner = username == null ? "" : username;
         if (owner.equals(text(RECENTS_OWNER, ""))) {
@@ -294,6 +308,11 @@ public final class Prefs {
         }
         for (int iter = 0; iter < RECENT_LIMIT; iter++) {
             store(RECENTS + "." + iter, null);
+        }
+        store(HOME, null);
+        store(WORK, null);
+        for (String name : ACCOUNT_OWNED) {
+            Preferences.delete(PREFIX + name);
         }
         Preferences.set(PREFIX + RECENTS_OWNER, owner);
         changed(RECENTS);

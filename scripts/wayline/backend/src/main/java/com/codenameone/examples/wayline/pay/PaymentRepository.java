@@ -186,6 +186,23 @@ public class PaymentRepository {
                 .setParameter("method", methodId).first().longValue() > 0L;
     }
 
+    /// Whether a completed ride of the rider's is still to be charged to this
+    /// method -- or to any card, for a null `methodId` -- and will be asked
+    /// about again: its payment is pending and it ended after `since`.
+    public boolean awaitsCharge(String rider, String methodId, long since) {
+        String query = "select count(r) from Ride r where r.rider = :rider "
+                + "and r.state = 'COMPLETED' and r.paymentStatus = 'PENDING' "
+                + "and r.updatedAt > :since";
+        if (methodId == null) {
+            return session.createQuery(query + " and r.methodId <> 'cash'", Long.class)
+                    .setParameter("rider", rider).setParameter("since", Long.valueOf(since))
+                    .first().longValue() > 0L;
+        }
+        return session.createQuery(query + " and r.methodId = :method", Long.class)
+                .setParameter("rider", rider).setParameter("since", Long.valueOf(since))
+                .setParameter("method", methodId).first().longValue() > 0L;
+    }
+
     /// A rider's completed rides, newest first.
     public List<Ride> completed(String rider, int limit) {
         return session.createQuery("select r from Ride r where r.rider = :rider "

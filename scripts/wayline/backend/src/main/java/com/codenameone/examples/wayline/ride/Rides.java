@@ -374,7 +374,7 @@ public class Rides {
 
     /// How long a completed ride's charge goes on being asked for. Short of
     /// the day a processor remembers the key a charge was first sent under.
-    private static final long RETRY_MILLIS = 23L * 60L * 60L * 1000L;
+    private static final long RETRY_MILLIS = Payments.RETRY_MILLIS;
 
     /// Finishes the payment of rides that completed and were never settled.
     ///
@@ -868,10 +868,17 @@ public class Rides {
             }
             DriverState car = drivers.find(driver);
             if (car != null) {
+                dto.driverRating = car.rating();
+            }
+            // Where the car is belongs to the ride while it brings the two
+            // together and carries one of them. A ride that has ended stays in
+            // its rider's history for good, and the driver goes on reporting
+            // where they are for other people's rides: read from here, a past
+            // rider could follow them indefinitely.
+            if (car != null && meeting) {
                 dto.driverLat = car.lat;
                 dto.driverLng = car.lng;
                 dto.driverHeading = car.heading;
-                dto.driverRating = car.rating();
                 // How long until the car is where it is going next: the pickup
                 // until the rider is in it, the destination after.
                 if (RideStates.ACCEPTED.equals(dto.state)) {
