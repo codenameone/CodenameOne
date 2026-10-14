@@ -1502,10 +1502,12 @@ public class ByteCodeTranslator {
         writer.append("pkg_check_modules(CN1DEPS REQUIRED\n");
         writer.append("    gtk+-3.0 cairo pango pangocairo gdk-pixbuf-2.0 glib-2.0 gobject-2.0 gio-2.0\n");
         writer.append("    fontconfig freetype2\n");
-        // libcrypto backs the port's crypto bridge (cn1_linux_crypto.c). It is
-        // already present wherever libcurl is: the OpenSSL-flavoured curl links
-        // it, and the -dev package pulls in the headers.
-        writer.append("    libcurl libcrypto)\n");
+        // libcrypto backs the port's crypto bridge (cn1_linux_crypto.c).
+        writer.append("    libcrypto)\n");
+        // HTTP resolves the libcurl.so.4 ABI by name. Direct linking imports the
+        // build distro's CURL_OPENSSL_4 tags, absent on Alma/RHEL's libcurl.
+        // Keep its headers/compiler flags, but do not link CN1CURL_LIBRARIES.
+        writer.append("pkg_check_modules(CN1CURL REQUIRED libcurl)\n");
         writer.append("pkg_check_modules(CN1GL REQUIRED epoxy egl glesv2)\n");
         // Optional feature libs (browser/media/secure-storage/notifications/
         // location). The port dlopen()s these lazily at first use (see
@@ -1517,8 +1519,8 @@ public class ByteCodeTranslator {
         writer.append("pkg_check_modules(CN1OPT REQUIRED\n");
         writer.append("    gstreamer-1.0 gstreamer-app-1.0 gstreamer-video-1.0\n");
         writer.append("    webkit2gtk-4.1 libsecret-1 libnotify libgeoclue-2.0)\n");
-        writer.append("target_include_directories(${PROJECT_NAME} PRIVATE ${CN1DEPS_INCLUDE_DIRS} ${CN1GL_INCLUDE_DIRS} ${CN1OPT_INCLUDE_DIRS})\n");
-        writer.append("target_compile_options(${PROJECT_NAME} PRIVATE ${CN1DEPS_CFLAGS_OTHER} ${CN1GL_CFLAGS_OTHER} ${CN1OPT_CFLAGS_OTHER})\n");
+        writer.append("target_include_directories(${PROJECT_NAME} PRIVATE ${CN1DEPS_INCLUDE_DIRS} ${CN1CURL_INCLUDE_DIRS} ${CN1GL_INCLUDE_DIRS} ${CN1OPT_INCLUDE_DIRS})\n");
+        writer.append("target_compile_options(${PROJECT_NAME} PRIVATE ${CN1DEPS_CFLAGS_OTHER} ${CN1CURL_CFLAGS_OTHER} ${CN1GL_CFLAGS_OTHER} ${CN1OPT_CFLAGS_OTHER})\n");
         // libm/pthread back the translated runtime + GC; dl is required for the
         // dlopen() of the optional libs above. Note: CN1OPT_LIBRARIES is
         // deliberately NOT linked.
