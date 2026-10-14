@@ -301,6 +301,37 @@ void com_codename1_impl_mac_MacNative_macSetTitleBarRegions___int_int_1ARRAY(COD
 #endif
 }
 
+// AppKit updates the snapshot. EDT layout can hold the render lock, so it
+// must not dispatch_sync to AppKit merely to measure window controls.
+static int cn1TitleInsets[5];
+static void cn1MacUpdateTitleInsets(void) {
+    NSWindow *window = [CN1MacHost sharedHost].window;
+    NSView *view = [CN1MacHost sharedHost].renderingView;
+    if (!window || !view) return;
+    CGFloat scale = window.backingScaleFactor;
+    int metrics[5] = {0};
+    NSWindowButton types[] = {NSWindowCloseButton, NSWindowMiniaturizeButton, NSWindowZoomButton};
+    for (int i = 0; i < 3; i++) {
+        NSButton *button = [window standardWindowButton:types[i]];
+        if (!button || button.hidden || !button.superview) continue;
+        NSRect rect = [view convertRect:button.frame fromView:button.superview];
+        metrics[0] = MAX(metrics[0], (int)ceil((NSMaxX(rect) + 8) * scale));
+        CGFloat bottom = view.isFlipped ? NSMaxY(rect) : NSHeight(view.bounds) - NSMinY(rect);
+        metrics[4] = MAX(metrics[4], (int)ceil((bottom + 4) * scale));
+    }
+    @synchronized ([CN1MacHost class]) {
+        memcpy(cn1TitleInsets, metrics, sizeof(metrics));
+    }
+}
+void com_codename1_impl_mac_MacNative_macTitleBarInsets___int_1ARRAY(CODENAME_ONE_THREAD_STATE,
+        JAVA_OBJECT instance, JAVA_OBJECT array) {
+    if (array == JAVA_NULL || ((JAVA_ARRAY)array)->length < 5) return;
+    @synchronized ([CN1MacHost class]) {
+        memcpy(CN1_ARRAY_DATA(array), cn1TitleInsets, sizeof(cn1TitleInsets));
+    }
+    dispatch_async(dispatch_get_main_queue(), ^{ cn1MacUpdateTitleInsets(); });
+}
+
 void CN1MacHostSetWindowUndecorated(BOOL undecorated) {
     dispatch_async(dispatch_get_main_queue(), ^{
         NSWindow *w = [CN1MacHost sharedHost].window;
@@ -316,6 +347,7 @@ void CN1MacHostSetWindowUndecorated(BOOL undecorated) {
             w.titlebarAppearsTransparent = YES;
             w.titleVisibility = NSWindowTitleHidden;
             w.movableByWindowBackground = YES;
+            cn1MacUpdateTitleInsets();
         } else {
             // Restored, unlike the Catalyst path, which only ever undecorates:
             // a form that set custom chrome and then navigated away left the

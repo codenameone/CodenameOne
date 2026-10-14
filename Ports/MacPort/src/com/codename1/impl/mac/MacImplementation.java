@@ -220,6 +220,17 @@ public class MacImplementation extends IOSImplementation {
 
     /// @inheritDoc
     @Override
+    public int[] getNativeWindowTitleBarInsets(com.codename1.ui.Component toolbar) {
+        if (ownerWindowId(toolbar) != -2) {
+            return null;
+        }
+        int[] result = new int[5];
+        macNative.macTitleBarInsets(result);
+        return result;
+    }
+
+    /// @inheritDoc
+    @Override
     public void setNativeWindowTitleBarRegions(com.codename1.ui.Component toolbar, int[] regions) {
         macNative.macSetTitleBarRegions(ownerWindowId(toolbar), regions);
     }

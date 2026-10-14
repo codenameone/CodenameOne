@@ -94,8 +94,7 @@ Dragging an empty part of the toolbar uses the OS window drag operation. Double-
 the user's macOS title-bar preference. Buttons (including disabled buttons), editable titles,
 scrollable regions and other interactive descendants are excluded from the drag area. The toolbar
 publishes these regions to the native port after layout; applications don't need their own window
-drag listeners. Other ports can implement `CodenameOneImplementation.setNativeWindowTitleBarRegions`
-to supply the same native behavior, or keep the existing toolbar drag fallback.
+drag listeners. The native Windows and Linux ports use the same toolbar contract, as described below.
 
 The setting can also be supplied as a runtime property before constructing the first `Form`:
 
@@ -107,6 +106,68 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 NOTE: On a phone or tablet iOS build these properties are ignored. The legacy Mac Catalyst target
 also honors them, through `UIWindowScene` and `UIMenuBuilder` rather than AppKit; see
 <<_working_with_mac_catalyst>>.
+
+==== Integrated title content on native desktops
+
+Use `desktop.titleBar=custom` when document actions, a search field, or other application controls
+belong in the title area. Configure the toolbar with `setTitleComponent()` and the usual left/right
+bar commands. The framework reserves space for the operating system's window controls; don't add
+fixed padding for traffic lights or caption buttons. Theme padding is additional application spacing.
+
+[source,java]
+-----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/DesktopTitleContent.java[tag=desktop-title-content,indent=0]
+-----
+
+The example belongs in the normal application lifecycle, after Codename One has initialized the
+display. Applications don't call `Display.init()`. The build hint can select the mode before
+`init()` runs; a runtime property must be set before constructing the first form.
+
+[cols="1,3"]
+|===
+|Native port |Window behavior in `custom` mode
+|macOS |AppKit retains the real traffic-light buttons, resizable frame and native menu bar.
+The toolbar occupies the full-size content area. Empty title space uses AppKit dragging and the
+user's configured double-click action.
+|Windows |The Desktop Window Manager retains the caption buttons. Native hit testing routes empty
+title space to caption dragging and routes the edges to resizing. Windows handles maximize,
+restore, minimize, close and the system menu. Application controls remain client input targets.
+Caption metrics follow the window DPI; caption appearance follows the system light/dark setting.
+|Linux |A `GtkHeaderBar` hosts the toolbar's rendered content beside real GTK window controls.
+GTK chooses their arrangement from the desktop settings and handles title gestures and window
+commands. The header and document share one Java component tree and rendering surface.
+|===
+
+On Windows, the integrated mode omits the separate Win32 menu row, which would overlap the custom
+caption. Toolbar commands remain available through their application controls and side menu, and
+native command accelerators remain registered. Use `native` mode for the traditional Win32 menu
+bar. On Linux, the native GTK menu row remains below the integrated header. The macOS menu stays
+in the system menu bar. If an application hides the toolbar's side menu, it must provide another
+visible way to invoke those commands, such as its ribbon.
+
+Reserved space uses physical left/right edges, independent of a document's text direction. The
+framework accounts for native controls while measuring and laying out the toolbar, and restores
+the application's padding values and units afterward. Resize, DPI and native theme changes can
+change this space. Avoid forcing the toolbar below its preferred height.
+
+Interactive children, including disabled buttons, are excluded from native dragging. Ordinary
+labels and empty title space can start window gestures. A label with pointer listeners counts as
+interactive. Hiding or removing the toolbar clears its drag regions; the Windows and Linux ports
+restore their ordinary title area. When DWM composition is unavailable, Windows retains its
+standard decorated frame instead of removing the user's window controls.
+
+This integration applies to the main application form in native desktop builds. Separate
+`Window` and dialog peers retain their own native decorations. Phone/tablet UI and browser pages
+use their existing toolbar behavior: this feature doesn't open browser popup windows or attempt
+to control browser chrome. The Java SE desktop port retains its existing custom-title behavior.
+
+For port implementers, `getNativeWindowTitleBarInsets(Component)` supplies physical left, right,
+top and bottom insets followed by the minimum title-band height, all in component pixels.
+`setNativeWindowTitleBarRegions(Component, int[])` receives the full band followed by interactive
+exclusion rectangles. An empty array clears the regions. These calls originate on the EDT;
+ports must copy arrays before asynchronous native work and must not call Java UI code from a
+synchronous native geometry query. The AppKit port reads a cached geometry snapshot so layout
+can't deadlock against the native rendering thread.
 
 === Native menu bar and command placement hints
 

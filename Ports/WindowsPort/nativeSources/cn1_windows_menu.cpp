@@ -72,6 +72,13 @@ typedef struct {
 static CN1MenuItem menuItems[CN1_MENU_MAX_ITEMS];
 static int menuItemCount = 0;
 static HMENU menuBar = NULL;
+static BOOL integratedTitleBar = FALSE;
+
+void cn1WinMenuSetIntegrated(BOOL integrated) {
+    integratedTitleBar = integrated;
+    SetMenu(cn1Win.hwnd, integrated ? NULL : menuBar);
+    DrawMenuBar(cn1Win.hwnd);
+}
 
 /* The standard top-level menus, in the order Windows applications put them. The hint
  * strings are Command.DESKTOP_MENU_* verbatim; anything else becomes a top-level menu
@@ -263,7 +270,7 @@ static void rebuildMenu(const char* spec) {
         }
     }
 
-    SetMenu(cn1Win.hwnd, menuBar);
+    SetMenu(cn1Win.hwnd, integratedTitleBar ? NULL : menuBar);
     DrawMenuBar(cn1Win.hwnd);
     if (previous != NULL) {
         /* After SetMenu, never before: destroying the menu the window is still showing

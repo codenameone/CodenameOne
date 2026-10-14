@@ -684,7 +684,17 @@ int cn1WinHandleGesture(HWND hwnd, int windowId, LPARAM lParam) {
 /* ------------------------------------------------------------- window proc */
 
 LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    LRESULT chromeResult;
+    if (cn1WinChromeMessage(hwnd, msg, wParam, lParam, &chromeResult)) return chromeResult;
     switch (msg) {
+        case WM_DPICHANGED: {
+            RECT* suggested = (RECT*)lParam;
+            SetWindowPos(hwnd, NULL, suggested->left, suggested->top,
+                    suggested->right - suggested->left, suggested->bottom - suggested->top,
+                    SWP_NOZORDER | SWP_NOACTIVATE);
+            cn1WinPushEvent(CN1_EVENT_THEME_SETTINGS_CHANGED, 0, 0, 0);
+            return 0;
+        }
         case WM_SETTINGCHANGE:
         case WM_THEMECHANGED:
         case WM_SYSCOLORCHANGE:

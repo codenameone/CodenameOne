@@ -2679,6 +2679,91 @@ public class Toolbar extends Container {
         }
     }
 
+    private boolean applyingTitleInsets;
+    private int[] laidOutTitleInsets;
+
+    private int[] titleInsets() {
+        Form form = getComponentForm();
+        return isVisible() && form != null && !(form instanceof Dialog) && form.isDesktopToolbarTitle()
+                ? Display.impl.getNativeWindowTitleBarInsets(this) : null;
+    }
+
+    // Native reserved space is additive and temporary: changing the platform metrics must
+    // not overwrite an application's theme, units, RTL padding or preferred-size settings.
+    private final class TitlePadding {
+        private final Style style = getStyle();
+        private final float[] padding = new float[4];
+        private final byte[] units = new byte[4];
+        private final boolean suppressed = style.isSuppressChangeEvents();
+
+        TitlePadding(int[] insets) {
+            int[] sides = {LEFT, RIGHT, TOP, BOTTOM};
+            byte[] originalUnits = style.getPaddingUnit();
+            for (int i = 0; i < 4; i++) {
+                padding[i] = style.getPaddingFloatValue(false, sides[i]);
+                units[i] = originalUnits == null ? Style.UNIT_TYPE_PIXELS
+                        : originalUnits[sides[i]];
+            }
+            int left = style.getPaddingLeftNoRTL();
+            int right = style.getPaddingRightNoRTL();
+            int top = style.getPaddingTop();
+            int bottom = style.getPaddingBottom();
+            style.setSuppressChangeEvents(true);
+            style.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
+            style.setPadding(TOP, top + insets[2], true);
+            style.setPadding(BOTTOM, bottom + insets[3], true);
+            style.setPadding(LEFT, left + insets[isRTL() ? 1 : 0], true);
+            style.setPadding(RIGHT, right + insets[isRTL() ? 0 : 1], true);
+            style.setSuppressChangeEvents(suppressed);
+        }
+
+        void restore() {
+            int[] sides = {LEFT, RIGHT, TOP, BOTTOM};
+            style.setSuppressChangeEvents(true);
+            for (int i = 0; i < 4; i++) {
+                style.setPadding(sides[i], padding[i], true);
+            }
+            style.setPaddingUnit(units[2], units[3], units[0], units[1]);
+            style.setSuppressChangeEvents(suppressed);
+        }
+    }
+
+    @Override
+    void doLayout() {
+        int[] insets = applyingTitleInsets ? null : titleInsets();
+        if (insets == null) {
+            laidOutTitleInsets = null;
+            super.doLayout();
+            return;
+        }
+        applyingTitleInsets = true;
+        TitlePadding padding = new TitlePadding(insets);
+        try {
+            super.doLayout();
+            laidOutTitleInsets = insets;
+        } finally {
+            padding.restore();
+            applyingTitleInsets = false;
+        }
+    }
+
+    @Override
+    protected com.codename1.ui.geom.Dimension calcPreferredSize() {
+        int[] insets = applyingTitleInsets ? null : titleInsets();
+        if (insets == null) {
+            return super.calcPreferredSize();
+        }
+        applyingTitleInsets = true;
+        TitlePadding padding = new TitlePadding(insets);
+        try {
+            com.codename1.ui.geom.Dimension size = super.calcPreferredSize();
+            return new com.codename1.ui.geom.Dimension(size.getWidth(), Math.max(size.getHeight(), insets[4]));
+        } finally {
+            padding.restore();
+            applyingTitleInsets = false;
+        }
+    }
+
     private int[] nativeTitleBarRegions;
 
     // Native hit testing must see the actual laid-out controls, including disabled
@@ -2751,6 +2836,17 @@ public class Toolbar extends Container {
 
     @Override
     public void paint(Graphics g) {
+        int[] insets = titleInsets();
+        boolean changedInsets = (insets == null) != (laidOutTitleInsets == null);
+        if (insets != null && laidOutTitleInsets != null) {
+            for (int i = 0; i < 5; i++) {
+                changedInsets |= insets[i] != laidOutTitleInsets[i];
+            }
+        }
+        if (changedInsets) {
+            setShouldCalcPreferredSize(true);
+            revalidateLater();
+        }
         Form parent = getComponentForm();
         if (isVisible() && parent != null && !(parent instanceof Dialog) && parent.isDesktopToolbarTitle()) {
             int[] regions = titleBarRegions();

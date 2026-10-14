@@ -212,6 +212,16 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private boolean desktop;
     private String desktopTitleBarMode = "toolbar";
     private int[] lastTitleBarRegions;
+    private int[] nativeTitleBarInsets;
+
+    public void setNativeTitleBarInsets(int... values) {
+        nativeTitleBarInsets = values;
+    }
+
+    @Override
+    public int[] getNativeWindowTitleBarInsets(Component toolbar) {
+        return nativeTitleBarInsets;
+    }
 
     @Override
     public void setNativeWindowTitleBarRegions(Component toolbar, int[] regions) {

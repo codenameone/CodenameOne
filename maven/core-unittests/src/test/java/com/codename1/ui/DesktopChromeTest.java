@@ -130,6 +130,60 @@ class DesktopChromeTest extends UITestBase {
         assertTrue(implementation.getLastTitleBarRegions().length > 0);
     }
 
+    @FormTest
+    void nativeControlsReservePhysicalSpaceWithoutChangingApplicationStyle() {
+        desktopMode("custom");
+        implementation.setNativeTitleBarInsets(70, 130, 6, 4, 50);
+        Form form = new Form("Document");
+        Toolbar toolbar = form.getToolbar();
+        toolbar.getAllStyles().setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
+        toolbar.getAllStyles().setPadding(2, 3, 5, 7);
+        toolbar.setTitleCentered(false);
+        Container content = new Container(new com.codename1.ui.layouts.BorderLayout());
+        Button left = new Button("Save");
+        Button right = new Button("Search");
+        content.add(com.codename1.ui.layouts.BorderLayout.WEST, left);
+        content.add(com.codename1.ui.layouts.BorderLayout.EAST, right);
+        toolbar.setTitleComponent(content);
+        form.show();
+        DisplayTest.flushEdt();
+        assertTrue(toolbar.getPreferredH() >= 50);
+        assertTrue(content.getX() >= 75);
+        assertTrue(content.getX() + content.getWidth() <= toolbar.getWidth() - 137);
+        assertEquals(5, toolbar.getStyle().getPaddingLeftNoRTL());
+        assertEquals(7, toolbar.getStyle().getPaddingRightNoRTL());
+        assertEquals(2, toolbar.getStyle().getPaddingTop());
+        assertEquals(3, toolbar.getStyle().getPaddingBottom());
+        int x = content.getX();
+        toolbar.layoutContainer();
+        assertEquals(x, content.getX(), "repeated layouts must not accumulate native insets");
+        implementation.setNativeTitleBarInsets(0, 90, 0, 0, 35);
+        toolbar.setShouldCalcPreferredSize(true);
+        toolbar.layoutContainer();
+        assertTrue(content.getX() < x, "changed native geometry releases the old reserved space");
+        assertTrue(content.getX() + content.getWidth() <= toolbar.getWidth() - 97);
+        toolbar.setRTL(true);
+        toolbar.layoutContainer();
+        assertTrue(content.getX() + content.getWidth() <= toolbar.getWidth() - 90,
+                "OS controls stay on their physical side in an RTL document");
+    }
+
+    @FormTest
+    void mobileAndLegacyToolbarsDoNotReserveDesktopControls() {
+        implementation.setNativeTitleBarInsets(200, 200, 50, 50, 300);
+        Toolbar.setGlobalToolbar(true);
+        implementation.setDesktop(false);
+        Form mobile = new Form("Mobile");
+        mobile.show();
+        DisplayTest.flushEdt();
+        assertTrue(mobile.getToolbar().getPreferredH() < 300);
+        desktopMode("toolbar");
+        Form legacy = new Form("Legacy");
+        legacy.show();
+        DisplayTest.flushEdt();
+        assertTrue(legacy.getToolbar().getPreferredH() < 300);
+    }
+
     private void desktopMode(String titleBarMode) {
         implementation.setDesktop(true);
         implementation.setDesktopTitleBarMode(titleBarMode);

@@ -5300,6 +5300,15 @@ public abstract class CodenameOneImplementation {
     public void setNativeWindowTitleBarRegions(Component toolbar, int[] regions) {
     }
 
+    /// Returns reserved title-bar space for an integrated custom Toolbar, in component pixels.
+    /// The five entries are physical left, right, top, bottom insets and minimum band height.
+    /// Return null when native integration is unavailable. Called on the EDT during layout;
+    /// implementations must not call Java UI code while querying their native UI thread.
+    /// Mobile and browser ports retain the null implementation.
+    public int[] getNativeWindowTitleBarInsets(Component toolbar) {
+        return null;
+    }
+
     /// Begins dragging the native desktop window (custom mode title bar). The arguments are
     /// absolute pointer coordinates at the start of the drag. No-op without a native window.
     ///
