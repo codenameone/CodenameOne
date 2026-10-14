@@ -11,13 +11,25 @@
 //  - named constructor parameters       -> void setter methods of the same name
 //  - instance getters                   -> no-arg method calls (name())
 //  - named parameters of methods        -> canonical positional order as declared
-//  - most callback-shaped parameters are typed Object here (dynamic in Dart
-//    terms); the runtime class behind them dispatches with instanceof.
-//    listen()'s onData is the one exception -- real Dart types it strictly
-//    void, and outside a few names the emitter special-cases (Future.then
-//    et al.), a Dart closure literal transpiles to a bare, untyped Java
-//    lambda, so the REAL Java parameter (dart.async.Stream, not this stub)
-//    must be a genuine Funcs functional interface for it to compile at all.
+//  - every callback-shaped parameter here stays Object/dynamic, matching
+//    the convention of every other stub's optional callbacks -- the Java
+//    SIGNATURE that actually receives a transpiled closure lives in
+//    dart.async.Stream/StreamSubscription/StreamController (maven/dart-runtime),
+//    never in this file. Outside a few names the emitter special-cases
+//    (Future.then et al.), a Dart closure literal transpiles to a bare,
+//    untyped Java lambda with no wrapping, so whatever REAL Java parameter
+//    it lands on must be a genuine Funcs functional interface or the
+//    generated call fails to compile -- a plain Object parameter is not
+//    one. listen()'s onData, map()'s transform, where()'s test and
+//    listen()'s onDone are all concretely typed on the Java side for this
+//    reason. onError stays Object even there -- real Dart's untyped
+//    onError accepts a one- or a two-argument handler, and the stub
+//    convention pads an omitted trailing named parameter with a bare null,
+//    which would be ambiguous between a one- and a two-argument overload --
+//    so the emitter itself pins a transpiled onError: closure to the Funcs
+//    type its own arity needs before the call, the same way it pins
+//    Future.then's onError:. See dart.async.Stream's class comment for the
+//    full detail.
 
 @JavaName('dart.async.StreamSubscription')
 abstract class StreamSubscription<T> {

@@ -37,8 +37,21 @@ public class DartIterable<E> implements Iterable<E> {
 
     private final Iterable<E> source;
 
+    /// Overrides the default element-by-element scan in {@link #contains}, used only
+    /// by {@code DartMap.keys()}/{@code valuesIterable()} so a view over a map's own
+    /// keys or values agrees with that map's {@code containsKey}/{@code containsValue}
+    /// -- see the field's one use for why a scan is not always the same answer.
+    private final Funcs.Func1<Object, Boolean> membershipTest;
+
     protected DartIterable(Iterable<E> source) {
+        this(source, null);
+    }
+
+    /// Package-private: only a map's own views need to redirect membership to the
+    /// map, so this is not part of the public combinator surface.
+    DartIterable(Iterable<E> source, Funcs.Func1<Object, Boolean> membershipTest) {
         this.source = source;
+        this.membershipTest = membershipTest;
     }
 
     public static <E> DartIterable<E> wrap(Iterable<E> source) {
@@ -281,6 +294,9 @@ public class DartIterable<E> implements Iterable<E> {
     }
 
     public boolean contains(Object element) {
+        if (membershipTest != null) {
+            return Boolean.TRUE.equals(membershipTest.call(element));
+        }
         for (E e : this) {
             if (dart.runtime.DartRuntime.eq(e, element)) {
                 return true;

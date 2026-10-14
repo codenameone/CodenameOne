@@ -67,6 +67,22 @@ public final class StreamController<T> {
         return new StreamController<T>();
     }
 
+    /**
+     * Same as the plain constructor -- see the class comment. Takes the stub's three
+     * named parameters in canonical positional order ({@code onListen, onCancel, sync}):
+     * the stub declares {@code broadcast({onListen, onCancel, sync})}, and a transpiled
+     * call with ANY of them given -- {@code StreamController<T>.broadcast(sync: true)},
+     * say -- is flattened to all three positionally, nulls filling in whichever were
+     * not given. The no-argument {@link #broadcast()} above answers only the
+     * zero-argument call and would fail to compile every other one.
+     */
+    public static <T> StreamController<T> broadcast(Object onListen, Object onCancel, Boolean sync) {
+        StreamController<T> c = new StreamController<T>();
+        c.onListen(onListen);
+        c.onCancel(onCancel);
+        return c;
+    }
+
     public void onListen(Object handler) {
         this.onListenHandler = handler;
     }

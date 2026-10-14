@@ -229,6 +229,46 @@ public class ImageRenderElement extends RenderElement {
         return hex.toString();
     }
 
+    /**
+     * A terminal failure for {@code source}: the network returned no bytes, or what it
+     * returned would not decode. Without this, {@link #loadedSource} stayed set to the
+     * failed source, so every later rebuild of the SAME {@code Image.network} hit the
+     * equality check at the top of {@link #loadImage} and returned before ever asking
+     * again -- a transient failure (a dropped connection, a server hiccup) left the
+     * image blank forever instead of just until the next rebuild, where Flutter's own
+     * {@code ImageCache} evicts a failed load rather than caching the blank permanently.
+     *
+     * <p>Clearing the marker is enough: it does not retry itself, so there is no tight
+     * loop here, only a later rebuild -- a parent rebuild, a scroll that remounts the
+     * tile, {@code setState} -- calling {@link #loadImage} again and finding the source
+     * no longer "loaded".</p>
+     *
+     * <p>Guarded on identity with the CURRENT load: by the time a response arrives the
+     * widget may already have moved on to a different {@code source} (a fast-scrolling
+     * list reusing this element), and a stale failure for the OLD source must not clear
+     * the marker the new one is relying on.</p>
+     */
+    void onLoadFailed(String source) {
+        if (source.equals(loadedSource)) {
+            loadedSource = null;
+        }
+    }
+
+    /// Seam for FailedNetworkImageRetryTest: whether loadImage() would treat `source` as
+    /// already loaded and skip reloading it, without driving Storage, ConnectionRequest
+    /// or NetworkManager -- the pieces the retry fix does not depend on to be correct.
+    boolean isLoadedForTest(String source) {
+        return source.equals(loadedSource);
+    }
+
+    /// Seam for FailedNetworkImageRetryTest: simulates loadImage() having just started a
+    /// fetch for `source`, the way it marks `loadedSource` before calling
+    /// fetchNetworkImage.
+    void simulateLoadStartedForTest(String source) {
+        loadedSource = source;
+        img = null;
+    }
+
     /** Loads a network image from the storage cache, or downloads and caches it. */
     private void fetchNetworkImage(final Label l, final String source, String url,
             final java.util.Map<?, ?> headers) {
@@ -260,6 +300,7 @@ public class ImageRenderElement extends RenderElement {
             public void actionPerformed(com.codename1.io.NetworkEvent evt) {
                 final byte[] data = req.getResponseData();
                 if (data == null || data.length == 0) {
+                    onLoadFailed(source);
                     return;
                 }
                 com.codename1.ui.CN.callSerially(new Runnable() {
@@ -272,6 +313,7 @@ public class ImageRenderElement extends RenderElement {
                             img = downsample(encodedWithKnownSize(new java.io.ByteArrayInputStream(data)));
                         } catch (java.io.IOException e) {
                             Log.p("Flutter runtime: could not decode image " + source);
+                            onLoadFailed(source);
                             return;
                         }
                         java.io.OutputStream out = null;

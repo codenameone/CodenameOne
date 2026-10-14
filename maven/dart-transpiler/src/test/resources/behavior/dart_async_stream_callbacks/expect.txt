@@ -1,0 +1,3 @@
+map-where: [mapped:2, mapped:3, even:2, mapped:4, mapped:5, even:4]
+onerror-1arg: [data:a, err1:boom1, done1]
+onerror-2arg: [data:b, err2:boom2, done2]

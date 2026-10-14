@@ -289,12 +289,20 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> {
         return !isEmpty();
     }
 
+    /// Membership delegates to {@link #containsKey}, not a scan comparing elements
+    /// with Dart's {@code ==}: for a {@code Map.identity()} map, {@link #containsKey}
+    /// matches by identity, so a plain scan over {@code keySet()} disagreed with it --
+    /// {@code map.keys.contains(b)} answered true for a distinct, merely equal {@code b}
+    /// that {@code containsKey(b)} answered false for.
     public DartIterable<K> keys() {
-        return DartIterable.wrap(keySet());
+        return new DartIterable<K>(keySet(), this::containsKey);
     }
 
+    /// Delegates to {@link #containsValue} for the same reason {@link #keys} delegates
+    /// to {@link #containsKey}: a subclass may give the two a different meaning, and a
+    /// view that scanned its own elements instead would silently disagree with it.
     public DartIterable<V> valuesIterable() {
-        return DartIterable.wrap(values());
+        return new DartIterable<V>(values(), this::containsValue);
     }
 
     public V putIfAbsentDart(K key, Funcs.Func0<V> ifAbsent) {

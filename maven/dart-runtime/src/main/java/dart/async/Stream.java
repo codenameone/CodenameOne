@@ -40,15 +40,36 @@ import java.util.List;
  * literal is emitted as a plain, untyped Java lambda with no wrapping, so
  * whatever parameter it is passed to MUST be a genuine functional
  * interface -- a parameter typed plain {@code Object} is not one, and the
- * generated call fails to compile. {@code onError} and {@code onDone}
- * stay {@code Object} (real Dart types {@code onError} as the untyped
- * {@code Function?}) and are dispatched with {@code instanceof} across
- * {@link Funcs.VoidFunc0}/{@link Funcs.Func0}/
- * {@link Funcs.VoidFunc1}/{@link Funcs.Func1} -- never a blind cast, per
- * this runtime's no-ClassCastException rule -- which covers every
- * hand-written Java caller; a transpiled Dart closure passed for either of
- * those two specifically would need the same concrete typing {@code
- * onData} has, which is not provided here.</p>
+ * generated call fails to compile. {@link #map} and {@link #where} are
+ * concretely typed the same way ({@link Funcs.Func1}), and so is
+ * {@code onDone} ({@link Funcs.VoidFunc0}, real Dart's own
+ * {@code void onDone()?}).
+ *
+ * <p>{@code onError} stays {@code Object}: real Dart types it as the
+ * untyped {@code Function?} and accepts either a one- or a two-argument
+ * handler ({@code void onError(e)} or {@code void onError(e, StackTrace
+ * st)}), and one concrete Java parameter type cannot express both -- nor
+ * can {@link #listen} be overloaded on it the way {@code then}/
+ * {@code catchError} are overloaded on a lambda's return shape: the stub
+ * convention pads every omitted trailing named parameter with a bare
+ * {@code null} (see {@link #listen(Funcs.VoidFunc1, Object, Funcs.VoidFunc0,
+ * Boolean)}'s own comment), and a {@code null} given where {@code onError}
+ * was not supplied -- the common case -- would be ambiguous between a
+ * one- and a two-argument overload equally. The emitter instead pins a
+ * transpiled {@code onError:} closure literal to
+ * {@link Funcs.VoidFunc1}{@code <Object>} or
+ * {@link Funcs.VoidFunc2}{@code <Object, Object>} by the closure's OWN
+ * arity before the call (mirroring {@code Future.then}'s {@code onError:}
+ * handling) -- never a blind cast, per this runtime's no-ClassCastException
+ * rule. A hand-written Java caller may still pass any of
+ * {@link Funcs.VoidFunc1}/{@link Funcs.Func1}/{@link Funcs.VoidFunc2}/
+ * {@link Funcs.Func2} for {@code onError} directly (it stays {@code Object});
+ * {@link #deliverError} dispatches across all of them with
+ * {@code instanceof}, never a cast. {@code onDone} itself is concretely
+ * {@link Funcs.VoidFunc0} on {@link #listen}, but {@link StreamSubscription}'s
+ * own {@code onDone(Object)} setter can still replace it with a
+ * value-returning {@link Funcs.Func0}, which {@link #deliverVoid} also
+ * dispatches by {@code instanceof}.</p>
  *
  * <p><b>Not implemented</b> (kept out deliberately, not by oversight): a
  * single-subscription stream that buffers events before anyone listens --
@@ -154,25 +175,32 @@ public class Stream<T> {
         return listen(onData, onError, null, null);
     }
 
-    public final StreamSubscription<T> listen(Funcs.VoidFunc1<T> onData, Object onError, Object onDone) {
+    public final StreamSubscription<T> listen(Funcs.VoidFunc1<T> onData, Object onError, Funcs.VoidFunc0 onDone) {
         return listen(onData, onError, onDone, null);
     }
 
     /**
      * Dart's {@code listen(onData, {onError, onDone, cancelOnError})},
      * flattened to its canonical positional order (the stub convention for
-     * named parameters). {@code cancelOnError} cancels the subscription
-     * right after its {@code onError} handler runs for the first error.
+     * named parameters) -- which pads every TRAILING parameter the call
+     * omits with {@code null}, all the way out to {@code cancelOnError}, so
+     * this is the one overload every transpiled call actually reaches;
+     * the three above exist for hand-written Java callers.
+     * {@code cancelOnError} cancels the subscription right after its
+     * {@code onError} handler runs for the first error.
      *
-     * <p>{@code onData} is concretely typed (real Dart's own signature is
-     * {@code void onData(T event)?}, never value-returning), unlike
-     * {@code onError}/{@code onDone}: the transpiler emits every closure
-     * literal as a bare, untyped Java lambda with no wrapping, so any
-     * parameter a Dart closure is passed to must be a genuine functional
-     * interface -- a plain {@code Object} parameter is not one, and the
-     * generated call fails to compile.</p>
+     * <p>{@code onError} stays {@code Object}, unlike {@code onData} and
+     * {@code onDone} -- see the class comment for why. {@code null} (the
+     * common case, since most listeners give no {@code onError} at all)
+     * and any of {@link Funcs.VoidFunc1}/{@link Funcs.Func1}/
+     * {@link Funcs.VoidFunc2}/{@link Funcs.Func2} pass through as is; the
+     * emitter pins a transpiled closure literal to the concrete type its
+     * own arity needs before it ever reaches here (see
+     * {@code JavaEmitter}'s {@code onError} handling for {@code Stream.listen},
+     * mirroring {@code Future.then}'s).</p>
      */
-    public final StreamSubscription<T> listen(Funcs.VoidFunc1<T> onData, Object onError, Object onDone, Boolean cancelOnError) {
+    public final StreamSubscription<T> listen(Funcs.VoidFunc1<T> onData, Object onError, Funcs.VoidFunc0 onDone,
+            Boolean cancelOnError) {
         Sub sub = new Sub();
         sub.onData = onData;
         sub.onError = onError;
@@ -350,27 +378,30 @@ public class Stream<T> {
      * Dart's {@code Stream<T>.map<R>}: a derived stream that applies
      * {@code transform} to every event. The upstream subscription is only
      * live while the derived stream itself has listeners.
+     *
+     * <p>Concretely typed ({@link Funcs.Func1}, not {@code Object}) for the
+     * same reason {@link #listen}'s {@code onData} is -- see the class
+     * comment.</p>
      */
-    public final <R> Stream<R> map(final Object transform) {
+    public final <R> Stream<R> map(final Funcs.Func1<T, R> transform) {
         final Stream<T> upstream = this;
         return new Stream<R>() {
             private StreamSubscription<T> upstreamSub;
 
             @Override
-            @SuppressWarnings("unchecked")
             protected void onFirstListener() {
                 final Stream<R> self = this;
                 upstreamSub = upstream.listen(new Funcs.VoidFunc1<T>() {
                     @Override
                     public void call(T v) {
-                        Object mapped;
+                        R mapped;
                         try {
-                            mapped = invoke1(transform, v);
+                            mapped = transform.call(v);
                         } catch (Throwable t) {
                             self.emitError(t);
                             return;
                         }
-                        self.emit((R) mapped);
+                        self.emit(mapped);
                     }
                 }, new Funcs.VoidFunc1<Object>() {
                     @Override
@@ -395,8 +426,12 @@ public class Stream<T> {
         };
     }
 
-    /** Dart's {@code Stream<T>.where}: a derived stream of events {@code test} accepts. */
-    public final Stream<T> where(final Object test) {
+    /**
+     * Dart's {@code Stream<T>.where}: a derived stream of events {@code test} accepts.
+     *
+     * <p>Concretely typed, like {@link #map} -- see the class comment.</p>
+     */
+    public final Stream<T> where(final Funcs.Func1<T, Boolean> test) {
         final Stream<T> upstream = this;
         return new Stream<T>() {
             private StreamSubscription<T> upstreamSub;
@@ -409,7 +444,7 @@ public class Stream<T> {
                     public void call(T v) {
                         boolean keep;
                         try {
-                            keep = Boolean.TRUE.equals(invoke1(test, v));
+                            keep = Boolean.TRUE.equals(test.call(v));
                         } catch (Throwable t) {
                             self.emitError(t);
                             return;
@@ -456,19 +491,6 @@ public class Stream<T> {
         } catch (Throwable t) {
             reportUncaught(t);
         }
-    }
-
-    /** Invokes a one-argument transform/predicate callback and returns its result. */
-    @SuppressWarnings("unchecked")
-    static Object invoke1(Object fn, Object value) {
-        if (fn instanceof Funcs.Func1) {
-            return ((Funcs.Func1<Object, Object>) fn).call(value);
-        }
-        if (fn instanceof Funcs.VoidFunc1) {
-            ((Funcs.VoidFunc1<Object>) fn).call(value);
-            return null;
-        }
-        throw new dart.core.ArgumentError("not a one-argument function");
     }
 
     /**

@@ -579,6 +579,34 @@ public class DartCoreSemanticsTest {
     }
 
     @Test
+    public void anIdentityMapKeysIterableAgreesWithContainsKey() {
+        // keys() used to be the generic DartIterable wrapping keySet(), whose
+        // contains() scans with Dart's == -- so an equal but distinct key read
+        // as present through keys().contains() while containsKey() (identity)
+        // said it was not. Both must agree, in both directions.
+        DartMap<Object, String> m = DartMap.identity();
+        String a = new String("k");
+        String b = new String("k");
+        m.put(a, "first");
+        assertTrue(m.keys().contains(a));
+        assertTrue(m.containsKey(a));
+        assertFalse(m.keys().contains(b), "equal but distinct key must not read as a member");
+        assertFalse(m.containsKey(b));
+        assertFalse(m.keys().contains("k"));
+        assertFalse(m.containsKey("k"));
+
+        // values()/entries() checked for the same divergence: valuesIterable()
+        // must agree with containsValue (values are never identity-compared,
+        // but the delegation must not break the ordinary case), and entries()
+        // -- MapEntry has no == override in Dart, so a freshly built MapEntry is
+        // never `contains`-equal to another, identity map or not.
+        assertTrue(m.valuesIterable().contains("first"));
+        assertTrue(m.containsValue("first"));
+        assertFalse(m.valuesIterable().contains("second"));
+        assertFalse(m.entries().contains(new MapEntry<Object, String>(a, "first")));
+    }
+
+    @Test
     public void doublesPrintInDartNotation() {
         // Recorded from the Dart SDK.
         String[][] cases = {

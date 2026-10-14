@@ -8974,7 +8974,18 @@ public final class JavaEmitter {
                         break;
                     }
                 }
-                if (match != null) {
+                if (match != null && p.name.equals("onError") && match.value instanceof Lambda) {
+                    // dart.async.Stream.listen's onError (and any other stub parameter
+                    // literally named onError): real Dart's onError takes either a
+                    // one- or a two-argument handler, which no single concrete Java
+                    // parameter type -- nor an overload, once a stub call pads every
+                    // omitted trailing named parameter with a bare null -- can express.
+                    // Pin the closure to the Funcs type its OWN arity needs, the same
+                    // way Future.then's onError: is pinned (pinnedHandler), rather than
+                    // leaving it a bare lambda a plain Object parameter cannot accept.
+                    // See dart.async.Stream's class comment.
+                    sb.append(pinnedErrorHandler((Lambda) match.value, emitExpr(match.value, null, ctx)));
+                } else if (match != null) {
                     Out o = emitExpr(match.value, pt, ctx);
                     sb.append(coerce(o, pt, ctx));
                 } else if (p.defaultValue != null) {
@@ -8986,6 +8997,21 @@ public final class JavaEmitter {
         }
         reportUnknownNamedArgs(ct, owner, args);
         return sb.toString();
+    }
+
+    /**
+     * Pins a transpiled {@code onError:} closure literal to the Funcs type its own
+     * arity needs: {@code dart.runtime.Funcs.VoidFunc1<Object>} for a one-argument
+     * handler ({@code (e) { ... }}), {@code dart.runtime.Funcs.VoidFunc2<Object,
+     * Object>} for a two-argument one ({@code (e, st) { ... }}) -- see the call
+     * site's comment and {@code dart.async.Stream}'s class comment for why this
+     * cannot instead be an overload.
+     */
+    private String pinnedErrorHandler(Lambda src, Out o) {
+        String type = src.params.size() >= 2
+                ? "dart.runtime.Funcs.VoidFunc2<Object, Object>"
+                : "dart.runtime.Funcs.VoidFunc1<Object>";
+        return "(" + type + ") " + paren(o.code);
     }
 
     /** Set while emitting a super(...) initializer, where no statement may come first. */
