@@ -288,6 +288,12 @@ final class Access extends BackendAccess {
     }
 
     @Override
+    public Object begin(int propagation, boolean readOnly, int timeoutSeconds,
+                        com.codename1.backend.annotations.Isolation isolation) {
+        return Transactions.begin(propagation, readOnly, timeoutSeconds, isolation);
+    }
+
+    @Override
     public void commit(Object transaction) {
         if (transaction instanceof Transactions.Transaction) {
             Transactions.commit((Transactions.Transaction) transaction);

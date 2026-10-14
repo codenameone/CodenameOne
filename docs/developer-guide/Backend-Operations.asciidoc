@@ -188,6 +188,16 @@ The reasons to choose this are cold start, footprint, deployment shape, and one
 language across the app and its server. If none of those matter for the service in
 front of you, use a JVM framework.
 
+=== External Programs
+
+Backend applications use the shared `com.codename1.io.ProcessBuilder` and
+`com.codename1.io.Process` API described in <<processes>>. The same API serves
+JavaSE and native desktop applications. Request-scoped children must be closed
+on completion or cancellation; long-lived children belong to a managed bean
+with a `@PreDestroy` cleanup method. A timed wait doesn't itself terminate a
+child. See that chapter for pipe draining, virtual-thread behavior, platform
+restrictions, and the differences from JavaSE.
+
 [[backend-zip]]
 === Streaming ZIP archives
 

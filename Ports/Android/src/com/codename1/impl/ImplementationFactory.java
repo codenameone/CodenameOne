@@ -69,4 +69,8 @@ public class ImplementationFactory {
         }
         return new AndroidImplementation();
     }
+    /** Internal process adapter; null means this port does not support processes. */
+    public Object createProcessSupport() {
+        return null;
+    }
 }

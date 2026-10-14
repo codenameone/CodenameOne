@@ -120,4 +120,10 @@ public class Object{
     protected Object clone() {
         return null;
     }
+    /**
+     * Finalization hook for subclasses that own native resources. The base
+     * implementation does nothing; callers should release resources explicitly.
+     */
+    protected void finalize() throws Throwable {
+    }
 }
