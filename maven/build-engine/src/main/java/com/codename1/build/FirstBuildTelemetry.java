@@ -266,6 +266,22 @@ public final class FirstBuildTelemetry {
         }
     }
 
+    /// Whether this JVM was started for this one build, so its shutdown is the build's
+    /// end: Maven's own launcher (`mvn`, `mvnw`, and the external runs of IntelliJ
+    /// IDEA, NetBeans and Eclipse) starts through plexus-classworlds, and the older
+    /// Maven Wrapper through its own main class in the same JVM. Embedded Maven
+    /// (Eclipse m2e's workspace builds) and the Maven daemon run many builds in one
+    /// JVM and are left out.
+    public static boolean jvmEndsWithBuild(Map<?, ?> sysProps) {
+        Object command = sysProps.get("sun.java.command");
+        if (command == null) {
+            return false;
+        }
+        String c = command.toString();
+        return (c.contains("classworlds") || c.contains("org.apache.maven.wrapper.MavenWrapperMain"))
+                && !c.contains("mvnd") && sysProps.get("mvnd.home") == null;
+    }
+
     /// The report the shutdown hook sends; package-private so tests can run it.
     void stopped() {
         if (!ended.compareAndSet(false, true)) {

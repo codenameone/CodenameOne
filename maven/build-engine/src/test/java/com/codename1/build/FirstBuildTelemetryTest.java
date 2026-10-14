@@ -39,6 +39,7 @@ import java.util.Properties;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -263,6 +264,21 @@ class FirstBuildTelemetryTest {
         t.stopped();
         assertEquals(1, exits());
         assertTrue(bodies.get(bodies.size() - 1).contains("reason=ok"));
+    }
+
+    @Test
+    void onlyAJvmStartedForTheBuildReportsAStop() {
+        assertTrue(FirstBuildTelemetry.jvmEndsWithBuild(props("sun.java.command",
+                "org.codehaus.plexus.classworlds.launcher.Launcher -B package")));
+        // IntelliJ IDEA's external Maven runner.
+        assertTrue(FirstBuildTelemetry.jvmEndsWithBuild(props("sun.java.command",
+                "org.codehaus.classworlds.Launcher -Didea.version=2026.2 verify")));
+        // Embedded Maven in an IDE, the Maven daemon, and an unknown host.
+        assertFalse(FirstBuildTelemetry.jvmEndsWithBuild(props("sun.java.command",
+                "org.eclipse.equinox.launcher.Main -os macosx")));
+        assertFalse(FirstBuildTelemetry.jvmEndsWithBuild(props("sun.java.command",
+                "org.mvndaemon.mvnd.daemon.Server", "mvnd.home", "/opt/mvnd")));
+        assertFalse(FirstBuildTelemetry.jvmEndsWithBuild(props()));
     }
 
     @Test
