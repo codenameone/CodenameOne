@@ -6923,9 +6923,27 @@ public final class JavaEmitter {
      */
     private TypeRef lastLambdaExprType;
     private List<TypeRef> lastLambdaReturns;
+    /**
+     * Whether the most recently emitted lambda is a single-expression arrow body
+     * (no statements had to be lifted out of it) whose body, AS EMITTED JAVA, is
+     * itself a legal statement -- a method call, assignment, {@code new X(...)} or
+     * increment/decrement. Per JLS 15.27.3 such a body is compatible with both a
+     * void-returning and a value-returning functional-interface descriptor
+     * regardless of the body's own static type: a Dart binary expression with a
+     * dynamic operand lowers to a call like {@code DartRuntime.dynBinary(...)},
+     * which returns Object but is syntactically still a bare statement, so
+     * {@code (v) -> DartRuntime.dynBinary(...)} is exactly as ambiguous, passed to
+     * an overloaded method, as a body that is genuinely void. {@link #pinnedHandler}
+     * reads this to decide whether a value-typed callback still needs a
+     * disambiguating cast; a block body (one or more lifted statements, or any
+     * body with an explicit {@code { ... }}) is never ambiguous this way, since it
+     * is void-compatible only in the absence of any value-returning {@code return}.
+     */
+    private boolean lastLambdaExprIsStatementShaped;
 
     private Out emitLambda(Lambda l, TypeRef expected, Ctx ctx) {
         lastLambdaVoid = false;
+        lastLambdaExprIsStatementShaped = false;
         // typedef-typed target position gives untyped lambda params real types
         TypeRef[] sigTypes = expected != null ? typedefSig(expected.name) : null;
         // An inline function type target (`Widget Function(BuildContext, T, Widget?)`,
@@ -7027,6 +7045,7 @@ public final class JavaEmitter {
             String lifted = ctx.popWriter();
             exprType = o.type;
             lastLambdaVoid = o.type != null && o.type.is("void");
+            lastLambdaExprIsStatementShaped = lifted.isEmpty() && isJavaStatementExpr(o.code);
             if (lifted.isEmpty()) {
                 code = head + " -> " + o.code;
             } else if (o.type.is("void") || o.type.is("Null")) {
@@ -9509,7 +9528,118 @@ public final class JavaEmitter {
                 return new Out(callee + "(" + all + ")", sub);
             }
         }
-        return new Out(callee + "(" + args + ")", substReturn != null ? substReturn : rt);
+        TypeRef result = substReturn != null ? substReturn : rt;
+        // isConcreteType above only vets the return type's own head: `Stream<R> map<R>(...)`
+        // passes it because "Stream" is a known stub class, leaving the method's OWN type
+        // parameter R dangling inside the type argument -- a name the generated Java never
+        // declares (javac then rejects the local it types). Resolve any of the method's
+        // own generics that still appear anywhere in the result.
+        result = bindMethodTypeParams(result, m, c, ctx);
+        return new Out(callee + "(" + args + ")", result);
+    }
+
+    /**
+     * Binds a generic stub method's OWN type parameters -- the {@code <R>} of
+     * {@code Stream<R> map<R>(...)} or the {@code <T>} of {@code NavigatorState}'s
+     * {@code Future<T> push<T>(...)}, as opposed to the receiver class's own type
+     * parameter that {@link #stubMemberReturnType} already substitutes from the
+     * receiver's instantiation -- wherever one of them still appears inside {@code t}.
+     * {@link #isConcreteType} cannot catch this: it only inspects a type's own head, so
+     * a {@code Stream<R>} return passes it ("Stream" is a known stub class) and leaves
+     * the nested {@code R} behind as a type-variable name with no Java declaration.
+     *
+     * <p>Resolves each of the method's type parameters, in order: an explicit type
+     * argument at the call site ({@code stream.map<String>(...)}); failing that, the
+     * inferred return type of a closure-literal argument ({@code (x) => x + 1} binds R
+     * to {@code int} -- the {@code map}/{@code then}/{@code expand}/{@code fold}-style
+     * idiom where the type parameter is never spelled out); or, failing both, erasure to
+     * {@code dynamic}, which {@link #javaType} renders as the raw {@code Object} type
+     * argument. The result therefore never names an unbound method type variable.</p>
+     */
+    private TypeRef bindMethodTypeParams(TypeRef t, Ast.MethodDecl m, Call c, Ctx ctx) {
+        if (t == null || m.typeParams.isEmpty() || !mentionsAnyTypeParam(t, m.typeParams)) {
+            return t;
+        }
+        TypeRef fromClosure = null;
+        boolean triedClosure = false;
+        java.util.Map<String, TypeRef> subst = new java.util.HashMap<String, TypeRef>();
+        for (int i = 0; i < m.typeParams.size(); i++) {
+            TypeRef bound = i < c.typeArgs.size() ? c.typeArgs.get(i) : null;
+            if (bound == null) {
+                if (!triedClosure) {
+                    fromClosure = inferClosureArgReturnType(c);
+                    triedClosure = true;
+                }
+                bound = fromClosure != null ? fromClosure : TypeRef.DYNAMIC;
+            }
+            subst.put(m.typeParams.get(i), bound);
+        }
+        return substTypeVars(t, subst);
+    }
+
+    /** Whether {@code t} names one of {@code params} anywhere in its (possibly nested) type arguments. */
+    private boolean mentionsAnyTypeParam(TypeRef t, List<String> params) {
+        if (t == null) {
+            return false;
+        }
+        if (t.args.isEmpty()) {
+            return params.contains(t.name);
+        }
+        for (TypeRef a : t.args) {
+            if (mentionsAnyTypeParam(a, params)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The inferred type of a single closure-literal argument's return value, for the
+     * {@code map}/{@code then}/{@code expand}/{@code fold}-style idiom where a generic
+     * stub method's own type parameter is inferred from the callback rather than
+     * spelled out. Reads {@link #lastLambdaExprType}/{@link #lastLambdaReturns}, the
+     * fields {@link #emitLambda} leaves behind describing the lambda it most recently
+     * emitted -- the same fields {@code Future.catchError}/{@code whenComplete} already
+     * consult immediately after emitting their own callback argument, above. That means
+     * this must run right after the call's arguments are emitted (never cached across
+     * calls), and only once a Lambda literal argument is confirmed present: a call
+     * passing a tear-off or a stored function value emits no lambda at all, and would
+     * otherwise read a stale value left by some earlier, unrelated closure.
+     */
+    private TypeRef inferClosureArgReturnType(Call c) {
+        boolean hasLambdaArg = false;
+        for (Expr e : c.args.positional) {
+            if (e instanceof Lambda) {
+                hasLambdaArg = true;
+                break;
+            }
+        }
+        if (!hasLambdaArg) {
+            for (NamedArg na : c.args.named) {
+                if (na.value instanceof Lambda) {
+                    hasLambdaArg = true;
+                    break;
+                }
+            }
+        }
+        if (!hasLambdaArg) {
+            return null;
+        }
+        TypeRef t = lastLambdaExprType;
+        if (t == null && lastLambdaReturns != null && !lastLambdaReturns.isEmpty()) {
+            for (TypeRef r : lastLambdaReturns) {
+                TypeRef rr = r == null ? TypeRef.DYNAMIC : r;
+                if (t == null) {
+                    t = rr;
+                } else if (!t.toString().equals(rr.toString())) {
+                    t = TypeRef.DYNAMIC;
+                }
+            }
+        }
+        if (t == null || t.is("void") || t.is("Null") || t.is("var") || t.is("dynamic")) {
+            return null;
+        }
+        return t;
     }
 
     /**
@@ -9805,16 +9935,22 @@ public final class JavaEmitter {
      * A callback lambda cast to the functional type its body fits. A lambda has no type
      * of its own, so it cannot go where the parameter is Object; and a void- or
      * throw-bodied one fits both the value and the void overload of then/catchError,
-     * which javac reports as ambiguous. {@code forceCast} casts a value-returning lambda
-     * too (an Object parameter); otherwise only a void one is cast and javac resolves the
-     * rest as it always has. Anything that is not a lambda passes as is.
+     * which javac reports as ambiguous. So does a value-bodied arrow lambda whose single
+     * expression is itself a Java statement (a method call, assignment, {@code new X(...)}
+     * or increment/decrement) -- {@code (v) -> list.add(v)} is ambiguous even though
+     * {@code add} returns a value, and so is {@code (v) -> DartRuntime.dynBinary(...)},
+     * which a dynamic-operand Dart binary expression lowers to; see
+     * {@link #lastLambdaExprIsStatementShaped}. {@code forceCast} casts a value-returning
+     * lambda too (an Object parameter); otherwise only an ambiguous one is cast and javac
+     * resolves the rest as it always has. Anything that is not a lambda passes as is.
      */
     private String pinnedHandler(Expr src, Out o, boolean forceCast, String asValue, String asVoid) {
         if (!(src instanceof Lambda)) {
             return o.code;
         }
         boolean value = ((Lambda) src).exprBody != null ? !lastLambdaVoid : lambdaReturnsValue(src);
-        if (value && !forceCast) {
+        boolean ambiguous = ((Lambda) src).exprBody != null && lastLambdaExprIsStatementShaped;
+        if (value && !forceCast && !ambiguous) {
             return o.code;
         }
         return "(" + (value ? asValue : asVoid) + ") " + paren(o.code);
@@ -10702,6 +10838,22 @@ public final class JavaEmitter {
             return "var $unused" + (unusedCounter++) + " = " + code;
         }
         return code;
+    }
+
+    /**
+     * Whether {@code code}, as emitted Java, is itself a legal statement on its own (a
+     * method call, assignment, {@code new X(...)}, or an increment/decrement) rather than
+     * a value-only expression (a literal, an operator, a ternary, a bare identifier).
+     * Mirrors {@link #statementize}'s own classification of what needs no further
+     * wrapping to appear as a statement; used by {@link #pinnedHandler} to recognize an
+     * arrow-bodied lambda that is ambiguous between a void- and a value-returning
+     * functional-interface overload regardless of its body's own static type.
+     */
+    private boolean isJavaStatementExpr(String code) {
+        if (code.matches("[A-Za-z_$][A-Za-z0-9_$]*")) {
+            return false;
+        }
+        return !(code.startsWith("(") && code.endsWith(")"));
     }
 
     private int unusedCounter;

@@ -1,0 +1,8 @@
+doubled: [doubled:2, doubled:4, doubled:6]
+pinned: [pinned:2, pinned:4, pinned:6]
+tags: [tag-1, tag-2, tag-3]
+iterable-map: [Ann, Bo]
+list-map: [1, 4, 9]
+future-then: 15
+fold: 6
+expand: [1, 1, 2, 2, 3, 3]
