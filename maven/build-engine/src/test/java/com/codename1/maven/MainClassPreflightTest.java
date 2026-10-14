@@ -200,6 +200,56 @@ class MainClassPreflightTest {
         assertTrue(new File(host.buildDir, "test-android-device-jar-with-dependencies.jar").isFile());
     }
 
+    private void cachedApk(TestProjectHost host) throws Exception {
+        File apk = new File(host.buildDir, "test.apk");
+        Files.write(apk.toPath(), new byte[] {1});
+        host.sourcesModified = apk.lastModified() - 1000;
+        Files.write(new File(host.buildDir, "test.apk.cn1hardenkey").toPath(),
+                "unhardened".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    private AppBuilder cachedAndroidBuilder(TestProjectHost host) {
+        return new AppBuilder(host) {
+            @Override
+            protected void updateCodenameOne(boolean force) {
+                fail("Cached builds must validate and return before invoking the build client");
+            }
+        }.platform("android").buildTarget("android-device");
+    }
+
+    @Test
+    void cachedApkDoesNotHideInvalidMainClassSettingsOrOverrides() throws Exception {
+        File dependency = jar(app("com/example/MyApp"));
+        for (String key : new String[] {"codename1.mainName", "codename1.packageName"}) {
+            for (boolean commandLine : new boolean[] {false, true}) {
+                Properties settings = settings("com.example", "MyApp");
+                if (!commandLine) {
+                    settings.setProperty(key, "Missing");
+                }
+                TestProjectHost host = host("android", dependency, settings);
+                if (commandLine) {
+                    host.userProperties.setProperty(key, "Missing");
+                }
+                cachedApk(host);
+                String message = assertThrows(BuildFailureException.class,
+                        cachedAndroidBuilder(host)::execute, key + ", commandLine=" + commandLine)
+                        .getMessage();
+                assertTrue(message.contains("was not found in the compiled classes"), message);
+                assertTrue(message.contains("mvn cn1:settings"), message);
+            }
+        }
+    }
+
+    @Test
+    void validCachedApkStillSkipsTheBuildClientAfterValidation() throws Exception {
+        TestProjectHost host = host("android", jar(app("com/example/MyApp")),
+                settings("com.example", "MyApp"));
+        cachedApk(host);
+        cachedAndroidBuilder(host).execute();
+        assertTrue(new File(host.buildDir, "test-android-device-jar-with-dependencies.jar").isFile(),
+                "The cached APK must only be reused after staging and validating the main class");
+    }
+
     @Test
     void stagingRejectsMissingMainToo() throws Exception {
         TestProjectHost host = host("android", jar(app("com/example/Renamed")),

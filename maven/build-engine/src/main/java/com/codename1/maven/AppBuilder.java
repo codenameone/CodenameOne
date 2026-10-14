@@ -354,30 +354,6 @@ public class AppBuilder {
         // cloud build slot to discover. See applyIOSProvisioningPreflight.
         applyIOSProvisioningPreflight();
 
-        // stageOnly builds no APK, so it must neither short-circuit on a cached one (it would
-        // then stage nothing) nor, below, stamp that cached APK as matching this configuration.
-        if (platform.contains("android") && !stageOnly) {
-            if (!BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
-                File apkFile = androidApkFile();
-                try {
-                    // Up-to-date only when the APK is newer than the sources AND was built with the SAME
-                    // hardening outcome, recorded in the marker beside it. The source-timestamp check cannot
-                    // see a hardening change made through a build hint, so a change in EITHER direction --
-                    // enabling hardening (a stale unhardened APK) or disabling it (a stale hardened APK) --
-                    // must invalidate the cache and rebuild, rather than publish an APK that contradicts the
-                    // current configuration.
-                    if (apkFile.exists()
-                            && hardeningCacheKey.equals(readTextFileOrNull(androidHardeningCacheMarker()))
-                            && apkFile.lastModified() >= getSourcesModificationTime()) {
-                        getLog().info("Sources have not been modified since APK at " + apkFile + " was created.  Skipping Android build");
-                        return;
-                    }
-                } catch (IOException ex) {
-                    throw new BuildExecutionException("Failed to check sources modification time", ex);
-                }
-            }
-        }
-
         try {
             createAntProject();
         } catch (IOException ex) {
@@ -1975,6 +1951,31 @@ public class AppBuilder {
         // Validate the exact settings and classes sent to every cloud/local target before
         // invoking the build client. A renamed entry point must not cost a cloud build.
         MainClassPreflight.validate(jarWithDependencies, cn1SettingsProps);
+
+        // Reuse an APK only after validating the staged classes against the merged settings.
+        // Settings-file edits and command-line overrides do not change source timestamps and
+        // must not bypass the main-class preflight. stageOnly has already returned above.
+        if (platform.contains("android")) {
+            if (!BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
+                File apkFile = androidApkFile();
+                try {
+                    // Up-to-date only when the APK is newer than the sources AND was built with the SAME
+                    // hardening outcome, recorded in the marker beside it. The source-timestamp check cannot
+                    // see a hardening change made through a build hint, so a change in EITHER direction --
+                    // enabling hardening (a stale unhardened APK) or disabling it (a stale hardened APK) --
+                    // must invalidate the cache and rebuild, rather than publish an APK that contradicts the
+                    // current configuration.
+                    if (apkFile.exists()
+                            && hardeningCacheKey.equals(readTextFileOrNull(androidHardeningCacheMarker()))
+                            && apkFile.lastModified() >= getSourcesModificationTime()) {
+                        getLog().info("Sources have not been modified since APK at " + apkFile + " was created.  Skipping Android build");
+                        return;
+                    }
+                } catch (IOException ex) {
+                    throw new BuildExecutionException("Failed to check sources modification time", ex);
+                }
+            }
+        }
 
         try {
             updateCodenameOne(false);
