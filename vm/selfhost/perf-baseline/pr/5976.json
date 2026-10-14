@@ -119,6 +119,26 @@
       "time": 0.5
      }
     }
+   },
+   "stringBuilding": {
+    "all": {
+     "from": {
+      "memory": 0.175,
+      "time": 1.386,
+      "tolerance": {
+       "memory": 0.35,
+       "time": 0.2
+      }
+     },
+     "memory": 0.267,
+     "reason": "Windows x64 AMD Family 26 Model 2 stringBuilding all-core RAM is 0.267x on master's own runs 38346386877 and 38226452649 and on this PR's run 38519282184; pr/6010.json recorded 0.175x from a single run. The benchmark has no float or array-of-arrays path, so this PR's native changes cannot reach it. Pool the three same-model runs; keep the memory tolerance and time baseline.",
+     "runs": 3,
+     "time": 1.386,
+     "tolerance": {
+      "memory": 0.35,
+      "time": 0.2
+     }
+    }
    }
   }
  }
