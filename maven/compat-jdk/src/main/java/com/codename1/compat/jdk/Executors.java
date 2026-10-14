@@ -251,20 +251,32 @@ public final class Executors {
         @Override
         public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks) throws InterruptedException {
             List<Future<T>> futures = new ArrayList<Future<T>>(tasks.size());
-            for (Callable<T> task : tasks) {
-                futures.add(submit(task));
-            }
-            for (Future<T> future : futures) {
-                try {
-                    future.get();
-                } catch (ExecutionException e) {
-                    // The future holds the failure for whoever asks it.
-                    continue;
-                } catch (CancellationException e) {
-                    continue;
+            boolean done = false;
+            try {
+                for (Callable<T> task : tasks) {
+                    futures.add(submit(task));
+                }
+                for (Future<T> future : futures) {
+                    try {
+                        future.get();
+                    } catch (ExecutionException e) {
+                        // The future holds the failure for whoever asks it.
+                        continue;
+                    } catch (CancellationException e) {
+                        continue;
+                    }
+                }
+                done = true;
+                return futures;
+            } finally {
+                // Interrupted while waiting, or a submission refused: the
+                // tasks not yet finished are cancelled, as the contract asks.
+                if (!done) {
+                    for (Future<T> future : futures) {
+                        future.cancel(true);
+                    }
                 }
             }
-            return futures;
         }
 
         @Override
@@ -401,6 +413,7 @@ public final class Executors {
             if (cancelled.get()) {
                 throw new CancellationException();
             }
+            awaitable();
             try {
                 return outcome.get();
             } catch (AsyncResource.AsyncExecutionException e) {
@@ -413,6 +426,7 @@ public final class Executors {
             if (cancelled.get()) {
                 throw new CancellationException();
             }
+            awaitable();
             long millis = unit.toMillis(timeout);
             if (!outcome.isDone() && millis <= 0) {
                 throw new TimeoutException();
@@ -428,6 +442,16 @@ public final class Executors {
                     throw new TimeoutException();
                 }
                 throw e;
+            }
+        }
+
+        /// A thread that is interrupted does not start to wait, as with the
+        /// JDK's FutureTask, and its interrupt is consumed by the exception.
+        /// An interrupt that arrives during the wait is not seen: the wait
+        /// is AsyncResource's, which is not interruptible.
+        private void awaitable() throws InterruptedException {
+            if (!outcome.isDone() && Thread.interrupted()) {
+                throw new InterruptedException();
             }
         }
 

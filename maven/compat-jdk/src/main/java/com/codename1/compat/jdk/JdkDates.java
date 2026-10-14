@@ -34,10 +34,8 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.temporal.TemporalAccessor;
-import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.List;
 
 /// Members of `java.time` and `java.util.Date` the device's classes lack,
 /// as static methods that take the receiver first.
@@ -320,16 +318,25 @@ public final class JdkDates {
 
     /// The dates from `date` up to and not including `end`, a day apart.
     public static Stream<LocalDate> datesUntil(LocalDate date, LocalDate end) {
-        long from = date.toEpochDay();
-        long to = end.toEpochDay();
+        final long from = date.toEpochDay();
+        final long to = end.toEpochDay();
         if (to < from) {
             throw new IllegalArgumentException(end + " < " + date);
         }
-        List<LocalDate> dates = new ArrayList<LocalDate>();
-        for (long day = from; day < to; day++) {
-            dates.add(LocalDate.ofEpochDay(day));
-        }
-        return JdkCollections.stream(dates);
+        // Lazy, as the JDK's is: datesUntil(LocalDate.MAX).limit(1) makes
+        // one date, not every one up to the end of time.
+        return ObjPipeline.over(new PullIterator<LocalDate>() {
+            private long day = from;
+
+            @Override
+            boolean advance() {
+                if (day >= to) {
+                    return false;
+                }
+                emit(LocalDate.ofEpochDay(day++));
+                return true;
+            }
+        });
     }
 
     private static long prolepticMonth(LocalDate date) {
@@ -403,11 +410,11 @@ public final class JdkDates {
     }
 
     public static LocalDateTime plusWeeks(LocalDateTime value, long weeks) {
-        return value.plusDays(weeks * 7);
+        return value.plusDays(JdkTime.weeksAsDays(weeks));
     }
 
     public static LocalDateTime minusWeeks(LocalDateTime value, long weeks) {
-        return value.plusDays(-weeks * 7);
+        return value.plusDays(-JdkTime.weeksAsDays(weeks));
     }
 
     public static LocalDateTime plusMonths(LocalDateTime value, long months) {
@@ -658,11 +665,11 @@ public final class JdkDates {
     }
 
     public static ZonedDateTime plusWeeks(ZonedDateTime value, long weeks) {
-        return plusDays(value, weeks * 7);
+        return plusDays(value, JdkTime.weeksAsDays(weeks));
     }
 
     public static ZonedDateTime minusWeeks(ZonedDateTime value, long weeks) {
-        return plusDays(value, -weeks * 7);
+        return plusDays(value, -JdkTime.weeksAsDays(weeks));
     }
 
     public static ZonedDateTime plusMonths(ZonedDateTime value, long months) {

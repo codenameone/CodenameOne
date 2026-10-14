@@ -312,6 +312,12 @@ public class ControlsDataTest {
         assertTrue(cellAt(cells, 3).isSelected());
         assertTrue(list.getSelectionModel().isSelected(3));
 
+        // A row replaced in place stays selected and selects the new item.
+        list.getItems().set(3, "three");
+        assertEquals("[1, 3]", list.getSelectionModel().getSelectedIndices().toString());
+        assertEquals("[item 1, three]", list.getSelectionModel().getSelectedItems().toString());
+        list.getItems().set(3, "item 3");
+
         list.getSelectionModel().selectRange(0, 3);
         assertEquals("[0, 1, 2, 3]", list.getSelectionModel().getSelectedIndices().toString());
         list.getSelectionModel().clearSelection(1);

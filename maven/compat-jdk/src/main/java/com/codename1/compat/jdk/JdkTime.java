@@ -148,11 +148,20 @@ public final class JdkTime {
     }
 
     public static LocalDate plusWeeks(LocalDate date, long weeks) {
-        return date.plusDays(weeks * 7L);
+        return date.plusDays(weeksAsDays(weeks));
     }
 
     public static LocalDate minusWeeks(LocalDate date, long weeks) {
-        return date.plusDays(-weeks * 7L);
+        return date.plusDays(-weeksAsDays(weeks));
+    }
+
+    /// Weeks as days, failing on overflow as the JDK's exact multiply does
+    /// rather than wrapping to a small, wrong count.
+    static long weeksAsDays(long weeks) {
+        if (weeks > Long.MAX_VALUE / 7 || weeks < Long.MIN_VALUE / 7) {
+            throw new ArithmeticException("long overflow");
+        }
+        return weeks * 7L;
     }
 
     public static LocalDate localDateFrom(TemporalAccessor temporal) {

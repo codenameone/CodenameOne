@@ -256,10 +256,17 @@ final class RowSelection<T> {
             int from = change.getFrom();
             int removed = change.getRemovedSize();
             int added = change.getAddedSize();
+            // A row replaced in place, items.set(i, x), keeps its selection
+            // and now selects the new item, as in JavaFX. Replacing the
+            // whole list (setAll) leaves nothing selected, also as there.
+            int kept = 0;
+            if (change.wasReplaced() && !(from == 0 && added == change.getList().size())) {
+                kept = Math.min(removed, added);
+            }
             ArrayList<Integer> shifted = new ArrayList<Integer>();
             for (int i = 0; i < next.size(); i++) {
                 int v = next.get(i).intValue();
-                if (v < from) {
+                if (v < from + kept) {
                     shifted.add(Integer.valueOf(v));
                 } else if (v >= from + removed) {
                     shifted.add(Integer.valueOf(v - removed + added));
@@ -268,7 +275,7 @@ final class RowSelection<T> {
             next = shifted;
             if (l >= from + removed) {
                 l = l - removed + added;
-            } else if (l >= from) {
+            } else if (l >= from + kept) {
                 l = -1;
             }
         }

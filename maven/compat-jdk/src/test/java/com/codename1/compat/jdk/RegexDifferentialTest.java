@@ -27,6 +27,7 @@ import java.util.Arrays;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -422,5 +423,21 @@ public class RegexDifferentialTest {
             }
         }
         assertTrue(compared > 500);
+    }
+
+    /// results() finds each match only when the stream asks for it.
+    @Test
+    public void resultsAreFoundAsTheyAreTaken() {
+        Matcher m = Pattern.compile("\\d").matcher("a1b2c3");
+        Stream<MatchResult> unused = m.results();
+        assertNotNull(unused);
+        // Making the stream moved nothing: the matcher still finds the first.
+        assertTrue(m.find());
+        assertEquals(1, m.start());
+
+        Matcher n = Pattern.compile("\\d").matcher("a1b2c3");
+        assertEquals(1L, n.results().limit(1).count());
+        assertTrue(n.find());
+        assertEquals("2", n.group());
     }
 }

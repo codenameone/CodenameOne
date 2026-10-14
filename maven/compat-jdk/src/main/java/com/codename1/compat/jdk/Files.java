@@ -653,6 +653,10 @@ public final class Files {
             throw new NoSuchFileException(target.toString());
         }
         if (!from.renameTo(to)) {
+            // No copy fallback for a regular file: File.renameTo already is
+            // one -- outside its directory it copies the bytes and deletes
+            // the original -- so a rename that failed is a copy or a delete
+            // that failed, and trying the same again would fail the same way.
             if (!from.isDirectory()) {
                 throw new IOException("Could not move " + source + " to " + target);
             }

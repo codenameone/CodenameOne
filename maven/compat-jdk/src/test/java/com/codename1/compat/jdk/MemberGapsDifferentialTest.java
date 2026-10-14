@@ -36,6 +36,7 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
@@ -596,6 +597,56 @@ public class MemberGapsDifferentialTest {
             fail();
         } catch (NullPointerException expected) {
             // As the JDK's.
+        }
+    }
+
+    /// datesUntil is lazy: an end at the end of time costs only the dates
+    /// taken.
+    @Test
+    public void datesUntilMakesOnlyTheDatesTaken() {
+        LocalDate start = LocalDate.of(2024, 1, 1);
+        java.util.Iterator<LocalDate> it = JdkDates.datesUntil(start, LocalDate.MAX).limit(2).iterator();
+        assertEquals(start, it.next());
+        assertEquals(LocalDate.of(2024, 1, 2), it.next());
+        assertFalse(it.hasNext());
+        assertEquals(31L, JdkDates.datesUntil(start, LocalDate.of(2024, 2, 1)).count());
+        assertEquals(0L, JdkDates.datesUntil(start, start).count());
+    }
+
+    /// A week count too large for days fails, as the JDK's exact multiply
+    /// does, instead of wrapping to a small one.
+    @Test
+    public void weeksThatOverflowDaysFail() {
+        final LocalDate date = LocalDate.of(2024, 1, 1);
+        final LocalDateTime time = date.atStartOfDay();
+        long[] huge = {7905747460161236407L, Long.MAX_VALUE, Long.MIN_VALUE, -7905747460161236407L};
+        for (long w : huge) {
+            assertThrowsLikeJdk("LocalDate.plusWeeks " + w, () -> date.plusWeeks(w), () -> JdkTime.plusWeeks(date, w));
+            assertThrowsLikeJdk("LocalDate.minusWeeks " + w, () -> date.minusWeeks(w), () -> JdkTime.minusWeeks(date, w));
+            assertThrowsLikeJdk("LocalDateTime.plusWeeks " + w, () -> time.plusWeeks(w),
+                    () -> JdkDates.plusWeeks(time, w));
+        }
+        assertEquals(date.plusWeeks(3), JdkTime.plusWeeks(date, 3));
+        assertEquals(date.minusWeeks(3), JdkTime.minusWeeks(date, 3));
+    }
+
+    private static void assertThrowsLikeJdk(String what, Runnable jdk, Runnable ours) {
+        Class<?> expected = null;
+        try {
+            jdk.run();
+        } catch (RuntimeException e) {
+            expected = e.getClass();
+        }
+        assertNotNull(what + ": the JDK did not throw", expected);
+        try {
+            ours.run();
+            fail(what + ": answered a value");
+        } catch (ArithmeticException e) {
+            assertTrue(what + ": " + e, ArithmeticException.class.isAssignableFrom(expected)
+                    || DateTimeException.class.isAssignableFrom(expected));
+        } catch (DateTimeException e) {
+            assertTrue(what + ": " + e, DateTimeException.class.isAssignableFrom(expected)
+                    || ArithmeticException.class.isAssignableFrom(expected));
         }
     }
 }

@@ -743,4 +743,45 @@ public class ExecutorsTest {
         spaced.cancel(false);
         pool.shutdownNow();
     }
+
+    /// invokeAll interrupted while it waits cancels the tasks that have not
+    /// finished, so none of them runs after it has returned.
+    @Test
+    public void anInterruptedInvokeAllCancelsWhatIsLeft() throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(1);
+        final CountDownLatch release = new CountDownLatch(1);
+        final AtomicInteger later = new AtomicInteger();
+        List<Callable<String>> tasks = new ArrayList<Callable<String>>();
+        tasks.add(new Callable<String>() {
+            @Override
+            public String call() throws Exception {
+                release.await(10, TimeUnit.SECONDS);
+                return "first";
+            }
+        });
+        tasks.add(new Callable<String>() {
+            @Override
+            public String call() {
+                later.incrementAndGet();
+                return "second";
+            }
+        });
+        Thread.currentThread().interrupt();
+        try {
+            pool.invokeAll(tasks);
+            fail("invokeAll returned although interrupted");
+        } catch (InterruptedException expected) {
+            assertFalse(Thread.currentThread().isInterrupted());
+        } finally {
+            release.countDown();
+        }
+        assertEquals("after", pool.submit(new Callable<String>() {
+            @Override
+            public String call() {
+                return "after";
+            }
+        }).get(10, TimeUnit.SECONDS));
+        assertEquals("a cancelled task ran", 0, later.get());
+        pool.shutdownNow();
+    }
 }

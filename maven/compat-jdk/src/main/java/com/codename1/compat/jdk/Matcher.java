@@ -22,8 +22,6 @@
  */
 package com.codename1.compat.jdk;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.function.Function;
 
 /// `java.util.regex.Matcher` over this module's [Pattern].
@@ -390,12 +388,20 @@ public final class Matcher implements MatchResult {
     /// match found, or from the start of the region when there is none.
     /// The matcher is not reset, so a match already consumed is not
     /// answered again and a region stays in force.
+    ///
+    /// Lazy, as the JDK's is: each match is found only when the stream asks
+    /// for it, so `results().limit(1)` scans no further than the first.
     public Stream<MatchResult> results() {
-        List<MatchResult> all = new ArrayList<MatchResult>();
-        while (find()) {
-            all.add(toMatchResult());
-        }
-        return JdkCollections.stream(all);
+        return ObjPipeline.over(new PullIterator<MatchResult>() {
+            @Override
+            boolean advance() {
+                if (!find()) {
+                    return false;
+                }
+                emit(toMatchResult());
+                return true;
+            }
+        });
     }
 
     /// A replacement in which `$` and backslash stand for themselves.
