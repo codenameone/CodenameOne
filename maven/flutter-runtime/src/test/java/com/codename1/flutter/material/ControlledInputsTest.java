@@ -238,6 +238,25 @@ class ControlledInputsTest {
         assertEquals(2, notified[0]);
     }
 
+    @Test
+    void theOverloadedTextAccessorBehavesLikeSetText() {
+        // `controller.text = v` in Dart lowers to this exact overloaded Java accessor
+        // (text(String), not setText(String) -- see TextEditingController's class
+        // javadoc), so it must notify listeners just like setText does. It used to
+        // only update the stored value silently, so a transpiled `controller.text = v`
+        // assignment did nothing visible. (componentText() is unavailable here --
+        // headless, no native field -- see TextFieldRenderElement.componentText();
+        // the push-to-field half of setText's behaviour is pinned instead by
+        // controllerSetTextAndClearNotifyListeners's sibling coverage of setText
+        // itself, which text(String) now delegates to verbatim.)
+        TextEditingController ctl = new TextEditingController();
+        final int[] notified = {0};
+        ctl.addListener(() -> notified[0]++);
+        ctl.text("abc");
+        assertEquals("abc", ctl.text(), "the overloaded accessor must still update the value");
+        assertEquals(1, notified[0], "text(String) must notify listeners like setText does");
+    }
+
     // ------------------------------------------------------------------
     // SnackBar consumption
     // ------------------------------------------------------------------

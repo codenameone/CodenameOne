@@ -368,6 +368,56 @@ public class StreamTest {
     }
 
     @Test
+    public void secondPauseRequiresASecondResumeBeforeDraining() {
+        // Dart's own contract: pause() nests, and resume() must be called once per
+        // pause() before delivery actually resumes -- confirmed against the Dart 3.9
+        // VM's _BufferingStreamSubscription, which tracks a pause COUNT rather than a
+        // flag. A single boolean "paused" flag collapses two pause() calls into one,
+        // so the first of the two matching resume() calls already drained everything.
+        StreamController<String> c = new StreamController<String>();
+        final List<String> seen = new ArrayList<String>();
+        StreamSubscription<String> sub = c.stream().listen(new Funcs.VoidFunc1<String>() {
+            @Override
+            public void call(String v) {
+                seen.add(v);
+            }
+        });
+        sub.pause();
+        sub.pause();
+        c.add("queued while doubly paused");
+        sub.resume();
+        assertTrue(sub.isPaused(), "one resume() must not undo two pause() calls");
+        assertTrue(seen.isEmpty(), "still paused after only one matching resume(): must not deliver yet");
+        sub.resume();
+        assertFalse(sub.isPaused(), "the second, matching resume() must lift the pause");
+        assertEquals(java.util.Arrays.asList("queued while doubly paused"), seen,
+                "the second resume() must drain what was buffered while doubly paused");
+    }
+
+    @Test
+    public void unmatchedResumeBeyondThePauseCountIsANoOp() {
+        // The mirror case: more resume() calls than pause() calls must not throw and
+        // must not do anything odd (it must not, for instance, leave the subscription
+        // "negatively paused" so a later real pause() needs two resumes to clear it).
+        StreamController<String> c = new StreamController<String>();
+        final List<String> seen = new ArrayList<String>();
+        StreamSubscription<String> sub = c.stream().listen(new Funcs.VoidFunc1<String>() {
+            @Override
+            public void call(String v) {
+                seen.add(v);
+            }
+        });
+        sub.resume();
+        assertFalse(sub.isPaused(), "resume() with no prior pause() must stay a no-op");
+        sub.pause();
+        c.add("queued");
+        sub.resume();
+        assertFalse(sub.isPaused());
+        assertEquals(java.util.Arrays.asList("queued"), seen,
+                "a single pause() must still need only a single resume() after an earlier stray resume()");
+    }
+
+    @Test
     public void closeFutureWaitsForAPausedListenerToDrainDone() {
         // Regression: close() used to hand back an already-completed future
         // even while a paused listener still had the done event only queued.

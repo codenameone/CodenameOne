@@ -31,13 +31,19 @@ import java.util.List;
 /**
  * A controller for an editable text field. The controller and the CN1 text
  * component are kept in two-way sync by {@link TextFieldRenderElement}:
- * user edits flow into {@link #text()} (and notify listeners), while
- * {@link #setText(String)}/{@link #clear()} push into the mounted component.
+ * user edits flow into {@link #text()}, while {@link #setText(String)}/
+ * {@link #clear()} push into the mounted component and notify listeners.
  *
  * <p>Transpiler surface: the Dart constructor's named {@code text:} parameter
- * becomes the {@link #text(String)} setter, the Dart {@code text} getter
- * becomes {@link #text()}, and Dart {@code controller.text = v} assignments
- * are emitted as the explicit {@link #setText(String)} method.</p>
+ * AND a Dart {@code controller.text = v} assignment both lower to the SAME
+ * overloaded Java accessor -- the emitter always calls a stub setter by the
+ * Dart property's own name, so there is no separate Java name a Dart
+ * {@code set text(...)} declaration could target. {@link #text(String)}
+ * therefore has to behave exactly like {@link #setText(String)} (it delegates
+ * to it): a controller is never pre-bound to a field or pre-subscribed to a
+ * listener when this runs, so doing the full notifying work here is
+ * harmless, and is what makes {@code controller.text = v} work at all. The
+ * Dart {@code text} getter becomes {@link #text()}.</p>
  */
 public class TextEditingController {
 
@@ -64,11 +70,13 @@ public class TextEditingController {
     }
 
     /**
-     * Named parameter setter for the Dart {@code text:} constructor parameter
-     * (initial value, no listener notification).
+     * Named parameter setter for the Dart {@code text:} constructor parameter,
+     * and the target of a Dart {@code controller.text = v} assignment -- both
+     * lower to this one overloaded accessor (see the class javadoc). Delegates
+     * to {@link #setText(String)}.
      */
     public void text(String v) {
-        this.value = v == null ? "" : v;
+        setText(v);
     }
 
     /**

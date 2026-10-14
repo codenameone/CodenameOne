@@ -641,6 +641,12 @@ class InkWell extends Widget {
 class TextEditingController {
   external TextEditingController({String? text});
   external String get text;
+  // `controller.text = v` lowers to the overloaded Java accessor `text(String)` --
+  // the same name as this Dart setter, the way every other stub get/set pair here
+  // is routed -- so the notifying behaviour has to live on THAT method, not under a
+  // differently named one. TextEditingController.text(String) delegates to setText,
+  // which is why declaring this setter is enough to fix the assignment.
+  external set text(String value);
   external void setText(String value);
   external void addListener(VoidCallback listener);
   external void removeListener(VoidCallback listener);
@@ -687,13 +693,23 @@ class MaterialPageRoute<T> extends Route<T> {
 
 @JavaName('com.codename1.flutter.navigation.Navigator')
 class Navigator extends Widget {
-  external Navigator({Key? key});
+  // The nested-Navigator constructor parameters the Java class actually implements
+  // (see Navigator.java's initialRoute/onGenerateRoute/onUnknownRoute/
+  // restorationScopeId/observers/pages/onPopPage setters) -- a plain push/pop app
+  // never constructs a Navigator directly and only reaches the statics below.
+  external Navigator({Key? key, String? initialRoute,
+      Object? Function(RouteSettings)? onGenerateRoute,
+      Object? Function(RouteSettings)? onUnknownRoute,
+      String? restorationScopeId, Object? observers, Object? pages, Object? onPopPage});
   // push completes with the value the route is popped with, as Flutter's does.
   external static Future<Object?> push(BuildContext context, MaterialPageRoute route);
   external static void pop(BuildContext context, [Object? result]);
   external static NavigatorState of(BuildContext context, {bool? rootNavigator});
   external static String restorablePush(BuildContext context, dynamic routeBuilder, {dynamic arguments});
-  external static bool maybePop(BuildContext context);
+  // Future<bool>, matching Flutter's own Navigator.maybePop(context, [result]) --
+  // this used to answer a synchronous bool, so `await Navigator.maybePop(context)`
+  // did not compile against the stub.
+  external static Future<bool> maybePop(BuildContext context, [Object? result]);
 }
 
 @JavaName('com.codename1.flutter.material.Dialogs.showDialog')

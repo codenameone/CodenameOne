@@ -801,15 +801,26 @@ public class Navigator extends StatelessWidget {
     }
 
     /**
-     * Pops the topmost route if one exists, returning whether anything was
-     * popped ({@code Navigator.maybePop}).
+     * Pops the topmost route if one exists ({@code Navigator.maybePop}). Flutter's own
+     * signature is {@code Future<bool> maybePop(BuildContext context, [T? result])} --
+     * this used to answer a synchronous {@code boolean}, so {@code await
+     * Navigator.maybePop(context)} did not compile against the stub, and the result the
+     * popped route's future should complete with had nowhere to go.
      */
-    public static boolean maybePop(BuildContext context) {
+    public static dart.async.Future<Boolean> maybePop(BuildContext context) {
+        return maybePop(context, null);
+    }
+
+    /**
+     * {@link #maybePop(BuildContext)} with the value the popped route's future completes
+     * with, when something was popped -- Flutter's optional {@code result} parameter.
+     */
+    public static dart.async.Future<Boolean> maybePop(BuildContext context, Object result) {
         if (!poppable()) {
-            return false;
+            return dart.async.Future.value(Boolean.FALSE);
         }
-        pop(context);
-        return true;
+        pop(context, result);
+        return dart.async.Future.value(Boolean.TRUE);
     }
 
     private static final class RouteEntry {

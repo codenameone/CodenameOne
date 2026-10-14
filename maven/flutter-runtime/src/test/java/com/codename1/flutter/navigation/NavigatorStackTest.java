@@ -73,6 +73,30 @@ class NavigatorStackTest {
     }
 
     @Test
+    void staticMaybePopResolvesFalseWithNothingToPop() {
+        // Flutter's own signature is Future<bool> maybePop(context, [result]); this used
+        // to answer a synchronous boolean, so `await Navigator.maybePop(context)` did not
+        // compile against the stub. getNow() reads an already-completed future's value
+        // synchronously -- maybePop never needs to park, so this is never null here.
+        dart.async.Future<Boolean> popped = Navigator.maybePop(null);
+        assertEquals(Boolean.FALSE, popped.getNow());
+    }
+
+    @Test
+    void staticMaybePopPopsAndCompletesWithTheOptionalResult() {
+        MaterialPageRoute r = route();
+        dart.async.Future<Object> pushResult = Navigator.push(null, r);
+        assertEquals(1, Navigator.stackSize());
+
+        dart.async.Future<Boolean> popped = Navigator.maybePop(null, "closed");
+        assertEquals(Boolean.TRUE, popped.getNow(), "a pushed route must be poppable");
+        assertEquals(0, Navigator.stackSize());
+        assertEquals("closed", pushResult.getNow(),
+                "the optional result must flow through to the popped route's own future, "
+                        + "exactly as Navigator.pop(context, result) does");
+    }
+
+    @Test
     void dialogMountsHeadlessAndPopDismissesItBeforeRoutes() {
         Navigator.push(null, route());
         assertEquals(1, Navigator.stackSize());

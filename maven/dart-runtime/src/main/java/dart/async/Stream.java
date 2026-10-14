@@ -116,11 +116,16 @@ public class Stream<T> {
         Object onError;
         Object onDone;
         boolean cancelOnError;
-        boolean paused;
+        /// How many unmatched pause() calls are outstanding. Dart requires as many
+        /// resume() calls as pause() calls before delivery resumes -- a second
+        /// pause() while already paused is not a no-op, and the FIRST resume() must
+        /// not drain anything while this is still above zero.
+        int pauseCount;
         boolean cancelled;
-        /// Events raised while `paused`, delivered in order by `#drain` on
-        /// resume(); `null` until the first one is queued. `#cancelSub`
-        /// discards it, matching Dart's own pause()/cancel() interaction.
+        /// Events raised while paused (`pauseCount > 0`), delivered in order by
+        /// `#drain` once `pauseCount` reaches zero again; `null` until the first one
+        /// is queued. `#cancelSub` discards it, matching Dart's own
+        /// pause()/cancel() interaction.
         List<QueuedEvent> pending;
         /// Set by `#emitDone` when this subscription was paused and its done
         /// event only queued, not yet delivered; cleared once `#drain` or
@@ -246,7 +251,7 @@ public class Stream<T> {
             if (s.cancelled) {
                 continue;
             }
-            if (s.paused) {
+            if (s.pauseCount > 0) {
                 queue(s, QueuedEvent.DATA, value);
             } else {
                 deliverData(s.onData, value);
@@ -265,7 +270,7 @@ public class Stream<T> {
             if (s.cancelled) {
                 continue;
             }
-            if (s.paused) {
+            if (s.pauseCount > 0) {
                 queue(s, QueuedEvent.ERROR, error);
                 continue;
             }
@@ -299,7 +304,7 @@ public class Stream<T> {
             if (s.cancelled) {
                 continue;
             }
-            if (s.paused) {
+            if (s.pauseCount > 0) {
                 queue(s, QueuedEvent.DONE, null);
                 s.pendingClose = pendingClose;
                 pendingClose.remaining++;
@@ -345,7 +350,7 @@ public class Stream<T> {
      * remaining queued events simply stay queued for a later resume().
      */
     private void drain(Sub s) {
-        while (!s.cancelled && !s.paused && s.pending != null && !s.pending.isEmpty()) {
+        while (!s.cancelled && s.pauseCount == 0 && s.pending != null && !s.pending.isEmpty()) {
             QueuedEvent e = s.pending.remove(0);
             switch (e.kind) {
                 case QueuedEvent.DATA:
@@ -590,18 +595,30 @@ public class Stream<T> {
 
         @Override
         public void pause() {
-            sub.paused = true;
+            sub.pauseCount++;
         }
 
         @Override
         public void resume() {
-            sub.paused = false;
-            drain(sub);
+            // As many resume() calls as pause() calls are required before delivery
+            // actually resumes (Dart's own StreamSubscription contract); an extra,
+            // unmatched resume() -- pauseCount already zero -- is a harmless no-op,
+            // matching dart:async's _BufferingStreamSubscription.resume(), which only
+            // acts "if (_isPaused)". Draining only once the count reaches zero is the
+            // whole fix: the old boolean flag let a SECOND resume() look like the
+            // first one, draining everything after only one of two pauses lifted.
+            if (sub.pauseCount <= 0) {
+                return;
+            }
+            sub.pauseCount--;
+            if (sub.pauseCount == 0) {
+                drain(sub);
+            }
         }
 
         @Override
         public boolean isPaused() {
-            return sub.paused;
+            return sub.pauseCount > 0;
         }
     }
 }
