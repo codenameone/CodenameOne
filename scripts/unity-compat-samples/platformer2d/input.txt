@@ -1,6 +1,9 @@
 # Run to the right, jump once clear of the platform, land, run through the
-# thorn and on into the wall the script built.
+# thorn and on into the wall the script built. Then a step back from the
+# wall, which the hero leaves while it still stands on the ground.
 20 right down
 100 space down
 102 space up
 270 right up
+288 left down
+291 left up

@@ -378,4 +378,16 @@ struct 3 v 2 1
 generic method 19 15 53 30 24
 generic lambda 31 25 32 4
 runtime empty 0 0 4000000000
+== primitive arrays to generic members
+int 1,2,3 9,9,1,2,3 2,3,7
+int errors Argument Argument ArgumentOutOfRange Argument ArgumentOutOfRange Argument
+uint 4000000000 5 byte 0 200 1 float 1.5 -0.25 bool False True char xy
+ulong 18000000000000000000 ushort 65000 sbyte -5 long -9000000000 double 0.125 short -300 enum TwoOne
+own generic 2,1,200 4000000000,1 0.5,0,3 2;1;200; 4000000000;1;
+constructor 3;4;5; 5,4,5
+== string argument errors
+new string ArgumentOutOfRange [] []
+Substring ArgumentOutOfRange ArgumentOutOfRange [] ArgumentOutOfRange ArgumentOutOfRange ArgumentOutOfRange []
+chars IndexOutOfRange IndexOutOfRange
+null arguments ArgumentNull ArgumentNull ArgumentNull ArgumentNull ArgumentNull Argument ArgumentNull ArgumentOutOfRange
 done

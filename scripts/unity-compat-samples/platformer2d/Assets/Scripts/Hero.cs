@@ -210,6 +210,27 @@ public class Hero : MonoBehaviour
         touching--;
     }
 
+    // What a frame of standing says, each time it changes and on every frame
+    // of the step back from the wall. The ground is outlines of many edges,
+    // one contact each, so the hero touches it through the wall's contact
+    // and the floor's at once, and leaves the wall while it still stands:
+    // as long as the two touch there is a point, and a normal.
+    private string standing;
+
+    private void OnCollisionStay2D(Collision2D collision)
+    {
+        string now = collision.gameObject.name + " points=" + (collision.contactCount > 0 ? "some" : "none");
+        if (collision.contactCount > 0)
+        {
+            now += " normal=" + (collision.GetContact(0).normal.sqrMagnitude > 0.5f ? "yes" : "none");
+        }
+        if (now != standing || Time.frameCount >= 288 && Time.frameCount <= 292)
+        {
+            standing = now;
+            Debug.Log("frame " + Time.frameCount + " hero stands on " + now);
+        }
+    }
+
     private void OnTriggerEnter2D(Collider2D other)
     {
         animator.SetTrigger("hit");

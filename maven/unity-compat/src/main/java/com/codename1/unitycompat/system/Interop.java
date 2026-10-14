@@ -700,4 +700,140 @@ public final class Interop {
         }
         return to;
     }
+
+    // ------------------------------------------------ into erased arrays
+
+    /// `list.CopyTo(ints)`, and any `T[]` parameter of a generic member
+    /// handed an array of a primitive: the erased callee takes an
+    /// `Object[]`, which an `int[]` is not. It is given this array of the
+    /// same length, holding each element boxed as erased code holds a `T`,
+    /// and `$copyBackBoxes` then writes what it holds into the caller's
+    /// array. `unsigned` says which of the two C# types sharing a Java one
+    /// the translator knows the elements to be (`byte[]` rather than
+    /// `sbyte[]`, `uint[]` rather than `int[]`): an array cannot say. Null
+    /// for null, so that the callee's own test for it is the one that
+    /// throws.
+    public static Object[] $boxElements(Object array, boolean unsigned) {
+        if (array == null) {
+            return null;
+        }
+        if (array instanceof int[]) {
+            int[] a = (int[]) array;
+            Object[] boxes = new Object[a.length];
+            for (int i = 0; i < a.length; i++) {
+                boxes[i] = unsigned ? (Object) UInt32Box.valueOf(a[i]) : Integer.valueOf(a[i]);
+            }
+            return boxes;
+        }
+        if (array instanceof float[]) {
+            float[] a = (float[]) array;
+            Object[] boxes = new Object[a.length];
+            for (int i = 0; i < a.length; i++) {
+                boxes[i] = Float.valueOf(a[i]);
+            }
+            return boxes;
+        }
+        if (array instanceof boolean[]) {
+            boolean[] a = (boolean[]) array;
+            Object[] boxes = new Object[a.length];
+            for (int i = 0; i < a.length; i++) {
+                boxes[i] = Boolean.valueOf(a[i]);
+            }
+            return boxes;
+        }
+        if (array instanceof char[]) {
+            char[] a = (char[]) array;
+            Object[] boxes = new Object[a.length];
+            for (int i = 0; i < a.length; i++) {
+                boxes[i] = unsigned ? (Object) UInt16Box.valueOf(a[i]) : Character.valueOf(a[i]);
+            }
+            return boxes;
+        }
+        if (array instanceof byte[]) {
+            byte[] a = (byte[]) array;
+            Object[] boxes = new Object[a.length];
+            for (int i = 0; i < a.length; i++) {
+                boxes[i] = unsigned ? (Object) ByteBox.valueOf(a[i]) : Byte.valueOf(a[i]);
+            }
+            return boxes;
+        }
+        if (array instanceof short[]) {
+            short[] a = (short[]) array;
+            Object[] boxes = new Object[a.length];
+            for (int i = 0; i < a.length; i++) {
+                boxes[i] = Short.valueOf(a[i]);
+            }
+            return boxes;
+        }
+        if (array instanceof long[]) {
+            long[] a = (long[]) array;
+            Object[] boxes = new Object[a.length];
+            for (int i = 0; i < a.length; i++) {
+                boxes[i] = unsigned ? (Object) UInt64Box.valueOf(a[i]) : Long.valueOf(a[i]);
+            }
+            return boxes;
+        }
+        if (array instanceof double[]) {
+            double[] a = (double[]) array;
+            Object[] boxes = new Object[a.length];
+            for (int i = 0; i < a.length; i++) {
+                boxes[i] = Double.valueOf(a[i]);
+            }
+            return boxes;
+        }
+        throw new InvalidCastException();
+    }
+
+    /// The other half of `$boxElements`, once the call has returned: every
+    /// element of `boxes` unboxed into `array`, the caller's own. All of
+    /// them, not only those a callee is known to write -- nothing says which
+    /// it wrote, and an element it did not is written back unchanged. A
+    /// null is `default(T)`, which erased code writes as one.
+    public static void $copyBackBoxes(Object[] boxes, Object array, boolean unsigned) {
+        if (boxes == null) {
+            return;
+        }
+        int n = boxes.length;
+        if (array instanceof int[]) {
+            int[] a = (int[]) array;
+            for (int i = 0; i < n; i++) {
+                a[i] = unsigned ? orDefaultUInt(boxes[i]) : orDefaultInt(boxes[i]);
+            }
+        } else if (array instanceof float[]) {
+            float[] a = (float[]) array;
+            for (int i = 0; i < n; i++) {
+                a[i] = orDefaultFloat(boxes[i]);
+            }
+        } else if (array instanceof boolean[]) {
+            boolean[] a = (boolean[]) array;
+            for (int i = 0; i < n; i++) {
+                a[i] = orDefaultBoolean(boxes[i]);
+            }
+        } else if (array instanceof char[]) {
+            char[] a = (char[]) array;
+            for (int i = 0; i < n; i++) {
+                a[i] = unsigned ? orDefaultUShort(boxes[i]) : orDefaultChar(boxes[i]);
+            }
+        } else if (array instanceof byte[]) {
+            byte[] a = (byte[]) array;
+            for (int i = 0; i < n; i++) {
+                a[i] = unsigned ? orDefaultUByte(boxes[i]) : orDefaultByte(boxes[i]);
+            }
+        } else if (array instanceof short[]) {
+            short[] a = (short[]) array;
+            for (int i = 0; i < n; i++) {
+                a[i] = orDefaultShort(boxes[i]);
+            }
+        } else if (array instanceof long[]) {
+            long[] a = (long[]) array;
+            for (int i = 0; i < n; i++) {
+                a[i] = unsigned ? orDefaultULong(boxes[i]) : orDefaultLong(boxes[i]);
+            }
+        } else if (array instanceof double[]) {
+            double[] a = (double[]) array;
+            for (int i = 0; i < n; i++) {
+                a[i] = orDefaultDouble(boxes[i]);
+            }
+        }
+    }
 }

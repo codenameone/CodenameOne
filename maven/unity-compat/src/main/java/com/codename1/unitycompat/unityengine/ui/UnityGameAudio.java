@@ -61,6 +61,13 @@ public final class UnityGameAudio implements AudioOutput {
     /// A voice to its `Media`, for those still playing.
     private final HashMap playing = new HashMap();
     private final HashMap looping = new HashMap();
+    /// A voice to the volume it is playing at now, a `Float`: what it was
+    /// started with, then each `volume` since -- `AudioSource.volume` and
+    /// `mute` both arrive that way. A looped voice is started again with
+    /// this, and never with the volume of its first play: a source turned
+    /// down or muted after `Play` would otherwise come back at its old
+    /// volume at the next loop, audible while muted.
+    private final HashMap volumes = new HashMap();
     /// The voices paused by themselves, which a release leaves paused.
     private final HashMap paused = new HashMap();
     /// `AudioListener.pause`: nothing sounds until it is released.
@@ -94,13 +101,14 @@ public final class UnityGameAudio implements AudioOutput {
             Media media = MediaManager.createMedia(in, mime(clip.resource), new Runnable() {
                 @Override
                 public void run() {
-                    ended(key, clip, volume);
+                    ended(key, clip);
                 }
             });
             if (media == null) {
                 return;
             }
             playing.put(key, media);
+            volumes.put(key, Float.valueOf(volume));
             if (loop) {
                 looping.put(key, Boolean.TRUE);
             }
@@ -115,15 +123,19 @@ public final class UnityGameAudio implements AudioOutput {
         }
     }
 
-    /// A clip that ran to its end: release it, or start it again.
-    private void ended(Integer key, AudioClip clip, float volume) {
+    /// A clip that ran to its end: release it, or start it again at the
+    /// volume the voice has now. Nothing else of the voice carries over:
+    /// a pitch is never applied (see the head of this class), and a loop
+    /// starts again at the start of the clip wherever a seek had put it.
+    private void ended(Integer key, AudioClip clip) {
+        Object level = volumes.get(key);
         paused.remove(key);
         Object media = playing.remove(key);
         if (media instanceof Media) {
             ((Media) media).cleanup();
         }
-        if (looping.containsKey(key)) {
-            play(key.intValue(), clip, volume, 1f, true);
+        if (looping.containsKey(key) && level instanceof Float) {
+            play(key.intValue(), clip, ((Float) level).floatValue(), 1f, true);
         }
     }
 
@@ -137,6 +149,7 @@ public final class UnityGameAudio implements AudioOutput {
         Integer key = Integer.valueOf(voice);
         looping.remove(key);
         paused.remove(key);
+        volumes.remove(key);
         Object media = playing.remove(key);
         if (media instanceof Media) {
             ((Media) media).cleanup();
@@ -206,8 +219,10 @@ public final class UnityGameAudio implements AudioOutput {
 
     @Override
     public void volume(int voice, float volume) {
-        Object media = playing.get(Integer.valueOf(voice));
+        Integer key = Integer.valueOf(voice);
+        Object media = playing.get(key);
         if (media instanceof Media) {
+            volumes.put(key, Float.valueOf(volume));
             ((Media) media).setVolume(percent(volume));
         }
     }

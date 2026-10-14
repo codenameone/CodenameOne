@@ -379,4 +379,12 @@
         </Or>
         <Bug pattern="UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR"/>
     </Match>
+    <!-- The boxed copy of a null array is null: the erased callee it is
+         handed to (List<T>.CopyTo) is the one that throws for it, as .NET
+         does. An empty array would be copied into instead. -->
+    <Match>
+        <Class name="com.codename1.unitycompat.system.Interop"/>
+        <Method name="$boxElements"/>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
 </FindBugsFilter>

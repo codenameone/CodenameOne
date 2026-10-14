@@ -163,6 +163,29 @@ public class List_1 implements ICollection_1 {
         }
     }
 
+    /// `CopyTo(int, T[], int, int)`: `count` elements from `index`, into the
+    /// array at `arrayIndex`. Checked in .NET's order: the range of the list
+    /// first, then the array's own checks (null, a negative number, too short).
+    public void CopyTo(int index, Object[] array, int arrayIndex, int count) {
+        if (size - index < count) {
+            throw new ArgumentException("Offset and length were out of bounds for the array or count is greater"
+                    + " than the number of elements from index to the end of the source collection.");
+        }
+        if (array == null) {
+            throw new ArgumentNullException();
+        }
+        if (index < 0 || arrayIndex < 0 || count < 0) {
+            throw new ArgumentOutOfRangeException();
+        }
+        if (array.length - arrayIndex < count) {
+            throw new ArgumentException("Destination array was not long enough.");
+        }
+        for (int i = 0; i < count; i++) {
+            Object v = items[index + i];
+            array[arrayIndex + i] = v instanceof Struct ? ((Struct) v).$copyValue() : v;
+        }
+    }
+
     public void AddRange(IEnumerable_1 values) {
         if (values == null) {
             throw new ArgumentNullException();

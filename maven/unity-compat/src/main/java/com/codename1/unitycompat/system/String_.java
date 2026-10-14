@@ -32,11 +32,19 @@ public final class String_ {
     private String_() {
     }
 
+    /// A null array is the empty string, as on .NET.
     public static String New(char[] chars) {
-        return new String(chars);
+        return chars == null ? "" : new String(chars);
     }
 
+    /// A negative count is an ArgumentOutOfRangeException, which .NET
+    /// checks for. The StringBuilder would otherwise refuse it as a
+    /// negative array size, which is what an `OverflowException` is made
+    /// from (Interop.wrap), and a script catching the one never saw it.
     public static String New(char c, int count) {
+        if (count < 0) {
+            throw new ArgumentOutOfRangeException();
+        }
         StringBuilder sb = new StringBuilder(count);
         for (int i = 0; i < count; i++) {
             sb.append(c);
@@ -152,6 +160,9 @@ public final class String_ {
     }
 
     public static String Join(String separator, String[] parts) {
+        if (parts == null) {
+            throw new ArgumentNullException();
+        }
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < parts.length; i++) {
             if (i > 0) {
@@ -327,21 +338,52 @@ public final class String_ {
         return s.length();
     }
 
+    /// Checked here rather than left to `charAt`: what that throws past the
+    /// end is the JDK's to choose, and on JavaScript it was not an
+    /// IndexOutOfBoundsException, so the IndexOutOfRangeException .NET throws
+    /// reached a script as a plain `Exception`.
     public static char get_Chars(String s, int index) {
+        if (index < 0 || index >= s.length()) {
+            throw new IndexOutOfRangeException();
+        }
         return s.charAt(index);
     }
 
+    // An index or a length out of range is an ArgumentOutOfRangeException
+    // on .NET. Java's own check would throw StringIndexOutOfBoundsException,
+    // which becomes an IndexOutOfRangeException (Interop.wrap) -- the one a
+    // string's indexer throws, and not what a script's catch around
+    // `Substring` names. A null argument where .NET wants a string is an
+    // ArgumentNullException, not the NullReferenceException the JDK's NPE
+    // would become; the receiver itself being null still is one.
+
     public static String Substring(String s, int start) {
+        if (start < 0 || start > s.length()) {
+            throw new ArgumentOutOfRangeException();
+        }
         return s.substring(start);
     }
 
     /// The second argument is a length in .NET, not an end index.
     public static String Substring(String s, int start, int length) {
+        if (start < 0 || length < 0 || start > s.length() - length) {
+            throw new ArgumentOutOfRangeException();
+        }
         return s.substring(start, start + length);
     }
 
+    private static String notNull(String s, String value) {
+        if (s == null) {
+            throw new NullReferenceException();
+        }
+        if (value == null) {
+            throw new ArgumentNullException();
+        }
+        return value;
+    }
+
     public static int IndexOf(String s, String value) {
-        return s.indexOf(value);
+        return s.indexOf(notNull(s, value));
     }
 
     public static int IndexOf(String s, char value) {
@@ -349,15 +391,15 @@ public final class String_ {
     }
 
     public static boolean Contains(String s, String value) {
-        return s.indexOf(value) >= 0;
+        return s.indexOf(notNull(s, value)) >= 0;
     }
 
     public static boolean StartsWith(String s, String value) {
-        return s.startsWith(value);
+        return s.startsWith(notNull(s, value));
     }
 
     public static boolean EndsWith(String s, String value) {
-        return s.endsWith(value);
+        return s.endsWith(notNull(s, value));
     }
 
     // `Trim` and its two halves take off what `char.IsWhiteSpace` calls
@@ -433,7 +475,7 @@ public final class String_ {
     }
 
     public static String Replace(String s, String from, String to) {
-        if (from.length() == 0) {
+        if (notNull(s, from).length() == 0) {
             throw new ArgumentException();
         }
         StringBuilder sb = new StringBuilder();

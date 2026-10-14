@@ -432,6 +432,36 @@ namespace Spike
         public static Func<int> Later<T>(T v) { return () => { GsPool<T>.Return(v); return GsPool<T>.Returned; }; }
     }
 
+    // Generic members of the program's own that take a T[], handed arrays
+    // of primitives.
+    public static class GaArrays
+    {
+        public static void Reverse<T>(T[] a)
+        {
+            for (int i = 0, j = a.Length - 1; i < j; i++, j--)
+            {
+                T t = a[i];
+                a[i] = a[j];
+                a[j] = t;
+            }
+        }
+
+        public static void Clear<T>(T[] a, int at) { a[at] = default(T); }
+
+        public static string Join<T>(T[] a)
+        {
+            string s = "";
+            foreach (T x in a) s += x + ";";
+            return s;
+        }
+    }
+
+    public class GaHolder<T>
+    {
+        public readonly string Seen;
+        public GaHolder(T[] a) { Seen = GaArrays.Join(a); a[0] = a[a.Length - 1]; }
+    }
+
     public static class Program
     {
         public static void Log(string s)
@@ -2447,6 +2477,152 @@ namespace Spike
             Log("pairs " + pairs.Length + " " + pairs[0].Key + pairs[0].Value);
         }
 
+        // An array of a primitive handed to a generic member that declares
+        // T[]: whatever the member writes into it is in the caller's array
+        // when it returns, read back as the type it is -- a byte of 200, a
+        // uint above int.MaxValue.
+        private static string Show(int[] a)
+        {
+            string s = "";
+            for (int i = 0; i < a.Length; i++) s += (i > 0 ? "," : "") + a[i];
+            return s;
+        }
+
+        private static string ShowUnsigned(uint[] a)
+        {
+            string s = "";
+            for (int i = 0; i < a.Length; i++) s += (i > 0 ? "," : "") + a[i];
+            return s;
+        }
+
+        private static string Show(byte[] a)
+        {
+            string s = "";
+            for (int i = 0; i < a.Length; i++) s += (i > 0 ? "," : "") + a[i];
+            return s;
+        }
+
+        private static string Show(float[] a)
+        {
+            string s = "";
+            for (int i = 0; i < a.Length; i++) s += (i > 0 ? "," : "") + a[i];
+            return s;
+        }
+
+        private static void PrimitiveArraysToGenerics()
+        {
+            Section("primitive arrays to generic members");
+            var ints = new List<int> { 1, 2, 3 };
+            int[] a = new int[3];
+            ints.CopyTo(a);
+            int[] b = { 9, 9, 9, 9, 9 };
+            ints.CopyTo(b, 2);
+            int[] c = { 7, 7, 7 };
+            ints.CopyTo(1, c, 0, 2);
+            Log("int " + Show(a) + " " + Show(b) + " " + Show(c));
+            Log("int errors " + Named(() => { ints.CopyTo(new int[2]); return "copied"; }) + " "
+                + Named(() => { ints.CopyTo((int[])null); return "copied"; }) + " "
+                + Named(() => { ints.CopyTo(a, -1); return "copied"; }) + " "
+                + Named(() => { ints.CopyTo(2, c, 0, 2); return "copied"; }) + " "
+                + Named(() => { ints.CopyTo(0, c, -1, 1); return "copied"; }) + " "
+                + Named(() => { ints.CopyTo(0, c, 2, 2); return "copied"; }));
+            uint[] u = new uint[2];
+            new List<uint> { 4000000000u, 5u }.CopyTo(u);
+            byte[] by = new byte[3];
+            new List<byte> { 200, 1 }.CopyTo(by, 1);
+            float[] f = new float[2];
+            new List<float> { 1.5f, -0.25f }.CopyTo(f);
+            bool[] bo = new bool[2];
+            new List<bool> { false, true }.CopyTo(bo);
+            char[] ch = new char[2];
+            new List<char> { 'x', 'y' }.CopyTo(ch);
+            Log("uint " + u[0] + " " + u[1] + " byte " + by[0] + " " + by[1] + " " + by[2] + " float " + f[0] + " "
+                + f[1] + " bool " + bo[0] + " " + bo[1] + " char " + new string(ch));
+            ulong[] ul = new ulong[1];
+            new List<ulong> { 18000000000000000000ul }.CopyTo(ul);
+            ushort[] us = new ushort[1];
+            new List<ushort> { 65000 }.CopyTo(us);
+            sbyte[] sb = new sbyte[1];
+            new List<sbyte> { -5 }.CopyTo(sb);
+            long[] lo = new long[1];
+            new List<long> { -9000000000L }.CopyTo(lo);
+            double[] d = new double[1];
+            new List<double> { 0.125 }.CopyTo(d);
+            short[] sh = new short[1];
+            new List<short> { -300 }.CopyTo(sh);
+            Rank[] ranks = new Rank[2];
+            new List<Rank> { Rank.Two, Rank.One }.CopyTo(ranks);
+            Log("ulong " + ul[0] + " ushort " + us[0] + " sbyte " + sb[0] + " long " + lo[0] + " double " + d[0]
+                + " short " + sh[0] + " enum " + ranks[0] + ranks[1]);
+            byte[] bytes = { 200, 1, 2 };
+            GaArrays.Reverse(bytes);
+            uint[] big = { 1u, 4000000000u };
+            GaArrays.Reverse(big);
+            float[] fl = { 0.5f, 2f, 3f };
+            GaArrays.Clear(fl, 1);
+            Log("own generic " + Show(bytes) + " " + ShowUnsigned(big) + " " + Show(fl)
+                + " " + GaArrays.Join(bytes) + " " + GaArrays.Join(big));
+            int[] held = { 3, 4, 5 };
+            var holder = new GaHolder<int>(held);
+            Log("constructor " + holder.Seen + " " + Show(held));
+        }
+
+        private static string Thrown(Func<string> f)
+        {
+            try
+            {
+                return f();
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                return "ArgumentOutOfRange";
+            }
+            catch (ArgumentNullException)
+            {
+                return "ArgumentNull";
+            }
+            catch (ArgumentException)
+            {
+                return "Argument";
+            }
+            catch (IndexOutOfRangeException)
+            {
+                return "IndexOutOfRange";
+            }
+            catch (NullReferenceException)
+            {
+                return "NullReference";
+            }
+            catch (OverflowException)
+            {
+                return "Overflow";
+            }
+            catch (Exception)
+            {
+                return "another exception";
+            }
+        }
+
+        // What each string member throws for a count, an index or an
+        // argument out of its range: the type is what a script's catch
+        // clause selects on.
+        private static void StringArgumentErrors()
+        {
+            Section("string argument errors");
+            string abc = "abc";
+            string none = null;
+            Log("new string " + Thrown(() => new string('x', -1)) + " [" + new string('x', 0) + "] ["
+                + new string((char[])null) + "]");
+            Log("Substring " + Thrown(() => abc.Substring(-1)) + " " + Thrown(() => abc.Substring(4)) + " ["
+                + abc.Substring(3) + "] " + Thrown(() => abc.Substring(1, 5)) + " " + Thrown(() => abc.Substring(1, -1))
+                + " " + Thrown(() => abc.Substring(-1, 1)) + " [" + abc.Substring(3, 0) + "]");
+            Log("chars " + Thrown(() => "" + abc[3]) + " " + Thrown(() => "" + abc[-1]));
+            Log("null arguments " + Thrown(() => "" + abc.IndexOf(none)) + " " + Thrown(() => "" + abc.Contains(none))
+                + " " + Thrown(() => "" + abc.StartsWith(none)) + " " + Thrown(() => "" + abc.EndsWith(none)) + " "
+                + Thrown(() => abc.Replace(none, "x")) + " " + Thrown(() => abc.Replace("", "x")) + " "
+                + Thrown(() => string.Join(",", (string[])null)) + " " + Thrown(() => abc.Split(',', -1)[0]));
+        }
+
         // ---- boxes, null receivers and capacities ------------------------------
 
         private static void BoxesAndReceivers()
@@ -2712,6 +2888,8 @@ namespace Spike
             BoxesAndReceivers();
             UnboxingEnums();
             GenericStatics();
+            PrimitiveArraysToGenerics();
+            StringArgumentErrors();
             Console.WriteLine("done");
         }
     }

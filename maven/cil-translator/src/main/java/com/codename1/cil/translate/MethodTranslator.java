@@ -2100,6 +2100,7 @@ final class MethodTranslator implements Opcodes {
     private static final int FIX_ARRAY_VIEW = 5;
     private static final int FIX_GENERIC_BYREF = 6;
     private static final int FIX_NARROW = 7;
+    private static final int FIX_BOXED_ELEMENTS = 8;
 
     /// An array is every one of these on .NET and none of them on the JVM,
     /// so an array handed to a parameter of such a type goes in a view that
@@ -2117,6 +2118,17 @@ final class MethodTranslator implements Opcodes {
     }
 
     private final List<Runnable> afterCall = new ArrayList<Runnable>();
+
+    /// What the argument fixes left to do once the call has returned, with
+    /// the result (if any) still on the stack: each leaves the stack as it
+    /// found it. A constructor runs them too -- `new Pool<int>(ref f)` or
+    /// `new Grid<int>(ints)` -- or they would run after the next call.
+    private void runAfterCall() {
+        for (Runnable r : afterCall) {
+            r.run();
+        }
+        afterCall.clear();
+    }
 
     /// Applies per-argument fixes to values that are already on the stack.
     /// Only the top one can be touched, so everything above the deepest
@@ -2195,6 +2207,9 @@ final class MethodTranslator implements Opcodes {
                 break;
             case FIX_NARROW:
                 typeInsn(CHECKCAST, narrowed(v, type));
+                break;
+            case FIX_BOXED_ELEMENTS:
+                boxedElements(type);
                 break;
             default:
                 break;
@@ -2285,6 +2300,45 @@ final class MethodTranslator implements Opcodes {
         }
         Jvm.pushInt(mv, kind);
         invoke(INVOKESTATIC, ARRAY_VIEW, "$viewIfArray", "(Ljava/lang/Object;I)Ljava/lang/Object;", false);
+    }
+
+    /// Stack: an array of a primitive (or an enum) that goes where an
+    /// erased generic member declares `T[]`. Leaves an `Object[]` of the same
+    /// length holding its elements boxed, and has every element of that
+    /// copied back into the array once the call returns.
+    ///
+    /// Copying back after every call, whatever the member, is what makes
+    /// this the same as .NET for anything the callee does to the array while
+    /// it runs, reads and writes alike; nothing says which of the two a
+    /// member does, and an element it did not write is written back as it
+    /// was. The runtime's only such members are `List<T>.CopyTo(T[])` and
+    /// `CopyTo(T[], int)`, which write and keep nothing; a list built from an
+    /// array is handed its view (ArrayView), not this. What a copy cannot be
+    /// is the array itself: a generic member of the program's own that keeps
+    /// the `T[]` it is given, in a field, keeps the boxes, and a write
+    /// through either after the call is not seen by the other. So is a
+    /// write made before the callee throws, since the copy back is not in a
+    /// `finally`.
+    private void boxedElements(final CilType element) {
+        final boolean unsigned = Names.isUnsignedBox(element);
+        final int array = newSlot(1);
+        final int boxes = newSlot(1);
+        mv.visitInsn(DUP);
+        mv.visitVarInsn(ASTORE, array);
+        mv.visitInsn(unsigned ? ICONST_1 : ICONST_0);
+        invoke(INVOKESTATIC, Names.INTEROP, "$boxElements", "(Ljava/lang/Object;Z)[Ljava/lang/Object;", false);
+        mv.visitInsn(DUP);
+        mv.visitVarInsn(ASTORE, boxes);
+        afterCall.add(new Runnable() {
+            @Override
+            public void run() {
+                mv.visitVarInsn(ALOAD, boxes);
+                mv.visitVarInsn(ALOAD, array);
+                mv.visitInsn(unsigned ? ICONST_1 : ICONST_0);
+                invoke(INVOKESTATIC, Names.INTEROP, "$copyBackBoxes", "([Ljava/lang/Object;Ljava/lang/Object;Z)V",
+                        false);
+            }
+        });
     }
 
     /// `ref obj.field` passed to a method. A by-reference parameter is an
@@ -2430,13 +2484,14 @@ final class MethodTranslator implements Opcodes {
         if (erased && declared.kind == CilType.Kind.SZARRAY && Names.isTypeVariable(declared.element)
                 && s.kind == CilType.Kind.SZARRAY && names.norm(s.element).isPrimitive()) {
             // `List<int>.CopyTo(int[])`: the erased callee takes an
-            // `Object[]`, which an `int[]` is not, and it would have to
-            // write boxes into it. Said here, with the method and the line,
-            // rather than left to the verifier of whichever target loads
-            // the class first -- ParparVM has none and would write object
-            // references into an array of numbers.
-            throw fail("passing an array of " + names.norm(s.element) + " where a generic member declares T[]"
-                    + " is not supported");
+            // `Object[]`, which an `int[]` is not, and it writes boxes. It
+            // is handed a boxed copy, which is copied back: see
+            // boxedElements. Never the `int[]` itself -- ParparVM has no
+            // verifier and would write object references into an array of
+            // numbers.
+            fixes[i] = FIX_BOXED_ELEMENTS;
+            fixTypes[i] = names.norm(s.element);
+            return;
         }
         if (Names.isTypeVariable(declared) && erased) {
             if (s.isPrimitive()) {
@@ -2728,10 +2783,7 @@ final class MethodTranslator implements Opcodes {
             mv.visitFieldInsn(GETSTATIC, names.className(ct.name), "$TYPE", Translator.TYPE_DESCRIPTOR);
         }
         invoke(opcode, target, name, descriptor, isInterface);
-        for (Runnable r : afterCall) {
-            r.run();
-        }
-        afterCall.clear();
+        runAfterCall();
 
         CilType rt = sig.returnType;
         if (rt.kind == CilType.Kind.VOID) {
@@ -2806,6 +2858,7 @@ final class MethodTranslator implements Opcodes {
             fixArguments(values, fixes, fixTypes);
             invoke(INVOKESTATIC, Names.helperClass(declaring), "New",
                     names.methodDescriptor(sig).replace(")V", ")" + names.descriptor(ref.declaringType)), false);
+            runAfterCall();
             push(Val.ref(ref.declaringType, Val.FRESH));
             return;
         }
@@ -2819,6 +2872,7 @@ final class MethodTranslator implements Opcodes {
             String d = names.methodDescriptor(sig);
             invoke(INVOKESTATIC, structClass, "$new",
                     d.substring(0, d.length() - 2) + "L" + structClass + ";)L" + structClass + ";", false);
+            runAfterCall();
             push(Val.ref(ref.declaringType, Val.LOCAL));
             return;
         }
@@ -2843,6 +2897,7 @@ final class MethodTranslator implements Opcodes {
             descriptor = GenericStatics.withHidden(descriptor, "L" + host.generics.contextClass(context) + ";");
         }
         invoke(INVOKESPECIAL, c, "<init>", descriptor, false);
+        runAfterCall();
         push(Val.ref(ref.declaringType, Val.FRESH));
     }
 

@@ -127,7 +127,18 @@ final class PhysicsWorld {
         boolean passing;
         /// The pair began by passing, so no message was sent for it.
         boolean silent;
+        /// The contact a frame of staying is described from: the newest of
+        /// `contacts` in touch.
         Contact contact;
+        /// Every fixture contact of the pair in touch, oldest first, `count`
+        /// of them. A polygon is several fixtures once it is concave and an
+        /// outline one edge per child, so two colliders touch through
+        /// several contacts at once, and one of them ending -- the newest
+        /// as easily as any -- leaves the others standing in for it. Only
+        /// one remembered let `contact` go null while `count` said the two
+        /// still touched, and `OnCollisionStay2D` was told of no point and
+        /// no normal until they parted.
+        Contact[] contacts = new Contact[2];
         /// What each side is told while the two stay in touch, filled in
         /// again for every frame rather than made anew: Unity reuses the
         /// object it passes too (`Physics2D.reuseCollisionCallbacks`).
@@ -1041,6 +1052,12 @@ final class PhysicsWorld {
             p.b = b;
             pairs.add(p);
         }
+        if (p.count == p.contacts.length) {
+            Contact[] more = new Contact[p.count * 2];
+            System.arraycopy(p.contacts, 0, more, 0, p.count);
+            p.contacts = more;
+        }
+        p.contacts[p.count] = contact;
         p.count++;
         p.contact = contact;
         if (p.count > 1) {
@@ -1076,10 +1093,24 @@ final class PhysicsWorld {
         if (p == null) {
             return;
         }
-        if (p.contact == contact) { // NOPMD CompareObjectsWithEquals
-            p.contact = null;
+        // Out of the list, the rest keeping their order; Box2D pools its
+        // contacts, so one left here would come back as another pair's.
+        int at = p.count - 1;
+        while (at >= 0 && p.contacts[at] != contact) { // NOPMD CompareObjectsWithEquals
+            at--;
         }
+        if (at < 0) {
+            // Never counted, so never begun here: nothing to end.
+            return;
+        }
+        for (int i = at + 1; i < p.count; i++) {
+            p.contacts[i - 1] = p.contacts[i];
+        }
+        p.contacts[p.count - 1] = null;
         p.count--;
+        if (p.contact == contact) { // NOPMD CompareObjectsWithEquals
+            p.contact = p.count > 0 ? p.contacts[p.count - 1] : null;
+        }
         if (p.count > 0) {
             return;
         }

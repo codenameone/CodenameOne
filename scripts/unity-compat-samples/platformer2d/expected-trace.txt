@@ -24,6 +24,7 @@ draw frame=1 commands=15 background=ff1a1f33
   hero.png src=24,0+8x8 layer=0 order=2 at=20000,18750 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
   text "Steps 0" layer=0 order=0 at=1000,1000 size=20000x3000 font=2000 fit=0 min=1800 max=7200 align=3 style=0 wrap=1 color=ffffe666
 frame 2 state Idle -> Jump sprite=hero_3
+frame 3 hero stands on Ground points=some normal=yes
 frame 3 state Jump -> Idle sprite=hero_0
 input frame=20 key=275 down
 frame 21 state Idle -> Run sprite=hero_2
@@ -107,4 +108,12 @@ frame 241 hero 759,-148 camera 673,32 size=400
 input frame=270 key=275 up
 frame 271 state Run -> Idle sprite=hero_0
 frame 286 idle events blink breath blink breath blink
+input frame=288 key=276 down
+frame 288 hero stands on Ground points=some normal=yes
+frame 289 state Idle -> Run sprite=hero_2
+frame 290 hero stands on Ground points=some normal=yes
+input frame=291 key=276 up
+frame 291 hero stands on Ground points=some normal=yes
+frame 292 hero stands on Ground points=some normal=yes
+frame 292 state Run -> Idle sprite=hero_0
 frame 300 objects=15 drawn=18 text="Steps 9"
