@@ -74,14 +74,20 @@ draw frame=200 commands=4 background=ff1a1a33
   unity-builtin-knob-20x20.png src=0,0+20x20 layer=0 order=3 at=30097,13903 size=600x600 anchor=50,50 rotation=4500 color=ffffff00 flip=00
   text "Hits: 2" layer=0 order=0 at=500,1000 size=15000x2000 font=1200 fit=0 min=500 max=2000 align=3 style=1 wrap=1 color=ffffffff
 axes frame 201 glide=200 snappy=50 plain=100 raw=1
+inverted frame 201 flipped=-100 raw=-1
 axes frame 214 glide=1000 snappy=375 plain=750 raw=1
+inverted frame 214 flipped=-750 raw=-1
 input frame=215 key=101 up
 input frame=215 key=113 down
 axes frame 215 glide=900 snappy=-25 plain=-50 raw=-1
+inverted frame 215 flipped=50 raw=1
 axes frame 216 glide=800 snappy=-50 plain=-100 raw=-1
+inverted frame 216 flipped=100 raw=1
 input frame=230 key=113 up
 axes frame 231 glide=-467 snappy=-175 plain=-650 raw=0
+inverted frame 231 flipped=650 raw=0
 axes frame 240 glide=-317 snappy=0 plain=-200 raw=0
+inverted frame 240 flipped=200 raw=0
 frame 240 objects=10 Shot=2 drawn=4 text="Hits: 2"
 shot expired at 701,401
 frame 300 objects=9 Shot=1 drawn=3 text="Hits: 2"

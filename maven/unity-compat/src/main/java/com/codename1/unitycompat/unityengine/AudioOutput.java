@@ -32,8 +32,10 @@ package com.codename1.unitycompat.unityengine;
 public interface AudioOutput {
     /// Starts a clip. `voice` identifies the playback: a source's own
     /// voice is replaced by its next `Play`, and a one-shot gets a voice
-    /// of its own that nothing refers to again. `volume` is 0..1 with the
-    /// listener's already multiplied in; `pitch` is a speed, 1 unchanged.
+    /// of its own that nothing refers to again. `volume` is 0..1, the
+    /// source's own -- its volume, a one-shot's scale, zero when muted --
+    /// and the output multiplies the listener's in (see
+    /// [#listenerVolume(float)]); `pitch` is a speed, 1 unchanged.
     void play(int voice, AudioClip clip, float volume, float pitch, boolean loop);
 
     /// Stops a voice, if it is still playing.
@@ -41,7 +43,18 @@ public interface AudioOutput {
 
     void pause(int voice, boolean paused);
 
+    /// A voice's own volume changed, as in [#play]: the listener's is
+    /// still to be multiplied in.
     void volume(int voice, float volume);
+
+    /// `AudioListener.volume`: every voice sounds at its own volume times
+    /// this, from now on -- those already playing, the one-shots among
+    /// them, at once, and every one started later. Unity's listener volume
+    /// is "the game sound volume", and a slider in a settings menu that
+    /// moved only the next sound would not be one. It is kept here and not
+    /// multiplied in by the sources because a one-shot has no source that
+    /// knows it is still playing; the output does.
+    void listenerVolume(float volume);
 
     /// Changes the speed of a voice that is playing or paused, from where
     /// it is: `source.pitch = value` on a source that is heard. A pitch

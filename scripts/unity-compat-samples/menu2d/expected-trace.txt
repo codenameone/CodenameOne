@@ -97,6 +97,13 @@ resumed 6 frames: 100ms playing=False
 tick, frame 136 clicks=1 selected=True
 audio frame=138 play beep
 audio frame=140 looping beep on
+listener volume 50 looping=True
+audio frame=144 listener volume 50
+audio frame=144 output listener 50: beep looping 25
+audio frame=145 output volume beep 13
+audio frame=146 listener volume 100
+audio frame=146 output listener 100: beep looping 25
+audio frame=146 output volume beep 50
 looping: 17ms playing=True
 loop off: 17ms playing=True
 audio frame=151 looping beep off

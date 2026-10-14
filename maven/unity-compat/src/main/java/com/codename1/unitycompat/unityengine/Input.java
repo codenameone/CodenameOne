@@ -121,6 +121,13 @@ public final class Input {
         /// Whether a key of the other direction starts from zero and not
         /// from where the axis was.
         boolean snap = true;
+        /// Invert: "the positive buttons will send negative values to the
+        /// axis, and vice versa" -- and the mouse moving right a negative
+        /// value. Applied to what the axis reads raw, so `GetAxis` eases
+        /// towards the inverted target; `GetButton` still asks the
+        /// positive button, which is the same key whether or not it counts
+        /// negative.
+        boolean invert;
         float value;
     }
 
@@ -292,6 +299,14 @@ public final class Input {
         a.gravity = gravity;
         a.sensitivity = sensitivity;
         a.snap = snap;
+    }
+
+    /// Inverts the axis defined last: the Input Manager's Invert, which
+    /// generated code calls after the definition of an axis that has it.
+    public static void $invertLast() {
+        if (axes.length > 0) {
+            axes[axes.length - 1].invert = true;
+        }
     }
 
     // ------------------------------------------------------- from the host
@@ -589,6 +604,13 @@ public final class Input {
     }
 
     private static float raw(Axis a) {
+        float v = uninverted(a);
+        // Subtracted from zero rather than negated: an axis at rest is then
+        // 0 and not -0, which a script printing it would show.
+        return a.invert ? 0f - v : v;
+    }
+
+    private static float uninverted(Axis a) {
         if (a.mouse >= 0) {
             return a.mouse == 0 ? mouseDeltaX * a.sensitivity : a.mouse == 1 ? mouseDeltaY * a.sensitivity : 0f;
         }

@@ -39,3 +39,13 @@ InputManager:
     sensitivity: 0.5
     type: 1
     axis: 1
+  - serializedVersion: 3
+    m_Name: Mouse Flipped
+    negativeButton:
+    positiveButton:
+    altNegativeButton:
+    altPositiveButton:
+    sensitivity: 0.5
+    invert: 1
+    type: 1
+    axis: 0

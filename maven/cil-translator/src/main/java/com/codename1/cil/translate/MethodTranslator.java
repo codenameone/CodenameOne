@@ -2675,6 +2675,13 @@ final class MethodTranslator implements Opcodes {
                 // the static one pays for no test it does not need.
                 name = "$equals";
             }
+            if ("System.String".equals(declaring) && sig.hasThis && name.startsWith("Equals")) {
+                // The same for a string: `s.Equals(t)` on a null `s` throws
+                // NullReferenceException, while `string.Equals(s, t)` --
+                // the same descriptor once the receiver is a parameter --
+                // answers. `Equals$StringComparison` keeps its suffix.
+                name = "$equals" + name.substring("Equals".length());
+            }
             if ("System.Array".equals(declaring) && values.length > 0 && values[0].type != null
                     && values[0].type.kind == CilType.Kind.SZARRAY && names.isStruct(values[0].type.element)) {
                 // The runtime cannot tell an array of structs from an array
@@ -2850,6 +2857,7 @@ final class MethodTranslator implements Opcodes {
             mv.visitInsn(DUP_X1);
             mv.visitInsn(SWAP);
             mv.visitMethodInsn(INVOKESPECIAL, c, "<init>", "(Ljava/lang/Object;)V", false);
+            delegateTypeKey(ref.declaringType);
             push(Val.ref(ref.declaringType, Val.HEAP));
             return;
         }
@@ -2912,6 +2920,43 @@ final class MethodTranslator implements Opcodes {
         invoke(INVOKESPECIAL, c, "<init>", descriptor, false);
         runAfterCall();
         push(Val.ref(ref.declaringType, Val.FRESH));
+    }
+
+    /// Stack: a delegate just made. Erasure leaves an `Action<int>` and an
+    /// `Action<string>` one class, and `Delegate.Combine` of the two must
+    /// throw, so a delegate of a closed constructed type carries that type
+    /// as a string constant: the JVM interns one constant for every class
+    /// that names it, which makes the runtime's test a reference compare.
+    /// A type built from type variables -- `Action<T>` made inside
+    /// `Pool<T>` -- is known only at run time, and naming it there would
+    /// cost a string on every creation, so such a delegate carries none and
+    /// compares by its erased type alone (see `Delegate.$typeKey`).
+    private void delegateTypeKey(CilType type) {
+        if (type.kind != CilType.Kind.GENERICINST || namesTypeVariable(type)) {
+            return;
+        }
+        String delegate = Names.RUNTIME + "system/Delegate";
+        host.index.requireField(delegate, "$typeKey", "Ljava/lang/Object;", where());
+        mv.visitInsn(DUP);
+        mv.visitLdcInsn(type.toString());
+        mv.visitFieldInsn(PUTFIELD, delegate, "$typeKey", "Ljava/lang/Object;");
+    }
+
+    private static boolean namesTypeVariable(CilType type) {
+        if (type == null) {
+            return false;
+        }
+        if (type.kind == CilType.Kind.VAR || type.kind == CilType.Kind.MVAR || namesTypeVariable(type.element)) {
+            return true;
+        }
+        if (type.args != null) {
+            for (CilType a : type.args) {
+                if (namesTypeVariable(a)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     // ------------------------------------------ arrays of several dimensions

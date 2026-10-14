@@ -61,13 +61,16 @@ public final class UnityGameAudio implements AudioOutput {
     /// A voice to its `Media`, for those still playing.
     private final HashMap playing = new HashMap();
     private final HashMap looping = new HashMap();
-    /// A voice to the volume it is playing at now, a `Float`: what it was
-    /// started with, then each `volume` since -- `AudioSource.volume` and
-    /// `mute` both arrive that way. A looped voice is started again with
-    /// this, and never with the volume of its first play: a source turned
-    /// down or muted after `Play` would otherwise come back at its old
-    /// volume at the next loop, audible while muted.
+    /// A voice to its own volume now, a `Float`: what it was started with,
+    /// then each `volume` since -- `AudioSource.volume` and `mute` both
+    /// arrive that way. A looped voice is started again with this, and
+    /// never with the volume of its first play: a source turned down or
+    /// muted after `Play` would otherwise come back at its old volume at
+    /// the next loop, audible while muted. The listener's volume is not in
+    /// it; the `Media` is set to the product of the two.
     private final HashMap volumes = new HashMap();
+    /// `AudioListener.volume`, which multiplies every voice's.
+    private float listener = 1f;
     /// The voices paused by themselves, which a release leaves paused.
     private final HashMap paused = new HashMap();
     /// `AudioListener.pause`: nothing sounds until it is released.
@@ -112,7 +115,7 @@ public final class UnityGameAudio implements AudioOutput {
             if (loop) {
                 looping.put(key, Boolean.TRUE);
             }
-            media.setVolume(percent(volume));
+            media.setVolume(percent(volume * listener));
             // Started while everything is held, it is ready and waits for
             // the release.
             if (!held) {
@@ -223,7 +226,23 @@ public final class UnityGameAudio implements AudioOutput {
         Object media = playing.get(key);
         if (media instanceof Media) {
             volumes.put(key, Float.valueOf(volume));
-            ((Media) media).setVolume(percent(volume));
+            ((Media) media).setVolume(percent(volume * listener));
+        }
+    }
+
+    /// Every voice that is playing, at once, at its own volume times the
+    /// new one; those started later take it in [#play].
+    @Override
+    public void listenerVolume(float volume) {
+        listener = volume;
+        ArrayList voices = new ArrayList(playing.keySet());
+        for (int i = 0; i < voices.size(); i++) { // NOPMD ForLoopCanBeForeach
+            Object key = voices.get(i);
+            Object media = playing.get(key);
+            Object level = volumes.get(key);
+            if (media instanceof Media && level instanceof Float) {
+                ((Media) media).setVolume(percent(((Float) level).floatValue() * listener));
+            }
         }
     }
 

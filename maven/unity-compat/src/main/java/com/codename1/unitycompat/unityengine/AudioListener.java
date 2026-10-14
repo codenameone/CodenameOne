@@ -24,7 +24,7 @@ package com.codename1.unitycompat.unityengine;
 
 /// `UnityEngine.AudioListener`: where the scene is heard from. Sound here
 /// is not placed in space, so the listener itself does nothing; its static
-/// `volume` scales every sound that starts after it is set, and its static
+/// `volume` scales every sound, those playing as it is set too, and its static
 /// `pause` holds every sound and every source's clock until it is cleared.
 /// There is no `AudioSource.ignoreListenerPause` here, so no sound is
 /// exempt: one played for a pause menu waits for the pause to end.
@@ -40,7 +40,7 @@ public final class AudioListener extends Behaviour {
     }
 
     public static void set_volume(float value) {
-        AudioSource.listenerVolume = value < 0f ? 0f : value > 1f ? 1f : value;
+        AudioSource.listenerVolume(value < 0f ? 0f : value > 1f ? 1f : value);
     }
 
     public static boolean get_pause() {

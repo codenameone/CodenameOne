@@ -36,6 +36,7 @@ public class Ball : MonoBehaviour
     private AudioSource source;
     private int count;
     private int soughtAt;
+    private float ownVolume;
 
     private void Awake()
     {
@@ -186,6 +187,23 @@ public class Ball : MonoBehaviour
         else if (since == 40)
         {
             source.loop = true;
+        }
+        else if (since == 44)
+        {
+            // The listener's volume reaches the voice that is playing, not
+            // only the next one; then the source's own goes under it.
+            AudioListener.volume = 0.5f;
+            Debug.Log("listener volume " + Mathf.RoundToInt(AudioListener.volume * 100f) + " looping=" + source.isPlaying);
+        }
+        else if (since == 45)
+        {
+            ownVolume = source.volume;
+            source.volume = ownVolume * 0.5f;
+        }
+        else if (since == 46)
+        {
+            AudioListener.volume = 1f;
+            source.volume = ownVolume;
         }
         else if (since == 51)
         {

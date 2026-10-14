@@ -314,6 +314,12 @@ public class Probe : MonoBehaviour
         List<RaycastHit2D> list = new List<RaycastHit2D>();
         n = Physics2D.Raycast(from, Vector2.right, filter, list);
         Debug.Log("filter list " + n + " " + list.Count + " first=" + list[0].collider.name);
+        // Clearing a filter turns it off and keeps its bounds: set again by
+        // hand, it filters by them. Both hits face 180 degrees.
+        filter.SetNormalAngle(0f, 90f);
+        filter.ClearNormalAngle();
+        filter.useNormalAngle = true;
+        Debug.Log("filter angle kept " + Physics2D.Raycast(from, Vector2.right, filter, three, 10f));
 
         Vector2 inside = new Vector2(4f, 3f);
         Debug.Log("inside " + Hit(Physics2D.Raycast(inside, Vector2.right)));
@@ -385,6 +391,11 @@ public class Probe : MonoBehaviour
         ContactFilter2D filter = new ContactFilter2D();
         filter.SetLayerMask(LayerMask.GetMask("Props"));
         Debug.Log("filter " + Names(found, Physics2D.OverlapCircle(new Vector2(4f, 0f), 3.2f, filter, found)));
+        filter.NoFilter();
+        filter.SetDepth(-1f, 1f);
+        filter.ClearDepth();
+        filter.useDepth = true;
+        Debug.Log("filter depth kept " + Names(found, Physics2D.OverlapCircle(new Vector2(4f, 0f), 3.2f, filter, found)));
 
         Debug.Log("own point " + floor.OverlapPoint(new Vector2(-5.9f, -3.6f)) + " " + floor.OverlapPoint(new Vector2(-6.1f, -3.6f)));
         Collider2D pill = Physics2D.OverlapPoint(new Vector2(4f, -1f));

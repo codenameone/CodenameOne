@@ -400,4 +400,19 @@ int 3 3 9,1,2, NotSupported 3
 uint 2 4000000000,5, struct 2 2 1,7,
 cast True 3 3
 read only list walked 12
+== string receivers
+instance NullReference NullReference NullReference NullReference
+static True False False True True False Argument
+on text False True False True True False
+other receivers NullReference NullReference NullReference NullReference NullReference NullReference NullReference NullReference
+== delegate type arguments
+combine int+string: threw ArgumentException
+combine int+int: True
+combine object+string: threw ArgumentException
+combine variant+string: threw ArgumentException
+plus variant: threw ArgumentException
+combine multi+string: threw ArgumentException
+remove int-string: threw ArgumentException
+remove int-int: True
+equals object/variant: True False
 done

@@ -82,5 +82,10 @@ public class Fingers : MonoBehaviour
             + " at " + Mathf.RoundToInt(Input.mousePosition.x) + "," + Mathf.RoundToInt(Input.mousePosition.y)
             + " axis=" + Mathf.RoundToInt(Input.GetAxis("Mouse X") * 100f) + "," + Mathf.RoundToInt(Input.GetAxis("Mouse Y") * 100f);
         Debug.Log(s);
+        if (frame == 11 || frame == 16)
+        {
+            // Mouse X inverted: a move to the right reads negative.
+            Debug.Log("frame " + frame + " inverted mouse=" + Mathf.RoundToInt(Input.GetAxis("Mouse Flipped") * 100f));
+        }
     }
 }

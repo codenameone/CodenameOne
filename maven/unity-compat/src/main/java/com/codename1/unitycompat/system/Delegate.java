@@ -33,6 +33,15 @@ public abstract class Delegate {
     /// The delegates a multicast delegate calls, in order. Null for a
     /// delegate over a single method.
     public Delegate[] $list;
+    /// The closed delegate type, ``System.Action`1<int32>`` as a string
+    /// constant, for a delegate
+    /// type with type arguments: the translator stores it where the
+    /// delegate is made and the type is known. Null for one without type
+    /// arguments, for one made inside generic code from its own type
+    /// parameters (`Action<T>` in a method of `Pool<T>`), where the type is
+    /// not known without building a name on every creation, and for one
+    /// the runtime makes. A null key compares as the erased type alone.
+    public Object $typeKey;
 
     /// A multicast delegate of the same delegate type as this one.
     protected abstract Delegate $multi(Delegate[] list);
@@ -43,19 +52,33 @@ public abstract class Delegate {
     /// for each method. Nothing but that abstract class knows its name
     /// without reflection, so it answers, with an `instanceof` of itself.
     ///
-    /// Type arguments are erased: an `Action<int>` and an `Action<string>`
-    /// are one type as far as this can tell.
+    /// Type arguments are erased here, so an `Action<int>` and an
+    /// `Action<string>` are one abstract class; [#$typeKey] tells them
+    /// apart, in [#sameType(Delegate, Delegate)].
     protected abstract boolean $sameType(Delegate other);
 
     /// What .NET throws from `Combine` and `Remove` alike when both are
-    /// there and are not one delegate type. `+=` and `-=` cannot get here:
-    /// C# only lets them join delegates of one type, and for them the test
-    /// is a virtual call and a type test beside the arrays and the delegate
-    /// `Combine` makes.
+    /// there and are not one delegate type. C# lets `+=` join only delegates
+    /// of one static type, but variance lets an `Action<object>` be kept in
+    /// an `Action<string>`, and .NET wants the same run-time type, exactly:
+    /// so the closed types are compared too. Two of the same type share one
+    /// interned constant, and the test is a single reference compare; the
+    /// `equals` behind it runs only for two keys that differ by identity,
+    /// which a target that does not intern constants across classes could
+    /// give for one type.
     private static void sameType(Delegate a, Delegate b) {
-        if (!a.$sameType(b)) {
+        Object x = a.$typeKey;
+        Object y = b.$typeKey;
+        if (!a.$sameType(b) || x != y && x != null && y != null && !x.equals(y)) { // NOPMD CompareObjectsWithEquals
             throw new ArgumentException("Delegates must be of the same type.");
         }
+    }
+
+    /// A multicast delegate of `a`'s type, closed type included.
+    private static Delegate multi(Delegate a, Delegate[] list) {
+        Delegate d = a.$multi(list);
+        d.$typeKey = a.$typeKey;
+        return d;
     }
 
     private Delegate[] invocationList() {
@@ -75,7 +98,7 @@ public abstract class Delegate {
         Delegate[] all = new Delegate[x.length + y.length];
         System.arraycopy(x, 0, all, 0, x.length);
         System.arraycopy(y, 0, all, x.length, y.length);
-        return a.$multi(all);
+        return multi(a, all);
     }
 
     /// Removes the last occurrence of `value`'s invocation list from
@@ -105,7 +128,7 @@ public abstract class Delegate {
             Delegate[] kept = new Delegate[rest];
             System.arraycopy(x, 0, kept, 0, at);
             System.arraycopy(x, at + y.length, kept, at, rest - at);
-            return rest == 1 ? kept[0] : source.$multi(kept); // NOPMD AvoidBranchingStatementAsLastInLoop
+            return rest == 1 ? kept[0] : multi(source, kept); // NOPMD AvoidBranchingStatementAsLastInLoop
         }
         return source;
     }
@@ -129,6 +152,12 @@ public abstract class Delegate {
             return false;
         }
         Delegate d = (Delegate) o;
+        Object k = d.$typeKey;
+        if ($typeKey != k && $typeKey != null && k != null && !$typeKey.equals(k)) { // NOPMD CompareObjectsWithEquals
+            // One method as an `Action<object>` and as an `Action<string>`:
+            // two delegate types, which .NET never calls equal.
+            return false;
+        }
         if ($list == null) {
             return d.$list == null && d.$target == $target; // NOPMD CompareObjectsWithEquals
         }

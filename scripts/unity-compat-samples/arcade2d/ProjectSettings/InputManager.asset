@@ -55,3 +55,12 @@ InputManager:
     altPositiveButton:
     type: 0
     axis: 0
+  - serializedVersion: 3
+    m_Name: Flipped
+    negativeButton: q
+    positiveButton: e
+    altNegativeButton:
+    altPositiveButton:
+    invert: 1
+    type: 0
+    axis: 0

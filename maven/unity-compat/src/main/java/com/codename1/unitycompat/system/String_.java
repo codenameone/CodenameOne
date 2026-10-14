@@ -309,13 +309,52 @@ public final class String_ {
         return !op_Equality(a, b);
     }
 
-    /// Both `a.Equals(b)` and the static `string.Equals(a, b)`.
+    /// The static `string.Equals(a, b)`, which takes a null on either side.
     public static boolean Equals(String a, String b) {
         return op_Equality(a, b);
     }
 
-    public static boolean Equals(String a, Object b) {
+    // The instance `a.Equals(b)` is a method of its own (the translator
+    // names it `$equals`): it throws NullReferenceException for a null `a`,
+    // which the static one, of the same descriptor here, must not. The
+    // test is explicit rather than left to the JDK's own dereference, which
+    // `a == b` in `op_Equality` would skip for two nulls.
+
+    public static boolean $equals(String a, String b) {
+        if (a == null) {
+            throw new NullReferenceException();
+        }
         return a.equals(b);
+    }
+
+    public static boolean $equals(String a, Object b) {
+        if (a == null) {
+            throw new NullReferenceException();
+        }
+        return a.equals(b);
+    }
+
+    /// `a.Equals(b, comparisonType)`.
+    public static boolean $equals$StringComparison(String a, String b, int comparison) {
+        if (a == null) {
+            throw new NullReferenceException();
+        }
+        return Equals$StringComparison(a, b, comparison);
+    }
+
+    /// `string.Equals(a, b, comparisonType)`. Every comparison is ordinal
+    /// here (see the head of this class), so the culture kinds compare as
+    /// their ordinal twins: 0, 2 and 4 by the characters, 1, 3 and 5 by the
+    /// characters folded. Any other value is an ArgumentException, as on
+    /// .NET, even when the strings would settle it.
+    public static boolean Equals$StringComparison(String a, String b, int comparison) {
+        if (comparison < 0 || comparison > 5) {
+            throw new ArgumentException("The string comparison type passed in is currently not supported.");
+        }
+        if (a == null || b == null) {
+            return a == null && b == null;
+        }
+        return (comparison & 1) == 0 ? a.equals(b) : a.equalsIgnoreCase(b);
     }
 
     public static int GetHashCode(String s) {
@@ -327,6 +366,9 @@ public final class String_ {
     }
 
     public static int CompareTo(String a, String b) {
+        if (a == null) {
+            throw new NullReferenceException();
+        }
         if (b == null) {
             return 1;
         }

@@ -2945,6 +2945,56 @@ namespace Spike
                 + es.Length + " " + eu.Concat(new uint[] { 4000000000u }).First());
         }
 
+        // ---- string receivers ---------------------------------------------
+
+        // An instance method of string called on null throws
+        // NullReferenceException; the static string.Equals takes a null on
+        // either side. ArgumentNullException is for a null argument only.
+        private static void StringReceivers()
+        {
+            Section("string receivers");
+            string none = null, abc = "abc";
+            Log("instance " + Kind(() => "" + none.Equals((string)null)) + " " + Kind(() => "" + none.Equals((object)null))
+                + " " + Kind(() => "" + none.Equals("abc")) + " " + Kind(() => "" + none.Equals((string)null, StringComparison.Ordinal)));
+            Log("static " + string.Equals(none, null) + " " + string.Equals(none, abc) + " " + string.Equals(abc, none) + " "
+                + string.Equals(none, null, StringComparison.Ordinal) + " " + string.Equals("ABC", abc, StringComparison.OrdinalIgnoreCase)
+                + " " + string.Equals("ABC", abc, StringComparison.Ordinal) + " " + Kind(() => "" + string.Equals(abc, "x", (StringComparison)9)));
+            Log("on text " + abc.Equals((string)null) + " " + abc.Equals((object)"abc") + " " + abc.Equals((object)1) + " "
+                + abc.Equals("ABC", StringComparison.OrdinalIgnoreCase) + " " + abc.Equals("ABC", StringComparison.InvariantCultureIgnoreCase)
+                + " " + abc.Equals("ABC", StringComparison.CurrentCulture));
+            Log("other receivers " + Kind(() => "" + none.CompareTo((string)null)) + " " + Kind(() => "" + none.CompareTo("a")) + " "
+                + Kind(() => "" + none.StartsWith("a")) + " " + Kind(() => "" + none.EndsWith("a")) + " " + Kind(() => "" + none.Contains("a"))
+                + " " + Kind(() => "" + none.IndexOf("a")) + " " + Kind(() => "" + none.IndexOf('a')) + " " + Kind(() => "" + none.Length));
+        }
+
+        // ---- delegate type arguments --------------------------------------
+
+        private static void TakesObject(object o)
+        {
+        }
+
+        // Combine and Remove want one run-time delegate type, type arguments
+        // and all, exactly: a delegate kept through variance is still of the
+        // type it was made as.
+        private static void DelegateTypeArguments()
+        {
+            Section("delegate type arguments");
+            Action<int> ai = x => { };
+            Action<int> ai2 = TakesInt;
+            Action<string> text = x => { };
+            Action<object> ao = TakesObject;
+            Action<string> variant = ao;
+            Try("combine int+string", () => "" + (Delegate.Combine(ai, text) != null));
+            Try("combine int+int", () => "" + (Delegate.Combine(ai, ai2) != null));
+            Try("combine object+string", () => "" + (Delegate.Combine(ao, text) != null));
+            Try("combine variant+string", () => "" + (Delegate.Combine(variant, text) != null));
+            Try("plus variant", () => { Action<string> e = text; e += variant; return "joined"; });
+            Try("combine multi+string", () => "" + (Delegate.Combine(Delegate.Combine(ai, ai2), text) != null));
+            Try("remove int-string", () => "" + (Delegate.Remove(ai, text) == (Delegate)ai));
+            Try("remove int-int", () => "" + (Delegate.Remove(Delegate.Combine(ai, ai2), ai2) == (Delegate)ai));
+            Try("equals object/variant", () => "" + ao.Equals(variant) + " " + ((Action<string>)TakesObject).Equals(variant));
+        }
+
         public static void Main(string[] args)
         {
             ValueTypes();
@@ -2981,6 +3031,8 @@ namespace Spike
             StringArgumentErrors();
             ComparableArguments();
             ArraysAsCollections();
+            StringReceivers();
+            DelegateTypeArguments();
             Console.WriteLine("done");
         }
     }

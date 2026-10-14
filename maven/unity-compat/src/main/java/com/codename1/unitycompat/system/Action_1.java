@@ -24,7 +24,10 @@ package com.codename1.unitycompat.system;
 
 /// `System.Action`1`. Type arguments are erased, so every parameter is an
 /// `Object` and the generated subclass unboxes what the method it calls
-/// takes as a primitive.
+/// takes as a primitive. That makes `Action<int>` and `Action<string>` one
+/// class, which `$sameType` cannot tell apart; the closed type a delegate
+/// was made as travels in `Delegate.$typeKey`, and `Delegate.Combine`
+/// compares that as well.
 @SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
 public abstract class Action_1 extends MulticastDelegate {
     public abstract void Invoke(Object a0);

@@ -29,6 +29,7 @@ all row depth 1 Log@113
 nonalloc 2 Log@113 Pill@950
 filter 1 Box@300 filtering=True
 filter list 2 2 first=Zone
+filter angle kept 0
 inside Box d=0 p=400,300 n=-100,0 f=0
 inside off none
 inside off down Disc d=150 p=400,150 n=0,100 f=0
@@ -72,6 +73,7 @@ area Zone
 area all 3 Floor Ramp Box
 capsule Disc
 filter 1 Pill
+filter depth kept 4 Zone Ramp Disc Box
 own point True False
 bounds pill 350,-200..450,0 ramp -300,-300..300,-200 log -493,-175..-307,-25 floor -600,-450..-200,-350
 find Menu/Panel/Button Menu/Panel/Button 12 Menu Menu/Panel none none none none TrueTrue
@@ -96,6 +98,7 @@ deep b step=8 frame=10
 frame 10 touches=1 [0 began 100,100 d=0,0 taps=1] array=1 mouse=down at 100,100 axis=0,0
 input frame=11 touch=110,200
 frame 11 touches=1 [0 moved 110,100 d=10,0 taps=1] array=1 mouse=held at 110,100 axis=500,0
+frame 11 inverted mouse=-500
 input frame=12 touch=110,200;300,100
 frame 12 touches=2 [0 stationary 110,100 d=0,0 taps=1] [1 began 300,200 d=0,0 taps=1] array=2 mouse=held at 110,100 axis=0,0
 input frame=13 touch=120,210;300,100
@@ -107,6 +110,7 @@ frame 14 touches=2 [0 stationary 120,90 d=0,0 taps=1] [1 moved 310,210 d=10,10 t
 frame 15 touches=2 [0 stationary 120,90 d=0,0 taps=1] [1 stationary 310,210 d=0,0 taps=1] array=2 mouse=held at 120,90 axis=0,0
 input frame=16 touch=310,90
 frame 16 touches=2 [0 ended 120,90 d=0,0 taps=1] [1 stationary 310,210 d=0,0 taps=1] array=2 mouse=held at 310,210 axis=9500,6000
+frame 16 inverted mouse=-9500
 frame 17 touches=1 [1 stationary 310,210 d=0,0 taps=1] array=1 mouse=held at 310,210 axis=0,0
 input frame=18 touch=none
 frame 18 touches=1 [1 ended 310,210 d=0,0 taps=1] array=1 mouse=up at 310,210 axis=0,0

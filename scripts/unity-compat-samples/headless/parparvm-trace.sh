@@ -119,6 +119,7 @@ HOST_SOURCE=()
 find "$RUNTIME_SRC" "$OUT/gen" "$DIR/src" "${HOST_SOURCE[@]}" -name '*.java' -not -name 'UnityGame*.java' \
   -not -path '*/com/codename1/unitycompat/app/*' > "$DIR/sources"
 echo "$HERE/java/headless/HeadlessTrace.java" >> "$DIR/sources"
+echo "$HERE/java/headless/HeadlessAudio.java" >> "$DIR/sources"
 javac -nowarn -source 8 -target 8 -bootclasspath "$API" -Xlint:-options -cp "$OUT/app:$DIR/box" -d "$DIR/classes" \
   "@$DIR/sources" > "$DIR/javac.log" 2>&1 || { tail -40 "$DIR/javac.log" >&2; fail "javac against vm/JavaAPI"; }
 cp -R "$OUT/app/." "$DIR/classes/"

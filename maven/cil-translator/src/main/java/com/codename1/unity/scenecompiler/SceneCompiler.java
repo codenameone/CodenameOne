@@ -3645,9 +3645,16 @@ public final class SceneCompiler {
                 // joystick axis has no keys, and reads as zero.
                 String type = integer(axis.get("type"), "0");
                 boolean keys = "0".equals(type);
+                // Invert: "If enabled, the positive buttons will send
+                // negative values to the axis, and vice versa" -- for keys
+                // and the mouse alike. It marks the axis just defined.
+                boolean invert = !"0".equals(integer(axis.get("invert"), "0"));
                 if ("1".equals(type)) {
                     line(sb, RUNTIME + "Input.$mouseAxis(" + string(text(axis.get("m_Name"))) + ", (int) "
                             + integer(axis.get("axis"), "0") + "L, " + f(axis.get("sensitivity"), "0.1") + ");");
+                    if (invert) {
+                        line(sb, RUNTIME + "Input.$invertLast();");
+                    }
                     continue;
                 }
                 joystick |= !keys;
@@ -3664,6 +3671,9 @@ public final class SceneCompiler {
                         .append(f(axis.get("sensitivity"), "3")).append(", ")
                         .append(!"0".equals(integer(axis.get("snap"), "1")));
                 line(sb, call + ");");
+                if (invert && keys) {
+                    line(sb, RUNTIME + "Input.$invertLast();");
+                }
             }
             if (joystick) {
                 notes.add("the input settings define joystick axes; those read as zero, and the keys of the same"

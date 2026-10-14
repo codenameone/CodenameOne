@@ -77,6 +77,9 @@ public final class AudioSource extends Behaviour {
     /// Installs what makes the sound, or null for silence.
     public static void $output(AudioOutput o) {
         output = o;
+        if (o != null) {
+            o.listenerVolume(listenerVolume);
+        }
         // An output that arrives in the middle of a pause -- a view shown
         // again behind a pause menu -- must not sound what starts on it.
         if (o != null && listenerPaused) {
@@ -94,6 +97,19 @@ public final class AudioSource extends Behaviour {
     /// themselves.
     private static float now() {
         return (listenerPaused ? listenerPausedAt : Time.unscaledTime) - listenerPausedFor;
+    }
+
+    /// `AudioListener.volume`, already clamped: handed to the output,
+    /// which applies it to every voice it has, and recorded as `listener
+    /// volume` and a percentage.
+    static void listenerVolume(float value) {
+        listenerVolume = value;
+        if (logging) {
+            log.add("listener volume " + (int) (value * 100f + 0.5f));
+        }
+        if (output != null) {
+            output.listenerVolume(value);
+        }
     }
 
     static boolean listenerPaused() {
@@ -143,6 +159,9 @@ public final class AudioSource extends Behaviour {
     static void resetAll() {
         log.clear();
         listenerVolume = 1f;
+        if (output != null) {
+            output.listenerVolume(1f);
+        }
         // The clock starts again with the game's, and an output the
         // project before left held is released for the next one.
         if (listenerPaused && output != null) {
@@ -175,8 +194,10 @@ public final class AudioSource extends Behaviour {
         $setup(s.clip, s.volume, s.pitch, s.loop, s.mute, s.playOnAwake);
     }
 
+    /// What a voice of this source is played at, before the listener's
+    /// volume, which the output applies (see `AudioOutput.listenerVolume`).
     private float level(float scale) {
-        return mute ? 0f : volume * scale * listenerVolume;
+        return mute ? 0f : volume * scale;
     }
 
     private static void record(String kind, AudioClip c) {
@@ -503,7 +524,7 @@ public final class AudioSource extends Behaviour {
         }
         record("shot", c);
         if (output != null) {
-            output.play(newVoice(), c, volume * listenerVolume, 1f, false);
+            output.play(newVoice(), c, volume, 1f, false);
         }
     }
 }

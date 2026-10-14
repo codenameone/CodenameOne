@@ -84,9 +84,13 @@ public final class ContactFilter2D implements Struct {
         useDepth = true;
     }
 
+    // The three `Clear` methods turn a filter off and nothing more: "Turns
+    // off depth filtering by setting useDepth to false. The associated
+    // values of minDepth and maxDepth are not changed." (and the same of
+    // the normal angle and the layer mask). A script that clears and then
+    // sets `useDepth = true` again filters by the bounds it had.
+
     public void ClearDepth() {
-        minDepth = Float.NEGATIVE_INFINITY;
-        maxDepth = Float.POSITIVE_INFINITY;
         useDepth = false;
     }
 
@@ -97,8 +101,6 @@ public final class ContactFilter2D implements Struct {
     }
 
     public void ClearNormalAngle() {
-        minNormalAngle = 0f;
-        maxNormalAngle = UPPER;
         useNormalAngle = false;
     }
 

@@ -268,6 +268,10 @@ public final class HeadlessTrace {
         // Nothing makes a sound here; what would have played, and when, is
         // part of the trace instead.
         AudioSource.$record(true);
+        // And an output that keeps a device's account of the volumes, which
+        // it reports when one changes.
+        HeadlessAudio audio = new HeadlessAudio();
+        AudioSource.$output(audio);
         // And nothing is kept: every run starts with no preferences.
         PlayerPrefs.$store(null);
         PlayerPrefs.$resetMemory();
@@ -325,6 +329,10 @@ public final class HeadlessTrace {
             String[] played = AudioSource.$drainLog();
             for (int i = 0; i < played.length; i++) {
                 System.out.println("audio frame=" + frame + " " + played[i]);
+            }
+            String[] heard = audio.drain();
+            for (int i = 0; i < heard.length; i++) {
+                System.out.println("audio frame=" + frame + " " + heard[i]);
             }
             boolean dump = dumped(frame);
             if (dump || (countEvery > 0 && frame % countEvery == 0) || frame == frames) {

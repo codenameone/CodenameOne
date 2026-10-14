@@ -115,6 +115,9 @@ public class Player : MonoBehaviour
             Debug.Log("axes frame " + f + " glide=" + Mathf.RoundToInt(Input.GetAxis("Glide") * 1000f) + " snappy="
                 + Mathf.RoundToInt(Input.GetAxis("Snappy") * 1000f) + " plain="
                 + Mathf.RoundToInt(Input.GetAxis("Plain") * 1000f) + " raw=" + Input.GetAxisRaw("Glide"));
+            // Plain's keys, inverted: e counts negative and q positive.
+            Debug.Log("inverted frame " + f + " flipped=" + Mathf.RoundToInt(Input.GetAxis("Flipped") * 1000f)
+                + " raw=" + Input.GetAxisRaw("Flipped"));
         }
     }
 
