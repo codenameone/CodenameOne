@@ -774,6 +774,11 @@ public class ByteCodeClass {
     }
 
     public boolean hasFinalizer() {
+        // Object declares the Java API hook but has no cleanup work. Treating
+        // it as a finalizer would put every object on the finalization path.
+        if ("java_lang_Object".equals(clsName)) {
+            return false;
+        }
         for(BytecodeMethod bm : methods) {
             if(bm.isFinalizer()) {
                 return true;

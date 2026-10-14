@@ -401,7 +401,10 @@ jobs:
       # the job's last step fails it on a regression. Before the upload below, so the
       # results travel with the screenshots.
       - name: ParparVM vs JDK 25 (performance gate)
-        if: success() || failure()
+        # A timed-out CMake parent can leave compiler children running. Do not
+        # measure performance after a failed build/suite with that extra load.
+        # The earlier failure still fails this job and its logs are uploaded.
+        if: success()
         # Names this pull request's overlay (perf-baseline/pr/<number>.json) in the
         # comment. A workflow_dispatch run carries no pull request, so the gate asks gh.
         env:

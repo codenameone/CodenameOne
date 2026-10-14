@@ -22,7 +22,8 @@ jobs:
   build-linux-jdk8:
 
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    # Includes archetype integration tests and backend packaging after the Ant build.
+    timeout-minutes: 75
 
     steps:
     - uses: actions/checkout@v6

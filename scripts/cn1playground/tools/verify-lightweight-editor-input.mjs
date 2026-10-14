@@ -21,11 +21,17 @@ if (!url) {
 }
 
 const browser = await chromium.launch({headless: true});
+const artifactDir = process.env.PLAYGROUND_INPUT_ARTIFACT_DIR
+    || process.env.PLAYGROUND_BROWSER_ARTIFACT_DIR;
 let page;
 let completed = false;
 try {
   page = await browser.newPage({viewport: {width: 1440, height: 900}});
+  let initialPreviewOutcome;
   page.on('console', message => {
+    if (message.text().startsWith('[playground]') && initialPreviewOutcome === undefined) {
+      initialPreviewOutcome = message.text();
+    }
     if (message.type() === 'error'
         && message.text() !== 'Failed to load resource: net::ERR_FAILED'
         && !message.text().includes('cloudflareinsights.com/cdn-cgi/rum')) {
@@ -59,6 +65,15 @@ try {
   }
   assert.ok(appFrame, 'Playground app iframe did not finish navigating');
   await appFrame.waitForFunction(() => window.cn1Started === true, null, {timeout: 90000});
+
+  // VM startup precedes the initial compilation and editor layout. Clicking while
+  // those are still running can focus the Code tab instead of opening the editor.
+  const previewDeadline = Date.now() + 90000;
+  while (initialPreviewOutcome === undefined && Date.now() < previewDeadline) {
+    await page.waitForTimeout(100);
+  }
+  assert.ok(initialPreviewOutcome && initialPreviewOutcome.includes('preview updated'),
+      `Initial playground preview did not become ready: ${initialPreviewOutcome || 'no outcome'}`);
 
   const frameElement = appFrame === page.mainFrame() ? null : await appFrame.frameElement();
   const frameBox = frameElement ? await frameElement.boundingBox() : {x: 0, y: 0};
@@ -196,14 +211,12 @@ try {
     throw error;
   }
 
-  const artifactDir = process.env.PLAYGROUND_INPUT_ARTIFACT_DIR;
   if (artifactDir) {
     await page.screenshot({path: `${artifactDir}/playground-lightweight-input.png`, fullPage: true});
   }
   console.log('PASS: lightweight playground input accepted spaces, arrows, rapid text, negotiated paste, and visibly repainted.');
   completed = true;
 } finally {
-  const artifactDir = process.env.PLAYGROUND_INPUT_ARTIFACT_DIR;
   if (page && artifactDir && !completed) {
     await page.screenshot({path: `${artifactDir}/playground-lightweight-input-final.png`, fullPage: true}).catch(() => {});
     console.error('Browser frames:', page.frames().map(frame => frame.url()));

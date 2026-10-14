@@ -39,7 +39,6 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -117,7 +116,7 @@ class CleanTargetIntegrationTest {
         configure.addAll(CompilerHelper.cmakeToolchainArgs());
         runCommand(configure, distDir);
 
-        runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
+        runCmakeBuild(buildDir, distDir);
 
         Path executable = buildDir.resolve(CompilerHelper.executableName("HelloCleanApp"));
         String output = runCommand(Arrays.asList(executable.toString()), buildDir);
@@ -160,7 +159,7 @@ class CleanTargetIntegrationTest {
         configure.addAll(CompilerHelper.cmakeToolchainArgs());
         runCommand(configure, distDir);
 
-        runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
+        runCmakeBuild(buildDir, distDir);
 
         Path executable = buildDir.resolve(CompilerHelper.executableName("FloatingToStringApp"));
         String output = runCommand(Arrays.asList(executable.toString()), buildDir);
@@ -246,7 +245,7 @@ class CleanTargetIntegrationTest {
         configure.addAll(CompilerHelper.cmakeToolchainArgs());
         runCommand(configure, distDir);
 
-        runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
+        runCmakeBuild(buildDir, distDir);
 
         Path executable = buildDir.resolve(CompilerHelper.executableName("WinCleanApp"));
         String output = runCommand(Arrays.asList(executable.toString()), buildDir);
@@ -552,7 +551,7 @@ class CleanTargetIntegrationTest {
                 "-DCMAKE_BUILD_TYPE=Release", "-G", "Ninja",
                 "-DCMAKE_C_COMPILER=clang-cl", "-DCMAKE_CXX_COMPILER=clang-cl"));
         runCommand(configure, distDir);
-        runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
+        runCmakeBuild(buildDir, distDir);
 
         Path exe = buildDir.resolve(CompilerHelper.executableName("WinGfxTest"));
         // The app writes cn1_render.png into its working directory.
@@ -702,7 +701,7 @@ class CleanTargetIntegrationTest {
                 "-DCMAKE_BUILD_TYPE=RelWithDebInfo", "-G", "Ninja",
                 "-DCMAKE_C_COMPILER=clang-cl", "-DCMAKE_CXX_COMPILER=clang-cl"));
         runCommand(configure, cmakeRoot);
-        runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), cmakeRoot);
+        runCmakeBuild(buildDir, cmakeRoot);
         Path exe = buildDir.resolve(CompilerHelper.executableName(appName));
         assertTrue(Files.exists(exe), "native executable should be produced: " + exe);
         // Ship the port's native material theme next to the exe so the Windows
@@ -839,7 +838,7 @@ class CleanTargetIntegrationTest {
                 "-DCMAKE_RC_COMPILER=" + llvmRc,
                 "-DCMAKE_RC_FLAGS=" + rcFlags,
                 "-DCMAKE_EXE_LINKER_FLAGS=" + linkFlags), cmakeRoot);
-        runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), cmakeRoot);
+        runCmakeBuild(buildDir, cmakeRoot);
 
         Path exe = buildDir.resolve(exeName + ".exe");
         assertTrue(Files.exists(exe), "cross-compiled Windows executable should be produced: " + exe);
@@ -1066,7 +1065,7 @@ class CleanTargetIntegrationTest {
         runCommand(Arrays.asList("cmake", "-S", cmakeRoot.toString(), "-B", buildDir.toString(),
                 "-DCMAKE_BUILD_TYPE=RelWithDebInfo", "-G", "Ninja",
                 "-DCMAKE_C_COMPILER=clang-cl", "-DCMAKE_CXX_COMPILER=clang-cl"), cmakeRoot);
-        runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), cmakeRoot);
+        runCmakeBuild(buildDir, cmakeRoot);
         Path exe = buildDir.resolve(CompilerHelper.executableName("WinHelloMain"));
         assertTrue(Files.exists(exe), "native executable should be produced: " + exe);
         // The single executable is fully self-contained: its classpath resources
@@ -1644,7 +1643,7 @@ class CleanTargetIntegrationTest {
             runCommand(Arrays.asList("cmake", "-S", distDir.toString(), "-B", buildDir.toString(),
                     "-DCMAKE_BUILD_TYPE=Release", "-G", "Ninja",
                     "-DCMAKE_C_COMPILER=clang-cl", "-DCMAKE_CXX_COMPILER=clang-cl"), distDir);
-            runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
+            runCmakeBuild(buildDir, distDir);
             Path exe = buildDir.resolve(CompilerHelper.executableName("WinGfx3DTest"));
             String out = runCommand(Arrays.asList(exe.toString()), buildDir);
             Path png = buildDir.resolve("cn1_render.png");
@@ -1694,7 +1693,7 @@ class CleanTargetIntegrationTest {
                 "-DCMAKE_BUILD_TYPE=Release", "-DCMAKE_C_FLAGS=" + inc, "-DCMAKE_CXX_FLAGS=" + inc,
                 "-DCMAKE_RC_COMPILER=" + llvmRc, "-DCMAKE_RC_FLAGS=" + rcFlags,
                 "-DCMAKE_EXE_LINKER_FLAGS=" + linkFlags), distDir);
-        runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
+        runCmakeBuild(buildDir, distDir);
         Path exe = buildDir.resolve("WinGfx3DTest.exe");
         assertTrue(Files.exists(exe) && Files.size(exe) > 100_000, "cross-compiled D3D PE should be produced: " + exe);
         System.out.println("CN1_GPU_XWIN_EXE=" + exe.toAbsolutePath());
@@ -2016,19 +2015,56 @@ class CleanTargetIntegrationTest {
         return b.toString();
     }
 
+    static String runCmakeBuild(Path buildDir, Path workingDir) throws Exception {
+        // The full desktop suite compiles more than 4,000 translation units. On
+        // Linux/musl, a healthy build can take over 20 minutes; it must not share
+        // the ten-minute deadline used to detect a hung test executable.
+        ProcessBuilder builder = new ProcessBuilder("cmake", "--build", buildDir.toString());
+        builder.directory(workingDir.toFile());
+        return runCommand(builder, 30, java.util.concurrent.TimeUnit.MINUTES);
+    }
+
     static String runCommand(List<String> command, Path workingDir) throws Exception {
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.directory(workingDir.toFile());
+        return runCommand(builder, 600, java.util.concurrent.TimeUnit.SECONDS);
+    }
+
+    static String runCommand(ProcessBuilder builder, long timeout, java.util.concurrent.TimeUnit unit) throws Exception {
+        Path workingDir = builder.directory().toPath();
+        Path log = Files.createTempFile(workingDir, "command-", ".log");
+        String command = String.join(" ", builder.command());
+        System.out.println("Running command: " + command + " (output: " + log + ")");
         builder.redirectErrorStream(true);
-        Process process = builder.start();
-        String output;
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-            output = reader.lines().collect(Collectors.joining("\n"));
+        // A pipe read before waitFor() can block forever, bypassing the timeout.
+        builder.redirectOutput(log.toFile());
+        Process process = null;
+        boolean succeeded = false;
+        try {
+            process = builder.start();
+            // None of these commands receives input. Supply EOF instead of keeping
+            // a child that reads stdin waiting for the test runner indefinitely.
+            process.getOutputStream().close();
+            boolean finished = process.waitFor(timeout, unit);
+            if (!finished) {
+                process.destroyForcibly();
+                process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS);
+            }
+            String output = new String(Files.readAllBytes(log), StandardCharsets.UTF_8);
+            String diagnostic = "Command: " + command + "\nFull output: " + log
+                    + "\nOutput (tail):\n" + tailOf(output) + sourceRootSummary(workingDir);
+            assertTrue(finished, "Command timed out after " + timeout + " " + unit + "\n" + diagnostic);
+            assertEquals(0, process.exitValue(), diagnostic);
+            succeeded = true;
+            return output;
+        } finally {
+            if (process != null && process.isAlive()) {
+                process.destroyForcibly();
+            }
+            if (succeeded) {
+                Files.deleteIfExists(log);
+            }
         }
-        int exit = process.waitFor();
-        assertEquals(0, exit, "Command failed: " + String.join(" ", command)
-                + "\nOutput (tail):\n" + tailOf(output) + sourceRootSummary(workingDir));
-        return output;
     }
 
     /// What the generated project's source roots held when its build failed.
@@ -2173,7 +2209,7 @@ class CleanTargetIntegrationTest {
                 "cmake", "-S", distDir.toString(), "-B", buildDir.toString(), "-DCMAKE_BUILD_TYPE=Release"));
         configure.addAll(CompilerHelper.cmakeToolchainArgs());
         runCommand(configure, distDir);
-        runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
+        runCmakeBuild(buildDir, distDir);
 
         // U+00E9 (two UTF-8 bytes) and U+20AC (three), so both the 2- and 3-byte
         // paths are covered; widening would report the individual bytes instead.
@@ -2183,12 +2219,7 @@ class CleanTargetIntegrationTest {
         pb.directory(buildDir.toFile());
         pb.redirectErrorStream(true);
         pb.environment().put("CN1_UTF8_PROBE", arg);
-        Process p = pb.start();
-        String out;
-        try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
-            out = r.lines().collect(Collectors.joining("\n"));
-        }
-        assertEquals(0, p.waitFor(), "Utf8ArgsApp failed:\n" + out);
+        String out = runCommand(pb, 600, java.util.concurrent.TimeUnit.SECONDS);
         assertTrue(out.contains("ARG=99,97,102,233,8364"),
                 "argv must decode to the right code points, got:\n" + out);
         assertTrue(out.contains("ENV=99,97,102,233,8364"),
@@ -2224,7 +2255,7 @@ class CleanTargetIntegrationTest {
                 "cmake", "-S", distDir.toString(), "-B", buildDir.toString(), "-DCMAKE_BUILD_TYPE=Release"));
         configure.addAll(CompilerHelper.cmakeToolchainArgs());
         runCommand(configure, distDir);
-        runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
+        runCmakeBuild(buildDir, distDir);
 
         String output = runCommand(
                 Arrays.asList(buildDir.resolve(CompilerHelper.executableName("StdinCloseApp")).toString()), buildDir);

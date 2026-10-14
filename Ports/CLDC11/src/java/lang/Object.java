@@ -109,4 +109,8 @@ public class Object{
         return null;
     }
 
+    /// Compile-time declaration of the runtime finalization hook.
+    /// Collection and finalization behavior depends on the target runtime.
+    protected void finalize() throws Throwable {
+    }
 }

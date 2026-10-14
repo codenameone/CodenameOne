@@ -54,7 +54,7 @@ class BackendZipStreamingTest {
                 paths.filter(p -> p.toString().endsWith(".java")).forEach(p -> compile.add(p.toString()));
             }
         }
-        String shared = run(backend, work, Arrays.asList("./shared-sources.sh"));
+        String shared = run(backend, work, Arrays.asList("./shared-sources.sh", "--javase"));
         for (String file : shared.split("\\r?\\n")) {
             if (!file.isEmpty()) compile.add(file);
         }

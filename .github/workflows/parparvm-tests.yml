@@ -186,10 +186,10 @@ jobs:
 
   vm-tests:
     runs-on: ubuntu-24.04
-    # The full suite takes about an hour before the bounded GC benchmark arms.
-    # Android compatibility and Kotlin translation add time; leave room for
-    # both phases while each GC workload retains its own timeout.
-    timeout-minutes: 120
+    # The full suite and serial GC benchmarks took 69 and 47 minutes in run
+    # 38355108612. Both passed, but setup plus reporting exceeded two hours.
+    # Leave reporting headroom; each GC workload retains its own timeout.
+    timeout-minutes: 150
     # The two database engines the backend speaks a wire protocol to.
     #
     # BackendDatabaseTest and BackendOrmTest run one body of assertions against

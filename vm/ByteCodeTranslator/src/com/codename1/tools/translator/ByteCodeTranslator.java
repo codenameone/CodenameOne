@@ -521,6 +521,8 @@ public class ByteCodeTranslator {
         File cn1Globals = copyRuntimeResource(srcRoot, "cn1_globals.h");
         copyRuntimeResource(srcRoot, "cn1_intrinsics.h");
         copyRuntimeResource(srcRoot, "cn1_collections.h");
+        copyRuntimeResource(srcRoot, "cn1_process.h");
+        copyRuntimeResource(srcRoot, "cn1_process_vm.h");
         // Virtual threads: the switch is a few instructions of assembly per
         // architecture, so the .S travels with the runtime rather than being
         // generated. A project that gets the C and not the .S links against a
@@ -903,6 +905,8 @@ public class ByteCodeTranslator {
         File cn1Globals = copyRuntimeResource(srcRoot, "cn1_globals.h");
         copyRuntimeResource(srcRoot, "cn1_intrinsics.h");
         copyRuntimeResource(srcRoot, "cn1_collections.h");
+        copyRuntimeResource(srcRoot, "cn1_process.h");
+        copyRuntimeResource(srcRoot, "cn1_process_vm.h");
         // Virtual threads: the switch is a few instructions of assembly per
         // architecture, so the .S travels with the runtime rather than being
         // generated. A project that gets the C and not the .S links against a
