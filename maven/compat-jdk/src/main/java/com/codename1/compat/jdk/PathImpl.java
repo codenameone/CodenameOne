@@ -361,6 +361,18 @@ final class PathImpl implements Path {
         return resolveSibling(of(other));
     }
 
+    private boolean hasDots() {
+        if (isEmpty()) {
+            return false;
+        }
+        for (String name : names()) {
+            if (".".equals(name) || "..".equals(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Override
     public Path relativize(Path other) {
         PathImpl o = impl(other);
@@ -370,7 +382,17 @@ final class PathImpl implements Path {
         if (path.equals(o.path)) {
             return new PathImpl("");
         }
-        String[] a = isEmpty() ? NO_NAMES : names();
+        // A `.` or `..` anywhere has both sides normalized first, as the
+        // JDK has done since it stopped answering `../../b` for `a/..`
+        // against `b`: a name that cancels the one before it is no step
+        // away from anything. What is left of a `..` afterwards leads the
+        // path, cancels nothing, and is refused below.
+        PathImpl from = this;
+        if (!isEmpty() && (hasDots() || o.hasDots())) {
+            from = impl(normalize());
+            o = impl(o.normalize());
+        }
+        String[] a = from.isEmpty() ? NO_NAMES : from.names();
         String[] b = o.isEmpty() ? NO_NAMES : o.names();
         int common = 0;
         while (common < a.length && common < b.length && a[common].equals(b[common])) {
@@ -380,9 +402,6 @@ final class PathImpl implements Path {
         for (int i = common; i < a.length; i++) {
             if ("..".equals(a[i])) {
                 throw new IllegalArgumentException("Unable to compute relative path from " + this + " to " + other);
-            }
-            if (".".equals(a[i])) {
-                continue;
             }
             if (sb.length() > 0) {
                 sb.append('/');

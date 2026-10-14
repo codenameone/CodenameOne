@@ -24,8 +24,7 @@ package com.codename1.compat.jdk;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -51,9 +50,8 @@ final class ScheduledPool implements ScheduledExecutorService {
     private static final Scheduled<?>[] NONE = new Scheduled<?>[0];
 
     private final ExecutorService pool;
-    private final Timer timer = new Timer();
     private final AtomicBoolean shutdown = new AtomicBoolean();
-    /// Set once the timer and the pool have been told to stop.
+    /// Set once the pool has been told to stop and nothing waits any more.
     private final AtomicBoolean stopped = new AtomicBoolean();
     /// The scheduled work that has not completed, which is what an orderly
     /// shutdown waits for (the work that runs once) or cancels (the work
@@ -65,19 +63,24 @@ final class ScheduledPool implements ScheduledExecutorService {
         this.pool = pool;
     }
 
-    private final class Scheduled<V> extends TimerTask implements ScheduledFuture<V> {
+    private final class Scheduled<V> implements Runnable, ScheduledFuture<V> {
         private final Callable<V> work;
         private final boolean periodic;
         /// The gap to keep after a run ends, or zero for a fixed rate.
         private final long delayAfter;
+        /// The period of a fixed rate, or zero.
+        private final long rate;
+        /// The wait this is in, in [Delays], or null: see [#arm].
+        private final AtomicReference<Delays.Handle> wait = new AtomicReference<Delays.Handle>();
         private final AtomicLong due;
         private final AtomicBoolean running = new AtomicBoolean();
         private final CompletableFuture<V> outcome = new CompletableFuture<V>();
 
-        Scheduled(Callable<V> work, long dueAt, boolean periodic, long delayAfter) {
+        Scheduled(Callable<V> work, long dueAt, boolean periodic, long delayAfter, long rate) {
             this.work = work;
             this.periodic = periodic;
             this.delayAfter = delayAfter;
+            this.rate = rate;
             this.due = new AtomicLong(dueAt);
         }
 
@@ -86,8 +89,13 @@ final class ScheduledPool implements ScheduledExecutorService {
             // Work that runs once and was accepted before a shutdown still
             // runs; work that repeats does not.
             if (outcome.isDone() || (periodic && shutdown.get()) || stopped.get()) {
-                super.cancel();
+                disarm();
                 return;
+            }
+            if (rate > 0) {
+                // A fixed rate keeps its beat whatever a run takes.
+                due.set(due.get() + rate);
+                arm(due.get() - System.currentTimeMillis());
             }
             if (!running.compareAndSet(false, true)) {
                 // The run before this one has not ended; a fixed rate does
@@ -104,7 +112,28 @@ final class ScheduledPool implements ScheduledExecutorService {
             } catch (RuntimeException e) {
                 running.set(false);
                 outcome.completeExceptionally(e);
-                super.cancel();
+                disarm();
+            }
+        }
+
+        /// Waits `millis` and then runs. The handle is kept so that a
+        /// cancelled task leaves the queue at once.
+        void arm(long millis) {
+            Delays.Handle next = Delays.after(millis, this);
+            Delays.Handle before = wait.getAndSet(next);
+            if (before != null) {
+                before.cancel();
+            }
+            if (outcome.isDone() || stopped.get()) {
+                // Cancelled, or stopped, while this was being armed.
+                disarm();
+            }
+        }
+
+        void disarm() {
+            Delays.Handle before = wait.getAndSet(null);
+            if (before != null) {
+                before.cancel();
             }
         }
 
@@ -117,7 +146,7 @@ final class ScheduledPool implements ScheduledExecutorService {
                 } catch (Throwable t) {
                     // Work that fails is not run again.
                     outcome.completeExceptionally(t);
-                    Scheduled.super.cancel();
+                    disarm();
                     return;
                 }
                 if (!periodic) {
@@ -139,19 +168,8 @@ final class ScheduledPool implements ScheduledExecutorService {
         }
 
         private void again() {
-            final Scheduled<V> self = this;
             due.set(System.currentTimeMillis() + delayAfter);
-            try {
-                timer.schedule(new TimerTask() {
-                    @Override
-                    public void run() {
-                        self.run();
-                    }
-                }, delayAfter);
-            } catch (IllegalStateException e) {
-                // The timer was cancelled by a shutdown in between.
-                outcome.cancel(false);
-            }
+            arm(delayAfter);
         }
 
         @Override
@@ -161,7 +179,7 @@ final class ScheduledPool implements ScheduledExecutorService {
 
         @Override
         public boolean cancel(boolean mayInterruptIfRunning) {
-            super.cancel();
+            disarm();
             return outcome.cancel(mayInterruptIfRunning);
         }
 
@@ -186,8 +204,8 @@ final class ScheduledPool implements ScheduledExecutorService {
         }
     }
 
-    /// Keeps `task` until it completes, and schedules it with `start`.
-    private <V> Scheduled<V> accept(final Scheduled<V> task, Runnable start) {
+    /// Keeps `task` until it completes, and runs it after `millis`.
+    private <V> Scheduled<V> accept(final Scheduled<V> task, long millis) {
         checkOpen();
         while (true) {
             Scheduled<?>[] before = live.get();
@@ -209,13 +227,7 @@ final class ScheduledPool implements ScheduledExecutorService {
             task.cancel(false);
             throw new RejectedExecutionException("The executor has been shut down");
         }
-        try {
-            start.run();
-        } catch (IllegalStateException e) {
-            // The timer was cancelled by a shutdown in between.
-            task.cancel(false);
-            throw new RejectedExecutionException("The executor has been shut down");
-        }
+        task.arm(millis);
         return task;
     }
 
@@ -245,7 +257,6 @@ final class ScheduledPool implements ScheduledExecutorService {
     /// is left to run.
     private void stopWhenIdle() {
         if (shutdown.get() && live.get().length == 0 && stopped.compareAndSet(false, true)) {
-            timer.cancel();
             pool.shutdown();
         }
     }
@@ -262,13 +273,8 @@ final class ScheduledPool implements ScheduledExecutorService {
             throw new NullPointerException();
         }
         final long millis = Math.max(0, unit.toMillis(delay));
-        final Scheduled<V> task = new Scheduled<V>(callable, System.currentTimeMillis() + millis, false, 0);
-        return accept(task, new Runnable() {
-            @Override
-            public void run() {
-                timer.schedule(task, millis);
-            }
-        });
+        final Scheduled<V> task = new Scheduled<V>(callable, System.currentTimeMillis() + millis, false, 0, 0);
+        return accept(task, millis);
     }
 
     @Override
@@ -287,13 +293,8 @@ final class ScheduledPool implements ScheduledExecutorService {
         final long millis = Math.max(0, unit.toMillis(initialDelay));
         final long every = Math.max(1, unit.toMillis(period));
         final Scheduled<Object> task = new Scheduled<Object>(Executors.callable(command, null),
-                System.currentTimeMillis() + millis, true, 0);
-        return accept(task, new Runnable() {
-            @Override
-            public void run() {
-                timer.scheduleAtFixedRate(task, millis, every);
-            }
-        });
+                System.currentTimeMillis() + millis, true, 0, every);
+        return accept(task, millis);
     }
 
     @Override
@@ -307,13 +308,8 @@ final class ScheduledPool implements ScheduledExecutorService {
         }
         final long millis = Math.max(0, unit.toMillis(initialDelay));
         final Scheduled<Object> task = new Scheduled<Object>(Executors.callable(command, null),
-                System.currentTimeMillis() + millis, true, Math.max(1, unit.toMillis(delay)));
-        return accept(task, new Runnable() {
-            @Override
-            public void run() {
-                timer.schedule(task, millis);
-            }
-        });
+                System.currentTimeMillis() + millis, true, Math.max(1, unit.toMillis(delay)), 0);
+        return accept(task, millis);
     }
 
     @Override
@@ -339,12 +335,24 @@ final class ScheduledPool implements ScheduledExecutorService {
     /// Nothing scheduled that has not started runs after this. The futures
     /// of the dropped work stay as they are, neither done nor cancelled,
     /// as the JDK leaves them.
+    ///
+    /// What is answered is all of it, as the contract of the interface
+    /// has it: the work the pool had been handed and had not begun, and
+    /// the work that was still waiting for its time, which the pool never
+    /// saw. The JDK answers its delayed tasks the same way, as the futures
+    /// `schedule` returned.
     @Override
     public List<Runnable> shutdownNow() {
         shutdown.set(true);
         stopped.set(true);
-        timer.cancel();
-        return pool.shutdownNow();
+        List<Runnable> dropped = new ArrayList<Runnable>(pool.shutdownNow());
+        for (Scheduled<?> task : live.get()) {
+            task.disarm();
+            if (!task.outcome.isDone() && !task.running.get()) {
+                dropped.add(task);
+            }
+        }
+        return dropped;
     }
 
     @Override

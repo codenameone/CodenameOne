@@ -67,6 +67,11 @@ import java.util.Map;
 /// application has; a platform that kills the process runs none.
 public final class JdkSystem {
 
+    // Both are read and written under their own monitor. The JDK's property
+    // table and hook list are safe to use from any thread, and desktop code
+    // does: a worker sets a property, a pool's thread registers a hook. A
+    // HashMap written from two threads loses entries. No lock is held while
+    // a built-in answer is worked out or a hook runs.
     private static final Map<String, String> OVERRIDES = new HashMap<String, String>();
     private static final List<Thread> HOOKS = new ArrayList<Thread>();
     private static UncaughtExceptionHandler defaultHandler;
@@ -94,8 +99,10 @@ public final class JdkSystem {
         if (key.length() == 0) {
             throw new IllegalArgumentException("key can't be empty");
         }
-        if (OVERRIDES.containsKey(key)) {
-            return OVERRIDES.get(key);
+        synchronized (OVERRIDES) {
+            if (OVERRIDES.containsKey(key)) {
+                return OVERRIDES.get(key);
+            }
         }
         if ("user.home".equals(key) || "user.dir".equals(key) || "java.io.tmpdir".equals(key)) {
             return home();
@@ -134,7 +141,9 @@ public final class JdkSystem {
             throw new NullPointerException("value can't be null");
         }
         String old = getProperty(key);
-        OVERRIDES.put(key, value);
+        synchronized (OVERRIDES) {
+            OVERRIDES.put(key, value);
+        }
         return old;
     }
 
@@ -142,7 +151,9 @@ public final class JdkSystem {
     /// for a key that has a built-in answer.
     public static String clearProperty(String key) {
         String old = getProperty(key);
-        OVERRIDES.put(key, null);
+        synchronized (OVERRIDES) {
+            OVERRIDES.put(key, null);
+        }
         return old;
     }
 
@@ -175,8 +186,11 @@ public final class JdkSystem {
     /// that thread and nothing else; here it is reported the way an
     /// uncaught exception of a thread is, and the next hook runs.
     static void runShutdownHooks() {
-        List<Thread> hooks = new ArrayList<Thread>(HOOKS);
-        HOOKS.clear();
+        List<Thread> hooks;
+        synchronized (HOOKS) {
+            hooks = new ArrayList<Thread>(HOOKS);
+            HOOKS.clear();
+        }
         for (Thread hook : hooks) {
             try {
                 hook.run();
@@ -191,7 +205,9 @@ public final class JdkSystem {
     }
 
     public static void halt(Runtime runtime, int status) {
-        HOOKS.clear();
+        synchronized (HOOKS) {
+            HOOKS.clear();
+        }
         Display.getInstance().exitApplication();
     }
 
@@ -199,17 +215,21 @@ public final class JdkSystem {
         if (hook == null) {
             throw new NullPointerException();
         }
-        if (HOOKS.contains(hook)) {
-            throw new IllegalArgumentException("Hook previously registered");
+        synchronized (HOOKS) {
+            if (HOOKS.contains(hook)) {
+                throw new IllegalArgumentException("Hook previously registered");
+            }
+            HOOKS.add(hook);
         }
-        HOOKS.add(hook);
     }
 
     public static boolean removeShutdownHook(Runtime runtime, Thread hook) {
         if (hook == null) {
             throw new NullPointerException();
         }
-        return HOOKS.remove(hook);
+        synchronized (HOOKS) {
+            return HOOKS.remove(hook);
+        }
     }
 
     /// One: application code is confined to a single thread, and sizing a

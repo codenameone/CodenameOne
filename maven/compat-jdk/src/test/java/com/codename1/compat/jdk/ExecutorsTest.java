@@ -332,7 +332,18 @@ public class ExecutorsTest {
         ScheduledExecutorService pool = Executors.newScheduledThreadPool(1);
         AtomicBoolean ran = new AtomicBoolean();
         ScheduledFuture<String> once = pool.schedule(answering("ran", ran), 150, TimeUnit.MILLISECONDS);
-        pool.shutdownNow();
+        ScheduledFuture<?> repeating = pool.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+            }
+        }, 1, 1, TimeUnit.HOURS);
+        // Work still waiting for its time never reached the pool, and is
+        // handed back all the same: as the futures it was scheduled as.
+        List<Runnable> dropped = pool.shutdownNow();
+        assertEquals(2, dropped.size());
+        assertTrue(dropped.contains(once));
+        assertTrue(dropped.contains(repeating));
+        assertEquals("a dropped wait is still queued", 0, Delays.pending());
         assertTrue(pool.isShutdown());
         assertTrue(pool.awaitTermination(10, TimeUnit.SECONDS));
         Thread.sleep(400);
@@ -348,6 +359,68 @@ public class ExecutorsTest {
             Thread.sleep(20);
         }
         return ref.get() == null;
+    }
+
+    /// Desktop code sets properties from its workers; the JDK's table takes
+    /// that, and a plain map written from several threads loses entries.
+    @Test
+    public void propertiesSetFromSeveralThreadsAreAllKept() throws Exception {
+        final int each = 2000;
+        Thread[] writers = new Thread[4];
+        for (int t = 0; t < writers.length; t++) {
+            final int id = t;
+            writers[t] = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    for (int i = 0; i < each; i++) {
+                        JdkSystem.setProperty("cn1.test.concurrent." + id + "." + i, "v");
+                    }
+                }
+            });
+            writers[t].start();
+        }
+        for (Thread w : writers) {
+            w.join();
+        }
+        for (int t = 0; t < writers.length; t++) {
+            for (int i = 0; i < each; i++) {
+                assertEquals("v", JdkSystem.clearProperty("cn1.test.concurrent." + t + "." + i));
+            }
+        }
+    }
+
+    /// A device's timer sleeps a thread through every delay it is given,
+    /// cancelled or not, so a timeout per request was a thread per request
+    /// until the deadline. A wait that is given up leaves the queue at
+    /// once, and one thread serves whatever is left.
+    @Test
+    public void manyTimeoutsThatAreNotNeededHoldNoThread() throws Exception {
+        int threads = Thread.activeCount();
+        List<CompletableFuture<String>> all = new ArrayList<CompletableFuture<String>>();
+        for (int i = 0; i < 500; i++) {
+            all.add(new CompletableFuture<String>().orTimeout(1, TimeUnit.HOURS));
+            all.add(new CompletableFuture<String>().completeOnTimeout("late", 1, TimeUnit.HOURS));
+        }
+        assertEquals(1000, Delays.pending());
+        assertTrue("one thread waits for all of them", Thread.activeCount() <= threads + 1);
+        for (CompletableFuture<String> f : all) {
+            assertTrue(f.complete("in time"));
+        }
+        assertEquals(0, Delays.pending());
+        // And the waits that are due still fire, in the order of their time.
+        final List<String> order = Collections.synchronizedList(new ArrayList<String>());
+        final java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(3);
+        for (final int millis : new int[] {120, 20, 70}) {
+            Delays.after(millis, new Runnable() {
+                @Override
+                public void run() {
+                    order.add(String.valueOf(millis));
+                    done.countDown();
+                }
+            });
+        }
+        assertTrue(done.await(10, java.util.concurrent.TimeUnit.SECONDS));
+        assertEquals(Arrays.asList("20", "70", "120"), order);
     }
 
     /// A timeout set for a future that completed in time is cancelled, and

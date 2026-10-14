@@ -480,7 +480,11 @@ public final class DesktopProjectImporter {
     private static final Pattern KOTLIN_EXTENDS = Pattern.compile(
             "\\bclass\\s+(\\w+)[^{\\n]*?:[^{\\n]*?((?:javafx\\.application\\.)?Application)\\s*\\(");
     private static final Pattern KOTLIN_STATIC_MAIN = Pattern.compile("@JvmStatic\\s+fun\\s+main\\s*\\(");
-    private static final Pattern KOTLIN_TOP_MAIN = Pattern.compile("(?m)^fun\\s+main\\s*\\(");
+    // At the start of a line, so top level; `public` is the default
+    // visibility spelled out and `suspend` still gets the static facade
+    // main. A private or internal one is not an entry point.
+    private static final Pattern KOTLIN_TOP_MAIN = Pattern.compile(
+            "(?m)^(?:(?:public|suspend)\\s+)*fun\\s+main\\s*\\(");
     private static final Pattern KOTLIN_FILE_NAME = Pattern.compile("@file\\s*:\\s*JvmName\\s*\\(\\s*\"(\\w+)\"");
 
     /// Source text with its comments and string literals blanked, so a class
@@ -880,9 +884,11 @@ public final class DesktopProjectImporter {
                 }
             }
             String text = file == null ? "" : withoutXmlComments(read(file));
-            // Maven takes the file only when it is the POM asked for.
-            String own = element(POM_PARENT.matcher(text).replaceAll(" "), "artifactId");
-            if (text.length() == 0 || own == null || !own.equals(element(parent.group(1), "artifactId"))) {
+            // Maven takes the file only when it is the POM asked for, by
+            // all three coordinates: a POM of the right artifact id in
+            // another group, or at another version, is some other project's,
+            // and Maven resolves the parent from a repository instead.
+            if (text.length() == 0 || !isPom(text, parent.group(1))) {
                 r.unresolved.add("the parent POM " + named + " is not among the project's files; dependencies it "
                         + "declares for its modules were not read: add the ones the application needs to its "
                         + "build by hand");
@@ -893,6 +899,58 @@ public final class DesktopProjectImporter {
             dir = file.getAbsoluteFile().getParentFile();
         }
         return chain;
+    }
+
+    /// Whether the POM `text` is the one the `<parent>` element `asked`
+    /// names. A POM that leaves out its group id or version has its own
+    /// parent's. A coordinate written with a property on either side
+    /// (`${revision}`) is not compared: resolving it is the effective
+    /// model's work, which an import does not do.
+    private static boolean isPom(String text, String asked) {
+        Matcher up = POM_PARENT.matcher(text);
+        String inherited = up.find() ? up.group(1) : "";
+        String artifact = projectElement(text, "artifactId");
+        if (artifact == null || !artifact.equals(element(asked, "artifactId"))) {
+            return false;
+        }
+        for (String name : new String[] {"groupId", "version"}) {
+            String own = projectElement(text, name);
+            if (own == null) {
+                own = element(inherited, name);
+            }
+            String wanted = element(asked, name);
+            if (own != null && wanted != null && own.indexOf("${") < 0 && wanted.indexOf("${") < 0
+                    && !own.equals(wanted)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static final Pattern XML_TAG = Pattern.compile("<(/?)([\\w.:-]+)[^<>]*?(/?)>");
+
+    /// The text of the element `name` that is a child of the document's
+    /// root, or null. [#element] takes the first one anywhere, which for a
+    /// POM that inherits its group id is a dependency's.
+    static String projectElement(String xml, String name) {
+        Matcher m = XML_TAG.matcher(xml);
+        int depth = 0;
+        while (m.find()) {
+            if (m.group(3).length() > 0) {
+                continue;
+            }
+            if (m.group(1).length() > 0) {
+                depth--;
+                continue;
+            }
+            if (depth == 1 && name.equals(m.group(2))) {
+                int end = xml.indexOf('<', m.end());
+                String value = end < 0 ? "" : xml.substring(m.end(), end).trim();
+                return value.length() == 0 ? null : value;
+            }
+            depth++;
+        }
+        return null;
     }
 
     private static final Pattern XML_COMMENT = Pattern.compile("(?s)<!--.*?-->");

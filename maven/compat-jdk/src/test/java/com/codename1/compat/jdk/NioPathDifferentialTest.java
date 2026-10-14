@@ -30,6 +30,7 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /// Every method of `Path` that only rearranges names, run on the same inputs
 /// through this module's class and through the JDK's on a Unix file system.
@@ -202,6 +203,30 @@ public class NioPathDifferentialTest {
             }
         }
         assertTrue(compared > 1500);
+    }
+
+    /// What a current JDK answers for the dotted pairs the comparison above
+    /// leaves out: both sides are normalized first, so a name that cancels
+    /// the one before it is no step away from anything. The JDK these tests
+    /// run on predates that and answers `../../b` for the first.
+    @Test
+    public void relativizeNormalizesDottedPaths() {
+        String[][] cases = {{"a/..", "b", "b"}, {"a/../c", "c/d", "d"}, {"a/b", "a/./c", "../c"},
+            {"/a/../b", "/b/c", "c"}, {"a", "../b", "../../b"}, {"a/./b", "a/b", ""}, {"a/b/..", "a", ""},
+            {"", "a/../b", "a/../b"}};
+        for (String[] c : cases) {
+            assertEquals("\"" + c[0] + "\" relativize \"" + c[1] + "\"", c[2],
+                    Paths.get(c[0]).relativize(Paths.get(c[1])).toString());
+        }
+        // A `..` that nothing cancels still leads nowhere that can be named.
+        for (String from : new String[] {"../a", "a/../..", ".."}) {
+            try {
+                Paths.get(from).relativize(Paths.get("b"));
+                fail(from);
+            } catch (IllegalArgumentException expected) {
+                assertTrue(expected.getMessage(), expected.getMessage().startsWith("Unable to compute"));
+            }
+        }
     }
 
     @Test

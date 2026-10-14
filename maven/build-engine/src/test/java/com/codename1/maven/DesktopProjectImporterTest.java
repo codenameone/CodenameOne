@@ -688,6 +688,62 @@ public class DesktopProjectImporterTest {
         }
     }
 
+    /// A file of the parent's artifact id where the parent is looked for is
+    /// the parent only when its group and version are the ones asked for;
+    /// Maven goes to a repository for any other, and so nothing of that
+    /// file is the module's.
+    @Test
+    public void aLocalPomOfAnotherGroupOrVersionIsNotTheParent() throws Exception {
+        String[][] cases = {
+            // what the file above declares, and whether it is the parent
+            {"<groupId>com.acme</groupId><artifactId>root</artifactId><version>1</version>", "yes"},
+            {"<groupId>org.other</groupId><artifactId>root</artifactId><version>1</version>", "no"},
+            {"<groupId>com.acme</groupId><artifactId>root</artifactId><version>2</version>", "no"},
+            // Group and version inherited from a parent of its own; the
+            // group id of its dependency is not the project's.
+            {"<parent><groupId>com.acme</groupId><artifactId>top</artifactId><version>1</version>"
+                    + "<relativePath/></parent><artifactId>root</artifactId>", "yes"},
+            {"<parent><groupId>org.other</groupId><artifactId>top</artifactId><version>1</version>"
+                    + "<relativePath/></parent><artifactId>root</artifactId>", "no"},
+            {"<groupId>com.acme</groupId><artifactId>root</artifactId><version>${revision}</version>", "yes"},
+        };
+        for (String[] c : cases) {
+            File source = tmp.newFolder();
+            write(source, "pom.xml", "<project>\n" + c[0] + "\n<dependencies>\n<dependency>"
+                    + "<groupId>com.miglayout</groupId><artifactId>miglayout-swing</artifactId>"
+                    + "<version>5.0</version></dependency>\n</dependencies>\n</project>\n");
+            write(source, "app/pom.xml", "<project>\n<parent><groupId>com.acme</groupId>"
+                    + "<artifactId>root</artifactId><version>1</version></parent>\n<artifactId>app</artifactId>\n"
+                    + "</project>\n");
+            DesktopProjectImporter.Result r = new DesktopProjectImporter.Result();
+            DesktopProjectImporter.readDependencies(new File(source, "app"), r);
+            boolean parent = "yes".equals(c[1]);
+            // The file's own parent, `top`, is nowhere and is reported too.
+            assertEquals(c[0], !parent, r.unresolved.toString().contains("the parent POM com.acme:root "));
+            assertEquals(c[0], parent, !r.libraries.isEmpty());
+        }
+    }
+
+    /// `public` is Kotlin's default visibility written out, and a
+    /// `suspend` main gets the same static facade method.
+    @Test
+    public void aKotlinTopLevelMainMayCarryModifiers() {
+        Map<String, DesktopProjectImporter.Candidate> out =
+                new java.util.LinkedHashMap<String, DesktopProjectImporter.Candidate>();
+        for (String main : new String[] {"public fun main() {\n}\n", "suspend fun main() {\n}\n",
+            "public suspend fun main(args: Array<String>) {\n}\n"}) {
+            out.clear();
+            DesktopProjectImporter.scanKotlin("Tool", "package k\n\n" + main, out);
+            assertEquals(main, Collections.singleton("k.ToolKt"), out.keySet());
+        }
+        for (String main : new String[] {"private fun main() {\n}\n",
+            "class A {\n    public fun main() {\n    }\n}\n"}) {
+            out.clear();
+            DesktopProjectImporter.scanKotlin("Tool", "package k\n\n" + main, out);
+            assertTrue(main, out.isEmpty());
+        }
+    }
+
     /// A Kotlin `@JvmStatic main` is a static method of the class it is
     /// declared in, whatever the file is called.
     @Test

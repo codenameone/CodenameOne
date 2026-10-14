@@ -316,6 +316,46 @@ public class CompatLibrariesTest {
         assertTrue(CompatLibraries.bundledJarNames(Collections.singletonList(classes)).isEmpty());
     }
 
+    /// The sources of a library copied into the project where its jar used
+    /// to be: the compiler has written the application's class to a path
+    /// the record still calls the library's.
+    @Test
+    public void aDroppedLibraryLeavesTheClassTheApplicationTookOver() throws Exception {
+        File plain = plainLibrary();
+        File classes = application(WORDY_MAIN, plain);
+        assertTrue(remapper(classes, Collections.singletonList(plain), plain).run());
+
+        String own = "package org.plain;\npublic class Words {\n"
+                + "    public static String mine() { return \"the application's\"; }\n}\n";
+        CompatFixtures.compileAgainst(runtimes(), tmp.newFolder(), classes, "org/plain/Words.java", own);
+        assertTrue(remapper(classes, Collections.<File>emptyList(), plain).run());
+        File words = new File(classes, "org/plain/Words.class");
+        assertTrue("the application's class went with the library", words.isFile());
+        assertTrue(CompatFixtures.members(Files.readAllBytes(words.toPath())).toString(),
+                new String(Files.readAllBytes(words.toPath()), "ISO-8859-1").contains("mine"));
+        // What the library alone had is still taken away.
+        assertFalse(new File(classes, "org/plain/words.properties").exists());
+    }
+
+    /// The same class taken over while the jar is still a dependency: the
+    /// library's copy must not be written back over it.
+    @Test
+    public void aKeptLibraryDoesNotOverwriteTheClassTheApplicationTookOver() throws Exception {
+        File plain = plainLibrary();
+        File classes = application(WORDY_MAIN, plain);
+        assertTrue(remapper(classes, Collections.singletonList(plain), plain).run());
+
+        String own = "package org.plain;\npublic class Words {\n"
+                + "    public static String mine() { return \"the application's\"; }\n}\n";
+        CompatFixtures.compileAgainst(runtimes(), tmp.newFolder(), classes, "org/plain/Words.java", own);
+        for (int run = 0; run < 2; run++) {
+            assertTrue(remapper(classes, Collections.singletonList(plain), plain).run());
+            assertTrue("run " + run, new String(Files.readAllBytes(new File(classes, "org/plain/Words.class")
+                    .toPath()), "ISO-8859-1").contains("mine"));
+            assertFalse("run " + run, CompatLibraries.classOrigins(classes).containsKey("org/plain/Words"));
+        }
+    }
+
     @Test
     public void nativeCodeIsNamedAndItsBinariesStayBehind() throws Exception {
         File plain = plainLibrary("linux-x86-64/libwords.so", new byte[] {127, 'E', 'L', 'F'});

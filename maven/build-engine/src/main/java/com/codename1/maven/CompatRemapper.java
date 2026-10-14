@@ -378,6 +378,8 @@ public final class CompatRemapper {
                 log.info("Relocated " + appClasses.size() + " application classes and " + runtime + " "
                         + names + " runtime classes");
             }
+            // Last, when nothing here writes to the directory any more.
+            CompatLibraries.seal(classesDir);
             return true;
         } catch (IOException e) {
             throw new BuildException("Compatibility layer remapping failed: " + e.getMessage(), e);

@@ -123,6 +123,7 @@ public final class CompatLibraries {
     private static final String FILE = "file\t";
     private static final String INFO = "info\t";
     private static final String SERVICE = "service\t";
+    private static final String SUM = "sum\t";
 
     /// The one directory of a jar's `META-INF` that holds what the library
     /// loads by name.
@@ -145,6 +146,7 @@ public final class CompatLibraries {
         if (candidates.isEmpty() && before.isEmpty()) {
             return bundled;
         }
+        boolean released = release(classesDir, before, log);
         List<File> jars = new ArrayList<File>();
         for (File jar : candidates) {
             if (jar != null && !skip.contains(jar)) {
@@ -198,10 +200,72 @@ public final class CompatLibraries {
                 delete(classesDir, e.getValue().files, allFiles(after));
             }
         }
-        if (!after.equals(before)) {
+        if (released || !after.equals(before)) {
             write(classesDir, after);
         }
         return bundled;
+    }
+
+    /// Takes out of the record every file that is no longer the bytes the
+    /// last build left there, and says whether there was one.
+    ///
+    /// The compiler runs before this step. A project that drops a library
+    /// and carries its classes itself -- the sources copied in where the jar
+    /// used to be -- has compiled a class to a path the record still calls
+    /// the library's, and deleting what a jar "takes with it" would delete
+    /// the application's own class: a build that works clean and loses a
+    /// class incrementally. A file the last build sealed and that has
+    /// changed since is therefore somebody else's by now, exactly as
+    /// [ClassRelocator#extractRuntime] treats a runtime class.
+    ///
+    /// A record with no checksum for a file -- one a build wrote and did not
+    /// live to seal -- says nothing about it, and the file stays the jar's.
+    private static boolean release(File classesDir, Map<String, Entry> before, Log log) throws IOException {
+        boolean released = false;
+        for (Entry e : before.values()) {
+            for (Map.Entry<String, String> sum : e.sums.entrySet()) {
+                File f = new File(classesDir, sum.getKey());
+                if (e.files.contains(sum.getKey()) && f.isFile()
+                        && !sum.getValue().equals(checksum(Files.readAllBytes(f.toPath())))) {
+                    log.debug(sum.getKey() + " has changed since it was unpacked: it is the application's own now");
+                    e.files.remove(sum.getKey());
+                    released = true;
+                }
+            }
+        }
+        return released;
+    }
+
+    /// Records what every unpacked file looks like once the step that
+    /// called [#bundle] is done with the directory: relocation rewrites the
+    /// classes after they are unpacked, so only then are they the bytes the
+    /// next build will find. See [#release], which reads this.
+    static void seal(File classesDir) throws IOException {
+        Map<String, Entry> entries = read(classesDir);
+        boolean changed = false;
+        for (Entry e : entries.values()) {
+            Map<String, String> sums = new TreeMap<String, String>();
+            for (String name : e.files) {
+                File f = new File(classesDir, name);
+                if (f.isFile()) {
+                    sums.put(name, checksum(Files.readAllBytes(f.toPath())));
+                }
+            }
+            if (!sums.equals(e.sums)) {
+                e.sums.clear();
+                e.sums.putAll(sums);
+                changed = true;
+            }
+        }
+        if (changed) {
+            write(classesDir, entries);
+        }
+    }
+
+    private static String checksum(byte[] data) {
+        CRC32 crc = new CRC32();
+        crc.update(data, 0, data.length);
+        return data.length + ":" + Long.toHexString(crc.getValue());
     }
 
     /// What the record calls a jar: its file name, which is what every
@@ -398,6 +462,11 @@ public final class CompatLibraries {
         /// The providers the jar lists for the services the application
         /// reaches, each as `service`, a tab, `provider`, in the jar's order.
         private final List<String> services = new ArrayList<String>();
+        /// The checksum each unpacked file had when the build that wrote
+        /// this was done with it; see [CompatLibraries#seal]. Not part of
+        /// what makes two entries equal: it describes the directory, not
+        /// what was decided about the jar.
+        private final Map<String, String> sums = new TreeMap<String, String>();
         /// What the jar was classified as, by key: see [Library].
         private final Map<String, String> info = new TreeMap<String, String>();
 
@@ -540,6 +609,11 @@ public final class CompatLibraries {
                 current.files.add(line.substring(FILE.length()));
             } else if (line.startsWith(SERVICE) && current != null) {
                 current.services.add(line.substring(SERVICE.length()));
+            } else if (line.startsWith(SUM) && current != null) {
+                int tab = line.indexOf('\t', SUM.length());
+                if (tab > 0) {
+                    current.sums.put(line.substring(tab + 1), line.substring(SUM.length(), tab));
+                }
             } else if (line.startsWith(INFO) && current != null) {
                 int eq = line.indexOf('=');
                 if (eq > INFO.length()) {
@@ -597,6 +671,9 @@ public final class CompatLibraries {
             }
             for (String s : e.getValue().services) {
                 text.append(SERVICE).append(s).append('\n');
+            }
+            for (Map.Entry<String, String> sum : e.getValue().sums.entrySet()) {
+                text.append(SUM).append(sum.getValue()).append('\t').append(sum.getKey()).append('\n');
             }
         }
         File parent = record.getParentFile();

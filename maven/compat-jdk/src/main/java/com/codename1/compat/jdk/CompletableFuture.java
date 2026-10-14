@@ -24,8 +24,6 @@ package com.codename1.compat.jdk;
 
 import com.codename1.util.AsyncResource;
 
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -82,7 +80,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     private static final Waiting RELEASED = new Waiting(null);
 
     private static final AtomicReference<AsyncPool> POOL = new AtomicReference<AsyncPool>();
-    private static final AtomicReference<Timer> TIMER = new AtomicReference<Timer>();
 
     private final AtomicReference<Object> result = new AtomicReference<Object>();
     private final AtomicReference<Waiting> waiting = new AtomicReference<Waiting>();
@@ -491,45 +488,15 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     // Time
     // ------------------------------------------------------------------
 
-    /// A timer task that lets go of its action when cancelled. A cancelled
-    /// `TimerTask` stays in its timer's queue until the time it was set
-    /// for, and would hold the future it was to complete for as long.
-    private static final class Timeout extends TimerTask {
-        private final AtomicReference<Runnable> action;
-
-        Timeout(Runnable action) {
-            this.action = new AtomicReference<Runnable>(action);
-        }
-
-        @Override
-        public void run() {
-            Runnable due = action.getAndSet(null);
-            if (due != null) {
-                due.run();
-            }
-        }
-
-        @Override
-        public boolean cancel() {
-            action.set(null);
-            return super.cancel();
-        }
-    }
-
     /// Runs `action` after `millis`, unless this future completes first:
-    /// then the task is cancelled, and holds nothing.
+    /// then the wait is given up, and holds neither a thread nor the
+    /// future. See [Delays].
     private void later(long millis, Runnable action) {
-        Timer timer = TIMER.get();
-        if (timer == null) {
-            TIMER.compareAndSet(null, new Timer());
-            timer = TIMER.get();
-        }
-        final Timeout task = new Timeout(action);
-        timer.schedule(task, Math.max(0, millis));
+        final Delays.Handle wait = Delays.after(millis, action);
         whenDone(new Runnable() {
             @Override
             public void run() {
-                task.cancel();
+                wait.cancel();
             }
         });
     }
