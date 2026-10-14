@@ -103,6 +103,9 @@ void CN1MacTextInputNotifyEditorAction(void) {
 
 @implementation CN1MacTextInputSession {
     int editSeq;
+    int pendingEditorCommand;
+    int deferredEditGeneration;
+    NSMutableArray *deferredEdits;
     /// Bumped by every start, so a teardown queued by the previous session can
     /// tell that the singleton has since been rebound to a different editor.
     int sessionGeneration;
@@ -119,6 +122,51 @@ void CN1MacTextInputNotifyEditorAction(void) {
         shared = [[CN1MacTextInputSession alloc] init];
     });
     return shared;
+}
+
+// All queue access is on AppKit's main thread. A replaced/stopped session drops
+// its delayed edits instead of replaying them into another document.
+- (void)resetDeferredEditsIfNeeded {
+    if (!self.active || deferredEditGeneration != sessionGeneration) {
+        pendingEditorCommand = 0;
+        [deferredEdits removeAllObjects];
+        deferredEditGeneration = sessionGeneration;
+    }
+}
+
+- (BOOL)deferNativeEdit:(void (^)(void))edit {
+    [self resetDeferredEditsIfNeeded];
+    if (pendingEditorCommand == 0) {
+        return NO;
+    }
+    if (deferredEdits == nil) { deferredEdits = [[NSMutableArray alloc] init]; }
+    void (^saved)(void) = [edit copy];
+    [deferredEdits addObject:saved];
+#if !__has_feature(objc_arc)
+    [saved release];
+#endif
+    return YES;
+}
+
+- (int)beginEditorCommand {
+    [self resetDeferredEditsIfNeeded];
+    pendingEditorCommand = [self nextEditSeq];
+    return pendingEditorCommand;
+}
+
+- (void)completeEditorCommand:(int)sequence {
+    [self resetDeferredEditsIfNeeded];
+    if (pendingEditorCommand != sequence) { return; }
+    pendingEditorCommand = 0;
+    while (deferredEdits.count > 0 && pendingEditorCommand == 0 && self.active) {
+        void (^edit)(void) = [deferredEdits[0] copy];
+        [deferredEdits removeObjectAtIndex:0];
+        edit();
+#if !__has_feature(objc_arc)
+        [edit release];
+#endif
+        [self resetDeferredEditsIfNeeded];
+    }
 }
 
 - (instancetype)init {
@@ -174,6 +222,7 @@ void CN1MacTextInputSetPendingOwner(NSView *view) {
     sessionGeneration++;
 
     dispatch_async(dispatch_get_main_queue(), ^{
+        [self resetDeferredEditsIfNeeded];
         // The window the editing started in, not always the main one. Editing a
         // component in a secondary NSWindow used to make the MAIN host's view
         // first responder, which took key focus away from the window the user
@@ -217,6 +266,7 @@ void CN1MacTextInputSetPendingOwner(NSView *view) {
     // finish the composition of whichever editor now owns it.
     int teardownGeneration = sessionGeneration;
     dispatch_async(dispatch_get_main_queue(), ^{
+        [self resetDeferredEditsIfNeeded];
         BOOL superseded = sessionGeneration != teardownGeneration;
         if (!superseded) {
             [[NSTextInputContext currentInputContext] discardMarkedText];
@@ -352,6 +402,7 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_updateTextInputState___java_lang_Stri
         NSInteger start = MIN(MAX((NSInteger)selStart, 0), len);
         NSInteger end = MIN(MAX((NSInteger)selEnd, start), len);
         session.selectedRange = NSMakeRange(start, end - start);
+        [session completeEditorCommand:(int)seq];
     });
 }
 

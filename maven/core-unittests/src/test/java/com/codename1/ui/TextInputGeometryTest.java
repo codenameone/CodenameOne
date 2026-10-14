@@ -50,4 +50,12 @@ class TextInputGeometryTest {
         assertArrayEquals(new int[0], geometry.selectionRects(1,1));
         assertArrayEquals(new int[]{20,20,10,12}, geometry.selectionRects(1,2));
     }
+    @Test void adjacentLinesDoNotShareTheirBoundaryPixel() {
+        TextInputGeometry geometry = new TextInputGeometry(new int[]{
+            0,10,20,1,12, 1,100,32,1,12}, 0,0,new int[0],new int[]{10,20,1,12});
+        assertEquals(0, geometry.offsetAtPoint(10,31));
+        assertEquals(1, geometry.offsetAtPoint(10,32));
+        assertEquals(1, geometry.offsetAtPoint(10,43));
+    }
+
 }

@@ -33,9 +33,11 @@ import static org.junit.jupiter.api.Assertions.*;
 class IOSTextInputGeometryTest extends UITestBase {
     private static class NativeStub extends IOSNative {
         int[] bounds;
+        int sequence;
+        String text;
         @Override void startTextInput(int constraint, boolean correct, boolean caps, boolean multi,
                 String text, int start, int end, int action) { }
-        @Override void updateTextInputState(String text, int start, int end, int x, int y, int w, int h, int seq) { }
+        @Override void updateTextInputState(String text, int start, int end, int x, int y, int w, int h, int seq) { sequence = seq; this.text = text; }
         @Override void setTextInputBounds(int x, int y, int w, int h) { bounds = new int[]{x, y, w, h}; }
         @Override void stopTextInput() { }
         @Override public boolean isAsyncEditMode() { return false; }
@@ -165,4 +167,91 @@ class IOSTextInputGeometryTest extends UITestBase {
             IOSImplementation.instance = oldInstance;
         }
     }
+    @FormTest
+    void delayedKeyboardHideRestoresItsOwnerAndPreservesTheNextFormsPadding() {
+        IOSNative oldNative = IOSImplementation.nativeInstance;
+        IOSImplementation oldInstance = IOSImplementation.instance;
+        Port port = new Port();
+        Client a = new Client();
+        Client b = new Client();
+        try {
+            IOSImplementation.nativeInstance = new NativeStub();
+            IOSImplementation.instance = port;
+            Form first = new Form(new BorderLayout());
+            first.setFormBottomPaddingEditingMode(true);
+            first.add(BorderLayout.CENTER, a);
+            Form second = new Form(new BorderLayout());
+            second.setFormBottomPaddingEditingMode(true);
+            second.add(BorderLayout.CENTER, b);
+            first.getContentPane().getStyle().setPaddingUnitBottom(com.codename1.ui.plaf.Style.UNIT_TYPE_DIPS);
+            first.getContentPane().getStyle().setPadding(Component.BOTTOM, 21);
+            second.getContentPane().getStyle().setPadding(Component.BOTTOM, 35);
+            first.show();
+            flushSerialCalls();
+            port.startTextInput(a, a.getConfig());
+            IOSImplementation.keyboardWillBeShown();
+            flushSerialCalls();
+            assertEquals(150, first.getContentPane().getStyle().getPaddingBottom());
+            IOSImplementation.keyboardWillBeHidden(); // queued against first
+            second.show();
+            port.startTextInput(b, b.getConfig());
+            IOSImplementation.keyboardWillBeShown();
+            flushSerialCalls();
+            assertEquals(21, first.getContentPane().getStyle().getPaddingFloatValue(false, Component.BOTTOM));
+            assertEquals(com.codename1.ui.plaf.Style.UNIT_TYPE_DIPS,
+                    first.getContentPane().getStyle().getPaddingUnit()[Component.BOTTOM]);
+            assertEquals(150, second.getContentPane().getStyle().getPaddingBottom());
+            IOSImplementation.keyboardWillBeHidden();
+            IOSImplementation.keyboardWillBeShown(); // same form, a newer notification
+            flushSerialCalls();
+            assertEquals(150, second.getContentPane().getStyle().getPaddingBottom());
+            IOSImplementation.keyboardWillBeHidden();
+            flushSerialCalls();
+            assertEquals(35, second.getContentPane().getStyle().getPaddingBottom());
+        } finally {
+            port.stopTextInput(a);
+            port.stopTextInput(b);
+            IOSImplementation.nativeInstance = oldNative;
+            IOSImplementation.instance = oldInstance;
+        }
+    }
+
+    @FormTest
+    void commandAcknowledgementFollowsTheFinalStateAndIgnoresReplacedSessions() {
+        IOSNative oldNative = IOSImplementation.nativeInstance;
+        IOSImplementation oldInstance = IOSImplementation.instance;
+        final Port port = new Port();
+        final NativeStub stub = new NativeStub();
+        final int[] calls = new int[1];
+        EditorView client = new EditorView(null, false) {
+            @Override public void onKeyCommand(int command, int modifiers) {
+                calls[0]++;
+                setText("intermediate");
+                port.updateTextInputState(this, getEditingState());
+                assertNotEquals(40, stub.sequence, "intermediate pushes cannot release the native barrier");
+                setText("final rich paste");
+            }
+        };
+        Client replacement = new Client();
+        try {
+            IOSImplementation.nativeInstance = stub;
+            IOSImplementation.instance = port;
+            port.startTextInput(client, client.getConfig());
+            IOSImplementation.tiKeyCommandWithSequence(TextInputClient.KEY_PASTE, 0, 40);
+            flushSerialCalls();
+            assertEquals(1, calls[0]);
+            assertEquals(40, stub.sequence);
+            assertEquals("final rich paste", stub.text);
+            IOSImplementation.tiKeyCommandWithSequence(TextInputClient.KEY_CUT, 0, 41);
+            port.startTextInput(replacement, replacement.getConfig());
+            flushSerialCalls();
+            assertEquals(1, calls[0]);
+        } finally {
+            port.stopTextInput(client);
+            port.stopTextInput(replacement);
+            IOSImplementation.nativeInstance = oldNative;
+            IOSImplementation.instance = oldInstance;
+        }
+    }
+
 }

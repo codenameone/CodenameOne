@@ -111,7 +111,7 @@ public final class TextInputGeometry {
         int best = end;
         long bestY = Long.MAX_VALUE, bestX = Long.MAX_VALUE;
         for (int i = 0; i + 4 < carets.length; i += 5) {
-            long dy = Math.max(0, Math.max((long) carets[i + 2] - y, (long) y - carets[i + 2] - carets[i + 4]));
+            long dy = Math.max(0, Math.max((long) carets[i + 2] - y, (long) y - carets[i + 2] - Math.max(1, carets[i + 4]) + 1));
             long dx = Math.abs((long) x - carets[i + 1]);
             if (dy < bestY || dy == bestY && dx < bestX) {
                 bestY = dy;

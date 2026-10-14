@@ -104,6 +104,42 @@ class EditorGeometrySnapshotTest extends UITestBase {
             }
         }
     }
+    @FormTest
+    void largeSelectionsOnlyMeasureVisibleLinesInEitherDirection() {
+        final int[] measured = new int[1];
+        EditorView[] editors = {new EditorView(null, false) {
+            @Override protected int[] lineVisualSegments(int line, String text, int a, int b, Font font) {
+                measured[0]++;
+                return super.lineVisualSegments(line, text, a, b, font);
+            }
+        }, new com.codename1.ui.editor.RichView(null) {
+            @Override protected int[] lineVisualSegments(int line, String text, int a, int b, Font font) {
+                measured[0]++;
+                return super.lineVisualSegments(line, text, a, b, font);
+            }
+        }};
+        StringBuilder text = new StringBuilder();
+        for (int i = 0; i < 10000; i++) text.append("abc\n");
+        for (EditorView editor : editors) {
+            editor.setWidth(300);
+            editor.setHeight(100);
+            editor.setText(text.toString());
+            for (boolean reverse : new boolean[]{false, true}) {
+                int end = editor.getTextLength();
+                editor.setSelectionRange(reverse ? end : 0, reverse ? 0 : end);
+                measured[0] = 0;
+                TextInputGeometry geometry = TextInputGeometry.capture(editor);
+                int[] rectangles = geometry.selectionRects(0, end);
+                assertTrue(measured[0] < 30, "capture must not walk 10,000 selected lines");
+                assertTrue(rectangles.length > 0 && rectangles.length < 120);
+                for (int r = 0; r < rectangles.length; r += 4) {
+                    assertTrue(rectangles[r + 1] + rectangles[r + 3] >= editor.getAbsoluteY());
+                    assertTrue(rectangles[r + 1] <= editor.getAbsoluteY() + editor.getHeight());
+                }
+            }
+        }
+    }
+
     private static class ScrolledClient extends Container implements TextInputClient {
         final java.util.List<int[]> samples = new java.util.ArrayList<int[]>();
         void scroll(int x, int y) { setScrollX(x); setScrollY(y); }

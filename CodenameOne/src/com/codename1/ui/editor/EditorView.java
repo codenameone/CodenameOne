@@ -2136,7 +2136,7 @@ public class EditorView extends Component implements TextInputClient, com.codena
             at += line.length;
         }
         return new com.codename1.ui.TextInputGeometry(points, getSelectionStart(), getSelectionEnd(),
-                selectionRects(getSelectionStart(), getSelectionEnd()), getCaretRect());
+                selectionRects(getSelectionStart(), getSelectionEnd(), first, last), getCaretRect());
     }
 
     @Override
@@ -2178,6 +2178,10 @@ public class EditorView extends Component implements TextInputClient, com.codena
 
     @Override
     public int[] selectionRects(int start, int end) {
+        return selectionRects(start, end, 0, doc.getLineCount() - 1);
+    }
+
+    private int[] selectionRects(int start, int end, int firstVisibleLine, int lastVisibleLine) {
         start = doc.clamp(start);
         end = doc.clamp(end);
         if (start > end) {
@@ -2189,7 +2193,7 @@ public class EditorView extends Component implements TextInputClient, com.codena
         int firstLine = doc.lineOfOffset(start);
         int lastLine = doc.lineOfOffset(end);
         java.util.List<int[]> rects = new java.util.ArrayList<int[]>();
-        for (int ln = firstLine; ln <= lastLine; ln++) {
+        for (int ln = Math.max(firstLine, firstVisibleLine); ln <= Math.min(lastLine, lastVisibleLine); ln++) {
             int ls = doc.getLineStart(ln);
             int le = doc.getLineEnd(ln);
             String text = doc.getLineText(ln);

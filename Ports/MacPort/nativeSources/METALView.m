@@ -90,6 +90,12 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 }
 @end
 
+@interface METALView ()
+- (BOOL)cn1DeferNativeEdit:(void (^)(void))edit;
+- (void)cn1SendEditorKeyCommand:(int)command modifiers:(int)modifiers;
+- (void)cn1SendEditorKeyCommand:(int)command;
+@end
+
 @implementation METALView {
     NSTrackingArea *cn1TrackingArea;
     NSMutableIndexSet *consumedKeys;
@@ -1709,6 +1715,10 @@ static int CN1MacKeyCode(NSEvent *event) {
         // rather than reading characters directly is what buys dead keys, CJK
         // input methods, dictation and the Emacs key bindings for free.
         [[self cn1ConsumedKeys] addIndex:event.keyCode];
+        if ([self cn1DeferNativeEdit:^{
+            cn1CurrentModifiers = cn1ModifiersOf(event);
+            [self interpretKeyEvents:@[event]];
+        }]) { return; }
         [self interpretKeyEvents:@[event]];
         return;
     }
@@ -1814,6 +1824,7 @@ static int CN1MacKeyCode(NSEvent *event) {
 }
 
 - (void)insertText:(id)string replacementRange:(NSRange)replacementRange {
+    if ([self cn1DeferNativeEdit:^{ [self insertText:string replacementRange:replacementRange]; }]) { return; }
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
     if (!cn1OwnsSession(self, session)) {
         return;
@@ -1856,6 +1867,7 @@ static int CN1MacKeyCode(NSEvent *event) {
 - (void)setMarkedText:(id)string
         selectedRange:(NSRange)selectedRange
      replacementRange:(NSRange)replacementRange {
+    if ([self cn1DeferNativeEdit:^{ [self setMarkedText:string selectedRange:selectedRange replacementRange:replacementRange]; }]) { return; }
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
     if (!cn1OwnsSession(self, session)) {
         return;
@@ -1924,6 +1936,7 @@ static int CN1MacKeyCode(NSEvent *event) {
         // the discard, so re-entering it here would only come straight back.
         return;
     }
+    if ([self cn1DeferNativeEdit:^{ [self unmarkText]; }]) { return; }
     CN1MacTextInputNotifyFinishComposing();
     session.markedRange = NSMakeRange(NSNotFound, 0);
     [[NSTextInputContext currentInputContext] discardMarkedText];
@@ -2164,6 +2177,7 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
 }
 
 - (void)doCommandBySelector:(SEL)selector {
+    if ([self cn1DeferNativeEdit:^{ [self doCommandBySelector:selector]; }]) { return; }
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
     if (!cn1OwnsSession(self, session)) {
         [super doCommandBySelector:selector];
@@ -2186,12 +2200,7 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
             // TextInputClient owns indentation in a multiline editor, as on
             // iOS. Do not end its session or move focus before delivering Tab.
             // Single-line fields and the legacy text path still traverse below.
-            extern void com_codename1_impl_ios_IOSImplementation_tiKeyCommand___int_int(
-                    CODENAME_ONE_THREAD_STATE, JAVA_INT command, JAVA_INT modifiers);
-            struct ThreadLocalData *threadStateData = getThreadLocalData();
-            com_codename1_impl_ios_IOSImplementation_tiKeyCommand___int_int(
-                    threadStateData, 18 /* TextInputClient.KEY_TAB */,
-                    forward ? 0 : 1 /* TextInputClient.MOD_SHIFT */);
+            [self cn1SendEditorKeyCommand:18 modifiers:forward ? 0 : 1];
             return;
         }
         // Tab moves focus rather than inserting, which is the AppKit convention.
@@ -2555,12 +2564,28 @@ static BOOL cn1PasteBlocked(NSView *view, CN1MacTextInputSession *session) {
 ///
 /// Reported as a key COMMAND rather than an editor action: an action ends the
 /// session, and undo is something done inside one.
-- (void)cn1SendEditorKeyCommand:(int)command {
-    extern JAVA_VOID com_codename1_impl_ios_IOSImplementation_tiKeyCommand___int_int(
-            CODENAME_ONE_THREAD_STATE, JAVA_INT cmd, JAVA_INT modifiers);
+- (BOOL)cn1DeferNativeEdit:(void (^)(void))edit {
+    CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
+    return session.pureEditor && cn1OwnsSession(self, session) && [session deferNativeEdit:edit];
+}
+
+- (void)cn1SendEditorKeyCommand:(int)command modifiers:(int)modifiers {
+    CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
+    // The Java editor owns rich paste/undo results. Hold subsequent native edits
+    // until its sequenced state echo supplies the new text and selection.
+    if (session.markedRange.location != NSNotFound) {
+        session.markedRange = NSMakeRange(NSNotFound, 0);
+        CN1MacTextInputNotifyFinishComposing();
+    }
+    extern JAVA_VOID com_codename1_impl_ios_IOSImplementation_tiKeyCommandWithSequence___int_int_int(
+            CODENAME_ONE_THREAD_STATE, JAVA_INT cmd, JAVA_INT modifiers, JAVA_INT sequence);
     struct ThreadLocalData *threadStateData = getThreadLocalData();
-    com_codename1_impl_ios_IOSImplementation_tiKeyCommand___int_int(
-            threadStateData, (JAVA_INT)command, (JAVA_INT)0);
+    com_codename1_impl_ios_IOSImplementation_tiKeyCommandWithSequence___int_int_int(
+            threadStateData, (JAVA_INT)command, (JAVA_INT)modifiers, [session beginEditorCommand]);
+}
+
+- (void)cn1SendEditorKeyCommand:(int)command {
+    [self cn1SendEditorKeyCommand:command modifiers:0];
 }
 
 /// Guarded here as well as in validateUserInterfaceItem:, for the reason -copy:
@@ -2574,6 +2599,7 @@ static BOOL cn1PasteBlocked(NSView *view, CN1MacTextInputSession *session) {
 /// The condition is the same one validation answers with, deliberately: two
 /// spellings of "may this view undo" would eventually disagree.
 - (void)cn1PerformEditorUndoRedo:(int)command {
+    if ([self cn1DeferNativeEdit:^{ [self cn1PerformEditorUndoRedo:command]; }]) { return; }
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
     if (!session.pureEditor || !cn1OwnsSession(self, session)) {
         return;
@@ -2590,6 +2616,7 @@ static BOOL cn1PasteBlocked(NSView *view, CN1MacTextInputSession *session) {
 }
 
 - (void)copy:(id)sender {
+    if ([self cn1DeferNativeEdit:^{ [self copy:sender]; }]) { return; }
     // Checked here as well as in validation: a key equivalent reaches the
     // responder chain directly and never asks whether the menu item is
     // enabled, so validation alone leaves Command-C working.
@@ -2621,6 +2648,7 @@ static BOOL cn1PasteBlocked(NSView *view, CN1MacTextInputSession *session) {
 }
 
 - (void)cut:(id)sender {
+    if ([self cn1DeferNativeEdit:^{ [self cut:sender]; }]) { return; }
     if (cn1CutBlocked(self, [CN1MacTextInputSession sharedSession])) {
         return;
     }
@@ -2638,6 +2666,7 @@ static BOOL cn1PasteBlocked(NSView *view, CN1MacTextInputSession *session) {
 }
 
 - (void)delete:(id)sender {
+    if ([self cn1DeferNativeEdit:^{ [self delete:sender]; }]) { return; }
     NSRange sel = [self cn1SelectionForEditing];
     if (sel.length == 0) {
         return;
@@ -2658,6 +2687,7 @@ static BOOL cn1PasteBlocked(NSView *view, CN1MacTextInputSession *session) {
 }
 
 - (void)paste:(id)sender {
+    if ([self cn1DeferNativeEdit:^{ [self paste:sender]; }]) { return; }
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
     if (cn1PasteBlocked(self, session)) {
         return;
@@ -2680,6 +2710,7 @@ static BOOL cn1PasteBlocked(NSView *view, CN1MacTextInputSession *session) {
 }
 
 - (void)selectAll:(id)sender {
+    if ([self cn1DeferNativeEdit:^{ [self selectAll:sender]; }]) { return; }
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
     // Ownership, like every other Edit action. Command-A is a key equivalent and
     // arrives here directly, so testing only "a session is active" let the key

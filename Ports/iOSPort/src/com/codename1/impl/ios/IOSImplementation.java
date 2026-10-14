@@ -1045,6 +1045,25 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     boolean keyboardShowing;
+    private volatile KeyboardLayout keyboardLayout;
+    private KeyboardLayout paddedKeyboardLayout;
+
+    private static class KeyboardLayout {
+        final Form form;
+        float bottomPadding;
+        byte bottomUnit;
+        KeyboardLayout(Form form) { this.form = form; }
+    }
+
+    private void restoreKeyboardPadding(KeyboardLayout layout) {
+        if (layout == null || paddedKeyboardLayout != layout) {
+            return;
+        }
+        Style style = getRootPane(layout.form).getUnselectedStyle();
+        style.setPaddingUnitBottom(layout.bottomUnit);
+        style.setPadding(Component.BOTTOM, layout.bottomPadding);
+        paddedKeyboardLayout = null;
+    }
     
     /**
      * Callback for native.  Called when keyboard is shown.  Used for async editing 
@@ -1052,17 +1071,25 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     static void keyboardWillBeShown(){
         instance.keyboardShowing = true;
+        final KeyboardLayout layout = new KeyboardLayout(Display.getInstance().getCurrent());
+        instance.keyboardLayout = layout;
         if(nativeInstance.isAsyncEditMode() || tiClient != null) {
             // revalidate the parent since the size of form is now larger due to the vkb
-            final Form current = Display.getInstance().getCurrent();
+            final Form current = layout.form;
             //final Component currentEditingFinal = instance.currentEditing;
             if (current != null) {
                 if(current.isFormBottomPaddingEditingMode()) {
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
-                            if (current != null) {
-                                getRootPane(current).getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
-                                getRootPane(current).getUnselectedStyle().setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
+                            if (instance.keyboardLayout == layout && Display.getInstance().getCurrent() == current) {
+                                instance.restoreKeyboardPadding(instance.paddedKeyboardLayout);
+                                Style style = getRootPane(current).getUnselectedStyle();
+                                layout.bottomPadding = style.getPaddingFloatValue(false, Component.BOTTOM);
+                                byte[] units = style.getPaddingUnit();
+                                layout.bottomUnit = units == null ? Style.UNIT_TYPE_PIXELS : units[Component.BOTTOM];
+                                style.setPaddingUnitBottom(Style.UNIT_TYPE_PIXELS);
+                                style.setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
+                                instance.paddedKeyboardLayout = layout;
                                 current.revalidate();
                                 if (tiClient instanceof Component) {
                                     instance.revealTextInputClient(tiClient);
@@ -1079,7 +1106,8 @@ public class IOSImplementation extends CodenameOneImplementation {
                 } else {
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
-                            if (current != null) {
+                            if (instance.keyboardLayout == layout && Display.getInstance().getCurrent() == current) {
+                                instance.restoreKeyboardPadding(instance.paddedKeyboardLayout);
                                 if (tiClient instanceof Component) {
                                     instance.revealTextInputClient(tiClient);
                                     instance.refreshTextInputGeometry();
@@ -1114,16 +1142,20 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     static void keyboardWillBeHidden(){
         instance.keyboardShowing = false;
+        final KeyboardLayout layout = instance.keyboardLayout;
+        instance.keyboardLayout = null;
         Display.getInstance().callSerially(new Runnable(){
 
             @Override
             public void run() {
-                Form current = Display.getInstance().getCurrent();
-                if (current != null) {
+                if (layout == null || layout.form == null) {
+                    return;
+                }
+                instance.restoreKeyboardPadding(layout);
+                Form current = layout.form;
+                // A newer show owns keyboard layout now, including on the same form.
+                if (instance.keyboardLayout == null && Display.getInstance().getCurrent() == current) {
                     instance.areaUnderVKBOverride = 0;
-                    if (current.isFormBottomPaddingEditingMode()) {
-                        getRootPane(current).getUnselectedStyle().setPadding(Component.BOTTOM, 0);
-                    }
                     try {
                         current.revalidate();
                         //Now that screen size is changed, the scroll positions may
@@ -1853,6 +1885,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             tiFinishComposing(0);
             tiDeleteBackward(0);
             tiKeyCommand(0, 0);
+            tiKeyCommandWithSequence(0, 0, 0);
             tiEditorAction(0);
             tiReplaceRange(0, 0, "", 0);
             tiSetSelection(0, 0, 0);
@@ -1945,6 +1978,26 @@ public class IOSImplementation extends CodenameOneImplementation {
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
                 c.onKeyCommand(command, modifiers);
+            }
+        });
+    }
+
+    /// macOS commands wait for this acknowledged state before replaying native edits.
+    public static void tiKeyCommandWithSequence(final int command, final int modifiers, final int seq) {
+        final com.codename1.ui.TextInputClient client = tiClient;
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                if (client == null || client != tiClient) {
+                    return;
+                }
+                try {
+                    client.onKeyCommand(command, modifiers);
+                } finally {
+                    if (client == tiClient) {
+                        tiNativeSeq = seq;
+                        instance.updateTextInputState(client, client.getEditingState());
+                    }
+                }
             }
         });
     }
