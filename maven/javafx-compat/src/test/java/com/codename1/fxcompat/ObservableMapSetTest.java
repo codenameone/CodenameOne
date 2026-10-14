@@ -114,6 +114,34 @@ public class ObservableMapSetTest {
         assertEquals(0, map.size());
     }
 
+    /// A value set through an entry handed out earlier does not change
+    /// what a removal of the current one reports, and a sorted map that
+    /// reuses the removed node reports the value that was removed.
+    @Test
+    public void anEarlierEntrysValueIsNotTheRemovedOne() {
+        ObservableMap<String, Integer> map = FXCollections.observableMap(new java.util.TreeMap<String, Integer>());
+        map.put("a", Integer.valueOf(1));
+        map.put("b", Integer.valueOf(2));
+        map.put("c", Integer.valueOf(3));
+        map.addListener(mapProbe);
+        Iterator<Map.Entry<String, Integer>> entries = map.entrySet().iterator();
+        Map.Entry<String, Integer> first = entries.next();
+        entries.next();
+        first.setValue(Integer.valueOf(10));
+        assertEquals("[a -1 +10]", take());
+        entries.remove();
+        assertEquals("[b -2]", take());
+        assertEquals("c", entries.next().getKey());
+        entries.remove();
+        assertEquals("[c -3]", take());
+        try {
+            entries.remove();
+            fail("Removed twice");
+        } catch (IllegalStateException expected) {
+            assertTrue(map.containsKey("a"));
+        }
+    }
+
     @Test
     public void mapInvalidationAndListenerRemoval() {
         ObservableMap<String, Integer> map = FXCollections.observableHashMap();

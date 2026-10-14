@@ -184,6 +184,10 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_createImageFromBytes___byte_1ARRA
     if (data == JAVA_NULL || length <= 0) {
         return 0;
     }
+    /* Never read outside the array, whatever the caller passed. */
+    if (offset < 0 || length > ((JAVA_ARRAY) data)->length - offset) {
+        return 0;
+    }
     bytes = (unsigned char*) CN1_ARRAY_DATA(data);
     stream = g_memory_input_stream_new_from_data(bytes + offset, length, 0);
     pix = gdk_pixbuf_new_from_stream(stream, 0, 0);

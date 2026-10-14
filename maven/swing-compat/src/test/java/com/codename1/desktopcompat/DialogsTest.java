@@ -457,9 +457,21 @@ public class DialogsTest extends WindowsTestBase {
         assertEquals(0, fc.getChoosableFileFilters().length);
         fc.setMultiSelectionEnabled(true);
         assertTrue(fc.isMultiSelectionEnabled());
+        final List<String> changes = new ArrayList<String>();
+        fc.addPropertyChangeListener(JFileChooser.SELECTED_FILES_CHANGED_PROPERTY,
+                new com.codename1.desktopcompat.java.beans.PropertyChangeListener() {
+                    @Override
+                    public void propertyChange(com.codename1.desktopcompat.java.beans.PropertyChangeEvent e) {
+                        Object v = e.getNewValue();
+                        changes.add(v instanceof File[] ? String.valueOf(((File[]) v).length) : String.valueOf(v));
+                    }
+                });
         fc.setSelectedFiles(new File[] {new File("x"), new File("y")});
         assertEquals(new File("x"), fc.getSelectedFile());
         assertEquals(2, fc.getSelectedFiles().length);
+        fc.setSelectedFiles(null);
+        assertEquals(0, fc.getSelectedFiles().length);
+        assertEquals("[2, null]", changes.toString());
     }
 
     @Test

@@ -178,6 +178,12 @@ public class ListAndComboTest extends KernelTestBase {
                 realLog.clear();
             }
         }
+        // An empty selection clears, and changes mode, at once.
+        DefaultListSelectionModel empty = new DefaultListSelectionModel();
+        empty.clearSelection();
+        empty.clearSelection();
+        empty.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        assertTrue(empty.isSelectionEmpty());
         try {
             new DefaultListSelectionModel().setSelectionMode(7);
             fail();

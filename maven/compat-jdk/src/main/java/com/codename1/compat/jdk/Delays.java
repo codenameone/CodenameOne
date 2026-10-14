@@ -77,7 +77,11 @@ final class Delays {
 
     /// Runs `action` once `millis` have passed.
     static Handle after(long millis, Runnable action) {
-        Handle handle = new Handle(System.currentTimeMillis() + Math.max(0, millis), action);
+        // A delay too long to add to the clock (Long.MAX_VALUE as "never",
+        // say) is due at the end of time rather than wrapping into the past.
+        long now = System.currentTimeMillis();
+        long due = millis > Long.MAX_VALUE - now ? Long.MAX_VALUE : now + Math.max(0, millis);
+        Handle handle = new Handle(due, action);
         synchronized (LOCK) {
             int at = QUEUE.size();
             while (at > 0 && QUEUE.get(at - 1).due > handle.due) {

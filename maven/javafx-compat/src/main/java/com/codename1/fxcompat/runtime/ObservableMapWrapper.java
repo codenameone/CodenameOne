@@ -153,8 +153,10 @@ public final class ObservableMapWrapper<K, V> extends AbstractMap<K, V> implemen
     /// a value set through an entry.
     private final class EntryIterator implements Iterator<Map.Entry<K, V>> {
         private final Iterator<Map.Entry<K, V>> source = backing.entrySet().iterator();
-        private K lastKey;
-        private V lastValue;
+        // The entry next() returned last. Its value is read when it is
+        // removed, not remembered at next(): a setValue on it, or on an
+        // entry handed out earlier, must not change what a removal reports.
+        private Map.Entry<K, V> last;
 
         @Override
         public boolean hasNext() {
@@ -164,8 +166,7 @@ public final class ObservableMapWrapper<K, V> extends AbstractMap<K, V> implemen
         @Override
         public Map.Entry<K, V> next() {
             final Map.Entry<K, V> entry = source.next();
-            lastKey = entry.getKey();
-            lastValue = entry.getValue();
+            last = entry;
             return new Map.Entry<K, V>() {
                 @Override
                 public K getKey() {
@@ -180,7 +181,6 @@ public final class ObservableMapWrapper<K, V> extends AbstractMap<K, V> implemen
                 @Override
                 public V setValue(V value) {
                     V old = entry.setValue(value);
-                    lastValue = value;
                     if (old == null ? value != null : !old.equals(value)) {
                         fire(entry.getKey(), old, value, true, true);
                     }
@@ -206,8 +206,16 @@ public final class ObservableMapWrapper<K, V> extends AbstractMap<K, V> implemen
 
         @Override
         public void remove() {
+            if (last == null) {
+                throw new IllegalStateException();
+            }
+            // Read before removing: a TreeMap may reuse the removed node for
+            // its successor.
+            K key = last.getKey();
+            V old = last.getValue();
             source.remove();
-            fire(lastKey, lastValue, null, false, true);
+            last = null;
+            fire(key, old, null, false, true);
         }
     }
 }

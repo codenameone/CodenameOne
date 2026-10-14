@@ -2322,6 +2322,12 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     @Override
     public Object createImage(byte[] bytes, int offset, int len) {
+        // The native decoder reads the range as it is given; a range past
+        // the array is refused here, as Java would, before it is read.
+        if (bytes != null && (offset < 0 || len < 0 || offset > bytes.length - len)) {
+            throw new ArrayIndexOutOfBoundsException("offset " + offset + ", length " + len
+                    + ", array " + bytes.length);
+        }
         return wrapImage(LinuxNative.createImageFromBytes(bytes, offset, len), 0, 0);
     }
 

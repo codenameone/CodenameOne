@@ -224,6 +224,40 @@ public class EdtAndGraphicsTest extends KernelTestBase {
         assertEquals(before + 1, fired[0]);
     }
 
+    /// A new delay reaches a running timer: the firing already due keeps
+    /// its time, as in Swing, and the new period applies after it.
+    @Test
+    public void aRunningTimerTakesANewDelay() throws Exception {
+        final int[] fired = new int[1];
+        Timer timer = new Timer(2, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                fired[0]++;
+            }
+        });
+        timer.start();
+        for (int i = 0; i < 400 && fired[0] < 2; i++) {
+            MainThreadRule.drain();
+            Thread.sleep(5);
+        }
+        assertTrue(fired[0] >= 2);
+        timer.setDelay(60000);
+        assertEquals(60000, timer.getDelay());
+        assertTrue(timer.isRunning());
+        // Whatever was already due may still arrive; nothing after it.
+        for (int i = 0; i < 10; i++) {
+            MainThreadRule.drain();
+            Thread.sleep(5);
+        }
+        int settled = fired[0];
+        for (int i = 0; i < 40; i++) {
+            MainThreadRule.drain();
+            Thread.sleep(5);
+        }
+        assertEquals(settled, fired[0]);
+        timer.stop();
+    }
+
     @Test
     public void userSpaceStartsAtThePeerOriginScaledToDevicePixels() {
         G2D g = graphics();

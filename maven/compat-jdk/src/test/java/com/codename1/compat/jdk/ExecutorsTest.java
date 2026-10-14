@@ -455,6 +455,18 @@ public class ExecutorsTest {
     /// cancelled or not, so a timeout per request was a thread per request
     /// until the deadline. A wait that is given up leaves the queue at
     /// once, and one thread serves whatever is left.
+    /// A delay too long to add to the clock means never, not the past.
+    @Test
+    public void aDelayPastTheEndOfTheClockNeverFires() throws Exception {
+        CompletableFuture<String> never = new CompletableFuture<String>().orTimeout(Long.MAX_VALUE,
+                TimeUnit.MILLISECONDS);
+        CompletableFuture<String> soon = new CompletableFuture<String>().completeOnTimeout("late", 30,
+                TimeUnit.MILLISECONDS);
+        assertEquals("late", soon.get(10, TimeUnit.SECONDS));
+        assertFalse(never.isDone());
+        assertTrue(never.complete("in time"));
+    }
+
     @Test
     public void manyTimeoutsThatAreNotNeededHoldNoThread() throws Exception {
         int threads = Thread.activeCount();

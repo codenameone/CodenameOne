@@ -42,6 +42,11 @@ public class Timer {
     private String actionCommand;
     private java.util.Timer timer;
     private int run;
+    // The running timer's schedule, kept so a new delay can be applied
+    // without moving the firing that is already due.
+    private long firstDue;
+    private int period;
+    private Hop hop;
 
     public Timer(int delay, ActionListener listener) {
         this.delay = delay;
@@ -74,12 +79,19 @@ public class Timer {
         return delay;
     }
 
-    /// Takes effect the next time the timer is started.
+    /// On a running timer, as in Swing, the firing already due keeps its
+    /// time and the new delay applies from there on.
     public void setDelay(int delay) {
         if (delay < 0) {
             throw new IllegalArgumentException("Invalid delay: " + delay);
         }
         this.delay = delay;
+        if (timer != null && Math.max(1, delay) != period) {
+            long now = System.currentTimeMillis();
+            long next = now < firstDue ? firstDue - now : period - (now - firstDue) % period;
+            timer.cancel();
+            schedule(hop.tick, hop.pending, next);
+        }
     }
 
     public int getInitialDelay() {
@@ -134,13 +146,20 @@ public class Timer {
                 tick(mine, pending.getAndSet(0));
             }
         };
-        TimerTask task = new Hop(tick, pending);
+        schedule(tick, pending, initialDelay);
+    }
+
+    /// Always periodic: whether the timer repeats is asked at each firing,
+    /// so setRepeats(true) on a running one-shot timer takes effect, as it
+    /// does in Swing. A timer that does not repeat stops itself at its
+    /// first tick. The ticket stays the same across a reschedule, so ticks
+    /// already queued by the previous schedule still count.
+    private void schedule(Runnable tick, AtomicInteger pending, long initial) {
+        period = Math.max(1, delay);
+        firstDue = System.currentTimeMillis() + initial;
+        hop = new Hop(tick, pending);
         timer = new java.util.Timer();
-        // Always periodic: whether the timer repeats is asked at each
-        // firing, so setRepeats(true) on a running one-shot timer takes
-        // effect, as it does in Swing. A timer that does not repeat stops
-        // itself at its first tick.
-        timer.schedule(task, initialDelay, Math.max(1, delay));
+        timer.schedule(hop, initial, period);
     }
 
     /// Runs on the event dispatch thread; a tick queued before the timer
@@ -165,6 +184,7 @@ public class Timer {
         if (timer != null) {
             timer.cancel();
             timer = null;
+            hop = null;
         }
     }
 

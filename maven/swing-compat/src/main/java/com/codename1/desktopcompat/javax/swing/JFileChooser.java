@@ -193,6 +193,7 @@ public class JFileChooser extends JComponent implements Accessible {
     }
 
     public void setSelectedFiles(File[] files) {
+        File[] old = selectedFiles;
         if (files == null || files.length == 0) {
             selectedFiles = null;
             setSelectedFile(null);
@@ -201,6 +202,7 @@ public class JFileChooser extends JComponent implements Accessible {
             System.arraycopy(files, 0, selectedFiles, 0, files.length);
             setSelectedFile(selectedFiles[0]);
         }
+        firePropertyChange(SELECTED_FILES_CHANGED_PROPERTY, old, selectedFiles);
     }
 
     public File getCurrentDirectory() {
@@ -313,8 +315,7 @@ public class JFileChooser extends JComponent implements Accessible {
                 cancelSelection();
             } else {
                 File f = new File(path);
-                selectedFiles = new File[] {f};
-                selectedFile = f;
+                setSelectedFiles(new File[] {f});
                 File parentDir = f.getParentFile();
                 if (parentDir != null) {
                     currentDirectory = parentDir;
@@ -552,8 +553,7 @@ public class JFileChooser extends JComponent implements Accessible {
             }
             setCurrentDirectory(f);
         } else {
-            setSelectedFile(f);
-            selectedFiles = new File[] {f};
+            setSelectedFiles(new File[] {f});
             approveSelection();
         }
     }

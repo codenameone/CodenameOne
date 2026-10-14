@@ -258,6 +258,9 @@ public class DefaultListSelectionModel implements ListSelectionModel {
 
     @Override
     public void clearSelection() {
+        // With nothing selected maxIndex is -1, and removeSelectionIntervalImpl
+        // returns at once on a -1 end, as the JDK's does: an empty
+        // selection never reaches the loop over Integer.MAX_VALUE..-1.
         removeSelectionIntervalImpl(minIndex, maxIndex, false);
     }
 
