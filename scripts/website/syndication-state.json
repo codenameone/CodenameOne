@@ -2743,6 +2743,15 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-10-14T00:02:19+00:00"
+      },
+      "devto": {
+        "id": 4851919,
+        "url": "https://dev.to/codenameone/do-you-want-your-web-app-to-feel-like-a-native-app-124k",
+        "syndicated_at": "2026-10-14T17:59:45+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/@Codename_One/do-you-want-your-web-app-to-feel-like-a-native-app-b2b98becca92?postPublishedType=initial",
+        "syndicated_at": "2026-10-14T19:01:38+00:00"
       }
     }
   }
