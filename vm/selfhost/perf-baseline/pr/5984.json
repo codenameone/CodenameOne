@@ -76,12 +76,12 @@
        "time": 0.5
       }
      },
-     "memory": 1.154,
-     "reason": "This change tightens the proof that lets the translator retire an object when its frame ends: an object whose only callee is a native method (Thread.start) is no longer retired early, because the root scan then read a live Thread as freed and the sweep finalized it. Fewer objects are retired early, so peak RAM can only rise, and hello is the one workload small enough for that to show. Measured on top of the 0.828 that #6010 pooled from runs without this change: runs for 3d3119ed9d and 95738c7ece on this CPU, five rounds each, hello RAM medians 1.216 and 1.092, the same direction Linux arm64 and Windows arm64 moved. Timing and tolerances are kept.",
-     "runs": 2,
+     "memory": 1.092,
+     "reason": "This change tightens the proof that lets the translator retire an object when its frame ends: an object whose only callee is a native method (Thread.start) is no longer retired early, because the root scan then read a live Thread as freed and the sweep finalized it. Fewer objects are retired early, so peak RAM can only rise, and hello is the one workload small enough for that to show. On this CPU the result is bimodal, as on the Intel Windows x64 runner: runs for 3d3119ed9d and 95738c7ece gave medians 1.216 and 1.092, and the run for 8ac2f37307 gave rounds 1.16 0.74 0.81 0.80 0.87 (median 0.81) against the 1.154 recorded from the first two. The baseline is the middle of the three run medians, 1.092, and the memory tolerance is 0.35, as hello's RAM on the Intel Windows x64 and the Windows arm64 runners already has; it covers 0.71 to 1.47. Timing is kept.",
+     "runs": 3,
      "time": 1.375,
      "tolerance": {
-      "memory": 0.2,
+      "memory": 0.35,
       "time": 0.5
      }
     }
