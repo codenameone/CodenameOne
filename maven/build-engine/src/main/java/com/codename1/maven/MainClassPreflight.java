@@ -23,6 +23,9 @@
 package com.codename1.maven;
 
 import com.codename1.build.BuildFailureException;
+import com.codename1.maven.annotations.ClassScanner;
+import com.codename1.maven.annotations.ProcessingException;
+import com.codename1.maven.processors.BuildHintAnnotationProcessor;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
@@ -32,6 +35,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Enumeration;
+import java.util.Collections;
+import java.util.List;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -51,6 +56,11 @@ final class MainClassPreflight {
     }
 
     static void validate(File stagedJar, Properties settings) throws BuildFailureException {
+        validate(stagedJar, settings, Collections.<File>emptyList(), null);
+    }
+
+    static void validate(File stagedJar, Properties settings, List<File> inputs,
+                         AnnotationBuildHints.Sources sources) throws BuildFailureException {
         String packageName = settings.getProperty("codename1.packageName", "");
         String mainName = settings.getProperty("codename1.mainName", "");
         if (packageName.trim().isEmpty() || mainName.trim().isEmpty()) {
@@ -60,20 +70,59 @@ final class MainClassPreflight {
         String className = packageName + "." + mainName;
         try (JarFile jar = new JarFile(stagedJar)) {
             JarEntry entry = jar.getJarEntry(className.replace('.', '/') + ".class");
-            if (entry != null && !entry.isDirectory()) {
+            boolean present = entry != null && !entry.isDirectory();
+            if (present && hasBackingSource(jar, entry, inputs, sources)) {
                 return;
             }
-            String candidate = findCandidate(jar);
+            String candidate = findCandidate(jar, inputs, sources);
             throw new BuildFailureException("The main class " + className
-                    + " named in codenameone_settings.properties was not found in the compiled classes. "
+                    + " named in codenameone_settings.properties "
+                    + (present ? "has no matching source; its compiled class is stale. "
+                            + "Run mvn clean to remove stale output after correcting the settings. "
+                            : "was not found in the compiled classes. ")
                     + FIX + (candidate == null ? "" : " Possible main class: " + candidate + "."));
         } catch (IOException ex) {
             throw new BuildFailureException("Could not check the app's main class in " + stagedJar, ex);
         }
     }
 
+    /** Only known project outputs require source; installed binary dependencies remain valid. */
+    private static boolean hasBackingSource(JarFile staged, JarEntry entry, List<File> inputs,
+                                             AnnotationBuildHints.Sources sources)
+            throws IOException, BuildFailureException {
+        if (sources == null) {
+            return true;
+        }
+        for (File input : inputs) {
+            boolean contains;
+            if (input.isDirectory()) {
+                contains = new File(input, entry.getName()).isFile();
+            } else if (input.isFile()) {
+                try (JarFile jar = new JarFile(input)) {
+                    contains = jar.getJarEntry(entry.getName()) != null;
+                }
+            } else {
+                continue;
+            }
+            if (!contains) {
+                continue;
+            }
+            List<String> roots = sources.rootsFor(input);
+            if (roots == null || roots.isEmpty()) {
+                return true;
+            }
+            try (InputStream in = staged.getInputStream(entry)) {
+                return BuildHintAnnotationProcessor.hasBackingSource(ClassScanner.readClass(in, input),
+                        roots, sources.encodingFor(input));
+            } catch (ProcessingException ex) {
+                throw new BuildFailureException("Could not inspect the main class source for " + entry.getName(), ex);
+            }
+        }
+        return true;
+    }
+
     /** Suggestions are best effort; unreadable/unsupported bytecode must not hide the fix. */
-    private static String findCandidate(JarFile jar) {
+    private static String findCandidate(JarFile jar, List<File> inputs, AnnotationBuildHints.Sources sources) {
         Map<String, ClassInfo> classes = new HashMap<String, ClassInfo>();
         Enumeration<JarEntry> entries = jar.entries();
         while (entries.hasMoreElements()) {
@@ -115,6 +164,13 @@ final class MainClassPreflight {
                 name = parent.superName;
             }
             if (lifecycle || methods.size() == 4) {
+                try {
+                    if (!hasBackingSource(jar, jar.getJarEntry(entry.getKey() + ".class"), inputs, sources)) {
+                        continue;
+                    }
+                } catch (IOException | BuildFailureException ex) {
+                    return null;
+                }
                 if (candidate != null) {
                     return null;
                 }

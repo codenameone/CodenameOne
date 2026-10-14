@@ -205,7 +205,7 @@ class MainClassPreflightTest {
         Files.write(apk.toPath(), new byte[] {1});
         host.sourcesModified = apk.lastModified() - 1000;
         Files.write(new File(host.buildDir, "test.apk.cn1hardenkey").toPath(),
-                "unhardened".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                "unhardened:main=com.example.MyApp".getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     private AppBuilder cachedAndroidBuilder(TestProjectHost host) {
@@ -248,6 +248,90 @@ class MainClassPreflightTest {
         cachedAndroidBuilder(host).execute();
         assertTrue(new File(host.buildDir, "test-android-device-jar-with-dependencies.jar").isFile(),
                 "The cached APK must only be reused after staging and validating the main class");
+    }
+
+    private static final class BuildClientReached extends RuntimeException {
+    }
+
+    @Test
+    void switchingToAnotherPresentEntryPointInvalidatesTheCachedApk() throws Exception {
+        File dependency = jar(app("com/example/MyApp"), app("com/example/Second"), app("other/MyApp"));
+        for (String key : new String[] {"codename1.mainName", "codename1.packageName"}) {
+            for (boolean commandLine : new boolean[] {false, true}) {
+                Properties settings = settings("com.example", "MyApp");
+                String replacement = key.endsWith("mainName") ? "Second" : "other";
+                if (!commandLine) {
+                    settings.setProperty(key, replacement);
+                }
+                TestProjectHost host = host("android", dependency, settings);
+                cachedApk(host);
+                if (commandLine) {
+                    host.userProperties.setProperty(key, replacement);
+                }
+                AppBuilder builder = new AppBuilder(host) {
+                    @Override
+                    protected void updateCodenameOne(boolean force) {
+                        throw new BuildClientReached();
+                    }
+                }.platform("android").buildTarget("android-device");
+                assertThrows(BuildClientReached.class, builder::execute);
+                assertEquals("unhardened:main=com.example.MyApp", new String(Files.readAllBytes(
+                        new File(host.buildDir, "test.apk.cn1hardenkey").toPath()),
+                        java.nio.charset.StandardCharsets.UTF_8));
+            }
+        }
+    }
+
+    private Path compileSource(TestProjectHost host, Path root, String pkg, String name) throws Exception {
+        Path source = root.resolve(name + ".java");
+        String code = "package " + pkg + "; public class " + name
+                + " { public void init(Object o) {} public void start() {}"
+                + " public void stop() {} public void destroy() {} }";
+        Files.write(source, code.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        assertEquals(0, javax.tools.ToolProvider.getSystemJavaCompiler().run(null, null, null,
+                "-d", host.outputDir.getAbsolutePath(), source.toString()));
+        return source;
+    }
+
+    @Test
+    void incrementalRenameOrMoveRejectsOrphanedMainAndSuggestsLiveClass() throws Exception {
+        for (boolean movePackage : new boolean[] {false, true}) {
+            TestProjectHost host = host("android", jar(), settings("com.example", "MyApp"));
+            Path root = Files.createDirectories(host.projectDir.toPath().resolve("custom-sources"));
+            host.sourceRoots.add(root.toString());
+            Path oldSource = compileSource(host, root, "com.example", "MyApp");
+            Files.delete(oldSource);
+            String pkg = movePackage ? "other" : "com.example";
+            String name = movePackage ? "MyApp" : "Renamed";
+            compileSource(host, root, pkg, name);
+            assertTrue(new File(host.outputDir, "com/example/MyApp.class").isFile(),
+                    "Incremental compilation leaves the obsolete class behind");
+            AppBuilder builder = new AppBuilder(host).platform("android").buildTarget("android-device").stageOnly(true);
+            String message = assertThrows(BuildFailureException.class, builder::execute).getMessage();
+            assertTrue(message.contains("compiled class is stale"), message);
+            assertTrue(message.contains("mvn cn1:settings"), message);
+            assertTrue(message.contains("Possible main class: " + pkg + "." + name), message);
+        }
+    }
+
+    @Test
+    void liveMainInCustomGeneratedSourceRootIsAccepted() throws Exception {
+        TestProjectHost host = host("android", jar(), settings("com.example", "MyApp"));
+        Path root = Files.createDirectories(host.buildDir.toPath().resolve("custom-generated"));
+        host.sourceRoots.add(root.toString());
+        compileSource(host, root, "com.example", "MyApp");
+        new AppBuilder(host).platform("android").buildTarget("android-device").stageOnly(true).execute();
+    }
+
+    @Test
+    void binaryDependencyDoesNotNeedSourceInTheRunningProject() throws Exception {
+        TestProjectHost producer = host("android", jar(), settings("com.example", "MyApp"));
+        Path root = Files.createDirectory(tmp.resolve("library-sources"));
+        compileSource(producer, root, "com.example", "MyApp");
+        File binary = jar(Files.readAllBytes(producer.outputDir.toPath().resolve("com/example/MyApp.class")));
+        TestProjectHost consumer = host("android", binary, settings("com.example", "MyApp"));
+        consumer.sourceRoots.add(Files.createDirectory(consumer.projectDir.toPath().resolve("src")).toString());
+        new AppBuilder(consumer).platform("android").buildTarget("android-device").stageOnly(true).execute();
     }
 
     @Test
