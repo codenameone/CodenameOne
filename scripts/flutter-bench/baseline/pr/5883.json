@@ -59,12 +59,12 @@
      "from": {
       "value": 4720336
      },
-     "reason": "Android code grew with features added on this branch after the gate was armed: 4,720,336 -> 4,773,504 (custom theme mode, runtime mount/styling, earlier features; still 4.5x under Flutter); then +25,396 bytes (+0.53%) for frozen const collections, Directionality/locale resolution (1f97b4f6da) and typed fields for untyped collection literals (358604f9b7). Tolerance is 0.5% (d070d57bc1).",
+     "reason": "Android code grew with features added on this branch after the gate was armed: 4,720,336 -> 4,773,504 (custom theme mode, runtime mount/styling, earlier features; still 4.5x under Flutter); then +25,396 bytes (+0.53%) for frozen const collections, Directionality/locale resolution (1f97b4f6da) and typed fields for untyped collection literals (358604f9b7). Tolerance is 0.5% (d070d57bc1); then runtime fixes from the gallery fidelity work and three review rounds (platform channels, Stream, Cupertino/TextField/TabBar/FAB/elevation fixes, overlays, Dismissible axes, PageController, RegExp, DateTime checks): +24,408 bytes (+0.51%), run 38438969080 at 8fdf261e3f",
      "runs": 1,
      "tolerance": {
       "value": 0.005
      },
-     "value": 4798900
+     "value": 4823308
     },
     "install_bytes": {
      "from": {
