@@ -22,6 +22,9 @@ set -e
 source "$SCRIPTPATH/inc/env.sh"
 source "$SCRIPTPATH/inc/gradle.sh"
 
+# Main-class preflight must use all source roots the app compiles.
+bash "$SCRIPTPATH/gradle-main-class-preflight-test.sh"
+
 WORKDIR="$SCRIPTPATH/build/gradle-app"
 rm -rf "$WORKDIR"
 mkdir -p "$WORKDIR"
