@@ -547,15 +547,18 @@ public class PageViewRenderElement extends ScrollRenderElement {
                 items.add(new PageSlot(child));
             }
         }
+        // A viewportFraction below 1 CENTRES the current page: Flutter rests the scroll
+        // at -(1-f)*viewport/2, so page 0 sits inset with its neighbour peeking. This is
+        // SliverFillViewport's own main-axis padding, which is axis-agnostic -- a vertical
+        // PageView centres exactly the way a horizontal one does, so page 0 must not be
+        // flush against the leading edge there either. padEnds: false (Flutter default
+        // true) opts out of the gap on EITHER axis, leaving page 0 flush against the
+        // leading edge and all the slack on the trailing side.
+        if (viewportFraction() < 1 && pageView().isPadEnds()) {
+            items.insert(0, new PageGap());
+            items.add(new PageGap());
+        }
         if (horizontal()) {
-            // A viewportFraction below 1 CENTRES the current page: Flutter rests the
-            // scroll at -(1-f)*viewport/2, so page 0 sits inset with its neighbour
-            // peeking. Without this leading gap the first page is flush against the
-            // leading edge and all the slack piles up on the trailing side.
-            if (viewportFraction() < 1) {
-                items.insert(0, new PageGap());
-                items.add(new PageGap());
-            }
             Row row = new Row();
             row.crossAxisAlignment(CrossAxisAlignment.stretch);
             row.mainAxisSize(MainAxisSize.min);
@@ -583,6 +586,11 @@ public class PageViewRenderElement extends ScrollRenderElement {
         }
     }
 
+    /**
+     * The slack is taken out of the MAIN axis -- width for a horizontal PageView,
+     * height for a vertical one, matching {@link PageSlotElement}'s own axis split --
+     * and the cross axis fills whatever the incoming constraint offers.
+     */
     private final class PageGapElement extends RenderElement {
         PageGapElement(PageGap widget) {
             super(widget);
@@ -590,9 +598,14 @@ public class PageViewRenderElement extends ScrollRenderElement {
 
         @Override
         protected Size performLayout(BoxConstraints constraints) {
-            double slack = viewportW * (1 - viewportFraction()) / 2;
-            return new Size(Math.max(0, slack),
-                    constraints.hasBoundedHeight() ? constraints.maxHeight() : 0);
+            if (horizontal()) {
+                double slack = viewportW * (1 - viewportFraction()) / 2;
+                return new Size(Math.max(0, slack),
+                        constraints.hasBoundedHeight() ? constraints.maxHeight() : 0);
+            }
+            double slack = viewportH * (1 - viewportFraction()) / 2;
+            return new Size(constraints.hasBoundedWidth() ? constraints.maxWidth() : 0,
+                    Math.max(0, slack));
         }
     }
 

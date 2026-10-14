@@ -66,17 +66,35 @@ public class ListViewRenderElement extends ScrollRenderElement {
     private int builtStart;
     private int builtEnd;
     private boolean builtTopSpacer;
+    private boolean builtBottomSpacer;
     private Column lastColumn;
 
     private ScrollController controller;
     private final ScrollController.Client client = new ScrollController.Client() {
         @Override
         public void scrollToOffset(double offset) {
-            if (pane instanceof ScrollPane) {
-                ((ScrollPane) pane).scrollToPosition((int) Math.round(Dp.px(offset)), horizontal());
-            }
+            requestControllerScroll(offset);
         }
     };
+
+    /**
+     * A controller offset asked for before the pane had real scroll geometry -- applied,
+     * converted, the first time {@link ListPane#layoutContainer} sees a real size.
+     */
+    private Double pendingControllerOffsetDp;
+
+    /// Whether a controller offset (explicit or the default {@code initialScrollOffset}
+    /// of 0) has already been applied to the pane. Set the moment one is, even if the
+    /// request happened to resolve to physical 0 -- that is still a choice made FOR this
+    /// list, and {@link #applyInitialReverseScrollIfNeeded} must not then overwrite it
+    /// with the no-controller default of opening on the reversed leading edge.
+    private boolean explicitControllerScrollApplied;
+
+    /// Whether the reverse list's own default starting position -- the leading edge of
+    /// the reversed axis, where index 0 sits -- has been applied. Flutter opens a
+    /// reversed list there with NO controller action at all, which is why this cannot
+    /// simply be left to {@link #explicitControllerScrollApplied}.
+    private boolean initialReverseScrollDone;
 
     public ListViewRenderElement(ListView widget) {
         super(widget);
@@ -103,6 +121,97 @@ public class ListViewRenderElement extends ScrollRenderElement {
      */
     private boolean windowed() {
         return listView().isBuilderMode() && !horizontal();
+    }
+
+    /**
+     * Flutter's {@code ListView.reverse}: the list runs from end to start -- bottom to
+     * top for a vertical list, right to left for a horizontal one. Index 0 sits at that
+     * reversed leading edge, and a controller's offset 0 is defined to be there too.
+     */
+    private boolean reverse() {
+        return listView().getReverse();
+    }
+
+    /** The pane's largest physical scroll offset along its axis, or 0 before it is laid out. */
+    private int maxScrollExtentPx() {
+        if (pane == null) {
+            return 0;
+        }
+        boolean h = horizontal();
+        int content = h ? pane.getScrollDimension().getWidth() : pane.getScrollDimension().getHeight();
+        int viewport = h ? pane.getWidth() : pane.getHeight();
+        return Math.max(0, content - viewport);
+    }
+
+    /**
+     * Flutter's logical scroll position (distance from index 0) and this pane's
+     * physical one coincide when the list is NOT reversed. Reversed, index 0 sits at
+     * the far physical end, so the physical position runs backwards from the pane's
+     * maximum -- and that mirroring is its own inverse, so one helper converts both
+     * ways: physical-from-logical here, and logical-from-physical in {@link
+     * #reportScroll} and {@link #onScroll}.
+     *
+     * <p>Package-private and static so the conversion -- the whole difference between
+     * a reversed list that opens on index 0 and one that opens on its last index -- can
+     * be asserted directly.</p>
+     */
+    static double mirrorIfReverse(double px, double maxExtentPx, boolean reverse) {
+        return reverse ? Math.max(0, maxExtentPx - px) : px;
+    }
+
+    /**
+     * Converts a Flutter logical offset (distance from index 0, the reversed leading
+     * edge included) into the physical device-pixel scroll this pane actually takes.
+     */
+    private int physicalScrollPx(double logicalOffsetDp) {
+        return (int) Math.round(mirrorIfReverse(Dp.px(logicalOffsetDp), maxScrollExtentPx(), reverse()));
+    }
+
+    /** A controller asked to move this list to {@code offsetDp}; applied once sized. */
+    private void requestControllerScroll(double offsetDp) {
+        pendingControllerOffsetDp = offsetDp;
+        applyPendingControllerScroll();
+    }
+
+    /** Applies a pending controller offset once the pane has real geometry to convert
+     * it against; otherwise a no-op that {@link ListPane#layoutContainer} retries. */
+    private void applyPendingControllerScroll() {
+        if (pendingControllerOffsetDp == null || !(pane instanceof ScrollPane)) {
+            return;
+        }
+        boolean h = horizontal();
+        int dim = h ? pane.getWidth() : pane.getHeight();
+        if (dim <= 0) {
+            return;
+        }
+        double offsetDp = pendingControllerOffsetDp.doubleValue();
+        pendingControllerOffsetDp = null;
+        explicitControllerScrollApplied = true;
+        ((ScrollPane) pane).scrollToPosition(physicalScrollPx(offsetDp), h);
+    }
+
+    /**
+     * Flutter opens a reversed list on index 0 -- the reversed leading edge, which on a
+     * plain vertical list is the BOTTOM -- with no controller action at all, so the pane
+     * cannot simply default to physical 0 the way a non-reversed one does. Applied once,
+     * the first time the pane has a real size, and only when nothing else (a controller's
+     * own offset, explicit or the default zero) already placed it.
+     */
+    private void applyInitialReverseScrollIfNeeded() {
+        if (initialReverseScrollDone || explicitControllerScrollApplied || !reverse()
+                || !(pane instanceof ScrollPane)) {
+            return;
+        }
+        boolean h = horizontal();
+        int dim = h ? pane.getWidth() : pane.getHeight();
+        if (dim <= 0) {
+            return;
+        }
+        initialReverseScrollDone = true;
+        int max = maxScrollExtentPx();
+        if (max > 0) {
+            ((ScrollPane) pane).scrollToPosition(max, h);
+        }
     }
 
     @Override
@@ -152,6 +261,29 @@ public class ListViewRenderElement extends ScrollRenderElement {
         return c;
     }
 
+    @Override
+    protected com.codename1.ui.Container createPane(com.codename1.ui.layouts.Layout layout) {
+        return new ListPane(layout);
+    }
+
+    /**
+     * The scroll pane with one addition: once it has a real size, it retries a
+     * controller offset that arrived before there was any geometry to convert it
+     * against, and parks a reversed list on its default leading edge.
+     */
+    private final class ListPane extends ScrollPane {
+        ListPane(com.codename1.ui.layouts.Layout layout) {
+            super(layout);
+        }
+
+        @Override
+        public void layoutContainer() {
+            super.layoutContainer();
+            applyPendingControllerScroll();
+            applyInitialReverseScrollIfNeeded();
+        }
+    }
+
     /** Tells the attached controller where the user scrolled to. */
     private void reportScroll(int scrollPx) {
         if (controller == null || pane == null) {
@@ -162,7 +294,9 @@ public class ListViewRenderElement extends ScrollRenderElement {
         double s = scale > 0 ? scale : 1;
         double content = h ? pane.getScrollDimension().getWidth() : pane.getScrollDimension().getHeight();
         double viewport = h ? pane.getWidth() : pane.getHeight();
-        controller.userScrolled(client, scrollPx / s, Math.max(0, content - viewport) / s, viewport / s);
+        double maxExtent = Math.max(0, content - viewport);
+        double logicalPx = mirrorIfReverse(scrollPx, maxExtent, reverse());
+        controller.userScrolled(client, logicalPx / s, maxExtent / s, viewport / s);
     }
 
     /** Recomputes the visible window on scroll and rebuilds when it changed. */
@@ -174,16 +308,20 @@ public class ListViewRenderElement extends ScrollRenderElement {
         long count = listView().getItemCount();
         ensureHeights(count);
         int viewport = pane.getHeight();
+        // The window math below is written against the LOGICAL scroll position -- the
+        // distance from index 0 -- which for a reverse list runs backwards from the
+        // pane's physical scrollY.
+        int logicalScrollY = (int) Math.round(mirrorIfReverse(scrollY, maxScrollExtentPx(), reverse()));
         // The first row at or below the scroll position, by prefix sum.
         double y = 0;
         int first = 0;
-        while (first < count && y + heightOf(first) <= scrollY) {
+        while (first < count && y + heightOf(first) <= logicalScrollY) {
             y += heightOf(first);
             first++;
         }
         int last = first;
         double bottom = y;
-        while (last < count && bottom < scrollY + viewport) {
+        while (last < count && bottom < logicalScrollY + viewport) {
             bottom += heightOf(last);
             last++;
         }
@@ -225,18 +363,26 @@ public class ListViewRenderElement extends ScrollRenderElement {
         return measuredCount > 0 ? measuredSum / measuredCount : Dp.px(64);
     }
 
-    /** Measures every row the last build materialized, from its laid-out component. */
+    /**
+     * Measures every row the last build materialized, from its laid-out component.
+     *
+     * <p>Reverse flips the physical order the rows were built in: the window runs
+     * PHYSICALLY from {@code builtEnd-1} down to {@code builtStart}, behind the bottom
+     * spacer rather than the top one, which is why {@code ci} counts down from
+     * {@code builtEnd-1} instead of up from {@code builtStart}.</p>
+     */
     private void recordHeights() {
         com.codename1.ui.Container rows = rowsContainer();
         if (rows == null) {
             return;
         }
         ensureHeights(listView().getItemCount());
-        int offset = builtTopSpacer ? 1 : 0;
+        boolean rev = reverse();
+        int offset = rev ? (builtBottomSpacer ? 1 : 0) : (builtTopSpacer ? 1 : 0);
         for (int i = builtStart; i < builtEnd && i < heights.length; i++) {
-            int ci = offset + (i - builtStart);
-            if (ci >= rows.getComponentCount()) {
-                break;
+            int ci = rev ? offset + (builtEnd - 1 - i) : offset + (i - builtStart);
+            if (ci < 0 || ci >= rows.getComponentCount()) {
+                continue;
             }
             Component c = rows.getComponentAt(ci);
             double h = c.getHeight() + c.getStyle().getVerticalMargins();
@@ -319,7 +465,8 @@ public class ListViewRenderElement extends ScrollRenderElement {
         builtStart = start;
         builtEnd = end;
         // bottom spacer for the items below the window
-        if (estimable && end < count) {
+        builtBottomSpacer = estimable && end < count;
+        if (builtBottomSpacer) {
             double below = 0;
             for (int i = end; i < count; i++) {
                 below += heightOf(i);
@@ -336,22 +483,44 @@ public class ListViewRenderElement extends ScrollRenderElement {
         return s;
     }
 
+    /**
+     * Lays {@code items} out along the scroll axis, reversed end-to-end when the list
+     * asks for it. Reverse flips the WHOLE physical order -- spacers included -- rather
+     * than just the item indices: a windowed list's two spacers swap ends along with
+     * everything between them, which is what keeps index 0 at the reversed leading edge
+     * in both eager and windowed (builder) layouts.
+     */
     private Widget wrap(ListView w, DartList<Widget> items) {
+        DartList<Widget> ordered = w.getReverse() ? reversedCopy(items) : items;
         Widget line;
         if (horizontal()) {
             Row row = new Row();
             row.crossAxisAlignment(CrossAxisAlignment.stretch);
             row.mainAxisSize(MainAxisSize.min);
-            row.children(items);
+            row.children(ordered);
             line = row;
         } else {
             Column col = new Column();
             col.crossAxisAlignment(CrossAxisAlignment.stretch);
             col.mainAxisSize(MainAxisSize.min);
-            col.children(items);
+            col.children(ordered);
             lastColumn = col;
             line = col;
         }
         return padForScrollAxis(line, w.getPadding());
+    }
+
+    /**
+     * A main-axis-reversed COPY of {@code items}. A copy, never an in-place reverse: in
+     * children mode {@code items} is the widget's own children list, reused unchanged
+     * across rebuilds, and reversing it in place would flip it back and forth on every
+     * other build.
+     */
+    private static DartList<Widget> reversedCopy(DartList<Widget> items) {
+        DartList<Widget> out = new DartList<Widget>();
+        for (int i = items.size() - 1; i >= 0; i--) {
+            out.add(items.get(i));
+        }
+        return out;
     }
 }

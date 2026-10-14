@@ -56,6 +56,7 @@ public class PageView extends Widget {
     private Boolean allowImplicitScrolling;
     private String restorationId;
     private Object clipBehavior;
+    private Boolean padEnds;
 
     private Funcs.Func2<BuildContext, Long, Widget> itemBuilder;
     private Long itemCount;
@@ -73,6 +74,7 @@ public class PageView extends Widget {
     public void allowImplicitScrolling(Boolean v) { this.allowImplicitScrolling = v; }
     public void restorationId(String v) { this.restorationId = v; }
     public void clipBehavior(Object v) { this.clipBehavior = v; }
+    public void padEnds(boolean v) { this.padEnds = v; }
 
     /** Dart's {@code PageView.builder} named constructor in positional form. */
     public static PageView builder(Key key, PageController controller, Object scrollDirection,
@@ -121,6 +123,15 @@ public class PageView extends Widget {
      */
     public boolean isPageSnapping() {
         return pageSnapping == null || pageSnapping.booleanValue();
+    }
+
+    /**
+     * Whether a {@code viewportFraction} below 1 centres the current page with a leading
+     * and trailing gap -- Flutter's {@code PageView.padEnds}, default true. {@code false}
+     * leaves page 0 flush against the leading edge on either scroll axis.
+     */
+    public boolean isPadEnds() {
+        return padEnds == null || padEnds.booleanValue();
     }
 
     public Funcs.VoidFunc1<RefLong> getOnPageChanged() {
