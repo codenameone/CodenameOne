@@ -253,8 +253,13 @@ public class FlutterAssets {
         return isRatioDir(dir) ? Double.parseDouble(dir.substring(0, dir.length() - 1)) : 1;
     }
 
-    /** The bundled manifest's resource name; the build writes it (TranscodeFlutterMojo). */
-    static final String MANIFEST = "cn1f_AssetManifest.txt";
+    /**
+     * The bundled manifest's resource name; the build writes it (TranscodeFlutterMojo,
+     * ASSET_MANIFEST -- the two literals must match). An underscore followed by
+     * {@code A} is outside what the asset-name encoding produces, so no declared asset
+     * can flatten onto it.
+     */
+    static final String MANIFEST = "cn1f__AssetManifest.txt";
 
     private static java.util.Map<String, java.util.List<String>> manifest;
     private static boolean manifestRead;

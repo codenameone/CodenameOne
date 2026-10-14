@@ -183,36 +183,27 @@ public class TranscodeFlutterAssetsTest {
     }
 
     /**
-     * A root-declared asset (outside {@code assets/}/{@code packages/}, so it goes
-     * through {@link TranscodeFlutterMojo#readDeclaredAssetKeys}) named exactly
-     * {@code AssetManifest.txt} flattens to {@link TranscodeFlutterMojo#ASSET_MANIFEST}
-     * -- the same name {@code writeAssetManifest} writes the generated key list to.
-     * Before the fix, {@code copyAssets} copied the asset there first and then
-     * silently overwrote it with the generated manifest, so {@code
-     * Image.asset("AssetManifest.txt")} loaded the manifest instead of the asset.
-     * The fix fails the build instead, before anything is written.
+     * A root-declared asset (outside {@code assets/}/{@code packages/}) named exactly
+     * {@code AssetManifest.txt} used to flatten onto the generated manifest's name, and
+     * {@code writeAssetManifest} then overwrote it, so {@code Image.asset("AssetManifest.txt")}
+     * loaded the key list. The manifest's name is now outside the flattening namespace:
+     * both files are written, each with its own content.
      */
     @Test
-    public void aRootAssetNamedLikeTheManifestFailsTheBuildInsteadOfBeingSilentlyOverwritten()
-            throws Exception {
+    public void aRootAssetNamedLikeTheManifestIsKeptBesideTheManifest() throws Exception {
         File colliding = new File(flutter, "AssetManifest.txt");
         Files.write(colliding.toPath(), "this is the developer's own asset".getBytes(
                 java.nio.charset.StandardCharsets.UTF_8));
         declareAssetKeys("AssetManifest.txt");
 
-        try {
-            mojo.copyAssets();
-            org.junit.Assert.fail("expected copyAssets to refuse the colliding asset name");
-        } catch (org.apache.maven.plugin.MojoExecutionException expected) {
-            // The build failed instead of silently overwriting the developer's asset.
-        }
+        mojo.copyAssets();
 
-        // Nothing was written for the reserved name at all -- in particular, not the
-        // generated manifest's content, which is what the silent overwrite used to
-        // leave behind in the developer's asset's place.
+        File asset = new File(classes, TranscodeFlutterMojo.flatAssetName("AssetManifest.txt"));
+        assertEquals("this is the developer's own asset", new String(Files.readAllBytes(asset.toPath()),
+                java.nio.charset.StandardCharsets.UTF_8));
         File manifestFile = new File(classes, TranscodeFlutterMojo.ASSET_MANIFEST);
-        assertFalse("the build must not have written the reserved manifest name",
-                manifestFile.exists());
+        assertTrue("the generated manifest is written under its own name", manifestFile.isFile());
+        assertFalse(asset.getName().equals(manifestFile.getName()));
     }
 
     /**
