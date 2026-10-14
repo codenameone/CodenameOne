@@ -23,6 +23,8 @@
 #import <AppKit/AppKit.h>
 #import "CN1MacHost.h"
 #import "CN1MacMenu.h"
+#import "CN1AppKitWindows.h"
+#import "METALView.h"
 #include "cn1_globals.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
 
@@ -280,6 +282,25 @@ void CN1MacHostSetWindowTitle(NSString *title) {
     });
 }
 
+// Copy before dispatch: a Java array must never escape into an asynchronous
+// AppKit block, where the moving/collecting VM no longer protects its storage.
+void com_codename1_impl_mac_MacNative_macSetTitleBarRegions___int_int_1ARRAY(CODENAME_ONE_THREAD_STATE,
+        JAVA_OBJECT __cn1ThisObject, JAVA_INT windowId, JAVA_OBJECT regionsObject) {
+    JAVA_ARRAY regions = (JAVA_ARRAY)regionsObject;
+    NSData *copy = regionsObject == JAVA_NULL ? [[NSData alloc] init]
+            : [[NSData alloc] initWithBytes:CN1_ARRAY_DATA(regions) length:regions->length * sizeof(JAVA_ARRAY_INT)];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSView *view = windowId == -2 ? [CN1MacHost sharedHost].renderingView
+                : CN1MacPeerHostViewForWindowId(windowId);
+        if ([view isKindOfClass:[METALView class]]) {
+            ((METALView *)view).cn1TitleBarRegions = copy;
+        }
+    });
+#if !__has_feature(objc_arc)
+    [copy release];
+#endif
+}
+
 void CN1MacHostSetWindowUndecorated(BOOL undecorated) {
     dispatch_async(dispatch_get_main_queue(), ^{
         NSWindow *w = [CN1MacHost sharedHost].window;
@@ -303,6 +324,10 @@ void CN1MacHostSetWindowUndecorated(BOOL undecorated) {
             w.titlebarAppearsTransparent = NO;
             w.titleVisibility = NSWindowTitleVisible;
             w.movableByWindowBackground = NO;
+            NSView *view = [CN1MacHost sharedHost].renderingView;
+            if ([view isKindOfClass:[METALView class]]) {
+                ((METALView *)view).cn1TitleBarRegions = nil;
+            }
         }
     });
 }

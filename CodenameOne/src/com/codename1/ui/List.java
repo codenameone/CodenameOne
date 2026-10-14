@@ -1676,6 +1676,24 @@ public class List<T> extends Component implements ActionSource {
         dispatcher.removeListener(l);
     }
 
+    /// Selects and activates an item on behalf of assistive technology.
+    /// This does not depend on hardware key mappings or open a ComboBox popup
+    /// after the user has already chosen a virtual accessibility item.
+    /// Must be called on the EDT.
+    ///
+    /// #### Parameters
+    /// - `index`: the item to select and activate
+    /// #### Returns
+    /// true if the enabled list accepted the item, false for an invalid index
+    public boolean accessibilityActivateItem(int index) {
+        if (!isEnabled() || index < 0 || index >= size()) {
+            return false;
+        }
+        setSelectedIndex(index);
+        fireActionEvent();
+        return true;
+    }
+
     /// Fires an action event for the current event source.
     @Override
     protected void fireActionEvent() {

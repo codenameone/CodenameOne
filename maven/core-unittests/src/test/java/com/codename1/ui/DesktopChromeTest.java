@@ -43,6 +43,72 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class DesktopChromeTest extends UITestBase {
 
+    @FormTest
+    void customChromePublishesOriginalOnTopSideMenuCommandsAndLaterChanges() {
+        boolean onTop = Toolbar.isOnTopSideMenu();
+        try {
+            Toolbar.setOnTopSideMenu(true);
+            desktopMode("custom");
+            Form f = new Form("Document");
+            Command save = new Command("Save");
+            save.setDesktopMenu("File");
+            f.getToolbar().addCommandToSideMenu(save);
+            f.show();
+            DisplayTest.flushEdt();
+            assertTrue(implementation.getLastNativeCommands().contains(save));
+            Command later = new Command("Export");
+            f.getToolbar().addCommandToSideMenu(later);
+            assertTrue(implementation.getLastNativeCommands().contains(later));
+            f.getToolbar().removeCommand(later);
+            assertFalse(implementation.getLastNativeCommands().contains(later));
+        } finally {
+            Toolbar.setOnTopSideMenu(onTop);
+        }
+    }
+
+    @FormTest
+    void customTitleBarExcludesButtonsAndPointerListenersFromWindowDrags() {
+        desktopMode("custom");
+        Form f = new Form("Document");
+        Toolbar toolbar = f.getToolbar();
+        Button save = new Button("Save");
+        save.setEnabled(false);
+        Label rename = new Label("Rename");
+        rename.addPointerReleasedListener(e -> { });
+        Label title = new Label("Document");
+        Container content = BoxLayout.encloseX(save, rename, title);
+        toolbar.setTitleComponent(content);
+        f.show();
+        DisplayTest.flushEdt();
+        assertFalse(toolbar.isTitleBarDragPoint(save.getAbsoluteX() + 1, save.getAbsoluteY() + 1),
+                "even a disabled button must not initiate a window drag");
+        assertFalse(toolbar.isTitleBarDragPoint(rename.getAbsoluteX() + 1, rename.getAbsoluteY() + 1),
+                "custom pointer controls keep their gestures");
+        assertTrue(toolbar.isTitleBarDragPoint(title.getAbsoluteX() + 1, title.getAbsoluteY() + 1),
+                "an ordinary title label remains a native drag region");
+        assertFalse(toolbar.isTitleBarDragPoint(toolbar.getAbsoluteX() + 1,
+                toolbar.getAbsoluteY() + toolbar.getHeight()), "the document below is not a title bar");
+    }
+
+    @FormTest
+    void customTitleRegionsFollowResizeAndClearWhenToolbarIsRemoved() {
+        desktopMode("custom");
+        Form f = new Form("Document");
+        f.show();
+        DisplayTest.flushEdt();
+        Toolbar toolbar = f.getToolbar();
+        Graphics graphics = Image.createImage(800, 800).getGraphics();
+        toolbar.paint(graphics);
+        int width = toolbar.getWidth();
+        assertEquals(width, implementation.getLastTitleBarRegions()[2]);
+        toolbar.setWidth(width + 100);
+        toolbar.paint(graphics);
+        assertEquals(width + 100, implementation.getLastTitleBarRegions()[2]);
+        toolbar.deinitialize();
+        assertEquals(0, implementation.getLastTitleBarRegions().length,
+                "a removed title bar must not leave invisible window drag handles");
+    }
+
     private void desktopMode(String titleBarMode) {
         implementation.setDesktop(true);
         implementation.setDesktopTitleBarMode(titleBarMode);

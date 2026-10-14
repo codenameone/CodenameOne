@@ -46,7 +46,7 @@ The window chrome is selected by the `desktop.titleBar` setting, which takes one
 |===
 |`native` |Hide the CN1 `Toolbar`. The `Form` title goes into the OS window title bar and the
 toolbar's commands are bridged to a native menu bar. This is the default for newly generated apps.
-|`custom` |Undecorated window (no OS title bar) where the CN1 `Toolbar` itself acts as the window's
+|`custom` |Application-drawn title content where the CN1 `Toolbar` acts as the window's
 title bar: it shows the `Form` title and side menu, dragging it moves the window, and the window is
 resized by dragging its edges. The commands are bridged to the native menu bar *and* remain in the
 toolbar's side menu.
@@ -82,8 +82,22 @@ ever take effect on the desktop.
 ==== Enabling it on the native macOS build
 
 The local `mac-source` build runs through ParparVM, where the chrome is the application's own
-`NSWindow` and `NSMenu`. There it's read as a runtime property and defaults to `toolbar`, so
-existing apps are unaffected. Opt in from your app before the first `Form` is shown:
+`NSWindow` and `NSMenu`. Set `codename1.arg.desktop.titleBar=custom` in
+`codenameone_settings.properties` to draw title content in the toolbar, or use `native` for the
+standard OS title bar. The generated launcher applies the build hint before calling the
+application's `init()` method, so the first toolbar uses the requested mode. Without a hint the
+installed theme chooses the mode: the bundled Aqua theme requests `native`. If the theme does not
+specify a mode, the port supplies its fallback.
+
+In `custom` mode, macOS retains its native close, minimize and zoom controls and window resizing.
+Dragging an empty part of the toolbar uses the OS window drag operation. Double-clicking it follows
+the user's macOS title-bar preference. Buttons (including disabled buttons), editable titles,
+scrollable regions and other interactive descendants are excluded from the drag area. The toolbar
+publishes these regions to the native port after layout; applications do not need their own window
+drag listeners. Other ports can implement `CodenameOneImplementation.setNativeWindowTitleBarRegions`
+to supply the same native behavior, or keep the existing toolbar drag fallback.
+
+The setting can also be supplied as a runtime property before constructing the first `Form`:
 
 [source,java]
 -----
@@ -96,7 +110,7 @@ also honors them, through `UIWindowScene` and `UIMenuBuilder` rather than AppKit
 
 === Native menu bar and command placement hints
 
-When the `Toolbar` is hidden (`native` or `custom` mode), the commands you add through the
+In `native` and `custom` title-bar modes, the commands you add through the
 `Toolbar` / `Form` command API are bridged to the platform's native menu bar - a Swing `JMenuBar`
 (which becomes the macOS screen menu) on the Java SE build, and an `NSMenu` on the native macOS build.
 Selecting a menu item runs the command's `actionPerformed` on the Codename One EDT, exactly as a

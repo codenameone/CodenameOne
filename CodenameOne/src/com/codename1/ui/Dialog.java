@@ -2041,6 +2041,12 @@ public class Dialog extends Form implements AbstractDialog {
         if (hostTopLevel != null) {
             return hostTopLevel;
         }
+        if (nativeWindow != null) {
+            // Its payload is now parented to this new window. The owner still
+            // supplies the sizing context; measuring against the initial peer
+            // would cap wider content at that peer's default width forever.
+            return nativeWindow.getOwnerWindow();
+        }
         if (getParent() != null) {
             TopLevelContainer attached = getTopLevelContainer();
             if (attached != null && attached != this) { //NOPMD CompareObjectsWithEquals

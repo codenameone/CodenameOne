@@ -54,6 +54,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MacOSStubThemeTest {
 
     @Test
+    void customTitleBarReachesTheApplicationBeforeInit(@TempDir Path tmp) throws Exception {
+        Map<String, String> hints = new HashMap<String, String>();
+        hints.put("desktop.titleBar", "CUSTOM");
+        String stub = generateStub(tmp, hints);
+        String property = "Display.getInstance().setProperty(\"desktop.titleBar\", \"custom\")";
+        assertTrue(stub.contains(property));
+        assertTrue(stub.indexOf(property) < stub.indexOf("i.init(this)"));
+    }
+
+    @Test
+    void absentTitleBarHintKeepsTheThemeInControl(@TempDir Path tmp) throws Exception {
+        assertFalse(generateStub(tmp, new HashMap<String, String>()).contains("desktop.titleBar"));
+    }
+
+    @Test
     void theGeneratedStubInstallsTheAquaThemeByDefault(@TempDir Path tmp) throws Exception {
         String stub = generateStub(tmp, new HashMap<String, String>());
         assertTrue(stub.contains("setIosMode(\"aqua\")"),
@@ -176,6 +191,9 @@ class MacOSStubThemeTest {
         request.setPackageName("com.example.app");
         request.setMainClass("MyApp");
         request.setVersion("1.0");
+        for (Map.Entry<String, String> hint : raw.entrySet()) {
+            request.putArgument(hint.getKey(), hint.getValue());
+        }
 
         MacOSNativeBuilder builder = new MacOSNativeBuilder();
         builder.setCodenameOneJar(new File("../core/target/classes"));

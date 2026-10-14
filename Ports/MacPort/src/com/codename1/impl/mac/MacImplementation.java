@@ -218,6 +218,12 @@ public class MacImplementation extends IOSImplementation {
         macNative.macTextInputSetOwnerWindow(ownerWindowId(cmp));
     }
 
+    /// @inheritDoc
+    @Override
+    public void setNativeWindowTitleBarRegions(com.codename1.ui.Component toolbar, int[] regions) {
+        macNative.macSetTitleBarRegions(ownerWindowId(toolbar), regions);
+    }
+
     /// Which surface the native side should treat as the owner of the next
     /// presentation or editing session.
     ///

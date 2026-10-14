@@ -28,8 +28,14 @@ import com.codename1.io.JSONParser;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Button;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Desktop;
+import com.codename1.testing.TestWindowManager;
+import com.codename1.ui.Display;
+import com.codename1.ui.DisplayTest;
 import com.codename1.ui.Form;
 import com.codename1.ui.TextField;
+import com.codename1.ui.Window;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import java.util.List;
@@ -41,6 +47,97 @@ import static org.junit.jupiter.api.Assertions.*;
 /// error codes) and end to end user interface driving through the accessibility
 /// semantics tree. Runs on the Codename One EDT via {@link FormTest}.
 class MCPServerTest extends UITestBase {
+
+    @FormTest
+    void modalActionReturnsWhileDialogIsOpenAndNextRequestCanCloseIt() throws Exception {
+        Form form = new Form("Main");
+        final Dialog dialog = new Dialog("MCP dialog");
+        Button close = new Button("Close test dialog");
+        close.addActionListener(e -> dialog.dispose());
+        dialog.add(close);
+        Button open = new Button("Open test dialog");
+        open.addActionListener(e -> dialog.showPacked("Center", true));
+        form.add(open);
+        form.show();
+        DisplayTest.flushEdt();
+        final MCPServer server = new MCPServer();
+        long openId = firstNodeWithAction(callTool(server, "ui_snapshot", "{}"), "activate");
+        final Throwable[] failure = new Throwable[1];
+        try {
+            Display.getInstance().invokeAndBlock(() -> {
+                try {
+                    Map<String, Object> result = parse(callTool(server, "ui_activate",
+                            "{\"nodeId\":" + openId + "}"));
+                    assertTrue(asBool(result.get("pending")));
+                    assertNull(result.get("success"), "pending is not a completed successful action");
+                    String snapshot = callTool(server, "ui_snapshot", "{}");
+                    assertTrue(snapshot.contains("Close test dialog"));
+                    long closeId = firstNodeWithAction(snapshot, "activate");
+                    result = parse(callTool(server, "ui_activate", "{\"nodeId\":" + closeId + "}"));
+                    assertTrue(asBool(result.get("success")));
+                } catch (Throwable ex) {
+                    failure[0] = ex;
+                } finally {
+                    Display.getInstance().callSerially(() -> dialog.dispose());
+                }
+            });
+            if (failure[0] != null) throw new AssertionError("MCP modal workflow failed", failure[0]);
+            DisplayTest.flushEdt();
+            assertSame(form, Display.getInstance().getCurrent());
+        } finally {
+            dialog.dispose();
+        }
+    }
+
+    @FormTest
+    void snapshotAndActionsFollowNativeDialogWindow() throws Exception {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Form main = new Form("Main window");
+        main.add(new Button("Main only button"));
+        main.show();
+        DisplayTest.flushEdt();
+        Dialog dialog = new Dialog("Native dialog");
+        dialog.setNativeWindowMode(true);
+        TextField field = new TextField("dialog text");
+        dialog.add(field);
+        dialog.showModeless();
+        DisplayTest.flushEdt();
+        Desktop.getInstance().windowFocusChanged(wm.getLastWindow().getWindowId(), true);
+        DisplayTest.flushEdt();
+        try {
+            MCPServer server = new MCPServer();
+            String snapshot = callTool(server, "ui_snapshot", "{}");
+            assertTrue(snapshot.contains("dialog text"));
+            assertFalse(snapshot.contains("Main only button"));
+            long id = firstNodeWithAction(snapshot, "setText");
+            Map<String, Object> result = parse(callTool(server, "ui_set_text",
+                    "{\"nodeId\":" + id + ",\"text\":\"changed dialog\"}"));
+            assertTrue(asBool(result.get("success")));
+            assertEquals("changed dialog", field.getText());
+
+            int windowId = wm.getLastWindow().getWindowId();
+            Desktop.getInstance().windowFocusChanged(windowId, false);
+            DisplayTest.flushEdt();
+            String windows = callTool(server, "ui_windows", "{}");
+            assertTrue(windows.contains("Native dialog"));
+            snapshot = callTool(server, "ui_snapshot", "{\"windowId\":" + windowId + "}");
+            assertTrue(snapshot.contains("changed dialog"), "explicit targeting works without focus");
+            id = firstNodeWithAction(snapshot, "setText");
+            result = parse(callTool(server, "ui_set_text", "{\"nodeId\":" + id
+                    + ",\"windowId\":" + windowId + ",\"text\":\"explicit window\"}"));
+            assertTrue(asBool(result.get("success")));
+            assertEquals("explicit window", field.getText());
+
+            long mainId = firstNodeWithAction(callTool(server, "ui_snapshot", "{\"windowId\":0}"), "activate");
+            Desktop.getInstance().windowById(windowId).setModalityType(Window.MODALITY_APPLICATION);
+            result = parse(callTool(server, "ui_activate", "{\"nodeId\":" + mainId + ",\"windowId\":0}"));
+            assertFalse(asBool(result.get("success")), "MCP must honor the modal input block");
+            assertTrue(result.get("error").toString().contains("blocked"));
+        } finally {
+            dialog.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
 
     @FormTest
     void initializeReportsProtocolCapabilitiesAndServerInfo() throws Exception {

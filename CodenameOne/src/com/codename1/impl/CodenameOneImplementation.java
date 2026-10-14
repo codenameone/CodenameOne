@@ -5264,6 +5264,14 @@ public abstract class CodenameOneImplementation {
     public void closeNativeWindow() {
     }
 
+    /// Publishes the custom Toolbar's native title-bar hit regions. Coordinates are
+    /// absolute component pixels relative to its window. The first x/y/width/height
+    /// rectangle is the title band; subsequent rectangles exclude interactive children.
+    /// An empty array clears the regions. Ports with native event tracking can use this
+    /// to start an OS window drag before dispatching a component pointer event.
+    public void setNativeWindowTitleBarRegions(Component toolbar, int[] regions) {
+    }
+
     /// Begins dragging the native desktop window (custom mode title bar). The arguments are
     /// absolute pointer coordinates at the start of the drag. No-op without a native window.
     ///

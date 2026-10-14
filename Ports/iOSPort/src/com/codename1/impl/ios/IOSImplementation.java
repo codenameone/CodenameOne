@@ -915,7 +915,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (areaUnderVKBOverride >= 0) {
             return areaUnderVKBOverride;
         }
-        if(isAsyncEditMode()) {
+        if(isAsyncEditMode() || tiClient != null) {
             return nativeInstance.getVKBHeight();
         }
         return 0;
@@ -1052,7 +1052,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     static void keyboardWillBeShown(){
         instance.keyboardShowing = true;
-        if(nativeInstance.isAsyncEditMode()) {
+        if(nativeInstance.isAsyncEditMode() || tiClient != null) {
             // revalidate the parent since the size of form is now larger due to the vkb
             final Form current = Display.getInstance().getCurrent();
             //final Component currentEditingFinal = instance.currentEditing;
@@ -1114,6 +1114,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                 Form current = Display.getInstance().getCurrent();
                 if (current != null) {
                     instance.areaUnderVKBOverride = 0;
+                    if (current.isFormBottomPaddingEditingMode()) {
+                        getRootPane(current).getUnselectedStyle().setPadding(Component.BOTTOM, 0);
+                    }
                     try {
                         current.revalidate();
                         //Now that screen size is changed, the scroll positions may
@@ -1756,6 +1759,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// text/selection queries are answered from this on the iOS main thread (the EDT is a
     /// separate ParparVM thread, so reading the live document there would race edits).
     private static volatile com.codename1.ui.TextInputState tiSnapshot;
+    private static volatile com.codename1.ui.TextInputGeometry tiGeometry;
     /// Generation of the last native-originated edit APPLIED to the Java document. Echoed back
     /// with every state push so the native shadow can drop echoes that predate a newer local
     /// edit (fast typing would otherwise regress the shadow text and caret).
@@ -1771,6 +1775,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         tiClient = client;
         com.codename1.ui.TextInputState st = client.getEditingState();
         tiSnapshot = st;
+        tiGeometry = com.codename1.ui.TextInputGeometry.capture(client);
         tiNativeSeq = 0;
         int constraint = config != null ? config.getConstraint() : 0;
         boolean autoCorrect = config == null || config.isAutoCorrect();
@@ -1792,13 +1797,15 @@ public class IOSImplementation extends CodenameOneImplementation {
         com.codename1.ui.TextInputClient c = tiClient;
         int[] r = c != null ? c.getCaretRect() : new int[]{0, 0, 0, 0};
         tiSnapshot = state;
+        tiGeometry = com.codename1.ui.TextInputGeometry.capture(c);
         nativeInstance.updateTextInputState(state.getText(), state.getSelectionStart(), state.getSelectionEnd(),
                 r[0], r[1], r[2], r[3], tiNativeSeq);
         // Push the editor component's absolute bounds so the native input view can gate its touch region to
         // the editor (letting iOS draw its selection loupe/handles there) while passing other touches through.
         if (c instanceof com.codename1.ui.Component) {
             com.codename1.ui.Component comp = (com.codename1.ui.Component) c;
-            nativeInstance.setTextInputBounds(comp.getAbsoluteX(), comp.getAbsoluteY(),
+            nativeInstance.setTextInputBounds(comp.getAbsoluteX() + comp.getScrollX(),
+                    comp.getAbsoluteY() + comp.getScrollY(),
                     comp.getWidth(), comp.getHeight());
         }
         tiKeepNativeCallbacksAlive();
@@ -1842,6 +1849,8 @@ public class IOSImplementation extends CodenameOneImplementation {
             return;
         }
         tiClient = null;
+        tiSnapshot = null;
+        tiGeometry = null;
         nativeInstance.stopTextInput();
     }
 
@@ -1931,7 +1940,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     // ---- UITextInput text/selection/geometry queries. These arrive synchronously on the iOS
     // MAIN thread while the EDT (a separate ParparVM thread) may be mid-edit, so text and
     // selection are answered from the volatile immutable snapshot pushed with each state
-    // update, and layout-dependent geometry marshals onto the EDT. ----
+    // update, including immutable layout geometry captured on the EDT. ----
 
     /// Total document length in UTF-16 characters.
     public static int tiTextLength() {
@@ -1963,60 +1972,22 @@ public class IOSImplementation extends CodenameOneImplementation {
         return s != null ? s.getSelectionEnd() : 0;
     }
 
-    /// Runs a geometry query against the live editor on the EDT and returns its result. The main
-    /// thread never holds locks the EDT needs (all native UI work is dispatched asynchronously),
-    /// so the bounded wait cannot deadlock.
-    private static int[] tiGeometryQuery(final TiGeometryOp op) {
-        final com.codename1.ui.TextInputClient c = tiClient;
-        if (c == null) {
-            return new int[0];
-        }
-        Display d = Display.getInstance();
-        if (d.isEdt()) {
-            return op.run(c);
-        }
-        final int[][] out = new int[1][];
-        d.callSeriallyAndWait(new Runnable() {
-            public void run() {
-                if (c == tiClient) {
-                    out[0] = op.run(c);
-                }
-            }
-        });
-        return out[0] != null ? out[0] : new int[0];
-    }
-
-    private interface TiGeometryOp {
-        int[] run(com.codename1.ui.TextInputClient c);
-    }
-
-    /// Caret rectangle for an offset, absolute screen pixels `{x, y, w, h}`.
+    // UIKit geometry callbacks must not synchronously wait for the EDT. Rendering, font
+    // metrics and other EDT operations can synchronously dispatch to the main queue.
+    // Geometry is captured with each editing-state update and queried as immutable data.
     public static int[] tiRectForOffset(final int offset) {
-        int[] r = tiGeometryQuery(new TiGeometryOp() {
-            public int[] run(com.codename1.ui.TextInputClient c) {
-                return c.rectForOffset(offset);
-            }
-        });
-        return r.length >= 4 ? r : new int[]{0, 0, 0, 0};
+        com.codename1.ui.TextInputGeometry g = tiGeometry;
+        return g == null ? new int[]{0, 0, 0, 0} : g.rectForOffset(offset);
     }
 
-    /// Document offset nearest an absolute screen point (pixels).
     public static int tiOffsetAtPoint(final int x, final int y) {
-        int[] r = tiGeometryQuery(new TiGeometryOp() {
-            public int[] run(com.codename1.ui.TextInputClient c) {
-                return new int[]{c.offsetAtPoint(x, y)};
-            }
-        });
-        return r.length > 0 ? r[0] : 0;
+        com.codename1.ui.TextInputGeometry g = tiGeometry;
+        return g == null ? 0 : g.offsetAtPoint(x, y);
     }
 
-    /// Selection rectangles for `[start, end)`, flat array of absolute-pixel `{x, y, w, h, ...}`.
     public static int[] tiSelectionRects(final int start, final int end) {
-        return tiGeometryQuery(new TiGeometryOp() {
-            public int[] run(com.codename1.ui.TextInputClient c) {
-                return c.selectionRects(start, end);
-            }
-        });
+        com.codename1.ui.TextInputGeometry g = tiGeometry;
+        return g == null ? new int[0] : g.selectionRects(start, end);
     }
 
     /// Callback from native: replace a range with text (range based edit).

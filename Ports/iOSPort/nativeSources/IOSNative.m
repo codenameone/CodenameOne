@@ -9026,7 +9026,10 @@ static void cn1AddFileChooserDocumentType(NSMutableArray *types, CFStringRef tag
     if (tag == nil || [tag length] == 0) {
         return;
     }
-    CFStringRef uti = UTTypeCreatePreferredIdentifierForTag(tagClass, (CFStringRef)tag, NULL);
+    // Unknown extensions produce dynamic UTIs. Filesystem URLs classify these
+    // as data, so creating an unconstrained dynamic UTI makes the picker reject
+    // the very extension requested by the caller (e.g. a saved .cn1doc file).
+    CFStringRef uti = UTTypeCreatePreferredIdentifierForTag(tagClass, (CFStringRef)tag, kUTTypeData);
     if (uti != NULL) {
 #if __has_feature(objc_arc)
         NSString *type = CFBridgingRelease(uti);
@@ -9083,40 +9086,26 @@ void com_codename1_impl_ios_IOSNative_openFileChooser___java_lang_String(CN1_THR
         if (documentTypes.count > 0) {
             panel.allowedFileTypes = documentTypes;
         }
-        NSInteger response = [panel runModal];
-        NSURL *picked = response == NSModalResponseOK ? panel.URL : nil;
-        // Called from the AppKit main queue, not the EDT -- the same thread
-        // contract the UIKit twin of this callback has always had:
-        // -documentPicker:didPickDocumentsAtURLs: in
-        // CodenameOne_GLViewController.m calls this very method straight from a
-        // UIKit main thread delegate, and the EDT is a separate thread on both
-        // platforms. The share callback in CN1MacShare.m does the same.
-        //
-        // An application listener that dispatch_syncs to the main queue from
-        // here deadlocks on itself, and setURL() does exactly that through the
-        // shared browser native -- so these two call sites go through
-        // macFileChooserResult / macCapturePictureResult, which clear
-        // dropEvents immediately and hand the listener to the EDT.
-        //
-        // This used to argue the opposite: that marshalling macOS alone would
-        // put the port out of step with the iOS twin and the mac share
-        // callback. Consistency is worth something, but not a deadlock, and
-        // running an application listener on the EDT is the framework's
-        // contract rather than a local preference. The iOS twin still fires off
-        // the EDT and can still deadlock the same way; that is pre-existing and
-        // wants fixing where every caller benefits.
-        struct ThreadLocalData* threadStateData = getThreadLocalData();
-        com_codename1_impl_ios_IOSImplementation_macFileChooserResult___java_lang_String(
-            threadStateData,
-            // path, not absoluteString. fileChooserResult prefixes "file:" and
-            // unfile() strips it again WITHOUT percent decoding, so an encoded
-            // URL reached FileSystemStorage.openInputStream() as a literal
-            // "My%20File.txt" and the documented workflow simply failed on any
-            // name with a space, a '#' or a non-ASCII character. A single path
-            // needs no encoding: unlike the multi-select gallery beside it,
-            // there is no separator here for a filename to collide with.
-            picked == nil ? JAVA_NULL
-                          : fromNSString(threadStateData, [picked path]));
+        NSWindow *owner = [CN1MacKeyRenderingHostView() window];
+        void (^completed)(NSModalResponse) = ^(NSModalResponse response) {
+            POOL_BEGIN();
+            NSURL *picked = response == NSModalResponseOK ? panel.URL : nil;
+            [panel orderOut:nil];
+            if (owner != nil && owner.visible) [owner makeKeyAndOrderFront:nil];
+            // The native callback clears dropEvents, then delivers the path on the EDT.
+            // FileSystemStorage expects an unescaped path, not a URL string.
+            struct ThreadLocalData *threadStateData = getThreadLocalData();
+            com_codename1_impl_ios_IOSImplementation_macFileChooserResult___java_lang_String(
+                threadStateData, picked == nil ? JAVA_NULL : fromNSString(threadStateData, [picked path]));
+            POOL_END();
+        };
+        if (owner != nil) {
+            // A document-owned sheet avoids a nested application-modal event loop and
+            // returns keyboard/accessibility focus to the window that opened it.
+            [panel beginSheetModalForWindow:owner completionHandler:completed];
+        } else {
+            [panel beginWithCompletionHandler:completed];
+        }
         POOL_END();
 #ifndef CN1_USE_ARC
         [documentTypes release];

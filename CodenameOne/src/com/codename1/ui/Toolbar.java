@@ -227,7 +227,7 @@ public class Toolbar extends Container {
     private Container permanentRightSideMenuContainer;
     /// The form of a toolbar the desktop {@code native} title-bar mode keeps detached, null otherwise
     private Form desktopHiddenHost;
-    /// Side menu commands added while detached, only bridged to the native menu bar
+    /// Original side menu commands bridged to the desktop native menu bar.
     private Vector<Command> desktopHiddenSideMenuCommands;
     private Command searchCommand;
     /// Component placed on the bottom (south) portion of the permanent/on-top
@@ -1474,7 +1474,9 @@ public class Toolbar extends Container {
     }
 
     private boolean addDesktopHiddenSideMenuCommand(Command cmd) {
-        if (!isDesktopHidden()) {
+        boolean hidden = isDesktopHidden();
+        Form host = getHostForm();
+        if (!hidden && (host == null || !host.isDesktopNativeChrome())) {
             return false;
         }
         if (cmd != null) {
@@ -1486,17 +1488,19 @@ public class Toolbar extends Container {
                 refreshDesktopHiddenNativeCommands();
             }
         }
-        return true;
+        // Custom desktop chrome still draws a toolbar. Keep the original command
+        // for the native menu too: on-top side menus hold wrapped commands in a
+        // detached container, so harvesting the toolbar tree cannot find them.
+        return hidden;
     }
 
     /// `Form.initComponentImpl` publishes the commands when the form is shown, this covers later changes.
     /// Every mutation of the Toolbar's command lists calls it -- the left and right bars and the
-    /// overflow as well as the side menu -- because with the Toolbar hidden by the desktop chrome
-    /// the native menu is the only place those commands can be reached. A no-op unless this
-    /// Toolbar's hidden host form is the one on screen.
+    /// overflow as well as the side menu. Both native and custom desktop title bars publish
+    /// these commands. A no-op unless this Toolbar's host form is the one on screen.
     private void refreshDesktopHiddenNativeCommands() {
-        Form host = desktopHiddenHost;
-        if (host != null && host.isInitialized() && host.getParent() == null
+        Form host = getHostForm();
+        if (host != null && host.isDesktopNativeChrome() && host.isInitialized() && host.getParent() == null
                 && Display.getInstance().getCurrent() == host) { //NOPMD CompareObjectsWithEquals
             Display.impl.setNativeCommands(getAllNativeMenuCommands());
         }
@@ -2675,6 +2679,87 @@ public class Toolbar extends Container {
         }
     }
 
+    private int[] nativeTitleBarRegions;
+
+    // Native hit testing must see the actual laid-out controls, including disabled
+    // buttons. A disabled Save button is not an unexpected window-drag handle.
+    private void collectTitleBarControls(Container parent, Vector<Component> controls) {
+        for (Component child : parent) {
+            if (!child.isVisible()) {
+                continue;
+            }
+            if (child instanceof Button || child.isFocusable() || child.isGrabsPointerEvents()
+                    || child.isDraggable() || child.isScrollable() || child.getLeadComponent() != null
+                    || child.pointerPressedListeners != null && child.pointerPressedListeners.hasListeners()
+                    || child.pointerReleasedListeners != null && child.pointerReleasedListeners.hasListeners()
+                    || child.pointerDraggedListeners != null && child.pointerDraggedListeners.hasListeners()) {
+                controls.addElement(child);
+            } else if (child instanceof Container) {
+                collectTitleBarControls((Container) child, controls);
+            }
+        }
+    }
+
+    int[] titleBarRegions() {
+        Vector<Component> controls = new Vector<Component>();
+        collectTitleBarControls(this, controls);
+        int[] regions = new int[(controls.size() + 1) * 4];
+        regions[0] = getAbsoluteX();
+        regions[1] = getAbsoluteY();
+        regions[2] = getWidth();
+        regions[3] = getHeight();
+        for (int i = 0; i < controls.size(); i++) {
+            Component c = controls.elementAt(i);
+            int offset = (i + 1) * 4;
+            regions[offset] = c.getAbsoluteX();
+            regions[offset + 1] = c.getAbsoluteY();
+            regions[offset + 2] = c.getWidth();
+            regions[offset + 3] = c.getHeight();
+        }
+        return regions;
+    }
+
+    boolean isTitleBarDragPoint(int x, int y) {
+        int[] regions = titleBarRegions();
+        for (int i = 0; i < regions.length; i += 4) {
+            boolean inside = x >= regions[i] && y >= regions[i + 1]
+                    && x < regions[i] + regions[i + 2] && y < regions[i + 1] + regions[i + 3];
+            if (i == 0 && !inside || i > 0 && inside) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public void paint(Graphics g) {
+        Form parent = getComponentForm();
+        if (parent != null && !(parent instanceof Dialog) && parent.isDesktopToolbarTitle()) {
+            int[] regions = titleBarRegions();
+            boolean changed = nativeTitleBarRegions == null || nativeTitleBarRegions.length != regions.length;
+            for (int i = 0; !changed && i < regions.length; i++) {
+                changed = regions[i] != nativeTitleBarRegions[i];
+            }
+            if (changed) {
+                nativeTitleBarRegions = regions;
+                Display.impl.setNativeWindowTitleBarRegions(this, regions);
+            }
+        } else if (nativeTitleBarRegions != null) {
+            Display.impl.setNativeWindowTitleBarRegions(this, new int[0]);
+            nativeTitleBarRegions = null;
+        }
+        super.paint(g);
+    }
+
+    @Override
+    protected void deinitialize() {
+        if (nativeTitleBarRegions != null) {
+            Display.impl.setNativeWindowTitleBarRegions(this, new int[0]);
+            nativeTitleBarRegions = null;
+        }
+        super.deinitialize();
+    }
+
     /// Wires the visible Toolbar to act as the draggable title bar of an undecorated desktop window
     /// (the {@code custom} desktop title-bar mode). The listener is registered at the form level (so
     /// it fires reliably for every pointer drag) and starts a window move only when the press falls
@@ -2710,7 +2795,7 @@ public class Toolbar extends Container {
         public void actionPerformed(ActionEvent evt) {
             ActionEvent.Type t = evt.getEventType();
             if (t == ActionEvent.Type.PointerPressed) {
-                dragging = toolbar.isWithinTitleBarBand(evt.getY());
+                dragging = toolbar.isTitleBarDragPoint(evt.getX(), evt.getY());
                 if (dragging) {
                     Display.impl.startNativeWindowDrag(evt.getX(), evt.getY());
                 }

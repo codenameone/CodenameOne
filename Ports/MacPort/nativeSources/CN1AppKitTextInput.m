@@ -247,6 +247,10 @@ void CN1MacTextInputSetPendingOwner(NSView *view) {
     return editSeq;
 }
 
+- (int)currentSessionGeneration {
+    return sessionGeneration;
+}
+
 - (void)commitFinished:(BOOL)finished {
     if (self.pureEditor) {
         // The pure editor has already been told about the edit itself, operation
@@ -310,32 +314,45 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_stopTextInput__(CODENAME_ONE_THREAD_S
 
 JAVA_VOID com_codename1_impl_ios_IOSNative_updateTextInputState___java_lang_String_int_int_int_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT text, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT caretX, JAVA_INT caretY, JAVA_INT caretW, JAVA_INT caretH, JAVA_INT seq) {
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
-    // The caret geometry is taken from every push, stale or not: it is where the
-    // framework last drew the caret and an input method needs somewhere to put
-    // its candidate window.
-    session.caretRect = CGRectMake(caretX, caretY, caretW, caretH);
-    // The TEXT and the selection are not, when the echo is stale. Java echoes
-    // the sequence of the edit it applied, and a push for edit N that arrives
-    // after the user has already typed N+1 would otherwise overwrite the newer
-    // native text -- and the next keystroke would then be applied to a document
-    // the user has moved past, losing or misplacing what they typed. The UIKit
-    // path drops the same echo for the same reason.
-    if (seq != (JAVA_INT)[session currentEditSeq]) {
-        return;
-    }
-    if (session.markedRange.location != NSNotFound) {
-        // Mid composition the input method owns the text. Taking the
-        // framework's copy back here would drop the marked run and make the
-        // composition look like it did nothing.
-        return;
-    }
-    if (text != JAVA_NULL) {
-        session.text = toNSString(CN1_THREAD_GET_STATE_PASS_ARG text);
-    }
-    NSInteger len = (NSInteger)session.text.length;
-    NSInteger start = MIN(MAX((NSInteger)selStart, 0), len);
-    NSInteger end = MIN(MAX((NSInteger)selEnd, start), len);
-    session.selectedRange = NSMakeRange(start, end - start);
+    NSString *snapshot = text != JAVA_NULL
+        ? toNSString(CN1_THREAD_GET_STATE_PASS_ARG text) : nil;
+    int generation = [session currentSessionGeneration];
+    // AppKit mutates the shadow on the main thread. Check the generation and
+    // apply the echo on that same queue: checking on the EDT left a window in
+    // which a keystroke could advance the shadow before this older push wrote
+    // it back, even though its sequence check had passed.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (!session.active || !session.pureEditor
+                || generation != [session currentSessionGeneration]) {
+            return;
+        }
+        // The caret geometry is taken from every push, stale or not: it is where the
+        // framework last drew the caret and an input method needs somewhere to put
+        // its candidate window.
+        session.caretRect = CGRectMake(caretX, caretY, caretW, caretH);
+        // The TEXT and the selection are not, when the echo is stale. Java echoes
+        // the sequence of the edit it applied, and a push for edit N that arrives
+        // after the user has already typed N+1 would otherwise overwrite the newer
+        // native text -- and the next keystroke would then be applied to a document
+        // the user has moved past, losing or misplacing what they typed. The UIKit
+        // path drops the same echo for the same reason.
+        if (seq != (JAVA_INT)[session currentEditSeq]) {
+            return;
+        }
+        if (session.markedRange.location != NSNotFound) {
+            // Mid composition the input method owns the text. Taking the
+            // framework's copy back here would drop the marked run and make the
+            // composition look like it did nothing.
+            return;
+        }
+        if (snapshot != nil) {
+            session.text = snapshot;
+        }
+        NSInteger len = (NSInteger)session.text.length;
+        NSInteger start = MIN(MAX((NSInteger)selStart, 0), len);
+        NSInteger end = MIN(MAX((NSInteger)selEnd, start), len);
+        session.selectedRange = NSMakeRange(start, end - start);
+    });
 }
 
 /// Pushes the framework's text into the live session without disturbing the
