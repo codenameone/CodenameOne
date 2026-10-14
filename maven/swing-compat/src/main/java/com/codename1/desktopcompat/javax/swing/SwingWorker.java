@@ -91,6 +91,13 @@ public abstract class SwingWorker<T, V> implements Future<T>, Runnable {
             return;
         }
         runner.set(Thread.currentThread());
+        if (outcome.get() != RUNNING) {
+            // Cancelled between the check above and the line before this: the
+            // cancel saw no thread to interrupt, so it is this thread that
+            // must notice. Nothing has started.
+            runner.set(null);
+            return;
+        }
         if (state.compareAndSet(StateValue.PENDING, StateValue.STARTED)) {
             firePropertyChange("state", StateValue.PENDING, StateValue.STARTED);
         }

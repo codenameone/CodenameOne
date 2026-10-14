@@ -250,16 +250,22 @@ public class File implements Comparable<File>, java.io.Serializable {
         return false;
     }
 
+    // A device's storage has no permissions to change: every file is
+    // readable and writable for as long as it exists. A request that asks
+    // for that state already holds succeeds; one that asks to take a
+    // permission away fails, as the JDK answers when it could not change
+    // it, and canRead and canWrite go on saying so. Answering true there
+    // told code that had just made a file read-only that it was.
     public boolean setReadable(boolean readable) {
-        return exists();
+        return readable && exists();
     }
 
     public boolean setWritable(boolean writable) {
-        return exists();
+        return writable && exists();
     }
 
     public boolean setReadOnly() {
-        return exists();
+        return false;
     }
 
     public boolean setLastModified(long time) {

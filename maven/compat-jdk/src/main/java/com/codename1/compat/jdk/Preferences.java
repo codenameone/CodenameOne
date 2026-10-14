@@ -120,19 +120,33 @@ public class Preferences {
         return "/".equals(path) ? "/" + key : path + "/" + key;
     }
 
+    /// Guards every read-modify-write of an index, of any node: two threads
+    /// adding different keys to one node each read the same index, and the
+    /// one that saved last dropped the other's key for good. Static, since
+    /// two instances can stand for one node.
+    private static final Object INDEX_LOCK = new Object();
+
+    /// The node's keys, one per line. A key may hold any character, a line
+    /// break too, so a backslash and a line break inside one are written as
+    /// `\\` and `\n`; see [#saveIndex].
     private List<String> index() {
         List<String> keys = new ArrayList<String>();
         String all = com.codename1.io.Preferences.get(storeKey(INDEX), "");
-        int start = 0;
-        while (start < all.length()) {
-            int end = all.indexOf('\n', start);
-            if (end < 0) {
-                end = all.length();
+        StringBuilder key = new StringBuilder();
+        for (int i = 0; i < all.length(); i++) {
+            char c = all.charAt(i);
+            if (c == '\\' && i + 1 < all.length()) {
+                i++;
+                key.append(all.charAt(i) == 'n' ? '\n' : all.charAt(i));
+            } else if (c == '\n') {
+                keys.add(key.toString());
+                key.setLength(0);
+            } else {
+                key.append(c);
             }
-            if (end > start) {
-                keys.add(all.substring(start, end));
-            }
-            start = end + 1;
+        }
+        if (key.length() > 0) {
+            keys.add(key.toString());
         }
         return keys;
     }
@@ -144,7 +158,17 @@ public class Preferences {
         }
         StringBuilder all = new StringBuilder();
         for (String key : keys) {
-            all.append(key).append('\n');
+            for (int i = 0; i < key.length(); i++) {
+                char c = key.charAt(i);
+                if (c == '\\') {
+                    all.append("\\\\");
+                } else if (c == '\n') {
+                    all.append("\\n");
+                } else {
+                    all.append(c);
+                }
+            }
+            all.append('\n');
         }
         com.codename1.io.Preferences.set(storeKey(INDEX), all.toString());
     }
@@ -154,10 +178,12 @@ public class Preferences {
             throw new NullPointerException("Null value");
         }
         com.codename1.io.Preferences.set(storeKey(key), value);
-        List<String> keys = index();
-        if (!keys.contains(key)) {
-            keys.add(key);
-            saveIndex(keys);
+        synchronized (INDEX_LOCK) {
+            List<String> keys = index();
+            if (!keys.contains(key)) {
+                keys.add(key);
+                saveIndex(keys);
+            }
         }
     }
 
@@ -167,17 +193,21 @@ public class Preferences {
 
     public void remove(String key) {
         com.codename1.io.Preferences.delete(storeKey(key));
-        List<String> keys = index();
-        if (keys.remove(key)) {
-            saveIndex(keys);
+        synchronized (INDEX_LOCK) {
+            List<String> keys = index();
+            if (keys.remove(key)) {
+                saveIndex(keys);
+            }
         }
     }
 
     public void clear() throws BackingStoreException {
-        for (String key : index()) {
-            com.codename1.io.Preferences.delete(storeKey(key));
+        synchronized (INDEX_LOCK) {
+            for (String key : index()) {
+                com.codename1.io.Preferences.delete(storeKey(key));
+            }
+            saveIndex(new ArrayList<String>());
         }
-        saveIndex(new ArrayList<String>());
     }
 
     public String[] keys() throws BackingStoreException {

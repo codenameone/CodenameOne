@@ -99,7 +99,9 @@ final class ScheduledPool implements ScheduledExecutorService {
             }
             if (!running.compareAndSet(false, true)) {
                 // The run before this one has not ended; a fixed rate does
-                // not pile runs up.
+                // not pile runs up. Skipping it does not end the schedule:
+                // the next firing was armed above, before this check, so an
+                // overrun drops only the firings that fell inside it.
                 return;
             }
             try {

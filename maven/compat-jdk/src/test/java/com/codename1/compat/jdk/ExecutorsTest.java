@@ -361,6 +361,68 @@ public class ExecutorsTest {
         return ref.get() == null;
     }
 
+    /// A fixed rate whose run takes longer than its period keeps going: the
+    /// firings that fell inside the overrun are dropped, not the schedule.
+    @Test
+    public void aFixedRateOutlivesARunLongerThanItsPeriod() throws Exception {
+        ScheduledExecutorService pool = Executors.newScheduledThreadPool(1);
+        final AtomicInteger runs = new AtomicInteger();
+        final java.util.concurrent.CountDownLatch five = new java.util.concurrent.CountDownLatch(5);
+        pool.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                if (runs.incrementAndGet() == 1) {
+                    try {
+                        Thread.sleep(120);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+                five.countDown();
+            }
+        }, 0, 20, TimeUnit.MILLISECONDS);
+        assertTrue("the schedule stopped after an overrun, at " + runs.get(),
+                five.await(10, java.util.concurrent.TimeUnit.SECONDS));
+        pool.shutdownNow();
+    }
+
+    /// Two threads adding keys to one node, each through an instance of its
+    /// own: every key is kept, and a key may hold a line break.
+    @Test
+    public void preferenceKeysAddedFromSeveralThreadsAreAllIndexed() throws Exception {
+        final String node = "/cn1/test/concurrent";
+        Thread[] writers = new Thread[4];
+        for (int t = 0; t < writers.length; t++) {
+            final int id = t;
+            writers[t] = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    for (int i = 0; i < 50; i++) {
+                        Preferences.userRoot().node(node).put("k" + id + "." + i, "v");
+                    }
+                }
+            });
+            writers[t].start();
+        }
+        for (Thread w : writers) {
+            w.join();
+        }
+        Preferences prefs = Preferences.userRoot().node(node);
+        assertEquals(200, prefs.keys().length);
+
+        prefs.put("a\nb", "1");
+        prefs.put("c\\nd", "2");
+        List<String> keys = Arrays.asList(prefs.keys());
+        assertTrue(keys.toString(), keys.contains("a\nb"));
+        assertTrue(keys.toString(), keys.contains("c\\nd"));
+        assertEquals(202, keys.size());
+        prefs.remove("a\nb");
+        assertFalse(Arrays.asList(prefs.keys()).contains("a\nb"));
+        prefs.clear();
+        assertEquals(0, prefs.keys().length);
+        assertEquals("gone", prefs.get("c\\nd", "gone"));
+    }
+
     /// Desktop code sets properties from its workers; the JDK's table takes
     /// that, and a plain map written from several threads loses entries.
     @Test

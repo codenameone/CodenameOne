@@ -2016,12 +2016,16 @@ class CleanTargetIntegrationTest {
     }
 
     static String runCmakeBuild(Path buildDir, Path workingDir) throws Exception {
-        // The full desktop suite compiles more than 4,000 translation units. On
-        // Linux/musl, a healthy build can take over 20 minutes; it must not share
-        // the ten-minute deadline used to detect a hung test executable.
+        // The full desktop suite compiles more than 5,400 translation units now
+        // that it carries the Swing and JavaFX compatibility scenes. On a
+        // four-core Linux runner a healthy build takes close to 30 minutes, and
+        // one was stopped at 5,248 of 5,413 steps; it must not share the
+        // ten-minute deadline used to detect a hung test executable either.
+        // This is a guard against a hang, not a performance budget: the perf
+        // gate is what judges speed.
         ProcessBuilder builder = new ProcessBuilder("cmake", "--build", buildDir.toString());
         builder.directory(workingDir.toFile());
-        return runCommand(builder, 30, java.util.concurrent.TimeUnit.MINUTES);
+        return runCommand(builder, 45, java.util.concurrent.TimeUnit.MINUTES);
     }
 
     static String runCommand(List<String> command, Path workingDir) throws Exception {

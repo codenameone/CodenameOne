@@ -2454,10 +2454,15 @@ public class LinuxImplementation extends CodenameOneImplementation {
                         // Tab ended it: the editor kept the key from the form, so
                         // the form is given it now and moves its focus on. In the
                         // main window only; a second window keeps what it did.
-                        boolean tab = LinuxNative.editTabbed(editPeer) != 0
+                        int tabbed = LinuxNative.editTabbed(editPeer);
+                        boolean tab = tabbed != 0
                                 && LinuxWindowManager.slotForComponent(cmp) == MAIN_WINDOW_SLOT;
                         hideTextEditor();
                         if (tab) {
+                            // The editor consumed the key, so the direction travels
+                            // with it: 2 is Shift-Tab. See #isShiftKeyDown.
+                            tabDirection = tabbed;
+                            tabDirectionUntil = System.currentTimeMillis() + 1000;
                             keyPressed(KEY_CODE_TAB);
                             keyReleased(KEY_CODE_TAB);
                         }
@@ -3622,6 +3627,17 @@ public class LinuxImplementation extends CodenameOneImplementation {
     /// JavaSEPort and the macOS port reported modifier state before this.
     @Override
     public boolean isShiftKeyDown() {
+        if (tabDirection != 0) {
+            // Answered once, for the Tab a native editor ended its edit with: the
+            // form asks this when it handles that key, and by then the modifiers
+            // the window recorded belong to whatever key came last -- a Tab
+            // released after Shift reads as a plain Tab and moved focus forwards.
+            int direction = tabDirection;
+            tabDirection = 0;
+            if (System.currentTimeMillis() <= tabDirectionUntil) {
+                return direction == 2;
+            }
+        }
         return (LinuxNative.currentModifiers() & 1) != 0;
     }
 
@@ -3640,6 +3656,12 @@ public class LinuxImplementation extends CodenameOneImplementation {
     public boolean isAltKeyDown() {
         return (LinuxNative.currentModifiers() & 4) != 0;
     }
+
+    /// The direction of the Tab that ended a native edit -- 1 forward, 2 back
+    /// (Shift-Tab), 0 none -- for the one [#isShiftKeyDown] that asks about it,
+    /// and the time past which it is stale. Both on the EDT only.
+    private int tabDirection;
+    private long tabDirectionUntil;
 
     // ---- native menu bar ----------------------------------------------------
 

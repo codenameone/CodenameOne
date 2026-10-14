@@ -604,6 +604,24 @@ public class NioFilesDifferentialTest {
         }
     }
 
+    /// A device's storage has no permissions to take away: asking to is
+    /// answered as a change that did not happen, and the file stays as it was.
+    @Test
+    public void aPermissionThatCannotBeRevokedIsNotReportedRevoked() throws Exception {
+        File f = new File("perm.txt");
+        assertTrue(f.createNewFile());
+        assertFalse(f.setWritable(false));
+        assertFalse(f.setReadable(false));
+        assertFalse(f.setReadOnly());
+        assertFalse(f.setWritable(false, true));
+        assertTrue(f.canWrite());
+        assertTrue(f.canRead());
+        assertTrue(f.setWritable(true));
+        assertTrue(f.setReadable(true));
+        assertTrue(f.delete());
+        assertFalse(f.setWritable(true));
+    }
+
     @Test
     public void aTemporaryFileIsCreatedAndUnique() throws Exception {
         Path a = Files.createTempFile("pre", ".bin");
