@@ -45,6 +45,7 @@ public final class StreamController<T> {
     private Object onListenHandler;
     private Object onCancelHandler;
     private boolean closed;
+    private Future<Object> closeFuture;
 
     private final Stream<T> theStream = new Stream<T>() {
         @Override
@@ -113,12 +114,19 @@ public final class StreamController<T> {
         theStream.emitError(error);
     }
 
-    /** Dart's {@code close()}: returns an already-completed {@code Future<void>}. */
+    /**
+     * Dart's {@code close()}. Completes once every listener has handled the
+     * done event -- immediately when none is paused, which is the common
+     * case, but only once a paused listener resumes and drains it (or
+     * cancels) otherwise: measured on the Dart 3.9 VM, a paused listener
+     * with the done event still queued delays {@code close()}'s own future,
+     * it is not handed back already complete.
+     */
     public Future<Object> close() {
         if (!closed) {
             closed = true;
-            theStream.emitDone();
+            closeFuture = theStream.emitDone();
         }
-        return Future.value(null);
+        return closeFuture;
     }
 }

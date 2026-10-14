@@ -29,6 +29,8 @@ import dart.async.StreamSubscription;
 import dart.runtime.Funcs;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -218,5 +220,91 @@ public class EventChannelTest {
         });
         assertTrue(received.isEmpty());
         sub.cancel();
+    }
+
+    @Test
+    public void noPlatformHandlerReportsMissingPluginExceptionThroughFlutterErrorNotTheStream() {
+        // Regression: listening before any platform StreamHandler is
+        // registered used to leave the stream live forever with no report
+        // at all. Real Flutter's receiveBroadcastStream (services/
+        // platform_channel.dart, read against Flutter 3.35) awaits
+        // methodChannel.invokeMethod('listen', ...), which throws
+        // MissingPluginException when nothing answers it, and reports that
+        // through FlutterError.reportError -- never as an error event on
+        // the stream itself.
+        String channel = "test/events/" + System.nanoTime();
+        Stream<Object> stream = new EventChannel(channel).receiveBroadcastStream();
+        final List<Object> received = new ArrayList<Object>();
+        final List<Object> errors = new ArrayList<Object>();
+
+        PrintStream originalErr = System.err;
+        ByteArrayOutputStream captured = new ByteArrayOutputStream();
+        System.setErr(new PrintStream(captured));
+        StreamSubscription<Object> sub;
+        try {
+            sub = stream.listen(new Funcs.VoidFunc1<Object>() {
+                @Override
+                public void call(Object v) {
+                    received.add(v);
+                }
+            }, new Funcs.VoidFunc1<Object>() {
+                @Override
+                public void call(Object e) {
+                    errors.add(e);
+                }
+            });
+        } finally {
+            System.setErr(originalErr);
+        }
+
+        assertTrue(captured.toString().contains("MissingPluginException"),
+                "activation failure must be reported through FlutterError.reportError");
+        assertTrue(received.isEmpty());
+        assertTrue(errors.isEmpty(), "a missing platform handler must not be delivered as a stream error event");
+        sub.cancel();
+    }
+
+    @Test
+    public void onListenThrowingReportsThroughFlutterErrorNotTheStream() {
+        // Same source, same catch as the missing-handler case above: a
+        // platform StreamHandler.onListen that throws during activation is
+        // also only reported through FlutterError.reportError, not
+        // delivered to the stream as an error event.
+        String channel = "test/events/" + System.nanoTime();
+        new com.codename1.flutter.platform.EventChannel(channel).setStreamHandler(
+                new com.codename1.flutter.platform.EventChannel.StreamHandler() {
+                    @Override
+                    public void onListen(Object arguments, com.codename1.flutter.platform.EventChannel.EventSink events) {
+                        throw new RuntimeException("boom from onListen");
+                    }
+
+                    @Override
+                    public void onCancel(Object arguments) {
+                    }
+                });
+        Stream<Object> stream = new EventChannel(channel).receiveBroadcastStream();
+        final List<Object> errors = new ArrayList<Object>();
+
+        PrintStream originalErr = System.err;
+        ByteArrayOutputStream captured = new ByteArrayOutputStream();
+        System.setErr(new PrintStream(captured));
+        try {
+            stream.listen(new Funcs.VoidFunc1<Object>() {
+                @Override
+                public void call(Object v) {
+                }
+            }, new Funcs.VoidFunc1<Object>() {
+                @Override
+                public void call(Object e) {
+                    errors.add(e);
+                }
+            });
+        } finally {
+            System.setErr(originalErr);
+        }
+
+        assertTrue(captured.toString().contains("boom from onListen"),
+                "a throwing onListen must be reported through FlutterError.reportError");
+        assertTrue(errors.isEmpty(), "a throwing onListen must not be delivered as a stream error event");
     }
 }

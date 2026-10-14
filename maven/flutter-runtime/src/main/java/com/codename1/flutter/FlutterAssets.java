@@ -264,25 +264,36 @@ public class FlutterAssets {
     private static java.util.Map<String, java.util.List<String>> manifest;
     private static boolean manifestRead;
 
-    /** The bundled manifest, read once, or null when the build wrote none. */
+    /**
+     * The bundled manifest, read once an actual load attempt has run, or null
+     * when the build wrote none. {@code open()}/{@code variantCandidates()}
+     * can run before {@link com.codename1.ui.Display} is initialized (no
+     * resource lookup is possible yet); that call must not be remembered as
+     * "read" -- only a call that actually asked Display for the resource
+     * (found, missing, or unreadable) may set {@link #manifestRead}, so a
+     * guard-skipped call is retried once Display comes up, instead of
+     * permanently deciding "no manifest" without ever having looked.
+     */
     private static java.util.Map<String, java.util.List<String>> manifest() {
-        if (!manifestRead) {
-            manifestRead = true;
-            try {
-                if (com.codename1.ui.Display.isInitialized()) {
-                    java.io.InputStream in = com.codename1.ui.Display.getInstance()
-                            .getResourceAsStream(FlutterAssets.class, "/" + MANIFEST);
-                    if (in != null) {
-                        try {
-                            manifest = parseManifest(new String(com.codename1.io.Util.readInputStream(in), "UTF-8"));
-                        } finally {
-                            com.codename1.io.Util.cleanup(in);
-                        }
-                    }
+        if (manifestRead) {
+            return manifest;
+        }
+        if (!com.codename1.ui.Display.isInitialized()) {
+            return null;
+        }
+        manifestRead = true;
+        try {
+            java.io.InputStream in = com.codename1.ui.Display.getInstance()
+                    .getResourceAsStream(FlutterAssets.class, "/" + MANIFEST);
+            if (in != null) {
+                try {
+                    manifest = parseManifest(new String(com.codename1.io.Util.readInputStream(in), "UTF-8"));
+                } finally {
+                    com.codename1.io.Util.cleanup(in);
                 }
-            } catch (Exception unreadable) {
-                manifest = null;   // probe the fixed ratios, as without one
             }
+        } catch (Exception unreadable) {
+            manifest = null;   // probe the fixed ratios, as without one
         }
         return manifest;
     }

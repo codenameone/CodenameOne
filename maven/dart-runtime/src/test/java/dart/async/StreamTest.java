@@ -368,6 +368,83 @@ public class StreamTest {
     }
 
     @Test
+    public void closeFutureWaitsForAPausedListenerToDrainDone() {
+        // Regression: close() used to hand back an already-completed future
+        // even while a paused listener still had the done event only queued.
+        // Measured on the Dart 3.9 VM: StreamController.close()'s future does
+        // not complete until every listener has actually handled done --
+        // delayed, for a paused one, until it resumes (or cancels).
+        StreamController<String> c = new StreamController<String>();
+        StreamSubscription<String> sub = c.stream().listen(new Funcs.VoidFunc1<String>() {
+            @Override
+            public void call(String v) {
+            }
+        });
+        sub.pause();
+
+        Future<Object> closeFuture = c.close();
+        assertFalse(closeFuture.isCompletedOrAdopting(),
+                "close() must not complete while a paused listener still has done queued");
+
+        sub.resume();
+        assertTrue(closeFuture.isCompletedOrAdopting(),
+                "resume() draining the queued done must complete the close future");
+    }
+
+    @Test
+    public void closeFutureCompletesWhenAPausedListenerCancelsInsteadOfDraining() {
+        // Cancelling a paused listener discards its queued done (see
+        // cancelWhilePausedDiscardsTheBufferedQueue) rather than ever
+        // delivering it, so close() must resolve there too -- confirmed
+        // against the Dart 3.9 VM, which never delivers the cancelled
+        // listener's done but still completes close()'s future.
+        StreamController<String> c = new StreamController<String>();
+        StreamSubscription<String> sub = c.stream().listen(new Funcs.VoidFunc1<String>() {
+            @Override
+            public void call(String v) {
+            }
+        });
+        sub.pause();
+
+        Future<Object> closeFuture = c.close();
+        assertFalse(closeFuture.isCompletedOrAdopting());
+
+        sub.cancel();
+        assertTrue(closeFuture.isCompletedOrAdopting(),
+                "cancelling the paused listener must complete the close future too");
+    }
+
+    @Test
+    public void closeFutureWaitsForEveryPausedListenerIndependently() {
+        // Two paused listeners: the shared close future must not complete
+        // until BOTH have been resolved, one by drain and the other by
+        // cancel -- confirmed against the Dart 3.9 VM.
+        StreamController<String> c = new StreamController<String>();
+        StreamSubscription<String> sub1 = c.stream().listen(new Funcs.VoidFunc1<String>() {
+            @Override
+            public void call(String v) {
+            }
+        });
+        StreamSubscription<String> sub2 = c.stream().listen(new Funcs.VoidFunc1<String>() {
+            @Override
+            public void call(String v) {
+            }
+        });
+        sub1.pause();
+        sub2.pause();
+
+        Future<Object> closeFuture = c.close();
+        assertFalse(closeFuture.isCompletedOrAdopting());
+
+        sub1.resume();
+        assertFalse(closeFuture.isCompletedOrAdopting(),
+                "the other paused listener still has not handled done");
+
+        sub2.cancel();
+        assertTrue(closeFuture.isCompletedOrAdopting());
+    }
+
+    @Test
     public void listenAfterCloseCompletesWithDoneAndDoesNotRestartTheListenSession() {
         StreamController<String> c = new StreamController<String>();
         final int[] onListenCalls = {0};

@@ -101,6 +101,31 @@ public class Stream<T> {
         /// resume(); `null` until the first one is queued. `#cancelSub`
         /// discards it, matching Dart's own pause()/cancel() interaction.
         List<QueuedEvent> pending;
+        /// Set by `#emitDone` when this subscription was paused and its done
+        /// event only queued, not yet delivered; cleared once `#drain` or
+        /// `#cancelSub` resolves it. `null` the rest of the time.
+        PendingClose pendingClose;
+    }
+
+    /**
+     * What {@link #emitDone} hands back to {@link StreamController#close}: a
+     * shared completer plus how many paused subscriptions still owe it a
+     * resolution (drained or cancelled) before it can complete. Measured on
+     * the Dart 3.9 VM: {@code StreamController.close()}'s returned future
+     * does not complete while a paused listener still has the done event
+     * queued -- it waits for every listener to either receive done (via
+     * {@link Handle#resume}'s drain) or cancel.
+     */
+    private static final class PendingClose {
+        final Completer<Object> completer = new Completer<Object>();
+        int remaining;
+
+        void resolve() {
+            remaining--;
+            if (remaining <= 0) {
+                completer.complete();
+            }
+        }
     }
 
     /**
@@ -228,21 +253,36 @@ public class Stream<T> {
      * like {@link #emit}), then clears the listener set. The stream is done
      * either way -- a paused subscriber's queued done is still the last thing
      * {@link #drain} ever delivers to it.
+     *
+     * <p>Returns a future that completes once every subscriber has actually
+     * seen the done event: immediately for one that was not paused (already
+     * delivered above, synchronously), and only once {@link Handle#resume}
+     * drains it -- or {@link Handle#cancel} discards it -- for one that was.
+     * {@link StreamController#close} hands this straight back; a stream that
+     * has no listeners, or none paused, still completes it synchronously,
+     * matching the old {@code Future.value(null)}.</p>
      */
-    protected final void emitDone() {
+    protected final Future<Object> emitDone() {
         closed = true;
         List<Sub> snapshot = new ArrayList<Sub>(subs);
         subs.clear();
+        PendingClose pendingClose = new PendingClose();
         for (Sub s : snapshot) {
             if (s.cancelled) {
                 continue;
             }
             if (s.paused) {
                 queue(s, QueuedEvent.DONE, null);
+                s.pendingClose = pendingClose;
+                pendingClose.remaining++;
             } else {
                 deliverVoid(s.onDone);
             }
         }
+        if (pendingClose.remaining == 0) {
+            pendingClose.completer.complete();
+        }
+        return pendingClose.completer.future();
     }
 
     private void cancelSub(Sub s) {
@@ -251,6 +291,10 @@ public class Stream<T> {
         }
         s.cancelled = true;
         s.pending = null;
+        if (s.pendingClose != null) {
+            s.pendingClose.resolve();
+            s.pendingClose = null;
+        }
         subs.remove(s);
         if (subs.isEmpty() && !closed) {
             onNoListeners();
@@ -288,6 +332,10 @@ public class Stream<T> {
                 case QueuedEvent.DONE:
                     deliverVoid(s.onDone);
                     s.cancelled = true;
+                    if (s.pendingClose != null) {
+                        s.pendingClose.resolve();
+                        s.pendingClose = null;
+                    }
                     break;
                 default:
                     break;

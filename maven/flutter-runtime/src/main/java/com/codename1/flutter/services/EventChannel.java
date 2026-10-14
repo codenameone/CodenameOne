@@ -24,6 +24,8 @@
 package com.codename1.flutter.services;
 
 import com.codename1.flutter.FlutterChannelRegistry;
+import com.codename1.flutter.foundation.FlutterError;
+import com.codename1.flutter.platform.MissingPluginException;
 import com.codename1.flutter.platform.PlatformException;
 import dart.async.Stream;
 
@@ -82,16 +84,29 @@ public final class EventChannel {
             com.codename1.flutter.platform.EventChannel.StreamHandler h =
                     FlutterChannelRegistry.streamHandler(channel);
             if (h == null) {
-                // No platform handler registered: Dart's listener is live, it
-                // simply never receives anything until one is -- documented on
-                // dart.async.Stream, which this class otherwise matches.
+                // No platform handler registered: real Flutter's
+                // receiveBroadcastStream awaits methodChannel.invokeMethod(
+                // 'listen', arguments), which throws MissingPluginException
+                // when nothing answers it, and reports that through
+                // FlutterError.reportError -- never delivered to the stream
+                // itself (services/platform_channel.dart's
+                // receiveBroadcastStream, read against Flutter 3.35: the
+                // catch around invokeMethod only calls
+                // FlutterError.reportError, never controller.addError). The
+                // Dart listener therefore stays live but silent, matching
+                // that -- no error event here, ever.
+                FlutterError.reportError(new MissingPluginException(
+                        "No implementation found for method listen on channel " + channel));
                 return;
             }
             listening = true;
             try {
                 h.onListen(arguments, new SinkImpl());
             } catch (Throwable t) {
-                emitError(t);
+                // Same source, same catch: a platform handler that throws
+                // during activation is reported exactly like a missing one,
+                // not delivered to the stream.
+                FlutterError.reportError(t);
             }
         }
 
@@ -106,9 +121,13 @@ public final class EventChannel {
             if (h != null) {
                 try {
                     h.onCancel(arguments);
-                } catch (Throwable ignored) {
-                    // Dart's StreamSubscription.cancel() does not report onCancel
-                    // failures back to the (already-cancelling) listener.
+                } catch (Throwable t) {
+                    // receiveBroadcastStream's onCancel has the identical
+                    // try/catch around invokeMethod('cancel', ...), reporting
+                    // through FlutterError.reportError rather than swallowing
+                    // it -- there is no longer a listener to deliver it to
+                    // anyway.
+                    FlutterError.reportError(t);
                 }
             }
         }

@@ -23,8 +23,11 @@
  */
 package com.codename1.flutter;
 
+import com.codename1.flutter.testsupport.RasterDisplay;
+
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -141,5 +144,74 @@ class FlutterAssetsTest {
         assertEquals(3.0, FlutterAssets.ratioOf("a/3.0x/b.png", "a/b.png"), 0.001);
         assertEquals(1.5, FlutterAssets.ratioOf("a/1.5x/b.png", "a/b.png"), 0.001);
         assertEquals(1.0, FlutterAssets.ratioOf("a/b.png", "a/b.png"), 0.001);
+    }
+
+    // ------------------------------------------------------------------
+    // The manifest read guard
+    // ------------------------------------------------------------------
+
+    /**
+     * Regression: {@code variantCandidates()}/{@code open()} running before
+     * {@link com.codename1.ui.Display} is initialized used to mark the
+     * manifest as read even though the guarded load never ran -- the
+     * manifest was then never read for the rest of the process, even once
+     * Display came up, so a manifest-only variant (one the fixed ratio
+     * probe never tries, like {@code 2.5x} here) was never found. The
+     * manifest and read-flag are process-wide static state, so both are
+     * reset around this test regardless of what other tests already did
+     * with them.
+     */
+    @Test
+    void manifestReadIsRetriedOnceDisplayInitializes() throws Exception {
+        resetManifestState();
+        try {
+            // Headless: Display is not initialized, so the guarded load must
+            // not run -- and must not be remembered as having run either.
+            String[] before = FlutterAssets.variantCandidates("assets/icons/material.png", 3);
+            assertEquals("assets/icons/material.png", before[before.length - 1],
+                    "no manifest could be read yet, so this must be the fixed-ratio fallback");
+            for (String c : before) {
+                assertTrue(!c.contains("2.5x"), "the fixed ratio probe never tries 2.5x: " + c);
+            }
+
+            RasterDisplay impl = RasterDisplay.install();
+            // RasterDisplay.install() swaps Display's implementation field
+            // directly, bypassing the ordinary Display.initImpl() path that
+            // also wires com.codename1.io.Util's own implementation
+            // reference -- needed here for Util.readInputStream(), which
+            // FlutterAssets' manifest load uses. Save/restore so this test
+            // leaves no state behind for others.
+            Object previousUtilImpl = currentUtilImplementation();
+            com.codename1.io.Util.setImplementation(impl);
+            try {
+                String[] after = FlutterAssets.variantCandidates("assets/icons/material.png", 3);
+                assertEquals(
+                        java.util.Arrays.asList("assets/icons/material.png", "assets/icons/2.5x/material.png"),
+                        java.util.Arrays.asList(after),
+                        "now that Display is initialized the manifest must actually be read, "
+                                + "finding the 2.5x variant it (and only it) declares");
+            } finally {
+                com.codename1.io.Util.setImplementation(
+                        (com.codename1.impl.CodenameOneImplementation) previousUtilImpl);
+                RasterDisplay.uninstall();
+            }
+        } finally {
+            resetManifestState();
+        }
+    }
+
+    private static Object currentUtilImplementation() throws Exception {
+        Field f = com.codename1.io.Util.class.getDeclaredField("implInstance");
+        f.setAccessible(true);
+        return f.get(null);
+    }
+
+    private static void resetManifestState() throws Exception {
+        Field read = FlutterAssets.class.getDeclaredField("manifestRead");
+        read.setAccessible(true);
+        read.setBoolean(null, false);
+        Field manifest = FlutterAssets.class.getDeclaredField("manifest");
+        manifest.setAccessible(true);
+        manifest.set(null, null);
     }
 }

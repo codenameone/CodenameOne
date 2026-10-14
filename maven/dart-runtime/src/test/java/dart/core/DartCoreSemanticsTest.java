@@ -870,6 +870,78 @@ public class DartCoreSemanticsTest {
     }
 
     @Test
+    public void asMapRefusesEveryMutatorWithoutRunningItsCallback() {
+        // Regression: DartListMapView only overrode put/putAll/remove/clear, so
+        // the mutators DartUnmodifiableMap had to add overrides for too --
+        // DartMap's own extensions (putIfAbsentDart, update) and java.util.Map's
+        // putIfAbsent/compute*/merge/replace*/remove(k,v)/replaceAll, which
+        // HashMap implements by manipulating its table directly -- still
+        // mutated List.asMap() (and ran their callback) instead of throwing.
+        DartList<Object> l = DartList.of((Object) 1L, 2L);
+        DartMap<Long, Object> m = l.asMap();
+        boolean[] ran = {false};
+
+        assertThrows(UnsupportedError.class,
+                () -> m.putIfAbsentDart(0L, () -> {
+                    ran[0] = true;
+                    return 9L;
+                }),
+                "putIfAbsentDart on an EXISTING key used to return the stored value "
+                        + "instead of throwing");
+        assertFalse(ran[0], "the ifAbsent callback must not run");
+
+        assertThrows(UnsupportedError.class,
+                () -> m.update(0L, v -> {
+                    ran[0] = true;
+                    return v;
+                }, null),
+                "update used to run its callback before the put() it fed into failed");
+        assertFalse(ran[0], "the update callback must not run");
+
+        assertThrows(UnsupportedError.class, () -> m.removeDart(0L));
+        assertThrows(UnsupportedError.class, () -> m.addAll(new java.util.HashMap<>()),
+                "addAll of an EMPTY map must still throw");
+        assertThrows(UnsupportedError.class,
+                () -> m.addEntries(java.util.Collections.emptyList()),
+                "addEntries of an EMPTY iterable must still throw");
+
+        assertThrows(UnsupportedError.class, () -> m.putIfAbsent(0L, 9L));
+        assertThrows(UnsupportedError.class, () -> m.putIfAbsent(5L, 9L));
+        assertThrows(UnsupportedError.class, () -> m.remove(0L, 1L));
+        assertThrows(UnsupportedError.class, () -> m.replace(0L, 1L, 9L));
+        assertThrows(UnsupportedError.class, () -> m.replace(0L, 9L));
+        assertThrows(UnsupportedError.class, () -> m.computeIfAbsent(5L, k -> {
+            ran[0] = true;
+            return 9L;
+        }));
+        assertFalse(ran[0], "the computeIfAbsent callback must not run");
+        assertThrows(UnsupportedError.class, () -> m.computeIfPresent(0L, (k, v) -> {
+            ran[0] = true;
+            return v;
+        }));
+        assertFalse(ran[0], "the computeIfPresent callback must not run");
+        assertThrows(UnsupportedError.class, () -> m.compute(0L, (k, v) -> {
+            ran[0] = true;
+            return v;
+        }));
+        assertFalse(ran[0], "the compute callback must not run");
+        assertThrows(UnsupportedError.class, () -> m.merge(0L, 9L, (v1, v2) -> {
+            ran[0] = true;
+            return v1;
+        }));
+        assertFalse(ran[0], "the merge callback must not run");
+        assertThrows(UnsupportedError.class, () -> m.replaceAll((k, v) -> {
+            ran[0] = true;
+            return v;
+        }));
+        assertFalse(ran[0], "the replaceAll callback must not run");
+
+        // Still readable, and nothing above touched it.
+        assertEquals(1L, m.get(0L));
+        assertEquals(2, m.size());
+    }
+
+    @Test
     public void doubleParseFollowsDartsGrammar() {
         // Each recorded from the Dart SDK.
         assertEquals(null, DString.tryParseDouble("1d"));

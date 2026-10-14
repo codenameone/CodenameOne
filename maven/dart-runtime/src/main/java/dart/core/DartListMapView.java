@@ -103,6 +103,94 @@ final class DartListMapView<E> extends DartMap<Long, E> {
         throw unmodifiable();
     }
 
+    // --- Every other DartMap/Map mutator must also refuse up front, without
+    // --- running any callback it was given -- see DartUnmodifiableMap, whose
+    // --- class comment documents the two ways a mutator slips past a map that
+    // --- only overrides put/putAll/remove/clear: DartMap's own extensions
+    // --- (putIfAbsentDart, update) that check the map before ever reaching an
+    // --- overridden put, and java.util.HashMap's putIfAbsent/compute*/merge/
+    // --- replace*/remove(k,v)/replaceAll, which mutate its table directly.
+
+    @Override
+    public void removeWhere(dart.runtime.Funcs.Func2<Long, E, Boolean> test) {
+        throw unmodifiable();
+    }
+
+    @Override
+    public E removeDart(Object key) {
+        throw unmodifiable();
+    }
+
+    @Override
+    public void addAll(Map<? extends Long, ? extends E> other) {
+        throw unmodifiable();
+    }
+
+    @Override
+    public void addEntries(Iterable<? extends MapEntry<Long, E>> entries) {
+        throw unmodifiable();
+    }
+
+    @Override
+    public E idxSet(Long key, E value) {
+        throw unmodifiable();
+    }
+
+    @Override
+    public E putIfAbsentDart(Long key, dart.runtime.Funcs.Func0<E> ifAbsent) {
+        throw unmodifiable();
+    }
+
+    @Override
+    public E update(Long key, dart.runtime.Funcs.Func1<E, E> update, dart.runtime.Funcs.Func0<E> ifAbsent) {
+        throw unmodifiable();
+    }
+
+    @Override
+    public E putIfAbsent(Long key, E value) {
+        throw unmodifiable();
+    }
+
+    @Override
+    public boolean remove(Object key, Object value) {
+        throw unmodifiable();
+    }
+
+    @Override
+    public boolean replace(Long key, E oldValue, E newValue) {
+        throw unmodifiable();
+    }
+
+    @Override
+    public E replace(Long key, E value) {
+        throw unmodifiable();
+    }
+
+    @Override
+    public E computeIfAbsent(Long key, java.util.function.Function<? super Long, ? extends E> mappingFunction) {
+        throw unmodifiable();
+    }
+
+    @Override
+    public E computeIfPresent(Long key, java.util.function.BiFunction<? super Long, ? super E, ? extends E> remappingFunction) {
+        throw unmodifiable();
+    }
+
+    @Override
+    public E compute(Long key, java.util.function.BiFunction<? super Long, ? super E, ? extends E> remappingFunction) {
+        throw unmodifiable();
+    }
+
+    @Override
+    public E merge(Long key, E value, java.util.function.BiFunction<? super E, ? super E, ? extends E> remappingFunction) {
+        throw unmodifiable();
+    }
+
+    @Override
+    public void replaceAll(java.util.function.BiFunction<? super Long, ? super E, ? extends E> function) {
+        throw unmodifiable();
+    }
+
     @Override
     public Collection<E> values() {
         return java.util.Collections.unmodifiableList(list);

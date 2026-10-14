@@ -1,0 +1,2 @@
+assets/icons/material.png
+assets/icons/2.5x/material.png
