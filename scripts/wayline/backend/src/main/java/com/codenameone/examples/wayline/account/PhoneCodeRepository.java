@@ -58,8 +58,12 @@ public class PhoneCodeRepository {
     /// other: a new code sent between reading the hash and taking the guess
     /// has another hash, the update changes nothing, and the caller is not
     /// left comparing what was typed with a code that has been replaced.
+    ///
+    /// The code before it, when one is kept, is guessed at by the same guess,
+    /// so its count goes up too; its own limit is applied by the caller.
     public boolean takeGuess(String username, String codeHash, int most) {
-        return session.createQuery("update PhoneCode c set c.attempts = c.attempts + 1 "
+        return session.createQuery("update PhoneCode c set c.attempts = c.attempts + 1, "
+                + "c.previousAttempts = c.previousAttempts + 1 "
                 + "where c.username = :username and c.codeHash = :hash and c.attempts < :most")
                 .setParameter("username", username).setParameter("hash", codeHash)
                 .setParameter("most", Integer.valueOf(most))

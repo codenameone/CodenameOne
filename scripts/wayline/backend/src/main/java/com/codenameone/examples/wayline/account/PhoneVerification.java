@@ -119,11 +119,15 @@ public class PhoneVerification {
             pending = new PhoneCode();
             pending.username = username;
         } else if (pending.expiresAt >= now && pending.attempts < MAX_ATTEMPTS) {
+            // With the guesses it has used: asking for another code must not
+            // buy the old one a fresh set.
             pending.previousHash = pending.codeHash;
             pending.previousExpiresAt = pending.expiresAt;
+            pending.previousAttempts = pending.attempts;
         } else {
             pending.previousHash = "";
             pending.previousExpiresAt = 0L;
+            pending.previousAttempts = 0;
         }
         pending.codeHash = codeHash;
         pending.expiresAt = now + CODE_SECONDS * 1000L;
@@ -153,8 +157,10 @@ public class PhoneVerification {
         }
         pending.codeHash = pending.previousHash;
         pending.expiresAt = pending.previousExpiresAt;
+        pending.attempts = pending.previousAttempts;
         pending.previousHash = "";
         pending.previousExpiresAt = 0L;
+        pending.previousAttempts = 0;
         pending.sentAt = 0L;
     }
 
@@ -193,6 +199,10 @@ public class PhoneVerification {
         if (!codes.takeGuess(username, expected, MAX_ATTEMPTS)) {
             throw new ResponseStatusException(429, "Too many wrong codes. Ask for a new one");
         }
+        // Read again after the guess was taken, which the update did under
+        // the row's lock: the count of the code before is then this guess's
+        // own, and within its limit only when this guess was one it had left.
+        PhoneCode counted = codes.find(username);
         String typed = code == null ? "" : code.trim();
         byte[] given = hash(username, typed).getBytes("UTF-8");
         // Both compared every time, so the answer takes as long either way. The
@@ -202,7 +212,8 @@ public class PhoneVerification {
         boolean previous = Crypto.equalsConstantTime(given,
                 pending.previousHash.getBytes("UTF-8"))
                 && pending.previousHash.length() > 0
-                && pending.previousExpiresAt >= System.currentTimeMillis();
+                && pending.previousExpiresAt >= System.currentTimeMillis()
+                && counted != null && counted.previousAttempts <= MAX_ATTEMPTS;
         if (!current && !previous) {
             return false;
         }

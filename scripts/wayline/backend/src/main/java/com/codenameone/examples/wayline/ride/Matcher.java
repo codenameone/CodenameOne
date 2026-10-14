@@ -170,7 +170,7 @@ public class Matcher {
     }
 
     /// Whether the account of this name exists and has not been blocked.
-    private boolean enabled(String username) {
+    boolean enabled(String username) {
         return users.userExists(username) && users.loadUserByUsername(username).isEnabled();
     }
 

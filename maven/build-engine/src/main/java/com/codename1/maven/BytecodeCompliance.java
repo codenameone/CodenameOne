@@ -484,7 +484,7 @@ public class BytecodeCompliance {
 
     private static final FilenameFilter CLASS_FILES_FILTER = (dir, name) -> name.endsWith(".class");
 
-    private long getCompiledClassesModificationTime() {
+    long getCompiledClassesModificationTime() {
         long mTime = lastModifiedRecursive(new File(host.outputDirectory().getPath()), CLASS_FILES_FILTER);
         // With kotlin.compiler.incremental the Kotlin compiler writes to its
         // own output tree which executeImpl copies into the output directory,
@@ -492,6 +492,13 @@ public class BytecodeCompliance {
         File kotlinIncrementalOutputDir = new File(path(host.buildDirectory().getPath(), "kotlin-ic", "compile", "classes"));
         if (kotlinIncrementalOutputDir.exists()) {
             mTime = Math.max(mTime, lastModifiedRecursive(kotlinIncrementalOutputDir, CLASS_FILES_FILTER));
+        }
+        // The sibling modules checked with these classes (a `shared` module of
+        // DTOs and contracts). They are compiled by their own module, so a
+        // change to one alone leaves this module's sources and classes as they
+        // were, and the check would be skipped without reading the new ones.
+        for (File root : checkedDependencyRoots) {
+            mTime = Math.max(mTime, lastModifiedRecursive(root, CLASS_FILES_FILTER));
         }
         return mTime;
     }

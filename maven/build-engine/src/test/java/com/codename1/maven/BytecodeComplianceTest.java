@@ -33,6 +33,7 @@ import org.objectweb.asm.Opcodes;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.util.ArrayList;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -48,6 +49,30 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class BytecodeComplianceTest {
+    /// A sibling module checked with the application is compiled by its own
+    /// module, so its classes have to count when deciding whether the last
+    /// check still holds; otherwise a change to it alone skips the check.
+    @Test
+    void siblingClassesCountTowardsTheCheckBeingStale(@TempDir Path dir) throws Exception {
+        TestProjectHost host = TestProjectHost.empty();
+        host.buildDir = dir.resolve("build").toFile();
+        host.outputDir = dir.resolve("build/classes").toFile();
+        File own = new File(host.outputDir, "app/Main.class");
+        own.getParentFile().mkdirs();
+        Files.write(own.toPath(), new byte[] {1});
+        assertTrue(own.setLastModified(1000000000000L));
+        File shared = dir.resolve("shared/target/classes").toFile();
+        File dto = new File(shared, "api/Dto.class");
+        dto.getParentFile().mkdirs();
+        Files.write(dto.toPath(), new byte[] {1});
+        assertTrue(dto.setLastModified(2000000000000L));
+
+        BytecodeCompliance compliance = new BytecodeCompliance(host);
+        assertEquals(1000000000000L, compliance.getCompiledClassesModificationTime());
+        compliance.checkedDependencyRoots(Collections.singletonList(shared));
+        assertEquals(2000000000000L, compliance.getCompiledClassesModificationTime());
+    }
+
     @Test
     void backendAllowsThirdPartyJavaxButProtectsNativeApi(@TempDir Path dir) throws Exception {
         Path output = Files.createDirectories(dir.resolve("output"));

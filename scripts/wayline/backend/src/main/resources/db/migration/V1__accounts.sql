@@ -63,7 +63,8 @@ CREATE TABLE wl_phone_code (
     attempts INTEGER NOT NULL,
     sent_at BIGINT NOT NULL,
     previous_hash VARCHAR(64) NOT NULL DEFAULT '',
-    previous_expires_at BIGINT NOT NULL DEFAULT 0
+    previous_expires_at BIGINT NOT NULL DEFAULT 0,
+    previous_attempts INTEGER NOT NULL DEFAULT 0
 );
 
 -- Tickets for opening the live channel. A row is deleted by the connection that

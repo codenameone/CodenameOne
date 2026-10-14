@@ -52,6 +52,11 @@ public class PhoneCode {
     @Column(name = "previous_expires_at", nullable = false)
     public long previousExpiresAt;
 
+    /// The guesses already taken at the code before, which keeps the budget
+    /// it had rather than starting a new one when another code is sent.
+    @Column(name = "previous_attempts", nullable = false)
+    public int previousAttempts;
+
     public PhoneCode() {
     }
 }

@@ -173,6 +173,14 @@ final class BackendSupport {
         project.getTasks().register(WEB_APP_TASK, BackendWebAppTask.class, t -> {
             t.setGroup(AppSupport.GROUP);
             t.setDescription("Builds the app for the browser and stages it for this backend to serve");
+            // Never up to date. The bundle is a path that may name an archive
+            // or a directory, and with none given it is whichever the
+            // application's build directory holds, so none of it is an input
+            // Gradle could snapshot: a browser build rebuilt in place, or an
+            // archive replaced at the same path, would otherwise leave the old
+            // scripts and styles staged. Nothing depends on this task, so it
+            // runs only when asked for, and then it stages.
+            t.getOutputs().upToDateWhen(task -> false);
             t.getBundle().set(bundle);
             t.getWorkingDirectory().set(layout.projectDir());
             t.getOutputDirectory().set(project.getProviders().gradleProperty("cn1.backend.webapp.output")

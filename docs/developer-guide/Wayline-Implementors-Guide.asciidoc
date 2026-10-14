@@ -376,6 +376,9 @@ and leave the service with nobody to administer it.
 Neither blocks an account in the middle of a ride, nor withdraws the driver
 role from one: every request a blocked account sends is refused, so nobody
 could end that ride. The admin cancels the ride first, or waits for it to end.
+A driver taking an offer holds the driver's profile too and then checks that
+the account is still allowed, so a block and an accepted offer can't both
+land.
 A live connection that was opening while the change committed reads the
 account again once it's registered, so it can't keep what it read before.
 
@@ -404,7 +407,9 @@ before a block would otherwise write it back unblocked.
 A driver's position report holds the driver's state row, so two
 reports sent together don't count the same online minutes twice. Cashing out
 holds the driver's payout account, so two requests sent together pay the
-balance once and the second is told there's nothing left. Saving a driving
+balance once and the second is told there's nothing left. Saving the payout
+details holds the driver's profile, because the first save has no payout row
+to hold yet. Saving a driving
 application or uploading one of its documents holds the application, so
 neither can land on one that was handed in a moment earlier.
 
@@ -1071,7 +1076,8 @@ These are in `PhoneVerification` and `SecurityConfig`:
   void the one before it, which stays good until it would have expired:
   people ask again when a message is slow, and text messages aren't delivered
   in the order they were sent, so the first code can arrive last. At most two
-  codes are good at once, and entering either one uses up both.
+  codes are good at once, and entering either one uses up both. The earlier
+  code keeps the guesses it had left rather than getting five more.
 * The code is stored and committed before the message is sent. When the
   provider refuses the message, the code is discarded and the request is
   answered 503. The code sent before it, while still good, remains the one

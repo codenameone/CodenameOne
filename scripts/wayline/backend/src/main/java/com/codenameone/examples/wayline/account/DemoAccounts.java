@@ -168,9 +168,21 @@ public class DemoAccounts {
     /// An admin, or the plainest kind of account.
     private void add(String username, String password, String name, String phone, String vehicle,
             String plate) throws IOException {
-        if (!accounts.exists(username)) {
+        if (accounts.exists(username)) {
+            return;
+        }
+        try {
             accounts.create(username, password, name, phone, true, vehicle, plate, false,
                     ADMIN.equals(username) || !config.isDevelopmentProfile());
+        } catch (IOException | RuntimeException failed) {
+            // Two servers started together against a new database both find
+            // no admin and both make one; the second insert fails on the name.
+            // create() is one transaction, so the loser left nothing behind,
+            // and the account the other server made is the one wanted. Any
+            // other failure leaves no account, and is the start-up's to report.
+            if (!accounts.exists(username)) {
+                throw failed;
+            }
         }
     }
 

@@ -436,6 +436,19 @@ public class Rides {
     /// they see it afterwards.
     @Transactional
     private Change step(String driver, String id, String to) throws IOException {
+        if (RideStates.ACCEPTED.equals(to)) {
+            // Blocking a driver is refused while they have a ride taken, and
+            // takes the driver's profile to look. Taking an offer holds the
+            // same row first and then asks whether the account is still
+            // allowed: a block that committed meanwhile is seen here, and a
+            // block that comes after this commits sees the accepted ride.
+            // Either way no ride is left with a driver who can no longer
+            // drive it.
+            profiles.hold(driver);
+            if (!matcher.enabled(driver)) {
+                throw new ResponseStatusException(403, "This account has been blocked");
+            }
+        }
         owned(id, RideRepository.DRIVER, driver);
         move(id, to, driver, RideRepository.DRIVER, null, null);
         Ride ride = rides.find(id);

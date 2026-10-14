@@ -866,6 +866,10 @@ public class MapView extends Container implements MapSurface {
             // Two hundred logical pixels of wheel to a zoom level: half a level
             // for a notch of a mouse wheel, and a trackpad, which reports a few
             // pixels at a time, zooms as far as the fingers travel.
+            //
+            // Added, not subtracted: a positive deltaY is the wheel turned up
+            // (see WheelEvent; the ports negate the browser's and AWT's sign),
+            // and a wheel turned up zooms in, as it does on every web map.
             double from = zooming ? zoomTarget : engine.getZoom();
             double target = from + ev.getDeltaY() / (200 * engine.getPixelRatio());
             target = Math.max(engine.getMinZoom(), Math.min(engine.getMaxZoom(), target));

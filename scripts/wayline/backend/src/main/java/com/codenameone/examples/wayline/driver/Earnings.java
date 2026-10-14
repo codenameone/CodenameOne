@@ -28,6 +28,7 @@ import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.wayline.Days;
 import com.codenameone.examples.wayline.Ids;
 import com.codenameone.examples.wayline.Text;
+import com.codenameone.examples.wayline.account.ProfileRepository;
 import com.codenameone.examples.wayline.api.DayAmountDto;
 import com.codenameone.examples.wayline.api.EarningsSummaryDto;
 import com.codenameone.examples.wayline.api.PayoutAccountDto;
@@ -62,10 +63,12 @@ public class Earnings {
     private static final int DAYS = 14;
 
     private final PayoutRepository repository;
+    private final ProfileRepository profiles;
     private final Fares fares;
 
-    public Earnings(PayoutRepository repository, Fares fares) {
+    public Earnings(PayoutRepository repository, ProfileRepository profiles, Fares fares) {
         this.repository = repository;
+        this.profiles = profiles;
         this.fares = fares;
     }
 
@@ -193,6 +196,12 @@ public class Earnings {
         }
         String holder = Text.required(wanted.holder, 120, "the account holder's name");
         String bankName = Text.required(wanted.bankName, 80, "the bank's name");
+        // Before the row is looked for. Two first saves at once would both
+        // find none and both insert one under the same name, and one would
+        // fail; behind the profile's hold the second finds the first's row
+        // and updates it. The payout account itself cannot be held: until
+        // this inserts it there is no row.
+        profiles.hold(driver);
         PayoutAccount row = repository.account(driver);
         boolean added = row == null;
         if (added) {

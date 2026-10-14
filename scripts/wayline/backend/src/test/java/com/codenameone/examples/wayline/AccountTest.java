@@ -197,6 +197,48 @@ class AccountTest {
                 .andExpect(status().isOk());
     }
 
+    /// Asking for another code does not give the one before a fresh set of
+    /// guesses: it keeps what it had left.
+    @Test
+    void theCodeBeforeKeepsTheGuessesItHadLeft() throws Exception {
+        mvc.perform(post("/api/account/register").contentType("application/json")
+                        .content(registration("budget@example.com", "a-long-password", false)))
+                .andExpect(status().isOk());
+        String bearer = bearer("budget@example.com", "a-long-password");
+        String first = code(bearer);
+        // Four of the five guesses (PhoneVerification.MAX_ATTEMPTS) spent.
+        for (int iter = 0; iter < 4; iter++) {
+            verify(bearer, other(first, first)).andExpect(status().isBadRequest());
+        }
+        db.execute("UPDATE wl_phone_code SET sent_at = sent_at - 60000 WHERE username = ?",
+                new Object[] {"budget@example.com"});
+        String second = code(bearer);
+        // The first code's last guess, spent on a wrong one.
+        verify(bearer, other(first, second)).andExpect(status().isBadRequest());
+        // Now the first is out of guesses, though the second is not.
+        if (!first.equals(second)) {
+            verify(bearer, first).andExpect(status().isBadRequest());
+        }
+        verify(bearer, second).andExpect(status().isOk());
+    }
+
+    /// A six-digit code that is neither of these.
+    private static String other(String a, String b) {
+        for (int iter = 0; ; iter++) {
+            String candidate = String.valueOf(1000000 + iter).substring(1);
+            if (!candidate.equals(a) && !candidate.equals(b)) {
+                return candidate;
+            }
+        }
+    }
+
+    private com.codename1.backend.test.ResultActions verify(String bearer, String code)
+            throws Exception {
+        return mvc.perform(post("/api/account/phone/verify").header("Host", SignIn.HOST)
+                .header("Authorization", bearer).contentType("application/json")
+                .content("{\"code\":\"" + code + "\"}"));
+    }
+
     private String code(String bearer) throws Exception {
         String sent = mvc.perform(post("/api/account/phone/start").header("Host", SignIn.HOST)
                         .header("Authorization", bearer))
