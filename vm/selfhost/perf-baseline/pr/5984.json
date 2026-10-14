@@ -38,24 +38,12 @@
       }
      },
      "memory": 1.277,
-     "reason": "This change tightens the proof that lets the translator retire an object when its frame ends: an object whose only callee is a native method (Thread.start) is no longer retired early, because the root scan then read a live Thread as freed and the sweep finalized it. Fewer objects are retired early, so peak RAM can only rise. Windows arm64 runs 38210243191 (8ed4eb60a3) and 38293968963 (1dc66ed703), five rounds each: hello RAM 1.32 and 1.24 against 0.97 (Windows x64 moved the same way in the second run, 1.10 against 0.94), translator RAM 0.49 and 0.52 against a 0.45 baseline that rests on two runs. Timing and tolerances are kept.",
+     "reason": "This change tightens the proof that lets the translator retire an object when its frame ends: an object whose only callee is a native method (Thread.start) is no longer retired early, because the root scan then read a live Thread as freed and the sweep finalized it. Fewer objects are retired early, so peak RAM can only rise. Windows arm64 runs 38210243191 (8ed4eb60a3) and 38293968963 (1dc66ed703), five rounds each: hello RAM 1.32 and 1.24 against 0.97 (Windows x64 moved the same way in the second run, 1.10 against 0.94). Timing and tolerances are kept.",
      "runs": 2,
      "time": 1.107,
      "tolerance": {
       "memory": 0.35
      }
-    }
-   },
-   "translator": {
-    "all": {
-     "from": {
-      "memory": 0.451,
-      "time": 0.838
-     },
-     "memory": 0.507,
-     "reason": "This change tightens the proof that lets the translator retire an object when its frame ends: an object whose only callee is a native method (Thread.start) is no longer retired early, because the root scan then read a live Thread as freed and the sweep finalized it. Fewer objects are retired early, so peak RAM can only rise. Windows arm64 runs 38210243191 (8ed4eb60a3) and 38293968963 (1dc66ed703), five rounds each: hello RAM 1.32 and 1.24 against 0.97 (Windows x64 moved the same way in the second run, 1.10 against 0.94), translator RAM 0.49 and 0.52 against a 0.45 baseline that rests on two runs. Timing and tolerances are kept.",
-     "runs": 2,
-     "time": 0.838
     }
    }
   },
@@ -63,16 +51,16 @@
    "hello": {
     "all": {
      "from": {
-      "memory": 0.766,
+      "memory": 0.828,
       "time": 1.375,
       "tolerance": {
        "memory": 0.2,
        "time": 0.5
       }
      },
-     "memory": 1.216,
-     "reason": "This change tightens the proof that lets the translator retire an object when its frame ends: an object whose only callee is a native method (Thread.start) is no longer retired early, because the root scan then read a live Thread as freed and the sweep finalized it. Fewer objects are retired early, so peak RAM can only rise, and hello is the one workload small enough for that to show. Run for 3d3119ed9d, five rounds: hello RAM 1.01 against 0.87 on Linux arm64 and 1.22 against 0.77 on Windows x64, the same direction Windows arm64 moved earlier. Timing and tolerances are kept.",
-     "runs": 1,
+     "memory": 1.154,
+     "reason": "This change tightens the proof that lets the translator retire an object when its frame ends: an object whose only callee is a native method (Thread.start) is no longer retired early, because the root scan then read a live Thread as freed and the sweep finalized it. Fewer objects are retired early, so peak RAM can only rise, and hello is the one workload small enough for that to show. Measured on top of the 0.828 that #6010 pooled from runs without this change: runs for 3d3119ed9d and 95738c7ece on this CPU, five rounds each, hello RAM medians 1.216 and 1.092, the same direction Linux arm64 and Windows arm64 moved. Timing and tolerances are kept.",
+     "runs": 2,
      "time": 1.375,
      "tolerance": {
       "memory": 0.2,

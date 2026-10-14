@@ -413,6 +413,9 @@ class PaymentsTest {
         // paid, and not failed either.
         assertEquals("COMPLETED", done.get("state"));
         assertEquals("PENDING", done.get("paymentStatus"));
+        // Not money yet, so not the driver's to cash out.
+        assertEquals(0L, Trips.number(Trips.json(mvc, People.asDriver(
+                get("/api/driver/earnings/summary"), driver)), "balance"));
         // The card is what the ride will be asked about with, so it stays,
         // and so does the account it belongs to.
         mvc.perform(People.asRider(post("/api/payments/methods/" + card + "/remove"), rider))
@@ -433,6 +436,10 @@ class PaymentsTest {
         mvc.perform(People.asRider(get("/api/rides/" + id), rider))
                 .andExpect(jsonPath("$.paymentStatus").value("PAID"));
         assertEquals(total, Trips.number(Trips.receipt(mvc, rider, id), "total"));
+        // Paid now, and the driver's share is in the balance.
+        assertEquals(Trips.number(done, "fareCents") - Math.round(
+                Trips.number(done, "fareCents") * 20d / 100d), Trips.number(Trips.json(mvc,
+                People.asDriver(get("/api/driver/earnings/summary"), driver)), "balance"));
         // Settled, and the card can go.
         mvc.perform(People.asRider(post("/api/payments/methods/" + card + "/remove"), rider))
                 .andExpect(status().isOk());

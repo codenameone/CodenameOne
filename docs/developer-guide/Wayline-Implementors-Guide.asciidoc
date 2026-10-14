@@ -373,6 +373,11 @@ admin who asks and the profile of the account being changed, in the order of
 their names. The admin's own role is then read again inside the transaction.
 Without that, two admins could remove or block each other in the same moment
 and leave the service with nobody to administer it.
+Neither blocks an account in the middle of a ride, nor withdraws the driver
+role from one: every request a blocked account sends is refused, so nobody
+could end that ride. The admin cancels the ride first, or waits for it to end.
+A live connection that was opening while the change committed reads the
+account again once it's registered, so it can't keep what it read before.
 
 A conditional update settles a race over one row. Two races here are over a
 row that doesn't exist yet: a rider asking for two rides at once, and two rides
@@ -406,11 +411,10 @@ by its signature and runs out on its own.
 A ride's two parties see each other's display name, and each other's phone
 number while they're meeting. The e-mail address an account signs in with is
 its username, and `Rides.toDto` gives it only to its owner and to an admin. A
-tip paid by card counts toward a driver's balance once its charge is recorded.
-
-A payout has no single row to claim, so
-`Earnings.cashOut` commits the payout, reads the balance again, and takes its
-own row back when the balance has gone below zero.
+fare counts toward a driver's balance once the ride is paid for, in cash or by
+a card whose charge came back, and a tip paid by card once its charge is
+recorded. A charge that failed, was refunded or is still pending isn't money
+the driver can cash out.
 
 A statement that changes rows in bulk empties the session, so a `Ride` read
 before `move` is read again after it. The services do that wherever they go on

@@ -79,6 +79,16 @@ class ModerationTest {
         Map after = Trips.json(mvc, admin(get("/api/admin/stats/series?days=7")));
         assertEquals(Trips.number(before, "flaggedUsers") + 1, Trips.number(after, "flaggedUsers"));
 
+        // Not in the middle of a ride: nobody could end it. Waiting for a
+        // driver is in the middle of one.
+        String ride = (String) Trips.json(mvc, People.asRider(Trips.body(post("/api/rides"),
+                People.ride(41.3874, 2.1686, 41.3974, 2.1786)), who)).get("id");
+        mvc.perform(admin(Trips.body(post("/api/admin/users/" + who + "/suspend"),
+                        "{\"suspended\":true}")))
+                .andExpect(status().isConflict());
+        mvc.perform(People.asRider(post("/api/rides/" + ride + "/cancel"), who))
+                .andExpect(status().isOk());
+
         // A block is what stops it: the token in hand, and signing in again.
         mvc.perform(admin(Trips.body(post("/api/admin/users/" + who + "/suspend"),
                         "{\"suspended\":true,\"reason\":\"And then a third\"}")))

@@ -67,6 +67,18 @@ public class AccountCleanupRepository {
         return rides != null && rides.longValue() > 0L;
     }
 
+    /// Whether the account is in a ride that has not ended: as its rider, from
+    /// the moment it is asked for, or as its driver, once taken. An offer the
+    /// driver has not answered is not one; it passes to the next driver.
+    public boolean inRideUnderWay(String username) {
+        Long rides = session.createQuery("select count(r) from Ride r where "
+                + "(r.rider = :username and r.state in :waiting) "
+                + "or (r.driver = :username and r.state in :taken)", Long.class)
+                .setParameter("username", username).setParameter("waiting", UNDER_WAY)
+                .setParameter("taken", TAKEN).first();
+        return rides != null && rides.longValue() > 0L;
+    }
+
     /// Takes a driver off line, when the account stops being allowed to drive.
     /// Does nothing for an account that never drove.
     public void takeOffLine(String username) {

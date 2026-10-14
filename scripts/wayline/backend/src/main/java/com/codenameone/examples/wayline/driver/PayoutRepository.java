@@ -121,10 +121,16 @@ public class PayoutRepository {
                 .first().longValue();
     }
 
-    /// The driver's share of the fares of every ride they completed.
+    /// The driver's share of the fares of every ride they completed and that
+    /// was paid for -- in cash, or by a card whose charge came back. A charge
+    /// that failed, was refunded, or has not been answered yet is no money of
+    /// the service's, so it is not the driver's to cash out either; the
+    /// dashboard's totals ([com.codenameone.examples.wayline.ride.RideRepository])
+    /// count the same rides.
     public long fares(String driver) {
         return session.createQuery("select coalesce(sum(r.driverCents), 0) from Ride r "
-                + "where r.driver = :driver and r.state = 'COMPLETED'", Long.class)
+                + "where r.driver = :driver and r.state = 'COMPLETED' "
+                + "and r.paymentStatus = 'PAID'", Long.class)
                 .setParameter("driver", driver).first().longValue();
     }
 

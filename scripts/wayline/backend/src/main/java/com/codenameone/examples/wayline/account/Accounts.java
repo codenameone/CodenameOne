@@ -284,6 +284,15 @@ public class Accounts {
             throw new ResponseStatusException(400, "You cannot suspend your own account");
         }
         String why = Text.optional(reason, 255, "the reason");
+        // Not in the middle of a ride, for the reason a driver's role is not
+        // withdrawn then: a blocked account's requests are all refused, so a
+        // driver could no longer arrive, start, finish or cancel, and a rider
+        // could not cancel, and the other person would be left with a ride
+        // nobody can end. The admin cancels the ride first, or waits.
+        if (suspended && signIn.isEnabled() && cleanup.inRideUnderWay(username)) {
+            throw new ResponseStatusException(409,
+                    "That account is on a ride. Block it when the ride has ended");
+        }
         users.updateUser(User.withUserDetails(signIn).disabled(suspended).build());
         if (suspended) {
             cleanup.takeOffLine(username);

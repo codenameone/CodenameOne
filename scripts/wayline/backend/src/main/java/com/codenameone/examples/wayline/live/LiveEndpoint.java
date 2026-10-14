@@ -59,6 +59,19 @@ public class LiveEndpoint implements WebSocket {
         // state a WebSocket has that a request does not.
         session.setAttachment(username);
         hub.add(username, user.admin, session);
+        // Read again now that the connection is in the hub. A block or a
+        // withdrawn admin role commits and then drops the account's
+        // connections; one that committed after the read above and dropped
+        // before the add found nothing to drop, and this connection would
+        // carry what was read before -- for an admin, every driver's position.
+        // Either the change is seen here, or its drop comes after the add and
+        // closes this connection.
+        UserDto now = accounts.describe(username);
+        if (now == null || now.suspended || now.admin != user.admin) {
+            hub.remove(username, session);
+            session.close(4403, "changed");
+            return;
+        }
         session.sendText("{\"type\":\"ready\"}");
     }
 
