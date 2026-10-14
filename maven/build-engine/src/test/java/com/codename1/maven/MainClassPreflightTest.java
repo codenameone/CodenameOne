@@ -324,6 +324,21 @@ class MainClassPreflightTest {
     }
 
     @Test
+    void mainGeneratedByTheDesktopRemapIsAccepted() throws Exception {
+        TestProjectHost host = host("android", jar(), settings("com.example", "MyApp"));
+        host.sourceRoots.add(Files.createDirectories(host.projectDir.toPath().resolve("src")).toString());
+        org.objectweb.asm.ClassWriter cw = new org.objectweb.asm.ClassWriter(0);
+        cw.visit(org.objectweb.asm.Opcodes.V1_5, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "com/example/MyApp", null, "com/codename1/system/Lifecycle", null);
+        cw.visitSource(DesktopEntryPoints.GENERATED_SOURCE, null);
+        cw.visitEnd();
+        File out = new File(host.outputDir, "com/example/MyApp.class");
+        Files.createDirectories(out.getParentFile().toPath());
+        Files.write(out.toPath(), cw.toByteArray());
+        new AppBuilder(host).platform("android").buildTarget("android-device").stageOnly(true).execute();
+    }
+
+    @Test
     void binaryDependencyDoesNotNeedSourceInTheRunningProject() throws Exception {
         TestProjectHost producer = host("android", jar(), settings("com.example", "MyApp"));
         Path root = Files.createDirectory(tmp.resolve("library-sources"));
