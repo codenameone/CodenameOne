@@ -361,8 +361,113 @@ public class ExecutorsTest {
         return ref.get() == null;
     }
 
-    /// A fixed rate whose run takes longer than its period keeps going: the
-    /// firings that fell inside the overrun are dropped, not the schedule.
+    /// A fixed rate whose run overruns its period owes the firings that
+    /// fell inside it, as the JDK's does: they run late, one after another,
+    /// straight after the long run, and never two at once.
+    @Test
+    public void aFixedRateCatchesUpAfterAnOverrun() throws Exception {
+        ScheduledExecutorService pool = Executors.newScheduledThreadPool(2);
+        final AtomicInteger runs = new AtomicInteger();
+        final AtomicInteger active = new AtomicInteger();
+        final AtomicInteger overlap = new AtomicInteger();
+        final long[] ended = new long[1];
+        final List<Long> starts = java.util.Collections.synchronizedList(new ArrayList<Long>());
+        pool.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                if (active.incrementAndGet() > 1) {
+                    overlap.incrementAndGet();
+                }
+                starts.add(Long.valueOf(System.currentTimeMillis()));
+                if (runs.incrementAndGet() == 1) {
+                    try {
+                        Thread.sleep(200);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    ended[0] = System.currentTimeMillis();
+                }
+                active.decrementAndGet();
+            }
+        }, 0, 20, TimeUnit.MILLISECONDS);
+        for (int i = 0; i < 400 && runs.get() < 15; i++) {
+            Thread.sleep(5);
+        }
+        pool.shutdownNow();
+        assertEquals("runs overlapped", 0, overlap.get());
+        int soon = 0;
+        synchronized (starts) {
+            for (Long at : starts) {
+                if (at.longValue() >= ended[0] && at.longValue() - ended[0] < 40) {
+                    soon++;
+                }
+            }
+        }
+        // About nine firings fell inside the 200 ms run. Dropped, at most
+        // two would start within 40 ms of its end.
+        assertTrue("the overrun's firings were not run late: " + soon, soon >= 5);
+    }
+
+    /// A task cancelled after it was handed to a busy pool, before it got a
+    /// worker, never starts.
+    @Test
+    public void aTaskCancelledWhileWaitingForAWorkerNeverStarts() throws Exception {
+        ScheduledExecutorService pool = Executors.newScheduledThreadPool(1);
+        final CountDownLatch busy = new CountDownLatch(1);
+        final CountDownLatch release = new CountDownLatch(1);
+        pool.execute(new Runnable() {
+            @Override
+            public void run() {
+                busy.countDown();
+                try {
+                    release.await(10, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+        assertTrue(busy.await(10, TimeUnit.SECONDS));
+        final AtomicInteger ran = new AtomicInteger();
+        ScheduledFuture<?> waiting = pool.schedule(new Runnable() {
+            @Override
+            public void run() {
+                ran.incrementAndGet();
+            }
+        }, 1, TimeUnit.MILLISECONDS);
+        Thread.sleep(50);
+        assertTrue(waiting.cancel(false));
+        release.countDown();
+        // Something after it on the same worker shows the queue drained.
+        assertEquals("after", pool.submit(new Callable<String>() {
+            @Override
+            public String call() {
+                return "after";
+            }
+        }).get(10, TimeUnit.SECONDS));
+        assertEquals(0, ran.get());
+        assertTrue(waiting.isCancelled());
+        pool.shutdownNow();
+    }
+
+    @Test
+    public void aZeroSizedScheduledPoolRunsItsWork() throws Exception {
+        ScheduledExecutorService pool = Executors.newScheduledThreadPool(0);
+        assertEquals("ran", pool.schedule(new Callable<String>() {
+            @Override
+            public String call() {
+                return "ran";
+            }
+        }, 5, TimeUnit.MILLISECONDS).get(10, TimeUnit.SECONDS));
+        pool.shutdownNow();
+        try {
+            Executors.newScheduledThreadPool(-1);
+            fail("a negative size was accepted");
+        } catch (IllegalArgumentException expected) {
+            assertNotNull(expected);
+        }
+    }
+
+    /// A fixed rate whose run takes longer than its period keeps going.
     @Test
     public void aFixedRateOutlivesARunLongerThanItsPeriod() throws Exception {
         ScheduledExecutorService pool = Executors.newScheduledThreadPool(1);

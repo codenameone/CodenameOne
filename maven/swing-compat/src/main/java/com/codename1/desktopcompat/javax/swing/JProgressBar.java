@@ -315,6 +315,9 @@ public class JProgressBar extends JComponent implements Accessible, SwingConstan
         return model;
     }
 
+    /// Fires no "model" property change: in the JDK the progress bar's model
+    /// is not a bound property (unlike JSlider's), and its setModel tells
+    /// only the accessibility context.
     public void setModel(BoundedRangeModel newModel) {
         BoundedRangeModel old = model;
         if (newModel != old) {

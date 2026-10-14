@@ -129,6 +129,9 @@ public abstract class ObjectPropertyBase<T> extends ObjectProperty<T> {
         if (newObservable == null) {
             throw new NullPointerException("Cannot bind to null");
         }
+        // equals, not ==, as OpenJFX's ObjectPropertyBase.bind (and every
+        // other *PropertyBase) does: a source equal to the current one is
+        // taken to be the same binding and is not rebound.
         if (!newObservable.equals(observable)) {
             unbind();
             observable = newObservable;

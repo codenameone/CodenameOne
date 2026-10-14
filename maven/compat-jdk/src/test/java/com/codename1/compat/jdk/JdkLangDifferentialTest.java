@@ -46,6 +46,19 @@ public class JdkLangDifferentialTest {
     private static final double[] DOUBLES = {0.0, -0.0, 0.5, -0.5, 1.5, 2.5, -2.5, 3.49, -0.2, 1e300, -1e300,
         4503599627370497.0, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, 27, -8, 0.001};
 
+    /// Near zero the hyperbolic functions keep a small argument instead of
+    /// cancelling it away, and agree with the JDK across the range.
+    @Test
+    public void hyperbolicFunctionsKeepSmallArguments() {
+        double[] xs = {1e-300, 1e-20, -1e-20, 1e-8, 1e-3, -0.25, 0.5, 0.999, 1, -1.5, 3, 10, 25, -0.0, 0.0};
+        for (double x : xs) {
+            assertEquals("sinh " + x, Math.sinh(x), JdkNumbers.sinh(x), Math.abs(Math.sinh(x)) * 1e-14);
+            assertEquals("tanh " + x, Math.tanh(x), JdkNumbers.tanh(x), Math.abs(Math.tanh(x)) * 1e-14);
+        }
+        assertEquals(1e-20, JdkNumbers.sinh(1e-20), 0);
+        assertEquals(1e-20, JdkNumbers.tanh(1e-20), 0);
+    }
+
     @Test
     public void bitOperationsMatch() {
         for (int i : INTS) {

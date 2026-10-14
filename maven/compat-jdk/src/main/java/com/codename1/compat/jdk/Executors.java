@@ -471,6 +471,10 @@ public final class Executors {
     }
 
     public static ScheduledExecutorService newScheduledThreadPool(int corePoolSize) {
+        // Zero is accepted, as the JDK accepts it: ScheduledThreadPoolExecutor
+        // rejects only a negative core size, and a zero-sized one still
+        // starts a worker for the first task it is given. Only a negative
+        // size is refused here.
         if (corePoolSize < 0) {
             throw new IllegalArgumentException();
         }

@@ -147,6 +147,8 @@ public abstract class Interpolator {
         }
 
         static Interpolator spline(double x1, double y1, double x2, double y2) {
+            // All four, y included, as OpenJFX's SplineInterpolator checks
+            // them: a y outside [0,1] throws there, so it throws here.
             if (!(x1 >= 0 && x1 <= 1 && y1 >= 0 && y1 <= 1 && x2 >= 0 && x2 <= 1 && y2 >= 0 && y2 <= 1)) {
                 throw new IllegalArgumentException("Control point coordinates must all be in range [0,1]");
             }

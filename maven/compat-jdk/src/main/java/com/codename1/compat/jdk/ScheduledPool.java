@@ -26,6 +26,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
@@ -74,6 +75,9 @@ final class ScheduledPool implements ScheduledExecutorService {
         private final AtomicReference<Delays.Handle> wait = new AtomicReference<Delays.Handle>();
         private final AtomicLong due;
         private final AtomicBoolean running = new AtomicBoolean();
+        /// A fixed rate's firings that have come and not yet run, counting
+        /// the one running now. See [#run].
+        private final AtomicInteger owed = new AtomicInteger();
         private final CompletableFuture<V> outcome = new CompletableFuture<V>();
 
         Scheduled(Callable<V> work, long dueAt, boolean periodic, long delayAfter, long rate) {
@@ -96,12 +100,14 @@ final class ScheduledPool implements ScheduledExecutorService {
                 // A fixed rate keeps its beat whatever a run takes.
                 due.set(due.get() + rate);
                 arm(due.get() - System.currentTimeMillis());
-            }
-            if (!running.compareAndSet(false, true)) {
-                // The run before this one has not ended; a fixed rate does
-                // not pile runs up. Skipping it does not end the schedule:
-                // the next firing was armed above, before this check, so an
-                // overrun drops only the firings that fell inside it.
+                // A firing that comes while a run is under way is owed, not
+                // dropped: as with the JDK's scheduleAtFixedRate, an overrun
+                // makes the next runs start late and one after another,
+                // never at once. The worker already running takes it.
+                if (owed.getAndIncrement() > 0) {
+                    return;
+                }
+            } else if (!running.compareAndSet(false, true)) {
                 return;
             }
             try {
@@ -113,6 +119,7 @@ final class ScheduledPool implements ScheduledExecutorService {
                 });
             } catch (RuntimeException e) {
                 running.set(false);
+                owed.set(0);
                 outcome.completeExceptionally(e);
                 disarm();
             }
@@ -139,7 +146,29 @@ final class ScheduledPool implements ScheduledExecutorService {
             }
         }
 
+        /// A fixed rate runs every firing it owes, in turn, on this worker.
         private void once() {
+            if (rate == 0) {
+                step();
+                return;
+            }
+            do {
+                running.set(true);
+                if (!step()) {
+                    return;
+                }
+            } while (owed.decrementAndGet() > 0);
+        }
+
+        /// One run; false when the work is not to run again.
+        private boolean step() {
+            // Cancelled, or stopped, while it waited for a worker: a future
+            // that answers isCancelled() must never start its work after.
+            if (outcome.isDone() || (periodic && shutdown.get()) || stopped.get()) {
+                running.set(false);
+                disarm();
+                return false;
+            }
             boolean rearm = false;
             try {
                 V value;
@@ -149,7 +178,7 @@ final class ScheduledPool implements ScheduledExecutorService {
                     // Work that fails is not run again.
                     outcome.completeExceptionally(t);
                     disarm();
-                    return;
+                    return false;
                 }
                 if (!periodic) {
                     outcome.complete(value);
@@ -167,6 +196,7 @@ final class ScheduledPool implements ScheduledExecutorService {
                 // never completing.
                 again();
             }
+            return !outcome.isDone();
         }
 
         private void again() {

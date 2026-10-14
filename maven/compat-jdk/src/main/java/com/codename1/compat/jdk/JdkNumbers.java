@@ -422,7 +422,29 @@ public final class JdkNumbers {
     }
 
     public static double sinh(double x) {
+        if (Math.abs(x) < 1) {
+            // Near zero the two exponentials agree in almost every digit and
+            // their difference is lost (1e-20 gave 0); the series keeps it.
+            return sinhSeries(x);
+        }
         return (MathUtil.exp(x) - MathUtil.exp(-x)) / 2;
+    }
+
+    /// sinh by its Taylor series, for `|x| < 1`, where it converges within
+    /// a dozen terms.
+    private static double sinhSeries(double x) {
+        double x2 = x * x;
+        double term = x;
+        double sum = x;
+        for (int n = 3; n < 40; n += 2) {
+            term *= x2 / ((n - 1) * n);
+            double next = sum + term;
+            if (next == sum) {
+                break;
+            }
+            sum = next;
+        }
+        return sum;
     }
 
     public static double cosh(double x) {
@@ -435,6 +457,11 @@ public final class JdkNumbers {
         }
         if (x < -20) {
             return -1;
+        }
+        if (Math.abs(x) < 1) {
+            // Same cancellation as sinh: e - 1 below lost a small x.
+            double s = sinhSeries(x);
+            return s / Math.sqrt(1 + s * s);
         }
         double e = MathUtil.exp(2 * x);
         return (e - 1) / (e + 1);
