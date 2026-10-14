@@ -213,6 +213,10 @@ public abstract class Ellipse2D extends RectangularShape {
         double y = getY();
         double w = getWidth();
         double h = getHeight();
+        // A negative size has no outline, as in the JDK.
+        if (w < 0 || h < 0) {
+            return it;
+        }
         double near = 0.5 - KAPPA / 2.0;
         double far = 0.5 + KAPPA / 2.0;
         it.move(x + w, y + h * 0.5);

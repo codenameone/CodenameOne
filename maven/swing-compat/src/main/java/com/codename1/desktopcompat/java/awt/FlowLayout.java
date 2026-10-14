@@ -234,6 +234,11 @@ public class FlowLayout implements LayoutManager {
             }
             Dimension d = c.getPreferredSize();
             c.setSize(d.width, d.height);
+            // The gap before the component is not part of the test, exactly as
+            // in the JDK's FlowLayout: a component that fits without it stays
+            // on the row and the gap is added after. Including it would wrap
+            // components that Swing keeps, and move every layout written
+            // against Swing by a row.
             if (used == 0 || used + d.width <= avail) {
                 if (used > 0) {
                     used += hgap;

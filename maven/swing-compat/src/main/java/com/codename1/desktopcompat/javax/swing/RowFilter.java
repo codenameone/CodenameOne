@@ -132,7 +132,14 @@ public abstract class RowFilter<M, I> {
                     return false;
                 }
                 Number n = (Number) v;
-                if (isWhole(n) && isWhole(number)) {
+                if (n.getClass() == number.getClass() && number instanceof Comparable) {
+                    // Two numbers of one class compare as that class does, as
+                    // Swing compares them: a BigInteger or BigDecimal beyond
+                    // what a long or a double holds stays exact.
+                    @SuppressWarnings("unchecked")
+                    Comparable<Object> own = (Comparable<Object>) number;
+                    c = -Integer.signum(own.compareTo(n));
+                } else if (isWhole(n) && isWhole(number)) {
                     long a = n.longValue();
                     long b = number.longValue();
                     c = a < b ? -1 : a > b ? 1 : 0;

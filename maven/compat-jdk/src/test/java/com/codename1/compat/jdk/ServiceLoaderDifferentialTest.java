@@ -226,6 +226,30 @@ public class ServiceLoaderDifferentialTest {
         assertEquals(theirOrder, created());
     }
 
+    /// An iterator taken before a reload refuses to go on: its place counts
+    /// providers that are no longer there, and going on would create again
+    /// one it has already handed out.
+    @Test
+    public void anIteratorFromBeforeAReloadRefusesToGoOn() {
+        ServiceLoader<Greeter> mine = ServiceLoader.load(Greeter.class);
+        java.util.Iterator<Greeter> before = mine.iterator();
+        before.next();
+        mine.reload();
+        try {
+            before.hasNext();
+            org.junit.Assert.fail("hasNext after reload");
+        } catch (java.util.ConcurrentModificationException expected) {
+            // as the JDK
+        }
+        try {
+            before.next();
+            org.junit.Assert.fail("next after reload");
+        } catch (java.util.ConcurrentModificationException expected) {
+            // as the JDK
+        }
+        assertTrue(mine.iterator().hasNext());
+    }
+
     @Test
     public void aServiceWithNoProviderHasNone() {
         assertFalse(java.util.ServiceLoader.load(Empty.class).iterator().hasNext());

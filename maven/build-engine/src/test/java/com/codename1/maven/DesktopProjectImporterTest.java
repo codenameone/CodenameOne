@@ -724,6 +724,37 @@ public class DesktopProjectImporterTest {
         }
     }
 
+    /// `public` spelled out after `@JvmStatic` is the same entry point.
+    @Test
+    public void aKotlinJvmStaticMainMayBePublic() {
+        Map<String, DesktopProjectImporter.Candidate> out =
+                new java.util.LinkedHashMap<String, DesktopProjectImporter.Candidate>();
+        DesktopProjectImporter.scanKotlin("Boot", "package k\n\nobject Boot {\n    @JvmStatic public fun main("
+                + "a: Array<String>) {\n    }\n}\n", out);
+        assertEquals(Collections.singleton("k.Boot"), out.keySet());
+    }
+
+    /// Whether the generated main class's name is taken is a question of
+    /// what the Kotlin sources declare, not of what their files are called.
+    @Test
+    public void aKotlinClassIsFoundByItsDeclaration() throws Exception {
+        File main = tmp.newFolder();
+        write(main, "kotlin/com/foo/MyApp.kt", "package com.foo\n\nfun helper() = 1\n");
+        assertFalse(DesktopProjectImporter.declares(main, "com.foo.MyApp"));
+        write(main, "kotlin/com/foo/Other.kt", "package com.foo\n\n// class MyApp\ndata class MyApp(val a: Int)\n");
+        assertTrue(DesktopProjectImporter.declares(main, "com.foo.MyApp"));
+        assertFalse(DesktopProjectImporter.declares(main, "com.bar.MyApp"));
+        File named = tmp.newFolder();
+        write(named, "kotlin/x/Start.kt", "@file:JvmName(\"Launcher\")\npackage x\n\nfun main() {}\n");
+        assertTrue(DesktopProjectImporter.declares(named, "x.Launcher"));
+        File nested = tmp.newFolder();
+        write(nested, "kotlin/x/A.kt", "package x\n\nclass A {\n    class MyApp\n}\n");
+        assertFalse(DesktopProjectImporter.declares(nested, "x.MyApp"));
+        File java = tmp.newFolder();
+        write(java, "java/x/MyApp.java", "package x; class MyApp {}\n");
+        assertTrue(DesktopProjectImporter.declares(java, "x.MyApp"));
+    }
+
     /// `public` is Kotlin's default visibility written out, and a
     /// `suspend` main gets the same static facade method.
     @Test

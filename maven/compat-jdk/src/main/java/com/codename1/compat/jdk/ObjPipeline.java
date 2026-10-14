@@ -316,7 +316,12 @@ final class ObjPipeline<T> implements Stream<T> {
 
     @Override
     public Stream<T> sorted(Comparator<? super T> comparator) {
-        Comparator<? super T> order = comparator == null ? JdkFunctions.<T>natural() : comparator;
+        // The JDK refuses a null comparator here; only sorted() means the
+        // natural order, and it passes that order itself.
+        if (comparator == null) {
+            throw new NullPointerException();
+        }
+        final Comparator<? super T> order = comparator;
         Iterator<T> up = take();
         return stage(new PullIterator<T>() {
             private Iterator<T> it;

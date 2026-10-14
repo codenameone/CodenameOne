@@ -153,9 +153,20 @@ public class Color implements Paint {
     }
 
     /// Parses a decimal, `0x`/`#` hexadecimal or `0` octal number as an
-    /// opaque color.
+    /// opaque color, as `Integer.decode` reads it: an optional sign before
+    /// the prefix, and a value that fits a signed 32-bit int. A device has
+    /// no `Integer.decode`, so this is that method.
     public static Color decode(String nm) throws NumberFormatException {
-        String s = nm.trim();
+        String s = nm;
+        if (s.length() == 0) {
+            throw new NumberFormatException("Zero length string");
+        }
+        boolean negative = false;
+        char first = s.charAt(0);
+        if (first == '-' || first == '+') {
+            negative = first == '-';
+            s = s.substring(1);
+        }
         int radix = 10;
         if (s.startsWith("0x") || s.startsWith("0X")) {
             s = s.substring(2);
@@ -167,7 +178,17 @@ public class Color implements Paint {
             s = s.substring(1);
             radix = 8;
         }
-        int i = (int) Long.parseLong(s, radix);
+        if (s.length() == 0 || s.charAt(0) == '-' || s.charAt(0) == '+') {
+            throw new NumberFormatException("Sign character in wrong position: " + nm);
+        }
+        long v = Long.parseLong(s, radix);
+        if (negative) {
+            v = -v;
+        }
+        if (v < Integer.MIN_VALUE || v > Integer.MAX_VALUE) {
+            throw new NumberFormatException("For input string: \"" + nm + "\"");
+        }
+        int i = (int) v;
         return new Color((i >> 16) & 0xff, (i >> 8) & 0xff, i & 0xff);
     }
 

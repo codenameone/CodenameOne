@@ -300,6 +300,10 @@ public abstract class RoundRectangle2D extends RectangularShape {
         SegmentIterator it = new SegmentIterator(PathIterator.WIND_NON_ZERO, at, 10);
         double x0 = getX();
         double y0 = getY();
+        // A negative size has no outline, as in the JDK.
+        if (getWidth() < 0 || getHeight() < 0) {
+            return it;
+        }
         double x1 = x0 + getWidth();
         double y1 = y0 + getHeight();
         double rx = radiusX();

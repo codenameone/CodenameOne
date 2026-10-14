@@ -376,6 +376,12 @@ public abstract class Rectangle2D extends RectangularShape {
         double y = getY();
         double w = getWidth();
         double h = getHeight();
+        // A negative size has no outline -- the JDK's iterator is done at
+        // once. createIntersection answers one for two rectangles that do
+        // not meet, and drawing it drew an inverted rectangle.
+        if (w < 0 || h < 0) {
+            return it;
+        }
         it.move(x, y);
         it.line(x + w, y);
         it.line(x + w, y + h);

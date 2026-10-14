@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.ConcurrentModificationException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -91,6 +92,9 @@ public final class ServiceLoader<S> implements Iterable<S> {
 
     /// The index in [#entries] of the next provider to create.
     private int next;
+
+    /// Counts the reloads, so that an iterator taken before one can tell.
+    private int generation;
 
     /// Whether this is the loader of the installed providers, which has none.
     private final boolean installed;
@@ -365,14 +369,27 @@ public final class ServiceLoader<S> implements Iterable<S> {
     public Iterator<S> iterator() {
         return new Iterator<S>() {
             private int index;
+            private final int born = generation;
+
+            /// After a reload this iterator's place means nothing: the
+            /// instances it walked are gone and the providers are counted
+            /// from the start again. Going on would create a provider it
+            /// has already handed out, so it refuses, as the JDK's does.
+            private void check() {
+                if (born != generation) {
+                    throw new ConcurrentModificationException();
+                }
+            }
 
             @Override
             public boolean hasNext() {
+                check();
                 return index < instances.size() || more();
             }
 
             @Override
             public S next() {
+                check();
                 if (index < instances.size()) {
                     return instances.get(index++);
                 }
@@ -456,6 +473,7 @@ public final class ServiceLoader<S> implements Iterable<S> {
     /// Forgets the providers created so far, so that the next iteration
     /// creates them again.
     public void reload() {
+        generation++;
         instances.clear();
         next = 0;
         entries = null;

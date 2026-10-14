@@ -448,6 +448,11 @@ public class AffineTransform implements Cloneable {
         return new Point2D.Float();
     }
 
+    /// Forwards, point by point, into the destination's own objects, as the
+    /// JDK does. Its documentation says that this overload takes no
+    /// precautions against a destination that is a later source -- unlike
+    /// the overloads over coordinate arrays, which copy -- and code written
+    /// against it sees exactly that result here.
     public void transform(Point2D[] ptSrc, int srcOff, Point2D[] ptDst, int dstOff, int numPts) {
         for (int i = 0; i < numPts; i++) {
             Point2D src = ptSrc[srcOff + i];

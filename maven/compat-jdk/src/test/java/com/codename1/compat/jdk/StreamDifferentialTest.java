@@ -78,6 +78,24 @@ public class StreamDifferentialTest {
 
     // ---- intermediate operations, and the order they keep ----
 
+    /// The comparator `sorted` is given may not be null; only `sorted()`
+    /// means the natural order.
+    @Test
+    public void sortedRefusesANullComparator() {
+        for (boolean jdk : new boolean[] {true, false}) {
+            try {
+                if (jdk) {
+                    java.util.stream.Stream.of("b", "a").sorted(null);
+                } else {
+                    Stream.of("b", "a").sorted(null);
+                }
+                org.junit.Assert.fail(jdk ? "jdk" : "compat");
+            } catch (NullPointerException expected) {
+                // both
+            }
+        }
+    }
+
     @Test
     public void filterAndMapKeepEncounterOrder() {
         assertEquals(listed(theirs(WORDS).filter(w -> w.length() > 3).map(w -> w.toUpperCase() + w.length())),

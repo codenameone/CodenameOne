@@ -332,9 +332,54 @@ public final class DesktopProjectImporter {
     }
 
     /// Whether the sources under `main` declare the top-level class `name`.
-    private static boolean declares(File main, String name) {
+    ///
+    /// A Java class is the file of its name. A Kotlin file's name says
+    /// nothing: `MyApp.kt` of top-level functions compiles to `MyAppKt`, and
+    /// any file may declare `class MyApp`. So every Kotlin file is read for
+    /// its package and its top-level classes, objects and interfaces, and
+    /// for a `@file:JvmName` that gives its facade the name.
+    static boolean declares(File main, String name) throws IOException {
         String path = name.replace('.', '/');
-        return new File(main, "java/" + path + ".java").isFile() || new File(main, "kotlin/" + path + ".kt").isFile();
+        if (new File(main, "java/" + path + ".java").isFile()) {
+            return true;
+        }
+        int dot = name.lastIndexOf('.');
+        String pkg = dot < 0 ? "" : name.substring(0, dot);
+        String simple = name.substring(dot + 1);
+        Pattern type = Pattern.compile("(?m)^(?:(?:public|internal|private|open|final|abstract|sealed|data|enum"
+                + "|annotation|value|inline|expect|actual|fun)\\s+)*(?:class|object|interface)\\s+"
+                + Pattern.quote(simple) + "\\b");
+        for (String dir : new String[] {"kotlin", "java"}) {
+            List<File> files = new ArrayList<File>();
+            kotlinFiles(new File(main, dir), files);
+            for (File f : files) {
+                String raw = read(f);
+                Matcher named = KOTLIN_FILE_NAME.matcher(raw);
+                String text = code(raw);
+                Matcher p = PACKAGE.matcher(text);
+                if (!(p.find() ? p.group(1) : "").equals(pkg)) {
+                    continue;
+                }
+                if (type.matcher(text).find() || (named.find() && named.group(1).equals(simple))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static void kotlinFiles(File dir, List<File> out) {
+        File[] files = dir.listFiles();
+        if (files == null) {
+            return;
+        }
+        for (File f : files) {
+            if (f.isDirectory()) {
+                kotlinFiles(f, out);
+            } else if (f.getName().endsWith(".kt")) {
+                out.add(f);
+            }
+        }
     }
 
     /// Moves the application's own main class source out of the compiler's
@@ -479,7 +524,9 @@ public final class DesktopProjectImporter {
             + "(?:\\[\\s*\\]\\s*\\w+|\\.\\.\\.\\s*\\w+|\\s+\\w+\\s*\\[\\s*\\])\\s*\\)");
     private static final Pattern KOTLIN_EXTENDS = Pattern.compile(
             "\\bclass\\s+(\\w+)[^{\\n]*?:[^{\\n]*?((?:javafx\\.application\\.)?Application)\\s*\\(");
-    private static final Pattern KOTLIN_STATIC_MAIN = Pattern.compile("@JvmStatic\\s+fun\\s+main\\s*\\(");
+    // `public` may be spelled out between the annotation and `fun`.
+    private static final Pattern KOTLIN_STATIC_MAIN = Pattern.compile(
+            "@JvmStatic\\s+(?:public\\s+)?fun\\s+main\\s*\\(");
     // At the start of a line, so top level; `public` is the default
     // visibility spelled out and `suspend` still gets the static facade
     // main. A private or internal one is not an entry point.
