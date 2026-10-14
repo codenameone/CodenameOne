@@ -234,6 +234,43 @@ class FirstBuildTelemetryTest {
         assertTrue(exit.contains("reason=ok"), exit);
     }
 
+    private long exits() {
+        return bodies.stream().filter(b -> b.contains("step=exit")).count();
+    }
+
+    @Test
+    void aBuildStoppedFromTheIdeIsReportedAsInterrupted() throws Exception {
+        String url = recorder(0);
+        FirstBuildTelemetry t = FirstBuildTelemetry.start(url, ID, "verify", env(), props());
+        t.reportIfStopped();
+        // What the shutdown hook runs when the IDE stops Maven.
+        t.stopped();
+        assertEquals(1, exits());
+        String exit = bodies.get(bodies.size() - 1);
+        assertTrue(exit.contains("exit=130&reason=interrupted"), exit);
+        assertTrue(exit.contains("&secs="), exit);
+        // The build cannot also be reported as ending normally.
+        t.finished(null);
+        assertEquals(1, exits());
+    }
+
+    @Test
+    void aBuildThatEndedIsNotReportedAgainAtShutdown() throws Exception {
+        String url = recorder(0);
+        FirstBuildTelemetry t = FirstBuildTelemetry.start(url, ID, "verify", env(), props());
+        t.reportIfStopped();
+        t.finished(null);
+        t.stopped();
+        assertEquals(1, exits());
+        assertTrue(bodies.get(bodies.size() - 1).contains("reason=ok"));
+    }
+
+    @Test
+    void aCancelledGradleBuildIsInterrupted() {
+        assertEquals("interrupted", reason("Build cancelled."));
+        assertEquals("interrupted", FirstBuildTelemetry.reason("", "org.gradle.api.BuildCancelledException\n"));
+    }
+
     @Test
     void aStalledServerHoldsTheBuildUpForThreeSecondsAtMost() throws Exception {
         String url = recorder(6_000);

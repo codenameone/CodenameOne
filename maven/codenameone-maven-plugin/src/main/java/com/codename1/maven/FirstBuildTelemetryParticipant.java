@@ -85,6 +85,8 @@ public class FirstBuildTelemetryParticipant extends AbstractMavenLifecyclePartic
             claim = mine;
             telemetry = t;
             telemetry.launched();
+            // An IDE's Stop ends Maven without the session ending; report that too.
+            telemetry.reportIfStopped();
         } catch (RuntimeException ignored) {
             // Reporting must never be the reason a build fails.
             telemetry = null;
