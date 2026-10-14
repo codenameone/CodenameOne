@@ -61,7 +61,10 @@ class KotlinMain {
 EOF_KOTLIN
 sed 's/KotlinMain/GeneratedMain/' "$APP/src/main/kotlin/Entry.kt" > "$APP/extra/kotlin/Generated.kt"
 
-for main in CustomMain KotlinMain GeneratedMain CustomMain; do
+# Repeat identical properties consecutively. Gradle 8.5 invalidates the previous
+# configuration-cache entry when -Pcodename1.mainName changes; newer Gradle
+# versions can retain multiple entries, but the test must work with either.
+for main in CustomMain CustomMain KotlinMain GeneratedMain; do
   log="$WORKDIR/$main.log"
   run_gradle "$APP" buildAndroid --configuration-cache -Pcodename1.stageOnly=true \
     "-Pcodename1.mainName=$main" > "$log" 2>&1 \
