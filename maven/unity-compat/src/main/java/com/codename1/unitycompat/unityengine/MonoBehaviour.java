@@ -136,8 +136,14 @@ public class MonoBehaviour extends Behaviour {
         UnityRuntime.invokeLater(this, methodName, time, 0f);
     }
 
-    /// A repeat rate of zero or less would never let a frame end; it is
-    /// taken, as Unity takes it, to mean no repeat.
+    /// Unity's documentation says the method is called after `time` and
+    /// then every `repeatRate` seconds, scaled by `Time.timeScale`; it says
+    /// nothing of a rate of zero or less -- neither that it throws nor what
+    /// it does instead -- so that case is unspecified there. A rate that
+    /// never moves the next call forward would be due again in the same
+    /// frame, every frame, so here it is taken to mean one call and no
+    /// repeat. A positive rate however small repeats, at most once a frame:
+    /// each frame runs a due invocation once and moves it on by one rate.
     public void InvokeRepeating(String methodName, float time, float repeatRate) {
         UnityRuntime.invokeLater(this, methodName, time, repeatRate > 0f ? repeatRate : 0f);
     }

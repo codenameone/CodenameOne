@@ -245,6 +245,7 @@ public class UnityProjectBuilder {
         // No digest, no skipping: content that could not be read matches
         // nothing, not even a state file that is empty for the same reason.
         String missing = missingOutput(staged, appImpl, resources, runtimeClasses);
+        boolean compiled = false;
         if (now != null && recorded != null && now.digest.equals(recorded.digest) && missing == null) {
             log.debug("Unity project unchanged; not compiled again");
         } else {
@@ -260,11 +261,15 @@ public class UnityProjectBuilder {
                 throw new BuildException("The scene compiler wrote no " + appImpl + " (log: "
                         + new File(workDir, "scene-compiler.log") + ")");
             }
-            if (now != null) {
-                write(state, now.text());
-            }
+            compiled = true;
         }
-        install(staged, resources, runtimeClasses);
+        install(staged, resources, runtimeClasses, compiled);
+        // Recorded only once installed: an install that failed part way must
+        // be repeated in full by the next build, and only a build that
+        // compiles replaces every output (see install).
+        if (compiled && now != null) {
+            write(state, now.text());
+        }
         writeMainClass();
         return true;
     }
@@ -833,7 +838,17 @@ public class UnityProjectBuilder {
     /// This runs on every build, also when nothing was compiled: the classes
     /// directory is the build tool's, and a clean of it alone must not lose
     /// the game.
-    private void install(File staged, File resources, File runtimeClasses) throws BuildException {
+    ///
+    /// When `compiled`, the steps have just written every staged file, and
+    /// each one replaces the installed copy whatever its size and time. A
+    /// changed class or image can keep its length, and be written within
+    /// the same tick of the file system's clock as the copy it replaces --
+    /// or after a copy whose time is ahead -- so length and time alone
+    /// would keep the stale one. When nothing was compiled, the staged
+    /// files are the ones installed last time, and length and time are
+    /// enough to refill a cleaned directory without copying the rest.
+    private void install(File staged, File resources, File runtimeClasses, boolean compiled)
+            throws BuildException {
         File record = new File(workDir, "installed.txt");
         Set<String> previous = new LinkedHashSet<String>();
         String recorded = read(record);
@@ -857,14 +872,14 @@ public class UnityProjectBuilder {
                 if (new File(runtimeClasses, rel).isFile()) {
                     continue;
                 }
-                copyIfChanged(new File(staged, rel), new File(classesOut, rel));
+                install(new File(staged, rel), new File(classesOut, rel), compiled);
                 installed.add(rel);
                 classes++;
             }
             files.clear();
             collect(resources, "", files);
             for (String rel : files) {
-                copyIfChanged(new File(resources, rel), new File(classesOut, rel));
+                install(new File(resources, rel), new File(classesOut, rel), compiled);
                 installed.add(rel);
             }
         } catch (IOException e) {
@@ -883,8 +898,8 @@ public class UnityProjectBuilder {
         log.debug("Installed " + classes + " translated classes and " + files.size() + " images in " + classesOut);
     }
 
-    private static void copyIfChanged(File from, File to) throws IOException {
-        if (to.isFile() && to.length() == from.length() && to.lastModified() >= from.lastModified()) {
+    private static void install(File from, File to, boolean always) throws IOException {
+        if (!always && to.isFile() && to.length() == from.length() && to.lastModified() >= from.lastModified()) {
             return;
         }
         File parent = to.getParentFile();

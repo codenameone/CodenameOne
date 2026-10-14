@@ -22,6 +22,7 @@
  */
 package com.codename1.unitycompat.system;
 
+import com.codename1.unitycompat.system.reflection.MemberInfo;
 import java.util.HashMap;
 
 /// `System.Type`, as far as translated code can use one: `typeof(T)`
@@ -34,7 +35,7 @@ import java.util.HashMap;
 /// values, which is the one thing about an enum the integer under it cannot
 /// say, and the integer type it is stored as.
 @SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
-public final class Type {
+public final class Type extends MemberInfo {
     // The integer type under an enum.
     static final int I1 = 1;
     static final int U1 = 2;
@@ -75,9 +76,13 @@ public final class Type {
     /// false. So the class alone finds a type only when the name agrees; a
     /// second name for a class gets a type of its own, kept by that name.
     ///
-    /// What erasure leaves the same stays the same: `List<int>` and
-    /// `List<string>` are one class and arrive under one name, so their
-    /// types are one object.
+    /// Erasure makes `List<int>` and `List<string>` one class, but they
+    /// arrive under two names (``List`1[System.Int32]`` and
+    /// ``List`1[System.String]``), so they are two types, and every `typeof`
+    /// of one of them is the same object. `typeof(List<T>)` made in generic
+    /// code that cannot tell its `T` arrives as the definition's name alone.
+    /// `GetType()` is not offered: an erased instance cannot say what it
+    /// was constructed with.
     public static Type $of(Class type, String fullName) {
         Type t = (Type) byClass.get(type);
         if (t == null) {
@@ -282,18 +287,67 @@ public final class Type {
         return underlying == U8 ? Interop.unsignedToString(value) : Long.toString(value);
     }
 
+    /// The name without its namespace or enclosing types, and, for a
+    /// constructed type, without its arguments: ``List`1`` for
+    /// ``System.Collections.Generic.List`1[System.Int32]``, as .NET has it.
+    /// An array keeps its brackets (``List`1[]``).
+    @Override
     public String get_Name() {
-        int dot = fullName.lastIndexOf('.');
-        int plus = fullName.lastIndexOf('+');
-        return fullName.substring((plus > dot ? plus : dot) + 1);
+        int end = argumentsStart();
+        String head = end < 0 ? fullName : fullName.substring(0, end);
+        int dot = head.lastIndexOf('.');
+        int plus = head.lastIndexOf('+');
+        String name = head.substring((plus > dot ? plus : dot) + 1);
+        if (end < 0) {
+            return name;
+        }
+        int depth = 0;
+        for (int i = end; i < fullName.length(); i++) {
+            char c = fullName.charAt(i);
+            if (c == '[') {
+                depth++;
+            } else if (c == ']') {
+                depth--;
+                if (depth == 0) {
+                    return name + fullName.substring(i + 1);
+                }
+            }
+        }
+        return name;
     }
 
+    /// Where the argument list of a constructed type's name opens: the
+    /// first `[` that is not an array's (`[]`, `[,]`). -1 when there is none.
+    private int argumentsStart() {
+        int n = fullName.length();
+        for (int i = 0; i + 1 < n; i++) {
+            if (fullName.charAt(i) == '[') {
+                char next = fullName.charAt(i + 1);
+                if (next != ']' && next != ',') {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
+    /// The name with the namespace. For a constructed type this is the
+    /// same as `ToString()`. .NET's `FullName` there qualifies every
+    /// argument with the assembly it comes from, version and key included
+    /// (``[[System.Int32, System.Private.CoreLib, Version=...]]``), and what
+    /// it says depends on which runtime and which version of it a script
+    /// runs on; there is no assembly behind a type here to name.
     public String get_FullName() {
         return fullName;
     }
 
     public boolean get_IsEnum() {
         return names != null;
+    }
+
+    /// `Type.Equals(Type)`: one type is one object here, as `$of` keeps it.
+    public boolean Equals(Type other) {
+        return this == other; // NOPMD CompareObjectsWithEquals
     }
 
     public static boolean op_Equality(Type a, Type b) {

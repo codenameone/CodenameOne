@@ -432,6 +432,24 @@ namespace Spike
         public static Func<int> Later<T>(T v) { return () => { GsPool<T>.Return(v); return GsPool<T>.Returned; }; }
     }
 
+    // Delegates and typeof made by generic code from its own type
+    // parameters, in code that has static state per constructed type.
+    public class DkKeyed<T>
+    {
+        public static int Made;
+        public Action<T> Make() { Made++; return x => { }; }
+        public static Action<T> MakeStatic() { Made++; return x => { }; }
+        public static Type ListType() { return typeof(List<T>); }
+    }
+
+    public static class DkMethods
+    {
+        public static Action<U> Make<U>() { DkKeyed<U>.Made++; return x => { }; }
+        public static Type ListOf<U>() { DkKeyed<U>.Made++; return typeof(Dictionary<string, U>); }
+    }
+
+    public class DkNest<T> { public class Inner { } }
+
     // Generic members of the program's own that take a T[], handed arrays
     // of primitives.
     public static class GaArrays
@@ -2993,6 +3011,30 @@ namespace Spike
             Try("remove int-string", () => "" + (Delegate.Remove(ai, text) == (Delegate)ai));
             Try("remove int-int", () => "" + (Delegate.Remove(Delegate.Combine(ai, ai2), ai2) == (Delegate)ai));
             Try("equals object/variant", () => "" + ao.Equals(variant) + " " + ((Action<string>)TakesObject).Equals(variant));
+            Try("generic int+string", () => "" + (Delegate.Combine(new DkKeyed<int>().Make(), new DkKeyed<string>().Make()) != null));
+            Try("generic int+int", () => "" + (Delegate.Combine(new DkKeyed<int>().Make(), DkKeyed<int>.MakeStatic()) != null));
+            Try("generic static+closed", () => "" + (Delegate.Combine(DkKeyed<int>.MakeStatic(), text) != null));
+            Try("generic static+closed int", () => "" + (Delegate.Combine(DkKeyed<int>.MakeStatic(), ai) != null));
+            Try("generic method int+string", () => "" + (Delegate.Combine(DkMethods.Make<int>(), DkMethods.Make<string>()) != null));
+            Try("generic method int+closed", () => "" + (Delegate.Combine(DkMethods.Make<int>(), ai2) != null));
+        }
+
+        private static void ConstructedTypes()
+        {
+            Section("constructed types");
+            Type a = typeof(List<int>);
+            Type b = typeof(List<string>);
+            Log("list " + (a == b) + " " + (a == typeof(List<int>)) + " " + a.Equals(b) + " " + a.Equals(typeof(List<int>))
+                + " " + (a != b));
+            Log(a.Name + " " + a + " | " + b);
+            Type d = typeof(Dictionary<string, int>);
+            Log(d.Name + " " + d + " " + (d == typeof(Dictionary<string, int>)) + " " + (d == typeof(Dictionary<int, string>)));
+            Log(typeof(List<List<int>>) + " " + typeof(List<int[]>) + " " + typeof(List<int[]>).Name + " "
+                + typeof(KeyValuePair<int, bool>) + " " + typeof(Action<int>) + " " + typeof(Func<int, string>).Name);
+            Log(typeof(DkNest<int>.Inner).Name + " " + typeof(DkNest<int>.Inner) + " " + typeof(DkKeyed<GsVec>));
+            Log("from generic code " + (DkKeyed<int>.ListType() == typeof(List<int>)) + " "
+                + (DkKeyed<string>.ListType() == typeof(List<int>)) + " " + DkKeyed<string>.ListType() + " "
+                + (DkMethods.ListOf<int>() == typeof(Dictionary<string, int>)) + " " + DkMethods.ListOf<bool>());
         }
 
         public static void Main(string[] args)
@@ -3033,6 +3075,7 @@ namespace Spike
             ArraysAsCollections();
             StringReceivers();
             DelegateTypeArguments();
+            ConstructedTypes();
             Console.WriteLine("done");
         }
     }

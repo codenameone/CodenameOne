@@ -150,10 +150,60 @@ public final class Translator implements Opcodes {
         }
         CilType n = names.norm(type);
         mv.visitLdcInsn(org.objectweb.asm.Type.getObjectType(classToken(n)));
-        mv.visitLdcInsn(String.valueOf(n.typeName() == null ? n.toString() : n.typeName()).replace('/', '+'));
+        String constructed = n.kind == CilType.Kind.GENERICINST ? dotnetName(n) : null;
+        mv.visitLdcInsn(constructed != null ? constructed
+                : String.valueOf(n.typeName() == null ? n.toString() : n.typeName()).replace('/', '+'));
         String descriptor = "(Ljava/lang/Class;Ljava/lang/String;)" + TYPE_DESCRIPTOR;
         index.requireMethod(TYPE, "$of", descriptor, neededFor);
         mv.visitMethodInsn(INVOKESTATIC, TYPE, "$of", descriptor, false);
+    }
+
+    /// The name .NET's `Type.ToString()` gives a type, which for a
+    /// constructed type lists its arguments: ``System.Collections.Generic.List`1[System.Int32]``,
+    /// ``G`1+N[System.Int32]`` for a type nested in a generic one. It is
+    /// the identity of the type at run time too (`Type.$of` keeps one
+    /// object per name), so `typeof(List<int>) != typeof(List<string>)`
+    /// although erasure makes both one class.
+    ///
+    /// Null when the type names a type variable: `typeof(List<T>)` in code
+    /// with no context to ask (see GenericStatics) is known only as its
+    /// definition, as it was before arguments were part of the name.
+    static String dotnetName(CilType type) {
+        switch (type.kind) {
+            case VAR:
+            case MVAR:
+                return null;
+            case SZARRAY: {
+                String e = dotnetName(type.element);
+                return e == null ? null : e + "[]";
+            }
+            case ARRAY: {
+                String e = dotnetName(type.element);
+                if (e == null) {
+                    return null;
+                }
+                StringBuilder sb = new StringBuilder(e).append('[');
+                for (int i = 1; i < type.index; i++) {
+                    sb.append(',');
+                }
+                return sb.append(']').toString();
+            }
+            case GENERICINST: {
+                StringBuilder sb = new StringBuilder(type.element.name.replace('/', '+')).append('[');
+                for (int i = 0; i < type.args.length; i++) {
+                    String a = dotnetName(type.args[i]);
+                    if (a == null) {
+                        return null;
+                    }
+                    sb.append(i > 0 ? "," : "").append(a);
+                }
+                return sb.append(']').toString();
+            }
+            default: {
+                String name = type.typeName();
+                return name == null ? null : name.replace('/', '+');
+            }
+        }
     }
 
     /// The class a type is known by at run time, to `typeof` and to a

@@ -80,6 +80,9 @@ public class UnityProjectBuilderTest {
                 "UnityEngine/Vector2"));
         String csproj;
         File runtimeClasses;
+        /// Appended to every class the fake translator writes, so that a
+        /// test can change a class without changing its length.
+        String classBody = "";
 
         public void compileScripts(File csprojFile, File logFile) throws BuildException {
             compiled++;
@@ -104,7 +107,7 @@ public class UnityProjectBuilderTest {
                 for (String name : classNames) {
                     File f = new File(out, name + ".class");
                     f.getParentFile().mkdirs();
-                    Files.write(f.toPath(), name.getBytes(StandardCharsets.UTF_8));
+                    Files.write(f.toPath(), (name + classBody).getBytes(StandardCharsets.UTF_8));
                 }
             } catch (IOException e) {
                 throw new BuildException(e.getMessage(), e);
@@ -359,6 +362,33 @@ public class UnityProjectBuilderTest {
         // And nothing changed is still nothing to do.
         assertTrue(builder().run());
         assertEquals(3, tools.scenes);
+    }
+
+    /// A class the translator wrote again with the same length, at a time no
+    /// later than the installed copy's -- one tick of the file system's
+    /// clock, or an installed copy whose time is ahead -- still replaces it:
+    /// whatever a step that ran has written is installed.
+    @Test
+    public void aRebuiltClassOfTheSameLengthAndTimeIsInstalled() throws Exception {
+        tools.classBody = "1";
+        assertTrue(builder().run());
+        File installed = new File(classes, "global/Player.class");
+        assertEquals("global/Player1", new String(Files.readAllBytes(installed.toPath()), StandardCharsets.UTF_8));
+        assertTrue(installed.setLastModified(System.currentTimeMillis() + 60000L));
+        tools.classBody = "2";
+        write(new File(unity, "Assets/Scripts/Player.cs"), "class Player { int lives; }");
+        assertTrue(builder().run());
+        assertEquals(2, tools.translated);
+        assertEquals("global/Player2", new String(Files.readAllBytes(installed.toPath()), StandardCharsets.UTF_8));
+        // Nothing changed since is still nothing to copy: the installed
+        // class keeps a time a copy made now would not have.
+        File staged = new File(target, "unity/app/global/Player.class");
+        assertTrue(staged.isFile());
+        assertTrue(installed.setLastModified(staged.lastModified() + 5000L));
+        long time = installed.lastModified();
+        assertTrue(builder().run());
+        assertEquals(2, tools.translated);
+        assertEquals(time, installed.lastModified());
     }
 
     /// The staging directory is made where the .NET SDK is and may be used

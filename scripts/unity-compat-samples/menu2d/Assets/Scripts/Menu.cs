@@ -25,6 +25,7 @@ using System.Collections;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.Assertions;
+using UnityEngine.Events;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
@@ -68,6 +69,24 @@ public class Menu : MonoBehaviour
             + Enum.IsDefined(typeof(Level), 9) + " floor=" + floor.name + " at y=" + Cm(floor.position.y) + " wide="
             + Cm(floor.localScale.x) + " listed=" + play.onClick.GetPersistentEventCount() + " interactable="
             + play.interactable + " has key=" + PlayerPrefs.HasKey("best"));
+        // Listeners added in code: one added twice is called once, and one
+        // whose object was destroyed is not called, by itself or as part of
+        // a delegate joined with a live one's.
+        UnityEvent probe = new UnityEvent();
+        Board kept = new GameObject("Kept").AddComponent<Board>();
+        Board gone = new GameObject("Gone").AddComponent<Board>();
+        probe.AddListener(kept.Hear);
+        probe.AddListener(kept.Hear);
+        probe.AddListener(gone.Hear);
+        probe.AddListener((UnityAction)Delegate.Combine(new UnityAction(gone.Hear), new UnityAction(kept.Hear)));
+        probe.Invoke();
+        int before = Board.heard;
+        DestroyImmediate(gone.gameObject);
+        probe.Invoke();
+        probe.RemoveListener(kept.Hear);
+        probe.Invoke();
+        Debug.Log("listeners heard " + before + " then " + Board.heard);
+        DestroyImmediate(kept.gameObject);
     }
 
     private void Update()

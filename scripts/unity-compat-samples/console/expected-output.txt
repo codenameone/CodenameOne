@@ -415,4 +415,17 @@ combine multi+string: threw ArgumentException
 remove int-string: threw ArgumentException
 remove int-int: True
 equals object/variant: True False
+generic int+string: threw ArgumentException
+generic int+int: True
+generic static+closed: threw ArgumentException
+generic static+closed int: True
+generic method int+string: threw ArgumentException
+generic method int+closed: True
+== constructed types
+list False True False True True
+List`1 System.Collections.Generic.List`1[System.Int32] | System.Collections.Generic.List`1[System.String]
+Dictionary`2 System.Collections.Generic.Dictionary`2[System.String,System.Int32] True False
+System.Collections.Generic.List`1[System.Collections.Generic.List`1[System.Int32]] System.Collections.Generic.List`1[System.Int32[]] List`1 System.Collections.Generic.KeyValuePair`2[System.Int32,System.Boolean] System.Action`1[System.Int32] Func`2
+Inner Spike.DkNest`1+Inner[System.Int32] Spike.DkKeyed`1[Spike.GsVec]
+from generic code True False System.Collections.Generic.List`1[System.String] True System.Collections.Generic.Dictionary`2[System.String,System.Boolean]
 done

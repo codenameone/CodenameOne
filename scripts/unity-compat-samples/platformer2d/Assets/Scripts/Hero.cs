@@ -77,6 +77,22 @@ public class Hero : MonoBehaviour
         Debug.Log("wall=" + ground.HasTile(wall) + " centre " + Cm(at.x) + "," + Cm(at.y) + " corner " + Cm(corner.x)
             + "," + Cm(corner.y) + " post=" + ground.HasTile(post) + " sign=" + sign.text + " follows="
             + follow.Follow.name);
+        // A copy of a camera rig whose camera follows an object inside the
+        // rig follows the copy of that object; one it looks at outside the
+        // rig is the same object in the copy.
+        GameObject rig = new GameObject("Rig");
+        Transform mark = new GameObject("Mark").transform;
+        mark.SetParent(rig.transform);
+        CinemachineVirtualCamera cam = rig.AddComponent<CinemachineVirtualCamera>();
+        cam.Priority = -100;
+        cam.Follow = mark;
+        cam.LookAt = transform;
+        GameObject copy = Instantiate(rig);
+        CinemachineVirtualCamera copied = copy.GetComponent<CinemachineVirtualCamera>();
+        Debug.Log("copied rig follows its copy=" + (copied.Follow == copy.transform.GetChild(0)) + " the original="
+            + (copied.Follow == mark) + " looks at " + copied.LookAt.name + " priority=" + copied.Priority);
+        DestroyImmediate(copy);
+        DestroyImmediate(rig);
     }
 
     private void Update()

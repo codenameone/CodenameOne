@@ -36,11 +36,25 @@ public abstract class Delegate {
     /// The closed delegate type, ``System.Action`1<int32>`` as a string
     /// constant, for a delegate
     /// type with type arguments: the translator stores it where the
-    /// delegate is made and the type is known. Null for one without type
-    /// arguments, for one made inside generic code from its own type
-    /// parameters (`Action<T>` in a method of `Pool<T>`), where the type is
-    /// not known without building a name on every creation, and for one
-    /// the runtime makes. A null key compares as the erased type alone.
+    /// delegate is made and the type is known. Made inside generic code
+    /// from its own type parameters (`Action<T>` in a method of `Pool<T>`),
+    /// the delegate takes the same constant from the context of the
+    /// constructed type the code runs as, where there is one: a generic
+    /// type with static state, one that names such a type through its own
+    /// parameters, or a generic method that does.
+    ///
+    /// Null otherwise -- such code in a generic type with no static state,
+    /// in an instance method of a generic struct, and in a lambda's closure
+    /// class -- because the closed type is not known there without building
+    /// a name on every creation; and null for a delegate type without type
+    /// arguments and for one the runtime makes. A null key compares as the
+    /// erased type alone, as matching any key: no closed type can be ruled
+    /// out for it, so an `Action<T>` made by `Plain<int>` combines with one
+    /// made by `Plain<string>`, and with a closed `Action<string>`, where
+    /// .NET throws; and two such delegates over one method and one target
+    /// are equal, where .NET's are not. A `Combine` or `Remove` that .NET
+    /// would reject is a bug in the program, so what this leaves is a
+    /// missing exception and that one `Equals`.
     public Object $typeKey;
 
     /// A multicast delegate of the same delegate type as this one.

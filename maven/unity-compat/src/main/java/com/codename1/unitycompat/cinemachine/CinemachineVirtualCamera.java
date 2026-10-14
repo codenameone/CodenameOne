@@ -24,6 +24,7 @@ package com.codename1.unitycompat.cinemachine;
 
 import com.codename1.unitycompat.unityengine.Component;
 import com.codename1.unitycompat.unityengine.Transform;
+import com.codename1.unitycompat.unityengine.UnityRuntime;
 
 /// `Cinemachine.CinemachineVirtualCamera`: follows a target.
 ///
@@ -58,8 +59,12 @@ public final class CinemachineVirtualCamera extends CinemachineVirtualCameraBase
     public void $copyFrom(Component source) {
         super.$copyFrom(source);
         CinemachineVirtualCamera v = (CinemachineVirtualCamera) source;
-        m_LookAt = v.m_LookAt;
-        m_Follow = v.m_Follow;
+        // A target inside what is being copied becomes its copy, as a
+        // reference in a script's field does; one outside stays the same.
+        Object look = UnityRuntime.$remap(v.m_LookAt);
+        Object follow = UnityRuntime.$remap(v.m_Follow);
+        m_LookAt = look instanceof Transform ? (Transform) look : null;
+        m_Follow = follow instanceof Transform ? (Transform) follow : null;
         m_Lens.$assign(v.m_Lens);
     }
 

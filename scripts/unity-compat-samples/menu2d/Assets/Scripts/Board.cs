@@ -37,8 +37,17 @@ public class Board : MonoBehaviour
     public KeyCode[] keys;
     public int[] weights;
 
+    // How many times Hear was called, on any board: Menu hands a UnityEvent
+    // listeners on boards it then destroys.
+    public static int heard;
+
     private int[,] cells;
     private readonly Dictionary<GameObject, Vector2> placed = new Dictionary<GameObject, Vector2>();
+
+    public void Hear()
+    {
+        heard++;
+    }
 
     private void Start()
     {

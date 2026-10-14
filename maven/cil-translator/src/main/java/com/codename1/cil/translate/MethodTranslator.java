@@ -849,7 +849,34 @@ final class MethodTranslator implements Opcodes {
         if (Names.isTypeVariable(type) && loadTypeVariable(type)) {
             return;
         }
+        if (type.kind == CilType.Kind.GENERICINST && namesTypeVariable(type)
+                && askContext(GenericStatics.typeOfGetter(type), type)) {
+            return;
+        }
         host.emitTypeOf(mv, type, where());
+    }
+
+    /// Stack: nothing. Pushes what this code's context answers for a
+    /// constructed type built from type variables (see
+    /// GenericStatics#openTypes), and says whether there was a context to
+    /// ask: a method's own when it has one, else its type's where the code
+    /// can reach that, as `typeof(T)` does.
+    private boolean askContext(String getter, CilType open) {
+        GenericStatics g = host.generics;
+        String descriptor = GenericStatics.openTypeDescriptor(getter);
+        if (methodContextSlot >= 0 && g.openTypes(method).containsKey(getter)) {
+            mv.visitVarInsn(ALOAD, methodContextSlot);
+            mv.visitMethodInsn(INVOKEVIRTUAL, g.contextClass(method), getter, descriptor, false);
+            return true;
+        }
+        if (!GenericStatics.namesMethodVariable(open) && g.hasContext(owner)
+                && (contextSlot >= 0 || (!method.isStatic() && !ownerIsStruct))
+                && g.openTypes(owner).containsKey(getter)) {
+            loadOwnContext("the constructed type " + open);
+            mv.visitMethodInsn(INVOKEVIRTUAL, g.contextClass(owner), getter, descriptor, false);
+            return true;
+        }
+        return false;
     }
 
     private void unbox(CilType primitive) {
@@ -2928,17 +2955,28 @@ final class MethodTranslator implements Opcodes {
     /// as a string constant: the JVM interns one constant for every class
     /// that names it, which makes the runtime's test a reference compare.
     /// A type built from type variables -- `Action<T>` made inside
-    /// `Pool<T>` -- is known only at run time, and naming it there would
-    /// cost a string on every creation, so such a delegate carries none and
-    /// compares by its erased type alone (see `Delegate.$typeKey`).
+    /// `Pool<T>` -- is known only at run time. Where the code has a context
+    /// (a generic type with static state, see GenericStatics), the context
+    /// of each constructed type holds the same constant, and the delegate
+    /// takes it from there; naming it anywhere else would cost a string on
+    /// every creation, so such a delegate carries none and compares by its
+    /// erased type alone (see `Delegate.$typeKey`).
     private void delegateTypeKey(CilType type) {
-        if (type.kind != CilType.Kind.GENERICINST || namesTypeVariable(type)) {
+        if (type.kind != CilType.Kind.GENERICINST) {
             return;
         }
         String delegate = Names.RUNTIME + "system/Delegate";
+        if (namesTypeVariable(type)) {
+            mv.visitInsn(DUP);
+            if (!askContext(GenericStatics.keyGetter(type), type)) {
+                mv.visitInsn(POP);
+                return;
+            }
+        } else {
+            mv.visitInsn(DUP);
+            mv.visitLdcInsn(type.toString());
+        }
         host.index.requireField(delegate, "$typeKey", "Ljava/lang/Object;", where());
-        mv.visitInsn(DUP);
-        mv.visitLdcInsn(type.toString());
         mv.visitFieldInsn(PUTFIELD, delegate, "$typeKey", "Ljava/lang/Object;");
     }
 

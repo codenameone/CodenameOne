@@ -29,6 +29,7 @@ import com.codename1.cil.metadata.CilAssembly.MethodDef;
 import com.codename1.cil.metadata.CilAssembly.MethodRef;
 import com.codename1.cil.metadata.CilAssembly.TypeDef;
 import com.codename1.cil.metadata.CilType;
+import com.codename1.cil.metadata.MetadataReader;
 import com.codename1.cil.metadata.MethodBody.Instr;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -75,7 +76,13 @@ import org.objectweb.asm.Opcodes;
 ///
 /// A context also answers `typeof(T)`, and the class a type variable
 /// travels as to a generic method of the runtime, so `FindObjectOfType<T>()`
-/// inside `Singleton<T>` finds a `T`.
+/// inside `Singleton<T>` finds a `T`. It answers, too, for the constructed
+/// types its code builds from its own variables and that erasure would
+/// otherwise make one: `typeof(List<T>)`, and the closed type of a
+/// delegate it makes, `Action<T>` (`Delegate.$typeKey`). Each is a
+/// constant of the `Type$$S$<arguments>` class, so making one costs no
+/// more than a call. Code without a context still cannot tell them apart
+/// (see `Delegate.$typeKey` for what that leaves).
 ///
 /// None of this touches a type without type parameters, or a generic type
 /// with no static state that names none that has: when no generic type of
@@ -183,6 +190,11 @@ final class GenericStatics implements Opcodes {
         return false;
     }
 
+    /// True when a type names a type variable of a method.
+    static boolean namesMethodVariable(CilType type) {
+        return mentions(type, CilType.Kind.MVAR);
+    }
+
     private static boolean mentions(CilType type, CilType.Kind kind) {
         if (type == null) {
             return false;
@@ -195,6 +207,7 @@ final class GenericStatics implements Opcodes {
     private final Set<TypeDef> keyedTypes = new HashSet<TypeDef>();
     private final Set<MethodDef> keyedMethods = new HashSet<MethodDef>();
     private final Map<Object, Map<String, Use>> dependencies = new HashMap<Object, Map<String, Use>>();
+    private final Map<Object, Map<String, CilType>> openTypes = new HashMap<Object, Map<String, CilType>>();
     /// The arguments each generated `...$<arguments>` class stands for, to
     /// notice two that were given one name.
     private final Map<String, String> closedClasses = new HashMap<String, String>();
@@ -567,6 +580,81 @@ final class GenericStatics implements Opcodes {
         }
     }
 
+    /// The constructed types built from a type's own variables whose closed
+    /// form its code needs at run time, by the method of its context that
+    /// answers each: see [#keyGetter(CilType)] and [#typeOfGetter(CilType)].
+    /// A type's own are those that name no variable of a method; a
+    /// method's are every one its body names.
+    Map<String, CilType> openTypes(TypeDef type) {
+        Map<String, CilType> found = openTypes.get(type);
+        if (found == null) {
+            found = new LinkedHashMap<String, CilType>();
+            for (MethodDef m : type.methods) {
+                scanOpenTypes(m, false, found);
+            }
+            openTypes.put(type, found);
+        }
+        return found;
+    }
+
+    Map<String, CilType> openTypes(MethodDef method) {
+        Map<String, CilType> found = openTypes.get(method);
+        if (found == null) {
+            found = new LinkedHashMap<String, CilType>();
+            scanOpenTypes(method, true, found);
+            openTypes.put(method, found);
+        }
+        return found;
+    }
+
+    private void scanOpenTypes(MethodDef m, boolean ofMethod, Map<String, CilType> out) {
+        if (!m.hasBody()) {
+            return;
+        }
+        CilAssembly assembly = m.owner.assembly;
+        for (Instr ins : m.body().instructions) {
+            CilType t = null;
+            boolean delegate = false;
+            if ("newobj".equals(ins.op)) {
+                MethodRef ref = assembly.methodRef(ins.operand);
+                TypeDef def = host.universe.definitionOf(ref.declaringType);
+                if (def != null && def.isDelegate() && ref.declaringType.kind == CilType.Kind.GENERICINST) {
+                    t = ref.declaringType;
+                    delegate = true;
+                }
+            } else if ("ldtoken".equals(ins.op)
+                    && MetadataReader.tokenTable(ins.operand) == MetadataReader.TYPE_SPEC) {
+                CilType x = assembly.typeFromToken(ins.operand);
+                if (x.kind == CilType.Kind.GENERICINST) {
+                    t = x;
+                }
+            }
+            if (t == null || !(mentions(t, CilType.Kind.VAR) || mentions(t, CilType.Kind.MVAR))
+                    || !ofMethod && mentions(t, CilType.Kind.MVAR)) {
+                continue;
+            }
+            out.put(delegate ? keyGetter(t) : typeOfGetter(t), t);
+        }
+    }
+
+    /// The method of a context that answers the closed type of a delegate
+    /// type its code makes, as the string constant `Delegate.$typeKey`
+    /// holds -- the one code naming the closed type writes, so the two
+    /// are one interned object.
+    static String keyGetter(CilType open) {
+        return "$k" + mangle(open.toString());
+    }
+
+    /// The method of a context that answers `typeof` of a constructed type
+    /// its code names.
+    static String typeOfGetter(CilType open) {
+        return "$y" + mangle(open.toString());
+    }
+
+    static String openTypeDescriptor(String getter) {
+        return getter.startsWith("$k") ? "()Ljava/lang/Object;" : "()" + Translator.TYPE_DESCRIPTOR;
+    }
+
     /// The method of a context that answers for a type its code names.
     static String getter(Use u) {
         return "$d" + mangle(u.key());
@@ -622,7 +710,7 @@ final class GenericStatics implements Opcodes {
         mv.visitInsn(RETURN);
         mv.visitMaxs(0, 0);
         mv.visitEnd();
-        emitQuestions(cw, type.genericParamCount, dependencies(type));
+        emitQuestions(cw, type.genericParamCount, dependencies(type), openTypes(type));
         cw.visitEnd();
         host.putClass(name, cw.toByteArray());
     }
@@ -638,12 +726,16 @@ final class GenericStatics implements Opcodes {
         mv.visitInsn(RETURN);
         mv.visitMaxs(0, 0);
         mv.visitEnd();
-        emitQuestions(cw, method.genericParamCount, dependencies(method));
+        emitQuestions(cw, method.genericParamCount, dependencies(method), openTypes(method));
         cw.visitEnd();
         host.putClass(name, cw.toByteArray());
     }
 
-    private void emitQuestions(ClassWriter cw, int typeParameters, Map<String, Use> uses) {
+    private void emitQuestions(ClassWriter cw, int typeParameters, Map<String, Use> uses,
+            Map<String, CilType> open) {
+        for (String g : open.keySet()) {
+            cw.visitMethod(ACC_PUBLIC | ACC_ABSTRACT, g, openTypeDescriptor(g), null, null).visitEnd();
+        }
         for (int i = 0; i < typeParameters; i++) {
             cw.visitMethod(ACC_PUBLIC | ACC_ABSTRACT, typeGetter(i), "()" + Translator.TYPE_DESCRIPTOR, null, null)
                     .visitEnd();
@@ -720,6 +812,20 @@ final class GenericStatics implements Opcodes {
             mv = cw.visitMethod(ACC_PUBLIC, typeGetter(i), "()" + Translator.TYPE_DESCRIPTOR, null, null);
             mv.visitCode();
             host.emitTypeOf(mv, own[i], neededBy);
+            mv.visitInsn(ARETURN);
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+        Map<String, CilType> types = u.method == null ? openTypes(u.type) : openTypes(u.method);
+        for (Map.Entry<String, CilType> e : types.entrySet()) {
+            CilType closed = e.getValue().substitute(u.typeArgs, u.methodArgs);
+            mv = cw.visitMethod(ACC_PUBLIC, e.getKey(), openTypeDescriptor(e.getKey()), null, null);
+            mv.visitCode();
+            if (e.getKey().startsWith("$k")) {
+                mv.visitLdcInsn(closed.toString());
+            } else {
+                host.emitTypeOf(mv, closed, neededBy);
+            }
             mv.visitInsn(ARETURN);
             mv.visitMaxs(0, 0);
             mv.visitEnd();
