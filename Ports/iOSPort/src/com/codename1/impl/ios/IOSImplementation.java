@@ -799,10 +799,10 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @return The root pane of the form.  If there is no layered pane, then this should just
      * return the content pane.  Otherwise it may return the parent of the layered pane and content pane.
      */
-    private static Container getRootPane(Form f) {
+    private static Container getRootPane(com.codename1.ui.TopLevelContainer f) {
         Container root = f.getContentPane();
         Container parent = null;
-        while ((parent = root.getParent()) != null && parent != f) {
+        while ((parent = root.getParent()) != null && parent != f.asContainer()) {
             root = parent;
         }
         return root;
@@ -912,6 +912,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public int getInvisibleAreaUnderVKB() {
+        // Secondary scenes reserve space in their own content pane. The main
+        // form must not shrink in response to another window's keyboard.
+        if (keyboardLayoutOwner() instanceof com.codename1.ui.Window) {
+            return 0;
+        }
         if (areaUnderVKBOverride >= 0) {
             return areaUnderVKBOverride;
         }
@@ -1049,17 +1054,28 @@ public class IOSImplementation extends CodenameOneImplementation {
     private KeyboardLayout paddedKeyboardLayout;
 
     private static class KeyboardLayout {
-        final Form form;
+        final com.codename1.ui.TopLevelContainer owner;
         float bottomPadding;
         byte bottomUnit;
-        KeyboardLayout(Form form) { this.form = form; }
+        KeyboardLayout(com.codename1.ui.TopLevelContainer owner) { this.owner = owner; }
+    }
+
+    private com.codename1.ui.TopLevelContainer keyboardLayoutOwner() {
+        Component client = tiClient instanceof Component ? (Component) tiClient : currentEditing;
+        com.codename1.ui.TopLevelContainer top = client == null ? null : client.getTopLevelContainer();
+        return top != null ? top : Display.getInstance().getCurrent();
+    }
+
+    private boolean isKeyboardLayoutOwner(com.codename1.ui.TopLevelContainer owner) {
+        return owner == keyboardLayoutOwner()
+                && (!(owner instanceof Form) || owner == Display.getInstance().getCurrent());
     }
 
     private void restoreKeyboardPadding(KeyboardLayout layout) {
         if (layout == null || paddedKeyboardLayout != layout) {
             return;
         }
-        Style style = getRootPane(layout.form).getUnselectedStyle();
+        Style style = getRootPane(layout.owner).getUnselectedStyle();
         style.setPaddingUnitBottom(layout.bottomUnit);
         style.setPadding(Component.BOTTOM, layout.bottomPadding);
         paddedKeyboardLayout = null;
@@ -1071,17 +1087,17 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     static void keyboardWillBeShown(){
         instance.keyboardShowing = true;
-        final KeyboardLayout layout = new KeyboardLayout(Display.getInstance().getCurrent());
+        final KeyboardLayout layout = new KeyboardLayout(instance.keyboardLayoutOwner());
         instance.keyboardLayout = layout;
         if(nativeInstance.isAsyncEditMode() || tiClient != null) {
             // revalidate the parent since the size of form is now larger due to the vkb
-            final Form current = layout.form;
+            final com.codename1.ui.TopLevelContainer current = layout.owner;
             //final Component currentEditingFinal = instance.currentEditing;
             if (current != null) {
-                if(current.isFormBottomPaddingEditingMode()) {
+                if (current instanceof com.codename1.ui.Window || ((Form) current).isFormBottomPaddingEditingMode()) {
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
-                            if (instance.keyboardLayout == layout && Display.getInstance().getCurrent() == current) {
+                            if (instance.keyboardLayout == layout && instance.isKeyboardLayoutOwner(current)) {
                                 instance.restoreKeyboardPadding(instance.paddedKeyboardLayout);
                                 Style style = getRootPane(current).getUnselectedStyle();
                                 layout.bottomPadding = style.getPaddingFloatValue(false, Component.BOTTOM);
@@ -1090,7 +1106,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                                 style.setPaddingUnitBottom(Style.UNIT_TYPE_PIXELS);
                                 style.setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
                                 instance.paddedKeyboardLayout = layout;
-                                current.revalidate();
+                                current.asContainer().revalidate();
                                 if (tiClient instanceof Component) {
                                     instance.revealTextInputClient(tiClient);
                                     instance.refreshTextInputGeometry();
@@ -1106,7 +1122,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 } else {
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
-                            if (instance.keyboardLayout == layout && Display.getInstance().getCurrent() == current) {
+                            if (instance.keyboardLayout == layout && instance.isKeyboardLayoutOwner(current)) {
                                 instance.restoreKeyboardPadding(instance.paddedKeyboardLayout);
                                 if (tiClient instanceof Component) {
                                     instance.revealTextInputClient(tiClient);
@@ -1118,7 +1134,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                                     } finally {
                                         instance.doNotHideTextEditorSemaphore--;
                                     }
-                                    current.revalidate();
+                                    current.asContainer().revalidate();
                                     Display.getInstance().callSerially(new Runnable() {
                                         public void run() {
                                             updateNativeTextEditorFrame();
@@ -1148,21 +1164,21 @@ public class IOSImplementation extends CodenameOneImplementation {
 
             @Override
             public void run() {
-                if (layout == null || layout.form == null) {
+                if (layout == null || layout.owner == null) {
                     return;
                 }
                 instance.restoreKeyboardPadding(layout);
-                Form current = layout.form;
+                com.codename1.ui.TopLevelContainer current = layout.owner;
                 // A newer show owns keyboard layout now, including on the same form.
-                if (instance.keyboardLayout == null && Display.getInstance().getCurrent() == current) {
+                if (instance.keyboardLayout == null && instance.isKeyboardLayoutOwner(current)) {
                     instance.areaUnderVKBOverride = 0;
                     try {
-                        current.revalidate();
+                        current.asContainer().revalidate();
                         //Now that screen size is changed, the scroll positions may
                         // be caught in a negative state, leaving a gap at the
                         // top.
                         //https://github.com/codenameone/CodenameOne/issues/2476
-                        Accessor.fixNegativeScrolls(current);
+                        if (current instanceof Form) { Accessor.fixNegativeScrolls((Form) current); }
                     } finally {
                         instance.areaUnderVKBOverride = -1;
                     }
@@ -6000,10 +6016,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// native's dispatch_sync back onto the main queue it was already occupying
     /// and deadlocked.
     ///
-    /// dropEvents is cleared HERE, immediately, and only the listener is
-    /// marshalled. That flag suppresses input while a modal picker is up, and
-    /// deferring it to the EDT would leave events dropped for a turn after the
-    /// picker closed.
+    /// Input suppression is updated here, immediately, and only the listener
+    /// is marshalled. A chooser keeps suppression while other requests remain
+    /// outstanding; the last completion releases it before EDT delivery.
     ///
     /// New methods rather than a change to the shared ones, so the iOS document
     /// picker and the Mac share callback keep the behaviour they have. Note
@@ -6011,13 +6026,15 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// deadlock the same way -- that is pre-existing, framework-wide, and wants
     /// fixing inside fileChooserResult/capturePictureResult where every caller
     /// benefits.
-    public static void macFileChooserResult(final String r) {
-        dropEvents = false;
-        // Bound to the request NOW, on the thread the native answered on,
-        // rather than read later from the shared slot: by the time the EDT runs
-        // the delivery a second openFileChooser() may have replaced it, and
-        // this result would then fire the wrong listener and orphan its own.
-        final EventDispatcher target = macDequeue(macFileChooserQueue);
+    public static void macFileChooserResult(final String r, final int requestId) {
+        final EventDispatcher target;
+        synchronized (macFileChooserRequests) {
+            target = macFileChooserRequests.remove(requestId);
+            dropEvents = !macFileChooserRequests.isEmpty();
+        }
+        if (target == null) {
+            return; // Duplicate or unknown completion cannot consume another request.
+        }
         if (target != null && target == fileChooserCallback) {
             // Nothing else has claimed the slot, so keep it in step: the shared
             // path clears it after delivering, and leaving a fired dispatcher
@@ -6035,7 +6052,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         fileChooserResult(r, target);
     }
 
-    /// @see #macFileChooserResult(String)
+    /// @see #macFileChooserResult(String, int)
     public static void macCapturePictureResult(final String r) {
         dropEvents = false;
         final MacCaptureRequest request = macDequeueCapture();
@@ -6111,13 +6128,13 @@ public class IOSImplementation extends CodenameOneImplementation {
      * Callback for the native document picker.
      */
     public static void fileChooserResult(String r) {
+        dropEvents = false;
         fileChooserResult(r, fileChooserCallback);
         fileChooserCallback = null;
     }
 
     /// @see #capturePictureResult(String, EventDispatcher)
     private static void fileChooserResult(String r, EventDispatcher fileChooserCallback) {
-        dropEvents = false;
         if(fileChooserCallback != null) {
             if(r != null) {
                 if(r.startsWith("file:")) {
@@ -6174,30 +6191,13 @@ public class IOSImplementation extends CodenameOneImplementation {
     private static EventDispatcher captureCallback;
     private static EventDispatcher fileChooserCallback;
 
-    /// The dispatchers of chooser requests the native has not answered yet,
-    /// oldest first. macOS only.
+    /// Outstanding macOS chooser dispatchers, keyed by request identity.
     ///
-    /// The shared callbacks above are ONE slot read at DELIVERY time, which is
-    /// only sound while a request cannot be outstanding when the next is made.
-    /// It can here: openFileChooser() returns as soon as it has queued the
-    /// panel, so two calls in a single EDT turn overwrite the slot before
-    /// either answer arrives -- the first panel's selection is then delivered
-    /// to the SECOND listener and clears the slot, and the second selection
-    /// finds it null and is dropped. Neither listener hears its own result and
-    /// one hears nothing at all.
-    ///
-    /// A queue rather than a single slot, because pairing by ORDER is exactly
-    /// right on this port: the panel runs through -[NSOpenPanel runModal],
-    /// which is application modal on the main queue, so a second panel cannot
-    /// start until the first returns and the answers come back in the order the
-    /// requests were made.
-    ///
-    /// iOS keeps the single slot. Its pickers are presented rather than run
-    /// modally and its result path is the shared one; changing it belongs with
-    /// a fix to fileChooserResult/capturePictureResult where every caller
-    /// benefits, not smuggled in here.
-    private static final java.util.ArrayList<EventDispatcher> macFileChooserQueue =
-            new java.util.ArrayList<EventDispatcher>();
+    /// Document-owned sheets can finish in any order across windows. Each native
+    /// completion carries the identity assigned before its panel was presented.
+    private static final java.util.HashMap<Integer, EventDispatcher> macFileChooserRequests =
+            new java.util.HashMap<Integer, EventDispatcher>();
+    private static int macFileChooserSequence;
 
     /// One outstanding capture request: who asked, and what SHAPE of answer it
     /// asked for.
@@ -6241,30 +6241,6 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
-    /// Remembers a chooser request's dispatcher so its own result can find it.
-    private static void macEnqueue(java.util.ArrayList<EventDispatcher> queue,
-            EventDispatcher dispatcher) {
-        if (!isMacPlatformStatic() || dispatcher == null) {
-            return;
-        }
-        synchronized (queue) {
-            queue.add(dispatcher);
-        }
-    }
-
-    /// The dispatcher for the oldest unanswered request, or null when there is
-    /// none -- a result the framework never asked for, which is dropped exactly
-    /// as the single-slot path dropped it.
-    private static EventDispatcher macDequeue(
-            java.util.ArrayList<EventDispatcher> queue) {
-        synchronized (queue) {
-            if (queue.isEmpty()) {
-                return null;
-            }
-            return queue.remove(0);
-        }
-    }
-    
     /**
      * Captures a photo and notifies with the image data when available
      * @param response callback for the resulting image
@@ -6693,11 +6669,31 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void openFileChooser(ActionListener response, String accept) {
-        fileChooserCallback = new EventDispatcher();
-        fileChooserCallback.addListener(response);
-        macEnqueue(macFileChooserQueue, fileChooserCallback);
-        nativeInstance.openFileChooser(accept);
+        EventDispatcher callback = new EventDispatcher();
+        callback.addListener(response);
+        fileChooserCallback = callback;
         dropEvents = true;
+        if (isMacPlatform()) {
+            final int requestId;
+            synchronized (macFileChooserRequests) {
+                requestId = ++macFileChooserSequence;
+                macFileChooserRequests.put(requestId, callback);
+                dropEvents = true;
+            }
+            try {
+                nativeInstance.openFileChooserWithId(accept, requestId);
+            } catch (RuntimeException failure) {
+                synchronized (macFileChooserRequests) {
+                    macFileChooserRequests.remove(requestId);
+                    dropEvents = !macFileChooserRequests.isEmpty();
+                }
+                if (fileChooserCallback == callback) { fileChooserCallback = null; }
+                throw failure;
+            }
+            if (tiKeepAlive) { macFileChooserResult(null, 0); }
+        } else {
+            nativeInstance.openFileChooser(accept);
+        }
     }
     
     

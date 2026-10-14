@@ -2720,6 +2720,9 @@ public class Toolbar extends Container {
     }
 
     boolean isTitleBarDragPoint(int x, int y) {
+        if (!isVisible()) {
+            return false;
+        }
         int[] regions = titleBarRegions();
         for (int i = 0; i < regions.length; i += 4) {
             boolean inside = x >= regions[i] && y >= regions[i + 1]
@@ -2731,10 +2734,25 @@ public class Toolbar extends Container {
         return true;
     }
 
+    private void clearNativeTitleBarRegions() {
+        if (nativeTitleBarRegions != null) {
+            Display.impl.setNativeWindowTitleBarRegions(this, new int[0]);
+            nativeTitleBarRegions = null;
+        }
+    }
+
+    @Override
+    public void setVisible(boolean visible) {
+        if (!visible) {
+            clearNativeTitleBarRegions();
+        }
+        super.setVisible(visible);
+    }
+
     @Override
     public void paint(Graphics g) {
         Form parent = getComponentForm();
-        if (parent != null && !(parent instanceof Dialog) && parent.isDesktopToolbarTitle()) {
+        if (isVisible() && parent != null && !(parent instanceof Dialog) && parent.isDesktopToolbarTitle()) {
             int[] regions = titleBarRegions();
             boolean changed = nativeTitleBarRegions == null || nativeTitleBarRegions.length != regions.length;
             for (int i = 0; !changed && i < regions.length; i++) {
@@ -2745,8 +2763,7 @@ public class Toolbar extends Container {
                 Display.impl.setNativeWindowTitleBarRegions(this, regions);
             }
         } else if (nativeTitleBarRegions != null) {
-            Display.impl.setNativeWindowTitleBarRegions(this, new int[0]);
-            nativeTitleBarRegions = null;
+            clearNativeTitleBarRegions();
         }
         super.paint(g);
     }
@@ -2754,8 +2771,7 @@ public class Toolbar extends Container {
     @Override
     protected void deinitialize() {
         if (nativeTitleBarRegions != null) {
-            Display.impl.setNativeWindowTitleBarRegions(this, new int[0]);
-            nativeTitleBarRegions = null;
+            clearNativeTitleBarRegions();
         }
         super.deinitialize();
     }
@@ -2793,6 +2809,10 @@ public class Toolbar extends Container {
 
         @Override
         public void actionPerformed(ActionEvent evt) {
+            if (!toolbar.isVisible()) {
+                dragging = false;
+                return;
+            }
             ActionEvent.Type t = evt.getEventType();
             if (t == ActionEvent.Type.PointerPressed) {
                 dragging = toolbar.isTitleBarDragPoint(evt.getX(), evt.getY());

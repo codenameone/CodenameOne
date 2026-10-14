@@ -109,6 +109,27 @@ class DesktopChromeTest extends UITestBase {
                 "a removed title bar must not leave invisible window drag handles");
     }
 
+    @FormTest
+    void hidingToolbarImmediatelyClearsNativeAndFallbackDragRegions() {
+        desktopMode("custom");
+        Form form = new Form("Document");
+        form.show();
+        DisplayTest.flushEdt();
+        Toolbar toolbar = form.getToolbar();
+        Graphics graphics = Image.createImage(800, 800).getGraphics();
+        toolbar.paint(graphics);
+        assertTrue(implementation.getLastTitleBarRegions().length > 0);
+        toolbar.setVisible(false);
+        assertEquals(0, implementation.getLastTitleBarRegions().length,
+                "hiding must clear regions before any subsequent paint");
+        assertFalse(toolbar.isTitleBarDragPoint(toolbar.getAbsoluteX() + 1, toolbar.getAbsoluteY() + 1));
+        toolbar.paint(graphics); // a manual paint must not republish a hidden band
+        assertEquals(0, implementation.getLastTitleBarRegions().length);
+        toolbar.setVisible(true);
+        toolbar.paint(graphics);
+        assertTrue(implementation.getLastTitleBarRegions().length > 0);
+    }
+
     private void desktopMode(String titleBarMode) {
         implementation.setDesktop(true);
         implementation.setDesktopTitleBarMode(titleBarMode);

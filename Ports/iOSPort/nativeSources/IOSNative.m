@@ -9111,7 +9111,14 @@ static NSArray *cn1FileChooserDocumentTypes(NSString *accept) {
 }
 #endif
 
+void com_codename1_impl_ios_IOSNative_openFileChooserWithId___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT accept, JAVA_INT requestId);
+
 void com_codename1_impl_ios_IOSNative_openFileChooser___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT accept) {
+    com_codename1_impl_ios_IOSNative_openFileChooserWithId___java_lang_String_int(
+        CN1_THREAD_STATE_PASS_ARG instanceObject, accept, 0);
+}
+
+void com_codename1_impl_ios_IOSNative_openFileChooserWithId___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT accept, JAVA_INT requestId) {
 #if TARGET_OS_OSX
     NSString *nsAccept = accept == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG accept);
     NSArray *documentTypes = cn1FileChooserDocumentTypes(nsAccept);
@@ -9138,8 +9145,8 @@ void com_codename1_impl_ios_IOSNative_openFileChooser___java_lang_String(CN1_THR
             // The native callback clears dropEvents, then delivers the path on the EDT.
             // FileSystemStorage expects an unescaped path, not a URL string.
             struct ThreadLocalData *threadStateData = getThreadLocalData();
-            com_codename1_impl_ios_IOSImplementation_macFileChooserResult___java_lang_String(
-                threadStateData, picked == nil ? JAVA_NULL : fromNSString(threadStateData, [picked path]));
+            com_codename1_impl_ios_IOSImplementation_macFileChooserResult___java_lang_String_int(
+                threadStateData, picked == nil ? JAVA_NULL : fromNSString(threadStateData, [picked path]), requestId);
             POOL_END();
         };
         if (owner != nil) {

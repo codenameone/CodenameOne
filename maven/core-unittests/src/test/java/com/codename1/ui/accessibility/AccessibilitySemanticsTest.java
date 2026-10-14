@@ -105,6 +105,44 @@ class AccessibilitySemanticsTest extends UITestBase {
     }
 
     @FormTest
+    void semanticListActivationIsIndependentOfTheLastPointerDrag() throws Exception {
+        java.lang.reflect.Field drag = Display.class.getDeclaredField("dragOccured");
+        drag.setAccessible(true);
+        Display display = Display.getInstance();
+        boolean old = drag.getBoolean(display);
+        try {
+            Form form = form();
+            for (com.codename1.ui.List<String> list : new com.codename1.ui.List[] {
+                    new com.codename1.ui.List<String>("Home", "Insert"),
+                    new com.codename1.ui.ComboBox<String>("Home", "Insert")}) {
+                place(form, list, 0, 0, 200, 160);
+                final int[] actions = {0};
+                list.addActionListener(e -> actions[0]++);
+                drag.setBoolean(display, true);
+                assertTrue(display.hasDragOccured());
+                AccessibilityTreeSnapshot tree = AccessibilityInspector.snapshot(form);
+                AccessibilityNodeSnapshot item = tree.getNode(find(tree, list).getChildIds().get(1));
+                assertTrue(item.getAction(AccessibilityAction.ACTIVATE).perform(list, null));
+                assertEquals(1, list.getSelectedIndex());
+                assertEquals(1, actions[0]);
+                assertTrue(display.hasDragOccured(), "semantic actions must not reset pointer gesture state");
+                list.remove();
+            }
+            class PointerList extends com.codename1.ui.List<String> {
+                PointerList() { super("One", "Two"); }
+                void pointerAction() { fireActionEvent(); }
+            }
+            PointerList pointer = new PointerList();
+            final int[] actions = {0};
+            pointer.addActionListener(e -> actions[0]++);
+            pointer.pointerAction();
+            assertEquals(0, actions[0], "ordinary pointer activation still respects the drag guard");
+        } finally {
+            drag.setBoolean(display, old);
+        }
+    }
+
+    @FormTest
     void associatedLabelChangesInvalidateTheCachedSnapshot() {
         Form form = form();
         TextArea area = new TextArea("Field content");

@@ -2783,19 +2783,19 @@ public abstract class CodenameOneImplementation {
         return positions;
     }
 
-    /// Revalidates a pure text client's form and reveals its caret after the keyboard changes
+    /// Revalidates a pure text client's top level and reveals its caret after the keyboard changes
     /// the available viewport. Called on the EDT, independently of legacy native text widgets.
     protected void revealTextInputClient(com.codename1.ui.TextInputClient client) {
         if (!(client instanceof Component)) {
             return;
         }
         Component component = (Component) client;
-        Form form = component.getComponentForm();
-        if (form == null) {
+        com.codename1.ui.TopLevelContainer top = component.getTopLevelContainer();
+        if (top == null) {
             return;
         }
         component.requestFocus();
-        form.revalidate();
+        top.asContainer().revalidate();
         int[] caret = client.getCaretRect();
         component.scrollRectToVisible(caret[0] - component.getAbsoluteX(),
                 caret[1] - component.getAbsoluteY(), Math.max(1, caret[2]), Math.max(1, caret[3]), component);

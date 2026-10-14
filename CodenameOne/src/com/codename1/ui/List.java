@@ -1690,7 +1690,7 @@ public class List<T> extends Component implements ActionSource {
             return false;
         }
         setSelectedIndex(index);
-        fireActionEvent();
+        dispatchActionEvent(new ActionEvent(eventSource, ActionEvent.Type.Other));
         return true;
     }
 
@@ -1706,7 +1706,13 @@ public class List<T> extends Component implements ActionSource {
     ///
     /// - `a`: the event to fire
     protected void fireActionEvent(ActionEvent a) {
-        if (isEnabled() && !Display.getInstance().hasDragOccured()) {
+        if (!Display.getInstance().hasDragOccured()) {
+            dispatchActionEvent(a);
+        }
+    }
+
+    private void dispatchActionEvent(ActionEvent a) {
+        if (isEnabled()) {
             if (disposeDialogOnSelection) {
                 popupSelectionFired = true;
                 // The enclosing Dialog, found the same way an activated command finds

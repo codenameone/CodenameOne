@@ -254,4 +254,51 @@ class IOSTextInputGeometryTest extends UITestBase {
         }
     }
 
+    @FormTest
+    void secondaryWindowKeyboardReservesItsOwnViewportAndLeavesMainFormAlone() {
+        IOSNative oldNative = IOSImplementation.nativeInstance;
+        IOSImplementation oldInstance = IOSImplementation.instance;
+        Port port = new Port();
+        Client client = new Client();
+        implementation.setMultiWindowSupported(true);
+        Window window = new Window("Secondary editor", new BorderLayout());
+        try {
+            IOSImplementation.nativeInstance = new NativeStub();
+            IOSImplementation.instance = port;
+            Form main = new Form("Main", new BorderLayout());
+            main.setFormBottomPaddingEditingMode(true);
+            main.getContentPane().getStyle().setPadding(Component.BOTTOM, 37);
+            main.show();
+            window.add(BorderLayout.CENTER, client);
+            window.show();
+            window.setWindowContentSize(400, 600);
+            flushSerialCalls();
+            StringBuilder text = new StringBuilder();
+            for (int i = 0; i < 80; i++) text.append("window keyboard caret\n");
+            client.setText(text.toString());
+            client.setSelectionRange(client.getTextLength(), client.getTextLength());
+            assertNull(client.getComponentForm());
+            assertSame(window, client.getTopLevelContainer());
+            int heightBefore = client.getHeight();
+            int mainPadding = main.getContentPane().getStyle().getPaddingBottom();
+            port.startTextInput(client, client.getConfig());
+            IOSImplementation.keyboardWillBeShown();
+            flushSerialCalls();
+            assertEquals(mainPadding, main.getContentPane().getStyle().getPaddingBottom());
+            assertEquals(0, port.getInvisibleAreaUnderVKB(), "another scene must not obscure the main form");
+            assertTrue(client.getHeight() <= heightBefore - 140, "secondary content must shrink above its keyboard");
+            assertTrue(client.revealCount > 0);
+            int[] caret = client.getCaretRect();
+            assertTrue(caret[1] + caret[3] <= window.getAbsoluteY() + window.getHeight() - 150);
+            IOSImplementation.keyboardWillBeHidden();
+            flushSerialCalls();
+            assertEquals(heightBefore, client.getHeight());
+        } finally {
+            port.stopTextInput(client);
+            window.dispose();
+            IOSImplementation.nativeInstance = oldNative;
+            IOSImplementation.instance = oldInstance;
+        }
+    }
+
 }
