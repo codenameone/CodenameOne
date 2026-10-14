@@ -116,6 +116,10 @@ int main(int argc, char** argv) {
     event.x = 10; event.y = 10;
     assert(cn1TitleButton(cn1TitleCanvas, &event, NULL)); // application control consumes
     event.x = 200;
+    event.type = GDK_BUTTON_RELEASE;
+    assert(cn1TitleButton(cn1TitleCanvas, &event, NULL)); // release outside still completes control gesture
+    assert(!cn1TitlePointerButtons);
+    event.type = GDK_BUTTON_PRESS;
     assert(!cn1TitleButton(cn1TitleCanvas, &event, NULL)); // GTK owns blank caption
     assert(cn1TitleEventY(cn1DrawingArea, 12) == cn1TitleHeight + 12);
     GtkWidget* edit = gtk_entry_new();

@@ -25,7 +25,15 @@
 /* Included by cn1_linux_window.c. GTK owns the header, decorations and controls.
  * The custom-title drawing area shows the Toolbar slice of the same back buffer
  * as the body. No independent Java component tree or synthetic window controls. */
+static int cn1TitlePointerButtons;
 static gboolean cn1TitleButton(GtkWidget* widget, GdkEventButton* event, gpointer data) {
+    int button = cn1LinuxButtonMask(event->button);
+    // GTK's implicit grab keeps releases on this canvas even if the pointer
+    // leaves the control. Finish the Java gesture before considering native drag.
+    if (event->type == GDK_BUTTON_RELEASE && (cn1TitlePointerButtons & button)) {
+        cn1TitlePointerButtons &= ~button;
+        return cn1OnButton(widget, event, data);
+    }
     int x = cn1TitleEventX(widget, event->x), y = cn1TitleEventY(widget, event->y);
     gboolean drag = cn1TitleRegionCount >= 4;
     for (int i = 0; drag && i < cn1TitleRegionCount; i += 4) {
@@ -37,6 +45,7 @@ static gboolean cn1TitleButton(GtkWidget* widget, GdkEventButton* event, gpointe
     // actions and compositor move tracking, on both X11 and Wayland.
     if (drag) return FALSE;
     if (event->type == GDK_2BUTTON_PRESS || event->type == GDK_3BUTTON_PRESS) return TRUE;
+    if (event->type == GDK_BUTTON_PRESS) cn1TitlePointerButtons |= button;
     return cn1OnButton(widget, event, data);
 }
 static void cn1TitleAllocated(GtkWidget* widget, GtkAllocation* allocation, gpointer data) {
@@ -56,6 +65,7 @@ static void cn1TitleAllocated(GtkWidget* widget, GtkAllocation* allocation, gpoi
 }
 static void cn1TitleEnable(gboolean enabled) {
     if (!cn1Window || (!!cn1TitleHeader == !!enabled)) return;
+    cn1TitlePointerButtons = 0;
     gboolean visible = gtk_widget_get_visible(cn1Window);
     // GTK requires titlebar changes before mapping for some window managers.
     if (visible) gtk_widget_hide(cn1Window);
