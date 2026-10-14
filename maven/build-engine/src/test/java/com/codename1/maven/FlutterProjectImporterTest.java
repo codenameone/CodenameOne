@@ -314,6 +314,115 @@ public class FlutterProjectImporterTest {
                 Files.readAllLines(record.toPath(), java.nio.charset.StandardCharsets.UTF_8));
     }
 
+    /// Flutter bundles a single-file asset's resolution-aware siblings --
+    /// `2.0x/logo.png`, `3.0x/logo.png` -- without a separate pubspec entry
+    /// for each. The importer must find and copy them beside the declared
+    /// file, and record each one's own key so `TranscodeFlutterMojo` packages
+    /// it; a sibling directory that is not a `<N>x` variant, or a same-named
+    /// file in a directory belonging to some other asset, must not be swept
+    /// in by mistake.
+    @Test
+    public void copiesResolutionVariantSiblingsOfASingleFileAssetKeyAndRecordsThem() throws Exception {
+        File root = Files.createTempDirectory("flutter-asset-variants").toFile();
+        File flutterProject = new File(root, "demo");
+        write(new File(flutterProject, "pubspec.yaml"), "name: demo\nversion: 1.0.0\n"
+                + "dependencies:\n  flutter:\n    sdk: flutter\n"
+                + "flutter:\n  assets:\n    - assets/logo.png\n");
+        write(new File(flutterProject, "lib/main.dart"), "void main() {}\n");
+        write(new File(flutterProject, "assets/logo.png"), "LOGO-1X");
+        write(new File(flutterProject, "assets/2.0x/logo.png"), "LOGO-2X");
+        write(new File(flutterProject, "assets/3.0x/logo.png"), "LOGO-3X");
+        // A same-named file sitting in a directory that is not a "<N>x" variant
+        // name must not be treated as a resolution variant.
+        write(new File(flutterProject, "assets/notaratio/logo.png"), "LOGO-NOT-A-VARIANT");
+        // A different file inside a real variant directory belongs to some
+        // other (undeclared) asset here, not to "logo.png".
+        write(new File(flutterProject, "assets/2.0x/other.png"), "OTHER-2X");
+
+        File common = new File(root, "common");
+        new FlutterProjectImporter(new com.codename1.build.SystemStreamLog())
+                .importProject(flutterProject, common, null, null);
+
+        File flutterDir = new File(common, "src/main/flutter");
+        assertEquals("LOGO-1X", read(new File(flutterDir, "assets/logo.png")));
+        assertEquals("LOGO-2X", read(new File(flutterDir, "assets/2.0x/logo.png")));
+        assertEquals("LOGO-3X", read(new File(flutterDir, "assets/3.0x/logo.png")));
+        assertFalse("a sibling directory that is not a resolution-variant name must be ignored",
+                new File(flutterDir, "assets/notaratio/logo.png").exists());
+        assertFalse("a different file in a variant directory belongs to another asset",
+                new File(flutterDir, "assets/2.0x/other.png").exists());
+
+        File record = new File(flutterDir, FlutterProjectImporter.ASSET_KEYS_RECORD);
+        assertEquals(java.util.Arrays.asList("assets/2.0x/logo.png", "assets/3.0x/logo.png", "assets/logo.png"),
+                Files.readAllLines(record.toPath(), java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    /// The same bundling rule applies to a package asset resolved through
+    /// `.dart_tool/package_config.json`: the variant lives beside the file in
+    /// the package's own `lib/`, not in the importing app's tree.
+    @Test
+    public void copiesResolutionVariantSiblingsOfAPackageAsset() throws Exception {
+        File root = Files.createTempDirectory("flutter-pkg-asset-variants").toFile();
+        File flutterProject = new File(root, "demo");
+        write(new File(flutterProject, "pubspec.yaml"), "name: demo\nversion: 1.0.0\n"
+                + "dependencies:\n  flutter:\n    sdk: flutter\n  my_pkg: 1.0.0\n"
+                + "flutter:\n  assets:\n    - packages/my_pkg/logo.png\n");
+        write(new File(flutterProject, "lib/main.dart"), "void main() {}\n");
+
+        File pkgRoot = new File(root, "fake-pub-cache/my_pkg-1.0.0");
+        write(new File(pkgRoot, "lib/logo.png"), "PKG-LOGO-1X");
+        write(new File(pkgRoot, "lib/2.0x/logo.png"), "PKG-LOGO-2X");
+
+        File dartTool = new File(flutterProject, ".dart_tool");
+        write(new File(dartTool, "package_config.json"), "{\n  \"configVersion\": 2,\n  \"packages\": [\n"
+                + "    {\n      \"name\": \"my_pkg\",\n      \"rootUri\": \"" + pkgRoot.toURI()
+                + "\",\n      \"packageUri\": \"lib/\"\n    }\n  ]\n}\n");
+
+        File common = new File(root, "common");
+        new FlutterProjectImporter(new com.codename1.build.SystemStreamLog())
+                .importProject(flutterProject, common, null, null);
+
+        File flutterDir = new File(common, "src/main/flutter");
+        assertEquals("PKG-LOGO-1X", read(new File(flutterDir, "packages/my_pkg/logo.png")));
+        assertEquals("PKG-LOGO-2X", read(new File(flutterDir, "packages/my_pkg/2.0x/logo.png")));
+
+        File record = new File(flutterDir, FlutterProjectImporter.ASSET_KEYS_RECORD);
+        assertEquals(java.util.Arrays.asList("packages/my_pkg/2.0x/logo.png", "packages/my_pkg/logo.png"),
+                Files.readAllLines(record.toPath(), java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    /// A variant dropped from the Flutter project (not just the main asset)
+    /// must stop being bundled on the next import, the same way a dropped
+    /// main asset already does.
+    @Test
+    public void reimportRemovesAStaleResolutionVariantNoLongerPresent() throws Exception {
+        File root = Files.createTempDirectory("flutter-reimport-variant").toFile();
+        File flutterProject = new File(root, "demo");
+        write(new File(flutterProject, "pubspec.yaml"), "name: demo\nversion: 1.0.0\n"
+                + "dependencies:\n  flutter:\n    sdk: flutter\n"
+                + "flutter:\n  assets:\n    - assets/logo.png\n");
+        write(new File(flutterProject, "lib/main.dart"), "void main() {}\n");
+        write(new File(flutterProject, "assets/logo.png"), "LOGO-1X");
+        File variant = new File(flutterProject, "assets/2.0x/logo.png");
+        write(variant, "LOGO-2X");
+
+        File common = new File(root, "common");
+        FlutterProjectImporter importer = new FlutterProjectImporter(new com.codename1.build.SystemStreamLog());
+        importer.importProject(flutterProject, common, null, null);
+
+        File flutterDir = new File(common, "src/main/flutter");
+        assertTrue(new File(flutterDir, "assets/2.0x/logo.png").isFile());
+
+        assertTrue(variant.delete());
+        importer.importProject(flutterProject, common, null, null);
+
+        assertFalse("the dropped variant must not stay behind",
+                new File(flutterDir, "assets/2.0x/logo.png").exists());
+        File record = new File(flutterDir, FlutterProjectImporter.ASSET_KEYS_RECORD);
+        assertEquals(java.util.Collections.singletonList("assets/logo.png"),
+                Files.readAllLines(record.toPath(), java.nio.charset.StandardCharsets.UTF_8));
+    }
+
     @Test
     public void aTrailingCommentIsNotPartOfAPubspecValue() {
         assertEquals("2.10.2+021002", FlutterProjectImporter.Pubspec.unquote("2.10.2+021002 # See README.md"));

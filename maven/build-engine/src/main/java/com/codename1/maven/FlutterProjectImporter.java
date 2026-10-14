@@ -87,6 +87,15 @@ public final class FlutterProjectImporter {
     /// reached by a transpiled build.
     static final String[] IGNORED = {"flutter_test", "flutter_driver", "integration_test", "test", "build_runner"};
 
+    /// flutter_tools' own resolution-variant directory name, matched exactly
+    /// (`asset.dart`'s `_assetVariantDirectoryRegExp`): one or more digits,
+    /// optionally a `.` and zero or more further digits, then `x` --
+    /// `"2x"`, `"3.0x"`, `"1.5x"`, even the edge case `"2.x"` that regex also
+    /// accepts. A pubspec asset key naming a single file never lists these
+    /// directories itself; Flutter still bundles whichever of them hold a
+    /// same-named file beside it, and [#copyAssetVariants] replicates that.
+    private static final Pattern VARIANT_DIR = Pattern.compile("\\d+(\\.\\d*)?x");
+
     public static final class Result {
         public final List<String> covered = new ArrayList<String>();
         public final List<String> uncovered = new ArrayList<String>();
@@ -195,8 +204,18 @@ public final class FlutterProjectImporter {
                 }
                 declaredAssetKeys.add(clean);
                 int before = r.copiedAssets;
+                boolean singleFile = assetSrc.isFile();
                 r.copiedAssets += copy(assetSrc, new File(target, clean.replace('/', File.separatorChar)), clean,
                         previous, imported);
+                if (singleFile) {
+                    // A directory key ("assets/icons/") already recurses through any
+                    // "<N>x/" sibling on its own, via #copy; only a single-file key
+                    // ("assets/logo.png") needs its resolution variants found
+                    // separately, because Flutter bundles them without a second
+                    // pubspec entry.
+                    r.copiedAssets += copyAssetVariants(assetSrc, clean, target, previous, imported,
+                            declaredAssetKeys);
+                }
                 if (r.copiedAssets == before) {
                     // A declared directory with nothing in it yet; not an error.
                     log.debug("No files found for Flutter asset entry " + key);
@@ -446,6 +465,52 @@ public final class FlutterProjectImporter {
         Files.copy(src.toPath(), dest.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         imported.put(path, sha256(dest));
         return 1;
+    }
+
+    /// Copies every resolution-specific sibling of a single-file asset --
+    /// `logo.png`'s `2.0x/logo.png`, `3.0x/logo.png` and so on -- that Flutter
+    /// bundles without a second pubspec entry (flutter_tools' own rule,
+    /// `asset.dart`'s `_AssetDirectoryCache.variantsFor`: any sibling directory
+    /// matching [#VARIANT_DIR] holding a same-named file). `assetSrc` is the
+    /// already-resolved main file, from either the Flutter project itself or a
+    /// pub package's `lib/`; `cleanKey` is the asset key it was declared under
+    /// (`assets/logo.png`, or `packages/<pkg>/assets/logo.png`), and each
+    /// variant's own key is built from it the way flutter_tools names the
+    /// variant file -- `assets/2.0x/logo.png`.
+    ///
+    /// Every variant's key is added to `declaredAssetKeys` too, unconditionally
+    /// once the variant file is found to exist -- the same rule [#importProject]
+    /// applies to the main key itself. A key rooted at `assets/`/`packages/`
+    /// does not strictly need that (`TranscodeFlutterMojo` already rescans those
+    /// two roots whole, so a variant copied under them is found regardless), but
+    /// any other project-relative key does: the mojo flattens such a key one
+    /// file at a time from exactly this record, with no scan of its own to find
+    /// the variant otherwise.
+    private int copyAssetVariants(File assetSrc, String cleanKey, File target, Map<String, String> previous,
+            Map<String, String> imported, Set<String> declaredAssetKeys) throws IOException {
+        File dir = assetSrc.getParentFile();
+        File[] siblings = dir == null ? null : dir.listFiles();
+        if (siblings == null) {
+            return 0;
+        }
+        String fileName = assetSrc.getName();
+        int slash = cleanKey.lastIndexOf('/');
+        String keyDir = slash < 0 ? "" : cleanKey.substring(0, slash + 1);
+        int copied = 0;
+        for (File sibling : siblings) {
+            if (!sibling.isDirectory() || !VARIANT_DIR.matcher(sibling.getName()).matches()) {
+                continue;
+            }
+            File variantFile = new File(sibling, fileName);
+            if (!variantFile.isFile()) {
+                continue;
+            }
+            String variantKey = keyDir + sibling.getName() + "/" + fileName;
+            declaredAssetKeys.add(variantKey);
+            copied += copy(variantFile, new File(target, variantKey.replace('/', File.separatorChar)), variantKey,
+                    previous, imported);
+        }
+        return copied;
     }
 
     /// Removes what an earlier import copied and this one did not -- a Dart
