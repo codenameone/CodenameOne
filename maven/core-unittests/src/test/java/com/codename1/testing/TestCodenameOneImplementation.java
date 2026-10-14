@@ -5643,10 +5643,13 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         }
 
         OutputStream openOutputStream() {
-            if (bufferedOutput == null) {
+            if (output == null) {
                 output = new ByteArrayOutputStream();
-                bufferedOutput = new com.codename1.io.BufferedOutputStream(output);
             }
+            // Each request closes its stream. Keep the accumulated bodies for
+            // assertions, but give the next request a fresh buffer: flushing a
+            // closed BufferedOutputStream silently discards its later writes.
+            bufferedOutput = new com.codename1.io.BufferedOutputStream(output);
             return bufferedOutput;
         }
 
