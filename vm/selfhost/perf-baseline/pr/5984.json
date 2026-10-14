@@ -86,6 +86,46 @@
      }
     }
    }
+  },
+  "windows-x64@intel64-family-6-model-207-genuineintel": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.82,
+      "time": 1.069,
+      "tolerance": {
+       "memory": 0.2,
+       "time": 0.5
+      }
+     },
+     "memory": 1.108,
+     "reason": "The first run of this change on the Intel Family 6 Model 207 Windows x64 runner, which the overlay had no rows for. hello RAM rises for the cause recorded for the other runners: the translator retires fewer objects when their frame ends, so peak RAM is higher (rounds 1.13 1.11 1.13 0.73 0.98, median 1.11 against 0.82; the AMD Windows x64 runner moved from 0.83 to 1.15). translator time rounds 0.76 0.75 0.69 0.58 0.80, median 0.75 against 0.60, with one round at the old baseline; on the AMD runner the same change measured 0.70 against 0.78. Tolerances are kept.",
+     "runs": 1,
+     "time": 1.069,
+     "tolerance": {
+      "memory": 0.2,
+      "time": 0.5
+     }
+    }
+   },
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.526,
+      "time": 0.602,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.526,
+     "reason": "The first run of this change on the Intel Family 6 Model 207 Windows x64 runner, which the overlay had no rows for. hello RAM rises for the cause recorded for the other runners: the translator retires fewer objects when their frame ends, so peak RAM is higher (rounds 1.13 1.11 1.13 0.73 0.98, median 1.11 against 0.82; the AMD Windows x64 runner moved from 0.83 to 1.15). translator time rounds 0.76 0.75 0.69 0.58 0.80, median 0.75 against 0.60, with one round at the old baseline; on the AMD runner the same change measured 0.70 against 0.78. Tolerances are kept.",
+     "runs": 1,
+     "time": 0.753,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   }
   }
  }
 }
