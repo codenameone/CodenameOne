@@ -105,6 +105,75 @@ public class DartCoreSemanticsTest {
         assertEquals(1997, offset.year());
     }
 
+    // --- DateTime's LOCAL constructor normalizes an overflowing component -----
+    // --- instead of narrowing it to int ----------------------------------------
+
+    @Test
+    public void localConstructorNormalizesAnOverflowingHourInsteadOfWrapping() {
+        // Regression: calendarBuild() used to narrow each raw long component to
+        // int with a plain cast before handing it to Calendar.set(). 2_200_000_000
+        // does not fit in an int, so the cast used to wrap it into a small, wrong
+        // value (a different date entirely) instead of Dart's own normalization,
+        // which carries the overflow into day/month/year -- landing here about
+        // 91.7 million days after the epoch. Expected values are `dart run`'s own
+        // output for the identical local DateTime() calls (Dart SDK 3.9.3); the
+        // zone is pinned here so the comparison does not depend on the runner's.
+        java.util.TimeZone saved = java.util.TimeZone.getDefault();
+        try {
+            java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("Asia/Jerusalem"));
+
+            DateTime overflowHour = new DateTime(1970, 1, 1, 2_200_000_000L, 0, 0, 0, 0);
+            assertEquals(252944, overflowHour.year());
+            assertEquals(10, overflowHour.month());
+            assertEquals(22, overflowHour.day());
+            assertEquals(16, overflowHour.hour());
+            assertEquals(7919999989200000L, overflowHour.millisecondsSinceEpoch());
+
+            // The negative side lands in the deep past (year < 0), which takes
+            // build()'s earlier, Calendar-free "ancient" branch rather than
+            // calendarBuild -- covered here too since both branches used to
+            // share the same (int) narrowing of the raw hour.
+            DateTime negativeOverflowHour = new DateTime(1970, 1, 1, -2_200_000_000L, 0, 0, 0, 0);
+            assertEquals(-7920000007200000L, negativeOverflowHour.millisecondsSinceEpoch());
+        } finally {
+            java.util.TimeZone.setDefault(saved);
+        }
+    }
+
+    @Test
+    public void localConstructorNormalizesMonthAndDayOverflowThroughTheCalendarBranch() {
+        // Same narrowing bug, through month and day this time, each landing a
+        // modern-enough date that build() takes the Calendar (DST-aware) branch
+        // calendarBuild() rather than the ancient/raw-offset one above.
+        java.util.TimeZone saved = java.util.TimeZone.getDefault();
+        try {
+            java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("Asia/Jerusalem"));
+
+            // Month 25 of 2024 is January of 2026.
+            DateTime monthOverflow = new DateTime(2024, 25, 1, 0, 0, 0, 0, 0);
+            assertEquals(2026, monthOverflow.year());
+            assertEquals(1, monthOverflow.month());
+            assertEquals(1, monthOverflow.day());
+            assertEquals(1767218400000L, monthOverflow.millisecondsSinceEpoch());
+
+            // Day 0 of March is the last day of February.
+            DateTime dayZero = new DateTime(2024, 3, 0, 0, 0, 0, 0, 0);
+            assertEquals(2024, dayZero.year());
+            assertEquals(2, dayZero.month());
+            assertEquals(29, dayZero.day(), "2024 is a leap year");
+            assertEquals(1709157600000L, dayZero.millisecondsSinceEpoch());
+
+            // Day -5 of March is five days before the last day of February.
+            DateTime negativeDay = new DateTime(2024, 3, -5, 0, 0, 0, 0, 0);
+            assertEquals(2024, negativeDay.year());
+            assertEquals(2, negativeDay.month());
+            assertEquals(24, negativeDay.day());
+            assertEquals(1708725600000L, negativeDay.millisecondsSinceEpoch());
+        } finally {
+            java.util.TimeZone.setDefault(saved);
+        }
+    }
+
     // --- Uri query components decode '+' as a space; path segments do not -----
 
     @Test
@@ -982,6 +1051,93 @@ public class DartCoreSemanticsTest {
         assertThrows(UnsupportedError.class, () -> q.remove("a"));
         assertThrows(UnsupportedError.class, q::clear);
         assertThrows(UnsupportedOperationException.class, () -> q.keySet().clear());
+        assertEquals(1, q.size());
+    }
+
+    @Test
+    public void unmodifiableMapRefusesEveryMutatorWithoutRunningItsCallback() {
+        // Regression: Map.unmodifiable's mutators -- including the ones with a
+        // callback argument -- throw UnsupportedError up front on the Dart 3.9 VM,
+        // even when the callback would never need to run (the key is already
+        // present for putIfAbsent, the map merged in by addAll/addEntries is
+        // empty). DartUnmodifiableMap only overrode put/putAll/remove/clear, so
+        // two classes of mutator slipped through: DartMap's own extensions
+        // (putIfAbsentDart, update) that check the map before ever calling the
+        // overridden put, and java.util.HashMap's own putIfAbsent/compute*/merge/
+        // replace*/replaceAll, which mutate its table directly rather than
+        // calling put()/remove() -- confirmed by a probe subclass that overrides
+        // put/remove to record every call: none of those nine HashMap methods
+        // triggers either override.
+        DartMap<String, String> q = DartUri.parse("https://x/?a=1").queryParameters();
+        boolean[] ran = {false};
+
+        assertThrows(UnsupportedError.class,
+                () -> q.putIfAbsentDart("a", () -> {
+                    ran[0] = true;
+                    return "ignored";
+                }),
+                "putIfAbsentDart on an EXISTING key used to return the stored value "
+                        + "instead of throwing");
+        assertFalse(ran[0], "the ifAbsent callback must not run");
+
+        assertThrows(UnsupportedError.class,
+                () -> q.putIfAbsentDart("new-key", () -> {
+                    ran[0] = true;
+                    return "ignored";
+                }));
+        assertFalse(ran[0], "the ifAbsent callback must not run");
+
+        assertThrows(UnsupportedError.class,
+                () -> q.update("a", v -> {
+                    ran[0] = true;
+                    return v;
+                }, null),
+                "update used to run its callback before the put() it fed into failed");
+        assertFalse(ran[0], "the update callback must not run");
+
+        assertThrows(UnsupportedError.class, () -> q.removeDart("a"));
+        assertThrows(UnsupportedError.class, () -> q.addAll(new java.util.HashMap<>()),
+                "addAll of an EMPTY map must still throw");
+        assertThrows(UnsupportedError.class,
+                () -> q.addEntries(java.util.Collections.emptyList()),
+                "addEntries of an EMPTY iterable must still throw");
+
+        // java.util.Map's own mutators -- HashMap bypasses put()/remove() for all
+        // of these, so each needs its own override rather than inheriting safety
+        // from put()/remove() being guarded.
+        assertThrows(UnsupportedError.class, () -> q.putIfAbsent("a", "x"));
+        assertThrows(UnsupportedError.class, () -> q.putIfAbsent("new-key", "x"));
+        assertThrows(UnsupportedError.class, () -> q.remove("a", "1"));
+        assertThrows(UnsupportedError.class, () -> q.replace("a", "1", "2"));
+        assertThrows(UnsupportedError.class, () -> q.replace("a", "2"));
+        assertThrows(UnsupportedError.class, () -> q.computeIfAbsent("new-key", k -> {
+            ran[0] = true;
+            return "x";
+        }));
+        assertFalse(ran[0], "the computeIfAbsent callback must not run");
+        assertThrows(UnsupportedError.class, () -> q.computeIfPresent("a", (k, v) -> {
+            ran[0] = true;
+            return v;
+        }));
+        assertFalse(ran[0], "the computeIfPresent callback must not run");
+        assertThrows(UnsupportedError.class, () -> q.compute("a", (k, v) -> {
+            ran[0] = true;
+            return v;
+        }));
+        assertFalse(ran[0], "the compute callback must not run");
+        assertThrows(UnsupportedError.class, () -> q.merge("a", "1", (v1, v2) -> {
+            ran[0] = true;
+            return v1;
+        }));
+        assertFalse(ran[0], "the merge callback must not run");
+        assertThrows(UnsupportedError.class, () -> q.replaceAll((k, v) -> {
+            ran[0] = true;
+            return v;
+        }));
+        assertFalse(ran[0], "the replaceAll callback must not run");
+
+        // Still readable, and nothing above touched it.
+        assertEquals("1", q.get("a"));
         assertEquals(1, q.size());
     }
 

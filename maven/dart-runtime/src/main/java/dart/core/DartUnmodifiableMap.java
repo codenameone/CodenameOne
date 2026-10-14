@@ -29,12 +29,40 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 
 /**
  * An unmodifiable Dart map: a copy of the entries it is built from, whose every write
  * -- map[k] = v, remove, clear, addAll, removeWhere, or a remove through one of its
  * views -- is a Dart UnsupportedError, as Map.unmodifiable and the maps Dart hands out
- * read-only (Uri.queryParameters) are.
+ * read-only (Uri.queryParameters) are. Measured against the Dart 3.9 VM
+ * (Map.unmodifiable): every mutator throws immediately, before calling any callback
+ * argument it was given, even when the mutation would otherwise be a no-op (the key
+ * already holds the value being proposed, the map being merged in is empty, and so on).
+ *
+ * <p>Every mutator below is therefore overridden to throw up front, unconditionally --
+ * not just {@link #put}/{@link #putAll}/{@link #remove}/{@link #clear}, which this class
+ * always held. Two classes of mutator used to slip through:</p>
+ *
+ * <ul>
+ * <li>{@link DartMap}'s own extensions ({@link #putIfAbsentDart}, {@link #update}) read
+ * the map first and only fall through to {@code put}/{@code get} when a write is
+ * actually needed, so a lookup that found the key already present, or a callback that
+ * ran before the (overridden) write, returned a value or had a side effect instead of
+ * throwing -- {@code Uri.parse("?a=1").queryParameters().putIfAbsentDart("a", cb)}
+ * returned the existing value rather than throwing, and {@code update} ran its callback
+ * before the {@code put} it feeds into failed.</li>
+ * <li>{@code java.util.HashMap}, which {@link DartMap} extends, implements
+ * {@code putIfAbsent}, {@code compute}, {@code computeIfAbsent}, {@code
+ * computeIfPresent}, {@code merge}, both {@code replace} overloads, {@code remove(Object,
+ * Object)} and {@code replaceAll} by manipulating its table directly rather than calling
+ * the public {@code put}/{@code remove} -- confirmed by probing a subclass that overrides
+ * {@code put}/{@code remove} to record every call; none of those nine methods triggers
+ * either override. Overriding only {@code put}/{@code remove}, the usual way to guard a
+ * {@code HashMap} subclass, therefore leaves every one of them able to mutate a
+ * supposedly-frozen map.</li>
+ * </ul>
  */
 final class DartUnmodifiableMap<K, V> extends DartMap<K, V> {
 
@@ -77,6 +105,85 @@ final class DartUnmodifiableMap<K, V> extends DartMap<K, V> {
 
     @Override
     public void removeWhere(Funcs.Func2<K, V, Boolean> test) {
+        throw refused();
+    }
+
+    @Override
+    public V removeDart(Object key) {
+        throw refused();
+    }
+
+    @Override
+    public void addAll(Map<? extends K, ? extends V> other) {
+        throw refused();
+    }
+
+    @Override
+    public void addEntries(Iterable<? extends MapEntry<K, V>> entries) {
+        throw refused();
+    }
+
+    @Override
+    public V idxSet(K key, V value) {
+        throw refused();
+    }
+
+    @Override
+    public V putIfAbsentDart(K key, Funcs.Func0<V> ifAbsent) {
+        throw refused();
+    }
+
+    @Override
+    public V update(K key, Funcs.Func1<V, V> update, Funcs.Func0<V> ifAbsent) {
+        throw refused();
+    }
+
+    // --- java.util.Map's own mutators: HashMap implements every one of these by
+    // --- manipulating its table directly (see the class comment), so none of them
+    // --- reaches put()/remove() above and each needs its own override.
+
+    @Override
+    public V putIfAbsent(K key, V value) {
+        throw refused();
+    }
+
+    @Override
+    public boolean remove(Object key, Object value) {
+        throw refused();
+    }
+
+    @Override
+    public boolean replace(K key, V oldValue, V newValue) {
+        throw refused();
+    }
+
+    @Override
+    public V replace(K key, V value) {
+        throw refused();
+    }
+
+    @Override
+    public V computeIfAbsent(K key, Function<? super K, ? extends V> mappingFunction) {
+        throw refused();
+    }
+
+    @Override
+    public V computeIfPresent(K key, BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
+        throw refused();
+    }
+
+    @Override
+    public V compute(K key, BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
+        throw refused();
+    }
+
+    @Override
+    public V merge(K key, V value, BiFunction<? super V, ? super V, ? extends V> remappingFunction) {
+        throw refused();
+    }
+
+    @Override
+    public void replaceAll(BiFunction<? super K, ? super V, ? extends V> function) {
         throw refused();
     }
 

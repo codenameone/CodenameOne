@@ -183,6 +183,39 @@ public class TranscodeFlutterAssetsTest {
     }
 
     /**
+     * A root-declared asset (outside {@code assets/}/{@code packages/}, so it goes
+     * through {@link TranscodeFlutterMojo#readDeclaredAssetKeys}) named exactly
+     * {@code AssetManifest.txt} flattens to {@link TranscodeFlutterMojo#ASSET_MANIFEST}
+     * -- the same name {@code writeAssetManifest} writes the generated key list to.
+     * Before the fix, {@code copyAssets} copied the asset there first and then
+     * silently overwrote it with the generated manifest, so {@code
+     * Image.asset("AssetManifest.txt")} loaded the manifest instead of the asset.
+     * The fix fails the build instead, before anything is written.
+     */
+    @Test
+    public void aRootAssetNamedLikeTheManifestFailsTheBuildInsteadOfBeingSilentlyOverwritten()
+            throws Exception {
+        File colliding = new File(flutter, "AssetManifest.txt");
+        Files.write(colliding.toPath(), "this is the developer's own asset".getBytes(
+                java.nio.charset.StandardCharsets.UTF_8));
+        declareAssetKeys("AssetManifest.txt");
+
+        try {
+            mojo.copyAssets();
+            org.junit.Assert.fail("expected copyAssets to refuse the colliding asset name");
+        } catch (org.apache.maven.plugin.MojoExecutionException expected) {
+            // The build failed instead of silently overwriting the developer's asset.
+        }
+
+        // Nothing was written for the reserved name at all -- in particular, not the
+        // generated manifest's content, which is what the silent overwrite used to
+        // leave behind in the developer's asset's place.
+        File manifestFile = new File(classes, TranscodeFlutterMojo.ASSET_MANIFEST);
+        assertFalse("the build must not have written the reserved manifest name",
+                manifestFile.exists());
+    }
+
+    /**
      * The same vectors as the runtime's FlutterAssetsTest and the benchmark's
      * stage_assets.py: the three encoders must agree name for name, or an asset
      * the build writes is one the runtime never finds.

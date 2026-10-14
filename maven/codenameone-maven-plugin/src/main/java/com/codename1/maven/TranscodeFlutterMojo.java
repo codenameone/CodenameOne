@@ -269,6 +269,7 @@ public class TranscodeFlutterMojo extends AbstractCN1Mojo {
             return 0;
         }
         String flat = flatAssetName(key);
+        checkNotReservedManifestName(key, flat);
         Files.copy(node.toPath(), new File(outDir, flat).toPath(), StandardCopyOption.REPLACE_EXISTING);
         written.add(flat);
         keys.add(key);
@@ -337,11 +338,40 @@ public class TranscodeFlutterMojo extends AbstractCN1Mojo {
      * builds the same thing (AssetManifest) for the same reason: a variant can sit
      * in any positive scale directory -- {@code 2.5x/}, or {@code 2x/} as well as
      * {@code 2.0x/} -- so no fixed probe list finds them all, and one outside it was
-     * bundled and never used. Its name cannot collide with an asset: every asset key
-     * starts with {@code assets/} or {@code packages/}, so every asset's flat name
-     * carries a {@code _s} after that root.
+     * bundled and never used.
+     *
+     * <p><b>This name is NOT guaranteed collision-free with an asset's flat name.</b>
+     * The comment this replaced claimed it was, because every asset key used to start
+     * with {@code assets/} or {@code packages/} -- giving every asset's flat name a
+     * {@code _s} after the {@code cn1f_} prefix that this literal name lacks. That
+     * stopped being true once {@link #readDeclaredAssetKeys} started flattening
+     * project-relative keys outside those two roots (a font or image declared bare in
+     * pubspec, {@code fonts/MyFont.ttf}): such a key can be a single path segment with
+     * no {@code '/'} at all, and one spelled exactly {@code AssetManifest.txt} flattens
+     * to this identical name. {@link #flattenInto} and {@link #flattenDeclaredAsset}
+     * both check for that collision before writing anything, rather than letting
+     * {@link #writeAssetManifest} silently overwrite the asset afterwards (an app
+     * calling {@code Image.asset("AssetManifest.txt")} would then load this manifest's
+     * own key list instead of the asset it asked for) -- there is no name for this
+     * file outside the {@code cn1f_} namespace that both this check could allow here
+     * and the runtime's {@code FlutterAssets} would still find; renaming it would need
+     * a matching change there.</p>
      */
     static final String ASSET_MANIFEST = "cn1f_AssetManifest.txt";
+
+    /**
+     * Fails the build, before anything is written, when a real asset's flat name
+     * would collide with {@link #ASSET_MANIFEST} -- see that field's comment. A
+     * clear build failure here is the deliberate alternative to the silent overwrite
+     * {@link #writeAssetManifest} used to produce.
+     */
+    private static void checkNotReservedManifestName(String key, String flat) throws IOException {
+        if (ASSET_MANIFEST.equals(flat)) {
+            throw new IOException("Flutter asset '" + key + "' flattens to " + flat
+                    + ", which is reserved for the build-generated asset manifest. "
+                    + "Rename this asset (or the pubspec entry that declares it).");
+        }
+    }
 
     private void writeAssetManifest(File outDir, List<String> keys, Set<String> written) throws IOException {
         List<String> sorted = new ArrayList<String>(keys);
@@ -363,6 +393,7 @@ public class TranscodeFlutterMojo extends AbstractCN1Mojo {
                 count += flattenInto(child, key, outDir, written, keys);
             } else {
                 String flat = flatAssetName(key);
+                checkNotReservedManifestName(key, flat);
                 Files.copy(child.toPath(), new File(outDir, flat).toPath(),
                         StandardCopyOption.REPLACE_EXISTING);
                 written.add(flat);

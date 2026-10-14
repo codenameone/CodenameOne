@@ -219,23 +219,46 @@ public final class DateTime {
             // No zone kept daylight time this early, so the raw offset is the offset.
             return wall - TimeZone.getDefault().getRawOffset();
         }
-        return calendarBuild(year, month, day, hour, minute, second, millisecond);
+        return calendarBuild(wall);
     }
 
-    /** A local time through the device's Calendar, which knows its daylight-time rules. */
-    private static long calendarBuild(long year, long month, long day, long hour, long minute,
-                                      long second, long millisecond) {
+    /**
+     * A local time through the device's Calendar, which knows its daylight-time rules.
+     * Takes the already fully-normalized wall-clock value ({@code wall}, built above by
+     * checked long arithmetic that never narrows) rather than the caller's raw
+     * year/month/day/hour/minute/second/millisecond. Those are Dart's own out-of-range
+     * calendar-arithmetic idiom and can be arbitrarily large -- DateTime(1970, 1, 1,
+     * 2_200_000_000) is a real example, about 91.7 million days past the epoch -- and this
+     * used to hand them to {@code Calendar.set(int, int)} with a plain {@code (int)} cast.
+     * A hugely out-of-range {@code long} narrows by truncating to its low 32 bits rather
+     * than normalizing, so the cast silently produced a small, wrong value (often negative)
+     * instead of the carried-over day/month/year Dart's semantics require.
+     *
+     * <p>{@code wall} decomposes here into a day count and a time-of-day ({@code
+     * floorDiv}/{@code floorMod}) and then into year/month/day ({@link #civilFromDays}, long
+     * arithmetic throughout), so narrowing happens only once every component is already
+     * correct. The year is the sole component that could in principle still be too big for
+     * an {@code int}, and every overflow check upstream ({@code checkedAdd}/{@code
+     * checkedMultiply} in {@link #build}, plus {@code MAX_BUILD_YEAR}) bounds the day count
+     * {@code wall} can carry to well under {@code Integer.MAX_VALUE} years -- and any
+     * negative (BC) year takes the earlier, Calendar-free "ancient" branch in {@link
+     * #build}, never reaching here -- so the narrowing below is always safe once it happens
+     * this late.</p>
+     */
+    private static long calendarBuild(long wall) {
+        long days = floorDiv(wall, DAY_MS);
+        long timeOfDay = floorMod(wall, DAY_MS);
+        long[] ymd = civilFromDays(days);
         // CN1's Calendar has no clear(); every time-carrying field is set
-        // explicitly so no residual "now" component leaks in. The lenient
-        // Calendar normalizes out-of-range components as Dart does.
+        // explicitly so no residual "now" component leaks in.
         Calendar c = Calendar.getInstance();
-        c.set(Calendar.YEAR, (int) year);
-        c.set(Calendar.MONTH, (int) month - 1);
-        c.set(Calendar.DAY_OF_MONTH, (int) day);
-        c.set(Calendar.HOUR_OF_DAY, (int) hour);
-        c.set(Calendar.MINUTE, (int) minute);
-        c.set(Calendar.SECOND, (int) second);
-        c.set(Calendar.MILLISECOND, (int) millisecond);
+        c.set(Calendar.YEAR, (int) ymd[0]);
+        c.set(Calendar.MONTH, (int) ymd[1] - 1);
+        c.set(Calendar.DAY_OF_MONTH, (int) ymd[2]);
+        c.set(Calendar.HOUR_OF_DAY, (int) (timeOfDay / 3600000L));
+        c.set(Calendar.MINUTE, (int) (timeOfDay / 60000L % 60L));
+        c.set(Calendar.SECOND, (int) (timeOfDay / 1000L % 60L));
+        c.set(Calendar.MILLISECOND, (int) (timeOfDay % 1000L));
         return c.getTime().getTime();
     }
 
