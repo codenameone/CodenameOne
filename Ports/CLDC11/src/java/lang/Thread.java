@@ -98,6 +98,26 @@ public class Thread implements java.lang.Runnable{
         return; //TODO codavaj!!
     }
 
+    /// Tests and clears the current thread's interrupt status.
+    /// Compile-time declaration; each platform supplies the runtime implementation.
+    public static boolean interrupted() {
+        return false;
+    }
+
+    /// Tests this thread's interrupt status without clearing it.
+    public boolean isInterrupted() {
+        return false;
+    }
+
+    /// Marks this thread as a daemon before it is started.
+    public final void setDaemon(boolean on) {
+    }
+
+    /// Returns whether this thread is a daemon.
+    public final boolean isDaemon() {
+        return false;
+    }
+
     /// Tests if this thread is alive. A thread is alive if it has been started and has not yet died.
     public final boolean isAlive(){
         return false; //TODO codavaj!!

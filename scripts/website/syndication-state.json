@@ -2722,6 +2722,27 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-10-13T00:02:15+00:00"
+      },
+      "devto": {
+        "id": 4846340,
+        "url": "https://dev.to/codenameone/connect-your-app-to-your-enterprise-traces-2n9m",
+        "syndicated_at": "2026-10-13T19:51:37+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/55b43f17e876/edit",
+        "syndicated_at": "2026-10-14T00:01:13+00:00"
+      }
+    },
+    "browser-desktop-theme": {
+      "hashnode": {
+        "url": "https://debugagent.com/do-you-want-your-web-app-to-feel-like-a-native-app",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6acec6548f91109c0f76464b",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-14T00:02:19+00:00"
       }
     }
   }

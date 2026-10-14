@@ -64,4 +64,8 @@ public class ImplementationFactory {
     public Object createImplementation() {
         throw new RuntimeException("You must include the platform port before the Codename One in the classpath");
     }
+    /** Internal process adapter; null means this port does not support processes. */
+    public Object createProcessSupport() {
+        return null;
+    }
 }

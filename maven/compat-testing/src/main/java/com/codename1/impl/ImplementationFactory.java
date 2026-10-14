@@ -44,4 +44,7 @@ public class ImplementationFactory {
     public Object createImplementation() {
         return new HeadlessImplementation();
     }
+    public Object createProcessSupport() {
+        return null;
+    }
 }

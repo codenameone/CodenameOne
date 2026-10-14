@@ -22,10 +22,10 @@ jobs:
   build-linux-jdk8:
 
     runs-on: ubuntu-24.04
-    # The job ran 32 to 42 minutes before the Swing and JavaFX compatibility
-    # modules joined the reactor it builds and tests, and was cancelled at 45
-    # while still making progress once they had.
-    timeout-minutes: 60
+    # Includes archetype integration tests and backend packaging after the Ant
+    # build, and the Swing and JavaFX compatibility modules in the reactor it
+    # builds and tests.
+    timeout-minutes: 75
 
     steps:
     - uses: actions/checkout@v6

@@ -41,3 +41,12 @@ done
 # [[:space:]]* tolerates a CR, so a CRLF source is found as well. The Ant selector
 # in maven/backend/pom.xml uses the equivalent \s*.
 grep -rlE --include='*.java' '^@(com\.codename1\.impl\.)?SharedWithBackend[[:space:]]*$' "$CORE" | LC_ALL=C sort
+
+# Runtime-specific sources shared with the JavaSE desktop port. Keep the native
+# selection free of host-JDK references.
+if [ "${1:-}" = "--javase" ]; then
+    printf '%s\n' "$BACKEND/../../Ports/JavaSE/src/com/codename1/impl/process/JavaSEProcessSupport.java"
+elif [ -n "${1:-}" ]; then
+    echo "usage: shared-sources.sh [--javase]" >&2
+    exit 2
+fi
