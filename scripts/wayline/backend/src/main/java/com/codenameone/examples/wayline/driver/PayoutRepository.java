@@ -99,7 +99,7 @@ public class PayoutRepository {
     public List<String> tipChargedSince(String driver, long since) {
         return session.createQuery("select r.id from Ride r where r.driver = :driver "
                 + "and r.state = 'COMPLETED' and r.updatedAt >= :since "
-                + "and r.methodId <> 'cash' and r.id in "
+                + "and r.methodId <> 'cash' and r.paymentStatus = 'PAID' and r.id in "
                 + "(select p.rideId from Payment p where p.tipRef <> '')", String.class)
                 .setParameter("driver", driver).setParameter("since", Long.valueOf(since)).list();
     }
@@ -141,6 +141,9 @@ public class PayoutRepository {
     /// there with no charge recorded when the processor did not answer. It is
     /// not money yet -- the card may never have been charged -- so it is not
     /// counted, and so cannot be cashed out, until the charge is on record.
+    /// A tip is charged only to a paid ride, and a refund returns it with the
+    /// fare while its charge stays on record, so a card tip also counts only
+    /// while its ride is still paid.
     public long tips(String driver) {
         long cash = session.createQuery("select coalesce(sum(r.tipCents), 0) from Ride r "
                 + "where r.driver = :driver and r.state = 'COMPLETED' "
@@ -148,7 +151,7 @@ public class PayoutRepository {
                 .setParameter("driver", driver).first().longValue();
         long charged = session.createQuery("select coalesce(sum(r.tipCents), 0) from Ride r "
                 + "where r.driver = :driver and r.state = 'COMPLETED' "
-                + "and r.methodId <> 'cash' and r.id in "
+                + "and r.methodId <> 'cash' and r.paymentStatus = 'PAID' and r.id in "
                 + "(select p.rideId from Payment p where p.tipRef <> '')", Long.class)
                 .setParameter("driver", driver).first().longValue();
         return cash + charged;

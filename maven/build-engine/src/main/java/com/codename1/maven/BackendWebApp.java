@@ -314,8 +314,19 @@ public final class BackendWebApp {
     public int copy(File staged, File destination) throws BuildExecutionException {
         try {
             File target = destination.getCanonicalFile();
-            if (target.equals(staged.getCanonicalFile())) {
+            File source = staged.getCanonicalFile();
+            if (target.equals(source)) {
                 return 0;
+            }
+            // A binary written under the staged app (target/webapp/bin/server)
+            // puts the copy inside its own source, and the tree walk would copy
+            // the copy into itself until the path is too long. The other way
+            // round, delete(target) would remove the source before reading it.
+            if (isInside(target, source) || isInside(source, target)) {
+                throw new BuildExecutionException("The web app staged in " + source
+                        + " cannot be copied to " + target + ", which "
+                        + (isInside(target, source) ? "is inside it" : "contains it")
+                        + ". Write the server binary somewhere else");
             }
             delete(target);
             if (!target.mkdirs() && !target.isDirectory()) {

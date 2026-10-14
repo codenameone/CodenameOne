@@ -22,6 +22,7 @@
  */
 package com.codename1.maven;
 
+import com.codename1.build.BuildExecutionException;
 import com.codename1.build.BuildFailureException;
 import com.codename1.build.SystemStreamLog;
 import org.junit.jupiter.api.Test;
@@ -283,6 +284,21 @@ class BackendWebAppTest {
         assertEquals(new File(out, "translated_app.js").lastModified(),
                 new File(beside, "translated_app.js").lastModified());
         assertEquals(0, webApp.copy(out, out));
+        assertEquals("x", read(new File(out, "index.html")));
+    }
+
+    /// A binary written under the staged app would have the app copied into
+    /// itself, and one whose directory holds the staged app would delete it.
+    @Test
+    void refusesACopyNestedInsideOrAroundTheStagedApp() throws Exception {
+        File out = tmp.resolve("site/webapp").toFile();
+        webApp.stage(zip(tmp.resolve("app.zip").toFile(),
+                "index.html", "x", "translated_app.js", script()), out);
+        File inside = new File(out, "bin/webapp");
+        assertThrows(BuildExecutionException.class, () -> webApp.copy(out, inside));
+        assertFalse(inside.exists());
+        assertThrows(BuildExecutionException.class,
+                () -> webApp.copy(out, tmp.resolve("site").toFile()));
         assertEquals("x", read(new File(out, "index.html")));
     }
 }

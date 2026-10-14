@@ -287,6 +287,19 @@ class PaymentsTest {
         assertEquals("refunded", Trips.receipt(mvc, rider, id).get("status"));
         mvc.perform(People.asRider(get("/api/rides/" + id), rider))
                 .andExpect(jsonPath("$.paymentStatus").value("REFUNDED"));
+
+        // The refund took the fare and the tip back, so neither is earned any
+        // more: not in the day's totals, and not in the balance, which now owes
+        // what was cashed out. The trip was still driven.
+        summary = Trips.json(mvc, People.asDriver(get("/api/driver/earnings/summary"), driver));
+        assertEquals(0L, Trips.number(summary, "today"));
+        assertEquals(0L, Trips.number(summary, "month"));
+        assertEquals(0L, Trips.number((Map) ((List) summary.get("daily")).get(13), "amount"));
+        assertEquals(1L, Trips.number((Map) ((List) summary.get("daily")).get(13), "trips"));
+        assertEquals(0L, Trips.number(summary, "tips"));
+        assertEquals(-earned, Trips.number(summary, "balance"));
+        mvc.perform(People.asDriver(post("/api/driver/payouts"), driver))
+                .andExpect(status().isConflict());
         Trips.offline(mvc, driver);
     }
 

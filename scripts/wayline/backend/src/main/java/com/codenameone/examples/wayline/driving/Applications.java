@@ -376,6 +376,11 @@ public class Applications {
     /// driver, with the car on the application as the car riders look for.
     @Transactional
     public DriverApplicationDto approve(String by, String username) throws IOException {
+        // The account first, the lock blocking an account takes too: role()
+        // rewrites the whole user row, its enabled flag with it, so an approval
+        // that read the account before a block and wrote it after would undo
+        // the block. Behind the hold it reads what the block left.
+        profiles.hold(username);
         decide(by, username, APPROVED, "");
         applications.markDocuments(username, "accepted");
         // Read after the statements above, which empty the session.

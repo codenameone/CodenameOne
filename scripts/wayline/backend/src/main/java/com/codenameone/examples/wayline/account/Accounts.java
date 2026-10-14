@@ -376,6 +376,12 @@ public class Accounts {
     @Transactional(rollbackFor = IOException.class)
     public UserDto changePassword(String username, String current, String replacement)
             throws IOException {
+        // Before the password is read. Two changes at once would otherwise
+        // both check the same old password and both succeed, the last one
+        // winning: whoever else knows the old password could race the owner's
+        // change and keep the account. Behind the hold the second change
+        // checks against the password the first one set.
+        profiles.hold(username);
         UserDetails signIn = load(username);
         if (current == null || !encoder.matches(current, signIn.getPassword())) {
             throw new ResponseStatusException(403, "That is not your current password");

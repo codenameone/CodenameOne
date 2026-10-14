@@ -395,7 +395,13 @@ The same hold serializes everything else that reads an account and then
 writes for it. Closing an account, removing a card and choosing the default
 card hold the profile, so each takes turns with a ride being asked for.
 Sending a phone code holds it too, so two requests can't both pass the wait
-between codes. A driver's position report holds the driver's state row, so two
+between codes. Changing a password holds it before the old password is
+checked, so of two changes made together the second is checked against the
+password the first one set. Approving a driving application holds the
+applicant's profile, the row blocking the account holds as well: granting the
+role rewrites the whole sign-in row, and an approval that read the account
+before a block would otherwise write it back unblocked.
+A driver's position report holds the driver's state row, so two
 reports sent together don't count the same online minutes twice. Cashing out
 holds the driver's payout account, so two requests sent together pay the
 balance once and the second is told there's nothing left. Saving a driving
@@ -414,7 +420,9 @@ its username, and `Rides.toDto` gives it only to its owner and to an admin. A
 fare counts toward a driver's balance once the ride is paid for, in cash or by
 a card whose charge came back, and a tip paid by card once its charge is
 recorded. A charge that failed, was refunded or is still pending isn't money
-the driver can cash out.
+the driver can cash out, and a refund takes the tip back with the fare. The
+earnings screen's totals for the day, week and month count the same money as
+the balance, so a refunded or unpaid ride counts as a trip and earns nothing.
 
 A statement that changes rows in bulk empties the session, so a `Ride` read
 before `move` is read again after it. The services do that wherever they go on

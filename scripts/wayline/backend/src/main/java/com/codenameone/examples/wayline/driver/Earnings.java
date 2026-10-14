@@ -36,6 +36,7 @@ import com.codenameone.examples.wayline.domain.DriverState;
 import com.codenameone.examples.wayline.domain.Payout;
 import com.codenameone.examples.wayline.domain.PayoutAccount;
 import com.codenameone.examples.wayline.domain.Ride;
+import com.codenameone.examples.wayline.pay.Payments;
 import com.codenameone.examples.wayline.ride.Fares;
 
 import java.io.IOException;
@@ -96,7 +97,11 @@ public class Earnings {
             Ride ride = rides.get(iter);
             long at = ride.updatedAt;
             boolean tipped = "cash".equals(ride.methodId) || charged.contains(ride.id);
-            long earned = ride.driverCents + (tipped ? ride.tipCents : 0L);
+            // The fare likewise counts only once it is paid, as in the balance:
+            // a card charge that failed, was refunded or has not come back is
+            // no money of the driver's. The trip still counts as driven.
+            boolean paid = Payments.PAID.equals(ride.paymentStatus);
+            long earned = (paid ? ride.driverCents : 0L) + (tipped ? ride.tipCents : 0L);
             dto.month += earned;
             if (at >= weekStart) {
                 dto.week += earned;
