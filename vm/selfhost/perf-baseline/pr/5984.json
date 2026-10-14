@@ -14,6 +14,24 @@
      "time": 0.931
     }
    },
+   "stringBuilding": {
+    "all": {
+     "from": {
+      "memory": 0.262,
+      "time": 1.36,
+      "tolerance": {
+       "memory": 0.3
+      }
+     },
+     "memory": 0.262,
+     "reason": "The same cause as the hello and translator rows: the translator retires fewer objects when their frame ends, so the temporaries string building makes are left to the collector. Linux arm64 rounds 1.57 1.58 1.42 1.57 1.55 (median 1.57) against 1.36; the Intel Windows x64 runner moved the same way in both of its runs (1.63 and 1.58 against 1.42, inside its tolerance). Memory and tolerances are kept.",
+     "runs": 1,
+     "time": 1.567,
+     "tolerance": {
+      "memory": 0.3
+     }
+    }
+   },
    "translator": {
     "all": {
      "from": {
@@ -98,12 +116,12 @@
        "time": 0.5
       }
      },
-     "memory": 1.108,
-     "reason": "The first run of this change on the Intel Family 6 Model 207 Windows x64 runner, which the overlay had no rows for. hello RAM rises for the cause recorded for the other runners: the translator retires fewer objects when their frame ends, so peak RAM is higher (rounds 1.13 1.11 1.13 0.73 0.98, median 1.11 against 0.82; the AMD Windows x64 runner moved from 0.83 to 1.15). translator time rounds 0.76 0.75 0.69 0.58 0.80, median 0.75 against 0.60, with one round at the old baseline; on the AMD runner the same change measured 0.70 against 0.78. Tolerances are kept.",
-     "runs": 1,
+     "memory": 0.857,
+     "reason": "The translator retires fewer objects when their frame ends, so hello's peak RAM rises, as on the other runners. On this Intel Family 6 Model 207 runner it is bimodal: two runs of this branch gave rounds 1.13 1.11 1.13 0.73 0.98 (median 1.11) and 0.72 0.66 0.71 0.68 1.02 (median 0.71), so no single run's median holds the next one within the 20 percent tolerance. The baseline is the median of all ten rounds, 0.857, and the memory tolerance is 0.35, as hello's RAM on the Windows arm64 runner already has; it covers 0.56 to 1.16. Timing is kept.",
+     "runs": 2,
      "time": 1.069,
      "tolerance": {
-      "memory": 0.2,
+      "memory": 0.35,
       "time": 0.5
      }
     }
