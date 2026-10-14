@@ -35,8 +35,11 @@ public final class TextInputGeometry {
         TextInputGeometry getGeometrySnapshot();
     }
 
-    private final int[] carets, selection, fallback;
-    private final int start, end;
+    private final int[] carets;
+    private final int[] selection;
+    private final int[] fallback;
+    private final int start;
+    private final int end;
 
     /// Each caret record is {UTF-16 offset, x, y, width, height}. Include visible insertion
     /// positions, in document order, including the endpoint after each visible run. Selection
@@ -64,10 +67,13 @@ public final class TextInputGeometry {
             return ((Provider) client).getGeometrySnapshot();
         }
         TextInputState state = client.getEditingState();
-        int caret = state.getSelectionEnd(), first = caret, last = caret;
+        int caret = state.getSelectionEnd();
+        int first = caret;
+        int last = caret;
         if (client instanceof Component) {
             Component c = (Component) client;
-            int x = c.getAbsoluteX() + c.getScrollX(), y = c.getAbsoluteY() + c.getScrollY();
+            int x = c.getAbsoluteX() + c.getScrollX();
+            int y = c.getAbsoluteY() + c.getScrollY();
             int[] offsets = new int[]{client.offsetAtPoint(x, y),
                 client.offsetAtPoint(x + c.getWidth(), y),
                 client.offsetAtPoint(x, y + c.getHeight()),
@@ -109,7 +115,8 @@ public final class TextInputGeometry {
     /// Hit-tests only immutable visible geometry. Vertical distance takes priority across lines.
     public int offsetAtPoint(int x, int y) {
         int best = end;
-        long bestY = Long.MAX_VALUE, bestX = Long.MAX_VALUE;
+        long bestY = Long.MAX_VALUE;
+        long bestX = Long.MAX_VALUE;
         for (int i = 0; i + 4 < carets.length; i += 5) {
             long dy = Math.max(0, Math.max((long) carets[i + 2] - y, (long) y - carets[i + 2] - Math.max(1, carets[i + 4]) + 1));
             long dx = Math.abs((long) x - carets[i + 1]);
@@ -125,7 +132,8 @@ public final class TextInputGeometry {
     /// Returns exact captured selection geometry for the active range, and visible character
     /// rectangles for other native queries without touching a live editor off the EDT.
     public int[] selectionRects(int a, int b) {
-        int low = Math.min(a, b), high = Math.max(a, b);
+        int low = Math.min(a, b);
+        int high = Math.max(a, b);
         if (low == high) {
             return new int[0];
         }
@@ -138,7 +146,10 @@ public final class TextInputGeometry {
             if (carets[i] < low || carets[i] >= high) {
                 continue;
             }
-            int x = carets[i + 1], y = carets[i + 2], h = carets[i + 4], w = carets[i + 3];
+            int x = carets[i + 1];
+            int y = carets[i + 2];
+            int h = carets[i + 4];
+            int w = carets[i + 3];
             if (carets[i + 7] == y) {
                 x = Math.min(x, carets[i + 6]);
                 w = Math.max(w, Math.abs(carets[i + 6] - carets[i + 1]));

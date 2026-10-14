@@ -68,7 +68,9 @@ final class McpUiTools {
                             @Override
                             public void run() {
                                 TopLevelContainer main = Display.getInstance().getCurrent();
-                                if (main != null) windows.add(windowInfo(0, main));
+                                if (main != null) {
+                                    windows.add(windowInfo(0, main));
+                                }
                                 if (Desktop.isSupported()) {
                                     for (Window window : Desktop.getInstance().getWindows()) {
                                         windows.add(windowInfo(window.getWindowId(), window));
@@ -231,11 +233,15 @@ final class McpUiTools {
                 try {
                     out.putAll(outcome);
                     out.put("pending", Boolean.valueOf(!complete[0]));
-                    if (!complete[0]) out.put("success", null);
+                    if (!complete[0]) {
+                        out.put("success", null);
+                    }
                     int snapshotWindow = windowId;
                     if (snapshotWindow > 0) {
                         Window window = Desktop.getInstance().windowById(snapshotWindow);
-                        if (window == null || !window.isWindowShowing()) snapshotWindow = -1;
+                        if (window == null || !window.isWindowShowing()) {
+                            snapshotWindow = -1;
+                        }
                     }
                     out.put("snapshot", JSONParser.rawJson(currentSnapshot(snapshotWindow).toJson()));
                 } catch (RuntimeException ex) {
@@ -365,8 +371,12 @@ final class McpUiTools {
     }
 
     private static TopLevelContainer resolveWindow(int windowId) {
-        if (windowId == -1) return Display.getInstance().getCurrentTopLevel();
-        if (windowId == 0) return Display.getInstance().getCurrent();
+        if (windowId == -1) {
+            return Display.getInstance().getCurrentTopLevel();
+        }
+        if (windowId == 0) {
+            return Display.getInstance().getCurrent();
+        }
         Window window = Desktop.getInstance().windowById(windowId);
         if (window == null || !window.isWindowShowing()) {
             throw new IllegalArgumentException("No visible window with id " + windowId);
@@ -379,7 +389,7 @@ final class McpUiTools {
         info.put("windowId", Integer.valueOf(id));
         info.put("title", top.getTitle());
         info.put("visible", Boolean.valueOf(!(top instanceof Window) || ((Window) top).isWindowShowing()));
-        info.put("focused", Boolean.valueOf(top == Display.getInstance().getCurrentTopLevel()));
+        info.put("focused", Boolean.valueOf(top == Display.getInstance().getCurrentTopLevel())); // NOPMD CompareObjectsWithEquals - focus identifies the exact window instance
         info.put("blocked", Boolean.valueOf(Desktop.isSupported() && Desktop.getInstance().isWindowInputBlocked(id)));
         return info;
     }
@@ -404,7 +414,9 @@ final class McpUiTools {
                     }
                 }
             });
-            if (error[0] != null) throw error[0];
+            if (error[0] != null) {
+                throw error[0];
+            }
         }
     }
 
