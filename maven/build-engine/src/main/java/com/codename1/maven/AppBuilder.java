@@ -58,7 +58,7 @@ import static com.codename1.maven.PathUtil.path;
 /// This is the build-tool independent body of what used to be all of
 /// `CN1BuildMojo`: staging the jar-with-dependencies, the class closure and
 /// icon checks, merging the settings a build is submitted with (annotations,
-/// command-line overrides, cn1lib properties), both preflights, and handing the
+/// command-line overrides, cn1lib properties), preflight checks, and handing the
 /// result to the cloud or to a local builder. A build tool subclasses it and
 /// answers the handful of questions only it can -- where the build directory
 /// is, what the resolved dependencies are, how to attach an output -- through
@@ -1858,17 +1858,17 @@ public class AppBuilder {
         verifyApplicationClassClosure(jarWithDependencies, cpElements);
 
         if (stageOnly) {
+            Properties settings = new Properties();
+            try (InputStream in = new FileInputStream(codenameOneSettingsCopy)) {
+                settings.load(in);
+            }
+            overlayCommandLineBuildHints(settings);
+            MainClassPreflight.validate(jarWithDependencies, settings);
             getLog().info("codename1.stageOnly is set: staged " + jarWithDependencies + " ("
                     + jarWithDependencies.length() + " bytes) for " + buildTarget + " and stopped before building");
             return;
         }
 
-        try {
-            updateCodenameOne(false);
-        } catch (BuildExecutionException ex) {
-            getLog().error("Failed to update Codename One");
-            throw new IOException("Failed to update Codename One", ex);
-        }
         File antDistDir = new File(antProject, "dist");
         File antDistJar = new File(antDistDir, finalName() + "-"+buildTarget+"-jar-with-dependencies.jar");
         antDistDir.mkdirs();
@@ -1972,6 +1972,16 @@ public class AppBuilder {
         // have been merged -- an early refusal would reject a build the merge was about to fix.
         applyIOSProvisioningPreflight(cn1SettingsProps);
 
+        // Validate the exact settings and classes sent to every cloud/local target before
+        // invoking the build client. A renamed entry point must not cost a cloud build.
+        MainClassPreflight.validate(jarWithDependencies, cn1SettingsProps);
+
+        try {
+            updateCodenameOne(false);
+        } catch (BuildExecutionException ex) {
+            getLog().error("Failed to update Codename One");
+            throw new IOException("Failed to update Codename One", ex);
+        }
 
         cn1SettingsProps.setProperty("codename1.arg.hyp.beamId", logPasskey);
         cn1SettingsProps.setProperty("codename1.arg.maven.codenameone-core.version", cn1MavenVersion);
