@@ -103,6 +103,8 @@ include::Game-Assets.asciidoc[]
 
 include::io.asciidoc[]
 
+include::Processes.asciidoc[]
+
 include::Network-Connectivity.asciidoc[]
 
 include::Annotation-JSON-XML-Mapping.asciidoc[]

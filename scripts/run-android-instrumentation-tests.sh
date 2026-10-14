@@ -82,6 +82,10 @@ if [ ! -x "$TARGET_JAVA_BIN" ]; then
   exit 3
 fi
 
+# Exercise editor completion interleavings before a lost wakeup can stall the
+# device suite. This runs the production handoff on the host JVM.
+JAVA_HOME="$TARGET_JAVA_HOME" python3 "$SCRIPT_DIR/test_android_editor_wait.py"
+
 cn1ss_setup "$TARGET_JAVA_BIN" "$CN1SS_HELPER_SOURCE_DIR"
 
 # Start the host-side WebSocket screenshot server on the fixed standard port.

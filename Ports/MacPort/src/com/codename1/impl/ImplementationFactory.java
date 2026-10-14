@@ -66,4 +66,8 @@ public class ImplementationFactory {
     public Object createImplementation() {
         return new MacImplementation();
     }
+    /** Internal process adapter; null means this port does not support processes. */
+    public Object createProcessSupport() {
+        return new com.codename1.impl.process.NativeProcessSupport();
+    }
 }

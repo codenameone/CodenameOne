@@ -1561,12 +1561,10 @@ JAVA_LONG java_lang_System_currentTimeMillis___R_long(CODENAME_ONE_THREAD_STATE)
 JAVA_LONG java_lang_System_nanoTime___R_long(CODENAME_ONE_THREAD_STATE) {
     __STATIC_INITIALIZER_java_lang_System(threadStateData);
 #ifdef _WIN32
-    /* clock_gettime / CLOCK_MONOTONIC are absent from the MSVC / clang-cl
-       target, so fall back to the microsecond wall clock that already backs
-       currentTimeMillis on Windows (gettimeofday is supplied by cn1_win_compat). */
-    struct timeval time;
-    gettimeofday(&time, NULL);
-    return (((JAVA_LONG)time.tv_sec) * 1000000000LL) + (((JAVA_LONG)time.tv_usec) * 1000LL);
+    /* The QPC-backed clock also used by Thread.sleep is independent of wall
+       clock adjustments. Its microsecond resolution is sufficient for nanoTime
+       (which specifies a unit, not nanosecond clock precision). */
+    return (JAVA_LONG)(cn1_monotonic_micros() * 1000LL);
 #else
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -5895,3 +5893,5 @@ JAVA_OBJECT java_lang_String_toLowerCase___R_java_lang_String(CODENAME_ONE_THREA
     return cn1StringConvertCase(threadStateData, __cn1ThisObject, 0);
 #endif
 }
+
+#include "cn1_process_vm.h"

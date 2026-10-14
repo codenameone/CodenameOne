@@ -314,7 +314,7 @@ class CleanTargetLinuxIntegrationTest {
         // measured nothing, which is worse than no diagnostic at all.
         System.out.println("CN1SS:HARNESS: cmake configure: " + String.join(" ", configure));
         CleanTargetIntegrationTest.runCommand(configure, cmakeRoot);
-        CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), cmakeRoot);
+        CleanTargetIntegrationTest.runCmakeBuild(buildDir, cmakeRoot);
         Path elf = buildDir.resolve("LinuxHelloMain");
         assertTrue(Files.exists(elf), "native ELF should be produced: " + elf);
         return elf;

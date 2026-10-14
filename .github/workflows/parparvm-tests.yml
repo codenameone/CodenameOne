@@ -178,16 +178,13 @@ jobs:
 
   vm-tests:
     runs-on: ubuntu-24.04
-    # The full suite takes about an hour before the bounded GC benchmark arms.
-    # Android compatibility and Kotlin translation add time; leave room for
-    # both phases while each GC workload retains its own timeout.
+    # The full suite and serial GC benchmarks took 69 and 47 minutes in run
+    # 38355108612. Both passed, but setup plus reporting exceeded two hours.
+    # Leave reporting headroom; each GC workload retains its own timeout.
     #
-    # Measured: passing runs took 108 to 113 minutes against a limit of 120,
-    # and two runs in a row were cancelled inside their last test class with
-    # nothing hung -- the suite was simply within a slow runner's variance of
-    # the limit. The tests of the runtime library no longer run once per JDK
-    # (CompilerHelper.getBookendCompilers), which gives back about five
-    # minutes; the rest of the margin is here.
+    # The tests of the runtime library no longer run once per JDK
+    # (CompilerHelper.getBookendCompilers), which gives back some of that
+    # time; the limit stays where a slow runner still fits inside it.
     timeout-minutes: 150
     # The two database engines the backend speaks a wire protocol to.
     #

@@ -168,7 +168,8 @@ jobs:
   build-test:
 
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    # Java 8 also runs the full quality reports and packaging checks.
+    timeout-minutes: ${{ matrix.java-version == 8 && 90 || 60 }}
     container: ghcr.io/codenameone/codenameone/pr-ci-container:latest
     env:
       # Java 8 uses the native locale for class-file names containing Unicode.

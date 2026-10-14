@@ -76,6 +76,7 @@ fi
 # cn1_sqlite3.c is synced too: it carries our build options for the bundled
 # engine, and a stale copy in target/classes silently builds the old ones.
 for f in cn1_globals.h cn1_globals.m nativeMethods.m cn1_intrinsics.h cn1_sqlite3.c \
+         cn1_process.h cn1_process_vm.h \
          cn1_virtual_thread.h cn1_virtual_thread.c cn1_virtual_thread_asm.S; do
     cp "$REPO/vm/ByteCodeTranslator/src/$f" "$TRANSLATOR/$f"
 done

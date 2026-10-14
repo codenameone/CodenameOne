@@ -108,7 +108,7 @@ case "$ARM" in
         fi
         OUT="$(pwd)/target/wsecho-classes"
         rm -rf "$OUT"; mkdir -p "$OUT"
-        { find src impl/javase demo/wsecho -name '*.java'; ./shared-sources.sh; } \
+        { find src impl/javase demo/wsecho -name '*.java'; ./shared-sources.sh --javase; } \
             | tr '\n' '\0' | xargs -0 "$JAVAC" -nowarn -d "$OUT"
         "$JAVA" -cp "$OUT" com.demo.WsEcho --port "$PORT" --host "$BIND_HOST" \
             --workers "$WORKERS" &
