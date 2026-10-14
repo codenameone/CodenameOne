@@ -4955,6 +4955,21 @@ public final class JavaEmitter {
         // static access through a class reference
         if (isClassRef(tt)) {
             String cls = tt.arg(0).name;
+            // dart:core Duration's named constants: `zero` is the one non-int member (an
+            // actual Duration instance, which the runtime class already declares), and the
+            // rest are compile-time int constants. These are emitted as plain long literals
+            // rather than routed through dart.core.Duration fields -- that class only models
+            // elapsed-time values and does not declare most of them.
+            if (cls.equals("Duration")) {
+                if (name.equals("zero")) {
+                    ctx.importClass("dart.core.Duration");
+                    return new Out("Duration.zero", new TypeRef("Duration"));
+                }
+                Long lit = DURATION_INT_CONSTANTS.get(name);
+                if (lit != null) {
+                    return new Out(lit + "L", TypeRef.INT);
+                }
+            }
             if (program.enums.containsKey(cls) || stubs.isStubEnum(cls)) {
                 importEnum(cls, ctx);
                 if (name.equals("values")) {
@@ -7974,6 +7989,21 @@ public final class JavaEmitter {
                 Out f = emitExpr(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx);
                 return new Out(target.code + ".where(" + f.code + ")", TypeRef.of("Iterable", elem));
             }
+            if (n.equals("whereType")) {
+                // Dart's whereType<T>() takes no predicate -- T can only be read from the
+                // explicit <T> -- so the runtime's whereType(Class<T>) takes it as a
+                // trailing type witness (a class literal for a user class, the boxed
+                // class for a type the emitter maps to a Java primitive). No explicit
+                // <T> (whereType<dynamic>()) passes a null witness, which the runtime
+                // treats the same way Dart does: every non-null element passes.
+                TypeRef sub = c.typeArgs.isEmpty() ? null : c.typeArgs.get(0);
+                String token = "null";
+                if (sub != null && !isTypeVariable(sub, ctx)) {
+                    token = javaType(sub, true, ctx) + ".class";
+                }
+                return new Out(target.code + ".whereType(" + token + ")",
+                        TypeRef.of("Iterable", sub != null ? sub : TypeRef.DYNAMIC));
+            }
             if (n.equals("forEach")) {
                 Out f = emitExpr(pos.get(0), elementLambda(elem, TypeRef.VOID), ctx);
                 return new Out(target.code + ".forEachDart(" + f.code + ")", TypeRef.VOID);
@@ -9466,6 +9496,32 @@ public final class JavaEmitter {
             java.util.Arrays.asList("dependOnInheritedWidgetOfExactType",
                     "findAncestorWidgetOfExactType", "findAncestorStateOfType",
                     "findAncestorRenderObjectOfType", "getInheritedWidgetOfExactType"));
+
+    /**
+     * dart:core {@code Duration}'s named int constants (everything except {@code zero}), by
+     * their Dart-specified values. The Dart SDK defines the "Per" constants from the four
+     * base ratios (1000 micros/milli, 1000 millis/sec, 60 sec/min, 60 min/hour, 24 hour/day);
+     * the derived constants are each other's products, laid out here the same way.
+     */
+    private static final java.util.Map<String, Long> DURATION_INT_CONSTANTS = new java.util.HashMap<String, Long>();
+
+    static {
+        DURATION_INT_CONSTANTS.put("microsecondsPerMillisecond", 1000L);
+        DURATION_INT_CONSTANTS.put("millisecondsPerSecond", 1000L);
+        DURATION_INT_CONSTANTS.put("secondsPerMinute", 60L);
+        DURATION_INT_CONSTANTS.put("minutesPerHour", 60L);
+        DURATION_INT_CONSTANTS.put("hoursPerDay", 24L);
+        DURATION_INT_CONSTANTS.put("microsecondsPerSecond", 1000L * 1000L);
+        DURATION_INT_CONSTANTS.put("millisecondsPerMinute", 1000L * 60L);
+        DURATION_INT_CONSTANTS.put("secondsPerHour", 60L * 60L);
+        DURATION_INT_CONSTANTS.put("microsecondsPerMinute", 1000L * 1000L * 60L);
+        DURATION_INT_CONSTANTS.put("millisecondsPerHour", 1000L * 60L * 60L);
+        DURATION_INT_CONSTANTS.put("secondsPerDay", 60L * 60L * 24L);
+        DURATION_INT_CONSTANTS.put("minutesPerDay", 60L * 24L);
+        DURATION_INT_CONSTANTS.put("microsecondsPerHour", 1000L * 1000L * 60L * 60L);
+        DURATION_INT_CONSTANTS.put("millisecondsPerDay", 1000L * 60L * 60L * 24L);
+        DURATION_INT_CONSTANTS.put("microsecondsPerDay", 1000L * 1000L * 60L * 60L * 24L);
+    }
 
     private static final java.util.Set<String> CONCRETE_CORE = new java.util.HashSet<String>(
             java.util.Arrays.asList("int", "double", "bool", "String", "void", "num",

@@ -156,6 +156,14 @@ public class FocusNode {
     /** Detaches {@code h}, if it is still the attached component. */
     public void detachHost(Host h) {
         if (host == h) {
+            // Flutter's FocusAttachment.detach unfocuses a primary node before
+            // severing the attachment. Only clearing `host` left the native editor
+            // still active, and this node still answering hasFocus()/primaryFocus()
+            // as the one holding the focus, after bindFocus() moved the attachment
+            // to a different FocusNode -- a mounted field replacing a focused
+            // external node. unfocus() blurs the still-attached host and clears
+            // the logical focus (notifying listeners) before the reference is cut.
+            unfocus();
             host = null;
         }
     }
