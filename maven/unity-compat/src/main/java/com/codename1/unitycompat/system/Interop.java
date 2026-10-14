@@ -489,48 +489,90 @@ public final class Interop {
 
     /// `IComparable.CompareTo` and `IComparable<T>.CompareTo`. A string or a
     /// boxed primitive implements both on .NET and is a JDK class here.
+    ///
+    /// The receiver is tested first: a call on null throws even when the
+    /// argument is null too, as .NET's `callvirt` does. Through the
+    /// non-generic interface the argument can be anything at all, and .NET
+    /// throws `ArgumentException` for one that is not of the receiver's own
+    /// type -- an `int` against a `long`, a `uint` box or an enum -- so the
+    /// argument is tested, never cast.
     public static int CompareTo(Object a, Object b) {
+        if (a == null) {
+            throw new NullReferenceException();
+        }
         if (a instanceof IComparable_1) {
             return ((IComparable_1) a).CompareTo(b);
         }
         if (a instanceof IComparable) {
             return ((IComparable) a).CompareTo(b);
         }
+        if (a instanceof EnumBox) {
+            return Enum_.CompareTo(a, b);
+        }
         if (b == null) {
             return 1;
         }
         if (a instanceof Integer) {
-            return Int32_.CompareTo(((Integer) a).intValue(), ((Integer) b).intValue());
+            if (b instanceof Integer) {
+                return Int32_.CompareTo(((Integer) a).intValue(), ((Integer) b).intValue());
+            }
+            throw mustBe("Int32");
         }
         if (a instanceof String) {
-            int c = ((String) a).compareTo((String) b);
-            return c < 0 ? -1 : c > 0 ? 1 : 0;
+            if (b instanceof String) {
+                int c = ((String) a).compareTo((String) b);
+                return c < 0 ? -1 : c > 0 ? 1 : 0;
+            }
+            throw mustBe("String");
         }
         if (a instanceof Float) {
-            return Single_.CompareTo(((Float) a).floatValue(), ((Float) b).floatValue());
+            if (b instanceof Float) {
+                return Single_.CompareTo(((Float) a).floatValue(), ((Float) b).floatValue());
+            }
+            throw mustBe("Single");
         }
         if (a instanceof Double) {
-            return Double_.CompareTo(((Double) a).doubleValue(), ((Double) b).doubleValue());
+            if (b instanceof Double) {
+                return Double_.CompareTo(((Double) a).doubleValue(), ((Double) b).doubleValue());
+            }
+            throw mustBe("Double");
         }
         if (a instanceof Long) {
-            return Int64_.CompareTo(((Long) a).longValue(), ((Long) b).longValue());
+            if (b instanceof Long) {
+                return Int64_.CompareTo(((Long) a).longValue(), ((Long) b).longValue());
+            }
+            throw mustBe("Int64");
         }
         if (a instanceof Character) {
-            return ((Character) a).charValue() - ((Character) b).charValue();
+            if (b instanceof Character) {
+                return ((Character) a).charValue() - ((Character) b).charValue();
+            }
+            throw mustBe("Char");
         }
         if (a instanceof Short) {
-            return ((Short) a).shortValue() - ((Short) b).shortValue();
+            if (b instanceof Short) {
+                return ((Short) a).shortValue() - ((Short) b).shortValue();
+            }
+            throw mustBe("Int16");
         }
         if (a instanceof Byte) {
-            return ((Byte) a).byteValue() - ((Byte) b).byteValue();
+            // The JDK box is `sbyte`'s; `byte` has its own (ByteBox).
+            if (b instanceof Byte) {
+                return ((Byte) a).byteValue() - ((Byte) b).byteValue();
+            }
+            throw mustBe("SByte");
         }
         if (a instanceof Boolean) {
-            return Boolean_.CompareTo(((Boolean) a).booleanValue(), ((Boolean) b).booleanValue());
-        }
-        if (a == null) {
-            throw new NullReferenceException();
+            if (b instanceof Boolean) {
+                return Boolean_.CompareTo(((Boolean) a).booleanValue(), ((Boolean) b).booleanValue());
+            }
+            throw mustBe("Boolean");
         }
         throw new InvalidCastException();
+    }
+
+    private static ArgumentException mustBe(String type) {
+        return new ArgumentException("Object must be of type " + type + ".");
     }
 
     /// `IEquatable<T>.Equals`.

@@ -46,7 +46,62 @@ public class Marker : MonoBehaviour
         Coroutine waits = StartCoroutine(Next("start", null));
         Debug.Log("marker " + Roots());
         Debug.Log("marker " + Edges(waits));
+        Debug.Log("marker " + Uniform());
+        Debug.Log("marker " + InParent());
         StartCoroutine(AfterEmpty());
+    }
+
+    // GetComponentInParent searches the object itself whatever its state,
+    // and of its parents only those active in the hierarchy.
+    private static string InParent()
+    {
+        GameObject root = new GameObject("root");
+        root.AddComponent<CapsuleCollider2D>();
+        GameObject off = new GameObject("off");
+        off.AddComponent<CapsuleCollider2D>();
+        off.transform.SetParent(root.transform);
+        off.SetActive(false);
+        GameObject plain = new GameObject("plain");
+        plain.transform.SetParent(off.transform);
+        GameObject own = new GameObject("own");
+        own.AddComponent<CapsuleCollider2D>();
+        own.transform.SetParent(off.transform);
+        GameObject offRoot = new GameObject("offRoot");
+        offRoot.AddComponent<CapsuleCollider2D>();
+        offRoot.SetActive(false);
+        GameObject under = new GameObject("under");
+        under.transform.SetParent(offRoot.transform);
+        GameObject leaf = new GameObject("leaf");
+        leaf.transform.SetParent(under.transform);
+        string s = "in parent " + Owner(plain.GetComponentInParent<CapsuleCollider2D>()) + " "
+            + Owner(own.GetComponentInParent<CapsuleCollider2D>()) + " "
+            + Owner(leaf.GetComponentInParent<CapsuleCollider2D>()) + " "
+            + Owner(plain.transform.GetComponentInParent<CapsuleCollider2D>()) + " "
+            + Owner(off.GetComponentInParent<CapsuleCollider2D>());
+        Destroy(root);
+        Destroy(offRoot);
+        return s;
+    }
+
+    private static string Owner(Component c)
+    {
+        return c == null ? "none" : c.gameObject.name;
+    }
+
+    // An int range of three quarters of 2^32: one 32-bit sample reduced
+    // with a remainder alone lands in the first third of it half the time,
+    // where every value equally likely lands there a third of the time.
+    private static string Uniform()
+    {
+        int low = 0;
+        for (int i = 0; i < 3000; i++)
+        {
+            if (Random.Range(-1610612736, 1610612736) < -536870912)
+            {
+                low++;
+            }
+        }
+        return "range uniform=" + (low > 900 && low < 1100);
     }
 
     private string Edges(Coroutine waits)

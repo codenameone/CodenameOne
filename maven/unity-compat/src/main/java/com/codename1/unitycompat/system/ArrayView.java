@@ -22,7 +22,7 @@
  */
 package com.codename1.unitycompat.system;
 
-import com.codename1.unitycompat.system.collections.generic.IEnumerable_1;
+import com.codename1.unitycompat.system.collections.generic.ICollection_1;
 import com.codename1.unitycompat.system.collections.generic.IEnumerator_1;
 
 /// An array seen as the collection interfaces it implements on .NET. The
@@ -39,8 +39,16 @@ import com.codename1.unitycompat.system.collections.generic.IEnumerator_1;
 /// what it is. Handing it the element itself let `cells.ToList()` share
 /// its values with the array, and let a lambda that writes the array
 /// change the argument it was still reading.
+///
+/// The view is every collection interface of the runtime that the
+/// translator converts an array to, `ICollection<T>` as well as the
+/// enumerables: a view that implemented only the enumerables failed
+/// `values.Count` on an array held as an `ICollection<int>` with
+/// IncompatibleClassChangeError. `IList<T>`, `IReadOnlyCollection<T>` and
+/// `IReadOnlyList<T>` have no class in the runtime, so a member of one is a
+/// missing member the build names; walking one is all it can be used for.
 @SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
-public final class ArrayView implements IEnumerable_1 {
+public final class ArrayView implements ICollection_1 {
     private final Object array;
     private final int length;
     private final boolean structs;
@@ -140,8 +148,16 @@ public final class ArrayView implements IEnumerable_1 {
         return new ArrayView(array, n, false, false);
     }
 
+    @Override
     public int get_Count() {
         return length;
+    }
+
+    /// An array has a fixed size: through `ICollection<T>` it is read-only,
+    /// and .NET says so with this exception and this message.
+    @Override
+    public void Clear() {
+        throw new NotSupportedException("Collection is read-only.");
     }
 
     public int get_Length() {

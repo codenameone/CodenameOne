@@ -415,8 +415,42 @@ public class UnityGameView extends GameView {
     private UnityGameAudio audio;
     private final UnityGamePrefs prefs = new UnityGamePrefs();
 
+    /// Whether this view is one of the [#multiKeyHolders]: between its
+    /// `initComponent` and its `deinitialize`.
+    private boolean holdsMultiKey;
+    /// How many views are shown, each wanting multi key mode on.
+    private static int multiKeyHolders;
+    /// Whether the views turned the mode on, rather than found it on.
+    private static boolean multiKeyInstalled;
+
+    /// Multi key mode is the display's, for the whole application: a view
+    /// that turned it on and left it on changed how every form after the
+    /// game takes keys. The first view shown turns it on only if it is
+    /// off, and the last one taken away turns it off only if the views
+    /// turned it on; a host that runs in the mode by choice keeps it. A
+    /// count, since two views can be shown at once; both run on the EDT.
+    private static void holdMultiKey() {
+        multiKeyHolders++;
+        if (multiKeyHolders == 1 && !Display.getInstance().isMultiKeyMode()) {
+            Display.getInstance().setMultiKeyMode(true);
+            multiKeyInstalled = true;
+        }
+    }
+
+    private static void releaseMultiKey() {
+        multiKeyHolders--;
+        if (multiKeyHolders == 0 && multiKeyInstalled) {
+            multiKeyInstalled = false;
+            Display.getInstance().setMultiKeyMode(false);
+        }
+    }
+
     @Override
     protected void deinitialize() {
+        if (holdsMultiKey) {
+            holdsMultiKey = false;
+            releaseMultiKey();
+        }
         if (audio != null) {
             audio.stopAll();
             AudioSource.$output(null);
@@ -495,7 +529,10 @@ public class UnityGameView extends GameView {
         // that keys overlap, the display takes the release of any key but
         // the last two pressed for a stray one and drops it, and the key
         // it belonged to stays down for good.
-        Display.getInstance().setMultiKeyMode(true);
+        if (!holdsMultiKey) {
+            holdsMultiKey = true;
+            holdMultiKey();
+        }
         // Sound has a device to play on and preferences somewhere to stay.
         // A host has usually asked already, before the first scene woke;
         // this is for the view shown again, and for a host that did not.

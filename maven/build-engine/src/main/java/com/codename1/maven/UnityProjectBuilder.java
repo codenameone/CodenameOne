@@ -244,11 +244,11 @@ public class UnityProjectBuilder {
         State recorded = State.parse(read(state));
         // No digest, no skipping: content that could not be read matches
         // nothing, not even a state file that is empty for the same reason.
-        if (now != null && recorded != null && now.digest.equals(recorded.digest) && staged.isDirectory()
-                && appImpl.isFile()) {
+        String missing = missingOutput(staged, appImpl, resources, runtimeClasses);
+        if (now != null && recorded != null && now.digest.equals(recorded.digest) && missing == null) {
             log.debug("Unity project unchanged; not compiled again");
         } else {
-            staleOutput = staleOutput(state, recorded, now, staged, appImpl);
+            staleOutput = staleOutput(state, recorded, now, missing);
             if (staleOutput != null) {
                 log.info(staleOutput);
             }
@@ -352,15 +352,55 @@ public class UnityProjectBuilder {
         }
     }
 
+    /// The first thing a full build would have left under the work directory
+    /// that is not there, or null when it is all there. A matching state file
+    /// says the output was made from these sources, not that it is still
+    /// whole: a cache restored in part, or a directory deleted by hand, and
+    /// [#install] would put an application together from what is left.
+    ///
+    /// Every compile creates the staging and image directories and unpacks
+    /// the runtime's classes, so all three exist after one -- the images
+    /// directory empty for a project that draws none, which is why it is
+    /// asked to exist and not to hold something. The runtime's directory is
+    /// never empty: install skips each staged class the runtime ships by
+    /// looking there, and an empty one installs a second copy of each. And
+    /// every file the last install copied (`installed.txt`) must still be
+    /// where it was copied from, which is what notices an image or a class
+    /// gone from a directory that is itself there.
+    private String missingOutput(File staged, File appImpl, File resources, File runtimeClasses) {
+        if (!staged.isDirectory()) {
+            return staged.toString();
+        }
+        if (!appImpl.isFile()) {
+            return appImpl.toString();
+        }
+        if (!resources.isDirectory()) {
+            return resources.toString();
+        }
+        String[] runtime = runtimeClasses.list();
+        if (runtime == null || runtime.length == 0) {
+            return runtimeClasses.toString();
+        }
+        String recorded = read(new File(workDir, "installed.txt"));
+        if (recorded != null) {
+            for (String rel : recorded.split("\n")) {
+                if (rel.length() > 0 && !new File(staged, rel).isFile() && !new File(resources, rel).isFile()) {
+                    return new File(resources, rel) + " (or " + new File(staged, rel) + ")";
+                }
+            }
+        }
+        return null;
+    }
+
     /// What to say about compiled output that is present and cannot be used,
     /// or null when the work directory holds none: a first build has nothing
     /// to explain.
-    private String staleOutput(File state, State recorded, State now, File staged, File appImpl) {
+    private String staleOutput(File state, State recorded, State now, String missing) {
         if (recorded == null) {
             return null;
         }
-        if (!staged.isDirectory() || !appImpl.isFile()) {
-            return state + " is there, but " + (staged.isDirectory() ? appImpl : staged) + " is not: the"
+        if (missing != null) {
+            return state + " is there, but " + missing + " is not: the"
                     + " compiled output of " + unityDir + " is incomplete and has to be made again.";
         }
         return "The compiled output under " + workDir + " does not match these sources or jars: " + state

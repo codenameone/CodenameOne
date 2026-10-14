@@ -426,6 +426,46 @@ public class UnityProjectBuilderTest {
 
     /// The classes directory is the build tool's to clean; cleaning it alone
     /// must not need the .NET SDK to get the game back.
+    /// A state file that matches is not output that is whole: each thing a
+    /// full build leaves under `target/unity` and install reads is required
+    /// before the build is skipped, or a cache restored in part installs an
+    /// application without its images, or with a second copy of each class
+    /// the runtime ships.
+    @Test
+    public void incompleteOutputIsCompiledAgain() throws Exception {
+        assertTrue(builder().run());
+        File work = new File(target, "unity");
+        String[] gone = {"resources", "runtime", "resources/sheet.png", "app/global/Player.class"};
+        for (int i = 0; i < gone.length; i++) {
+            deleteTree(new File(work, gone[i]));
+            assertTrue(gone[i], builder().run());
+            assertEquals(gone[i], i + 2, tools.compiled);
+            assertTrue(gone[i], new File(work, gone[i]).exists());
+        }
+        // Emptied rather than deleted.
+        File[] runtime = new File(work, "runtime").listFiles();
+        for (File f : runtime) {
+            deleteTree(f);
+        }
+        assertTrue(builder().run());
+        assertEquals(gone.length + 2, tools.compiled);
+        assertFalse(new File(classes, "UnityEngine/Vector2.class").exists());
+    }
+
+    /// A project that draws no image has an empty images directory, which
+    /// is whole.
+    @Test
+    public void aProjectWithoutImagesIsNotCompiledAgain() throws Exception {
+        assertTrue(builder().run());
+        File resources = new File(target, "unity/resources");
+        assertTrue(new File(resources, "sheet.png").delete());
+        // As a build of a project without images records its install.
+        Files.write(new File(target, "unity/installed.txt").toPath(),
+                "global/Player.class\nglobal/Shot.class\n".getBytes(StandardCharsets.UTF_8));
+        assertTrue(builder().run());
+        assertEquals(1, tools.compiled);
+    }
+
     @Test
     public void aCleanedClassesDirectoryIsRefilledWithoutCompiling() throws Exception {
         assertTrue(builder().run());

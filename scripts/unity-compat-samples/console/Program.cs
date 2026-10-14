@@ -2623,6 +2623,95 @@ namespace Spike
                 + Thrown(() => string.Join(",", (string[])null)) + " " + Thrown(() => abc.Split(',', -1)[0]));
         }
 
+        // ---- non-generic CompareTo and arrays as collections -------------------
+
+        private static string Kind(Func<string> f)
+        {
+            try
+            {
+                return f();
+            }
+            catch (NullReferenceException)
+            {
+                return "NullReference";
+            }
+            catch (ArgumentException)
+            {
+                return "Argument";
+            }
+            catch (InvalidCastException)
+            {
+                return "InvalidCast";
+            }
+            catch (NotSupportedException)
+            {
+                return "NotSupported";
+            }
+            catch (Exception)
+            {
+                return "another exception";
+            }
+        }
+
+        // Through the non-generic interface the argument can be anything;
+        // .NET throws ArgumentException for one not of the receiver's type,
+        // and a call on null throws whatever the argument is.
+        private static void ComparableArguments()
+        {
+            Section("comparable arguments");
+            IComparable none = null;
+            IComparable<int> noneOfInt = null;
+            Log("null receiver " + Kind(() => "" + none.CompareTo(null)) + " " + Kind(() => "" + none.CompareTo(1))
+                + " " + Kind(() => "" + noneOfInt.CompareTo(1)));
+            Log("same type " + ((IComparable)1).CompareTo(2) + " " + ((IComparable)"b").CompareTo("a") + " "
+                + ((IComparable)2L).CompareTo(2L) + " " + ((IComparable)1).CompareTo(null) + " "
+                + ((IComparable)"a").CompareTo(null) + " " + ((IComparable)Rank.Two).CompareTo(Rank.One));
+            Log("other type " + Kind(() => "" + ((IComparable)1).CompareTo("x")) + " "
+                + Kind(() => "" + ((IComparable)1).CompareTo(1L)) + " " + Kind(() => "" + ((IComparable)1L).CompareTo(1))
+                + " " + Kind(() => "" + ((IComparable)1).CompareTo(1u)) + " " + Kind(() => "" + ((IComparable)1u).CompareTo(1))
+                + " " + Kind(() => "" + ((IComparable)Rank.One).CompareTo(1)) + " "
+                + Kind(() => "" + ((IComparable)1).CompareTo(Rank.One)) + " " + Kind(() => "" + ((IComparable)"a").CompareTo(1)));
+            Log("other primitive " + Kind(() => "" + ((IComparable)1.5f).CompareTo(1.5)) + " "
+                + Kind(() => "" + ((IComparable)2.0).CompareTo(1.0f)) + " " + Kind(() => "" + ((IComparable)'a').CompareTo(1))
+                + " " + Kind(() => "" + ((IComparable)(short)1).CompareTo((ushort)1)) + " "
+                + Kind(() => "" + ((IComparable)(sbyte)1).CompareTo((byte)1)) + " " + Kind(() => "" + ((IComparable)true).CompareTo(1)));
+        }
+
+        private static int CountOf<T>(ICollection<T> c)
+        {
+            return c.Count;
+        }
+
+        // An array is an ICollection<T> on .NET: its count is its length,
+        // it reads through to the array, and it cannot change size.
+        private static void ArraysAsCollections()
+        {
+            Section("arrays as collections");
+            int[] ints = { 3, 1, 2 };
+            ICollection<int> c = ints;
+            ints[0] = 9;
+            string walked = "";
+            foreach (int i in c) walked += i + ",";
+            Log("int " + c.Count + " " + CountOf(ints) + " " + walked + " " + Kind(() => { c.Clear(); return "cleared"; })
+                + " " + ints.Length);
+            uint[] uints = { 4000000000u, 5u };
+            ICollection<uint> cu = uints;
+            string u = "";
+            foreach (uint x in cu) u += x + ",";
+            Vec2[] vs = { new Vec2(1, 2), new Vec2(3, 4) };
+            ICollection<Vec2> cv = vs;
+            vs[1].x = 7;
+            string v = "";
+            foreach (Vec2 x in cv) v += (int)x.x + ",";
+            Log("uint " + cu.Count + " " + u + " struct " + cv.Count + " " + CountOf(vs) + " " + v);
+            object o = ints;
+            Log("cast " + (o is ICollection<int>) + " " + ((ICollection<int>)o).Count + " " + (o as ICollection<int>).Count);
+            IReadOnlyList<int> r = ints;
+            int sum = 0;
+            foreach (int i in r) sum += i;
+            Log("read only list walked " + sum);
+        }
+
         // ---- boxes, null receivers and capacities ------------------------------
 
         private static void BoxesAndReceivers()
@@ -2890,6 +2979,8 @@ namespace Spike
             GenericStatics();
             PrimitiveArraysToGenerics();
             StringArgumentErrors();
+            ComparableArguments();
+            ArraysAsCollections();
             Console.WriteLine("done");
         }
     }

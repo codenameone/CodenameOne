@@ -390,4 +390,14 @@ new string ArgumentOutOfRange [] []
 Substring ArgumentOutOfRange ArgumentOutOfRange [] ArgumentOutOfRange ArgumentOutOfRange ArgumentOutOfRange []
 chars IndexOutOfRange IndexOutOfRange
 null arguments ArgumentNull ArgumentNull ArgumentNull ArgumentNull ArgumentNull Argument ArgumentNull ArgumentOutOfRange
+== comparable arguments
+null receiver NullReference NullReference NullReference
+same type -1 1 0 1 1 1
+other type Argument Argument Argument Argument Argument Argument Argument Argument
+other primitive Argument Argument Argument Argument Argument Argument
+== arrays as collections
+int 3 3 9,1,2, NotSupported 3
+uint 2 4000000000,5, struct 2 2 1,7,
+cast True 3 3
+read only list walked 12
 done

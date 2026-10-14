@@ -106,7 +106,17 @@ public final class Random {
         if (span == 0L) {
             return minInclusive;
         }
+        // Every value equally likely: `r % span` alone favours the low
+        // values whenever span does not divide 2^32, so a sample at or
+        // past the last whole multiple of span is drawn again. For the
+        // small spans scripts use a redraw has probability span / 2^32,
+        // which leaves seeded sequences as they were. All in `long`, read
+        // as unsigned; span is at least 1 here and below 2^32.
+        long limit = (0x100000000L / span) * span;
         long r = next() & 0xffffffffL;
+        while (r >= limit) {
+            r = next() & 0xffffffffL;
+        }
         return (int) (lo + r % span);
     }
 

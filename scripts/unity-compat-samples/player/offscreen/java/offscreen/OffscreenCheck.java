@@ -367,6 +367,7 @@ public final class OffscreenCheck {
         resized(view, surface, png);
         clock(view, surface);
         texts(view, surface);
+        multiKey(view);
         System.out.println(FAILURES.isEmpty() ? "OFFSCREEN OK" : "OFFSCREEN FAILED: " + FAILURES.size());
         return FAILURES.isEmpty() ? 0 : 1;
     }
@@ -874,5 +875,33 @@ public final class OffscreenCheck {
         System.out.println("texts: " + frames + " frames of a text that never repeats: at most " + cachedMost
                 + " painted texts (from " + cachedBefore + ") and " + texturesMost + " textures (from "
                 + texturesBefore + "); " + cachedAfter + " and " + texturesAfter + " once it was left alone");
+    }
+
+    /// Multi key mode is the whole application's: a view turns it on while
+    /// it is shown and off when it is taken away, and leaves alone a mode
+    /// the host had on. Last, since the view is taken off its form.
+    private static void multiKey(final UnityGameView view) {
+        final Display display = Display.getInstance();
+        final com.codename1.ui.Container parent = view.getParent();
+        final boolean[] seen = new boolean[4];
+        display.callSeriallyAndWait(new Runnable() {
+            public void run() {
+                seen[0] = display.isMultiKeyMode();
+                parent.removeComponent(view);
+                seen[1] = display.isMultiKeyMode();
+                display.setMultiKeyMode(true);
+                parent.add(com.codename1.ui.layouts.BorderLayout.CENTER, view);
+                parent.revalidate();
+                seen[2] = display.isMultiKeyMode();
+                parent.removeComponent(view);
+                seen[3] = display.isMultiKeyMode();
+                display.setMultiKeyMode(false);
+            }
+        });
+        check(seen[0], "multi key mode is off while the view is shown");
+        check(!seen[1], "multi key mode the view turned on is still on after the view was taken away");
+        check(seen[2] && seen[3], "the view turned off multi key mode the host had on");
+        System.out.println("multi key: shown " + seen[0] + ", taken away " + seen[1] + ", the host's kept "
+                + (seen[2] && seen[3]));
     }
 }

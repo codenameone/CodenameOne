@@ -133,6 +133,41 @@ public class DiagnosticsTest {
         assertHas(missing, "    used by Lacking.cs:11, in Lacking::Second(i4) : i4");
     }
 
+    /// An array converted to a collection interface the runtime has no class
+    /// for goes in its view all the same, since walking it is through
+    /// `IEnumerable<T>`; a member of the interface's own is a missing member
+    /// the build names, and not an IncompatibleClassChangeError on the
+    /// device.
+    @Test
+    public void anArrayAsAnInterfaceTheRuntimeLacksIsNamedWhereItIsUsed() throws Exception {
+        UnityToolchain.dotnet();
+        File work = UnityToolchain.workDir("diagnostics-readonly-list");
+        File source = new File(work, "src/Lists.cs");
+        Files.createDirectories(source.getParentFile().toPath());
+        Files.write(source.toPath(), ("using System.Collections.Generic;\n"
+                + "public static class Lists\n"
+                + "{\n"
+                + "    public static int Count(int[] values)\n"
+                + "    {\n"
+                + "        IReadOnlyList<int> list = values;\n"
+                + "        return list.Count;\n"
+                + "    }\n"
+                + "}\n").getBytes(StandardCharsets.UTF_8));
+        UnityToolchain.dotnetBuild(project(work, source.getAbsolutePath(), false), work);
+        File assembly = new File(work, "cs/bin/Release/netstandard2.1/Assembly-CSharp.dll");
+        File runtime = new File(work, "runtime");
+        UnityToolchain.javac(work, "javac-base-library", runtime, null, new File(UnityToolchain.runtimeModule(),
+                "src/main/java/com/codename1/unitycompat/system"));
+
+        Translator t = new Translator();
+        t.index.addDirectory(runtime);
+        t.run(Arrays.asList(assembly), Arrays.asList(netstandard()));
+        List<String> missing = t.missingMembers();
+        Assert.assertFalse("nothing reported", missing.isEmpty());
+        Assert.assertTrue(missing.get(0), missing.get(0).contains("IReadOnlyCollection_1.get_Count"));
+        assertHas(missing, "    used by Lists.cs:7, in Lists::Count(i4[]) : i4");
+    }
+
     /// An assembly with no PDB beside it still says which method.
     @Test
     public void missingMemberWithoutDebugInformationNamesTheMethod() throws Exception {

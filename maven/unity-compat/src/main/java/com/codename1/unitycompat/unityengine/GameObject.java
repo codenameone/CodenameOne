@@ -262,14 +262,37 @@ public final class GameObject extends Object {
         }
     }
 
+    /// This object first, then each parent up to the root. Unity's
+    /// one-argument form: "Only active parent GameObjects are included in
+    /// the search, unless you call the method with the `includeInactive`
+    /// parameter set to `true`", and "The GameObject on which the method is
+    /// called is always searched regardless of this parameter." Active as
+    /// [#GetComponentInChildren(Class)] reads it, in the hierarchy: a parent
+    /// below an inactive one is not searched either, and those above the
+    /// highest inactive one are.
     public java.lang.Object GetComponentInParent(Class type) {
-        Transform t = transform;
-        while (t != null) {
-            java.lang.Object c = t.gameObject.GetComponent(type);
-            if (c != null) {
-                return c;
+        java.lang.Object c = GetComponent(type);
+        if (c != null) {
+            return c;
+        }
+        // The highest parent that is itself inactive; it and everything
+        // between it and this object are inactive in the hierarchy.
+        Transform highestInactive = null;
+        for (Transform t = transform.parent; t != null; t = t.parent) {
+            if (!t.gameObject.active) {
+                highestInactive = t;
             }
-            t = t.parent;
+        }
+        boolean searched = highestInactive == null;
+        for (Transform t = transform.parent; t != null; t = t.parent) {
+            if (searched) {
+                c = t.gameObject.GetComponent(type);
+                if (c != null) {
+                    return c;
+                }
+            } else if (t == highestInactive) { // NOPMD CompareObjectsWithEquals
+                searched = true;
+            }
         }
         return null;
     }

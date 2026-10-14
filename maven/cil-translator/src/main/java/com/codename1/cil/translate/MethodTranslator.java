@@ -2105,6 +2105,16 @@ final class MethodTranslator implements Opcodes {
     /// An array is every one of these on .NET and none of them on the JVM,
     /// so an array handed to a parameter of such a type goes in a view that
     /// implements them over the same elements.
+    ///
+    /// The view (ArrayView) implements each of them the runtime has a class
+    /// for: the two enumerables and `ICollection<T>`. The others stay in the
+    /// list although the view is not one of them, because what reaches the
+    /// view through them is still right: walking one goes through
+    /// `IEnumerable<T>`, which it is, and any member of their own -- `Count`
+    /// of an `IReadOnlyList<int>`, an indexer of an `IList<int>` -- names a
+    /// runtime class that does not exist, which the build reports by file
+    /// and line (RuntimeIndex). Left out of this list, the array would be
+    /// stored as itself and the same walk would fail on the device.
     private static boolean isCollectionInterface(CilType type) {
         CilType t = type.kind == CilType.Kind.GENERICINST ? type.element : type;
         String name = t.typeName();
@@ -2279,7 +2289,10 @@ final class MethodTranslator implements Opcodes {
         CilType t = names.norm(target);
         CilType open = t.kind == CilType.Kind.GENERICINST ? t.element : t;
         String name = open.typeName();
-        boolean generic = "System.Collections.Generic.IEnumerable`1".equals(name);
+        // `ICollection<T>` too: the view is one (ArrayView), so an array
+        // held as an `object` answers `is ICollection<int>` as on .NET.
+        boolean generic = "System.Collections.Generic.IEnumerable`1".equals(name)
+                || "System.Collections.Generic.ICollection`1".equals(name);
         if (!generic && !"System.Collections.IEnumerable".equals(name)) {
             return;
         }
