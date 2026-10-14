@@ -53,13 +53,17 @@ CREATE TABLE wl_closed_account (
     closed_at BIGINT NOT NULL
 );
 
--- The verification code an account is waiting on. Only its hash is kept.
+-- The verification code an account is waiting on. Only its hash is kept, and
+-- that of the code before it while it is still good: text messages are not
+-- delivered in the order they were sent.
 CREATE TABLE wl_phone_code (
     username VARCHAR(190) NOT NULL PRIMARY KEY,
     code_hash VARCHAR(64) NOT NULL,
     expires_at BIGINT NOT NULL,
     attempts INTEGER NOT NULL,
-    sent_at BIGINT NOT NULL
+    sent_at BIGINT NOT NULL,
+    previous_hash VARCHAR(64) NOT NULL DEFAULT '',
+    previous_expires_at BIGINT NOT NULL DEFAULT 0
 );
 
 -- Tickets for opening the live channel. A row is deleted by the connection that

@@ -80,7 +80,8 @@
       return (v == null || typeof v !== "number" || !isFinite(v)) ? "" : String(v);
     };
     // watch: keep reporting until cn1GeoClear(the id returned). timeoutMillis
-    // and maximumAgeMillis: 0 or less leaves the browser's default.
+    // and maximumAgeMillis: 0 or less leaves the browser's default. Answers -1
+    // when no watch was started: 0 is a watch id a browser may hand out.
     window.cn1GeoRequest = function(callback, watch, timeoutMillis, maximumAgeMillis, highAccuracy) {
       var answer = function(text) {
         try { callback({ type: "cn1geolocation", data: text }); } catch (_e) { /* the worker is gone */ }
@@ -88,7 +89,7 @@
       var geo = window.navigator && window.navigator.geolocation;
       if (!geo) {
         window.setTimeout(function() { answer("E|2|This browser has no location service"); }, 0);
-        return 0;
+        return -1;
       }
       var options = {};
       if (timeoutMillis > 0) { options.timeout = timeoutMillis; }
@@ -113,11 +114,12 @@
         // A page that is not a secure context, or a policy that forbids it.
         window.setTimeout(function() { answer("E|2|" + (err && err.message ? err.message : err)); }, 0);
       }
-      return 0;
+      return -1;
     };
     window.cn1GeoClear = function(id) {
       var geo = window.navigator && window.navigator.geolocation;
-      if (geo && id) {
+      // Zero is a real watch id; only the -1 cn1GeoRequest answers is none.
+      if (geo && typeof id === "number" && id >= 0) {
         try { geo.clearWatch(id); } catch (_e) { /* nothing to clear */ }
       }
     };

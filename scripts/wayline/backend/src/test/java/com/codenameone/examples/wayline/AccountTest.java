@@ -22,6 +22,7 @@
  */
 package com.codenameone.examples.wayline;
 
+import com.codename1.backend.DataSource;
 import com.codename1.backend.Json;
 import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.test.BackendTest;
@@ -45,6 +46,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 class AccountTest {
     @Autowired
     private MockMvc mvc;
+    @Autowired
+    private DataSource db;
 
     private static String registration(String email, String password, boolean driver) {
         return "{\"email\":\"" + email + "\",\"password\":\"" + password
@@ -148,5 +151,57 @@ class AccountTest {
                         .header("Authorization", bearer).contentType("application/json")
                         .content("{\"code\":\"" + code + "\"}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    /// A second code is asked for when the first is slow to arrive, and the
+    /// first may then arrive last. Both are good until the first one would
+    /// have expired, and using either uses up both.
+    @Test
+    void aCodeStaysGoodWhenAnotherIsSentAfterIt() throws Exception {
+        mvc.perform(post("/api/account/register").contentType("application/json")
+                        .content(registration("resend@example.com", "a-long-password", false)))
+                .andExpect(status().isOk());
+        String bearer = bearer("resend@example.com", "a-long-password");
+        String first = code(bearer);
+        // The wait between codes has passed.
+        db.execute("UPDATE wl_phone_code SET sent_at = sent_at - 60000 WHERE username = ?",
+                new Object[] {"resend@example.com"});
+        String second = code(bearer);
+
+        mvc.perform(post("/api/account/phone/verify").header("Host", SignIn.HOST)
+                        .header("Authorization", bearer).contentType("application/json")
+                        .content("{\"code\":\"" + first + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.phoneVerified").value(true));
+        mvc.perform(post("/api/account/phone/verify").header("Host", SignIn.HOST)
+                        .header("Authorization", bearer).contentType("application/json")
+                        .content("{\"code\":\"" + second + "\"}"))
+                .andExpect(status().isBadRequest());
+
+        // Once the first has expired it is no longer good, though the second is.
+        String third = code(bearer);
+        db.execute("UPDATE wl_phone_code SET sent_at = sent_at - 60000 WHERE username = ?",
+                new Object[] {"resend@example.com"});
+        String fourth = code(bearer);
+        db.execute("UPDATE wl_phone_code SET previous_expires_at = 1 WHERE username = ?",
+                new Object[] {"resend@example.com"});
+        if (!third.equals(fourth)) {
+            mvc.perform(post("/api/account/phone/verify").header("Host", SignIn.HOST)
+                            .header("Authorization", bearer).contentType("application/json")
+                            .content("{\"code\":\"" + third + "\"}"))
+                    .andExpect(status().isBadRequest());
+        }
+        mvc.perform(post("/api/account/phone/verify").header("Host", SignIn.HOST)
+                        .header("Authorization", bearer).contentType("application/json")
+                        .content("{\"code\":\"" + fourth + "\"}"))
+                .andExpect(status().isOk());
+    }
+
+    private String code(String bearer) throws Exception {
+        String sent = mvc.perform(post("/api/account/phone/start").header("Host", SignIn.HOST)
+                        .header("Authorization", bearer))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return (String) Json.parseObject(sent).get("demoCode");
     }
 }

@@ -286,6 +286,13 @@ public final class BackendWebApp {
                 throw new BuildFailureException("The browser build " + bundle + " contains the "
                         + "directory it would be staged into, " + output);
             }
+            // The other way round: the output is emptied first, and a bundle (a
+            // directory or an archive) inside it would be deleted before it is
+            // read.
+            if (isInside(bundle.getCanonicalFile(), canonicalOutput)) {
+                throw new BuildFailureException("The browser build " + bundle + " is inside the "
+                        + "directory it would be staged into, " + output);
+            }
             delete(canonicalOutput);
             if (!canonicalOutput.mkdirs() && !canonicalOutput.isDirectory()) {
                 throw new BuildExecutionException("Could not create " + canonicalOutput);

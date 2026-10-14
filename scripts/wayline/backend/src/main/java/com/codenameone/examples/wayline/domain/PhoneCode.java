@@ -45,6 +45,13 @@ public class PhoneCode {
     @Column(name = "sent_at", nullable = false)
     public long sentAt;
 
+    /// The code sent before this one, while it is still good, or empty.
+    @Column(name = "previous_hash", nullable = false)
+    public String previousHash = "";
+
+    @Column(name = "previous_expires_at", nullable = false)
+    public long previousExpiresAt;
+
     public PhoneCode() {
     }
 }

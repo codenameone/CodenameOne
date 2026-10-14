@@ -199,15 +199,37 @@ final class BackendPackageSupport {
 
     /// Whether the binary already has the staged web app beside it, so a
     /// package whose inputs are unchanged has nothing left to do. A copy keeps
-    /// each file's time, so one older than what is staged is a copy of an
-    /// earlier browser build.
+    /// each file's time, so the copy is current when it holds the same files,
+    /// each the same length and time, and nothing else. Every file is compared,
+    /// not only index.html: a browser build may change a script or a style
+    /// and leave the page as it was, and the staged app is not a task input
+    /// that Gradle would compare on its own.
     static boolean webAppIsBeside(File staged, File binary) {
         File beside = webAppBeside(staged, binary);
         if (beside == null || beside.getAbsoluteFile().equals(staged.getAbsoluteFile())) {
             return true;
         }
-        File copied = new File(beside, BackendWebApp.INDEX);
-        return copied.isFile() && copied.lastModified() >= new File(staged, BackendWebApp.INDEX).lastModified();
+        return sameTree(staged, beside);
+    }
+
+    private static boolean sameTree(File from, File to) {
+        File[] children = from.listFiles();
+        String[] copied = to.list();
+        if (children == null || copied == null || children.length != copied.length) {
+            return false;
+        }
+        for (File child : children) {
+            File other = new File(to, child.getName());
+            if (child.isDirectory()) {
+                if (!other.isDirectory() || !sameTree(child, other)) {
+                    return false;
+                }
+            } else if (!other.isFile() || other.length() != child.length()
+                    || other.lastModified() != child.lastModified()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// Puts the web app `backendWebApp` staged beside the binary.

@@ -1067,11 +1067,15 @@ These are in `PhoneVerification` and `SecurityConfig`:
   answered 429.
 * `SecurityConfig` allows `/api/account/phone/**` ten requests in ten minutes
   for each signed-in user.
-* Only a hash of the code is stored, in `wl_phone_code`, and a new code
-  replaces the one before it.
+* Only a hash of the code is stored, in `wl_phone_code`. A new code doesn't
+  void the one before it, which stays good until it would have expired:
+  people ask again when a message is slow, and text messages aren't delivered
+  in the order they were sent, so the first code can arrive last. At most two
+  codes are good at once, and entering either one uses up both.
 * The code is stored and committed before the message is sent. When the
   provider refuses the message, the code is discarded and the request is
-  answered 503.
+  answered 503. The code sent before it, while still good, remains the one
+  to enter.
 
 The ten-in-ten-minutes limit uses an `InMemoryRateLimiter`, so it's counted in
 each server process. The other limits are in the database and hold across

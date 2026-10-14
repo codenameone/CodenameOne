@@ -63,7 +63,7 @@ public class HTML5LocationManager extends LocationManager {
 
     Location lastKnownLocation;
     private long lastFixTime;
-    private int watchId;
+    private int watchId = -1;
     private boolean watching;
     /// Counts the watches started, so an answer to one that has been cleared
     /// since is not taken for an answer to the current one.
@@ -266,7 +266,7 @@ public class HTML5LocationManager extends LocationManager {
             watching = false;
             watchGeneration++;
             window().cn1GeoClear(watchId);
-            watchId = 0;
+            watchId = -1;
         }
     }
 

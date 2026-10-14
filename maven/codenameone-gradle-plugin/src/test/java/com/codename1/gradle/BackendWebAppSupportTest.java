@@ -144,9 +144,23 @@ class BackendWebAppSupportTest {
                 StandardCharsets.UTF_8));
         assertTrue(BackendPackageSupport.webAppIsBeside(staged, binary));
 
-        // A later browser build is newer than the copy.
-        File index = new File(staged, "index.html");
-        assertTrue(index.setLastModified(index.lastModified() + 60000));
+        // A later browser build that changed only a script, the page as it was.
+        File script = write("backend/build/webapp/js/app.js", "run(2);");
+        assertFalse(BackendPackageSupport.webAppIsBeside(staged, binary));
+        BackendPackageSupport.webAppBesideTheBinary(new SystemStreamLog(), staged, binary);
+        assertTrue(BackendPackageSupport.webAppIsBeside(staged, binary));
+
+        // One that added an asset, and one that took it away again.
+        File added = write("backend/build/webapp/css/app.css", "a{}");
+        assertFalse(BackendPackageSupport.webAppIsBeside(staged, binary));
+        BackendPackageSupport.webAppBesideTheBinary(new SystemStreamLog(), staged, binary);
+        assertTrue(BackendPackageSupport.webAppIsBeside(staged, binary));
+        assertTrue(added.delete());
+        assertFalse(BackendPackageSupport.webAppIsBeside(staged, binary));
+
+        // A file the same length with only a newer time.
+        BackendPackageSupport.webAppBesideTheBinary(new SystemStreamLog(), staged, binary);
+        assertTrue(script.setLastModified(script.lastModified() + 60000));
         assertFalse(BackendPackageSupport.webAppIsBeside(staged, binary));
     }
 

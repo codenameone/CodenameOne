@@ -189,6 +189,13 @@ class BackendWebAppTest {
         assertThrows(BuildFailureException.class, () -> webApp.stage(dir, new File(dir, "webapp")));
         assertThrows(BuildFailureException.class, () -> webApp.stage(dir, dir));
         assertEquals("dir", read(new File(dir, "index.html")));
+        // Nor into a directory that holds it, which is emptied first.
+        assertThrows(BuildFailureException.class, () -> webApp.stage(dir, tmp.toFile()));
+        assertEquals("dir", read(new File(dir, "index.html")));
+        File archive = zip(tmp.resolve("site/app.zip").toFile(), "index.html", "x");
+        assertThrows(BuildFailureException.class,
+                () -> webApp.stage(archive, tmp.resolve("site").toFile()));
+        assertTrue(archive.isFile());
     }
 
     @Test

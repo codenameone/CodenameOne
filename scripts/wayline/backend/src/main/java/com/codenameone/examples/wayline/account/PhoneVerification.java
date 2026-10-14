@@ -45,7 +45,8 @@ public class PhoneVerification {
     /// How long a code stays good.
     static final int CODE_SECONDS = 300;
     /// Wrong guesses allowed before the code is void. Six digits and five
-    /// guesses is one chance in 200,000 per code sent.
+    /// guesses, each against at most two live codes (see [#store]), is one
+    /// chance in 100,000 per code sent.
     static final int MAX_ATTEMPTS = 5;
     /// The least time between two codes for one account. Each one is a text
     /// message somebody pays for and somebody receives.
@@ -96,6 +97,13 @@ public class PhoneVerification {
 
     /// Keeps the hash of a new code in place of the one before it. Answers 429
     /// when the one before it was sent a moment ago.
+    ///
+    /// The code before it stays good until it would have expired anyway. A
+    /// second code is asked for when the first is slow to arrive, and text
+    /// messages are not delivered in order: the first may arrive last, and the
+    /// newest message on the phone must not be a code the server refuses. Only
+    /// one is kept, so at most two codes are live, and only one whose guesses
+    /// were not used up.
     @Transactional
     void store(String username, String codeHash, long now) throws IOException {
         // Before the code is read: two requests for one account take turns,
@@ -110,6 +118,12 @@ public class PhoneVerification {
         if (first) {
             pending = new PhoneCode();
             pending.username = username;
+        } else if (pending.expiresAt >= now && pending.attempts < MAX_ATTEMPTS) {
+            pending.previousHash = pending.codeHash;
+            pending.previousExpiresAt = pending.expiresAt;
+        } else {
+            pending.previousHash = "";
+            pending.previousExpiresAt = 0L;
         }
         pending.codeHash = codeHash;
         pending.expiresAt = now + CODE_SECONDS * 1000L;
@@ -124,12 +138,24 @@ public class PhoneVerification {
     /// account is waiting on. A send can take longer to fail than the wait
     /// between two codes, and by then a later request may have stored a code
     /// of its own and had it delivered: that one is the user's, and stays.
+    /// The code before it, when it is still good, is the one waited on again,
+    /// and another may be asked for at once.
     @Transactional
     void discard(String username, String codeHash) throws IOException {
         PhoneCode pending = codes.find(username);
-        if (pending != null && codeHash.equals(pending.codeHash)) {
-            codes.remove(pending);
+        if (pending == null || !codeHash.equals(pending.codeHash)) {
+            return;
         }
+        if (pending.previousHash.length() == 0
+                || pending.previousExpiresAt < System.currentTimeMillis()) {
+            codes.remove(pending);
+            return;
+        }
+        pending.codeHash = pending.previousHash;
+        pending.expiresAt = pending.previousExpiresAt;
+        pending.previousHash = "";
+        pending.previousExpiresAt = 0L;
+        pending.sentAt = 0L;
     }
 
     /// Checks the code the user typed. Answers 400 for a wrong or expired one
@@ -168,8 +194,16 @@ public class PhoneVerification {
             throw new ResponseStatusException(429, "Too many wrong codes. Ask for a new one");
         }
         String typed = code == null ? "" : code.trim();
-        if (!Crypto.equalsConstantTime(hash(username, typed).getBytes("UTF-8"),
-                expected.getBytes("UTF-8"))) {
+        byte[] given = hash(username, typed).getBytes("UTF-8");
+        // Both compared every time, so the answer takes as long either way. The
+        // code before is good only until it would have expired; it was sent
+        // first, so it never outlives the current one checked above.
+        boolean current = Crypto.equalsConstantTime(given, expected.getBytes("UTF-8"));
+        boolean previous = Crypto.equalsConstantTime(given,
+                pending.previousHash.getBytes("UTF-8"))
+                && pending.previousHash.length() > 0
+                && pending.previousExpiresAt >= System.currentTimeMillis();
+        if (!current && !previous) {
             return false;
         }
         pending = codes.find(username);

@@ -95,7 +95,8 @@ public class JSOImplementations {
         /// Asks the page for the device's position; js/localforage-shim.js has
         /// it and says why the Geolocation API is not called directly. `watch`
         /// keeps the answers coming until [#cn1GeoClear] is given the id this
-        /// returns. A timeout or maximum age of 0 leaves the browser's default.
+        /// returns, which is -1 when no watch was started (0 is a valid id). A
+        /// timeout or maximum age of 0 leaves the browser's default.
         int cn1GeoRequest(GeoCallback callback, boolean watch, int timeoutMillis,
                 int maximumAgeMillis, boolean highAccuracy);
 
