@@ -173,6 +173,9 @@
                                 <!-- Cleared first, so a class whose marker was
                                      removed does not linger from an earlier run. -->
                                 <delete dir="${backend.shared.dir}"/>
+                                <copy todir="${backend.shared.dir}/com/codename1/impl/process">
+                                    <fileset dir="${project.basedir}/../../Ports/JavaSE/src/com/codename1/impl/process" includes="JavaSEProcessSupport.java"/>
+                                </copy>
                                 <copy todir="${backend.shared.dir}">
                                     <fileset dir="${core.src.dir}" includes="**/*.java">
                                         <containsregexp expression="^@(com\.codename1\.impl\.)?SharedWithBackend\s*$"/>
@@ -181,7 +184,7 @@
                                 <fail message="No core source is marked @com.codename1.impl.SharedWithBackend; the backend cannot compile without the shared ORM classes.">
                                     <condition>
                                         <resourcecount when="equal" count="0">
-                                            <fileset dir="${backend.shared.dir}" includes="**/*.java"/>
+                                            <fileset dir="${backend.shared.dir}" includes="**/*.java" excludes="**/JavaSEProcessSupport.java"/>
                                         </resourcecount>
                                     </condition>
                                 </fail>
@@ -204,7 +207,7 @@
                                 <jar destfile="${project.build.directory}/${project.build.finalName}-parparvm-sources.jar">
                                     <fileset dir="${backend.dir}/src" includes="**/*.java"/>
                                     <fileset dir="${backend.dir}/impl/parparvm" includes="**/*.java"/>
-                                    <fileset dir="${backend.shared.dir}" includes="**/*.java"/>
+                                    <fileset dir="${backend.shared.dir}" includes="**/*.java" excludes="**/JavaSEProcessSupport.java"/>
                                     <zipfileset dir="${backend.dir}/native" includes="*.c"
                                                 prefix="cn1-native"/>
                                 </jar>

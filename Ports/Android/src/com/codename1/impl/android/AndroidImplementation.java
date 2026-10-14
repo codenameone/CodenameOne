@@ -2544,15 +2544,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         });
 
-        if (!flag[0]) {
-            // Wait (if necessary) for the asynchronous runOnUiThread to do its work
-            synchronized (flag) {
-
+        boolean interrupted = false;
+        synchronized (flag) {
+            // Check under the same monitor as the UI callback. Otherwise it can
+            // notify between the check and wait, leaving the EDT blocked forever.
+            while (!flag[0]) {
                 try {
                     flag.wait();
                 } catch (InterruptedException e) {
+                    // Teardown must finish before the caller can paint another form.
+                    interrupted = true;
                 }
             }
+        }
+        if (interrupted) {
+            Thread.currentThread().interrupt();
         }
     }
 
@@ -10696,7 +10702,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public String getNativeLogSnapshot() {
         java.io.BufferedReader reader = null;
-        Process proc = null;
+        java.lang.Process proc = null;
         try {
             proc = Runtime.getRuntime().exec(new String[]{
                 "logcat", "-d", "-t", "200", "-v", "threadtime"});
