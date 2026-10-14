@@ -28,7 +28,8 @@ package com.codename1.unitycompat.system;
 /// A value reaches these methods as an [EnumBox], which knows its enum, or
 /// as a boxed integer. .NET is particular about which it takes where, and
 /// so is this: `IsDefined`, `HasFlag` and `CompareTo` refuse a value of
-/// another enum, where `GetName` reads the number out of anything.
+/// another enum, where `GetName` reads the number out of any enum or
+/// integer.
 @SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
 public final class Enum_ {
     private Enum_() {
@@ -137,6 +138,11 @@ public final class Enum_ {
             if (((EnumBox) value).type != t) { // NOPMD CompareObjectsWithEquals
                 throw otherEnum(value, t);
             }
+        } else if (value instanceof Character) {
+            // Refused as an integer of the wrong type, even by an enum over
+            // `ushort`, and not as something that is no integer at all.
+            throw new ArgumentException(
+                    "Enum underlying type and the object must be same type or object must be a String.");
         } else if (!isInteger(value)) {
             throw new InvalidOperationException("Unknown enum type.");
         } else if (!isUnderlying(t, value)) {
@@ -146,16 +152,61 @@ public final class Enum_ {
         return t.indexOf(t.held(number(value))) >= 0;
     }
 
+    /// A boxed enum or integer as the 64 bits .NET compares in `GetName`:
+    /// widened from the type the VALUE is of, with its sign if that type
+    /// has one and without if it has none. A `char` counts as the unsigned
+    /// 16 bits it is; a `bool`, a fraction or a string is refused.
+    private static long wide(Object value) {
+        if (value instanceof EnumBox) {
+            EnumBox box = (EnumBox) value;
+            return wideMember(box.type, box.value);
+        }
+        if (value instanceof ByteBox) {
+            return ((ByteBox) value).value & 0xFFL;
+        }
+        if (value instanceof UInt32Box) {
+            return ((UInt32Box) value).value & 0xFFFFFFFFL;
+        }
+        if (value instanceof Character) {
+            return ((Character) value).charValue();
+        }
+        // The signed ones widen with their sign, and a `ushort` and a
+        // `ulong` are held as what they are: `number` has them right.
+        return number(value);
+    }
+
+    /// The same 64 bits for a value this enum holds. Only an enum over
+    /// `uint` is held differently from how .NET widens it -- as a JVM
+    /// `int`, with a sign `uint` does not have.
+    private static long wideMember(Type t, long held) {
+        return t.underlying == Type.U4 ? held & 0xFFFFFFFFL : held;
+    }
+
     /// The name of the member with this number, or null. Unlike its
     /// neighbours this one does not ask whose value it was handed: .NET's
     /// `Enum.GetName(typeof(A), B.x)` reads the number out of `B.x` and
     /// answers with the member of `A` that has it, and takes an integer of
-    /// any width the same way. Only something that is neither an enum nor
+    /// any width the same way -- `GetName(typeof(ByteEnum), 1)` with an
+    /// `int` is the member, not an `ArgumentException`, on .NET 10 and on
+    /// every runtime before it. Only something that is neither an enum nor
     /// an integer is refused.
+    ///
+    /// What it does not do is cut the number down to the enum's width
+    /// first. Both sides are widened to 64 bits, each from its own type,
+    /// and compared whole: 456 is no member of an enum over `byte` though
+    /// its low eight bits are 200, and an `int` of -1 is not the 255 of
+    /// one either, nor the 4294967295 of an enum over `uint` -- while it is
+    /// the -1 of one over `sbyte` or `long`.
     public static String GetName(Type enumType, Object value) {
         Type t = enumType(enumType);
-        int at = t.indexOf(t.held(number(value)));
-        return at < 0 ? null : t.names[at];
+        long sought = wide(value);
+        long[] values = t.values;
+        for (int i = 0; i < values.length; i++) {
+            if (wideMember(t, values[i]) == sought) {
+                return t.names[i];
+            }
+        }
+        return null;
     }
 
     /// The names, in the order of their values: see [#GetValues].

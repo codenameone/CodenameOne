@@ -1409,6 +1409,18 @@ public final class UnityRuntime {
         Time.unscaledTime += dt;
         float scaled = dt * Time.timeScale;
         Time.deltaTime = scaled;
+        // The clock moves before anything of the frame runs, so that every
+        // message of one frame reads one time: `Time.time` is "the time at
+        // the beginning of the current frame", the same in `Start` as in
+        // the `Update` after it. It used to move between the fixed steps
+        // and `Update`, and whatever counted from it before that point --
+        // a `WaitForSeconds` yielded from `Start`, `FixedUpdate` or a
+        // collision message, an `Invoke`, a delayed `Destroy` -- counted
+        // from the frame before and was over one frame's length early:
+        // half a second asked for in `Start` was over on the same frame as
+        // 0.483 of a second asked for in that frame's `Update`. Inside
+        // `FixedUpdate` a script still reads the fixed clock.
+        Time.time += scaled;
         Time.frameCount++;
         Input.beginFrame(dt);
         runFrameCalls();
@@ -1442,7 +1454,6 @@ public final class UnityRuntime {
             Time.inFixedUpdate = false;
             runStarts();
         }
-        Time.time += scaled;
         for (int i = 0; i < behaviours.size(); i++) { // NOPMD ForLoopCanBeForeach
             MonoBehaviour b = (MonoBehaviour) behaviours.get(i);
             if (b.started && b.live()) {
@@ -1835,6 +1846,13 @@ public final class UnityRuntime {
         // greater number whether or not one is running now, so there is one
         // rule for a yield from `Update` too.
         c.notBeforeFixed = fixedSteps + 1;
+        // Counted from the frame's time, wherever in the frame it is
+        // yielded: the frame's own and not the fixed step's, since Unity
+        // has the wait begin with the frame's end, not the call -- "the
+        // coroutine resumes t seconds after the end of the frame rather
+        // than t seconds after it was called". [#step] moves the clock
+        // first, so this is the same number from `Start`, a fixed step, a
+        // collision message and `Update`.
         if (yielded instanceof WaitForSeconds) {
             c.resumeAt = Time.time + ((WaitForSeconds) yielded).seconds;
         } else if (yielded instanceof Coroutine) {

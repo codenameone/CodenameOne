@@ -21,3 +21,37 @@ InputManager:
     altPositiveButton:
     type: 2
     axis: 0
+  - serializedVersion: 3
+    m_Name: Glide
+    negativeButton: q
+    positiveButton: e
+    altNegativeButton:
+    altPositiveButton:
+    gravity: 1
+    dead: 0.001
+    sensitivity: 6
+    snap: 0
+    invert: 0
+    type: 0
+    axis: 0
+  - serializedVersion: 3
+    m_Name: Snappy
+    negativeButton: q
+    positiveButton: e
+    altNegativeButton:
+    altPositiveButton:
+    gravity: 6
+    dead: 0.001
+    sensitivity: 1.5
+    snap: 1
+    invert: 0
+    type: 0
+    axis: 0
+  - serializedVersion: 3
+    m_Name: Plain
+    negativeButton: q
+    positiveButton: e
+    altNegativeButton:
+    altPositiveButton:
+    type: 0
+    axis: 0

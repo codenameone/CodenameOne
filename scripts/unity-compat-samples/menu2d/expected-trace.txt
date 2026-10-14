@@ -72,7 +72,7 @@ draw frame=60 commands=10 background=ff141a29
   text "hard" layer=0 order=0 at=12500,1000 size=15000x2000 font=1200 fit=0 min=500 max=2000 align=1 style=0 wrap=1 color=ffffffff
   text "Best: 0" layer=0 order=0 at=29000,1000 size=10000x2000 font=1200 fit=0 min=500 max=2000 align=2 style=0 wrap=1 color=ffe6e64d
   unity-ui-white.png src=0,0+4x4 layer=0 order=5 at=0,0 size=40000x30000 anchor=0,0 rotation=0 color=ffffff flip=00
-tick, frame 73 clicks=1 selected=True
+tick, frame 74 clicks=1 selected=True
 input frame=90 key=32 down
 key frame 90 over interface=False panel=False clicks=1
 input frame=92 key=32 up
@@ -84,7 +84,7 @@ audio frame=100 shot beep
 audio frame=100 play beep
 audio frame=100 seek beep 40
 voice 3 frames on: 65ms playing=True
-tick, frame 104 clicks=1 selected=True
+tick, frame 105 clicks=1 selected=True
 voice 9 frames on: 100ms playing=False
 audio frame=112 play beep
 listener paused at 33ms playing=True
@@ -93,8 +93,8 @@ frame 120 objects=19 Ledge=1 drawn=10 text="hard" text="Best: 1 Hard"
 still paused=True at 33ms playing=True
 audio frame=130 listener resumed
 resumed 2 frames: 67ms playing=True
-tick, frame 135 clicks=1 selected=True
 resumed 6 frames: 100ms playing=False
+tick, frame 136 clicks=1 selected=True
 audio frame=138 play beep
 audio frame=140 looping beep on
 looping: 17ms playing=True
@@ -107,7 +107,7 @@ audio frame=158 play beep
 played while paused: 0ms playing=True
 audio frame=164 listener resumed
 and 2 frames after: 33ms playing=True
-tick, frame 166 clicks=1 selected=True
+tick, frame 167 clicks=1 selected=True
 placed while silent: 0ms playing=False, played from 60ms playing=True
 audio frame=172 play beep
 audio frame=172 seek beep 60
@@ -117,7 +117,7 @@ audio frame=174 play beep
 frame 180 objects=19 Ledge=1 drawn=10 text="hard" text="Best: 1 Hard"
 bounce 2 on Floor at y=-220 frame 186
 audio frame=186 shot beep
-tick, frame 197 clicks=1 selected=True
+tick, frame 198 clicks=1 selected=True
 frame 200 objects=19 Ledge=1 drawn=10 text="hard" text="Best: 2 Hard"
 draw frame=200 commands=10 background=ff141a29
   count 3 tile.png@0,0+16x16
@@ -136,5 +136,5 @@ draw frame=200 commands=10 background=ff141a29
   text "hard" layer=0 order=0 at=12500,1000 size=15000x2000 font=1200 fit=0 min=500 max=2000 align=1 style=0 wrap=1 color=ffffffff
   text "Best: 2 Hard" layer=0 order=0 at=29000,1000 size=10000x2000 font=1200 fit=0 min=500 max=2000 align=2 style=0 wrap=1 color=ffe6e64d
   unity-ui-white.png src=0,0+4x4 layer=0 order=5 at=0,0 size=40000x30000 anchor=0,0 rotation=0 color=ffffff flip=00
-tick, frame 228 clicks=1 selected=True
+tick, frame 229 clicks=1 selected=True
 frame 240 objects=19 Ledge=1 drawn=10 text="hard" text="Best: 2 Hard"

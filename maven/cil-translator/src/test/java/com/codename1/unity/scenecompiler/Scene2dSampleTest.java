@@ -93,11 +93,11 @@ public class Scene2dSampleTest {
         assertHas(trace, "ball awake body=True mood=1 verbose=True");
         assertHas(trace, "ball start at 0,400 ground at -50 marker=Marker nudge=25,0");
         // The body fell: it started at y=400 and is lower half a second later.
-        int fallen = Integer.parseInt(after(trace, "ball half a second in, frame 30 y="));
+        int fallen = Integer.parseInt(after(trace, "ball half a second in, frame 31 y="));
         Assert.assertTrue("the ball did not fall: y=" + fallen, fallen < 400);
         // A coroutine resumed after WaitForSeconds, after one frame, and ran to its end.
-        assertHas(trace, "ball one frame later, frame 31");
-        assertHas(trace, "ball blinking done, frame 46");
+        assertHas(trace, "ball one frame later, frame 32");
+        assertHas(trace, "ball blinking done, frame 47");
         // Physics reported the contact to the script, with the speed the two
         // closed at before the solver took it away: 42 steps of 0.02 s under
         // 9.81 m/s2 is 8.24 m/s. The ball is Discrete, as a Rigidbody2D is

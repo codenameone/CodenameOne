@@ -2198,6 +2198,14 @@ public final class SceneCompiler {
                             + f(p.get("m_Pitch"), "1") + ", " + "1".equals(text(p.get("Loop"))) + ", "
                             + "1".equals(text(p.get("Mute"))) + ", " + !"0".equals(text(p.get("m_PlayOnAwake")))
                             + ");");
+                    // A note and not a warning: what a script reads of the
+                    // source is what Unity answers, and only the ear differs.
+                    if (Double.parseDouble(number(p.get("m_Pitch"), "1")) != 1d) {
+                        notes.add(origin + ": the " + the("audio source", origin, n.doc.fileId) + " has a pitch of "
+                                + number(p.get("m_Pitch"), "1") + "; the source keeps time at that pitch, and the"
+                                + " clip is heard at the speed it was recorded at, since the device's media player"
+                                + " cannot change it");
+                    }
                     break;
                 }
                 case 58:
@@ -3649,6 +3657,12 @@ public final class SceneCompiler {
                     call.append(", ").append(RUNTIME).append("Input.$keyCode(")
                             .append(string(keys ? text(axis.get(button)) : "")).append(")");
                 }
+                // How fast the axis follows its keys. An entry that leaves
+                // them out -- Unity writes all three -- keeps what the
+                // runtime gives an axis it defines itself.
+                call.append(", ").append(f(axis.get("gravity"), "3")).append(", ")
+                        .append(f(axis.get("sensitivity"), "3")).append(", ")
+                        .append(!"0".equals(integer(axis.get("snap"), "1")));
                 line(sb, call + ");");
             }
             if (joystick) {

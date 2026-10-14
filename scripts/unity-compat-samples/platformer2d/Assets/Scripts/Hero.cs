@@ -57,6 +57,7 @@ public class Hero : MonoBehaviour
     private bool blocked;
     private int dustFrame = -100;
     private int hurtFrames;
+    private string idled;
 
     private void Start()
     {
@@ -87,6 +88,20 @@ public class Hero : MonoBehaviour
             body.velocity = new Vector2(body.velocity.x, jumpSpeed);
             jumps++;
             Debug.Log("frame " + Time.frameCount + " jump " + jumps + " from " + Cm(transform.position.x));
+        }
+        // One frame that is two and a half rounds of the Idle clip, which has
+        // two events: each is called once for every round the frame went
+        // through, and in the order the clip came to them.
+        if (Time.frameCount == 285)
+        {
+            idled = "";
+            animator.speed = 75f;
+        }
+        if (Time.frameCount == 286)
+        {
+            animator.speed = 1f;
+            Debug.Log("frame 286 idle events" + idled);
+            idled = null;
         }
         animator.SetFloat("speed", Mathf.Abs(move));
         animator.SetBool("grounded", grounded);
@@ -208,7 +223,24 @@ public class Hero : MonoBehaviour
         steps.text = "Steps " + stepCount;
     }
 
-    // Called by an event of the Proud clip, which plays once after a jump.
+    // Called by the two events of the Idle clip, and counted only in the one
+    // frame Update looks at.
+    private void Breath()
+    {
+        if (idled != null)
+        {
+            idled += " breath";
+        }
+    }
+
+    private void Blink()
+    {
+        if (idled != null)
+        {
+            idled += " blink";
+        }
+    }
+
     private void Bowed()
     {
         Debug.Log("frame " + Time.frameCount + " bowed after " + jumps + " steps=" + stepCount);

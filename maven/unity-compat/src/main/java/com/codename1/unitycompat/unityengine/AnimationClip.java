@@ -117,14 +117,22 @@ public final class AnimationClip extends Object {
     }
 
     /// A method of the scripts beside the animator, called when the clip
-    /// passes a time.
+    /// passes a time. The events are kept in the order of their times,
+    /// and those of one time in the order they were added: it is the order
+    /// the animator calls them in when one tick passes several.
     public void $event(float time, String function) {
         float[] t = new float[eventCount + 1];
         String[] f = new String[eventCount + 1];
-        System.arraycopy(eventTimes, 0, t, 0, eventCount);
-        System.arraycopy(eventNames, 0, f, 0, eventCount);
-        t[eventCount] = time;
-        f[eventCount] = function;
+        int at = eventCount;
+        while (at > 0 && eventTimes[at - 1] > time) {
+            at--;
+        }
+        System.arraycopy(eventTimes, 0, t, 0, at);
+        System.arraycopy(eventNames, 0, f, 0, at);
+        System.arraycopy(eventTimes, at, t, at + 1, eventCount - at);
+        System.arraycopy(eventNames, at, f, at + 1, eventCount - at);
+        t[at] = time;
+        f[at] = function;
         eventTimes = t;
         eventNames = f;
         eventCount++;

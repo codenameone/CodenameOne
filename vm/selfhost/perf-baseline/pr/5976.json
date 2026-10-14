@@ -42,6 +42,23 @@
     }
    }
   },
+  "macos-arm64": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.566,
+      "time": 0.623
+     },
+     "memory": 0.576,
+     "reason": "macos-arm64 (Apple M1 Virtual, 3 cores) translator RAM is bimodal on this runner: master d519cd4e6f measured 0.680 and 0.546 on two runs of the same commit; pooled from this PR's two runs and four master controls",
+     "runs": 6,
+     "time": 0.623,
+     "tolerance": {
+      "memory": 0.35
+     }
+    }
+   }
+  },
   "windows-arm64@armv8-64-bit-family-8-model-d49-microsoft-corporation": {
    "hello": {
     "all": {

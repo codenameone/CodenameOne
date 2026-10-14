@@ -133,6 +133,7 @@ big Small=1 Huge=5000000000 Neg=-2 tiny B=3 A=200 wide B A=60000 unsigned Low To
 walked 17 unboxed 60000 200 5000000000 undefined 3000000000 250 65535 -7 All
 defined TrueTrueTrueFalseTrueTrueFalse
 other enum Argument Argument InvalidOperation True Moved Ended null Argument
+name width B A null null B B Argument Argument|All All null null All|Top Top null Top|A null A A|Small Small Huge null|Argument InvalidOperation A Top
 has flag Argument True ArgumentNull True False Argument
 compare Argument Argument 1 -1 1 Argument 1 -1 equals FalseFalseTrueTrueFalseFalse
 parse Ground, Enemy|Ground, Player|Ground, Enemy|Argument|7|Ground|5000000000|Ended
@@ -349,4 +350,32 @@ same storage 2 One 2 Two 200 A 1 Low 5000000000 3 High Small
 other storage InvalidCast InvalidCast InvalidCast InvalidCast InvalidCast InvalidCast InvalidCast InvalidCast InvalidCast InvalidCast InvalidCast InvalidCast InvalidCast InvalidCast InvalidCast InvalidCast InvalidCast
 generic 2 One 2 InvalidCast InvalidCast 200
 tests False False False True False False
+singleton game audio 7 beep 1 1 game audio
+singleton made 2 1 True
+singleton reset False True
+cache inits 0
+cache 9 s 4,5 102 101 101 2 1 1
+cache inits 3 int;string;other; 0 False
+cache wide 4000000000 1099511627778 25 100
+cache struct 40 5
+generic method 11 t 104 103
+event 11 xy
+type id 0 1 2 3 0 1 3 4
+counted 1 2 1 3 3 1 3 1 11 33
+nested 2 1 4 2
+derived mid:2 mid:2 2 2 other:2
+pool 2 1 5 4 -1 a new 2 1
+pool iterator 15 [] 1 0
+pool delegates 5 3 3 2 True False
+pool typeof int kind string ?
+pool convert #1 4 1 6
+pool ref 7 10
+pool enum High 200 1 1 0
+wrapper 10 4 20 0
+wrapper lifted 1 2
+virtual derived2/2/base2 derived2/2/base2 derived1/1/base1 derived1/1/base1 2 1 1 0 derived none
+struct 3 v 2 1
+generic method 19 15 53 30 24
+generic lambda 31 25 32 4
+runtime empty 0 0 4000000000
 done

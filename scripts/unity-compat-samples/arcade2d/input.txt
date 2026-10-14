@@ -8,3 +8,9 @@
 150 d up
 160 space down
 163 space up
+# Three axes on one pair of keys, each with its own gravity, sensitivity and
+# snap: held, reversed in one frame, and let go.
+200 e down
+215 e up
+215 q down
+230 q up

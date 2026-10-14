@@ -473,30 +473,97 @@ public final class Animator extends Behaviour {
         apply();
     }
 
-    /// Calls the methods a clip names between two of its times.
+    /// Calls the methods a clip names between two of its times, each as
+    /// often as the time went past it and in the order it did.
+    ///
+    /// A tick may cover more than one round of a looping clip -- a short
+    /// clip, a high speed, a long frame -- and then an event is due once
+    /// for every round, with the clip's other events in between: a step
+    /// and a land in each of two rounds are step, land, step, land. So the
+    /// rounds are walked from the first the tick reaches to the last, and
+    /// within one the events in the order of their times, which is the
+    /// order a clip keeps them in. Which rounds an event is due in is the
+    /// same sum as before, the whole number of clip lengths between it and
+    /// each end of the tick, so a tick within one round calls what it
+    /// always did.
+    ///
+    /// Nothing is capped: a clip a thousandth of a frame long has its
+    /// events a thousand times a frame, as it asks. A clip of no length
+    /// counts as a second long, here as in [RuntimeAnimatorController],
+    /// so there is a length to divide by; and a time that is no number
+    /// any more -- a speed that overflowed -- has no rounds to count, and
+    /// calls nothing.
     private void events(AnimationClip clip, float from, float until) {
         if (clip == null || clip.eventCount == 0 || !(until > from)) { // NOPMD LogicInversion
             return;
         }
-        float length = clip.length > 0f ? clip.length : 1f;
-        for (int i = 0; i < clip.eventCount; i++) {
-            float at = clip.eventTimes[i];
-            boolean due;
-            if (clip.loop) {
-                float b = (from - at) / length;
-                float a = (until - at) / length;
-                due = floor(a) > floor(b) || (from == 0f && at == 0f);
-            } else {
-                due = (from < at || (from == 0f && at == 0f)) && until >= at;
-            }
-            if (due) {
-                ArrayList components = gameObject.components;
-                for (int k = 0; k < components.size(); k++) { // NOPMD ForLoopCanBeForeach
-                    java.lang.Object o = components.get(k);
-                    if (o instanceof MonoBehaviour) {
-                        ((MonoBehaviour) o).$invoke(clip.eventNames[i]);
-                    }
+        // Zero for every number there is, and not for an infinity or a NaN.
+        if ((until - from) * 0f != 0f) {
+            return;
+        }
+        int n = clip.eventCount;
+        if (!clip.loop) {
+            for (int i = 0; i < n; i++) {
+                float at = clip.eventTimes[i];
+                if ((from < at || (from == 0f && at == 0f)) && until >= at) {
+                    send(clip.eventNames[i]);
                 }
+            }
+            return;
+        }
+        float length = clip.length > 0f ? clip.length : 1f;
+        // The rounds any event is due in.
+        int first = Integer.MAX_VALUE;
+        int last = Integer.MIN_VALUE;
+        for (int i = 0; i < n; i++) {
+            float at = clip.eventTimes[i];
+            int lo = firstRound(from, at, length);
+            int hi = floor((until - at) / length);
+            if (lo <= hi) {
+                first = lo < first ? lo : first;
+                last = hi > last ? hi : last;
+            }
+        }
+        if (first > last) {
+            return;
+        }
+        // Left by `round == last` and not by a test of `round <= last`,
+        // which the largest int there is would never fail.
+        for (int round = first;; round++) {
+            for (int i = 0; i < n; i++) {
+                float at = clip.eventTimes[i];
+                int lo = firstRound(from, at, length);
+                if (round >= lo && round <= floor((until - at) / length)) {
+                    send(clip.eventNames[i]);
+                }
+            }
+            if (round == last) {
+                break;
+            }
+        }
+    }
+
+    /// The first round of a looping clip in which the event at `at` comes
+    /// after `from`: the one after the round `from` is in, counted from
+    /// the event. An event at the very start of a clip that is just
+    /// beginning is due in round zero, which that leaves out -- nothing
+    /// was before it to have gone past it.
+    private static int firstRound(float from, float at, float length) {
+        if (from == 0f && at == 0f) {
+            return 0;
+        }
+        int behind = floor((from - at) / length);
+        // The cast in `floor` stops at the largest int; one more would
+        // come out as the smallest.
+        return behind == Integer.MAX_VALUE ? behind : behind + 1;
+    }
+
+    private void send(String function) {
+        ArrayList components = gameObject.components;
+        for (int k = 0; k < components.size(); k++) { // NOPMD ForLoopCanBeForeach
+            java.lang.Object o = components.get(k);
+            if (o instanceof MonoBehaviour) {
+                ((MonoBehaviour) o).$invoke(function);
             }
         }
     }

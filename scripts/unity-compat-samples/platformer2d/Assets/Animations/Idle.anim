@@ -28,4 +28,18 @@ AnimationClip:
     m_StartTime: 0
     m_StopTime: 0.5
     m_LoopTime: 1
-  m_Events: []
+  m_Events:
+  - time: 0.4
+    functionName: Blink
+    data: 
+    objectReferenceParameter: {fileID: 0}
+    floatParameter: 0
+    intParameter: 0
+    messageOptions: 0
+  - time: 0.1
+    functionName: Breath
+    data: 
+    objectReferenceParameter: {fileID: 0}
+    floatParameter: 0
+    intParameter: 0
+    messageOptions: 0

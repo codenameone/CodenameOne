@@ -236,13 +236,31 @@ public final class AudioSource extends Behaviour {
     }
 
     /// A change of speed counts from now: what has played so far played at
-    /// the old one.
+    /// the old one. On a voice that is sounding it goes to the output as
+    /// well, as the volume does; it used to change this account alone, and
+    /// an output able to play faster was never asked to.
+    ///
+    /// What a script reads is Unity's answer whatever the output can do:
+    /// `time` and `isPlaying` follow the pitch on every target and with no
+    /// sound at all, which is what lets one trace hold all of them, and a
+    /// game that waits for a clip waits as long as it would in Unity. The
+    /// price is paid where the device cannot change a sound's speed --
+    /// [com.codename1.unitycompat.unityengine.ui.UnityGameAudio] says why
+    /// Codename One's media cannot -- and the sound is then heard at the
+    /// speed it was recorded at: above a pitch of one it is still sounding
+    /// when `isPlaying` turns false, below one it has ended while `time`
+    /// goes on. Counting at the speed heard instead would have a game run
+    /// differently where there is sound and where there is none. The
+    /// scene compiler says so for a source whose scene gives it a pitch.
     public void set_pitch(float value) {
         if (playing && clip != null) {
             startedFrom = position();
             startedAt = paused ? pausedAt : now();
         }
         pitch = value;
+        if (playing && output != null) {
+            output.pitch(voice, value);
+        }
     }
 
     public boolean get_loop() {
@@ -388,7 +406,12 @@ public final class AudioSource extends Behaviour {
         if (clip == null || !live()) {
             return;
         }
-        if (playing && output != null) {
+        // The voice before this one is stopped whether or not the account
+        // has it over: at a pitch above one the account ends the clip
+        // before an output that cannot play faster has, and a second
+        // `Play` then sounded over the first, on a source that has one
+        // voice. Stopping a voice that has ended is nothing.
+        if (voice != 0 && output != null) {
             output.stop(voice);
         }
         // From the place `time` was set to while the source was silent, if
@@ -427,7 +450,8 @@ public final class AudioSource extends Behaviour {
     /// "The Audio clip plays from the beginning the next time you play it",
     /// so a place set with `time` and not yet used is dropped as well.
     public void Stop() {
-        if (playing && output != null) {
+        // As in `Play`: a voice the account has over may still be heard.
+        if (voice != 0 && output != null) {
             output.stop(voice);
         }
         playing = false;

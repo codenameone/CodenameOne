@@ -104,6 +104,18 @@ public class Player : MonoBehaviour
         {
             Fire();
         }
+        // GetAxis follows a key at the axis's own sensitivity, falls back at
+        // its own gravity and starts a reversal from zero only if it snaps:
+        // Glide is fast up, slow down and does not snap, Snappy the other way
+        // round, and Plain says nothing and has the 3, 3 and snap of the
+        // default Horizontal axis.
+        int f = Time.frameCount;
+        if (f == 201 || f == 214 || f == 215 || f == 216 || f == 231 || f == 240)
+        {
+            Debug.Log("axes frame " + f + " glide=" + Mathf.RoundToInt(Input.GetAxis("Glide") * 1000f) + " snappy="
+                + Mathf.RoundToInt(Input.GetAxis("Snappy") * 1000f) + " plain="
+                + Mathf.RoundToInt(Input.GetAxis("Plain") * 1000f) + " raw=" + Input.GetAxisRaw("Glide"));
+        }
     }
 
     private void Fire()

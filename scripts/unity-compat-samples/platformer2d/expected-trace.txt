@@ -106,4 +106,5 @@ frame 240 objects=15 drawn=19 text="Steps 7"
 frame 241 hero 759,-148 camera 673,32 size=400
 input frame=270 key=275 up
 frame 271 state Run -> Idle sprite=hero_0
+frame 286 idle events blink breath blink breath blink
 frame 300 objects=15 drawn=18 text="Steps 9"

@@ -926,6 +926,12 @@ Traps that have already cost a fix:
   method that returns a value type follows the same convention, or the
   translated call site passes one argument more than it declares; and the
   reference it returns may be read but never kept.
+- **A static field of a generic type is one per constructed type.** Erasure
+  makes every `Singleton<T>` one class, so `GenericStatics` moves such fields
+  into a context object, `Type$$S`, with one subclass per constructed type
+  whose `<clinit>` runs the type's `.cctor`; static methods take it as a hidden
+  last parameter, instances keep it in a field. What cannot be keyed fails the
+  build, never shares one field.
 - **Float arithmetic has to round the way C# rounds.** Natively that needs
   `-ffp-contract=off`, or clang fuses a multiply and an add and the last bit
   differs from the JVM; on JavaScript every `float` result goes through

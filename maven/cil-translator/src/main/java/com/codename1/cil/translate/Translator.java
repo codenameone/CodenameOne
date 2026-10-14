@@ -53,7 +53,9 @@ import org.objectweb.asm.Opcodes;
 ///
 /// One class is written per C# class, struct and interface, plus one small
 /// class per method a delegate is made from. Enums become the integer under
-/// them and have no class. Generics are erased. Classes are Java 5 class
+/// them and have no class. Generics are erased, except for the static fields
+/// of a generic type, which [GenericStatics] keeps apart for each constructed
+/// type in classes of their own. Classes are Java 5 class
 /// files: no stack maps, no `invokedynamic`, nothing a Codename One target
 /// has to lower again.
 ///
@@ -65,6 +67,8 @@ public final class Translator implements Opcodes {
     final Universe universe = new Universe();
     final RuntimeIndex index = new RuntimeIndex();
     Names names;
+    /// Where the static state of generic types lives: see [GenericStatics].
+    final GenericStatics generics = new GenericStatics(this);
     private final Map<String, byte[]> classes = new LinkedHashMap<String, byte[]>();
     private final Map<String, String> delegateClasses = new HashMap<String, String>();
     private String entryClass;
@@ -133,6 +137,36 @@ public final class Translator implements Opcodes {
         return Collections.unmodifiableMap(classes);
     }
 
+    void putClass(String name, byte[] bytes) {
+        classes.put(name, bytes);
+    }
+
+    /// Stack: nothing. Leaves the `System.Type` of a type: the enum's own,
+    /// or one made from the class.
+    void emitTypeOf(MethodVisitor mv, CilType type, String neededFor) {
+        if (hasEnumType(type)) {
+            mv.visitFieldInsn(GETSTATIC, names.className(type.name), "$TYPE", TYPE_DESCRIPTOR);
+            return;
+        }
+        CilType n = names.norm(type);
+        mv.visitLdcInsn(org.objectweb.asm.Type.getObjectType(classToken(n)));
+        mv.visitLdcInsn(String.valueOf(n.typeName() == null ? n.toString() : n.typeName()).replace('/', '+'));
+        String descriptor = "(Ljava/lang/Class;Ljava/lang/String;)" + TYPE_DESCRIPTOR;
+        index.requireMethod(TYPE, "$of", descriptor, neededFor);
+        mv.visitMethodInsn(INVOKESTATIC, TYPE, "$of", descriptor, false);
+    }
+
+    /// The class a type is known by at run time, to `typeof` and to a
+    /// generic method of the runtime: a primitive or an enum is the class
+    /// it is boxed as, and a type variable nobody can name is `Object`.
+    String classToken(CilType type) {
+        CilType n = names.norm(type);
+        if (Names.isTypeVariable(n) || n.kind == CilType.Kind.OBJECT) {
+            return Names.OBJECT;
+        }
+        return n.isPrimitive() ? Names.boxClass(n) : names.classRef(n);
+    }
+
     public void run(List<File> translate, List<File> references) throws IOException {
         List<File> all = new ArrayList<File>(translate);
         all.addAll(references);
@@ -184,6 +218,15 @@ public final class Translator implements Opcodes {
                 | (type.isAbstract() ? ACC_ABSTRACT : 0) | (struct ? ACC_FINAL : 0);
         cw.visit(V1_5, access, name, null, superName, interfaces.toArray(new String[0]));
 
+        boolean keyed = generics.hasContext(type);
+        if (!keyed && type.isInterface() && type.genericParamCount > 0) {
+            for (FieldDef f : type.fields) {
+                if (f.isStatic() && !f.isLiteral()) {
+                    throw new TranslationException(full + "." + f.name + ": a static field of a generic interface"
+                            + " is not supported; every constructed type has its own in C#");
+                }
+            }
+        }
         Set<String> members = new HashSet<String>();
         for (FieldDef f : type.fields) {
             if (f.isLiteral() || f.rva != 0) {
@@ -194,7 +237,16 @@ public final class Translator implements Opcodes {
                 throw new TranslationException(full + ": two fields are both named " + fieldName
                         + " once their names are made legal");
             }
+            if (f.isStatic() && keyed) {
+                // Not a Java static: one per constructed type, in a context.
+                continue;
+            }
             cw.visitField(ACC_PUBLIC | (f.isStatic() ? ACC_STATIC : 0), fieldName, names.descriptor(f.type), null,
+                    null).visitEnd();
+        }
+        if (keyed && !struct) {
+            // What a constructor is handed and the instance methods read.
+            cw.visitField(ACC_PUBLIC, generics.contextField(type), "L" + generics.contextClass(type) + ";", null,
                     null).visitEnd();
         }
 
@@ -202,7 +254,16 @@ public final class Translator implements Opcodes {
         boolean[] objectVirtuals = new boolean[3];
         for (MethodDef m : type.methods) {
             String methodName = names.methodName(m.name, m.sig, struct);
-            String descriptor = names.methodDescriptor(m.sig);
+            String descriptor = GenericStatics.withHidden(names.methodDescriptor(m.sig),
+                    generics.hiddenParameters(m));
+            if (generics.hasContext(m)) {
+                generics.emitContextClass(m);
+            }
+            if (keyed && "<clinit>".equals(methodName)) {
+                // Run once for each constructed type, by the class that
+                // holds that type's context.
+                methodName = GenericStatics.STATIC_CONSTRUCTOR;
+            }
             if (!members.add(methodName + descriptor)) {
                 throw new TranslationException(m + ": another method of the type has the same name and"
                         + " parameters once generics are erased (" + methodName + descriptor + ")");
@@ -245,7 +306,9 @@ public final class Translator implements Opcodes {
         if (struct) {
             emitStructMembers(cw, type, name, objectVirtuals);
         }
-        if (!hasStaticConstructor && hasStructField(type, true)) {
+        if (keyed) {
+            generics.emitContextClass(type);
+        } else if (!hasStaticConstructor && hasStructField(type, true)) {
             MethodVisitor mv = cw.visitMethod(ACC_STATIC, "<clinit>", "()V", null, null);
             mv.visitCode();
             emitStaticStructFields(type, mv);
@@ -1148,7 +1211,16 @@ public final class Translator implements Opcodes {
         String delegate = "L" + Names.DELEGATE + ";";
         boolean add = (m.semantics & CilAssembly.SEMANTICS_ADD_ON) != 0;
         mv.visitCode();
-        if (m.isStatic()) {
+        boolean inContext = m.isStatic() && generics.hasContext(type);
+        if (inContext) {
+            // The event of one constructed type: a field of the context
+            // the accessor is handed after the delegate.
+            owner = generics.contextClass(type);
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitFieldInsn(GETFIELD, owner, fieldName, d);
+            mv.visitVarInsn(ALOAD, 0);
+        } else if (m.isStatic()) {
             mv.visitFieldInsn(GETSTATIC, owner, fieldName, d);
             mv.visitVarInsn(ALOAD, 0);
         } else {
@@ -1162,7 +1234,7 @@ public final class Translator implements Opcodes {
         mv.visitMethodInsn(INVOKESTATIC, Names.DELEGATE, add ? "Combine" : "Remove",
                 "(" + delegate + delegate + ")" + delegate, false);
         mv.visitTypeInsn(CHECKCAST, names.classRef(field.type));
-        mv.visitFieldInsn(m.isStatic() ? PUTSTATIC : PUTFIELD, owner, fieldName, d);
+        mv.visitFieldInsn(m.isStatic() && !inContext ? PUTSTATIC : PUTFIELD, owner, fieldName, d);
         mv.visitInsn(RETURN);
         mv.visitMaxs(0, 0);
         mv.visitEnd();
@@ -1177,6 +1249,13 @@ public final class Translator implements Opcodes {
     /// for delegates.
     private void adapt(MethodVisitor mv, MethodSig from, int firstSlot, MethodSig to, int opcode, String owner,
             String name, String descriptor, boolean isInterface) {
+        adapt(mv, from, firstSlot, to, opcode, owner, name, descriptor, isInterface, null);
+    }
+
+    /// `context`, when given, is the class of the context the target takes
+    /// after everything else; the delegate keeps it as its target.
+    private void adapt(MethodVisitor mv, MethodSig from, int firstSlot, MethodSig to, int opcode, String owner,
+            String name, String descriptor, boolean isInterface, String context) {
         int slot = firstSlot;
         for (int i = 0; i < from.params.length; i++) {
             CilType fp = from.params[i];
@@ -1234,6 +1313,7 @@ public final class Translator implements Opcodes {
                 mv.visitInsn(DUP);
                 mv.visitMethodInsn(INVOKESPECIAL, c, "<init>", "()V", false);
             }
+            loadDelegateContext(mv, context);
             mv.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
             if (fr.kind == CilType.Kind.VOID) {
                 mv.visitInsn(POP);
@@ -1243,6 +1323,7 @@ public final class Translator implements Opcodes {
             }
             return;
         }
+        loadDelegateContext(mv, context);
         mv.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
         if (fromStruct) {
             // An erased method answering for one declared to return a struct.
@@ -1279,6 +1360,14 @@ public final class Translator implements Opcodes {
         }
         int k = names.kind(fr);
         mv.visitInsn(k == Val.REF ? ARETURN : IRETURN + k);
+    }
+
+    private static void loadDelegateContext(MethodVisitor mv, String context) {
+        if (context != null) {
+            mv.visitVarInsn(ALOAD, 0);
+            mv.visitFieldInsn(GETFIELD, Names.DELEGATE, "$target", "Ljava/lang/Object;");
+            mv.visitTypeInsn(CHECKCAST, context);
+        }
     }
 
     private void collectInterfaces(CilType iface, List<CilType> out) {
@@ -1617,6 +1706,7 @@ public final class Translator implements Opcodes {
         String targetName;
         String descriptor;
         boolean isInterface = false;
+        String context = null;
         if (Names.hasHelperClass(declaring)) {
             opcode = INVOKESTATIC;
             owner = Names.helperClass(declaring);
@@ -1627,6 +1717,15 @@ public final class Translator implements Opcodes {
             owner = names.classRef(target.declaringType);
             targetName = names.methodName(target.name, sig, names.isStruct(target.declaringType));
             descriptor = names.methodDescriptor(sig);
+            MethodDef resolved = universe.resolve(target);
+            String hidden = resolved == null ? "" : generics.hiddenParameters(resolved);
+            if (hidden.length() > 0) {
+                // The one context such a method takes is the delegate's
+                // target (MethodTranslator.newObject puts it there, and
+                // refuses what would need two).
+                context = hidden.substring(1, hidden.length() - 1);
+                descriptor = GenericStatics.withHidden(descriptor, hidden);
+            }
             isInterface = tdef != null && tdef.isInterface();
             opcode = !sig.hasThis ? INVOKESTATIC : isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL;
         }
@@ -1641,7 +1740,7 @@ public final class Translator implements Opcodes {
                 mv.visitTypeInsn(CHECKCAST, receiver);
             }
         }
-        adapt(mv, invoke.sig, 1, sig, opcode, owner, targetName, descriptor, isInterface);
+        adapt(mv, invoke.sig, 1, sig, opcode, owner, targetName, descriptor, isInterface, context);
         mv.visitMaxs(0, 0);
         mv.visitEnd();
         cw.visitEnd();

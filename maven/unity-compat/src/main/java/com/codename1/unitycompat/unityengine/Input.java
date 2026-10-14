@@ -94,6 +94,13 @@ public final class Input {
 
     private static final int MOUSE0 = 323;
 
+    /// The gravity and the sensitivity of an axis that says neither: what
+    /// the Horizontal and Vertical axes of a new Unity project have, with
+    /// Snap on. It is what every axis here had before the project's own
+    /// numbers were read, so it is also what an axis defined without them
+    /// keeps.
+    private static final float DEFAULT_RATE = 3f;
+
     /// One axis or button: its name and the keys that drive it.
     private static final class Axis {
         String name;
@@ -104,7 +111,16 @@ public final class Input {
         /// For an axis the mouse drives: 0 for x, 1 for y, 2 for the wheel;
         /// -1 for one keys drive.
         int mouse = -1;
-        float sensitivity;
+        /// For the mouse, what a pixel of movement is worth. For keys, how
+        /// fast `GetAxis` moves towards a key that is held, in units a
+        /// second.
+        float sensitivity = DEFAULT_RATE;
+        /// How fast `GetAxis` falls back to zero with no key held, in
+        /// units a second.
+        float gravity = DEFAULT_RATE;
+        /// Whether a key of the other direction starts from zero and not
+        /// from where the axis was.
+        boolean snap = true;
         float value;
     }
 
@@ -257,6 +273,25 @@ public final class Input {
         System.arraycopy(axes, 0, grown, 0, axes.length);
         grown[axes.length] = a;
         axes = grown;
+    }
+
+    /// The same with the three settings Unity's Input Manager has for an
+    /// axis keys drive, which is what generated code calls with the
+    /// project's: Gravity, the "speed in units per second that the axis
+    /// falls toward neutral when no input is present"; Sensitivity, the
+    /// "speed in units per second that the axis will move toward the
+    /// target value"; and Snap, "if enabled, the axis value will reset to
+    /// zero when pressing a button that corresponds to the opposite
+    /// direction". Dead is not among them: it is how far an analog stick
+    /// has to move, and a key is not part of the way down. A rate below
+    /// zero moves nothing, like one of zero.
+    public static void $addAxis(String name, int negative, int positive, int altNegative, int altPositive,
+            float gravity, float sensitivity, boolean snap) {
+        $addAxis(name, negative, positive, altNegative, altPositive);
+        Axis a = axes[axes.length - 1];
+        a.gravity = gravity;
+        a.sensitivity = sensitivity;
+        a.snap = snap;
     }
 
     // ------------------------------------------------------- from the host
@@ -520,9 +555,12 @@ public final class Input {
         mouseDeltaY = mouseKnown ? mouseY - lastMouseY : 0f;
         lastMouseX = mouseX;
         lastMouseY = mouseY;
-        // GetAxis eases towards the key's value at Unity's default rate of
-        // three units a second, and snaps through zero on a reversal.
-        float step = 3f * dt;
+        // GetAxis eases: towards a key that is held at the axis's
+        // sensitivity, back to rest at its gravity when none is, and from
+        // zero on a reversal if the axis snaps. The project's numbers, not
+        // one rate for all: a game that sets Gravity to 100 so that its
+        // character stops when the key is let go would otherwise slide on
+        // for a third of a second.
         for (int i = 0; i < axes.length; i++) { // NOPMD ForLoopCanBeForeach
             Axis a = axes[i];
             float target = raw(a);
@@ -532,9 +570,11 @@ public final class Input {
                 continue;
             }
             float v = a.value;
-            if ((target > 0f && v < 0f) || (target < 0f && v > 0f)) {
+            if (a.snap && ((target > 0f && v < 0f) || (target < 0f && v > 0f))) {
                 v = 0f;
             }
+            float rate = target > 0f || target < 0f ? a.sensitivity : a.gravity;
+            float step = rate > 0f ? rate * dt : 0f;
             if (v < target) {
                 v = v + step > target ? target : v + step;
             } else if (v > target) {

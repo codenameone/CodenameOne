@@ -43,6 +43,13 @@ public interface AudioOutput {
 
     void volume(int voice, float volume);
 
+    /// Changes the speed of a voice that is playing or paused, from where
+    /// it is: `source.pitch = value` on a source that is heard. A pitch
+    /// set beforehand arrives with [#play]. An output that cannot change
+    /// the speed of a sound leaves the voice as it is; the source goes on
+    /// counting at the pitch either way, as Unity would.
+    void pitch(int voice, float pitch);
+
     /// Moves a voice that is playing or paused to a position in its clip,
     /// in seconds from the start: what a script's `source.time = t` asks
     /// for. A voice that has ended is not there to move.

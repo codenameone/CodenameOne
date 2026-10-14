@@ -41,6 +41,8 @@ public class BallController : MonoBehaviour
     private int bounces;
     private int fixedSteps;
     private float lowest = 1000f;
+    private int hitFrame;
+    private int fixedFrame;
 
     public enum Mood
     {
@@ -60,12 +62,30 @@ public class BallController : MonoBehaviour
         Debug.Log(label + " start at " + Cm(p.x) + "," + Cm(p.y) + " ground at " + Cm(ground.position.y)
             + " marker=" + marker.name + " nudge=" + Cm(nudge.x) + "," + Cm(nudge.y));
         body.velocity = nudge;
+        Managers();
         yield return new WaitForSeconds(0.5f);
         Debug.Log(label + " half a second in, frame " + Time.frameCount + " y=" + Cm(transform.position.y));
         yield return null;
         Debug.Log(label + " one frame later, frame " + Time.frameCount);
         yield return StartCoroutine(Blink(2));
         Debug.Log(label + " blinking done, frame " + Time.frameCount);
+    }
+
+    // Two managers off one generic base, each the instance of its own
+    // constructed type; a second audio manager, which finds the first one in
+    // place and removes itself; and two lookups by type argument.
+    private void Managers()
+    {
+        GameObject managers = new GameObject("Managers");
+        managers.AddComponent<GameManager>();
+        managers.AddComponent<AudioManager>();
+        new GameObject("Managers again").AddComponent<AudioManager>();
+        Debug.Log(label + " managers score=" + GameManager.Instance.score + " clip=" + AudioManager.Instance.clip
+            + " awakened=" + Singleton<GameManager>.Awakened + "," + Singleton<AudioManager>.Awakened + " kept="
+            + (AudioManager.Instance.gameObject == managers) + " found=" + Locator<Spinner>.Get().name + ","
+            + Locator<BallController>.Get().name + "," + Locator<Spinner>.Get().name + " searches="
+            + Locator<Spinner>.Searches + "," + Locator<BallController>.Searches + ","
+            + Locator<AudioManager>.Searches);
     }
 
     private IEnumerator Blink(int times)
@@ -79,8 +99,33 @@ public class BallController : MonoBehaviour
         }
     }
 
+    // A wait is counted from the frame it is yielded in, whichever message of
+    // that frame yields it: one asked for in Start, in FixedUpdate or in a
+    // collision message is over on the frame the same wait asked for in that
+    // frame's Update is, and not a frame sooner.
+    private IEnumerator Waited(string from, int milliseconds)
+    {
+        int began = Time.frameCount;
+        yield return new WaitForSeconds(milliseconds / 1000f);
+        Debug.Log(label + " waited " + milliseconds + "ms from " + from + ", began " + began + " resumed "
+            + Time.frameCount);
+    }
+
     private void Update()
     {
+        if (Time.frameCount == 1)
+        {
+            // Beside the half second Start waits, above.
+            StartCoroutine(Waited("update", 500));
+        }
+        if (Time.frameCount == hitFrame)
+        {
+            StartCoroutine(Waited("update beside collision", 250));
+        }
+        if (Time.frameCount == fixedFrame)
+        {
+            StartCoroutine(Waited("update beside fixed", 250));
+        }
         if (Input.GetMouseButtonDown(0))
         {
             Vector3 at = Input.mousePosition;
@@ -92,6 +137,11 @@ public class BallController : MonoBehaviour
     private void FixedUpdate()
     {
         fixedSteps++;
+        if (bounces == 1 && fixedFrame == 0)
+        {
+            fixedFrame = Time.frameCount;
+            StartCoroutine(Waited("fixed", 250));
+        }
         float y = transform.position.y;
         if (y < lowest)
         {
@@ -104,6 +154,11 @@ public class BallController : MonoBehaviour
         bounces++;
         Debug.Log(label + " hit " + collision.gameObject.name + " bounce " + bounces + " after " + fixedSteps
             + " steps, y=" + Cm(transform.position.y) + " closing=" + Cm(Mathf.Abs(collision.relativeVelocity.y)));
+        if (bounces == 1)
+        {
+            hitFrame = Time.frameCount;
+            StartCoroutine(Waited("collision", 250));
+        }
         if (bounces == maxBounces)
         {
             Debug.Log(label + " retiring the marker");

@@ -48,6 +48,15 @@ import java.util.HashMap;
 /// its recorded speed whatever the source asks, and seamless looping -- a
 /// looped clip is started again when it ends, with whatever gap the
 /// platform leaves.
+///
+/// Pitch is left out for want of anything to ask: a `Media` has a volume
+/// and a place in time and no rate. The one playback rate Codename One has
+/// is a voice's in `com.codename1.gaming.SoundPool`, and a pool cannot
+/// stand in here: it has no way to move a voice within its clip, which
+/// `AudioSource.time` needs, nor to change whether a playing voice loops,
+/// and only some of its backends say when a voice has ended. The source
+/// keeps Unity's account of the time regardless, so only the ear is told
+/// something else.
 public final class UnityGameAudio implements AudioOutput {
     /// A voice to its `Media`, for those still playing.
     private final HashMap playing = new HashMap();
@@ -201,6 +210,13 @@ public final class UnityGameAudio implements AudioOutput {
         if (media instanceof Media) {
             ((Media) media).setVolume(percent(volume));
         }
+    }
+
+    /// Nothing to do: see the head of this class. The voice goes on at the
+    /// speed it was recorded at.
+    @Override
+    public void pitch(int voice, float pitch) {
+        // `Media` has no playback rate.
     }
 
     @Override

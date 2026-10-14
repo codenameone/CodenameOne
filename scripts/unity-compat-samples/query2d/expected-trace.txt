@@ -84,24 +84,24 @@ touch supported=True multi=True simulate=True count=0
 inner a waited frame=3
 deep a step=3 frame=4
 falling touching=False layers=False y=-294
-inner a ends frame=7
-outer after a frame=7
-empty frame=7
-outer after empty frame=7
-inner b starts frame=7
-inner b waited frame=8
-deep b step=7 frame=9
+inner a ends frame=8
+outer after a frame=8
+empty frame=8
+outer after empty frame=8
+inner b starts frame=8
+inner b waited frame=9
 input frame=10 touch=100,200
 stopping ticks=9
+deep b step=8 frame=10
 frame 10 touches=1 [0 began 100,100 d=0,0 taps=1] array=1 mouse=down at 100,100 axis=0,0
 input frame=11 touch=110,200
 frame 11 touches=1 [0 moved 110,100 d=10,0 taps=1] array=1 mouse=held at 110,100 axis=500,0
-inner b ends frame=11
-outer ends frame=11
 input frame=12 touch=110,200;300,100
 frame 12 touches=2 [0 stationary 110,100 d=0,0 taps=1] [1 began 300,200 d=0,0 taps=1] array=2 mouse=held at 110,100 axis=0,0
 input frame=13 touch=120,210;300,100
 frame 13 touches=2 [0 moved 120,90 d=10,-10 taps=1] [1 stationary 300,200 d=0,0 taps=1] array=2 mouse=held at 120,90 axis=500,-500
+inner b ends frame=13
+outer ends frame=13
 input frame=14 touch=120,210;310,90
 frame 14 touches=2 [0 stationary 120,90 d=0,0 taps=1] [1 moved 310,210 d=10,10 taps=1] array=2 mouse=held at 120,90 axis=0,0
 frame 15 touches=2 [0 stationary 120,90 d=0,0 taps=1] [1 stationary 310,210 d=0,0 taps=1] array=2 mouse=held at 120,90 axis=0,0

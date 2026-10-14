@@ -293,6 +293,145 @@ namespace Spike
 
     public delegate void Yours(int x);
 
+    // Static state of generic types: every constructed type has its own
+    // variables and its own run of the static constructor, although all of
+    // them are one class once generics are erased.
+    public struct GsVec { public int x; public int y; public GsVec(int x, int y) { this.x = x; this.y = y; } }
+
+    public class GsSingleton<T> where T : GsSingleton<T>
+    {
+        static T instance;
+        public static int Made;
+        public static T Instance { get { return instance; } }
+        public static bool Has { get { return instance != null; } }
+        public string Tag;
+        protected GsSingleton() { Made++; if (instance == null) instance = this as T; }
+        public T Self() { return instance; }
+        public static void Reset() { instance = null; }
+    }
+    public sealed class GsGame : GsSingleton<GsGame> { public int score = 7; public GsGame() { Tag = "game"; } }
+    public sealed class GsAudio : GsSingleton<GsAudio> { public string clip = "beep"; public GsAudio() { Tag = "audio"; } }
+
+    public static class GsLog { public static int Inits; public static string Order = ""; }
+
+    public static class GsCache<T>
+    {
+        public static T Value;
+        public static int Hits;
+        public static readonly List<T> Items = new List<T>();
+        public static readonly T[] Empty = new T[0];
+        static GsCache() { GsLog.Inits++; GsLog.Order += (typeof(T) == typeof(int) ? "int" : typeof(T) == typeof(string) ? "string" : "other") + ";"; Hits = 100; }
+        public static void Put(T v) { Value = v; Hits++; Items.Add(v); }
+        public static T Get() { Hits++; return Value; }
+        public static int Count { get { return Items.Count; } }
+    }
+
+    public static class GsBus<T>
+    {
+        public static event Action<T> Raised;
+        public static void Raise(T v) { var h = Raised; if (h != null) h(v); }
+    }
+
+    public static class GsTypeIds { public static int Next; }
+    public static class GsTypeId<T> { public static readonly int Value = GsTypeIds.Next++; }
+
+    public class GsCounted<T>
+    {
+        static int count;
+        public readonly int id;
+        public T item;
+        public GsCounted(T item) { this.item = item; id = ++count; }
+        public static int Count { get { return count; } }
+        public int Seen() { return count; }
+        public GsCounted<T> Another(T v) { return new GsCounted<T>(v); }
+        public Func<int> Reader() { return () => count * 10 + id; }
+    }
+
+    public class GsOuter<T>
+    {
+        public static int Total;
+        public class Inner
+        {
+            public static int Mine;
+            public void Bump() { Mine++; Total += 2; }
+        }
+    }
+
+    public class GsMid<T> : GsCounted<T>
+    {
+        public static string Label = "mid";
+        public GsMid(T v) : base(v) { }
+        public string Describe() { return Label + ":" + Seen(); }
+    }
+    public sealed class GsLeaf : GsMid<long> { public GsLeaf() : base(5L) { } }
+
+    public static class GsUse
+    {
+        public static T Read<T>() { return GsCache<T>.Get(); }
+        public static void Write<T>(T v) { GsCache<T>.Put(v); }
+        public static int Id<T>() { return GsTypeId<T>.Value; }
+        public static int ListId<T>() { return GsTypeId<List<T>>.Value; }
+    }
+
+    public enum GsKind : byte { Low = 1, High = 200 }
+
+    public static class GsPool<T>
+    {
+        static readonly List<T> free = new List<T>();
+        public static int Returned;
+        public static Func<T> Factory;
+        public static void Return(T item) { free.Add(item); Returned++; }
+        public static T Take() { if (free.Count == 0) return Factory(); T last = free[free.Count - 1]; free.RemoveAt(free.Count - 1); return last; }
+        public static int Free { get { return free.Count; } }
+        public static IEnumerable<T> All() { foreach (T t in free) yield return t; }
+        public static int CountWhere(Func<T, bool> test) { return free.Count(x => test(x) && Returned > 0); }
+        public static Action<T> Returner() { return Return; }
+        public static Func<int> Counter() { return () => Returned; }
+        public static string Name() { return typeof(T) == typeof(int) ? "int" : typeof(T) == typeof(GsKind) ? "kind" : typeof(T) == typeof(string) ? "string" : "?"; }
+        public static U Convert<U>(Func<T, U> f) { GsPool<U>.Return(f(Take())); return GsPool<U>.Take(); }
+        public static void Bump(ref int by) { by += Returned; }
+    }
+
+    public class GsWrapper<T>
+    {
+        public int Returned() { return GsPool<T>.Returned; }
+        public static int Twice() { return GsPool<T>.Returned * 2; }
+        public GsWrapper<T[]> Lift() { return null; }
+        public int Lifted() { return GsPool<List<T>>.Returned; }
+    }
+
+    public abstract class GsBase<T>
+    {
+        protected static int made;
+        public static string Last = "none";
+        protected GsBase() { made++; Announce(); }
+        protected virtual void Announce() { Last = "base"; }
+        public virtual string Who() { return "base" + made; }
+        public static int Made { get { return made; } }
+    }
+    public class GsDerived<T> : GsBase<T>
+    {
+        static int derived;
+        public GsDerived() { derived++; }
+        protected override void Announce() { Last = "derived"; }
+        public override string Who() { return "derived" + made + "/" + derived + "/" + base.Who(); }
+    }
+    public sealed class GsFinal : GsDerived<GsVec> { }
+
+    public struct GsSlot<T>
+    {
+        public static int Count;
+        public T value;
+        public static GsSlot<T> Make(T v) { Count++; GsSlot<T> s; s.value = v; return s; }
+    }
+
+    public static class GsMath
+    {
+        public static int Sum<T>(T a, T b) where T : IComparable<T> { GsPool<T>.Returned += 10; return a.CompareTo(b) + GsPool<T>.Returned; }
+        public static int Relay<T>(T a) where T : IComparable<T> { return Sum(a, a) + Sum("a", "b"); }
+        public static Func<int> Later<T>(T v) { return () => { GsPool<T>.Return(v); return GsPool<T>.Returned; }; }
+    }
+
     public static class Program
     {
         public static void Log(string s)
@@ -1447,6 +1586,38 @@ namespace Spike
                 + Outcome(() => Enum.GetName(typeof(Phase), 7L)) + " "
                 + Outcome(() => Enum.GetName(typeof(Phase), 3)) + " "
                 + Outcome(() => Enum.GetName(typeof(Phase), "Moved")));
+            // GetName takes an integer of any width and a member of any enum,
+            // but compares the whole number: each side widened to 64 bits from
+            // its own type, nothing cut down to the enum's width.
+            Log("name width " + Outcome(() => Enum.GetName(typeof(Tiny), 3)) + " "
+                + Outcome(() => Enum.GetName(typeof(Tiny), 200L)) + " "
+                + Outcome(() => Enum.GetName(typeof(Tiny), 456)) + " "
+                + Outcome(() => Enum.GetName(typeof(Tiny), (sbyte)-56)) + " "
+                + Outcome(() => Enum.GetName(typeof(Tiny), Layers.Player | Layers.Ground)) + " "
+                + Outcome(() => Enum.GetName(typeof(Tiny), (char)3)) + " "
+                + Outcome(() => Enum.GetName(typeof(Tiny), true)) + " "
+                + Outcome(() => Enum.GetName(typeof(Tiny), 3f)) + "|"
+                + Outcome(() => Enum.GetName(typeof(Signed), (sbyte)-1)) + " "
+                + Outcome(() => Enum.GetName(typeof(Signed), -1L)) + " "
+                + Outcome(() => Enum.GetName(typeof(Signed), 4294967295u)) + " "
+                + Outcome(() => Enum.GetName(typeof(Signed), 4294967295L)) + " "
+                + Outcome(() => Enum.GetName(typeof(Signed), ulong.MaxValue)) + "|"
+                + Outcome(() => Enum.GetName(typeof(Unsigned), 4000000000u)) + " "
+                + Outcome(() => Enum.GetName(typeof(Unsigned), 4000000000L)) + " "
+                + Outcome(() => Enum.GetName(typeof(Unsigned), -294967296)) + " "
+                + Outcome(() => Enum.GetName(typeof(Unsigned), Unsigned.Top)) + "|"
+                + Outcome(() => Enum.GetName(typeof(Wide), (ushort)60000)) + " "
+                + Outcome(() => Enum.GetName(typeof(Wide), (short)-5536)) + " "
+                + Outcome(() => Enum.GetName(typeof(Wide), 60000)) + " "
+                + Outcome(() => Enum.GetName(typeof(Wide), (char)60000)) + "|"
+                + Outcome(() => Enum.GetName(typeof(Big), 1)) + " "
+                + Outcome(() => Enum.GetName(typeof(Big), (byte)1)) + " "
+                + Outcome(() => Enum.GetName(typeof(Big), 5000000000)) + " "
+                + Outcome(() => Enum.GetName(typeof(Big), Tiny.B)) + "|"
+                + Outcome(() => Enum.IsDefined(typeof(Wide), (char)3)) + " "
+                + Outcome(() => Enum.IsDefined(typeof(Tiny), true)) + " "
+                + Outcome(() => Enum.ToObject(typeof(Tiny), 456)) + " "
+                + Outcome(() => Enum.ToObject(typeof(Unsigned), -294967296)));
             Enum ground = Layers.Ground;
             Layers both = Layers.Ground | Layers.Enemy;
             Phase moved = Phase.Moved;
@@ -2343,6 +2514,172 @@ namespace Spike
                 + (tiny is byte) + " " + (unsigned is uint));
         }
 
+        // `Cache<int>.Value` and `Cache<string>.Value` are two variables. The
+        // sections go from the shape every Unity project has -- a singleton
+        // base class with one subclass per manager -- to a type that reaches
+        // the static state of another through its own type parameter, a
+        // generic method that does, and the classes the compiler writes for
+        // lambdas and iterators inside such a type.
+        private static void GenericStatics()
+        {
+            // Singleton with two subclasses.
+            GsGame g = new GsGame();
+            GsAudio a = new GsAudio();
+            Log("singleton " + GsSingleton<GsGame>.Instance.Tag + " " + GsSingleton<GsAudio>.Instance.Tag
+                + " " + GsGame.Instance.score + " " + GsAudio.Instance.clip + " " + GsSingleton<GsGame>.Made + " "
+                + GsSingleton<GsAudio>.Made + " " + g.Self().Tag + " " + a.Self().Tag);
+            new GsGame();
+            Log("singleton made " + GsSingleton<GsGame>.Made + " " + GsSingleton<GsAudio>.Made + " "
+                + (GsGame.Instance == g));
+            GsSingleton<GsGame>.Reset();
+            Log("singleton reset " + GsSingleton<GsGame>.Has + " " + GsSingleton<GsAudio>.Has);
+
+            // Static class per closed type, with a static constructor.
+            Log("cache inits " + GsLog.Inits);
+            GsCache<int>.Put(3);
+            GsCache<string>.Put("s");
+            GsCache<GsVec>.Put(new GsVec(4, 5));
+            GsCache<int>.Put(9);
+            GsVec cv = GsCache<GsVec>.Value;
+            Log("cache " + GsCache<int>.Value + " " + GsCache<string>.Value + " " + cv.x + "," + cv.y + " "
+                + GsCache<int>.Hits + " " + GsCache<string>.Hits + " " + GsCache<GsVec>.Hits + " "
+                + GsCache<int>.Count + " " + GsCache<string>.Count + " " + GsCache<GsVec>.Items.Count);
+            Log("cache inits " + GsLog.Inits + " " + GsLog.Order + " " + GsCache<int>.Empty.Length + " "
+                + ((object)GsCache<int>.Empty == (object)GsCache<string>.Empty));
+            GsCache<uint>.Value = 4000000000u;
+            GsCache<long>.Value = 1L << 40;
+            GsCache<double>.Value = 2.5;
+            GsCache<long>.Value += 2;
+            Log("cache wide " + GsCache<uint>.Value + " " + GsCache<long>.Value + " "
+                + (int)(GsCache<double>.Value * 10) + " " + GsCache<uint>.Hits);
+            GsCache<GsVec>.Value.x = 40;
+            Log("cache struct " + GsCache<GsVec>.Value.x + " " + GsCache<GsVec>.Get().y);
+
+            // From a generic method.
+            GsUse.Write(11);
+            GsUse.Write("t");
+            Log("generic method " + GsUse.Read<int>() + " " + GsUse.Read<string>() + " "
+                + GsCache<int>.Hits + " " + GsCache<string>.Hits);
+
+            // A static event.
+            int ints = 0;
+            string strings = "";
+            Action<int> onInt = v => ints += v;
+            GsBus<int>.Raised += onInt;
+            GsBus<string>.Raised += v => strings += v;
+            GsBus<int>.Raise(5);
+            GsBus<string>.Raise("x");
+            GsBus<int>.Raise(6);
+            GsBus<int>.Raised -= onInt;
+            GsBus<int>.Raise(100);
+            GsBus<string>.Raise("y");
+            Log("event " + ints + " " + strings);
+
+            // Type ids.
+            int idInt = GsTypeId<int>.Value;
+            int idString = GsTypeId<string>.Value;
+            int idVec = GsUse.Id<GsVec>();
+            int idList = GsUse.ListId<int>();
+            Log("type id " + idInt + " " + idString + " " + idVec + " " + idList + " " + GsTypeId<int>.Value
+                + " " + GsUse.Id<string>() + " " + GsTypeId<List<int>>.Value + " " + GsTypeIds.Next);
+
+            // A counter that has nothing to do with T.
+            GsCounted<int> c1 = new GsCounted<int>(1);
+            GsCounted<int> c2 = new GsCounted<int>(2);
+            GsCounted<string> c3 = new GsCounted<string>("z");
+            GsCounted<int> c4 = c2.Another(8);
+            Func<int> reader = c3.Reader();
+            Log("counted " + c1.id + " " + c2.id + " " + c3.id + " " + c4.id + " " + GsCounted<int>.Count
+                + " " + GsCounted<string>.Count + " " + c1.Seen() + " " + c3.Seen() + " " + reader() + " "
+                + c4.Reader()());
+
+            // A nested type of a generic type.
+            new GsOuter<int>.Inner().Bump();
+            new GsOuter<int>.Inner().Bump();
+            new GsOuter<string>.Inner().Bump();
+            Log("nested " + GsOuter<int>.Inner.Mine + " " + GsOuter<string>.Inner.Mine + " "
+                + GsOuter<int>.Total + " " + GsOuter<string>.Total);
+
+            // A generic class deriving from one, and a closed class from that.
+            GsMid<long> mid = new GsMid<long>(1L);
+            GsLeaf leaf = new GsLeaf();
+            GsMid<string>.Label = "other";
+            Log("derived " + mid.Describe() + " " + leaf.Describe() + " " + leaf.id + " "
+                + GsCounted<long>.Count + " " + new GsMid<string>("q").Describe());
+
+            GsPool<int>.Factory = () => -1;
+            GsPool<string>.Factory = () => "new";
+            GsPool<int>.Return(4);
+            GsPool<int>.Return(5);
+            GsPool<string>.Return("a");
+            Log("pool " + GsPool<int>.Free + " " + GsPool<string>.Free + " " + GsPool<int>.Take() + " "
+                + GsPool<int>.Take() + " " + GsPool<int>.Take() + " " + GsPool<string>.Take() + " "
+                + GsPool<string>.Take() + " " + GsPool<int>.Returned + " " + GsPool<string>.Returned);
+            GsPool<int>.Return(7);
+            GsPool<int>.Return(8);
+            int sum = 0;
+            foreach (int i in GsPool<int>.All()) sum += i;
+            string joined = "";
+            foreach (string s in GsPool<string>.All()) joined += s;
+            Log("pool iterator " + sum + " [" + joined + "] " + GsPool<int>.CountWhere(x => x > 7) + " "
+                + GsPool<string>.CountWhere(x => true));
+            Action<int> ret = GsPool<int>.Returner();
+            Action<string> rets = GsPool<string>.Returner();
+            Action<string> direct = GsPool<string>.Return;
+            ret(1);
+            rets("p");
+            direct("q");
+            Func<int> ci = GsPool<int>.Counter();
+            Func<int> cs = GsPool<string>.Counter();
+            Log("pool delegates " + ci() + " " + cs() + " " + GsPool<int>.Free + " " + GsPool<string>.Free
+                + " " + (ret == GsPool<int>.Returner()) + " " + ((object)ret == (object)rets));
+            Log("pool typeof " + GsPool<int>.Name() + " " + GsPool<GsKind>.Name() + " " + GsPool<string>.Name()
+                + " " + GsPool<double>.Name());
+            Log("pool convert " + GsPool<int>.Convert(x => "#" + x) + " " + GsPool<string>.Returned + " "
+                + GsPool<string>.Convert(x => x.Length) + " " + GsPool<int>.Returned);
+            int by = 1;
+            GsPool<int>.Bump(ref by);
+            GsPool<string>.Bump(ref GsPool<int>.Returned);
+            Log("pool ref " + by + " " + GsPool<int>.Returned);
+            GsPool<GsKind>.Return(GsKind.High);
+            GsPool<byte>.Return(200);
+            Log("pool enum " + GsPool<GsKind>.Take() + " " + GsPool<byte>.Take() + " " + GsPool<GsKind>.Returned
+                + " " + GsPool<byte>.Returned + " " + GsPool<sbyte>.Returned);
+
+            GsWrapper<int> w = new GsWrapper<int>();
+            Log("wrapper " + w.Returned() + " " + new GsWrapper<string>().Returned() + " "
+                + GsWrapper<int>.Twice() + " " + w.Lifted());
+            GsPool<List<int>>.Return(null);
+            Log("wrapper lifted " + w.Lifted() + " " + GsWrapper<List<int>>.Twice());
+
+            GsDerived<int> d1 = new GsDerived<int>();
+            GsDerived<int> d2 = new GsDerived<int>();
+            GsDerived<string> d3 = new GsDerived<string>();
+            GsBase<int> b = d2;
+            GsFinal f = new GsFinal();
+            Log("virtual " + d1.Who() + " " + b.Who() + " " + d3.Who() + " " + f.Who() + " "
+                + GsBase<int>.Made + " " + GsBase<string>.Made + " " + GsBase<GsVec>.Made + " " + GsBase<long>.Made
+                + " " + GsBase<int>.Last + " " + GsBase<long>.Last);
+
+            GsSlot<int> s1 = GsSlot<int>.Make(3);
+            GsSlot<int>.Make(4);
+            GsSlot<string> s2 = GsSlot<string>.Make("v");
+            Log("struct " + s1.value + " " + s2.value + " " + GsSlot<int>.Count + " " + GsSlot<string>.Count);
+
+            Log("generic method " + GsMath.Sum(1, 2) + " " + GsMath.Sum("b", "a") + " " + GsMath.Relay(5)
+                + " " + GsPool<int>.Returned + " " + GsPool<string>.Returned);
+            Func<int> later = GsMath.Later(9);
+            Func<int> laters = GsMath.Later("z");
+            Log("generic lambda " + later() + " " + laters() + " " + later() + " " + GsPool<int>.Free);
+
+            // The runtime's own generic statics, which are Java statics.
+            uint[] eu = Array.Empty<uint>();
+            GsVec[] ev = Array.Empty<GsVec>();
+            string[] es = Array.Empty<string>();
+            Log("runtime empty " + (eu.Length + ev.Length + es.Length) + " "
+                + es.Length + " " + eu.Concat(new uint[] { 4000000000u }).First());
+        }
+
         public static void Main(string[] args)
         {
             ValueTypes();
@@ -2374,6 +2711,7 @@ namespace Spike
             StructArraysFromGenerics();
             BoxesAndReceivers();
             UnboxingEnums();
+            GenericStatics();
             Console.WriteLine("done");
         }
     }

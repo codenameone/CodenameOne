@@ -126,6 +126,11 @@ final class MethodTranslator implements Opcodes {
 
     /// Where the result goes, in a method that returns a struct.
     private int retSlot = -1;
+    /// The context of the generic type this method belongs to, when it is
+    /// handed one: a static method or a constructor (see [GenericStatics]).
+    private int contextSlot = -1;
+    /// The context of this generic method itself.
+    private int methodContextSlot = -1;
     /// Set between a call that was handed this method's own result object and
     /// the `ret` right after it, which then has nothing left to copy.
     private boolean forwardedReturn;
@@ -241,6 +246,12 @@ final class MethodTranslator implements Opcodes {
         }
         if (names.returnsStruct(sig)) {
             retSlot = nextSlot++;
+        }
+        if (!factory && host.generics.takesTypeContext(method)) {
+            contextSlot = nextSlot++;
+        }
+        if (host.generics.hasContext(method)) {
+            methodContextSlot = nextSlot++;
         }
         locals = new Var[body.locals.length];
         for (int i = 0; i < locals.length; i++) {
@@ -362,6 +373,15 @@ final class MethodTranslator implements Opcodes {
     /// each variable whose address it takes, and a defined value in every
     /// local, which C# promises and the JVM verifier demands.
     private void emitEntry() {
+        if (isConstructor && contextSlot >= 0) {
+            // First of all, and before the base constructor: a field
+            // initializer may already read a static, and so may a virtual
+            // method the base constructor calls.
+            mv.visitVarInsn(ALOAD, 0);
+            mv.visitVarInsn(ALOAD, contextSlot);
+            mv.visitFieldInsn(PUTFIELD, names.className(owner.fullName()), host.generics.contextField(owner),
+                    "L" + host.generics.contextClass(owner) + ";");
+        }
         for (Var a : args) {
             if (a.mode == STRUCT && (a.addressTaken || a.stored)) {
                 mv.visitVarInsn(ALOAD, a.slot);
@@ -423,9 +443,87 @@ final class MethodTranslator implements Opcodes {
         }
         if (isConstructor && !chainsToThis()) {
             host.emitInstanceStructFields(owner, mv);
-        } else if (".cctor".equals(method.name)) {
+        } else if (".cctor".equals(method.name) && contextSlot < 0) {
+            // With a context, the context's own constructor made them.
             host.emitStaticStructFields(owner, mv);
         }
+    }
+
+    // ----------------------------------------------- contexts of generic types
+
+    /// Stack: nothing. Pushes the context of the generic type this method
+    /// belongs to.
+    private void loadOwnContext(String wanted) {
+        if (contextSlot >= 0) {
+            mv.visitVarInsn(ALOAD, contextSlot);
+        } else if (!host.generics.hasContext(owner) || method.isStatic()) {
+            throw fail(wanted + " cannot be told apart per constructed type here");
+        } else if (ownerIsStruct) {
+            throw fail(wanted + " is used in an instance method of the generic struct " + owner.fullName()
+                    + "; the static state of a generic type belongs to each constructed type, and a struct has"
+                    + " no constructor call to be told its own in. Make " + owner.fullName()
+                    + " a class, make the method static, or keep the state outside the generic type");
+        } else {
+            mv.visitVarInsn(ALOAD, 0);
+            mv.visitFieldInsn(GETFIELD, names.className(owner.fullName()), host.generics.contextField(owner),
+                    "L" + host.generics.contextClass(owner) + ";");
+        }
+    }
+
+    /// Stack: nothing. Pushes the context a use of a generic type or
+    /// method names: a constant where the use names a closed type, this
+    /// code's own where it names its own, and otherwise what this code's
+    /// context answers for it.
+    private void loadContext(GenericStatics.Use use) {
+        GenericStatics g = host.generics;
+        String c = g.contextClass(use);
+        if (!use.open()) {
+            mv.visitFieldInsn(GETSTATIC, g.closedClass(use, where()), GenericStatics.INSTANCE, "L" + c + ";");
+            return;
+        }
+        if (use.namesMethodVariable()) {
+            if (methodContextSlot < 0) {
+                throw fail(use + " cannot be told apart per constructed type here");
+            }
+            mv.visitVarInsn(ALOAD, methodContextSlot);
+            if (g.isSelf(use, owner, method)) {
+                return;
+            }
+            if (!g.dependencies(method).containsKey(use.key())) {
+                throw fail("the context of this method has no answer for " + use);
+            }
+            mv.visitMethodInsn(INVOKEVIRTUAL, g.contextClass(method), GenericStatics.getter(use), "()L" + c + ";",
+                    false);
+            return;
+        }
+        loadOwnContext(use.toString());
+        if (g.isSelf(use, owner, null)) {
+            return;
+        }
+        if (!g.dependencies(owner).containsKey(use.key())) {
+            throw fail("the context of " + owner.fullName() + " has no answer for " + use);
+        }
+        mv.visitMethodInsn(INVOKEVIRTUAL, g.contextClass(owner), GenericStatics.getter(use), "()L" + c + ";", false);
+    }
+
+    /// Stack: nothing. Pushes the `System.Type` of a type variable when
+    /// this code has a context to ask, and says whether it did.
+    private boolean loadTypeVariable(CilType variable) {
+        GenericStatics g = host.generics;
+        if (variable.kind == CilType.Kind.MVAR && methodContextSlot >= 0) {
+            mv.visitVarInsn(ALOAD, methodContextSlot);
+            mv.visitMethodInsn(INVOKEVIRTUAL, g.contextClass(method), GenericStatics.typeGetter(variable.index),
+                    "()" + Translator.TYPE_DESCRIPTOR, false);
+            return true;
+        }
+        if (variable.kind == CilType.Kind.VAR && g.hasContext(owner)
+                && (contextSlot >= 0 || (!method.isStatic() && !ownerIsStruct))) {
+            loadOwnContext("typeof");
+            mv.visitMethodInsn(INVOKEVIRTUAL, g.contextClass(owner), GenericStatics.typeGetter(variable.index),
+                    "()" + Translator.TYPE_DESCRIPTOR, false);
+            return true;
+        }
+        return false;
     }
 
     /// A constructor that starts with `this(...)` leaves the fields to the
@@ -748,23 +846,10 @@ final class MethodTranslator implements Opcodes {
 
     /// `typeof(T)`: the enum's own type, or one made from the class.
     private void loadType(CilType type) {
-        if (host.hasEnumType(type)) {
-            mv.visitFieldInsn(GETSTATIC, names.className(type.name), "$TYPE", Translator.TYPE_DESCRIPTOR);
+        if (Names.isTypeVariable(type) && loadTypeVariable(type)) {
             return;
         }
-        CilType n = names.norm(type);
-        String c;
-        if (Names.isTypeVariable(n) || n.kind == CilType.Kind.OBJECT) {
-            c = Names.OBJECT;
-        } else if (n.isPrimitive()) {
-            c = Names.boxClass(n);
-        } else {
-            c = names.classRef(n);
-        }
-        mv.visitLdcInsn(org.objectweb.asm.Type.getObjectType(c));
-        mv.visitLdcInsn(String.valueOf(n.typeName() == null ? n.toString() : n.typeName()).replace('/', '+'));
-        invoke(INVOKESTATIC, Translator.TYPE, "$of", "(Ljava/lang/Class;Ljava/lang/String;)"
-                + Translator.TYPE_DESCRIPTOR, false);
+        host.emitTypeOf(mv, type, where());
     }
 
     private void unbox(CilType primitive) {
@@ -1665,7 +1750,8 @@ final class MethodTranslator implements Opcodes {
                 } else if (names.isStruct(n) && v.own != Val.FRESH) {
                     copyStruct(n);
                 }
-                push(Val.ref(CilType.OBJECT, Val.FRESH));
+                // A boxed type parameter stays one: see narrowed.
+                push(Val.ref(Names.isTypeVariable(type) ? type : CilType.OBJECT, Val.FRESH));
                 return;
             }
             case "unbox.any":
@@ -1768,6 +1854,10 @@ final class MethodTranslator implements Opcodes {
         } else {
             Val v = pop();
             viewIfArray(v, rt);
+            String narrowed = narrowed(v, rt);
+            if (narrowed != null) {
+                typeInsn(CHECKCAST, narrowed);
+            }
             if (retSlot >= 0) {
                 if (forwardedReturn) {
                     // Already built where the caller asked for it.
@@ -1873,7 +1963,35 @@ final class MethodTranslator implements Opcodes {
     /// here lives on its helper class.
     private String fieldOwner(FieldRef ref) {
         String declaring = ref.declaringType.typeName();
-        return Names.hasHelperClass(declaring) ? Names.helperClass(declaring) : names.classRef(ref.declaringType);
+        if (Names.hasHelperClass(declaring)) {
+            return Names.helperClass(declaring);
+        }
+        // A static of a generic type is a field of its context.
+        GenericStatics.Use use = host.generics.fieldUse(ref);
+        return use != null ? host.generics.contextClass(use) : names.classRef(ref.declaringType);
+    }
+
+    /// Stack: nothing, or the value about to be stored when `underValue`
+    /// is given. Puts the context a static field of a generic type lives
+    /// in where the object of an instance field would be, and answers
+    /// whether the field is such a one: from here on it is read and
+    /// written as an instance field of the context.
+    private boolean loadFieldContext(FieldRef ref, Val underValue) {
+        GenericStatics.Use use = host.generics.fieldUse(ref);
+        if (use == null) {
+            return false;
+        }
+        if (underValue == null) {
+            loadContext(use);
+        } else if (underValue.size() == 1 && underValue.kind != Val.FIELD) {
+            loadContext(use);
+            mv.visitInsn(SWAP);
+        } else {
+            int kept = spill(underValue);
+            loadContext(use);
+            reload(underValue, kept);
+        }
+        return true;
     }
 
     private Val getField(FieldRef ref, boolean isStatic) {
@@ -1917,12 +2035,17 @@ final class MethodTranslator implements Opcodes {
         String descriptor = names.descriptor(ref.type);
         host.index.requireField(c, name, descriptor, where());
         toErased(ref.type, ref.type.substitute(typeArgsOf(ref.declaringType), null), value);
+        String narrowed = narrowed(value, ref.type);
+        if (narrowed != null) {
+            typeInsn(CHECKCAST, narrowed);
+        }
         mv.visitFieldInsn(isStatic ? PUTSTATIC : PUTFIELD, c, name, descriptor);
     }
 
-    private void loadField(FieldRef ref, boolean isStatic, boolean address) {
+    private void loadField(FieldRef ref, boolean declaredStatic, boolean address) {
         CilType substituted = ref.type.substitute(typeArgsOf(ref.declaringType), null);
-        if (!isStatic) {
+        boolean isStatic = declaredStatic && !loadFieldContext(ref, null);
+        if (!declaredStatic) {
             Val target = pop();
             if (target.kind != Val.REF) {
                 throw fail("field " + ref + " read through " + target);
@@ -1936,9 +2059,10 @@ final class MethodTranslator implements Opcodes {
         push(getField(ref, isStatic));
     }
 
-    private void storeField(FieldRef ref, boolean isStatic) {
+    private void storeField(FieldRef ref, boolean declaredStatic) {
         Val value = pop();
-        if (!isStatic) {
+        boolean isStatic = declaredStatic && !loadFieldContext(ref, value);
+        if (!declaredStatic) {
             pop();
         }
         viewIfArray(value, ref.type);
@@ -1975,6 +2099,7 @@ final class MethodTranslator implements Opcodes {
     private static final int FIX_FIELD_BYREF = 4;
     private static final int FIX_ARRAY_VIEW = 5;
     private static final int FIX_GENERIC_BYREF = 6;
+    private static final int FIX_NARROW = 7;
 
     /// An array is every one of these on .NET and none of them on the JVM,
     /// so an array handed to a parameter of such a type goes in a view that
@@ -2067,6 +2192,9 @@ final class MethodTranslator implements Opcodes {
                 break;
             case FIX_GENERIC_BYREF:
                 genericByReference(type);
+                break;
+            case FIX_NARROW:
+                typeInsn(CHECKCAST, narrowed(v, type));
                 break;
             default:
                 break;
@@ -2323,7 +2451,31 @@ final class MethodTranslator implements Opcodes {
             // while it still reads the argument.
             fixes[i] = FIX_COPY;
             fixTypes[i] = s;
+        } else if (narrowed(v, s) != null) {
+            fixes[i] = FIX_NARROW;
+            fixTypes[i] = s;
         }
+    }
+
+    /// The class a value has to be cast to before it goes where `declared`
+    /// is expected, or null when it needs no cast.
+    ///
+    /// A value of a type parameter is an `Object` here, and C# lets it go
+    /// where the parameter's constraint is expected with nothing but a
+    /// `box`: `instance == null` in a `Singleton<T> where T : MonoBehaviour`
+    /// hands a `T` to `Object.op_Equality`. The JVM's verifier rejects the
+    /// class without the cast. It cannot fail -- the constraint is what the
+    /// C# compiler checked -- so it is a plain one, and ParparVM drops it.
+    private String narrowed(Val v, CilType declared) {
+        if (v.kind != Val.REF || v.type == null || !Names.isTypeVariable(v.type)) {
+            return null;
+        }
+        CilType d = names.norm(declared);
+        if (d.kind != CilType.Kind.CLASS && d.kind != CilType.Kind.GENERICINST || names.isStruct(d)) {
+            return null;
+        }
+        String c = names.classRef(d);
+        return Names.OBJECT.equals(c) ? null : c;
     }
 
     /// The runtime's method for a `System.Enum` method called on a value of
@@ -2383,6 +2535,11 @@ final class MethodTranslator implements Opcodes {
         String descriptor;
         boolean erased = true;
         boolean isInterface = false;
+        // What a static method or a constructor of a generic type with
+        // static state takes after everything else, and a generic method
+        // that names such a type after that: see GenericStatics.
+        GenericStatics.Use typeContext = null;
+        GenericStatics.Use methodContext = null;
         CilType constrainedPrimitive = ct != null && names.norm(ct).isPrimitive() ? names.norm(ct) : null;
         // `side.ToString()` on an enum is the name of the value, which the
         // integer alone cannot give: the enum's type goes with it.
@@ -2489,6 +2646,8 @@ final class MethodTranslator implements Opcodes {
             name = names.methodName(ref.name, sig, targetIsStruct);
             descriptor = names.methodDescriptor(sig);
             target = names.classRef(ref.declaringType);
+            typeContext = host.generics.typeUse(ref);
+            methodContext = host.generics.methodUse(ref);
             if (!sig.hasThis) {
                 opcode = INVOKESTATIC;
             } else if ("<init>".equals(name)) {
@@ -2538,16 +2697,13 @@ final class MethodTranslator implements Opcodes {
                 CilType a = names.norm(argument);
                 // A primitive or an enum travels as the class it is boxed
                 // as, which is what the erased callee is handed too; a type
-                // variable of the caller is not known here either.
-                String c;
-                if (Names.isTypeVariable(a) || a.kind == CilType.Kind.OBJECT) {
-                    c = Names.OBJECT;
-                } else if (a.isPrimitive()) {
-                    c = Names.boxClass(a);
+                // variable of the caller is not known here either, unless
+                // this code has a context to ask (GenericStatics).
+                if (Names.isTypeVariable(a) && loadTypeVariable(a)) {
+                    invoke(INVOKEVIRTUAL, Translator.TYPE, "$class", "()Ljava/lang/Class;", false);
                 } else {
-                    c = names.classRef(a);
+                    mv.visitLdcInsn(org.objectweb.asm.Type.getObjectType(host.classToken(a)));
                 }
-                mv.visitLdcInsn(org.objectweb.asm.Type.getObjectType(c));
                 classes.append("Ljava/lang/Class;");
             }
             int at = descriptor.lastIndexOf(')');
@@ -2558,6 +2714,15 @@ final class MethodTranslator implements Opcodes {
         }
         if (structResult) {
             loadResultTarget(sig.returnType.substitute(typeArgs, ref.methodArgs));
+        }
+        if (typeContext != null) {
+            loadContext(typeContext);
+            descriptor = GenericStatics.withHidden(descriptor, "L" + host.generics.contextClass(typeContext) + ";");
+        }
+        if (methodContext != null) {
+            loadContext(methodContext);
+            descriptor = GenericStatics.withHidden(descriptor,
+                    "L" + host.generics.contextClass(methodContext) + ";");
         }
         if (enumToString || enumMethod != null) {
             mv.visitFieldInsn(GETSTATIC, names.className(ct.name), "$TYPE", Translator.TYPE_DESCRIPTOR);
@@ -2600,8 +2765,21 @@ final class MethodTranslator implements Opcodes {
             if (function.kind != Val.TOKEN) {
                 throw fail("a delegate built from something other than ldftn");
             }
-            String c = host.delegateClass(owner, ref.declaringType, asm.methodRef(function.token),
-                    function.virtualToken);
+            MethodRef to = asm.methodRef(function.token);
+            GenericStatics.Use typeContext = to.sig.hasThis ? null : host.generics.typeUse(to);
+            GenericStatics.Use methodContext = host.generics.methodUse(to);
+            if (methodContext != null && (to.sig.hasThis || typeContext != null)) {
+                throw fail("a delegate of the generic method " + to + ", which uses the static state of "
+                        + "a generic type through its own type parameters, is not supported: wrap the call"
+                        + " in a lambda");
+            }
+            if (typeContext != null || methodContext != null) {
+                // A static method that takes a context: the delegate has
+                // no object to call it on, so the context is its target.
+                mv.visitInsn(POP);
+                loadContext(typeContext != null ? typeContext : methodContext);
+            }
+            String c = host.delegateClass(owner, ref.declaringType, to, function.virtualToken);
             // target -> delegate, delegate, target
             typeInsn(NEW, c);
             mv.visitInsn(DUP_X1);
@@ -2657,7 +2835,14 @@ final class MethodTranslator implements Opcodes {
             reload(values[i], temps[i]);
             applyFix(fixes[i], fixTypes[i], values[i]);
         }
-        invoke(INVOKESPECIAL, c, "<init>", names.methodDescriptor(sig), false);
+        String descriptor = names.methodDescriptor(sig);
+        GenericStatics.Use context = host.generics.typeUse(ref);
+        if (context != null) {
+            // The object is told which constructed type it is of.
+            loadContext(context);
+            descriptor = GenericStatics.withHidden(descriptor, "L" + host.generics.contextClass(context) + ";");
+        }
+        invoke(INVOKESPECIAL, c, "<init>", descriptor, false);
         push(Val.ref(ref.declaringType, Val.FRESH));
     }
 

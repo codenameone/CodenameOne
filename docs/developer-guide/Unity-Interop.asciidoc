@@ -1038,6 +1038,17 @@ There are four places it speaks up:
   `DateTime` and `System.Random` are the ones a port meets first. The
   translation step lists each use; the usual replacement is a few lines in
   the script, such as a hand-written insertion sort or `UnityEngine.Random`.
+* *Static fields of generic types.* Each constructed type has its own, as
+  in .NET: `Singleton<GameManager>.Instance` and
+  `Singleton<AudioManager>.Instance` are two fields, and a static constructor
+  runs once for each. Three shapes can't be translated, and the build stops
+  with the type, the method and the line: an instance method of a generic
+  struct that reads its static fields, a virtual or interface generic method
+  that reaches them through its own type argument, such as `Slot<T>.Value`
+  inside `virtual T Read<T>()`, and a type that names itself with an
+  ever-larger argument, such as `Chain<T>` calling `Chain<List<T>>`. Make
+  the struct a class, make the method non-virtual, or keep that state in a
+  non-generic class.
 * *Reflection, `System.IO`, threads, `async` and `await`, networking and
   `unsafe` code.* None of these are translated. Keep saved data in
   `PlayerPrefs`, load bundled data with `Resources.Load`, and run timed work
