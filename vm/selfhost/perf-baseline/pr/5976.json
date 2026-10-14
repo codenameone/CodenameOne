@@ -43,6 +43,26 @@
    }
   },
   "macos-arm64": {
+   "mathTranscendental": {
+    "all": {
+     "from": {
+      "memory": 0.118,
+      "time": 1.007,
+      "tolerance": {
+       "memory": 0.4,
+       "time": 0.3
+      }
+     },
+     "memory": 0.118,
+     "reason": "macOS arm64 mathTranscendental all-core RAM is bimodal per round, ~0.118x or ~0.04x: this PR's run 38536963726 had 3 of 5 rounds low (median 0.0405x, reported as an improvement), its earlier run 38437154603 2 of 5, master runs 38365227954, 38521161771 and 38530112574 none. Pool all five runs so the tolerance spans both modes; time is unchanged.",
+     "runs": 5,
+     "time": 1.007,
+     "tolerance": {
+      "memory": 1.0,
+      "time": 0.3
+     }
+    }
+   },
    "translator": {
     "all": {
      "from": {
