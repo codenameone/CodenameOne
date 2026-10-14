@@ -39,7 +39,9 @@ public class ReceiptDto {
     /// The fare, the service fee and the tip, less the discount.
     public long total;
     public String methodLabel;
-    /// `pending`, `paid`, `failed`, `refunded` or `cash`.
+    /// `pending`, `paid`, `failed`, `refunded` or `cash`; while a refund the
+    /// processor took has not finished, `refund_pending`, and
+    /// `refund_failed` when it then did not return the money.
     public String status;
     /// Milliseconds since the epoch, or 0 while unpaid.
     public long paidAt;

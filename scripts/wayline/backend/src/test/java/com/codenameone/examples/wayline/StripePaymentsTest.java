@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -260,7 +261,9 @@ class StripePaymentsTest {
                 .reply(200, "{\"id\":\"re_1\",\"object\":\"refund\",\"status\":\"succeeded\"}")
                 .reply(200, "{\"id\":\"re_2\",\"object\":\"refund\",\"status\":\"failed\"}");
         StripePayments stripe = new StripePayments(script, RETURN);
-        assertEquals("re_1", stripe.refund("pi_1", 1840L));
+        PaymentProvider.Refund made = stripe.refund("pi_1", 1840L);
+        assertEquals("re_1", made.reference);
+        assertFalse(made.pending);
         assertEquals("POST /v1/refunds", script.asked.get(0));
         has(script.forms.get(0), "payment_intent=pi_1");
         has(script.forms.get(0), "amount=1840");
@@ -271,5 +274,29 @@ class StripePaymentsTest {
         } catch (IOException expected) {
             assertTrue(expected.getMessage().indexOf("failed") > 0);
         }
+    }
+
+    @Test
+    void aPendingRefundIsAskedAboutUntilItEnds() throws Exception {
+        Script script = new Script()
+                .reply(200, "{\"id\":\"re_3\",\"object\":\"refund\",\"status\":\"pending\"}")
+                .reply(200, "{\"id\":\"re_4\",\"object\":\"refund\","
+                        + "\"status\":\"requires_action\"}")
+                .reply(200, "{\"id\":\"re_3\",\"object\":\"refund\",\"status\":\"pending\"}")
+                .reply(200, "{\"id\":\"re_3\",\"object\":\"refund\",\"status\":\"succeeded\"}")
+                .reply(200, "{\"id\":\"re_4\",\"object\":\"refund\",\"status\":\"canceled\"}")
+                .reply(200, "{\"id\":\"re_5\",\"object\":\"refund\",\"status\":\"failed\"}");
+        StripePayments stripe = new StripePayments(script, RETURN);
+        // Taken, but not yet money back: neither is a refund to record as made.
+        PaymentProvider.Refund pending = stripe.refund("pi_3", 900L);
+        assertEquals("re_3", pending.reference);
+        assertTrue(pending.pending);
+        assertTrue(stripe.refund("pi_4", 900L).pending);
+        assertEquals(PaymentProvider.REFUND_PENDING, stripe.refundStatus("re_3"));
+        assertEquals("GET /v1/refunds/re_3", script.asked.get(2));
+        assertEquals(PaymentProvider.REFUND_SUCCEEDED, stripe.refundStatus("re_3"));
+        // Canceled returned no more money than failed did.
+        assertEquals(PaymentProvider.REFUND_FAILED, stripe.refundStatus("re_4"));
+        assertEquals(PaymentProvider.REFUND_FAILED, stripe.refundStatus("re_5"));
     }
 }

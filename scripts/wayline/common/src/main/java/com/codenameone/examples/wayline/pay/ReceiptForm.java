@@ -225,12 +225,15 @@ public final class ReceiptForm {
     /// A payment's state, in words.
     public static String status(String status) {
         return "paid".equals(status) ? "Paid" : "cash".equals(status) ? "Paid in cash"
-                : "refunded".equals(status) ? "Refunded" : "failed".equals(status)
-                ? "Payment failed" : "Payment pending";
+                : "refunded".equals(status) ? "Refunded"
+                : "refund_pending".equals(status) ? "Refund pending"
+                : "refund_failed".equals(status) ? "Refund failed"
+                : "failed".equals(status) ? "Payment failed" : "Payment pending";
     }
 
     public static String badge(String status) {
         return "paid".equals(status) || "cash".equals(status) ? "WlBadgeGood"
-                : "failed".equals(status) ? "WlBadgeBad" : "WlBadgeWarn";
+                : "failed".equals(status) || "refund_failed".equals(status) ? "WlBadgeBad"
+                : "WlBadgeWarn";
     }
 }

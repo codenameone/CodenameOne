@@ -246,4 +246,27 @@ public class PaymentRepository {
         session.createQuery("update Ride r set r.paymentStatus = 'PAID' where r.id = :id")
                 .setParameter("id", rideId).executeUpdate();
     }
+
+    /// Payments whose refund the processor took and has not finished, the
+    /// oldest first.
+    public List<Payment> refundsPending(int limit) {
+        return session.createQuery("select p from Payment p "
+                + "where p.status = 'REFUND_PENDING' order by p.createdAt", Payment.class)
+                .limit(limit).list();
+    }
+
+    /// Records how a pending refund ended, on its payment and its ride.
+    ///
+    /// @return true for the one caller that recorded it
+    public boolean endRefund(String rideId, String status, long at) {
+        boolean ended = session.createQuery("update Payment p set p.status = :status, "
+                + "p.refundedAt = :at where p.rideId = :id and p.status = 'REFUND_PENDING'")
+                .setParameter("status", status).setParameter("at", Long.valueOf(at))
+                .setParameter("id", rideId).executeUpdate() == 1;
+        if (ended) {
+            session.createQuery("update Ride r set r.paymentStatus = :status where r.id = :id")
+                    .setParameter("status", status).setParameter("id", rideId).executeUpdate();
+        }
+        return ended;
+    }
 }

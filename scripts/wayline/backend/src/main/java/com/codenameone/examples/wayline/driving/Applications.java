@@ -157,7 +157,7 @@ public class Applications {
         }
         // Held first, as an upload holds it: what is saved here must not land
         // on an application that was handed in after it was read.
-        applications.hold(username);
+        hold(username);
         DriverApplication application = editable(username);
         String birth = date(form.dateOfBirth, "your date of birth");
         String expiry = date(form.licenceExpiry, "the licence's expiry date");
@@ -235,7 +235,7 @@ public class Applications {
         // hold, an application handed in between the two had a document
         // replaced while it was under review, perhaps after an admin had
         // looked at the one it replaced.
-        applications.hold(username);
+        hold(username);
         editable(username);
         long now = System.currentTimeMillis();
         // Replaced with a statement where there is one already, so the picture
@@ -275,6 +275,12 @@ public class Applications {
     /// began.
     @Transactional(noRollbackFor = ResponseStatusException.class)
     public DriverApplicationDto submit(String username) throws IOException {
+        // Held before the form is read and checked: a save that lands between
+        // the check and the move below would otherwise hand in an application
+        // emptied after it was found complete, where it can no longer be
+        // corrected. Behind the hold a save either went first, and is what is
+        // checked, or comes after and finds it handed in.
+        hold(username);
         String was = editable(username).status;
         DriverApplicationDto form = get(username);
         List<String> missing = new ArrayList<String>();
@@ -478,6 +484,16 @@ public class Applications {
 
     /// The application, made as a draft if there is none, when the applicant
     /// may still change it; 409 otherwise.
+    /// Takes turns with every other change to an account's application. One
+    /// that has none yet has no row to hold: the first save, upload or
+    /// hand-in makes it, and two at once would both insert one under the same
+    /// name, so they take turns on the profile instead.
+    private void hold(String username) {
+        if (!applications.hold(username)) {
+            profiles.hold(username);
+        }
+    }
+
     private DriverApplication editable(String username) {
         DriverApplication application = applications.find(username);
         if (application == null) {

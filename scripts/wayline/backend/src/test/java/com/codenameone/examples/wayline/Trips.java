@@ -44,6 +44,8 @@ final class Trips {
     static final String FAILS_WHEN_CHARGED = "4000000000000341";
     /// Saved without complaint, and charging it fails without an answer.
     static final String NO_ANSWER_WHEN_CHARGED = "4000000000000119";
+    /// Charged without complaint; a refund of it is pending at first.
+    static final String SLOW_REFUND = "4000000000007726";
 
     private Trips() {
     }

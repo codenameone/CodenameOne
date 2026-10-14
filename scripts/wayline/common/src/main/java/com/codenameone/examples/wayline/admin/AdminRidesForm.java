@@ -169,7 +169,10 @@ public final class AdminRidesForm {
                         reason.reason = why;
                         Api.admin().refundRide(ride.id, reason, Net.to(refunded -> {
                             Telemetry.rideRefunded("rides");
-                            Ui.say("The ride was refunded");
+                            // The processor may not have returned the money
+                            // yet; the receipt says which.
+                            Ui.say("refund_pending".equals(refunded.status)
+                                    ? "The refund is pending" : "The ride was refunded");
                             panes.home();
                         }, Ui::fail));
                     })));
@@ -179,6 +182,8 @@ public final class AdminRidesForm {
 
     private static String payment(String status) {
         return "PAID".equals(status) ? "Paid" : "REFUNDED".equals(status) ? "Refunded"
+                : "REFUND_PENDING".equals(status) ? "Refund pending"
+                : "REFUND_FAILED".equals(status) ? "Refund failed"
                 : "FAILED".equals(status) ? "Payment failed" : "Payment pending";
     }
 }

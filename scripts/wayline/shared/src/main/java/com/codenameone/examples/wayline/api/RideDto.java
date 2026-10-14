@@ -61,6 +61,8 @@ public class RideDto {
     public int rating;
     /// PENDING until the ride completes, then PAID or FAILED; REFUNDED once an
     /// admin has returned the money. A cash ride is PAID when it completes.
+    /// A refund the processor has not finished is REFUND_PENDING until it
+    /// ends REFUNDED, or REFUND_FAILED when the money did not go back.
     public String paymentStatus;
     /// For a driver looking at an offer: how long is left to answer it.
     public int offerExpiresInSeconds;

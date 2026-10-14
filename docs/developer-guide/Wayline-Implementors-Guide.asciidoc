@@ -896,6 +896,18 @@ ride, and any other failure leaves it there with no charge recorded, so the
 rider can send the same tip again under the same key. The ride can't be
 refunded until then.
 
+A refund can also be taken without being finished. Stripe answers some
+refunds `pending` and only later says whether the bank returned the money, and
+a pending refund can still end `failed` or `canceled`. `PaymentProvider.refund`
+reports such a refund as pending, and the payment and its ride are then
+`REFUND_PENDING`, not `REFUNDED`: the receipt says the refund is pending, and the
+ride can't be refunded again. `Payments.settleRefunds` runs every minute and asks
+the provider about each one through `PaymentProvider.refundStatus`. Once the
+fare's refund and the tip's have both succeeded the ride is `REFUNDED`. If either
+fails, the ride is `REFUND_FAILED` and isn't tried again: part of the money may
+have gone back, so it takes a person with the provider's records to settle it.
+A ride in either state earns its driver nothing.
+
 While a ride's charge is being asked about, the card it was sent to can't be
 removed and the account can't be closed: `Payments.remove` and
 `Payments.forget` answer 409. The retry looks the card up by its token, so
@@ -943,7 +955,9 @@ configured the server refuses to start.
   server reads the saved card from the session.
 * A ride is charged with a PaymentIntent that's confirmed at once and marked
   off-session, with the ride's key as the idempotency key.
-* A refund is a Stripe refund of that PaymentIntent.
+* A refund is a Stripe refund of that PaymentIntent. One that Stripe answers
+  `pending` or `requires_action` is read again with `GET /v1/refunds/{id}`
+  until it succeeds, fails or is canceled.
 
 WARNING: The tests cover this path with stand-in answers in place of Stripe's.
 Nothing in the project has run against a Stripe account. Use a test-mode key

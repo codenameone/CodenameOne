@@ -73,8 +73,30 @@ public interface PaymentProvider {
 
     /// Returns `amountCents` of a charge to the card it came from.
     ///
-    /// @return the processor's reference for the refund
-    String refund(String chargeReference, long amountCents) throws IOException;
+    /// A processor may take the refund and only later say whether the bank
+    /// returned the money: such a refund comes back [Refund#pending], and is
+    /// asked about with [#refundStatus] until it has an answer.
+    ///
+    /// @return the refund as the processor took it
+    /// - `IOException`: when the processor could not be asked, or refused the
+    ///   refund outright
+    Refund refund(String chargeReference, long amountCents) throws IOException;
+
+    /// What became of a refund that was [Refund#pending]: [#REFUND_SUCCEEDED],
+    /// [#REFUND_PENDING] while the processor still does not know, or
+    /// [#REFUND_FAILED] when the money did not go back.
+    String refundStatus(String refundReference) throws IOException;
+
+    String REFUND_SUCCEEDED = "succeeded";
+    String REFUND_PENDING = "pending";
+    String REFUND_FAILED = "failed";
+
+    /// A refund the processor took.
+    final class Refund {
+        public String reference = "";
+        /// Whether the money is not yet known to be back on the card.
+        public boolean pending;
+    }
 
     /// A setup under way.
     final class Setup {

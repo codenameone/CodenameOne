@@ -29,6 +29,7 @@ import com.codename1.backend.test.MockMvc;
 import com.codename1.backend.test.MockRequestBuilder;
 import com.codenameone.examples.wayline.account.Accounts;
 import com.codenameone.examples.wayline.account.DemoAccounts;
+import com.codenameone.examples.wayline.pay.Payments;
 import com.codenameone.examples.wayline.ride.Rides;
 import org.junit.jupiter.api.Test;
 
@@ -55,6 +56,8 @@ class PaymentsTest {
     private Accounts accounts;
     @Autowired
     private Rides rides;
+    @Autowired
+    private Payments payments;
     @Autowired
     private DataSource db;
 
@@ -368,6 +371,51 @@ class PaymentsTest {
         // And once it is recorded, it is refunded once like any other.
         mvc.perform(admin(Trips.body(post("/api/admin/rides/" + id + "/refund"),
                         "{\"reason\":\"Twice\"}")))
+                .andExpect(status().isConflict());
+        Trips.offline(mvc, driver);
+    }
+
+    @Test
+    void aRefundTheProcessorHasNotFinishedIsRecordedOnlyOnceItEnds() throws Exception {
+        // Gothenburg.
+        String rider = People.rider(accounts, "got-rider");
+        String driver = People.driver(accounts, "got-driver");
+        String card = (String) Trips.addCard(mvc, rider, Trips.SLOW_REFUND).get("id");
+        String method = "\"paymentMethodId\":\"" + card + "\"";
+        Trips.online(mvc, driver, 57.7089, 11.9746);
+        String id = (String) Trips.complete(mvc, rider, driver, Trips.ride(57.7089, 11.9746,
+                57.7189, 11.9846, method)).get("id");
+
+        // Taken, and not yet money back: pending, and not to be asked for twice.
+        mvc.perform(admin(Trips.body(post("/api/admin/rides/" + id + "/refund"),
+                        "{\"reason\":\"Slow\"}")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("refund_pending"));
+        mvc.perform(People.asRider(get("/api/rides/" + id), rider))
+                .andExpect(jsonPath("$.paymentStatus").value("REFUND_PENDING"));
+        mvc.perform(admin(Trips.body(post("/api/admin/rides/" + id + "/refund"),
+                        "{\"reason\":\"Again\"}")))
+                .andExpect(status().isConflict());
+        // The processor has finished it by the time it is asked.
+        payments.settleRefunds();
+        assertEquals("refunded", Trips.receipt(mvc, rider, id).get("status"));
+
+        // And one the processor then fails is recorded as failed, never as
+        // refunded, and is not tried again from here.
+        db.execute("UPDATE wl_payment_method SET token = 'sim_pm_lost_card' WHERE id = ?",
+                new Object[] {card});
+        String lost = (String) Trips.complete(mvc, rider, driver, Trips.ride(57.7089, 11.9746,
+                57.7189, 11.9846, method)).get("id");
+        mvc.perform(admin(Trips.body(post("/api/admin/rides/" + lost + "/refund"),
+                        "{\"reason\":\"Lost\"}")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("refund_pending"));
+        payments.settleRefunds();
+        assertEquals("refund_failed", Trips.receipt(mvc, rider, lost).get("status"));
+        mvc.perform(People.asRider(get("/api/rides/" + lost), rider))
+                .andExpect(jsonPath("$.paymentStatus").value("REFUND_FAILED"));
+        mvc.perform(admin(Trips.body(post("/api/admin/rides/" + lost + "/refund"),
+                        "{\"reason\":\"Again\"}")))
                 .andExpect(status().isConflict());
         Trips.offline(mvc, driver);
     }

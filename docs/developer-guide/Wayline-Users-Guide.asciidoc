@@ -69,7 +69,7 @@ Sign in as the rider in one simulator and as a driver in another to follow a
 ride from both ends.
 
 No money moves on a server that hasn't been given a payment provider's key.
-Cards are simulated, and three numbers behave in three ways:
+Cards are simulated, and four numbers behave in four ways:
 
 [cols="2,3"]
 |===
@@ -87,6 +87,10 @@ Cards are simulated, and three numbers behave in three ways:
 | `4000 0000 0000 0119`
 | Accepted when added, then every charge fails without an answer, so the ride's
 payment stays pending.
+
+| `4000 0000 0000 7726`
+| Accepted, and every charge succeeds. A refund is pending at first, and shows
+as refunded about a minute later.
 |===
 
 Any expiry date in the future and any security code work with them.
@@ -407,7 +411,9 @@ those under way, completed, or cancelled. A ride opens with the trip, the fare
 and how it was paid. From there an administrator can cancel a ride that hasn't
 finished and refund one that was paid by card. A refund returns
 the fare, the service fee and the tip. A ride paid in cash has nothing to
-refund.
+refund. A refund the payment provider hasn't finished shows as **Refund
+pending** until it does. One the provider then fails shows as **Refund failed**
+and needs looking up with the provider.
 
 .Rides
 image::img/wayline-admin-desktop-rides.png["The rides section of the console: filters for all, under way, completed and cancelled rides above a list of rides with their fares and states",scaledwidth=95%]

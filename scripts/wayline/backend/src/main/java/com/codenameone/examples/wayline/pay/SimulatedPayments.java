@@ -43,6 +43,12 @@ import java.io.IOException;
 /// - `4000 0000 0000 0119` is accepted and then cannot be charged at all: the
 ///   processor fails without saying whether it took the money, which is how
 ///   a payment nobody can vouch for is tried out.
+/// - `4000 0000 0000 7726` is charged like any other, and a refund of it is
+///   pending when it is made and has succeeded when it is next asked about,
+///   which is how a refund the bank has not answered yet is tried out.
+///
+/// A refund that is pending and then fails has no card number: a card whose
+/// token starts `sim_pm_lost_` does that, and only a test makes one.
 ///
 /// The card number is read here, in this method, and goes no further: the
 /// brand and the last four digits are all that is returned or stored.
@@ -50,8 +56,14 @@ public class SimulatedPayments implements PaymentProvider {
     static final String DECLINED_NUMBER = "4000000000000002";
     static final String FAILS_LATER_NUMBER = "4000000000000341";
     static final String FAULTY_NUMBER = "4000000000000119";
+    static final String SLOW_REFUND_NUMBER = "4000000000007726";
     private static final String FAILING_TOKEN = "sim_pm_fail_";
     private static final String FAULTY_TOKEN = "sim_pm_fault_";
+    private static final String SLOW_REFUND_TOKEN = "sim_pm_slow_";
+    private static final String LOST_REFUND_TOKEN = "sim_pm_lost_";
+    private static final String SLOW_REFUND_CHARGE = "sim_ch_slow_";
+    private static final String LOST_REFUND_CHARGE = "sim_ch_lost_";
+    private static final String REFUND = "sim_re_";
 
     @Override
     public String name() {
@@ -101,7 +113,8 @@ public class SimulatedPayments implements PaymentProvider {
         card.expMonth = typed.expMonth;
         card.expYear = year;
         card.token = (FAILS_LATER_NUMBER.equals(number) ? FAILING_TOKEN
-                : FAULTY_NUMBER.equals(number) ? FAULTY_TOKEN : "sim_pm_") + Ids.next();
+                : FAULTY_NUMBER.equals(number) ? FAULTY_TOKEN
+                : SLOW_REFUND_NUMBER.equals(number) ? SLOW_REFUND_TOKEN : "sim_pm_") + Ids.next();
         return card;
     }
 
@@ -114,7 +127,10 @@ public class SimulatedPayments implements PaymentProvider {
         if (token.startsWith(FAULTY_TOKEN)) {
             throw new IOException("The simulated processor did not answer");
         }
-        return "sim_ch_" + key;
+        // A charge says how its refund is to go, as the card did: the refund
+        // has only the charge to go by.
+        return (token.startsWith(SLOW_REFUND_TOKEN) ? SLOW_REFUND_CHARGE
+                : token.startsWith(LOST_REFUND_TOKEN) ? LOST_REFUND_CHARGE : "sim_ch_") + key;
     }
 
     @Override
@@ -123,11 +139,21 @@ public class SimulatedPayments implements PaymentProvider {
     }
 
     @Override
-    public String refund(String chargeReference, long amountCents) throws IOException {
+    public Refund refund(String chargeReference, long amountCents) throws IOException {
         // Named after the charge, as a real processor's refund is keyed by
         // it: asking twice is one refund, which is what lets a refund whose
         // answer was lost be asked for again.
-        return "sim_re_" + chargeReference;
+        Refund refund = new Refund();
+        refund.reference = REFUND + chargeReference;
+        refund.pending = chargeReference.startsWith(SLOW_REFUND_CHARGE)
+                || chargeReference.startsWith(LOST_REFUND_CHARGE);
+        return refund;
+    }
+
+    @Override
+    public String refundStatus(String refundReference) throws IOException {
+        return refundReference.startsWith(REFUND + LOST_REFUND_CHARGE) ? REFUND_FAILED
+                : REFUND_SUCCEEDED;
     }
 
     /// The digits of what was typed, with the spaces and dashes people put in a

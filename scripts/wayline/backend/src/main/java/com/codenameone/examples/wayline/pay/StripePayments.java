@@ -170,14 +170,39 @@ public class StripePayments implements PaymentProvider {
     }
 
     @Override
-    public String refund(String chargeReference, long amountCents) throws IOException {
-        Map refund = ask("POST", "/v1/refunds", form("payment_intent", chargeReference,
+    public Refund refund(String chargeReference, long amountCents) throws IOException {
+        Map answer = ask("POST", "/v1/refunds", form("payment_intent", chargeReference,
                 "amount", String.valueOf(amountCents)), "refund-" + chargeReference);
-        String status = text(refund, "status");
-        if (!"succeeded".equals(status) && !"pending".equals(status)) {
-            throw new IOException("The refund was not accepted: " + status);
+        String status = refundState(text(answer, "status"));
+        if (REFUND_FAILED.equals(status)) {
+            throw new IOException("The refund was not accepted: " + text(answer, "status"));
         }
-        return id(refund);
+        Refund refund = new Refund();
+        refund.reference = id(answer);
+        // A pending refund can still fail or be canceled, so it is not yet a
+        // refund to record as made: the caller keeps asking.
+        refund.pending = REFUND_PENDING.equals(status);
+        return refund;
+    }
+
+    @Override
+    public String refundStatus(String refundReference) throws IOException {
+        return refundState(text(ask("GET", "/v1/refunds/" + UrlText.encode(refundReference),
+                null, null), "status"));
+    }
+
+    /// Stripe's five refund states as three. `requires_action` waits on the
+    /// cardholder like `pending` waits on the bank, and `canceled` returned no
+    /// more money than `failed` did. A state this does not know is taken as
+    /// still pending: asked about again, it is never recorded as money back.
+    private static String refundState(String stripe) {
+        if ("succeeded".equals(stripe)) {
+            return REFUND_SUCCEEDED;
+        }
+        if ("failed".equals(stripe) || "canceled".equals(stripe)) {
+            return REFUND_FAILED;
+        }
+        return REFUND_PENDING;
     }
 
     /// Makes a request and returns the object in the answer.

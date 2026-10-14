@@ -133,12 +133,14 @@ public class ApplicationRepository {
 
     /// Makes the rest of the transaction wait its turn behind any other that
     /// holds, or moves, the same application: handing it in and reviewing it
-    /// are statements on this row too. Does nothing for an account that has
-    /// no application yet, which nothing can hand in either.
-    public void hold(String username) {
-        session.createQuery("update DriverApplication a set a.status = a.status "
+    /// are statements on this row too.
+    ///
+    /// @return false for an account that has no application yet, where there
+    /// is no row to hold
+    public boolean hold(String username) {
+        return session.createQuery("update DriverApplication a set a.status = a.status "
                 + "where a.username = :username").setParameter("username", username)
-                .executeUpdate();
+                .executeUpdate() == 1;
     }
 
     public int delete(String username) {

@@ -24,6 +24,7 @@ package com.codenameone.examples.wayline.pay;
 
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
+import com.codename1.backend.annotations.Scheduled;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.wayline.Ids;
 import com.codenameone.examples.wayline.account.ProfileRepository;
@@ -70,6 +71,12 @@ public class Payments {
     public static final String PAID = "PAID";
     public static final String FAILED = "FAILED";
     public static final String REFUNDED = "REFUNDED";
+    /// Refunded at the processor, which has not yet said that the money is
+    /// back on the card. See [#settleRefunds].
+    public static final String REFUND_PENDING = "REFUND_PENDING";
+    /// A refund the processor took and then failed or canceled: the rider has
+    /// not had the money back.
+    public static final String REFUND_FAILED = "REFUND_FAILED";
     /// The id and the label of the method every account has.
     public static final String CASH = "cash";
     public static final String CASH_LABEL = "Cash";
@@ -130,7 +137,19 @@ public class Payments {
         PaymentProvider.Setup setup;
         try {
             if (customer == null) {
-                customer = keepCustomer(username, provider.createCustomer(username, displayName));
+                String created = provider.createCustomer(username, displayName);
+                customer = keepCustomer(username, created);
+                if (!created.equals(customer)) {
+                    // Not kept: the account was closed while the processor was
+                    // asked (its clean-up found no customer to delete, so this
+                    // one is ours to delete), or another request kept its own
+                    // first. Either way the record made here would otherwise
+                    // stay at the processor with the rider's name on it.
+                    forgetQuietly(created);
+                }
+                if (customer == null) {
+                    throw new ResponseStatusException(404, "No such account");
+                }
             }
             setup = provider.startCardSetup(customer, id);
         } catch (IOException failed) {
@@ -157,13 +176,17 @@ public class Payments {
 
     /// Keeps the reference the processor made for a rider on first use, and
     /// returns the one the account has: another request may have kept its own
-    /// while this one was asking for it.
+    /// while this one was asking for it. Null when the account is gone.
     @Transactional
     private String keepCustomer(String username, String reference) {
         // Two first cards started together both find no row. Taking turns on
         // the account lets the second see the first's row and use it, where
-        // it would otherwise insert a second and fail on the key.
-        profiles.hold(username);
+        // it would otherwise insert a second and fail on the key. With no
+        // profile to hold the account was closed meanwhile, and its clean-up
+        // has already run: a row kept now would never be deleted.
+        if (!profiles.hold(username)) {
+            return null;
+        }
         PaymentCustomer row = repository.customer(username);
         if (row == null) {
             row = new PaymentCustomer();
@@ -176,6 +199,11 @@ public class Payments {
 
     @Transactional
     private void keepSetup(String username, String id, String reference) {
+        // As in keepCustomer: an account closed while the processor was asked
+        // gets no row its clean-up has already missed.
+        if (!profiles.hold(username)) {
+            throw new ResponseStatusException(404, "No such account");
+        }
         PaymentSetup row = new PaymentSetup();
         row.id = id;
         row.username = username;
@@ -498,19 +526,98 @@ public class Payments {
     public ReceiptDto refund(String rideId, String reason) throws IOException {
         Ride ride = claimRefund(rideId);
         Payment payment = payment(rideId);
-        String reference;
+        PaymentProvider.Refund fare;
+        PaymentProvider.Refund tip = null;
         try {
-            reference = provider.refund(payment.providerRef, payment.amountCents);
+            fare = provider.refund(payment.providerRef, payment.amountCents);
             if (payment.tipRef.length() > 0) {
-                provider.refund(payment.tipRef, ride.tipCents);
+                tip = provider.refund(payment.tipRef, ride.tipCents);
             }
         } catch (IOException failed) {
             releaseRefund(rideId);
             throw unavailable("refund", failed);
         }
-        keepRefund(rideId, cut(reference, 64), cut(reason == null ? "" : reason.trim(), 255));
+        keepRefund(rideId, fare, tip, cut(reason == null ? "" : reason.trim(), 255));
         live.rideChanged(rideId, ride.state, ride.rider, ride.driver, "");
         return receipt("", true, rideId);
+    }
+
+    /// Asks the processor how each refund it took and had not finished came
+    /// out, and records the ones that have an answer.
+    ///
+    /// A processor can take a refund and only say later whether the bank
+    /// returned the money; Stripe answers such a refund `pending`, and it can
+    /// still end `failed` or `canceled`. Recorded as refunded at once, a
+    /// refund that then failed would show the rider and the admin money that
+    /// never came back, and nothing would look at it again. So it is kept as
+    /// [#REFUND_PENDING] and asked about here until it ends: [#REFUNDED] once
+    /// the fare's refund and the tip's have both succeeded, [#REFUND_FAILED]
+    /// as soon as either has not. A failed refund is not tried again from
+    /// here. Part of the money may have gone back, and the processor may
+    /// answer a repeat with the refund that failed, so what to do about it is
+    /// for a person with the processor's records.
+    ///
+    /// Not a transaction itself, as `Rides.settleLeftBehind` is not: the
+    /// processor is asked with none open, each refund is recorded in one of
+    /// its own, and what went wrong with the first refund that could not be
+    /// asked about is reported once the rest have been.
+    @Scheduled(fixedDelay = 60000, initialDelay = 45000, lock = "wayline-refunds")
+    public void settleRefunds() throws IOException {
+        List<Payment> pending = refundsPending();
+        Exception failed = null;
+        for (int iter = 0; iter < pending.size(); iter++) {
+            Payment payment = pending.get(iter);
+            try {
+                String outcome = refundOutcome(payment);
+                Ride ride = outcome == null ? null : endRefund(payment.rideId, outcome);
+                if (ride != null) {
+                    live.rideChanged(ride.id, ride.state, ride.rider, ride.driver, "");
+                }
+            } catch (IOException err) {
+                failed = failed == null ? err : failed;
+            } catch (RuntimeException err) {
+                failed = failed == null ? err : failed;
+            }
+        }
+        if (failed instanceof IOException) {
+            throw (IOException) failed;
+        }
+        if (failed instanceof RuntimeException) {
+            throw (RuntimeException) failed;
+        }
+    }
+
+    /// How a pending refund came out: [#REFUNDED], [#REFUND_FAILED], or null
+    /// while the processor still does not know.
+    private String refundOutcome(Payment payment) throws IOException {
+        String fare = provider.refundStatus(payment.refundRef);
+        String tip = payment.tipRefundRef.length() == 0 ? PaymentProvider.REFUND_SUCCEEDED
+                : provider.refundStatus(payment.tipRefundRef);
+        if (PaymentProvider.REFUND_FAILED.equals(fare)
+                || PaymentProvider.REFUND_FAILED.equals(tip)) {
+            return REFUND_FAILED;
+        }
+        if (PaymentProvider.REFUND_SUCCEEDED.equals(fare)
+                && PaymentProvider.REFUND_SUCCEEDED.equals(tip)) {
+            return REFUNDED;
+        }
+        return null;
+    }
+
+    @Transactional(readOnly = true)
+    private List<Payment> refundsPending() {
+        return repository.refundsPending(50);
+    }
+
+    /// Records how a refund ended and returns its ride, or null when another
+    /// pass recorded it first.
+    @Transactional
+    private Ride endRefund(String rideId, String outcome) {
+        if (!repository.endRefund(rideId, outcome,
+                REFUNDED.equals(outcome) ? System.currentTimeMillis() : 0L)) {
+            return null;
+        }
+        return repository.ride(rideId);
     }
 
     /// Marks the ride refunded and returns it as it was just before. Committed
@@ -537,6 +644,14 @@ public class Payments {
         }
         if (CASH.equals(ride.methodId)) {
             throw new ResponseStatusException(409, "A ride paid in cash has nothing to refund");
+        }
+        if (REFUND_PENDING.equals(ride.paymentStatus)) {
+            throw new ResponseStatusException(409,
+                    "That ride's refund is still with the payment processor");
+        }
+        if (REFUND_FAILED.equals(ride.paymentStatus)) {
+            throw new ResponseStatusException(409,
+                    "That ride's refund failed. Check it with the payment processor");
         }
         if (!claimed && !refundUnfinished(ride)) {
             throw new ResponseStatusException(409, "That ride has no payment to refund");
@@ -576,13 +691,22 @@ public class Payments {
         repository.releaseRefund(rideId);
     }
 
+    /// Records the refunds the processor took. Refunded when both are known
+    /// to have returned the money; otherwise the payment and its ride are
+    /// [#REFUND_PENDING], for [#settleRefunds] to finish.
     @Transactional
-    private void keepRefund(String rideId, String reference, String reason) {
+    private void keepRefund(String rideId, PaymentProvider.Refund fare,
+            PaymentProvider.Refund tip, String reason) {
+        boolean pending = fare.pending || (tip != null && tip.pending);
         Payment payment = repository.payment(rideId);
-        payment.status = REFUNDED;
-        payment.refundRef = reference;
+        payment.status = pending ? REFUND_PENDING : REFUNDED;
+        payment.refundRef = cut(fare.reference, 64);
+        payment.tipRefundRef = tip == null ? "" : cut(tip.reference, 64);
         payment.refundReason = reason;
-        payment.refundedAt = System.currentTimeMillis();
+        payment.refundedAt = pending ? 0L : System.currentTimeMillis();
+        if (pending) {
+            repository.ride(rideId).paymentStatus = REFUND_PENDING;
+        }
     }
 
     // -------------------------------------------------------------- receipts
@@ -664,10 +788,16 @@ public class Payments {
             dto.status = "failed";
         } else if (REFUNDED.equals(paid)) {
             dto.status = "refunded";
+        } else if (REFUND_PENDING.equals(paid)) {
+            dto.status = "refund_pending";
+        } else if (REFUND_FAILED.equals(paid)) {
+            dto.status = "refund_failed";
         } else {
             dto.status = "pending";
         }
-        dto.paidAt = PAID.equals(paid) || REFUNDED.equals(paid) ? paidAt : 0L;
+        // Every refund state follows a payment that was made.
+        dto.paidAt = PAID.equals(paid) || (paid != null && paid.startsWith("REFUND"))
+                ? paidAt : 0L;
         dto.pickupName = ride.pickupAddress;
         dto.dropoffName = ride.dropoffAddress;
         dto.distanceMeters = ride.distanceMeters;
@@ -755,6 +885,18 @@ public class Payments {
 
     private static String cut(String text, int max) {
         return text.length() > max ? text.substring(0, max) : text;
+    }
+
+    /// Deletes a customer record this server made and did not keep. A failure
+    /// is logged rather than answered: the request has its own answer, and
+    /// the record holds no card.
+    private void forgetQuietly(String reference) {
+        try {
+            provider.forgetCustomer(reference);
+        } catch (IOException failed) {
+            System.err.println("could not delete an unused payment customer: "
+                    + failed.getMessage());
+        }
     }
 
     /// A fault at the processor, as the app is told of it. What went wrong goes

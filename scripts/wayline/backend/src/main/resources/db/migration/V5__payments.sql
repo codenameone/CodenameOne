@@ -8,6 +8,9 @@ CREATE TABLE wl_payment (
     -- A ride's payment grows a tip, which is a second charge, and a refund.
     tip_ref VARCHAR(64) NOT NULL,
     refund_ref VARCHAR(64) NOT NULL,
+    -- The tip is refunded on its own, and a refund the processor has not
+    -- finished is asked about by both references.
+    tip_refund_ref VARCHAR(64) NOT NULL,
     refund_reason VARCHAR(255) NOT NULL,
     refunded_at BIGINT NOT NULL
 );

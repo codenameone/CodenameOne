@@ -54,6 +54,9 @@ public class Payment {
     @Column(name = "refund_ref", nullable = false)
     public String refundRef = "";
 
+    @Column(name = "tip_refund_ref", nullable = false)
+    public String tipRefundRef = "";
+
     @Column(name = "refund_reason", nullable = false)
     public String refundReason = "";
 
