@@ -67,7 +67,7 @@ public final class TextInputGeometry {
         int caret = state.getSelectionEnd(), first = caret, last = caret;
         if (client instanceof Component) {
             Component c = (Component) client;
-            int x = c.getAbsoluteX(), y = c.getAbsoluteY();
+            int x = c.getAbsoluteX() + c.getScrollX(), y = c.getAbsoluteY() + c.getScrollY();
             int[] offsets = new int[]{client.offsetAtPoint(x, y),
                 client.offsetAtPoint(x + c.getWidth(), y),
                 client.offsetAtPoint(x, y + c.getHeight()),

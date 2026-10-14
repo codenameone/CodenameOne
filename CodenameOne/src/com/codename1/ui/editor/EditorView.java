@@ -46,7 +46,7 @@ import com.codename1.ui.TopLevelContainer;
 /// This class provides the shared editing behavior. Feature layers (syntax highlighting, the gutter,
 /// styled rich text) subclass it and override `#paintContent(Graphics, int, int, int, int)` and the
 /// document/measurement hooks.
-public class EditorView extends Component implements TextInputClient {
+public class EditorView extends Component implements TextInputClient, com.codename1.ui.TextInputGeometry.Provider {
     private EditorHost host;
     private final boolean codeMode;
     private EditorDocument doc = new EditorDocument();
@@ -353,7 +353,14 @@ public class EditorView extends Component implements TextInputClient {
     }
 
     private int contentHeight() {
-        return getHeight() - getStyle().getPaddingTop() - getStyle().getPaddingBottom();
+        int visibleHeight = getHeight();
+        TopLevelContainer top = getTopLevelContainer();
+        if (top != null && top.getInvisibleAreaUnderVKB() > 0) {
+            int keyboardTop = top.asContainer().getAbsoluteY() + top.asContainer().getHeight()
+                    - top.getInvisibleAreaUnderVKB();
+            visibleHeight = Math.min(visibleHeight, Math.max(0, keyboardTop - getAbsoluteY()));
+        }
+        return visibleHeight - getStyle().getPaddingTop() - getStyle().getPaddingBottom();
     }
 
     // ---- selection helpers ----
@@ -2061,6 +2068,75 @@ public class EditorView extends Component implements TextInputClient {
     @Override
     public TextInputState getEditingState() {
         return new TextInputState(doc.getText(), getSelectionStart(), getSelectionEnd(), composingStart, composingEnd);
+    }
+
+    /// Measures all insertion positions with one bulk request per directional run. Subclasses
+    /// with styled runs or inline objects override this alongside measureColumnX().
+    protected int[] measureLineCaretPositions(int line, String text, Font font) {
+        if (BidiUtil.isTrivialLtr(text, isRTL())) {
+            return font.getTextRunPositions(text, false);
+        }
+        int[] positions = new int[text.length() + 1];
+        boolean[] assigned = new boolean[positions.length];
+        for (int[] run : bidiRuns(text, font)) {
+            int[] runPositions = font.getTextRunPositions(text.substring(run[0], run[1]), (run[2] & 1) != 0);
+            for (int i = 0; i < runPositions.length; i++) {
+                int column = run[0] + i;
+                if (!assigned[column]) {
+                    positions[column] = run[3] + runPositions[i];
+                    assigned[column] = true;
+                }
+            }
+        }
+        return positions;
+    }
+
+    @Override
+    public com.codename1.ui.TextInputGeometry getGeometrySnapshot() {
+        Font font = getEditorFont();
+        int first = lineAtContentY(scrollY);
+        int last = Math.min(doc.getLineCount() - 1, lineAtContentY(scrollY + Math.max(0, contentHeight())));
+        java.util.List<int[]> lines = new java.util.ArrayList<int[]>();
+        int size = 0;
+        int left = getAbsoluteX();
+        int right = left + getWidth();
+        for (int line = first; line <= last; line++) {
+            String text = doc.getLineText(line);
+            int[] positions = measureLineCaretPositions(line, text, font);
+            int x = left + getContentLeftInset() + lineContentOffsetX(line) - scrollX;
+            int y = getAbsoluteY() + getStyle().getPaddingTop() + lineTopContent(line) - scrollY;
+            int height = lineHeightAt(line);
+            int start = doc.getLineStart(line);
+            int[] points = new int[positions.length * 5];
+            int count = 0;
+            for (int col = 0; col < positions.length; col++) {
+                int px = x + positions[col];
+                // Keep visible positions and the endpoints of a character crossing either edge.
+                int previous = x + positions[Math.max(0, col - 1)];
+                int next = x + positions[Math.min(positions.length - 1, col + 1)];
+                if (Math.max(px, Math.max(previous, next)) < left
+                        || Math.min(px, Math.min(previous, next)) > right) {
+                    continue;
+                }
+                points[count++] = start + col;
+                points[count++] = px;
+                points[count++] = y;
+                points[count++] = Math.max(1, font.getHeight() / 16);
+                points[count++] = height;
+            }
+            int[] visible = new int[count];
+            System.arraycopy(points, 0, visible, 0, count);
+            lines.add(visible);
+            size += count;
+        }
+        int[] points = new int[size];
+        int at = 0;
+        for (int[] line : lines) {
+            System.arraycopy(line, 0, points, at, line.length);
+            at += line.length;
+        }
+        return new com.codename1.ui.TextInputGeometry(points, getSelectionStart(), getSelectionEnd(),
+                selectionRects(getSelectionStart(), getSelectionEnd()), getCaretRect());
     }
 
     @Override

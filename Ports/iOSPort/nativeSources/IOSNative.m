@@ -2764,6 +2764,49 @@ JAVA_INT com_codename1_impl_ios_IOSNative_stringWidthNative___long_java_lang_Str
     //XMLVM_END_WRAPPER
 }
 
+// One Core Text layout serves every UTF-16 insertion position. Measuring every
+// prefix separately makes long editor lines quadratic on each state update.
+void com_codename1_impl_ios_IOSNative_textRunPositionsNative___long_java_lang_String_boolean_int_1ARRAY(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer,
+        JAVA_OBJECT textObject, JAVA_BOOLEAN rtl, JAVA_OBJECT positionsObject) {
+    POOL_BEGIN();
+    NSString *text = toNSString(CN1_THREAD_STATE_PASS_ARG textObject);
+    CN1Font *font = (BRIDGE_CAST CN1Font *)(void *)peer;
+    if (font == nil) { font = [CN1Font systemFontOfSize:16.0]; }
+    NSDictionary *attributes = @{
+        NSFontAttributeName: font,
+        (BRIDGE_CAST id)kCTWritingDirectionAttributeName: @[@((rtl ? kCTWritingDirectionRightToLeft
+                : kCTWritingDirectionLeftToRight) | kCTWritingDirectionOverride)]
+    };
+    NSAttributedString *attributed = [[NSAttributedString alloc] initWithString:text attributes:attributes];
+    CTLineRef line = CTLineCreateWithAttributedString((BRIDGE_CAST CFAttributedStringRef)attributed);
+    JAVA_ARRAY array = (JAVA_ARRAY)positionsObject;
+    JAVA_ARRAY_INT *positions = (JAVA_ARRAY_INT *)CN1_ARRAY_DATA(array);
+    NSUInteger count = MIN((NSUInteger)array->length, text.length + 1);
+    for (NSUInteger i = 0; i < count; i++) { positions[i] = -1; }
+    // CTLineGetOffsetForStringIndex scans glyphs for each query, so calling it
+    // once per character is still quadratic even when the CTLine is shared.
+    // Enumerate the shaped caret edges in one pass instead.
+    CTLineEnumerateCaretOffsets(line, ^(double offset, CFIndex index, bool leading, bool *stop) {
+        CFIndex insertion = leading ? index : index + 1;
+        if (insertion >= 0 && insertion < count && (leading || positions[insertion] == -1)) {
+            positions[insertion] = (JAVA_ARRAY_INT)offset;
+        }
+    });
+    // Interior UTF-16 units of a surrogate pair or composed character share its
+    // logical leading edge. Core Text only enumerates legal cluster boundaries.
+    JAVA_ARRAY_INT previous = 0;
+    for (NSUInteger i = 0; i < count; i++) {
+        if (positions[i] == -1) { positions[i] = previous; }
+        previous = positions[i];
+    }
+    CFRelease(line);
+#if !__has_feature(objc_arc)
+    [attributed release];
+#endif
+    POOL_END();
+}
+
 JAVA_INT com_codename1_impl_ios_IOSNative_charWidthNative___long_char(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_CHAR n2)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_charWidthNative___long_char]

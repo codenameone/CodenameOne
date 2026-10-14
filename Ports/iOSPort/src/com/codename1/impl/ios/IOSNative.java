@@ -35,7 +35,7 @@ import java.util.Vector;
 /**
  * Abstraction of the underlying native API's
  */
-public final class IOSNative {
+public class IOSNative {
 
     native long beginBackgroundTask();
 
@@ -140,6 +140,7 @@ public final class IOSNative {
     native void nativeDrawImageRoundedMutable(long peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius);
     native void nativeTileImageGlobal(long peer, int alpha, int x, int y, int width, int height);
     native int stringWidthNative(long peer, String str);
+    native void textRunPositionsNative(long peer, String text, boolean rtl, int[] positions);
     native int charWidthNative(long peer, char ch);
     native int getFontHeightNative(long peer);
     native int fontAscentNative(long peer);

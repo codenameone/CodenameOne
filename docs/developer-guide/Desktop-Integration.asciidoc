@@ -86,14 +86,14 @@ The local `mac-source` build runs through ParparVM, where the chrome is the appl
 `codenameone_settings.properties` to draw title content in the toolbar, or use `native` for the
 standard OS title bar. The generated launcher applies the build hint before calling the
 application's `init()` method, so the first toolbar uses the requested mode. Without a hint the
-installed theme chooses the mode: the bundled Aqua theme requests `native`. If the theme does not
+installed theme chooses the mode: the bundled Aqua theme requests `native`. If the theme doesn't
 specify a mode, the port supplies its fallback.
 
 In `custom` mode, macOS retains its native close, minimize and zoom controls and window resizing.
 Dragging an empty part of the toolbar uses the OS window drag operation. Double-clicking it follows
 the user's macOS title-bar preference. Buttons (including disabled buttons), editable titles,
 scrollable regions and other interactive descendants are excluded from the drag area. The toolbar
-publishes these regions to the native port after layout; applications do not need their own window
+publishes these regions to the native port after layout; applications don't need their own window
 drag listeners. Other ports can implement `CodenameOneImplementation.setNativeWindowTitleBarRegions`
 to supply the same native behavior, or keep the existing toolbar drag fallback.
 

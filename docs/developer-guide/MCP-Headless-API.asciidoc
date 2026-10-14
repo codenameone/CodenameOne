@@ -87,7 +87,7 @@ A completed action returns `success` and a fresh `snapshot`, with `pending:false
 a blocking modal dialog, its nested event loop can return a snapshot with `pending:true` and
 `success:null` while the original handler is still running. This keeps the MCP connection available:
 use subsequent calls to inspect and dismiss the dialog, then verify the resulting state. A pending
-response is not confirmation that the original action completed successfully.
+response isn't confirmation that the original action completed successfully.
 
 === Publishing application tools
 

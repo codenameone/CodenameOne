@@ -2773,6 +2773,34 @@ public abstract class CodenameOneImplementation {
     /// the width of the given string in this font instance
     public abstract int stringWidth(Object nativeFont, String str);
 
+    /// Bulk caret measurement for a single directional text run. Ports with a shaping engine
+    /// should override this compatibility fallback to shape the run once.
+    public int[] getTextRunPositions(Object nativeFont, String text, boolean rtl) {
+        int[] positions = new int[text.length() + 1];
+        for (int i = 0; i < positions.length; i++) {
+            positions[i] = stringWidth(nativeFont, rtl ? text.substring(i) : text.substring(0, i));
+        }
+        return positions;
+    }
+
+    /// Revalidates a pure text client's form and reveals its caret after the keyboard changes
+    /// the available viewport. Called on the EDT, independently of legacy native text widgets.
+    protected void revealTextInputClient(com.codename1.ui.TextInputClient client) {
+        if (!(client instanceof Component)) {
+            return;
+        }
+        Component component = (Component) client;
+        Form form = component.getComponentForm();
+        if (form == null) {
+            return;
+        }
+        component.requestFocus();
+        form.revalidate();
+        int[] caret = client.getCaretRect();
+        component.scrollRectToVisible(caret[0] - component.getAbsoluteX(),
+                caret[1] - component.getAbsoluteY(), Math.max(1, caret[2]), Math.max(1, caret[3]), component);
+    }
+
     /// Return the width of the specific character when rendered alone
     ///
     /// #### Parameters

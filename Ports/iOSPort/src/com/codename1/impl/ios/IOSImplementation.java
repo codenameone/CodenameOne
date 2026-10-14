@@ -1064,6 +1064,10 @@ public class IOSImplementation extends CodenameOneImplementation {
                                 getRootPane(current).getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
                                 getRootPane(current).getUnselectedStyle().setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
                                 current.revalidate();
+                                if (tiClient instanceof Component) {
+                                    instance.revealTextInputClient(tiClient);
+                                    instance.refreshTextInputGeometry();
+                                }
                                 Display.getInstance().callSerially(new Runnable() {
                                     public void run() {
                                         updateNativeTextEditorFrame();
@@ -1076,7 +1080,10 @@ public class IOSImplementation extends CodenameOneImplementation {
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
                             if (current != null) {
-                                if (instance.currentEditing != null) {
+                                if (tiClient instanceof Component) {
+                                    instance.revealTextInputClient(tiClient);
+                                    instance.refreshTextInputGeometry();
+                                } else if (instance.currentEditing != null) {
                                     instance.doNotHideTextEditorSemaphore++;
                                     try {
                                         instance.currentEditing.requestFocus();
@@ -1760,6 +1767,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// separate ParparVM thread, so reading the live document there would race edits).
     private static volatile com.codename1.ui.TextInputState tiSnapshot;
     private static volatile com.codename1.ui.TextInputGeometry tiGeometry;
+    private int[] tiBounds;
     /// Generation of the last native-originated edit APPLIED to the Java document. Echoed back
     /// with every state push so the native shadow can drop echoes that predate a newer local
     /// edit (fast typing would otherwise regress the shadow text and caret).
@@ -1784,6 +1792,8 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.startTextInput(constraint, autoCorrect, autoCap, multiline,
                 st.getText(), st.getSelectionStart(), st.getSelectionEnd(),
                 config != null ? config.getActionType() : com.codename1.ui.TextInputConfig.ACTION_DEFAULT);
+        tiBounds = null;
+        refreshTextInputGeometry();
         return client;
     }
 
@@ -1797,18 +1807,32 @@ public class IOSImplementation extends CodenameOneImplementation {
         com.codename1.ui.TextInputClient c = tiClient;
         int[] r = c != null ? c.getCaretRect() : new int[]{0, 0, 0, 0};
         tiSnapshot = state;
-        tiGeometry = com.codename1.ui.TextInputGeometry.capture(c);
+        refreshTextInputGeometry();
         nativeInstance.updateTextInputState(state.getText(), state.getSelectionStart(), state.getSelectionEnd(),
                 r[0], r[1], r[2], r[3], tiNativeSeq);
-        // Push the editor component's absolute bounds so the native input view can gate its touch region to
-        // the editor (letting iOS draw its selection loupe/handles there) while passing other touches through.
-        if (c instanceof com.codename1.ui.Component) {
-            com.codename1.ui.Component comp = (com.codename1.ui.Component) c;
-            nativeInstance.setTextInputBounds(comp.getAbsoluteX() + comp.getScrollX(),
-                    comp.getAbsoluteY() + comp.getScrollY(),
-                    comp.getWidth(), comp.getHeight());
-        }
         tiKeepNativeCallbacksAlive();
+    }
+
+    // Called on the EDT after layout/painting as well as text changes. UIKit only reads the
+    // volatile immutable result; it never synchronously waits for the EDT to measure fonts.
+    private void refreshTextInputGeometry() {
+        com.codename1.ui.TextInputClient client = tiClient;
+        if (client == null) {
+            return;
+        }
+        tiGeometry = com.codename1.ui.TextInputGeometry.capture(client);
+        if (client instanceof Component) {
+            Component component = (Component) client;
+            int x = component.getAbsoluteX() + component.getScrollX();
+            int y = component.getAbsoluteY() + component.getScrollY();
+            int width = component.getWidth();
+            int height = component.getHeight();
+            if (tiBounds == null || tiBounds[0] != x || tiBounds[1] != y
+                    || tiBounds[2] != width || tiBounds[3] != height) {
+                tiBounds = new int[]{x, y, width, height};
+                nativeInstance.setTextInputBounds(x, y, width, height);
+            }
+        }
     }
 
     // The ti* callbacks below are invoked ONLY from native code (CN1TextInputView.m). ParparVM's dead
@@ -1851,6 +1875,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         tiClient = null;
         tiSnapshot = null;
         tiGeometry = null;
+        tiBounds = null;
         nativeInstance.stopTextInput();
     }
 
@@ -2012,8 +2037,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
+                if (c != tiClient) {
+                    return;
+                }
                 tiNativeSeq = seq;
                 c.setSelectionRange(start, end);
+                instance.updateTextInputState(c, c.getEditingState());
             }
         });
     }
@@ -2097,7 +2126,8 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// mode exists to make.
     @Override
     public void paintDirty() {
-        if (isDirectToDrawable() && hasPendingPaints()) {
+        boolean painted = hasPendingPaints();
+        if (isDirectToDrawable() && painted) {
             Form f = Display.getInstance().getCurrent();
             if (f != null) {
                 // Painted HERE rather than enqueued. repaint(f) would append,
@@ -2120,6 +2150,9 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
         }
         super.paintDirty();
+        if (painted && tiClient != null) {
+            refreshTextInputGeometry();
+        }
     }
 
     public void flushGraphics(int x, int y, int width, int height) {
@@ -5124,6 +5157,13 @@ public class IOSImplementation extends CodenameOneImplementation {
         return stringWidthNative(fnt.peer, str);
     }
     
+    @Override
+    public int[] getTextRunPositions(Object nativeFont, String text, boolean rtl) {
+        int[] positions = new int[text.length() + 1];
+        nativeInstance.textRunPositionsNative(f(nativeFont).peer, text, rtl, positions);
+        return positions;
+    }
+
     class FontStringCache {
         String txt;
         long peer;
