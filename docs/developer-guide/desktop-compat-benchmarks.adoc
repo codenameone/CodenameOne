@@ -33,35 +33,35 @@ Against the `jlink` image as installed the native build is smaller in 8 applicat
 
 Against the zipped `jlink` image the native build is smaller in 8 applications, of the 8 measured. Its best result is 6.0x for Mandelbrot explorer (6.5 MB against 38.9 MB).
 
-image::img/desktop-compat-macos-size.svg["Bar chart of the installed size of each application on macOS: the universal native application beside the jlink image",scaledwidth=90%]
+image::img/desktop-compat-macos-size.svg["Bar chart of the installed size of each application on macOS: the native application for arm64 beside the arm64 jlink image",scaledwidth=90%]
 
 .macOS: the distributed application (MB)
-[cols="<3,>1,>1,>1,>1,>1,>1,>1,>1",options="header"]
+[cols="<3,>1,>1,>1,>1,>1,>1,>1",options="header"]
 |===
-|Application |`jlink` image |`jlink` image, zipped |Native `.app` |arm64 slice |x86_64 slice |Native `.app`, zipped |JVM image / native `.app` |JVM zip / native zip
+|Application |`jlink` image, arm64 |`jlink` image, zipped |Native `.app`, arm64 |Native `.app`, zipped |Universal `.app` |JVM image / native `.app` |JVM zip / native zip
 
-|`swing-gallery` sample |51.4 |32.5 |49.6 |23.3 |23.9 |16.6 |1.0x |2.0x
+|`swing-gallery` sample |51.4 |32.5 |25.7 |8.7 |49.6 |2.0x |3.7x
 
-|SwingSet2, the JDK demo |50.7 |32.0 |49.5 |22.5 |23.1 |17.4 |1.0x |1.8x
+|SwingSet2, the JDK demo |50.7 |32.0 |26.4 |9.8 |49.5 |1.9x |3.3x
 
-|Notepad, the JDK demo |49.4 |30.7 |44.9 |21.0 |21.5 |15.1 |1.1x |2.0x
+|Notepad, the JDK demo |49.4 |30.7 |23.4 |8.0 |44.9 |2.1x |3.9x
 
-|Falling-blocks game |49.3 |30.6 |44.2 |20.6 |21.2 |14.8 |1.1x |2.1x
+|Falling-blocks game |49.3 |30.6 |23.0 |7.8 |44.2 |2.1x |3.9x
 
-|`javafx-gallery` sample |57.1 |37.1 |49.2 |23.0 |23.8 |16.4 |1.2x |2.3x
+|`javafx-gallery` sample |57.1 |37.1 |25.5 |8.6 |49.2 |2.2x |4.3x
 
-|Open-source 2048 game |57.1 |37.1 |46.0 |21.3 |21.9 |15.4 |1.2x |2.4x
+|Open-source 2048 game |57.1 |37.1 |24.0 |8.1 |46.0 |2.4x |4.6x
 
-|Address book |57.0 |37.0 |45.0 |20.9 |21.6 |15.1 |1.3x |2.5x
+|Address book |57.0 |37.0 |23.4 |7.9 |45.0 |2.4x |4.7x
 
-|Mandelbrot explorer |56.8 |36.9 |44.6 |20.8 |21.4 |14.9 |1.3x |2.5x
+|Mandelbrot explorer |56.8 |36.9 |23.2 |7.9 |44.6 |2.5x |4.7x
 |===
 
-The native `.app` is universal: it holds an arm64 and an x86_64 slice and runs on both. The `jlink` image holds the runtime of one architecture, so a JVM application that runs on both ships two of them.
+Both sides are built for arm64: the `jlink` image holds the arm64 runtime, and the native `.app` is the bundle with the arm64 slice of its executable only. The builder's default output is universal, with an x86_64 slice beside it; its size is in the last size column.
 
-Against the `jlink` image as installed the native build is smaller in 6 applications and within 5% of it in 2 applications, of the 8 measured. Its best result is 1.3x for Mandelbrot explorer (44.6 MB against 56.8 MB).
+Against the `jlink` image as installed the native build is smaller in 8 applications, of the 8 measured. Its best result is 2.5x for Mandelbrot explorer (23.2 MB against 56.8 MB).
 
-Against the zipped `jlink` image the native build is smaller in 8 applications, of the 8 measured. Its best result is 2.5x for Mandelbrot explorer (14.9 MB against 36.9 MB).
+Against the zipped `jlink` image the native build is smaller in 8 applications, of the 8 measured. Its best result is 4.7x for Mandelbrot explorer (7.9 MB against 36.9 MB).
 
 .iOS and Android: the distributed application (MB)
 [cols="<3,>2,>2,>2,>2,>2,>2",options="header"]
@@ -85,42 +85,26 @@ Against the zipped `jlink` image the native build is smaller in 8 applications, 
 |Mandelbrot explorer |25.3 |8.6 |16.3 |2.9 |5.5 |3.6
 |===
 
-.How much of the compatibility runtime an application keeps
+.How much of the toolkit layer an application keeps
 [cols="<3,<2,>1,>1,>1",options="header"]
 |===
-|Application |Layer |Classes handed to the builder |Classes translated |Kept
+|Application |Toolkit |Classes in the layer |Classes in the native build |Kept
 
-|`swing-gallery` sample |`swing-compat` |1039 |737 |71%
+|`swing-gallery` sample |Swing and AWT |1039 |737 |71%
 
-|`swing-gallery` sample |`compat-jdk` |345 |75 |22%
+|SwingSet2, the JDK demo |Swing and AWT |1039 |587 |56%
 
-|SwingSet2, the JDK demo |`swing-compat` |1039 |587 |56%
+|Notepad, the JDK demo |Swing and AWT |1039 |566 |54%
 
-|SwingSet2, the JDK demo |`compat-jdk` |345 |88 |26%
+|Falling-blocks game |Swing and AWT |1039 |538 |52%
 
-|Notepad, the JDK demo |`swing-compat` |1039 |566 |54%
+|`javafx-gallery` sample |JavaFX |901 |688 |76%
 
-|Notepad, the JDK demo |`compat-jdk` |345 |38 |11%
+|Open-source 2048 game |JavaFX |894 |413 |46%
 
-|Falling-blocks game |`swing-compat` |1039 |538 |52%
+|Address book |JavaFX |896 |461 |51%
 
-|Falling-blocks game |`compat-jdk` |344 |25 |7%
-
-|`javafx-gallery` sample |`javafx-compat` |901 |688 |76%
-
-|`javafx-gallery` sample |`compat-jdk` |345 |23 |7%
-
-|Open-source 2048 game |`javafx-compat` |894 |413 |46%
-
-|Open-source 2048 game |`compat-jdk` |345 |99 |29%
-
-|Address book |`javafx-compat` |896 |461 |51%
-
-|Address book |`compat-jdk` |345 |19 |6%
-
-|Mandelbrot explorer |`javafx-compat` |896 |442 |49%
-
-|Mandelbrot explorer |`compat-jdk` |345 |96 |28%
+|Mandelbrot explorer |JavaFX |896 |442 |49%
 |===
 
 .Linux: warm start, from process start to the first painted frame (ms, median with the range)

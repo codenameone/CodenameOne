@@ -401,6 +401,21 @@ build_cn1_macos() {
   find "$CN1/dist" -name '*.dSYM' -prune -exec rm -rf {} +
   printf '%s\n' "$(basename "$BUNDLE")" > "$CN1/executable.txt"
   record_cn1 "$CN1/dist/$(basename "$BUNDLE")/Contents/MacOS/$(basename "$BUNDLE" .app)" "$LOG" macos
+  # The jlink baseline holds the runtime of this machine's architecture only,
+  # so size a copy of the bundle with only that slice of the executable too:
+  # a universal bundle against one architecture is not like for like. The
+  # chapter compares size.cn1_macos_thin with the jlink image.
+  local THIN="$TMP/cn1-macos-thin" ARCH THIN_EXE
+  ARCH="$(uname -m)"
+  rm -rf "$THIN"
+  mkdir -p "$THIN"
+  cp -R "$CN1/dist/." "$THIN/"
+  THIN_EXE="$THIN/$(basename "$BUNDLE")/Contents/MacOS/$(basename "$BUNDLE" .app)"
+  if lipo "$THIN_EXE" -thin "$ARCH" -output "$THIN_EXE.thin" 2>/dev/null; then
+    mv "$THIN_EXE.thin" "$THIN_EXE"
+    util size --scratch "$TMP" "$THIN" > "$PARTS/size.cn1_macos_thin.json"
+  fi
+  rm -rf "$THIN"
 }
 
 build_cn1_windows() {

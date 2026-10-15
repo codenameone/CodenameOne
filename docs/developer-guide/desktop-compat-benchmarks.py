@@ -71,6 +71,12 @@ ORDER_OF_TABLES = ("linux-size", "macos-size", "mobile-size", "linux-layers", "l
                    "linux-startup-cold", "linux-memory-idle", "linux-memory-used", "linux-memory-peak",
                    "linux-idle-cpu")
 
+# The harness's name for each toolkit layer -> what the chapter calls it.
+# Module names are an implementation detail that moves, so none is printed.
+# The JDK classes the harness also counts are left out: they are part of the
+# Codename One runtime, not of a toolkit layer.
+LAYER_NAMES = (("swing-compat", "Swing and AWT"), ("javafx-compat", "JavaFX"))
+
 # A native build idling above this share of one core is repainting or polling
 # with nothing to do; the harness draws the line at the same place.
 IDLE_CPU_LIMIT = 1.0
@@ -456,8 +462,8 @@ def linux_tables(results):
     cpu.say(sentence)
     tables.append(cpu)
 
-    layers = Table("linux-layers", "How much of the compatibility runtime an application keeps",
-                   ["Application", "Layer", "Classes handed to the builder", "Classes translated", "Kept"],
+    layers = Table("linux-layers", "How much of the toolkit layer an application keeps",
+                   ["Application", "Toolkit", "Classes in the layer", "Classes in the native build", "Kept"],
                    ["<3", "<2", ">1", ">1", ">1"])
     for result in results:
         staged = dig(result, "layers", "staged_jar", "classes") or {}
@@ -465,12 +471,12 @@ def linux_tables(results):
         for key in sorted(dig(result, "layers") or {}):
             if key.startswith("translated_"):
                 translated = dig(result, "layers", key)
-        for layer in ("swing-compat", "javafx-compat", "compat-jdk"):
+        for layer, shown in LAYER_NAMES:
             if layer not in staged:
                 continue
             kept = dig(translated, layer, "classes")
             total = staged[layer]["classes"]
-            layers.add(LABEL[name_of(result)], "`%s`" % layer, total, EMPTY if kept is None else kept,
+            layers.add(LABEL[name_of(result)], shown, total, EMPTY if kept is None else kept,
                        EMPTY if kept is None or not total else "%.0f%%" % (100.0 * kept / total))
     if layers.rows:
         tables.append(layers)
@@ -478,43 +484,57 @@ def linux_tables(results):
 
 
 def macos_tables(results):
+    """The comparison is made for one architecture on both sides. The `jlink`
+    image holds the runtime of the machine it was built on, so the native side
+    is the same bundle with only that slice of its universal executable
+    (size.cn1_macos_thin, which bench.sh records). A result without it is
+    compared as a universal bundle, and every label then says so: universal
+    against one architecture is not like for like, and must not read as if it
+    were."""
+    if not results:
+        return []
+    thin = all(dig(r, "size", "cn1_macos_thin", "bytes") is not None for r in results)
+    key = "cn1_macos_thin" if thin else "cn1_macos"
+    native_name = "Native `.app`, arm64" if thin else "Native `.app`, universal (x86_64 + arm64)"
     table = Table("macos-size", "macOS: the distributed application (MB)",
-                  ["Application", "`jlink` image", "`jlink` image, zipped", "Native `.app`", "arm64 slice",
-                   "x86_64 slice", "Native `.app`, zipped", "JVM image / native `.app`", "JVM zip / native zip"],
-                  ["<3", ">1", ">1", ">1", ">1", ">1", ">1", ">1", ">1"])
+                  ["Application", "`jlink` image, arm64", "`jlink` image, zipped", native_name,
+                   "Native `.app`, zipped", "Universal `.app`", "JVM image / native `.app`",
+                   "JVM zip / native zip"],
+                  ["<3", ">1", ">1", ">1", ">1", ">1", ">1", ">1"])
     pairs = []
     installed = []
     for result in results:
         label = LABEL[name_of(result)]
         jlink = dig(result, "size", "baseline_jlink", "zip_bytes")
-        native = dig(result, "size", "cn1_macos", "zip_bytes")
-        slices = dig(result, "cn1_macos", "slice_bytes") or {}
+        native = dig(result, "size", key, "zip_bytes")
         ratio = value_ratio(jlink, native)
         pairs.append((label, ratio, megabytes(jlink) + " MB", megabytes(native) + " MB"))
         jlink_disk = dig(result, "size", "baseline_jlink", "bytes")
-        native_disk = dig(result, "size", "cn1_macos", "bytes")
+        native_disk = dig(result, "size", key, "bytes")
         disk_ratio = value_ratio(jlink_disk, native_disk)
         installed.append((label, disk_ratio, megabytes(jlink_disk) + " MB", megabytes(native_disk) + " MB"))
-        table.add(label, megabytes(jlink_disk), megabytes(jlink), megabytes(native_disk),
-                  megabytes(slices.get("arm64")), megabytes(slices.get("x86_64")), megabytes(native),
-                  show_ratio(disk_ratio), show_ratio(ratio))
+        table.add(label, megabytes(jlink_disk), megabytes(jlink), megabytes(native_disk), megabytes(native),
+                  megabytes(dig(result, "size", "cn1_macos", "bytes")), show_ratio(disk_ratio), show_ratio(ratio))
+    series_name = "Native .app, arm64" if thin else "Native .app, universal (x86_64 + arm64)"
     table.show(chart("macos-size", "macOS: the application as installed",
-                     "Bar chart of the installed size of each application on macOS: the universal native "
-                     "application beside the jlink image", "MB", [LABEL[name_of(r)] for r in results], [
-                         (("Native .app, universal", NATIVE_SERIES[1]),
-                          [megabytes_of(dig(r, "size", "cn1_macos", "bytes")) for r in results]),
-                         (("arm64 slice of the native .app", TUNED_SERIES[1]),
-                          [megabytes_of((dig(r, "cn1_macos", "slice_bytes") or {}).get("arm64"))
-                           for r in results]),
-                         (("JVM image, one architecture", DEFAULT_SERIES[1]),
+                     "Bar chart of the installed size of each application on macOS: the native application "
+                     + ("for arm64" if thin else "as a universal binary") + " beside the arm64 jlink image",
+                     "MB", [LABEL[name_of(r)] for r in results], [
+                         ((series_name, NATIVE_SERIES[1]),
+                          [megabytes_of(dig(r, "size", key, "bytes")) for r in results]),
+                         (("JVM image, jlink, arm64", DEFAULT_SERIES[1]),
                           [megabytes_of(dig(r, "size", "baseline_jlink", "bytes")) for r in results])],
                      where_measured(results)))
-    table.say("The native `.app` is universal: it holds an arm64 and an x86_64 slice and runs on both. "
-              "The `jlink` image holds the runtime of one architecture, so a JVM application that runs "
-              "on both ships two of them.")
+    if thin:
+        table.say("Both sides are built for arm64: the `jlink` image holds the arm64 runtime, and the native "
+                  "`.app` is the bundle with the arm64 slice of its executable only. The builder's default "
+                  "output is universal, with an x86_64 slice beside it; its size is in the last size column.")
+    else:
+        table.say("The native `.app` here is universal, with an x86_64 and an arm64 slice, while the `jlink` "
+                  "image holds the runtime of one architecture. The comparison favors the JVM.")
     table.say(tally(installed, "smaller", "larger", "the `jlink` image as installed"))
     table.say(tally(pairs, "smaller", "larger", "the zipped `jlink` image"))
-    return [table] if results else []
+    return [table]
 
 
 def mobile_tables(sizes):
