@@ -57,7 +57,7 @@ public interface DriverDocumentRepository extends CrudRepository<DriverDocument,
     /// Puts a new picture in place of a stored document's, and answers how
     /// many rows that changed: 0 says there was none of that kind to replace.
     /// A statement, so that the picture being replaced is never read.
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("update DriverDocument d set d.contentType = :type, d.status = :status, "
             + "d.uploadedAt = :at, d.data = :data where d.username = :username and d.kind = :kind")
     int replace(@Param("username") String username, @Param("kind") String kind,
@@ -65,7 +65,7 @@ public interface DriverDocumentRepository extends CrudRepository<DriverDocument,
             @Param("at") long at, @Param("data") String data);
 
     /// Sets the status of all of an account's documents.
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("update DriverDocument d set d.status = :status where d.username = :username")
     int markAll(@Param("username") String username, @Param("status") String status);
 

@@ -200,8 +200,12 @@ targets are rejected during query creation. Aggregate functions
 are allowed inside scalar nested queries, but not directly in assignments or bulk
 predicates. On MySQL and MariaDB, nested queries that read the bulk mutation target
 table are rejected during query creation. They flush pending
-managed changes, bypass per-entity callbacks and cascades, and clear the context
-so later reads can't reuse stale entities. Bulk assignments to required subtype
+managed changes and bypass per-entity callbacks and cascades. As in JPA, they
+don't clear the session: an entity it already manages stays managed and keeps
+the values it had before the statement, and a change made to it afterwards is
+still written. Call `refresh(entity)` to read what the statement wrote, or
+`clear()` and read again. An entity whose row a bulk DELETE removed fails with an
+`OptimisticLockException` if it's changed or removed afterwards. Bulk assignments to required subtype
 fields need a non-null literal or named parameter. Other assignment expressions
 are rejected for those fields. Literal and bound null assignments to primitive
 Java fields are rejected on both runtimes. Primitive assignments also reject
@@ -504,7 +508,16 @@ Derived methods support the following bounded grammar:
 `@Query` declares the existing JPQL subset. Every value argument requires a unique
 `@Param("name")` matching the query exactly. SQL values are bound, never
 interpolated. `@Modifying` is required for declared UPDATE/DELETE and forbidden
-for SELECT. Such methods return `int` or `void`. Native SQL uses
+for SELECT. Such methods return `int` or `void`. They behave like
+`executeUpdate()`: pending changes are flushed first, and the session is left as
+it is, so an entity the caller read before the call is still managed and a
+change made to it afterwards is written. `@Modifying(clearAutomatically = true)`
+empties the session after the statement instead, so what's read next comes from
+the database; an entity read before the call is then detached, and a later
+change to it is never written. `flushAutomatically` is accepted for
+compatibility with Spring Data and changes nothing, because the flush always
+happens. A derived `deleteBy` method is a bulk DELETE too and leaves the session
+the same way. Native SQL uses
 `@Query(value="...", nativeSql=true)` with the same named parameters, including
 repeated occurrences. Native parameters accept primitive and boxed scalar types,
 String, Date, BigInteger, BigDecimal, and `byte[]` BLOBs. Date values bind as epoch

@@ -195,8 +195,7 @@ public final class NativeQueryImpl<T> implements JpqlQuery<T> {
         Object[] args = arguments();
         session.requireTransaction();
         session.flush();
-        int changed = session.write(sql, args);
-        session.clear();
-        return changed;
+        // Like JPQL, the session is left as it is; see JpqlQueryImpl.executeUpdate.
+        return session.write(sql, args);
     }
 }

@@ -148,10 +148,11 @@ public class Drivers {
         DriverState state = drivers.findById(driver);
         // The time since the last report was time on line, unless it was so
         // long ago that the app had plainly stopped reporting. It is counted
-        // here and added last: adding it runs a bulk update, which flushes
-        // what this session changed and then detaches every row it holds. Run
-        // before the row below is changed, it detached the row first and the
-        // change was never written -- a driver going off line stayed on line.
+        // here, from the row as it was, and added last, once the row has been
+        // changed. Adding it is a bulk update that leaves the session as it
+        // is, so the row read here stays managed and its change is written
+        // either way; a statement marked clearAutomatically would detach it,
+        // and a change made after that would be lost.
         long since = state != null && state.isOnline() ? now - state.getLastSeen() : 0L;
         boolean first = state == null;
         if (first) {

@@ -57,7 +57,7 @@ public interface Session {
     /// scalar column of String, Long, Integer, Double, Boolean, or byte[]. Entity
     /// hydration and tuples are not supported. SQL identifiers and functions are
     /// database-specific. Bulk UPDATE/DELETE requires a transaction, flushes first,
-    /// and clears the persistence context after success, just like JPQL.
+    /// and leaves managed entities as they are, just like JPQL.
     /// @param <T> scalar result type
     /// @param statement one SELECT, UPDATE or DELETE statement
     /// @param resultType scalar class, or Object.class for mutations

@@ -394,7 +394,7 @@ public class Applications {
         profiles.hold(username);
         decide(by, username, APPROVED, "");
         documents.markAll(username, "accepted");
-        // Read after the statements above, which empty the session.
+        // Read after markAll, which empties the session.
         DriverApplication application = find(username);
         Profile profile = profiles.findById(username);
         if (application.getVehicleMake().length() > 0 && profile != null) {

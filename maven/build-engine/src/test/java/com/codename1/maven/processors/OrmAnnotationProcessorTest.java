@@ -80,6 +80,7 @@ public class OrmAnnotationProcessorTest {
             + "@Query(\"select coalesce(sum(e.score),0), count(e) from repositories.Note e where e.name=:name\") Object[] totals(@Param(\"name\") String name); "
             + "@Query(\"select e.name, e.score from repositories.Note e where e.name=:name order by e.score desc\") java.util.Optional<Object[]> best(@Param(\"name\") String name); "
             + "@Modifying @Query(\"update repositories.Note e set e.score=:score where e.name=:name\") int revise(@Param(\"name\") String name,@Param(\"score\") long score); "
+            + "@Modifying(clearAutomatically=true) @Query(\"update repositories.Note e set e.score=:score where e.name=:name\") void reviseAndClear(@Param(\"name\") String name,@Param(\"score\") long score); "
             + "@Query(value=\"SELECT COUNT(*) FROM repository_note WHERE name=:name\",nativeSql=true) Long nativeCount(@Param(\"name\") String name); }");
         // Compile the caller with the interface, before generating any implementation.
         sources.put("repositories.Check","package repositories; import com.codename1.orm.repository.*; import com.codename1.orm.session.*; public class Check { public static void run(Session s) { "
@@ -91,11 +92,20 @@ public class OrmAnnotationProcessorTest {
             + "if(byName.size()!=1 || !\"same\".equals(byName.get(0)[0]) || ((Number)byName.get(0)[1]).longValue()!=2 || ((Number)totals[0]).longValue()!=12 || ((Number)totals[1]).longValue()!=2 "
             + "|| ((Number)repo.best(\"same\").get()[1]).longValue()!=9 || repo.best(\"none\").isPresent()) throw new AssertionError(\"row projections\"); "
             + "if(repo.findByActiveTrue().get(0)!=a || repo.findByArchivedFalse().get(0)!=a || repo.findByNameAndScoreIn(\"same\",java.util.Arrays.asList(3L)).get(0)!=a || repo.findByScoreIn(new Long[]{9L}).get(0)!=b || repo.findByNameIn(java.util.Collections.singleton(\"same\")).size()!=2) throw new AssertionError(\"typed finders\"); "
-            + "s.beginTransaction(); a.score=4; if(repo.revise(\"same\",11)!=2 || s.contains(a)) throw new AssertionError(\"bulk\"); s.rollbackTransaction(); "
+            + "s.beginTransaction(); a.score=4; if(repo.revise(\"same\",11)!=2 || !s.contains(a) || a.score!=4) throw new AssertionError(\"bulk\"); s.rollbackTransaction(); "
             + "if(s.find(Note.class,a.id).score!=3) throw new AssertionError(\"rollback\"); "
             + "s.beginTransaction(); try { repo.findById(a.id); throw new AssertionError(\"SQLite should refuse row lock\"); } catch(UnsupportedOperationException expected) {} s.rollbackTransaction(); "
             + "s.beginTransaction(); if(repo.save(a)==a) throw new AssertionError(\"merge returns managed copy\"); repo.deleteById(b.id); s.commitTransaction(); "
-            + "s.beginTransaction(); if(repo.deleteByName(\"same\")!=1) throw new AssertionError(\"delete\");s.commitTransaction();if(repo.count()!=0) throw new AssertionError(); }}");
+            + "s.beginTransaction(); if(repo.deleteByName(\"same\")!=1) throw new AssertionError(\"delete\");s.commitTransaction();if(repo.count()!=0) throw new AssertionError(); "
+            // A @Modifying statement leaves the session as it is, as Spring Data does by
+            // default: an entity read before it is still managed, and a change made to it
+            // afterwards is written. clearAutomatically empties the session instead.
+            + "s.beginTransaction(); Note c=new Note(); c.name=\"kept\"; c.score=1; repo.insert(c); s.commitTransaction(); "
+            + "s.beginTransaction(); if(s.find(Note.class,c.id)!=c || repo.revise(\"kept\",5)!=1 || !s.contains(c) || c.score!=1) throw new AssertionError(\"bulk keeps the session\"); c.name=\"renamed\"; s.commitTransaction(); "
+            + "s.refresh(c); if(c.score!=5) throw new AssertionError(\"refresh after bulk\"); s.clear(); Note again=s.find(Note.class,c.id); "
+            + "if(again==c || !\"renamed\".equals(again.name) || again.score!=5) throw new AssertionError(\"change after bulk was lost\"); "
+            + "s.beginTransaction(); repo.reviseAndClear(\"renamed\",7); if(s.contains(again)) throw new AssertionError(\"clearAutomatically\"); again.name=\"dropped\"; s.commitTransaction(); "
+            + "Note last=s.find(Note.class,c.id); if(last==again || last.score!=7 || !\"renamed\".equals(last.name)) throw new AssertionError(\"after clear\"); }}");
         JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
         assertFalse(new File(classes,"repositories/NotesCn1Repository.class").exists());
         ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
@@ -568,7 +578,7 @@ public class OrmAnnotationProcessorTest {
             Object foundDog=s.find(base,dogId);assertFalse(s.isLoaded(foundDog,"keeper"));org.junit.Assert.assertNotNull(reader.getMethod("keeper",dogType).invoke(null,foundDog));
             List loaded=(List)reader.getMethod("animals",shelterType).invoke(null,s.find(shelterType,shelterId));org.junit.Assert.assertEquals(2,loaded.size());
             s.beginTransaction();catType.getField("lives").setInt(foundCat,8);s.commitTransaction();s.clear();org.junit.Assert.assertEquals(8,catType.getField("lives").getInt(s.find(base,catId)));
-            s.beginTransaction();org.junit.Assert.assertEquals(1,s.createQuery("update Cat c set c.name = :name").setParameter("name","Kitty").executeUpdate());s.commitTransaction();
+            s.beginTransaction();org.junit.Assert.assertEquals(1,s.createQuery("update Cat c set c.name = :name").setParameter("name","Kitty").executeUpdate());s.commitTransaction();s.clear();
             org.junit.Assert.assertEquals("Fido",base.getField("name").get(s.find(base,dogId)));
             s.beginTransaction();s.remove(s.find(shelterType,shelterId));s.commitTransaction();org.junit.Assert.assertEquals(0,s.query(base).count());
         } finally { s.close();em.close();loader.close(); }
@@ -733,14 +743,14 @@ public class OrmAnnotationProcessorTest {
                 try {
                     session.createTables();session.beginTransaction();Object entity=entry.newInstance();session.persist(entity);session.commitTransaction();Object id=entry.getField("id").get(entity);
                     for(String selection:Arrays.asList("count(i.id)","coalesce(sum(i.id),0)")) {
-                        session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.counter=(select "+selection+" from Other i)").executeUpdate());session.commitTransaction();org.junit.Assert.assertEquals(0,entry.getField("counter").getLong(session.find(entry,id)));
+                        session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.counter=(select "+selection+" from Other i)").executeUpdate());session.commitTransaction();session.clear();org.junit.Assert.assertEquals(0,entry.getField("counter").getLong(session.find(entry,id)));
                     }
                     session.beginTransaction();session.persist(other.newInstance());session.persist(other.newInstance());session.commitTransaction();
-                    session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.counter=(select count(i.id)+:delta from Other i)").setParameter("delta",3L).executeUpdate());session.commitTransaction();org.junit.Assert.assertEquals(5,entry.getField("counter").getLong(session.find(entry,id)));
+                    session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.counter=(select count(i.id)+:delta from Other i)").setParameter("delta",3L).executeUpdate());session.commitTransaction();session.clear();org.junit.Assert.assertEquals(5,entry.getField("counter").getLong(session.find(entry,id)));
                     session.beginTransaction();org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("update Entry e set e.counter=(select count(i.id)+:delta from Other i)").setParameter("delta",null).executeUpdate());session.rollbackTransaction();
                     for(String selection:Arrays.asList("count(i.id)","coalesce(sum(i.id),0)")) org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("update Entry e set e.counter=(select "+selection+" from Other i having count(i.id)<0)"));
                     org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("update Entry e set e.counter=(select sum(i.id) from Other i where i.id<0)"));
-                    session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.counter=coalesce((select count(i.id) from Other i having count(i.id)<0),7)").executeUpdate());session.commitTransaction();org.junit.Assert.assertEquals(7,entry.getField("counter").getLong(session.find(entry,id)));
+                    session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.counter=coalesce((select count(i.id) from Other i having count(i.id)<0),7)").executeUpdate());session.commitTransaction();session.clear();org.junit.Assert.assertEquals(7,entry.getField("counter").getLong(session.find(entry,id)));
                 } finally { session.close();db.close(); }
             }
         }
@@ -883,9 +893,9 @@ public class OrmAnnotationProcessorTest {
                     String[] fields={"amount","boxed","narrow","small","letter"};long[] lows={Integer.MIN_VALUE,Integer.MIN_VALUE,Byte.MIN_VALUE,Short.MIN_VALUE,Character.MIN_VALUE},highs={Integer.MAX_VALUE,Integer.MAX_VALUE,Byte.MAX_VALUE,Short.MAX_VALUE,Character.MAX_VALUE};
                     for(int i=0;i<fields.length;i++) {
                         for(long invalid:new long[]{lows[i]-1,highs[i]+1}) { final String predicateField=fields[i];org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.query(type).eq(predicateField,invalid));org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("select e from Entry e where e."+predicateField+"=:value").setParameter("value",invalid).list());session.beginTransaction();try { session.createQuery("update Entry e set e."+fields[i]+"=:value").setParameter("value",invalid).executeUpdate();fail("Stored out-of-range "+fields[i]); } catch(com.codename1.orm.session.PersistenceException expected) { session.rollbackTransaction(); } }
-                        for(long valid:new long[]{lows[i],highs[i]}) { session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e."+fields[i]+"=:value").setParameter("value",valid).executeUpdate());session.commitTransaction();Object stored=type.getField(fields[i]).get(session.find(type,1));org.junit.Assert.assertEquals(valid,stored instanceof Character?((Character)stored).charValue():((Number)stored).longValue()); }
+                        for(long valid:new long[]{lows[i],highs[i]}) { session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e."+fields[i]+"=:value").setParameter("value",valid).executeUpdate());session.commitTransaction();session.clear();Object stored=type.getField(fields[i]).get(session.find(type,1));org.junit.Assert.assertEquals(valid,stored instanceof Character?((Character)stored).charValue():((Number)stored).longValue()); }
                     }
-                    session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.boxed=NULL").executeUpdate());session.commitTransaction();org.junit.Assert.assertNull(type.getField("boxed").get(session.find(type,1)));
+                    session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.boxed=NULL").executeUpdate());session.commitTransaction();session.clear();org.junit.Assert.assertNull(type.getField("boxed").get(session.find(type,1)));
                     try { session.find(type,2147483648L);fail("Out-of-range identifier"); } catch(IllegalArgumentException expected) { assertTrue(expected.getMessage().contains("range")); }
                 } finally { session.close();db.close(); }
             }
@@ -1124,7 +1134,7 @@ public class OrmAnnotationProcessorTest {
                     }
                     org.junit.Assert.assertEquals(1,session.createQuery("select e from Entry e where e.code=:code").setParameter("code","Paris").list().size());
                     org.junit.Assert.assertEquals("Paris",session.createQuery("select 'Paris' from Entry e",String.class).first());
-                    session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.code='Rome' where e.code='Paris'").executeUpdate());session.commitTransaction();session.clear();org.junit.Assert.assertEquals("Rome",type.getField("code").get(session.find(type,id)));
+                    session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.code='Rome' where e.code='Paris'").executeUpdate());session.commitTransaction();session.clear();session.clear();org.junit.Assert.assertEquals("Rome",type.getField("code").get(session.find(type,id)));
                 } finally { session.close();db.close(); }
             }
         }
@@ -1303,9 +1313,9 @@ public class OrmAnnotationProcessorTest {
             org.junit.Assert.assertSame(s.find(type,id),s.createQuery("select e from converted.Entry e where e.code like :pattern escape :escape",type).setParameter("pattern",pattern).setParameter("escape","!").first());
             org.junit.Assert.assertNull(s.createQuery("select e from converted.Entry e where e.code like :pattern",type).setParameter("pattern",null).first());
             s.beginTransaction();Object replacement=codeType.getConstructor(String.class).newInstance("BULK");
-            org.junit.Assert.assertEquals(1,s.createQuery("update converted.Entry e set e.code = :code where e.id = :id").setParameter("code",replacement).setParameter("id",id).executeUpdate());s.commitTransaction();
+            org.junit.Assert.assertEquals(1,s.createQuery("update converted.Entry e set e.code = :code where e.id = :id").setParameter("code",replacement).setParameter("id",id).executeUpdate());s.commitTransaction();s.clear();
             org.junit.Assert.assertEquals("BULK",codeType.getField("value").get(type.getField("code").get(s.find(type,id))));
-            s.beginTransaction();org.junit.Assert.assertEquals(1,s.createQuery("update converted.Entry e set e.code = :code where e.id = :id").setParameter("code",null).setParameter("id",id).executeUpdate());s.commitTransaction();
+            s.beginTransaction();org.junit.Assert.assertEquals(1,s.createQuery("update converted.Entry e set e.code = :code where e.id = :id").setParameter("code",null).setParameter("id",id).executeUpdate());s.commitTransaction();s.clear();
             org.junit.Assert.assertNull(type.getField("code").get(s.find(type,id)));
             s.beginTransaction();s.createQuery("update converted.Entry e set e.code = :code").setParameter("code",codeType.getConstructor(String.class).newInstance("DEF")).executeUpdate();s.commitTransaction();
             s.beginTransaction();Object duplicate=type.newInstance();type.getField("code").set(duplicate,codeType.getConstructor(String.class).newInstance("DEF"));s.persist(duplicate);
@@ -1422,7 +1432,7 @@ public class OrmAnnotationProcessorTest {
                     org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.query(b).containsElement("tags","x"));
                     org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.query(holder).eq("member.aOnly",5L));
                     for(String query:Arrays.asList("select b.aOnly from querysiblings.B b","select b from querysiblings.B b join fetch b.aRelation","update querysiblings.B b set b.aOnly=7")) org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery(query));
-                    session.beginTransaction();org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.increment(b,id,"aOnly",1));org.junit.Assert.assertEquals(1,session.createQuery("update querysiblings.B b set b.bOnly=10").executeUpdate());session.commitTransaction();
+                    session.beginTransaction();org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.increment(b,id,"aOnly",1));org.junit.Assert.assertEquals(1,session.createQuery("update querysiblings.B b set b.bOnly=10").executeUpdate());session.commitTransaction();session.clear();
                     org.junit.Assert.assertEquals(Long.valueOf(5),session.createQuery("select a.aOnly from querysiblings.A a",Long.class).first());org.junit.Assert.assertEquals(10,b.getField("bOnly").getLong(session.find(b,id)));
                 } finally { session.close();db.close(); }
             }
@@ -1970,7 +1980,7 @@ public class OrmAnnotationProcessorTest {
                 try { session.createQuery("update requiredsub.Child c set c.code = NULL");fail("Bulk NULL must reject a required subtype column"); } catch(IllegalArgumentException expected) { assertTrue(expected.getMessage().contains("required subtype")); }
                 try { session.createQuery("update requiredsub.Base c set c.code = coalesce(NULL, NULL)");fail("Unknown-nullability bulk expressions must be rejected"); } catch(IllegalArgumentException expected) { assertTrue(expected.getMessage().contains("required subtype")); }
                 session.beginTransaction();try { session.createQuery("update requiredsub.Child c set c.code = :value").setParameter("value",null).executeUpdate();fail("Null bulk parameters must be rejected"); } catch(IllegalArgumentException expected) { assertTrue(expected.getMessage().contains("required subtype")); }session.rollbackTransaction();
-                session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update requiredsub.Child c set c.code = :value").setParameter("value","bulk").executeUpdate());session.commitTransaction();org.junit.Assert.assertEquals("bulk",childType.getField("code").get(session.find(childType,id)));
+                session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update requiredsub.Child c set c.code = :value").setParameter("value","bulk").executeUpdate());session.commitTransaction();session.clear();org.junit.Assert.assertEquals("bulk",childType.getField("code").get(session.find(childType,id)));
             } finally { session.close();em.close(); }
         }
     }

@@ -45,8 +45,11 @@ public interface PhoneCodeRepository extends CrudRepository<PhoneCode, String> {
     /// The code before it, when one is kept, is guessed at by the same guess,
     /// so its count goes up too; its own limit is applied by the caller.
     ///
+    /// Empties the session, so the code is read again after it with the guess
+    /// counted.
+    ///
     /// @return 1 for a guess taken, 0 when none is left or there is no code
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("update PhoneCode c set c.attempts = c.attempts + 1, "
             + "c.previousAttempts = c.previousAttempts + 1 "
             + "where c.username = :username and c.codeHash = :hash and c.attempts < :most")

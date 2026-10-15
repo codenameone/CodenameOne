@@ -741,9 +741,9 @@ public class Rides {
     /// The conditional update behind every change of state. True when this call
     /// is the one that made the change.
     ///
-    /// The session is empty afterwards, as after any bulk statement: a ride
-    /// read before this is no longer the session's, and is read again by
-    /// whoever needs it as it is now.
+    /// The session is empty afterwards, every move in `RideRepository` being
+    /// marked `clearAutomatically`: a ride read before this is no longer the
+    /// session's, and is read again by whoever needs it as it is now.
     ///
     /// @param ownerField [#RIDER] or [#DRIVER] to hold the change to rides
     ///     whose rider or driver is `actor`, or null for a change the server

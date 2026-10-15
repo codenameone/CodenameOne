@@ -45,9 +45,9 @@ public interface ProfileRepository extends CrudRepository<Profile, String> {
     /// holds the same account: the row is written, to the value it has, and a
     /// written row is kept by its writer until it commits. For a check and an
     /// insert that must not be interleaved with the same pair made for the
-    /// same account. Call it before anything is read: like every bulk
-    /// statement it empties the session, and what is read afterwards is what
-    /// the transaction before this one left.
+    /// same account. Call it before anything is read: what is read after it is
+    /// what the transaction before this one left, while a row read before it
+    /// was read before the wait.
     ///
     /// @return 1, or 0 when the account has no profile
     @Modifying

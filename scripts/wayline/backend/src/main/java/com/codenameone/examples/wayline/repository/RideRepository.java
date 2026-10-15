@@ -41,9 +41,9 @@ import java.util.List;
 /// answer: 1 when this call made the move, 0 when the ride was somewhere else by
 /// then. The database applies the rule and settles a race in the same breath:
 /// of two drivers accepting at once, or a rider cancelling as a driver accepts,
-/// one statement changes a row and the other changes none. Like every bulk
-/// statement each empties the session, so a ride read before it is read again
-/// after it.
+/// one statement changes a row and the other changes none. Each is marked
+/// `clearAutomatically`, which empties the session after it, so a ride read
+/// before it is read again after it, as the statement left it.
 ///
 /// A move comes in one of five shapes -- the rider's, the driver's, the
 /// driver's taking an offer, the driver's giving one back, and the server's --
@@ -124,14 +124,14 @@ public interface RideRepository extends CrudRepository<Ride, String> {
     // ---------------------------------------------------------------- moves
 
     /// Moves a ride of `rider`'s from one of `from` to `to`.
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("update Ride r set r.state = :to, r.updatedAt = :now "
             + "where r.id = :id and r.state in :from and r.rider = :rider")
     int moveAsRider(@Param("id") String id, @Param("from") RideState[] from,
             @Param("to") RideState to, @Param("now") long now, @Param("rider") String rider);
 
     /// Moves a ride of `driver`'s from one of `from` to `to`.
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("update Ride r set r.state = :to, r.updatedAt = :now "
             + "where r.id = :id and r.state in :from and r.driver = :driver")
     int moveAsDriver(@Param("id") String id, @Param("from") RideState[] from,
@@ -140,7 +140,7 @@ public interface RideRepository extends CrudRepository<Ride, String> {
     // tag::wayline-ride-move[]
     /// Takes an offer made to `driver`: refused once the offer has lapsed, as
     /// of `now`, even in the moment before the sweep takes it back.
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("update Ride r set r.state = :to, r.updatedAt = :now "
             + "where r.id = :id and r.state in :from and r.driver = :driver "
             + "and r.offerExpiresAt >= :now")
@@ -150,7 +150,7 @@ public interface RideRepository extends CrudRepository<Ride, String> {
 
     /// Gives a ride of `driver`'s back to be offered again, writing
     /// `newDriver` (empty: nobody) as its driver.
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("update Ride r set r.state = :to, r.updatedAt = :now, r.driver = :newDriver "
             + "where r.id = :id and r.state in :from and r.driver = :driver")
     int giveBack(@Param("id") String id, @Param("from") RideState[] from,
@@ -158,14 +158,14 @@ public interface RideRepository extends CrudRepository<Ride, String> {
             @Param("newDriver") String newDriver);
 
     /// A move the server makes itself, whoever has the ride.
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("update Ride r set r.state = :to, r.updatedAt = :now "
             + "where r.id = :id and r.state in :from")
     int moveByServer(@Param("id") String id, @Param("from") RideState[] from,
             @Param("to") RideState to, @Param("now") long now);
 
     /// Offers a ride to `driver` until `expiresAt`.
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("update Ride r set r.state = :to, r.updatedAt = :now, r.driver = :driver, "
             + "r.offerExpiresAt = :expiresAt where r.id = :id and r.state in :from")
     int offer(@Param("id") String id, @Param("from") RideState[] from,
@@ -177,7 +177,7 @@ public interface RideRepository extends CrudRepository<Ride, String> {
     /// Gives a completed ride its stars, if it has none yet. One statement,
     /// for the reason a move is one: a ride rated twice at the same moment is
     /// rated once.
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("update Ride r set r.stars = :stars where r.id = :id and r.rider = :rider "
             + "and r.state = 'COMPLETED' and r.stars = 0")
     int rate(@Param("id") String id, @Param("rider") String rider, @Param("stars") int stars);
@@ -192,27 +192,27 @@ public interface RideRepository extends CrudRepository<Ride, String> {
     /// Records how the charge for a ride came out. A statement of its own and
     /// not a change to a ride read earlier, so that it writes this one column
     /// whatever else was written to the ride meanwhile.
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("update Ride r set r.paymentStatus = :status where r.id = :id")
     int paymentStatus(@Param("id") String id, @Param("status") String status);
 
     /// Sets the tip of a completed, paid ride that has none.
     ///
     /// @return 1 for the one caller whose tip it now is
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("update Ride r set r.tipCents = :tip where r.id = :id and r.rider = :rider "
             + "and r.state = 'COMPLETED' and r.paymentStatus = 'PAID' and r.tipCents = 0")
     int claimTip(@Param("id") String id, @Param("rider") String rider, @Param("tip") long tip);
 
     /// Takes back a tip that could not be charged.
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("update Ride r set r.tipCents = 0 where r.id = :id")
     int releaseTip(@Param("id") String id);
 
     /// Marks a paid ride refunded.
     ///
     /// @return 1 for the one caller that is to refund it
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("update Ride r set r.paymentStatus = 'REFUNDED' where r.id = :id "
             + "and r.paymentStatus = 'PAID'")
     int claimRefund(@Param("id") String id);

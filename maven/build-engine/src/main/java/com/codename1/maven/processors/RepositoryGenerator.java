@@ -106,7 +106,14 @@ final class RepositoryGenerator {
         Type result = Type.getReturnType(method.getDescriptor());
         String name = method.getName();
         AnnotationValues query = method.getAnnotation(PREFIX + "Query;"), lock = method.getAnnotation(PREFIX + "Lock;");
-        boolean modifying = method.getAnnotation(PREFIX + "Modifying;") != null;
+        AnnotationValues modifyingValues = method.getAnnotation(PREFIX + "Modifying;");
+        boolean modifying = modifyingValues != null;
+        // Spring Data's default: the session is left as it is, so an entity the
+        // caller read before the statement is still managed and a change made to it
+        // afterwards is still written. clearAutomatically empties it after the
+        // statement. flushAutomatically needs no code: executeUpdate always flushes
+        // first (see Modifying.flushAutomatically).
+        boolean clearAfter = modifying && modifyingValues.getBoolOrDefault("clearAutomatically", false);
         if (method.getSignature() != null && method.getSignature().startsWith("<")) throw invalid("Generic methods are unsupported");
         if (lock != null) {
             if (!name.equals("findById") || args.length != 1 || !args[0].getClassName().equals(keyType)
@@ -246,7 +253,9 @@ final class RepositoryGenerator {
         for (int i = 0; i < names.size(); i++) body.append("q.setParameter(").append(quote(names.get(i))).append(",p").append(i).append(");");
         if (page >= 0) body.append("q.offset(p").append(page).append(".getOffset()).limit(p").append(page).append(".getSize());");
         if (limit > 0) body.append("q.limit(").append(limit).append(");");
-        body.append(mutation ? scalar.equals("void") ? "q.executeUpdate();" : "return q.executeUpdate();"
+        body.append(mutation && clearAfter ? scalar.equals("void") ? "q.executeUpdate();session.clear();"
+                        : "int changed=q.executeUpdate();session.clear();return changed;"
+                : mutation ? scalar.equals("void") ? "q.executeUpdate();" : "return q.executeUpdate();"
                 : count ? "return q.first().longValue();" : exists ? "return q.first().longValue()!=0;"
                 : list ? "return q.list();" : optional ? "return java.util.Optional.ofNullable(q.first());"
                 : "return q.first();");

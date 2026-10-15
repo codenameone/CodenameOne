@@ -37,8 +37,9 @@ import java.util.List;
 /// Every move of an application from one status to another is one conditional
 /// statement answering how many rows it changed, so that of two callers moving
 /// the same application out of the same status the count is 1 for one of them
-/// and 0 for the other. Each empties the session: an application read before
-/// it has to be read again.
+/// and 0 for the other. Each is marked `clearAutomatically`, which empties the
+/// session after it, so an application read before a move is read again after
+/// it, as the move left it.
 @Repository(entity = DriverApplication.class, key = String.class)
 public interface DriverApplicationRepository extends CrudRepository<DriverApplication, String> {
     /// The applications of these accounts; none for a name that made none.
@@ -70,7 +71,7 @@ public interface DriverApplicationRepository extends CrudRepository<DriverApplic
     List<DriverApplication> inStatus(@Param("status") String status, PageRequest page);
 
     /// Moves an application from status `from` to `to`, recording the review.
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("update DriverApplication a set a.status = :to, a.rejectionReason = :reason, "
             + "a.reviewedAt = :at, a.reviewedBy = :by "
             + "where a.username = :username and a.status = :from")
@@ -79,7 +80,7 @@ public interface DriverApplicationRepository extends CrudRepository<DriverApplic
             @Param("by") String by);
 
     /// Marks an application `approved` unless it already is.
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("update DriverApplication a set a.status = :to, a.rejectionReason = '', "
             + "a.reviewedAt = :at, a.reviewedBy = :by "
             + "where a.username = :username and a.status <> :to")
@@ -88,7 +89,7 @@ public interface DriverApplicationRepository extends CrudRepository<DriverApplic
 
     /// Hands an application in: from the status it was read in to `to`, with
     /// the last rejection's reason cleared.
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("update DriverApplication a set a.status = :to, a.submittedAt = :at, "
             + "a.rejectionReason = '' where a.username = :username and a.status = :from")
     int submit(@Param("username") String username, @Param("from") String from,
