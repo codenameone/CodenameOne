@@ -26,13 +26,14 @@ import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Scheduled;
 import com.codename1.backend.annotations.Transactional;
+import com.codename1.orm.repository.PageRequest;
 import com.codenameone.examples.wayline.Ids;
-import com.codenameone.examples.wayline.account.ProfileRepository;
 import com.codenameone.examples.wayline.api.CardDto;
 import com.codenameone.examples.wayline.api.PaymentConfigDto;
 import com.codenameone.examples.wayline.api.PaymentMethodDto;
 import com.codenameone.examples.wayline.api.PaymentSetupDto;
 import com.codenameone.examples.wayline.api.ReceiptDto;
+import com.codenameone.examples.wayline.api.RideState;
 import com.codenameone.examples.wayline.domain.Payment;
 import com.codenameone.examples.wayline.domain.PaymentCustomer;
 import com.codenameone.examples.wayline.domain.PaymentMethod;
@@ -40,6 +41,12 @@ import com.codenameone.examples.wayline.domain.PaymentSetup;
 import com.codenameone.examples.wayline.domain.Profile;
 import com.codenameone.examples.wayline.domain.Ride;
 import com.codenameone.examples.wayline.live.LiveHub;
+import com.codenameone.examples.wayline.repository.PaymentCustomerRepository;
+import com.codenameone.examples.wayline.repository.PaymentMethodRepository;
+import com.codenameone.examples.wayline.repository.PaymentRepository;
+import com.codenameone.examples.wayline.repository.PaymentSetupRepository;
+import com.codenameone.examples.wayline.repository.ProfileRepository;
+import com.codenameone.examples.wayline.repository.RideRepository;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -84,15 +91,28 @@ public class Payments {
     /// A setup not finished within this long is abandoned.
     private static final long SETUP_MILLIS = 3600000L;
     private static final long MAX_TIP_CENTS = 20000L;
+    /// The states of a ride that has not ended.
+    private static final RideState[] UNDER_WAY = {RideState.REQUESTED, RideState.OFFERED,
+        RideState.ACCEPTED, RideState.ARRIVED, RideState.IN_PROGRESS};
 
-    private final PaymentRepository repository;
+    private final PaymentMethodRepository cards;
+    private final PaymentSetupRepository setups;
+    private final PaymentCustomerRepository customers;
+    private final PaymentRepository payments;
+    private final RideRepository rides;
     private final ProfileRepository profiles;
     private final PaymentProvider provider;
     private final LiveHub live;
 
-    public Payments(PaymentRepository repository, ProfileRepository profiles,
-            PaymentProvider provider, LiveHub live) {
-        this.repository = repository;
+    public Payments(PaymentMethodRepository cards, PaymentSetupRepository setups,
+            PaymentCustomerRepository customers, PaymentRepository payments,
+            RideRepository rides, ProfileRepository profiles, PaymentProvider provider,
+            LiveHub live) {
+        this.cards = cards;
+        this.setups = setups;
+        this.customers = customers;
+        this.payments = payments;
+        this.rides = rides;
         this.profiles = profiles;
         this.provider = provider;
         this.live = live;
@@ -111,7 +131,7 @@ public class Payments {
     /// default: a card when one is marked, cash otherwise.
     @Transactional(readOnly = true)
     public List<PaymentMethodDto> methods(String username) throws IOException {
-        List<PaymentMethod> rows = repository.cards(username);
+        List<PaymentMethod> rows = cards.findByUsernameOrderByCreatedAtAscIdAsc(username);
         List<PaymentMethodDto> out = new ArrayList<PaymentMethodDto>();
         boolean marked = false;
         for (int iter = 0; iter < rows.size(); iter++) {
@@ -126,8 +146,8 @@ public class Payments {
     /// The id of the user's default method.
     @Transactional(readOnly = true)
     public String defaultMethod(String username) throws IOException {
-        PaymentMethod row = repository.defaultCard(username);
-        return row == null ? CASH : row.id;
+        PaymentMethod row = cards.findFirstByUsernameAndPreferredTrue(username);
+        return row == null ? CASH : row.getId();
     }
 
     /// Begins adding a card.
@@ -167,11 +187,11 @@ public class Payments {
     /// yet. Answers 409 for an account that has all the cards it may.
     @Transactional(readOnly = true)
     private String customerForSetup(String username) {
-        if (repository.countCards(username) >= MAX_CARDS) {
+        if (cards.countByUsername(username) >= MAX_CARDS) {
             throw new ResponseStatusException(409, "Remove a card before adding another");
         }
-        PaymentCustomer row = repository.customer(username);
-        return row == null ? null : row.reference;
+        PaymentCustomer row = customers.findById(username);
+        return row == null ? null : row.getReference();
     }
 
     /// Keeps the reference the processor made for a rider on first use, and
@@ -184,33 +204,33 @@ public class Payments {
         // it would otherwise insert a second and fail on the key. With no
         // profile to hold the account was closed meanwhile, and its clean-up
         // has already run: a row kept now would never be deleted.
-        if (!profiles.hold(username)) {
+        if (profiles.hold(username) == 0) {
             return null;
         }
-        PaymentCustomer row = repository.customer(username);
+        PaymentCustomer row = customers.findById(username);
         if (row == null) {
             row = new PaymentCustomer();
-            row.username = username;
-            row.reference = reference;
-            repository.add(row);
+            row.setUsername(username);
+            row.setReference(reference);
+            customers.insert(row);
         }
-        return row.reference;
+        return row.getReference();
     }
 
     @Transactional
     private void keepSetup(String username, String id, String reference) {
         // As in keepCustomer: an account closed while the processor was asked
         // gets no row its clean-up has already missed.
-        if (!profiles.hold(username)) {
+        if (profiles.hold(username) == 0) {
             throw new ResponseStatusException(404, "No such account");
         }
         PaymentSetup row = new PaymentSetup();
-        row.id = id;
-        row.username = username;
-        row.reference = reference;
-        row.createdAt = System.currentTimeMillis();
-        row.completed = false;
-        repository.add(row);
+        row.setId(id);
+        row.setUsername(username);
+        row.setReference(reference);
+        row.setCreatedAt(System.currentTimeMillis());
+        row.setCompleted(false);
+        setups.insert(row);
     }
 
     /// Finishes adding a card and returns it. The first card an account saves
@@ -234,13 +254,14 @@ public class Payments {
     /// open, in that order. Answers 404 for a setup that is not.
     @Transactional(readOnly = true)
     private String[] openSetup(String username, String setupId) {
-        PaymentSetup setup = repository.setup(username, setupId);
-        if (setup == null || setup.completed
-                || setup.createdAt < System.currentTimeMillis() - SETUP_MILLIS) {
+        PaymentSetup setup = setupId == null || setupId.length() == 0 || setupId.length() > 32
+                ? null : setups.findFirstByIdAndUsername(setupId, username);
+        if (setup == null || setup.isCompleted()
+                || setup.getCreatedAt() < System.currentTimeMillis() - SETUP_MILLIS) {
             throw new ResponseStatusException(404, "No such card setup");
         }
-        PaymentCustomer customer = repository.customer(username);
-        return new String[] {customer == null ? "" : customer.reference, setup.reference};
+        PaymentCustomer customer = customers.findById(username);
+        return new String[] {customer == null ? "" : customer.getReference(), setup.getReference()};
     }
 
     /// Closes the setup and saves its card, together or not at all.
@@ -249,7 +270,7 @@ public class Payments {
             PaymentProvider.Card card) {
         // Claimed with a conditional update, so a request sent twice saves the
         // card once.
-        if (!repository.claimSetup(setupId)) {
+        if (setups.claim(setupId) != 1) {
             throw new ResponseStatusException(404, "No such card setup");
         }
         // Counted again here, where the card is saved: starting a setup checks
@@ -257,27 +278,27 @@ public class Payments {
         // one. The account's row at the processor is written first, so two
         // setups finishing together take turns and the second counts the
         // first one's card. Refusing rolls the claim back with everything else.
-        repository.touchCustomer(username);
-        if (repository.countCards(username) >= MAX_CARDS) {
+        customers.hold(username);
+        if (cards.countByUsername(username) >= MAX_CARDS) {
             throw new ResponseStatusException(409, "Remove a card before adding another");
         }
-        boolean first = repository.defaultCard(username) == null;
+        boolean first = cards.findFirstByUsernameAndPreferredTrue(username) == null;
         // Cards are listed in the order they were added, and two added in the
         // same millisecond would have no order: the later is stamped after
         // the one before it.
-        Long newest = repository.newestCardAt(username);
+        Long newest = cards.newestAt(username);
         long after = newest == null ? 0L : newest.longValue() + 1L;
         PaymentMethod row = new PaymentMethod();
-        row.id = id;
-        row.username = username;
-        row.brand = cut(card.brand, 24);
-        row.last4 = cut(card.last4, 4);
-        row.expMonth = card.expMonth;
-        row.expYear = card.expYear;
-        row.token = card.token;
-        row.preferred = first;
-        row.createdAt = Math.max(System.currentTimeMillis(), after);
-        repository.add(row);
+        row.setId(id);
+        row.setUsername(username);
+        row.setBrand(cut(card.brand, 24));
+        row.setLast4(cut(card.last4, 4));
+        row.setExpMonth(card.expMonth);
+        row.setExpYear(card.expYear);
+        row.setToken(card.token);
+        row.setPreferred(first);
+        row.setCreatedAt(Math.max(System.currentTimeMillis(), after));
+        cards.insert(row);
         return card(row);
     }
 
@@ -289,15 +310,15 @@ public class Payments {
         profiles.hold(username);
         PaymentMethod chosen = CASH.equals(id) ? null : owned(username, id);
         // The cards are few, and each is written only if its mark changed.
-        List<PaymentMethod> rows = repository.cards(username);
+        List<PaymentMethod> rows = cards.findByUsernameOrderByCreatedAtAscIdAsc(username);
         for (int iter = 0; iter < rows.size(); iter++) {
             PaymentMethod row = rows.get(iter);
-            row.preferred = chosen != null && row.id.equals(chosen.id);
+            row.setPreferred(chosen != null && row.getId().equals(chosen.getId()));
         }
         if (chosen == null) {
             return cash(true);
         }
-        chosen.preferred = true;
+        chosen.setPreferred(true);
         return card(chosen);
     }
 
@@ -314,18 +335,18 @@ public class Payments {
         profiles.hold(username);
         PaymentMethod row = owned(username, id);
         PaymentMethodDto dto = card(row);
-        if (repository.paysForRideUnderWay(username, id)) {
+        if (rides.existsByRiderAndMethodIdAndStateIn(username, id, UNDER_WAY)) {
             throw new ResponseStatusException(409, "That card is paying for a ride under way");
         }
         // A ride that ended with nobody able to say whether its card was
         // charged is asked about again, by the card's token. With the card
         // gone the question could not be put: the ride would be written down
         // as unpaid, whether or not the first attempt took the money.
-        if (repository.awaitsCharge(username, id, retriedSince())) {
+        if (awaitsCharge(username, id, retriedSince())) {
             throw new ResponseStatusException(409,
                     "That card is still paying for a ride. Try again in a few minutes");
         }
-        repository.remove(row);
+        cards.deleteById(row.getId());
         dto.isDefault = false;
         return dto;
     }
@@ -341,7 +362,7 @@ public class Payments {
         if (CASH.equals(id)) {
             return new String[] {CASH, CASH_LABEL};
         }
-        PaymentMethod row = repository.card(username, id);
+        PaymentMethod row = card(username, id);
         if (row == null) {
             throw new ResponseStatusException(400, "Choose a way to pay");
         }
@@ -364,15 +385,15 @@ public class Payments {
     /// held, which nothing else in this class does.
     @Transactional(rollbackFor = IOException.class)
     public void forget(String username) throws IOException {
-        if (repository.awaitsCharge(username, null, retriedSince())) {
+        if (awaitsCharge(username, null, retriedSince())) {
             throw new ResponseStatusException(409,
                     "A ride is still being paid for. Try again in a few minutes");
         }
-        PaymentCustomer customer = repository.customer(username);
-        String reference = customer == null ? "" : customer.reference;
-        repository.removeCards(username);
-        repository.removeSetups(username);
-        repository.removeCustomer(username);
+        PaymentCustomer customer = customers.findById(username);
+        String reference = customer == null ? "" : customer.getReference();
+        cards.deleteByUsername(username);
+        setups.deleteByUsername(username);
+        customers.deleteByUsername(username);
         if (reference != null && reference.length() > 0) {
             provider.forgetCustomer(reference);
         }
@@ -403,48 +424,48 @@ public class Payments {
     /// would never be looked for, and the rider would have paid for a ride
     /// that says they did not.
     public String settle(Ride ride) throws IOException {
-        Payment kept = payment(ride.id);
+        Payment kept = payment(ride.getId());
         if (kept != null) {
-            return kept.status;
+            return kept.getStatus();
         }
-        long amount = ride.fareCents + ride.feeCents;
+        long amount = ride.getFareCents() + ride.getFeeCents();
         String status = PAID;
         String reference = CASH;
-        if (!CASH.equals(ride.methodId)) {
+        if (!CASH.equals(ride.getMethodId())) {
             try {
-                reference = charge("ride-" + ride.id, ride.rider, ride.methodId, amount,
-                        ride.currency, "Wayline ride");
+                reference = charge("ride-" + ride.getId(), ride.getRider(), ride.getMethodId(), amount,
+                        ride.getCurrency(), "Wayline ride");
             } catch (PaymentDeclinedException declined) {
                 // The ride and the amount, never the card.
-                System.err.println("payment for ride " + ride.id + " failed: "
+                System.err.println("payment for ride " + ride.getId() + " failed: "
                         + declined.getMessage());
                 status = FAILED;
                 reference = "";
             } catch (IOException unknown) {
-                System.err.println("payment for ride " + ride.id + " is not known yet: "
+                System.err.println("payment for ride " + ride.getId() + " is not known yet: "
                         + unknown.getMessage());
                 return PENDING;
             }
         }
-        keepPayment(ride.id, amount, ride.currency, status, reference);
+        keepPayment(ride.getId(), amount, ride.getCurrency(), status, reference);
         return status;
     }
 
     @Transactional
     private void keepPayment(String rideId, long amount, String currency, String status,
             String reference) {
-        if (repository.payment(rideId) != null) {
+        if (payments.findById(rideId) != null) {
             // Written while this request was at the processor.
             return;
         }
         Payment row = new Payment();
-        row.rideId = rideId;
-        row.amountCents = amount;
-        row.currency = currency;
-        row.status = status;
-        row.providerRef = reference;
-        row.createdAt = System.currentTimeMillis();
-        repository.add(row);
+        row.setRideId(rideId);
+        row.setAmountCents(amount);
+        row.setCurrency(currency);
+        row.setStatus(status);
+        row.setProviderRef(reference);
+        row.setCreatedAt(System.currentTimeMillis());
+        payments.insert(row);
     }
 
     /// Tips the driver of a completed ride, once. Charged to the method the
@@ -458,11 +479,11 @@ public class Payments {
     /// one. Until then the ride cannot be refunded -- see [#claimRefund].
     public ReceiptDto tip(String rider, String rideId, long amountCents) throws IOException {
         Ride ride = claimTip(rider, rideId, amountCents);
-        if (!CASH.equals(ride.methodId)) {
+        if (!CASH.equals(ride.getMethodId())) {
             String reference;
             try {
-                reference = charge("tip-" + rideId, rider, ride.methodId, amountCents,
-                        ride.currency, "Wayline tip");
+                reference = charge("tip-" + rideId, rider, ride.getMethodId(), amountCents,
+                        ride.getCurrency(), "Wayline tip");
             } catch (PaymentDeclinedException declined) {
                 releaseTip(rideId);
                 throw new ResponseStatusException(402, declined.getMessage());
@@ -472,7 +493,7 @@ public class Payments {
             keepTip(rideId, reference);
         }
         // The driver's earnings changed; their app reads them again.
-        live.rideChanged(rideId, ride.state, rider, ride.driver, "");
+        live.rideChanged(rideId, ride.getState(), rider, ride.getDriver(), "");
         return receipt(rider, false, rideId);
     }
 
@@ -480,8 +501,8 @@ public class Payments {
     /// before. Committed before the card is charged.
     @Transactional
     private Ride claimTip(String rider, String rideId, long amountCents) {
-        Ride ride = repository.ride(rideId);
-        if (ride == null || !rider.equals(ride.rider)) {
+        Ride ride = ride(rideId);
+        if (ride == null || !rider.equals(ride.getRider())) {
             throw new ResponseStatusException(404, "No such ride");
         }
         if (amountCents < 1L || amountCents > MAX_TIP_CENTS) {
@@ -489,7 +510,7 @@ public class Payments {
         }
         // Claimed before the charge: of two requests, one changes the row and
         // only that one charges.
-        if (!repository.claimTip(rideId, rider, amountCents) && !tipLeftUnknown(ride, amountCents)) {
+        if (rides.claimTip(rideId, rider, amountCents) != 1 && !tipLeftUnknown(ride, amountCents)) {
             throw new ResponseStatusException(409, "That ride cannot be tipped now");
         }
         return ride;
@@ -499,24 +520,24 @@ public class Payments {
     /// for it: one whose charge was asked for and never answered. Asking again
     /// is safe only for the same amount, the key being the ride's.
     private boolean tipLeftUnknown(Ride ride, long amountCents) {
-        if (ride.tipCents != amountCents || CASH.equals(ride.methodId)
-                || !PAID.equals(ride.paymentStatus)) {
+        if (ride.getTipCents() != amountCents || CASH.equals(ride.getMethodId())
+                || !PAID.equals(ride.getPaymentStatus())) {
             return false;
         }
-        Payment payment = repository.payment(ride.id);
-        return payment != null && (payment.tipRef == null || payment.tipRef.length() == 0);
+        Payment payment = payments.findById(ride.getId());
+        return payment != null && (payment.getTipRef() == null || payment.getTipRef().length() == 0);
     }
 
     @Transactional
     private void releaseTip(String rideId) {
-        repository.releaseTip(rideId);
+        rides.releaseTip(rideId);
     }
 
     @Transactional
     private void keepTip(String rideId, String reference) {
-        Payment payment = repository.payment(rideId);
+        Payment payment = payments.findById(rideId);
         if (payment != null) {
-            payment.tipRef = reference;
+            payment.setTipRef(reference);
         }
     }
 
@@ -529,16 +550,16 @@ public class Payments {
         PaymentProvider.Refund fare;
         PaymentProvider.Refund tip = null;
         try {
-            fare = provider.refund(payment.providerRef, payment.amountCents);
-            if (payment.tipRef.length() > 0) {
-                tip = provider.refund(payment.tipRef, ride.tipCents);
+            fare = provider.refund(payment.getProviderRef(), payment.getAmountCents());
+            if (payment.getTipRef().length() > 0) {
+                tip = provider.refund(payment.getTipRef(), ride.getTipCents());
             }
         } catch (IOException failed) {
             releaseRefund(rideId);
             throw unavailable("refund", failed);
         }
         keepRefund(rideId, fare, tip, cut(reason == null ? "" : reason.trim(), 255));
-        live.rideChanged(rideId, ride.state, ride.rider, ride.driver, "");
+        live.rideChanged(rideId, ride.getState(), ride.getRider(), ride.getDriver(), "");
         return receipt("", true, rideId);
     }
 
@@ -569,9 +590,9 @@ public class Payments {
             Payment payment = pending.get(iter);
             try {
                 String outcome = refundOutcome(payment);
-                Ride ride = outcome == null ? null : endRefund(payment.rideId, outcome);
+                Ride ride = outcome == null ? null : endRefund(payment.getRideId(), outcome);
                 if (ride != null) {
-                    live.rideChanged(ride.id, ride.state, ride.rider, ride.driver, "");
+                    live.rideChanged(ride.getId(), ride.getState(), ride.getRider(), ride.getDriver(), "");
                 }
             } catch (IOException err) {
                 failed = failed == null ? err : failed;
@@ -590,9 +611,9 @@ public class Payments {
     /// How a pending refund came out: [#REFUNDED], [#REFUND_FAILED], or null
     /// while the processor still does not know.
     private String refundOutcome(Payment payment) throws IOException {
-        String fare = provider.refundStatus(payment.refundRef);
-        String tip = payment.tipRefundRef.length() == 0 ? PaymentProvider.REFUND_SUCCEEDED
-                : provider.refundStatus(payment.tipRefundRef);
+        String fare = provider.refundStatus(payment.getRefundRef());
+        String tip = payment.getTipRefundRef().length() == 0 ? PaymentProvider.REFUND_SUCCEEDED
+                : provider.refundStatus(payment.getTipRefundRef());
         if (PaymentProvider.REFUND_FAILED.equals(fare)
                 || PaymentProvider.REFUND_FAILED.equals(tip)) {
             return REFUND_FAILED;
@@ -606,18 +627,19 @@ public class Payments {
 
     @Transactional(readOnly = true)
     private List<Payment> refundsPending() {
-        return repository.refundsPending(50);
+        return payments.findByStatusOrderByCreatedAtAsc(REFUND_PENDING, new PageRequest(0, 50));
     }
 
     /// Records how a refund ended and returns its ride, or null when another
     /// pass recorded it first.
     @Transactional
     private Ride endRefund(String rideId, String outcome) {
-        if (!repository.endRefund(rideId, outcome,
-                REFUNDED.equals(outcome) ? System.currentTimeMillis() : 0L)) {
+        if (payments.endRefund(rideId, outcome,
+                REFUNDED.equals(outcome) ? System.currentTimeMillis() : 0L) != 1) {
             return null;
         }
-        return repository.ride(rideId);
+        rides.paymentStatus(rideId, outcome);
+        return ride(rideId);
     }
 
     /// Marks the ride refunded and returns it as it was just before. Committed
@@ -637,28 +659,28 @@ public class Payments {
     /// charged, and it takes a person and the processor's records to say.
     @Transactional
     private Ride claimRefund(String rideId) {
-        boolean claimed = repository.claimRefund(rideId);
-        Ride ride = repository.ride(rideId);
+        boolean claimed = rides.claimRefund(rideId) == 1;
+        Ride ride = ride(rideId);
         if (ride == null) {
             throw new ResponseStatusException(404, "No such ride");
         }
-        if (CASH.equals(ride.methodId)) {
+        if (CASH.equals(ride.getMethodId())) {
             throw new ResponseStatusException(409, "A ride paid in cash has nothing to refund");
         }
-        if (REFUND_PENDING.equals(ride.paymentStatus)) {
+        if (REFUND_PENDING.equals(ride.getPaymentStatus())) {
             throw new ResponseStatusException(409,
                     "That ride's refund is still with the payment processor");
         }
-        if (REFUND_FAILED.equals(ride.paymentStatus)) {
+        if (REFUND_FAILED.equals(ride.getPaymentStatus())) {
             throw new ResponseStatusException(409,
                     "That ride's refund failed. Check it with the payment processor");
         }
         if (!claimed && !refundUnfinished(ride)) {
             throw new ResponseStatusException(409, "That ride has no payment to refund");
         }
-        if (ride.tipCents > 0L) {
-            Payment payment = repository.payment(rideId);
-            if (payment == null || payment.tipRef == null || payment.tipRef.length() == 0) {
+        if (ride.getTipCents() > 0L) {
+            Payment payment = payments.findById(rideId);
+            if (payment == null || payment.getTipRef() == null || payment.getTipRef().length() == 0) {
                 throw new ResponseStatusException(409,
                         "A tip on that ride is still being charged. Try again in a moment");
             }
@@ -674,21 +696,21 @@ public class Payments {
     /// is keyed by the charge it returns: the processor answers a repeat with
     /// the refund it already made, and makes one if it never did.
     private boolean refundUnfinished(Ride ride) {
-        if (!REFUNDED.equals(ride.paymentStatus)) {
+        if (!REFUNDED.equals(ride.getPaymentStatus())) {
             return false;
         }
-        Payment payment = repository.payment(ride.id);
-        return payment != null && !REFUNDED.equals(payment.status);
+        Payment payment = payments.findById(ride.getId());
+        return payment != null && !REFUNDED.equals(payment.getStatus());
     }
 
     @Transactional(readOnly = true)
     private Payment payment(String rideId) {
-        return repository.payment(rideId);
+        return payments.findById(rideId);
     }
 
     @Transactional
     private void releaseRefund(String rideId) {
-        repository.releaseRefund(rideId);
+        rides.paymentStatus(rideId, PAID);
     }
 
     /// Records the refunds the processor took. Refunded when both are known
@@ -698,14 +720,14 @@ public class Payments {
     private void keepRefund(String rideId, PaymentProvider.Refund fare,
             PaymentProvider.Refund tip, String reason) {
         boolean pending = fare.pending || (tip != null && tip.pending);
-        Payment payment = repository.payment(rideId);
-        payment.status = pending ? REFUND_PENDING : REFUNDED;
-        payment.refundRef = cut(fare.reference, 64);
-        payment.tipRefundRef = tip == null ? "" : cut(tip.reference, 64);
-        payment.refundReason = reason;
-        payment.refundedAt = pending ? 0L : System.currentTimeMillis();
+        Payment payment = payments.findById(rideId);
+        payment.setStatus(pending ? REFUND_PENDING : REFUNDED);
+        payment.setRefundRef(cut(fare.reference, 64));
+        payment.setTipRefundRef(tip == null ? "" : cut(tip.reference, 64));
+        payment.setRefundReason(reason);
+        payment.setRefundedAt(pending ? 0L : System.currentTimeMillis());
         if (pending) {
-            repository.ride(rideId).paymentStatus = REFUND_PENDING;
+            ride(rideId).setPaymentStatus(REFUND_PENDING);
         }
     }
 
@@ -714,13 +736,15 @@ public class Payments {
     /// A rider's receipts, newest first: one for every ride that completed.
     @Transactional(readOnly = true)
     public List<ReceiptDto> receipts(String rider) throws IOException {
-        return receipts(repository.completed(rider, 50), false);
+        return receipts(rides.findByRiderAndStateOrderByRequestedAtDesc(rider, RideState.COMPLETED,
+                new PageRequest(0, 50)), false);
     }
 
     /// Every receipt, newest first, for the admin.
     @Transactional(readOnly = true)
     public List<ReceiptDto> allReceipts() throws IOException {
-        return receipts(repository.completed(200), true);
+        return receipts(rides.findByStateOrderByRequestedAtDesc(RideState.COMPLETED,
+                new PageRequest(0, 200)), true);
     }
 
     /// The receipt of one ride: what it will cost while it is under way, what
@@ -728,38 +752,39 @@ public class Payments {
     /// viewer's, and for one that ended without completing, which cost nothing.
     @Transactional(readOnly = true)
     public ReceiptDto receipt(String viewer, boolean admin, String rideId) throws IOException {
-        Ride ride = repository.ride(rideId);
-        String state = ride == null ? "" : ride.state;
-        if (ride == null || !(admin || viewer.equals(ride.rider))
-                || state.startsWith("CANCELLED") || "NO_DRIVERS".equals(state)) {
+        Ride ride = ride(rideId);
+        RideState state = ride == null ? RideState.NONE : ride.getState();
+        if (ride == null || !(admin || viewer.equals(ride.getRider()))
+                || RideState.CANCELLED_BY_RIDER == state || RideState.CANCELLED_BY_DRIVER == state
+                || RideState.CANCELLED_BY_ADMIN == state || RideState.NO_DRIVERS == state) {
             throw new ResponseStatusException(404, "No such receipt");
         }
-        Payment payment = repository.payment(rideId);
-        return receipt(ride, payment == null ? 0L : payment.createdAt, admin,
+        Payment payment = payments.findById(rideId);
+        return receipt(ride, payment == null ? 0L : payment.getCreatedAt(), admin,
                 new HashMap<String, Profile>());
     }
 
     /// The rides' receipts. When each was paid is on its payment and not on
     /// the ride, so the payments of all of them are read at once and matched
     /// to their rides here.
-    private List<ReceiptDto> receipts(List<Ride> rides, boolean admin) {
+    private List<ReceiptDto> receipts(List<Ride> completed, boolean admin) {
         Map<String, Long> paidAt = new HashMap<String, Long>();
-        if (rides.size() > 0) {
+        if (completed.size() > 0) {
             List<String> ids = new ArrayList<String>();
-            for (int iter = 0; iter < rides.size(); iter++) {
-                ids.add(rides.get(iter).id);
+            for (int iter = 0; iter < completed.size(); iter++) {
+                ids.add(completed.get(iter).getId());
             }
-            List<Payment> payments = repository.payments(ids);
-            for (int iter = 0; iter < payments.size(); iter++) {
-                Payment payment = payments.get(iter);
-                paidAt.put(payment.rideId, Long.valueOf(payment.createdAt));
+            List<Payment> rows = payments.findByRideIdIn(ids);
+            for (int iter = 0; iter < rows.size(); iter++) {
+                Payment payment = rows.get(iter);
+                paidAt.put(payment.getRideId(), Long.valueOf(payment.getCreatedAt()));
             }
         }
         Map<String, Profile> drivers = new HashMap<String, Profile>();
         List<ReceiptDto> out = new ArrayList<ReceiptDto>();
-        for (int iter = 0; iter < rides.size(); iter++) {
-            Ride ride = rides.get(iter);
-            Long at = paidAt.get(ride.id);
+        for (int iter = 0; iter < completed.size(); iter++) {
+            Ride ride = completed.get(iter);
+            Long at = paidAt.get(ride.getId());
             out.add(receipt(ride, at == null ? 0L : at.longValue(), admin, drivers));
         }
         return out;
@@ -768,20 +793,20 @@ public class Payments {
     private ReceiptDto receipt(Ride ride, long paidAt, boolean admin,
             Map<String, Profile> drivers) {
         ReceiptDto dto = new ReceiptDto();
-        dto.rideId = ride.id;
-        dto.currency = ride.currency;
-        long fare = ride.fareCents;
-        dto.distanceFare = ride.distanceCents;
-        dto.timeFare = ride.timeCents;
+        dto.rideId = ride.getId();
+        dto.currency = ride.getCurrency();
+        long fare = ride.getFareCents();
+        dto.distanceFare = ride.getDistanceCents();
+        dto.timeFare = ride.getTimeCents();
         // Whatever of the fare the other two parts do not account for, which
         // for a ride asked for before the parts were kept is all of it.
         dto.baseFare = fare - dto.distanceFare - dto.timeFare;
-        dto.serviceFee = ride.feeCents;
-        dto.tip = ride.tipCents;
+        dto.serviceFee = ride.getFeeCents();
+        dto.tip = ride.getTipCents();
         dto.total = fare + dto.serviceFee + dto.tip - dto.discount;
-        dto.methodLabel = ride.methodLabel;
-        String paid = ride.paymentStatus;
-        boolean cash = CASH.equals(ride.methodId);
+        dto.methodLabel = ride.getMethodLabel();
+        String paid = ride.getPaymentStatus();
+        boolean cash = CASH.equals(ride.getMethodId());
         if (PAID.equals(paid)) {
             dto.status = cash ? "cash" : "paid";
         } else if (FAILED.equals(paid)) {
@@ -798,23 +823,23 @@ public class Payments {
         // Every refund state follows a payment that was made.
         dto.paidAt = PAID.equals(paid) || (paid != null && paid.startsWith("REFUND"))
                 ? paidAt : 0L;
-        dto.pickupName = ride.pickupAddress;
-        dto.dropoffName = ride.dropoffAddress;
-        dto.distanceMeters = ride.distanceMeters;
-        dto.durationSeconds = ride.durationSeconds;
-        dto.riderUsername = admin ? ride.rider : "";
+        dto.pickupName = ride.getPickupAddress();
+        dto.dropoffName = ride.getDropoffAddress();
+        dto.distanceMeters = ride.getDistanceMeters();
+        dto.durationSeconds = ride.getDurationSeconds();
+        dto.riderUsername = admin ? ride.getRider() : "";
         dto.driverName = "";
         dto.vehicle = "";
-        String driver = ride.driver;
-        if (driver.length() > 0 && !"OFFERED".equals(ride.state)) {
+        String driver = ride.getDriver();
+        if (driver.length() > 0 && RideState.OFFERED != ride.getState()) {
             Profile who = drivers.get(driver);
             if (who == null && !drivers.containsKey(driver)) {
-                who = profiles.find(driver);
+                who = profiles.findById(driver);
                 drivers.put(driver, who);
             }
             if (who != null) {
-                dto.driverName = who.displayName;
-                dto.vehicle = who.vehicle;
+                dto.driverName = who.getDisplayName();
+                dto.vehicle = who.getVehicle();
             }
         }
         return dto;
@@ -838,16 +863,16 @@ public class Payments {
     /// order, or null when either is gone.
     @Transactional(readOnly = true)
     private String[] chargeable(String rider, String methodId) {
-        PaymentMethod method = repository.card(rider, methodId);
-        PaymentCustomer customer = repository.customer(rider);
+        PaymentMethod method = card(rider, methodId);
+        PaymentCustomer customer = customers.findById(rider);
         if (method == null || customer == null) {
             return null;
         }
-        return new String[] {customer.reference, method.token};
+        return new String[] {customer.getReference(), method.getToken()};
     }
 
     private PaymentMethod owned(String username, String id) {
-        PaymentMethod row = repository.card(username, id);
+        PaymentMethod row = card(username, id);
         if (row == null) {
             // Someone else's card is told apart from no card by nobody.
             throw new ResponseStatusException(404, "No such payment method");
@@ -857,13 +882,13 @@ public class Payments {
 
     private static PaymentMethodDto card(PaymentMethod row) {
         PaymentMethodDto dto = new PaymentMethodDto();
-        dto.id = row.id;
+        dto.id = row.getId();
         dto.kind = "card";
-        dto.brand = row.brand;
-        dto.last4 = row.last4;
-        dto.expMonth = row.expMonth;
-        dto.expYear = row.expYear;
-        dto.isDefault = row.preferred;
+        dto.brand = row.getBrand();
+        dto.last4 = row.getLast4();
+        dto.expMonth = row.getExpMonth();
+        dto.expYear = row.getExpYear();
+        dto.isDefault = row.isPreferred();
         dto.label = label(row);
         return dto;
     }
@@ -880,7 +905,7 @@ public class Payments {
     }
 
     private static String label(PaymentMethod method) {
-        return method.brand + " " + method.last4;
+        return method.getBrand() + " " + method.getLast4();
     }
 
     private static String cut(String text, int max) {
@@ -904,5 +929,34 @@ public class Payments {
     private static ResponseStatusException unavailable(String what, IOException failed) {
         System.err.println("payment provider failed during " + what + ": " + failed.getMessage());
         return new ResponseStatusException(502, "Payments are unavailable right now");
+    }
+
+    /// A ride, or null when there is none. An id that cannot be one is not
+    /// looked for.
+    private Ride ride(String id) {
+        if (id == null || id.length() == 0 || id.length() > 32) {
+            return null;
+        }
+        return rides.findById(id);
+    }
+
+    /// One of an account's cards, or null when the id is not a card of theirs.
+    private PaymentMethod card(String username, String id) {
+        if (id == null || id.length() == 0 || id.length() > 32) {
+            return null;
+        }
+        return cards.findFirstByIdAndUsername(id, username);
+    }
+
+    /// Whether a completed ride of the rider's is still to be charged to this
+    /// method -- or to any card, for a null `methodId` -- and will be asked
+    /// about again: its payment is pending and it ended after `since`.
+    private boolean awaitsCharge(String rider, String methodId, long since) {
+        if (methodId == null) {
+            return rides.existsByRiderAndStateAndPaymentStatusAndUpdatedAtGreaterThanAndMethodIdNot(
+                    rider, RideState.COMPLETED, PENDING, since, CASH);
+        }
+        return rides.existsByRiderAndStateAndPaymentStatusAndUpdatedAtGreaterThanAndMethodId(
+                rider, RideState.COMPLETED, PENDING, since, methodId);
     }
 }

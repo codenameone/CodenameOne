@@ -31,15 +31,19 @@ import com.codename1.backend.security.core.userdetails.User;
 import com.codename1.backend.security.core.userdetails.UserDetails;
 import com.codename1.backend.security.core.userdetails.UsernameNotFoundException;
 import com.codename1.backend.security.crypto.PasswordEncoder;
+import com.codenameone.examples.wayline.Ids;
 import com.codenameone.examples.wayline.Roles;
 import com.codenameone.examples.wayline.Text;
 import com.codenameone.examples.wayline.api.ProfileDto;
 import com.codenameone.examples.wayline.api.RegisterDto;
 import com.codenameone.examples.wayline.api.UserDto;
+import com.codenameone.examples.wayline.domain.ClosedAccount;
 import com.codenameone.examples.wayline.domain.Profile;
 import com.codenameone.examples.wayline.driving.Applications;
 import com.codenameone.examples.wayline.live.LiveHub;
 import com.codenameone.examples.wayline.pay.Payments;
+import com.codenameone.examples.wayline.repository.ClosedAccountRepository;
+import com.codenameone.examples.wayline.repository.ProfileRepository;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -62,7 +66,7 @@ public class Accounts {
     public static final String[] GENDERS = {"unspecified", "female", "male", "nonbinary"};
 
     private final ProfileRepository profiles;
-    private final AccountCleanupRepository cleanup;
+    private final AccountCleanup cleanup;
     private final JdbcUserDetailsManager users;
     private final PasswordEncoder encoder;
     private final Applications applications;
@@ -72,7 +76,7 @@ public class Accounts {
     private final ClosedAccountRepository closed;
     private final Grants grants;
 
-    public Accounts(ProfileRepository profiles, AccountCleanupRepository cleanup,
+    public Accounts(ProfileRepository profiles, AccountCleanup cleanup,
             JdbcUserDetailsManager users, PasswordEncoder encoder, Applications applications,
             Moderation moderation, Payments payments, LiveHub live,
             ClosedAccountRepository closed, Grants grants) {
@@ -140,8 +144,8 @@ public class Accounts {
         }
         // An address whose account was closed is not given to anyone again:
         // the rides that account took are still filed under it. See
-        // ClosedAccountRepository.
-        if (closed.closed(username)) {
+        // [#retire].
+        if (closed.existsById(Ids.sha256(username))) {
             throw new ResponseStatusException(409,
                     "That e-mail belonged to an account that was closed. Use another");
         }
@@ -178,15 +182,15 @@ public class Accounts {
         users.createUser(User.withUsername(username).password(encoder.encode(password))
                 .roles(roles(driver, admin)).build());
         Profile profile = new Profile();
-        profile.username = username;
-        profile.displayName = displayName;
-        profile.phone = phone;
-        profile.phoneVerified = phoneVerified;
-        profile.vehicle = vehicle;
-        profile.plate = plate;
-        profile.createdAt = openedAt;
-        profile.gender = gender;
-        profiles.add(profile);
+        profile.setUsername(username);
+        profile.setDisplayName(displayName);
+        profile.setPhone(phone);
+        profile.setPhoneVerified(phoneVerified);
+        profile.setVehicle(vehicle);
+        profile.setPlate(plate);
+        profile.setCreatedAt(openedAt);
+        profile.setGender(gender);
+        profiles.insert(profile);
         if (driver) {
             applications.grant(username, username);
         }
@@ -199,7 +203,7 @@ public class Accounts {
     /// The account as the app sees it. Answers 404 for a name with no account.
     @Transactional(readOnly = true)
     public UserDto describe(String username) throws IOException {
-        Profile profile = profiles.find(username);
+        Profile profile = profiles.findById(username);
         if (profile == null || !users.userExists(username)) {
             throw new ResponseStatusException(404, "No such account");
         }
@@ -213,7 +217,7 @@ public class Accounts {
     public List<UserDto> all() throws IOException {
         Map<String, String> driving = applications.statuses();
         List<UserDto> out = new ArrayList<UserDto>();
-        List<Profile> everyone = profiles.all();
+        List<Profile> everyone = profiles.newestFirst();
         for (int iter = 0; iter < everyone.size(); iter++) {
             Profile profile = everyone.get(iter);
             // One sign-in read per account. The user store answers for one name
@@ -225,7 +229,7 @@ public class Accounts {
             List<String> held = new ArrayList<String>();
             boolean enabled = true;
             try {
-                UserDetails signIn = users.loadUserByUsername(profile.username);
+                UserDetails signIn = users.loadUserByUsername(profile.getUsername());
                 held = authorities(signIn);
                 enabled = signIn.isEnabled();
             } catch (UsernameNotFoundException gone) {
@@ -233,7 +237,7 @@ public class Accounts {
                 // no roles rather than failing the whole list.
                 enabled = true;
             }
-            String status = driving.get(profile.username);
+            String status = driving.get(profile.getUsername());
             out.add(toDto(profile, held, enabled, status == null ? Applications.NONE : status));
         }
         return out;
@@ -314,10 +318,10 @@ public class Accounts {
         if (flagged && why.length() == 0) {
             throw new ResponseStatusException(400, "Say why the account is flagged");
         }
-        Profile profile = profiles.find(username);
+        Profile profile = profiles.findById(username);
         if (profile != null) {
-            profile.flagged = flagged;
-            profile.flagReason = flagged ? why : "";
+            profile.setFlagged(flagged);
+            profile.setFlagReason(flagged ? why : "");
         }
         moderation.record(username, by, flagged ? Moderation.FLAG : Moderation.UNFLAG, why);
         return describe(username);
@@ -327,17 +331,17 @@ public class Accounts {
 
     @Transactional(readOnly = true)
     public ProfileDto profile(String username) throws IOException {
-        Profile row = profiles.find(username);
+        Profile row = profiles.findById(username);
         if (row == null) {
             throw new ResponseStatusException(404, "No such account");
         }
         ProfileDto dto = new ProfileDto();
-        dto.name = row.displayName;
-        dto.gender = row.gender;
-        dto.emergencyContactName = row.emergencyName;
-        dto.emergencyContactPhone = row.emergencyPhone;
-        dto.homeAddress = row.homeAddress;
-        dto.workAddress = row.workAddress;
+        dto.name = row.getDisplayName();
+        dto.gender = row.getGender();
+        dto.emergencyContactName = row.getEmergencyName();
+        dto.emergencyContactPhone = row.getEmergencyPhone();
+        dto.homeAddress = row.getHomeAddress();
+        dto.workAddress = row.getWorkAddress();
         return dto;
     }
 
@@ -357,16 +361,16 @@ public class Accounts {
         String emergencyPhone = contact.length() == 0 ? "" : phone(contact);
         String home = Text.optional(profile.homeAddress, 255, "an address");
         String work = Text.optional(profile.workAddress, 255, "an address");
-        Profile row = profiles.find(username);
+        Profile row = profiles.findById(username);
         if (row == null) {
             throw new ResponseStatusException(404, "No such account");
         }
-        row.displayName = name;
-        row.gender = gender;
-        row.emergencyName = emergencyName;
-        row.emergencyPhone = emergencyPhone;
-        row.homeAddress = home;
-        row.workAddress = work;
+        row.setDisplayName(name);
+        row.setGender(gender);
+        row.setEmergencyName(emergencyName);
+        row.setEmergencyPhone(emergencyPhone);
+        row.setHomeAddress(home);
+        row.setWorkAddress(work);
         return describe(username);
     }
 
@@ -445,17 +449,35 @@ public class Accounts {
         cleanup.removeEverythingOf(username);
         // Read again: the statements above each cleared what the session had
         // loaded, the profile that was described among it.
-        Profile profile = profiles.find(username);
+        Profile profile = profiles.findById(username);
         if (profile != null) {
-            profiles.remove(profile);
+            profiles.deleteById(username);
         }
         // The address is retired with the account, in the same transaction:
         // nobody can register it and inherit the rides kept under it.
-        closed.close(username);
+        retire(username);
         // Last: the tokens in hand stop working when the sign-in is gone.
         users.deleteUser(username);
         grants.endAll(username);
         return was;
+    }
+
+    /// Retires an e-mail for good, as only a hash of it.
+    ///
+    /// A ride outlives the account that took it, under the e-mail that account
+    /// signed in with, and so does a token until it expires. Were the address
+    /// free to register again, whoever took it would be handed the rides, the
+    /// receipts and the ratings of the person who left, and that person's old
+    /// token would sign in to the new account. Only a hash is kept: enough to
+    /// refuse it, and not a list of who has left.
+    private void retire(String username) throws IOException {
+        String hash = Ids.sha256(username);
+        if (!closed.existsById(hash)) {
+            ClosedAccount row = new ClosedAccount();
+            row.setUsernameHash(hash);
+            row.setClosedAt(System.currentTimeMillis());
+            closed.insert(row);
+        }
     }
 
     /// Makes the rest of the caller's transaction take its turn with any other
@@ -466,9 +488,9 @@ public class Accounts {
 
     @Transactional(rollbackFor = IOException.class)
     public void markPhoneVerified(String username) throws IOException {
-        Profile profile = profiles.find(username);
+        Profile profile = profiles.findById(username);
         if (profile != null) {
-            profile.phoneVerified = true;
+            profile.setPhoneVerified(true);
         }
     }
 
@@ -542,20 +564,20 @@ public class Accounts {
     private static UserDto toDto(Profile profile, List<String> authorities, boolean enabled,
             String driverStatus) {
         UserDto dto = new UserDto();
-        dto.username = profile.username;
-        dto.displayName = profile.displayName;
-        dto.phone = profile.phone;
-        dto.phoneVerified = profile.phoneVerified;
-        dto.vehicle = profile.vehicle;
-        dto.plate = profile.plate;
+        dto.username = profile.getUsername();
+        dto.displayName = profile.getDisplayName();
+        dto.phone = profile.getPhone();
+        dto.phoneVerified = profile.isPhoneVerified();
+        dto.vehicle = profile.getVehicle();
+        dto.plate = profile.getPlate();
         dto.rider = authorities.contains("ROLE_" + Roles.RIDER);
         dto.driver = authorities.contains("ROLE_" + Roles.DRIVER);
         dto.admin = authorities.contains("ROLE_" + Roles.ADMIN);
         dto.suspended = !enabled;
-        dto.gender = profile.gender;
-        dto.language = profile.language;
-        dto.flagged = profile.flagged;
-        dto.flagReason = profile.flagReason;
+        dto.gender = profile.getGender();
+        dto.language = profile.getLanguage();
+        dto.flagged = profile.isFlagged();
+        dto.flagReason = profile.getFlagReason();
         dto.driverStatus = driverStatus;
         return dto;
     }

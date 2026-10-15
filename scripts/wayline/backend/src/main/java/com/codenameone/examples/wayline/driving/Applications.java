@@ -30,11 +30,12 @@ import com.codename1.backend.security.GrantedAuthority;
 import com.codename1.backend.security.core.userdetails.JdbcUserDetailsManager;
 import com.codename1.backend.security.core.userdetails.User;
 import com.codename1.backend.security.core.userdetails.UserDetails;
+import com.codename1.orm.repository.PageRequest;
+import com.codename1.orm.session.Identifier;
 import com.codenameone.examples.wayline.Days;
 import com.codenameone.examples.wayline.Roles;
 import com.codenameone.examples.wayline.Text;
 import com.codenameone.examples.wayline.account.Moderation;
-import com.codenameone.examples.wayline.account.ProfileRepository;
 import com.codenameone.examples.wayline.api.DocumentContentDto;
 import com.codenameone.examples.wayline.api.DocumentDto;
 import com.codenameone.examples.wayline.api.DocumentUploadDto;
@@ -42,6 +43,9 @@ import com.codenameone.examples.wayline.api.DriverApplicationDto;
 import com.codenameone.examples.wayline.domain.DriverApplication;
 import com.codenameone.examples.wayline.domain.DriverDocument;
 import com.codenameone.examples.wayline.domain.Profile;
+import com.codenameone.examples.wayline.repository.DriverApplicationRepository;
+import com.codenameone.examples.wayline.repository.DriverDocumentRepository;
+import com.codenameone.examples.wayline.repository.ProfileRepository;
 import com.codenameone.examples.wayline.ride.Fares;
 
 import java.io.IOException;
@@ -86,14 +90,17 @@ public class Applications {
 
     private static final int LIST_LIMIT = 200;
 
-    private final ApplicationRepository applications;
+    private final DriverApplicationRepository applications;
+    private final DriverDocumentRepository documents;
     private final ProfileRepository profiles;
     private final JdbcUserDetailsManager users;
     private final Moderation moderation;
 
-    public Applications(ApplicationRepository applications, ProfileRepository profiles,
+    public Applications(DriverApplicationRepository applications,
+            DriverDocumentRepository documents, ProfileRepository profiles,
             JdbcUserDetailsManager users, Moderation moderation) {
         this.applications = applications;
+        this.documents = documents;
         this.profiles = profiles;
         this.users = users;
         this.moderation = moderation;
@@ -104,8 +111,8 @@ public class Applications {
     /// Where an account stands: one of the five statuses.
     @Transactional(readOnly = true)
     public String status(String username) throws IOException {
-        DriverApplication application = applications.find(username);
-        return application == null ? NONE : application.status;
+        DriverApplication application = find(username);
+        return application == null ? NONE : application.getStatus();
     }
 
     @Transactional(readOnly = true)
@@ -128,17 +135,17 @@ public class Applications {
     /// An account's application, or one whose status is `none`.
     @Transactional(readOnly = true)
     public DriverApplicationDto get(String username) throws IOException {
-        Profile profile = profiles.find(username);
-        return toDto(username, profile == null ? "" : profile.displayName,
-                applications.find(username), applications.documentSummaries(username), 0);
+        Profile profile = profiles.findById(username);
+        return toDto(username, profile == null ? "" : profile.getDisplayName(),
+                find(username), documents.summaries(username), 0);
     }
 
     /// Begins an application as a draft, when the account has none. `vehicle`
     /// and `plate` are what an older app collected at registration.
     @Transactional
     public void open(String username, String vehicle, String plate) throws IOException {
-        if (applications.find(username) == null) {
-            applications.add(blank(username, DRAFT, vehicle, plate));
+        if (find(username) == null) {
+            applications.insert(blank(username, DRAFT, vehicle, plate));
         }
     }
 
@@ -175,19 +182,19 @@ public class Applications {
         String color = Text.optional(form.vehicleColor, 24, "the vehicle's colour");
         String plate = Text.optional(form.vehiclePlate, 32, "the vehicle's plate");
         String product = Fares.product(form.product);
-        application.legalName = legalName;
-        application.dateOfBirth = birth;
-        application.licenceNumber = licenceNumber;
-        application.licenceExpiry = expiry;
-        application.vehicleMake = make;
-        application.vehicleModel = model;
-        application.vehicleYear = form.vehicleYear;
-        application.vehicleColor = color;
-        application.vehiclePlate = plate;
-        application.vehicleSeats = form.vehicleSeats;
-        application.product = product;
-        application.wheelchair = form.accessible;
-        application.pets = form.petFriendly;
+        application.setLegalName(legalName);
+        application.setDateOfBirth(birth);
+        application.setLicenceNumber(licenceNumber);
+        application.setLicenceExpiry(expiry);
+        application.setVehicleMake(make);
+        application.setVehicleModel(model);
+        application.setVehicleYear(form.vehicleYear);
+        application.setVehicleColor(color);
+        application.setVehiclePlate(plate);
+        application.setVehicleSeats(form.vehicleSeats);
+        application.setProduct(product);
+        application.setWheelchair(form.accessible);
+        application.setPets(form.petFriendly);
         return get(username);
     }
 
@@ -240,15 +247,15 @@ public class Applications {
         long now = System.currentTimeMillis();
         // Replaced with a statement where there is one already, so the picture
         // it held is not read only to be overwritten.
-        if (applications.replace(username, kind, type, "uploaded", now, data) == 0) {
+        if (documents.replace(username, kind, type, "uploaded", now, data) == 0) {
             DriverDocument document = new DriverDocument();
-            document.username = username;
-            document.kind = kind;
-            document.contentType = type;
-            document.status = "uploaded";
-            document.uploadedAt = now;
-            document.data = data;
-            applications.add(document);
+            document.setUsername(username);
+            document.setKind(kind);
+            document.setContentType(type);
+            document.setStatus("uploaded");
+            document.setUploadedAt(now);
+            document.setData(data);
+            documents.insert(document);
         }
         return get(username);
     }
@@ -259,14 +266,14 @@ public class Applications {
     public DocumentContentDto document(String username, String kind) throws IOException {
         DriverDocument stored = kind == null || kind.length() == 0 || kind.length() > 24
                 || username == null || username.length() == 0 ? null
-                : applications.document(username, kind);
+                : documents.findById(Identifier.of(username, kind));
         if (stored == null) {
             throw new ResponseStatusException(404, "No such document");
         }
         DocumentContentDto dto = new DocumentContentDto();
-        dto.kind = stored.kind;
-        dto.contentType = stored.contentType;
-        dto.dataBase64 = stored.data;
+        dto.kind = stored.getKind();
+        dto.contentType = stored.getContentType();
+        dto.dataBase64 = stored.getData();
         return dto;
     }
 
@@ -281,7 +288,7 @@ public class Applications {
         // corrected. Behind the hold a save either went first, and is what is
         // checked, or comes after and finds it handed in.
         hold(username);
-        String was = editable(username).status;
+        String was = editable(username).getStatus();
         DriverApplicationDto form = get(username);
         List<String> missing = new ArrayList<String>();
         String today = Days.iso(System.currentTimeMillis());
@@ -323,41 +330,42 @@ public class Applications {
     public List<DriverApplicationDto> list(String status) throws IOException {
         String wanted = Text.oneOf(status, new String[] {DRAFT, PENDING, APPROVED, REJECTED}, "",
                 "an application's status");
-        List<DriverApplication> rows = wanted.length() == 0 ? applications.newest(LIST_LIMIT)
-                : applications.inStatus(wanted, LIST_LIMIT);
+        PageRequest page = new PageRequest(0, LIST_LIMIT);
+        List<DriverApplication> rows = wanted.length() == 0 ? applications.newest(page)
+                : applications.inStatus(wanted, page);
         List<DriverApplicationDto> out = new ArrayList<DriverApplicationDto>();
         if (rows.isEmpty()) {
             return out;
         }
         List<String> owners = new ArrayList<String>();
         for (int iter = 0; iter < rows.size(); iter++) {
-            owners.add(rows.get(iter).username);
+            owners.add(rows.get(iter).getUsername());
         }
         // The applicants' names in one query, and the documents of all of them
         // in another, without the pictures.
         Map<String, String> names = new HashMap<String, String>();
-        List<Object[]> named = applications.displayNames(owners);
+        List<Object[]> named = profiles.displayNames(owners);
         for (int iter = 0; iter < named.size(); iter++) {
             Object[] row = named.get(iter);
             names.put((String) row[0], (String) row[1]);
         }
-        Map<String, List<Object[]>> documents = new HashMap<String, List<Object[]>>();
-        List<Object[]> all = applications.documentSummaries(owners);
+        Map<String, List<Object[]>> byOwner = new HashMap<String, List<Object[]>>();
+        List<Object[]> all = documents.summaries(owners);
         for (int iter = 0; iter < all.size(); iter++) {
             Object[] row = all.get(iter);
             String owner = (String) row[0];
-            List<Object[]> held = documents.get(owner);
+            List<Object[]> held = byOwner.get(owner);
             if (held == null) {
                 held = new ArrayList<Object[]>();
-                documents.put(owner, held);
+                byOwner.put(owner, held);
             }
             held.add(row);
         }
         for (int iter = 0; iter < rows.size(); iter++) {
             DriverApplication row = rows.get(iter);
-            String name = names.get(row.username);
-            List<Object[]> held = documents.get(row.username);
-            out.add(toDto(row.username, name == null ? "" : name, row,
+            String name = names.get(row.getUsername());
+            List<Object[]> held = byOwner.get(row.getUsername());
+            out.add(toDto(row.getUsername(), name == null ? "" : name, row,
                     held == null ? new ArrayList<Object[]>() : held, 1));
         }
         return out;
@@ -366,13 +374,13 @@ public class Applications {
     /// How many applications are waiting for an admin's answer.
     @Transactional(readOnly = true)
     public int waiting() throws IOException {
-        return (int) applications.count(PENDING);
+        return (int) applications.countByStatus(PENDING);
     }
 
     /// An application for an admin: 404 for an account that never began one.
     @Transactional(readOnly = true)
     public DriverApplicationDto review(String username) throws IOException {
-        if (applications.find(username) == null) {
+        if (find(username) == null) {
             throw new ResponseStatusException(404, "No such application");
         }
         return get(username);
@@ -388,15 +396,15 @@ public class Applications {
         // the block. Behind the hold it reads what the block left.
         profiles.hold(username);
         decide(by, username, APPROVED, "");
-        applications.markDocuments(username, "accepted");
+        documents.markAll(username, "accepted");
         // Read after the statements above, which empty the session.
-        DriverApplication application = applications.find(username);
-        Profile profile = profiles.find(username);
-        if (application.vehicleMake.length() > 0 && profile != null) {
-            String car = (application.vehicleColor + " " + application.vehicleMake + " "
-                    + application.vehicleModel).trim();
-            profile.vehicle = car.length() > 120 ? car.substring(0, 120) : car;
-            profile.plate = application.vehiclePlate;
+        DriverApplication application = find(username);
+        Profile profile = profiles.findById(username);
+        if (application.getVehicleMake().length() > 0 && profile != null) {
+            String car = (application.getVehicleColor() + " " + application.getVehicleMake() + " "
+                    + application.getVehicleModel()).trim();
+            profile.setVehicle(car.length() > 120 ? car.substring(0, 120) : car);
+            profile.setPlate(application.getVehiclePlate());
         }
         role(username, true);
         moderation.record(username, by, Moderation.APPROVE, "");
@@ -420,8 +428,8 @@ public class Applications {
     /// has none, so that "approved" has one meaning everywhere.
     @Transactional
     public void grant(String by, String username) throws IOException {
-        if (applications.find(username) == null) {
-            applications.add(blank(username, APPROVED, "", ""));
+        if (find(username) == null) {
+            applications.insert(blank(username, APPROVED, "", ""));
             return;
         }
         applications.approveUnlessApproved(username, APPROVED, System.currentTimeMillis(), by);
@@ -439,8 +447,8 @@ public class Applications {
     /// closed.
     @Transactional
     public void forget(String username) throws IOException {
-        applications.deleteDocuments(username);
-        applications.delete(username);
+        documents.deleteByUsername(username);
+        applications.deleteByUsername(username);
     }
 
     // ------------------------------------------------------------- internals
@@ -450,7 +458,7 @@ public class Applications {
     /// once one decides and the other is told it has been decided.
     private void decide(String by, String username, String to, String reason)
             throws IOException {
-        if (applications.find(username) == null) {
+        if (find(username) == null) {
             throw new ResponseStatusException(404, "No such application");
         }
         if (applications.move(username, PENDING, to, reason, System.currentTimeMillis(), by)
@@ -489,21 +497,29 @@ public class Applications {
     /// hand-in makes it, and two at once would both insert one under the same
     /// name, so they take turns on the profile instead.
     private void hold(String username) {
-        if (!applications.hold(username)) {
+        if (applications.hold(username) == 0) {
             profiles.hold(username);
         }
     }
 
+    /// An account's application, or null when it has none.
+    private DriverApplication find(String username) {
+        if (username == null || username.length() == 0 || username.length() > 190) {
+            return null;
+        }
+        return applications.findById(username);
+    }
+
     private DriverApplication editable(String username) {
-        DriverApplication application = applications.find(username);
+        DriverApplication application = find(username);
         if (application == null) {
             application = blank(username, DRAFT, "", "");
-            applications.add(application);
+            applications.insert(application);
         }
-        if (PENDING.equals(application.status)) {
+        if (PENDING.equals(application.getStatus())) {
             throw new ResponseStatusException(409, "Your application is being reviewed");
         }
-        if (APPROVED.equals(application.status)) {
+        if (APPROVED.equals(application.getStatus())) {
             throw new ResponseStatusException(409, "Your application was approved");
         }
         return application;
@@ -516,14 +532,14 @@ public class Applications {
             String plate) {
         long now = System.currentTimeMillis();
         DriverApplication application = new DriverApplication();
-        application.username = username;
-        application.status = status;
-        application.vehicleModel = vehicle.length() > 40 ? vehicle.substring(0, 40) : vehicle;
-        application.vehiclePlate = plate;
-        application.vehicleSeats = 4;
-        application.product = Fares.STANDARD;
-        application.createdAt = now;
-        application.reviewedAt = APPROVED.equals(status) ? now : 0L;
+        application.setUsername(username);
+        application.setStatus(status);
+        application.setVehicleModel(vehicle.length() > 40 ? vehicle.substring(0, 40) : vehicle);
+        application.setVehiclePlate(plate);
+        application.setVehicleSeats(4);
+        application.setProduct(Fares.STANDARD);
+        application.setCreatedAt(now);
+        application.setReviewedAt(APPROVED.equals(status) ? now : 0L);
         return application;
     }
 
@@ -549,24 +565,24 @@ public class Applications {
         DriverApplicationDto dto = new DriverApplicationDto();
         dto.username = username;
         dto.name = name;
-        dto.status = row == null ? NONE : row.status;
-        dto.legalName = row == null ? "" : row.legalName;
-        dto.dateOfBirth = row == null ? "" : row.dateOfBirth;
-        dto.licenceNumber = row == null ? "" : row.licenceNumber;
-        dto.licenceExpiry = row == null ? "" : row.licenceExpiry;
-        dto.vehicleMake = row == null ? "" : row.vehicleMake;
-        dto.vehicleModel = row == null ? "" : row.vehicleModel;
-        dto.vehicleYear = row == null ? 0 : row.vehicleYear;
-        dto.vehicleColor = row == null ? "" : row.vehicleColor;
-        dto.vehiclePlate = row == null ? "" : row.vehiclePlate;
-        dto.vehicleSeats = row == null ? 4 : row.vehicleSeats;
-        dto.product = row == null ? Fares.STANDARD : row.product;
-        dto.accessible = row != null && row.wheelchair;
-        dto.petFriendly = row != null && row.pets;
-        dto.rejectionReason = row == null ? "" : row.rejectionReason;
-        dto.submittedAt = row == null ? 0L : row.submittedAt;
-        dto.reviewedAt = row == null ? 0L : row.reviewedAt;
-        dto.reviewedBy = row == null ? "" : row.reviewedBy;
+        dto.status = row == null ? NONE : row.getStatus();
+        dto.legalName = row == null ? "" : row.getLegalName();
+        dto.dateOfBirth = row == null ? "" : row.getDateOfBirth();
+        dto.licenceNumber = row == null ? "" : row.getLicenceNumber();
+        dto.licenceExpiry = row == null ? "" : row.getLicenceExpiry();
+        dto.vehicleMake = row == null ? "" : row.getVehicleMake();
+        dto.vehicleModel = row == null ? "" : row.getVehicleModel();
+        dto.vehicleYear = row == null ? 0 : row.getVehicleYear();
+        dto.vehicleColor = row == null ? "" : row.getVehicleColor();
+        dto.vehiclePlate = row == null ? "" : row.getVehiclePlate();
+        dto.vehicleSeats = row == null ? 4 : row.getVehicleSeats();
+        dto.product = row == null ? Fares.STANDARD : row.getProduct();
+        dto.accessible = row != null && row.isWheelchair();
+        dto.petFriendly = row != null && row.isPets();
+        dto.rejectionReason = row == null ? "" : row.getRejectionReason();
+        dto.submittedAt = row == null ? 0L : row.getSubmittedAt();
+        dto.reviewedAt = row == null ? 0L : row.getReviewedAt();
+        dto.reviewedBy = row == null ? "" : row.getReviewedBy();
         dto.documents = new ArrayList<DocumentDto>();
         for (int kind = 0; kind < KINDS.length; kind++) {
             DocumentDto document = new DocumentDto();

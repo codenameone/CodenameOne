@@ -20,47 +20,24 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codenameone.examples.wayline.live;
+package com.codenameone.examples.wayline.repository;
 
-import com.codename1.backend.annotations.Component;
-import com.codename1.orm.session.Session;
+import com.codename1.orm.repository.CrudRepository;
+import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.wayline.domain.LiveTicket;
 
-/// Where live-channel tickets are kept. Only the hash of a ticket is stored,
-/// and it is the row's key.
-@Component
-public class LiveTicketRepository {
-    private final Session session;
-
-    public LiveTicketRepository(Session session) {
-        this.session = session;
-    }
-
-    public void add(LiveTicket ticket) {
-        session.persist(ticket);
-    }
-
-    /// The ticket with this hash, or null.
-    public LiveTicket find(String hash) {
-        return session.find(LiveTicket.class, hash);
-    }
-
+/// The tickets that open a live connection. Only the hash of a ticket is
+/// stored, and it is the row's key.
+@Repository(entity = LiveTicket.class, key = String.class)
+public interface LiveTicketRepository extends CrudRepository<LiveTicket, String> {
     /// Deletes a ticket and answers how many rows that removed: 1 for the one
     /// caller that used it, 0 for anyone presenting it after. A statement and
-    /// not `session.remove`, because that count is the whole point.
-    public int delete(String hash) {
-        return session.createQuery("delete from LiveTicket t where t.ticketHash = :hash")
-                .setParameter("hash", hash).executeUpdate();
-    }
+    /// not a read followed by a removal, because that count is the whole
+    /// point.
+    int deleteByTicketHash(String ticketHash);
 
     /// Deletes the tickets that went stale before `now`.
-    public int deleteExpired(long now) {
-        return session.createQuery("delete from LiveTicket t where t.expiresAt < :now")
-                .setParameter("now", Long.valueOf(now)).executeUpdate();
-    }
+    int deleteByExpiresAtLessThan(long now);
 
-    public int deleteOf(String username) {
-        return session.createQuery("delete from LiveTicket t where t.username = :username")
-                .setParameter("username", username).executeUpdate();
-    }
+    int deleteByUsername(String username);
 }

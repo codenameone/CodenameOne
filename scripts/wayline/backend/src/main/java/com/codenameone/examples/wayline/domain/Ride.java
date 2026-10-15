@@ -25,116 +25,389 @@ package com.codenameone.examples.wayline.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import com.codenameone.examples.wayline.api.RideState;
 
 /// A ride, from the request to its end.
 ///
 /// `rider` and `driver` are account names and not references: a ride outlives the
 /// accounts that took it, and `driver` is empty until one is offered it.
-@Entity(table = "wl_ride")
+@Entity
 public class Ride {
     @Id(autoIncrement = false)
-    @Column(name = "id", nullable = false)
-    public String id = "";
+    @Column(nullable = false)
+    private String id = "";
 
-    @Column(name = "state", nullable = false)
-    public String state = "";
+    @Column(nullable = false)
+    private RideState state = RideState.REQUESTED;
 
-    @Column(name = "rider", nullable = false)
-    public String rider = "";
+    @Column(nullable = false)
+    private String rider = "";
 
-    @Column(name = "driver", nullable = false)
-    public String driver = "";
+    @Column(nullable = false)
+    private String driver = "";
 
-    @Column(name = "pickup_lat", nullable = false)
-    public double pickupLat;
+    @Column(nullable = false)
+    private double pickupLat;
 
-    @Column(name = "pickup_lng", nullable = false)
-    public double pickupLng;
+    @Column(nullable = false)
+    private double pickupLng;
 
-    @Column(name = "pickup_address", nullable = false)
-    public String pickupAddress = "";
+    @Column(nullable = false)
+    private String pickupAddress = "";
 
-    @Column(name = "dropoff_lat", nullable = false)
-    public double dropoffLat;
+    @Column(nullable = false)
+    private double dropoffLat;
 
-    @Column(name = "dropoff_lng", nullable = false)
-    public double dropoffLng;
+    @Column(nullable = false)
+    private double dropoffLng;
 
-    @Column(name = "dropoff_address", nullable = false)
-    public String dropoffAddress = "";
+    @Column(nullable = false)
+    private String dropoffAddress = "";
 
-    @Column(name = "fare_cents", nullable = false)
-    public long fareCents;
+    @Column(nullable = false)
+    private long fareCents;
 
-    @Column(name = "currency", nullable = false)
-    public String currency = "";
+    @Column(nullable = false)
+    private String currency = "";
 
-    @Column(name = "distance_m", nullable = false)
-    public double distanceMeters;
+    @Column(nullable = false)
+    private double distanceMeters;
 
-    @Column(name = "duration_s", nullable = false)
-    public double durationSeconds;
+    @Column(nullable = false)
+    private double durationSeconds;
 
-    @Column(name = "requested_at", nullable = false)
-    public long requestedAt;
+    @Column(nullable = false)
+    private long requestedAt;
 
-    @Column(name = "updated_at", nullable = false)
-    public long updatedAt;
+    @Column(nullable = false)
+    private long updatedAt;
 
-    @Column(name = "offer_expires_at", nullable = false)
-    public long offerExpiresAt;
+    @Column(nullable = false)
+    private long offerExpiresAt;
 
-    @Column(name = "search_until", nullable = false)
-    public long searchUntil;
+    @Column(nullable = false)
+    private long searchUntil;
 
-    @Column(name = "stars", nullable = false)
-    public int stars;
+    @Column(nullable = false)
+    private int stars;
 
-    @Column(name = "payment_status", nullable = false)
-    public String paymentStatus = "";
+    @Column(nullable = false)
+    private String paymentStatus = "";
 
-    @Column(name = "product", nullable = false)
-    public String product = "standard";
+    @Column(nullable = false)
+    private String product = "standard";
 
-    @Column(name = "method_id", nullable = false)
-    public String methodId = "cash";
+    @Column(nullable = false)
+    private String methodId = "cash";
 
-    @Column(name = "method_label", nullable = false)
-    public String methodLabel = "Cash";
+    @Column(nullable = false)
+    private String methodLabel = "Cash";
 
-    @Column(name = "base_cents", nullable = false)
-    public long baseCents;
+    @Column(nullable = false)
+    private long baseCents;
 
-    @Column(name = "distance_cents", nullable = false)
-    public long distanceCents;
+    @Column(nullable = false)
+    private long distanceCents;
 
-    @Column(name = "time_cents", nullable = false)
-    public long timeCents;
+    @Column(nullable = false)
+    private long timeCents;
 
-    @Column(name = "fee_cents", nullable = false)
-    public long feeCents;
+    @Column(nullable = false)
+    private long feeCents;
 
-    @Column(name = "tip_cents", nullable = false)
-    public long tipCents;
+    @Column(nullable = false)
+    private long tipCents;
 
-    @Column(name = "driver_cents", nullable = false)
-    public long driverCents;
+    @Column(nullable = false)
+    private long driverCents;
 
-    @Column(name = "women_only", nullable = false)
-    public boolean womenOnly;
+    @Column(nullable = false)
+    private boolean womenOnly;
 
-    @Column(name = "quiet", nullable = false)
-    public boolean quiet;
+    @Column(nullable = false)
+    private boolean quiet;
 
-    @Column(name = "wheelchair", nullable = false)
-    public boolean wheelchair;
+    @Column(nullable = false)
+    private boolean wheelchair;
 
-    @Column(name = "pets", nullable = false)
-    public boolean pets;
+    @Column(nullable = false)
+    private boolean pets;
 
-    @Column(name = "note", nullable = false)
-    public String note = "";
+    @Column(nullable = false)
+    private String note = "";
 
     public Ride() {
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public RideState getState() {
+        return state;
+    }
+
+    public void setState(RideState state) {
+        this.state = state;
+    }
+
+    public String getRider() {
+        return rider;
+    }
+
+    public void setRider(String rider) {
+        this.rider = rider;
+    }
+
+    public String getDriver() {
+        return driver;
+    }
+
+    public void setDriver(String driver) {
+        this.driver = driver;
+    }
+
+    public double getPickupLat() {
+        return pickupLat;
+    }
+
+    public void setPickupLat(double pickupLat) {
+        this.pickupLat = pickupLat;
+    }
+
+    public double getPickupLng() {
+        return pickupLng;
+    }
+
+    public void setPickupLng(double pickupLng) {
+        this.pickupLng = pickupLng;
+    }
+
+    public String getPickupAddress() {
+        return pickupAddress;
+    }
+
+    public void setPickupAddress(String pickupAddress) {
+        this.pickupAddress = pickupAddress;
+    }
+
+    public double getDropoffLat() {
+        return dropoffLat;
+    }
+
+    public void setDropoffLat(double dropoffLat) {
+        this.dropoffLat = dropoffLat;
+    }
+
+    public double getDropoffLng() {
+        return dropoffLng;
+    }
+
+    public void setDropoffLng(double dropoffLng) {
+        this.dropoffLng = dropoffLng;
+    }
+
+    public String getDropoffAddress() {
+        return dropoffAddress;
+    }
+
+    public void setDropoffAddress(String dropoffAddress) {
+        this.dropoffAddress = dropoffAddress;
+    }
+
+    public long getFareCents() {
+        return fareCents;
+    }
+
+    public void setFareCents(long fareCents) {
+        this.fareCents = fareCents;
+    }
+
+    public String getCurrency() {
+        return currency;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
+    }
+
+    public double getDistanceMeters() {
+        return distanceMeters;
+    }
+
+    public void setDistanceMeters(double distanceMeters) {
+        this.distanceMeters = distanceMeters;
+    }
+
+    public double getDurationSeconds() {
+        return durationSeconds;
+    }
+
+    public void setDurationSeconds(double durationSeconds) {
+        this.durationSeconds = durationSeconds;
+    }
+
+    public long getRequestedAt() {
+        return requestedAt;
+    }
+
+    public void setRequestedAt(long requestedAt) {
+        this.requestedAt = requestedAt;
+    }
+
+    public long getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(long updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
+    public long getOfferExpiresAt() {
+        return offerExpiresAt;
+    }
+
+    public void setOfferExpiresAt(long offerExpiresAt) {
+        this.offerExpiresAt = offerExpiresAt;
+    }
+
+    public long getSearchUntil() {
+        return searchUntil;
+    }
+
+    public void setSearchUntil(long searchUntil) {
+        this.searchUntil = searchUntil;
+    }
+
+    public int getStars() {
+        return stars;
+    }
+
+    public void setStars(int stars) {
+        this.stars = stars;
+    }
+
+    public String getPaymentStatus() {
+        return paymentStatus;
+    }
+
+    public void setPaymentStatus(String paymentStatus) {
+        this.paymentStatus = paymentStatus;
+    }
+
+    public String getProduct() {
+        return product;
+    }
+
+    public void setProduct(String product) {
+        this.product = product;
+    }
+
+    public String getMethodId() {
+        return methodId;
+    }
+
+    public void setMethodId(String methodId) {
+        this.methodId = methodId;
+    }
+
+    public String getMethodLabel() {
+        return methodLabel;
+    }
+
+    public void setMethodLabel(String methodLabel) {
+        this.methodLabel = methodLabel;
+    }
+
+    public long getBaseCents() {
+        return baseCents;
+    }
+
+    public void setBaseCents(long baseCents) {
+        this.baseCents = baseCents;
+    }
+
+    public long getDistanceCents() {
+        return distanceCents;
+    }
+
+    public void setDistanceCents(long distanceCents) {
+        this.distanceCents = distanceCents;
+    }
+
+    public long getTimeCents() {
+        return timeCents;
+    }
+
+    public void setTimeCents(long timeCents) {
+        this.timeCents = timeCents;
+    }
+
+    public long getFeeCents() {
+        return feeCents;
+    }
+
+    public void setFeeCents(long feeCents) {
+        this.feeCents = feeCents;
+    }
+
+    public long getTipCents() {
+        return tipCents;
+    }
+
+    public void setTipCents(long tipCents) {
+        this.tipCents = tipCents;
+    }
+
+    public long getDriverCents() {
+        return driverCents;
+    }
+
+    public void setDriverCents(long driverCents) {
+        this.driverCents = driverCents;
+    }
+
+    public boolean isWomenOnly() {
+        return womenOnly;
+    }
+
+    public void setWomenOnly(boolean womenOnly) {
+        this.womenOnly = womenOnly;
+    }
+
+    public boolean isQuiet() {
+        return quiet;
+    }
+
+    public void setQuiet(boolean quiet) {
+        this.quiet = quiet;
+    }
+
+    public boolean isWheelchair() {
+        return wheelchair;
+    }
+
+    public void setWheelchair(boolean wheelchair) {
+        this.wheelchair = wheelchair;
+    }
+
+    public boolean isPets() {
+        return pets;
+    }
+
+    public void setPets(boolean pets) {
+        this.pets = pets;
+    }
+
+    public String getNote() {
+        return note;
+    }
+
+    public void setNote(String note) {
+        this.note = note;
     }
 }

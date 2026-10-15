@@ -1,4 +1,4 @@
-CREATE TABLE wl_ride (
+CREATE TABLE ride (
     id VARCHAR(32) NOT NULL PRIMARY KEY,
     state VARCHAR(24) NOT NULL,
     rider VARCHAR(190) NOT NULL,
@@ -13,8 +13,8 @@ CREATE TABLE wl_ride (
     dropoff_address VARCHAR(255) NOT NULL,
     fare_cents BIGINT NOT NULL,
     currency VARCHAR(3) NOT NULL,
-    distance_m DOUBLE PRECISION NOT NULL,
-    duration_s DOUBLE PRECISION NOT NULL,
+    distance_meters DOUBLE PRECISION NOT NULL,
+    duration_seconds DOUBLE PRECISION NOT NULL,
     requested_at BIGINT NOT NULL,
     updated_at BIGINT NOT NULL,
     -- When the offer in hand lapses, or when the search for a driver gives up.
@@ -42,23 +42,23 @@ CREATE TABLE wl_ride (
     -- theirs is one. Neither is, until someone says so.
     pets SMALLINT NOT NULL
 );
-CREATE INDEX wl_ride_rider ON wl_ride (rider, requested_at);
-CREATE INDEX wl_ride_driver ON wl_ride (driver, requested_at);
-CREATE INDEX wl_ride_state ON wl_ride (state);
+CREATE INDEX ride_rider ON ride (rider, requested_at);
+CREATE INDEX ride_driver ON ride (driver, requested_at);
+CREATE INDEX ride_state ON ride (state);
 
 -- Every change of a ride's state, for the admin's view of what happened.
-CREATE TABLE wl_ride_event (
+CREATE TABLE ride_event (
     id VARCHAR(32) NOT NULL PRIMARY KEY,
     ride_id VARCHAR(32) NOT NULL,
     state VARCHAR(24) NOT NULL,
     actor VARCHAR(190) NOT NULL,
     created_at BIGINT NOT NULL
 );
-CREATE INDEX wl_ride_event_ride ON wl_ride_event (ride_id, created_at);
+CREATE INDEX ride_event_ride ON ride_event (ride_id, created_at);
 
 -- The drivers who passed on a ride, or let its offer lapse: they are not asked
 -- again for the same ride.
-CREATE TABLE wl_ride_passed (
+CREATE TABLE ride_passed (
     ride_id VARCHAR(32) NOT NULL,
     driver VARCHAR(190) NOT NULL,
     PRIMARY KEY (ride_id, driver)

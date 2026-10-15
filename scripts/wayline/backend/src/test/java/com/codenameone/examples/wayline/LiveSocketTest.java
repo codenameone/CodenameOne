@@ -30,6 +30,7 @@ import com.codename1.backend.test.LocalServerPort;
 import com.codename1.backend.test.MockMvc;
 import com.codenameone.examples.wayline.account.Accounts;
 import com.codenameone.examples.wayline.account.DemoAccounts;
+import com.codenameone.examples.wayline.api.RideState;
 import com.codenameone.examples.wayline.live.LiveHub;
 import com.codenameone.examples.wayline.live.LiveTickets;
 import org.junit.jupiter.api.Test;
@@ -76,7 +77,7 @@ class LiveSocketTest {
             assertEquals("{\"type\":\"pong\"}", text());
 
             // Something happens to a ride of theirs.
-            hub.rideChanged("ride-1", "ACCEPTED", DemoAccounts.RIDER, DemoAccounts.DRIVER, "");
+            hub.rideChanged("ride-1", RideState.ACCEPTED, DemoAccounts.RIDER, DemoAccounts.DRIVER, "");
             readFrame(rider);
             assertEquals("{\"type\":\"ride\",\"id\":\"ride-1\",\"state\":\"ACCEPTED\"}", text());
             hub.driverMoved(DemoAccounts.RIDER, "ride-1", 37.8, -122.4, 90);
@@ -84,8 +85,8 @@ class LiveSocketTest {
             assertTrue(text().startsWith("{\"type\":\"driver\",\"rideId\":\"ride-1\",\"lat\":37.8"),
                     text());
             // And to somebody else's, which is none of their business.
-            hub.rideChanged("ride-2", "ACCEPTED", "other@test.example", DemoAccounts.DRIVER, "");
-            hub.rideChanged("ride-3", "COMPLETED", DemoAccounts.RIDER, "", "");
+            hub.rideChanged("ride-2", RideState.ACCEPTED, "other@test.example", DemoAccounts.DRIVER, "");
+            hub.rideChanged("ride-3", RideState.COMPLETED, DemoAccounts.RIDER, "", "");
             readFrame(rider);
             assertTrue(text().indexOf("ride-3") > 0, text());
 
@@ -150,7 +151,7 @@ class LiveSocketTest {
         try {
             readFrame(admin);
             assertEquals("{\"type\":\"ready\"}", text());
-            hub.rideChanged("ride-9", "REQUESTED", "someone@test.example", "", "");
+            hub.rideChanged("ride-9", RideState.REQUESTED, "someone@test.example", "", "");
             readFrame(admin);
             assertTrue(text().indexOf("ride-9") > 0, text());
             hub.fleetChanged(DemoAccounts.DRIVER, true, 37.8, -122.4, 0);

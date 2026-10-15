@@ -29,9 +29,9 @@ import com.codename1.annotations.Mapped;
 @Mapped
 public class RideDto {
     public String id;
-    /// One of the names in RideStates. NONE means "there is no such ride", which is
-    /// how a question like "what is my active ride?" is answered when there is not one.
-    public String state;
+    /// NONE means "there is no such ride", which is how a question like "what is
+    /// my active ride?" is answered when there is not one.
+    public RideState state;
     public String riderUsername;
     public String riderName;
     public String driverUsername;

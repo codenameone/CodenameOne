@@ -25,19 +25,30 @@ package com.codenameone.examples.wayline.driver;
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
+import com.codename1.orm.session.Identifier;
 import com.codenameone.examples.wayline.Days;
 import com.codenameone.examples.wayline.Ids;
+import com.codenameone.examples.wayline.Rows;
 import com.codenameone.examples.wayline.Text;
-import com.codenameone.examples.wayline.account.ProfileRepository;
 import com.codenameone.examples.wayline.api.DayAmountDto;
 import com.codenameone.examples.wayline.api.EarningsSummaryDto;
 import com.codenameone.examples.wayline.api.PayoutAccountDto;
 import com.codenameone.examples.wayline.api.PayoutDto;
+import com.codenameone.examples.wayline.api.RideState;
+import com.codenameone.examples.wayline.domain.DriverHours;
 import com.codenameone.examples.wayline.domain.DriverState;
 import com.codenameone.examples.wayline.domain.Payout;
 import com.codenameone.examples.wayline.domain.PayoutAccount;
 import com.codenameone.examples.wayline.domain.Ride;
 import com.codenameone.examples.wayline.pay.Payments;
+import com.codenameone.examples.wayline.repository.DriverHoursRepository;
+import com.codenameone.examples.wayline.repository.DriverStateRepository;
+import com.codenameone.examples.wayline.repository.PayoutAccountRepository;
+import com.codenameone.examples.wayline.repository.PayoutRepository;
+import com.codenameone.examples.wayline.repository.ProfileRepository;
+import com.codenameone.examples.wayline.repository.RideEventRepository;
+import com.codenameone.examples.wayline.repository.RidePassedRepository;
+import com.codenameone.examples.wayline.repository.RideRepository;
 import com.codenameone.examples.wayline.ride.Fares;
 
 import java.io.IOException;
@@ -62,12 +73,27 @@ import java.util.Set;
 public class Earnings {
     private static final int DAYS = 14;
 
-    private final PayoutRepository repository;
+    private final PayoutRepository payouts;
+    private final PayoutAccountRepository accounts;
+    private final RideRepository rides;
+    private final RideEventRepository events;
+    private final RidePassedRepository passes;
+    private final DriverStateRepository drivers;
+    private final DriverHoursRepository hours;
     private final ProfileRepository profiles;
     private final Fares fares;
 
-    public Earnings(PayoutRepository repository, ProfileRepository profiles, Fares fares) {
-        this.repository = repository;
+    public Earnings(PayoutRepository payouts, PayoutAccountRepository accounts,
+            RideRepository rides, RideEventRepository events, RidePassedRepository passes,
+            DriverStateRepository drivers, DriverHoursRepository hours,
+            ProfileRepository profiles, Fares fares) {
+        this.payouts = payouts;
+        this.accounts = accounts;
+        this.rides = rides;
+        this.events = events;
+        this.passes = passes;
+        this.drivers = drivers;
+        this.hours = hours;
         this.profiles = profiles;
         this.fares = fares;
     }
@@ -89,22 +115,23 @@ public class Earnings {
         // rows.
         long monthStart = today - 29 * Days.MILLIS;
         long weekStart = today - 6 * Days.MILLIS;
-        List<Ride> rides = repository.completedSince(driver, monthStart);
+        List<Ride> done = rides.findByDriverAndStateAndUpdatedAtGreaterThanEqual(driver,
+                RideState.COMPLETED, monthStart);
         // A card tip is on its ride from the moment it is asked for, and is
         // still there when the processor never answered. Only one whose charge
         // is on record is earned, here as in the balance: otherwise a day's
         // total would show money that cannot be cashed out.
         Set<String> charged = new HashSet<String>(
-                repository.tipChargedSince(driver, monthStart));
-        for (int iter = 0; iter < rides.size(); iter++) {
-            Ride ride = rides.get(iter);
-            long at = ride.updatedAt;
-            boolean tipped = "cash".equals(ride.methodId) || charged.contains(ride.id);
+                rides.tipChargedSince(driver, monthStart));
+        for (int iter = 0; iter < done.size(); iter++) {
+            Ride ride = done.get(iter);
+            long at = ride.getUpdatedAt();
+            boolean tipped = "cash".equals(ride.getMethodId()) || charged.contains(ride.getId());
             // The fare likewise counts only once it is paid, as in the balance:
             // a card charge that failed, was refunded or has not come back is
             // no money of the driver's. The trip still counts as driven.
-            boolean paid = Payments.PAID.equals(ride.paymentStatus);
-            long earned = (paid ? ride.driverCents : 0L) + (tipped ? ride.tipCents : 0L);
+            boolean paid = Payments.PAID.equals(ride.getPaymentStatus());
+            long earned = (paid ? ride.getDriverCents() : 0L) + (tipped ? ride.getTipCents() : 0L);
             dto.month += earned;
             if (at >= weekStart) {
                 dto.week += earned;
@@ -119,21 +146,22 @@ public class Earnings {
                 day.trips++;
             }
         }
-        dto.trips = (int) repository.trips(driver);
-        dto.tips = repository.tips(driver);
+        dto.trips = (int) rides.countByDriverAndState(driver, RideState.COMPLETED);
+        dto.tips = tips(driver);
         dto.balance = balance(driver);
-        dto.onlineMinutes = (int) (repository.onlineMillis(driver, Days.number(now)) / 60000L);
-        DriverState car = repository.state(driver);
+        DriverHours day = hours.findById(Identifier.of(driver, Long.valueOf(Days.number(now))));
+        dto.onlineMinutes = day == null ? 0 : (int) (day.getMillis() / 60000L);
+        DriverState car = drivers.findById(driver);
         dto.rating = car == null ? 5d : car.rating();
-        dto.acceptanceRate = Drivers.acceptanceRate(repository.accepted(driver),
-                repository.passed(driver));
+        dto.acceptanceRate = Drivers.acceptanceRate(events.countByActorAndState(driver,
+                RideState.ACCEPTED), passes.countByDriver(driver));
         return dto;
     }
 
     /// The payouts made to a driver, newest first.
     @Transactional(readOnly = true)
     public List<PayoutDto> payouts(String driver) throws IOException {
-        List<Payout> rows = repository.payouts(driver);
+        List<Payout> rows = payouts.findTop100ByDriverOrderByCreatedAtDescIdAsc(driver);
         List<PayoutDto> out = new ArrayList<PayoutDto>();
         for (int iter = 0; iter < rows.size(); iter++) {
             out.add(toDto(rows.get(iter)));
@@ -153,29 +181,29 @@ public class Earnings {
     /// second request would have looked at the ledger before it waited.
     @Transactional
     public PayoutDto cashOut(String driver) throws IOException {
-        if (!repository.holdAccount(driver)) {
+        if (accounts.hold(driver) == 0) {
             throw new ResponseStatusException(409, "Add the account to be paid into first");
         }
-        PayoutAccount account = repository.account(driver);
+        PayoutAccount account = accounts.findById(driver);
         long amount = balance(driver);
         if (amount <= 0L) {
             throw new ResponseStatusException(409, "There is nothing to cash out");
         }
         Payout row = new Payout();
-        row.id = Ids.next();
-        row.driver = driver;
-        row.amountCents = amount;
-        row.status = "paid";
-        row.createdAt = System.currentTimeMillis();
-        row.destination = account.bankName + " ****" + account.last4;
-        repository.add(row);
+        row.setId(Ids.next());
+        row.setDriver(driver);
+        row.setAmountCents(amount);
+        row.setStatus("paid");
+        row.setCreatedAt(System.currentTimeMillis());
+        row.setDestination(account.getBankName() + " ****" + account.getLast4());
+        payouts.insert(row);
         return toDto(row);
     }
 
     /// Where a driver is paid; every field empty until they have said.
     @Transactional(readOnly = true)
     public PayoutAccountDto account(String driver) throws IOException {
-        return toDto(repository.account(driver));
+        return toDto(accounts.findById(driver));
     }
 
     /// Saves where a driver is paid. Only the last four digits of the account
@@ -202,41 +230,57 @@ public class Earnings {
         // and updates it. The payout account itself cannot be held: until
         // this inserts it there is no row.
         profiles.hold(driver);
-        PayoutAccount row = repository.account(driver);
+        PayoutAccount row = accounts.findById(driver);
         boolean added = row == null;
         if (added) {
             row = new PayoutAccount();
-            row.username = driver;
+            row.setUsername(driver);
         }
-        row.holder = holder;
-        row.bankName = bankName;
-        row.last4 = last4;
+        row.setHolder(holder);
+        row.setBankName(bankName);
+        row.setLast4(last4);
         if (added) {
-            repository.add(row);
+            accounts.insert(row);
         }
         return toDto(row);
     }
 
     /// Everything earned less everything paid out.
+    ///
+    /// Earned is the driver's share of the fares of every ride they completed
+    /// and that was paid for, plus their tips. The dashboard's totals count
+    /// the same rides.
     private long balance(String driver) {
-        return repository.fares(driver) + repository.tips(driver) - repository.paidOut(driver);
+        return Rows.number(rides.driverShare(driver)) + tips(driver)
+                - Rows.number(payouts.paidOut(driver));
+    }
+
+    /// The tips a driver has been given: those handed over in cash, and those
+    /// put on a card whose charge has come back.
+    ///
+    /// A card tip sits on its ride from the moment it is asked for, and stays
+    /// there with no charge recorded when the processor did not answer. It is
+    /// not money yet -- the card may never have been charged -- so it is not
+    /// counted, and so cannot be cashed out, until the charge is on record.
+    private long tips(String driver) {
+        return Rows.number(rides.cashTips(driver)) + Rows.number(rides.chargedTips(driver));
     }
 
     private static PayoutAccountDto toDto(PayoutAccount row) {
         PayoutAccountDto dto = new PayoutAccountDto();
-        dto.holder = row == null ? "" : row.holder;
-        dto.bankName = row == null ? "" : row.bankName;
-        dto.accountLast4 = row == null ? "" : row.last4;
+        dto.holder = row == null ? "" : row.getHolder();
+        dto.bankName = row == null ? "" : row.getBankName();
+        dto.accountLast4 = row == null ? "" : row.getLast4();
         return dto;
     }
 
     private static PayoutDto toDto(Payout row) {
         PayoutDto dto = new PayoutDto();
-        dto.id = row.id;
-        dto.amount = row.amountCents;
-        dto.status = row.status;
-        dto.createdAt = row.createdAt;
-        dto.destination = row.destination;
+        dto.id = row.getId();
+        dto.amount = row.getAmountCents();
+        dto.status = row.getStatus();
+        dto.createdAt = row.getCreatedAt();
+        dto.destination = row.getDestination();
         return dto;
     }
 }

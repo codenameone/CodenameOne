@@ -27,24 +27,64 @@ import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
 
 /// A card being added on the provider's page, until the browser comes back.
-@Entity(table = "wl_payment_setup")
+@Entity
 public class PaymentSetup {
     @Id(autoIncrement = false)
-    @Column(name = "id", nullable = false)
-    public String id = "";
+    @Column(nullable = false)
+    private String id = "";
 
-    @Column(name = "username", nullable = false)
-    public String username = "";
+    @Column(nullable = false)
+    private String username = "";
 
-    @Column(name = "reference", nullable = false)
-    public String reference = "";
+    @Column(nullable = false)
+    private String reference = "";
 
-    @Column(name = "created_at", nullable = false)
-    public long createdAt;
+    @Column(nullable = false)
+    private long createdAt;
 
-    @Column(name = "completed", nullable = false)
-    public boolean completed;
+    @Column(nullable = false)
+    private boolean completed;
 
     public PaymentSetup() {
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getReference() {
+        return reference;
+    }
+
+    public void setReference(String reference) {
+        this.reference = reference;
+    }
+
+    public long getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(long createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public boolean isCompleted() {
+        return completed;
+    }
+
+    public void setCompleted(boolean completed) {
+        this.completed = completed;
     }
 }

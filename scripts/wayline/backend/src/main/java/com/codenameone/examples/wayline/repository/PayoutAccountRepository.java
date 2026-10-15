@@ -20,33 +20,25 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codenameone.examples.wayline.account;
+package com.codenameone.examples.wayline.repository;
 
-import com.codename1.backend.annotations.Component;
-import com.codename1.orm.session.Session;
-import com.codenameone.examples.wayline.domain.DriverApplication;
-import com.codenameone.examples.wayline.domain.DriverDocument;
+import com.codename1.orm.repository.CrudRepository;
+import com.codename1.orm.repository.Modifying;
+import com.codename1.orm.repository.Param;
+import com.codename1.orm.repository.Query;
+import com.codename1.orm.repository.Repository;
+import com.codenameone.examples.wayline.domain.PayoutAccount;
 
-/// What the demo accounts write that nobody using the server could: an
-/// application to drive dated in the past, and documents that were accepted
-/// without anybody having looked at them.
-///
-/// Only [DemoAccounts] uses it. Everything an account can really do to an
-/// application goes through the service that owns applications.
-@Component
-public class DemoAccountRepository {
-    private final Session session;
+/// Where each driver is paid, keyed by the driver.
+@Repository(entity = PayoutAccount.class, key = String.class)
+public interface PayoutAccountRepository extends CrudRepository<PayoutAccount, String> {
+    /// Makes the rest of the transaction wait its turn behind any other that
+    /// holds the same driver's payout account.
+    ///
+    /// @return 1, or 0 for a driver who has not said where to be paid
+    @Modifying
+    @Query("update PayoutAccount a set a.last4 = a.last4 where a.username = :driver")
+    int hold(@Param("driver") String driver);
 
-    public DemoAccountRepository(Session session) {
-        this.session = session;
-    }
-
-    /// An account's application to drive, or null when it has none.
-    public DriverApplication application(String username) {
-        return session.find(DriverApplication.class, username);
-    }
-
-    public void add(DriverDocument document) {
-        session.persist(document);
-    }
+    int deleteByUsername(String username);
 }

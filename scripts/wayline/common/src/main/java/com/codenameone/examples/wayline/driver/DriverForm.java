@@ -39,7 +39,7 @@ import com.codenameone.examples.wayline.Telemetry;
 import com.codenameone.examples.wayline.api.DriverStatusDto;
 import com.codenameone.examples.wayline.api.EarningsDto;
 import com.codenameone.examples.wayline.api.RideDto;
-import com.codenameone.examples.wayline.api.RideStates;
+import com.codenameone.examples.wayline.api.RideState;
 import com.codenameone.examples.wayline.live.LiveChannel;
 import com.codenameone.examples.wayline.map.CarMarker;
 import com.codenameone.examples.wayline.map.Locator;
@@ -192,8 +192,8 @@ public class DriverForm extends LiveChannel.Adapter implements Nav.Home {
     }
 
     private void update(RideDto latest) {
-        boolean none = latest == null || RideStates.NONE.equals(latest.state);
-        if (none && ride != null && RideStates.OFFERED.equals(ride.state)) {
+        boolean none = latest == null || RideState.NONE == latest.state;
+        if (none && ride != null && RideState.OFFERED == ride.state) {
             Ui.say("The request went to another driver");
         } else if (none && ride != null) {
             Ui.say("The rider cancelled");
@@ -262,10 +262,10 @@ public class DriverForm extends LiveChannel.Adapter implements Nav.Home {
         pickupMarker = Maps.pickup(stage.map, pickup);
         dropoffMarker = Maps.dropoff(stage.map, dropoff);
         stage.frame(here, pickup, dropoff);
-        if (RideStates.ARRIVED.equals(ride.state)) {
+        if (RideState.ARRIVED == ride.state) {
             return;
         }
-        final LatLng to = RideStates.IN_PROGRESS.equals(ride.state) ? dropoff : pickup;
+        final LatLng to = RideState.IN_PROGRESS == ride.state ? dropoff : pickup;
         final String aimed = target;
         Routes.find(here, to, route -> {
             if (!aimed.equals(target) || ride == null) {
@@ -273,7 +273,7 @@ public class DriverForm extends LiveChannel.Adapter implements Nav.Home {
             }
             line = Maps.route(stage.map, route.points);
             // An offer shows the way; only an accepted ride is driven.
-            if (!RideStates.OFFERED.equals(ride.state)) {
+            if (RideState.OFFERED != ride.state) {
                 way = route;
             }
         });
@@ -310,8 +310,8 @@ public class DriverForm extends LiveChannel.Adapter implements Nav.Home {
 
     /// How far, and about how long, to where the ride needs the car next.
     private void chip() {
-        if (ride == null || RideStates.OFFERED.equals(ride.state)
-                || RideStates.ARRIVED.equals(ride.state)) {
+        if (ride == null || RideState.OFFERED == ride.state
+                || RideState.ARRIVED == ride.state) {
             stage.chip(null, (char) 0);
             return;
         }
@@ -321,7 +321,7 @@ public class DriverForm extends LiveChannel.Adapter implements Nav.Home {
     }
 
     private LatLng next() {
-        return RideStates.IN_PROGRESS.equals(ride.state)
+        return RideState.IN_PROGRESS == ride.state
                 ? new LatLng(ride.dropoffLat, ride.dropoffLng)
                 : new LatLng(ride.pickupLat, ride.pickupLng);
     }
@@ -348,7 +348,7 @@ public class DriverForm extends LiveChannel.Adapter implements Nav.Home {
         chip();
         if (ride == null) {
             waiting();
-        } else if (RideStates.OFFERED.equals(ride.state)) {
+        } else if (RideState.OFFERED == ride.state) {
             offer();
         } else {
             trip();
@@ -440,15 +440,15 @@ public class DriverForm extends LiveChannel.Adapter implements Nav.Home {
 
     private void trip() {
         final String id = ride.id;
-        String state = ride.state;
+        RideState state = ride.state;
         Container peek = sheet.peek();
-        Label title = Ui.label(RideStates.ACCEPTED.equals(state)
+        Label title = Ui.label(RideState.ACCEPTED == state
                 ? Lang.tr("Pick up {0}", ride.riderName)
-                : RideStates.ARRIVED.equals(state) ? Lang.tr("Waiting for {0}", ride.riderName)
+                : RideState.ARRIVED == state ? Lang.tr("Waiting for {0}", ride.riderName)
                 : Lang.tr("On the trip"), "WlHeading");
         title.setName("driverState");
         peek.add(title);
-        boolean aboard = RideStates.IN_PROGRESS.equals(state);
+        boolean aboard = RideState.IN_PROGRESS == state;
         peek.add(Ui.row(aboard ? FontImage.MATERIAL_PLACE : FontImage.MATERIAL_TRIP_ORIGIN,
                 aboard ? ride.dropoffAddress : ride.pickupAddress,
                 aboard ? "Drop-off" : "Pickup", null));
@@ -467,10 +467,10 @@ public class DriverForm extends LiveChannel.Adapter implements Nav.Home {
             reach.add(Ui.action(FontImage.MATERIAL_SMS, "Message", "message", e -> message()));
             peek.add(reach);
         }
-        if (RideStates.ACCEPTED.equals(state)) {
+        if (RideState.ACCEPTED == state) {
             peek.add(Ui.primary("I have arrived", "arrived",
                     e -> act(cb -> Api.driver().arrived(id, cb))));
-        } else if (RideStates.ARRIVED.equals(state)) {
+        } else if (RideState.ARRIVED == state) {
             peek.add(Ui.primary("Start trip", "start",
                     e -> act(cb -> Api.driver().start(id, cb))));
         } else {

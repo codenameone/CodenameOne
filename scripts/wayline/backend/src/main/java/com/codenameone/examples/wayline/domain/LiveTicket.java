@@ -27,18 +27,42 @@ import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
 
 /// A ticket for one connection to the live channel, as its hash.
-@Entity(table = "wl_live_ticket")
+@Entity
 public class LiveTicket {
     @Id(autoIncrement = false)
-    @Column(name = "ticket_hash", nullable = false)
-    public String ticketHash = "";
+    @Column(nullable = false)
+    private String ticketHash = "";
 
-    @Column(name = "username", nullable = false)
-    public String username = "";
+    @Column(nullable = false)
+    private String username = "";
 
-    @Column(name = "expires_at", nullable = false)
-    public long expiresAt;
+    @Column(nullable = false)
+    private long expiresAt;
 
     public LiveTicket() {
+    }
+
+    public String getTicketHash() {
+        return ticketHash;
+    }
+
+    public void setTicketHash(String ticketHash) {
+        this.ticketHash = ticketHash;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public long getExpiresAt() {
+        return expiresAt;
+    }
+
+    public void setExpiresAt(long expiresAt) {
+        this.expiresAt = expiresAt;
     }
 }

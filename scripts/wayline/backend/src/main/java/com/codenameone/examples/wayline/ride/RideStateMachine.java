@@ -22,7 +22,7 @@
  */
 package com.codenameone.examples.wayline.ride;
 
-import com.codenameone.examples.wayline.api.RideStates;
+import com.codenameone.examples.wayline.api.RideState;
 
 /// Which state a ride may move to from which.
 ///
@@ -43,58 +43,58 @@ import com.codenameone.examples.wayline.api.RideStates;
 /// accepting at once, or a rider cancelling as a driver accepts, one statement
 /// changes a row and the other changes none.
 public final class RideStateMachine {
-    private static final String[] NONE = {};
-    private static final String[] FROM_REQUESTED = {RideStates.REQUESTED};
-    private static final String[] FROM_OFFERED = {RideStates.OFFERED};
-    private static final String[] FROM_ACCEPTED = {RideStates.ACCEPTED};
-    private static final String[] FROM_ARRIVED = {RideStates.ARRIVED};
-    private static final String[] FROM_IN_PROGRESS = {RideStates.IN_PROGRESS};
-    private static final String[] BEFORE_THE_TRIP = {RideStates.REQUESTED, RideStates.OFFERED,
-        RideStates.ACCEPTED, RideStates.ARRIVED};
-    private static final String[] UNDER_WAY = {RideStates.REQUESTED, RideStates.OFFERED,
-        RideStates.ACCEPTED, RideStates.ARRIVED, RideStates.IN_PROGRESS};
-    private static final String[] TAKEN_NOT_STARTED = {RideStates.ACCEPTED, RideStates.ARRIVED};
+    private static final RideState[] NONE = {};
+    private static final RideState[] FROM_REQUESTED = {RideState.REQUESTED};
+    private static final RideState[] FROM_OFFERED = {RideState.OFFERED};
+    private static final RideState[] FROM_ACCEPTED = {RideState.ACCEPTED};
+    private static final RideState[] FROM_ARRIVED = {RideState.ARRIVED};
+    private static final RideState[] FROM_IN_PROGRESS = {RideState.IN_PROGRESS};
+    private static final RideState[] BEFORE_THE_TRIP = {RideState.REQUESTED, RideState.OFFERED,
+        RideState.ACCEPTED, RideState.ARRIVED};
+    private static final RideState[] UNDER_WAY = {RideState.REQUESTED, RideState.OFFERED,
+        RideState.ACCEPTED, RideState.ARRIVED, RideState.IN_PROGRESS};
+    private static final RideState[] TAKEN_NOT_STARTED = {RideState.ACCEPTED, RideState.ARRIVED};
 
     private RideStateMachine() {
     }
 
     /// The states a ride may be in to move to `to`. Empty for a state nothing
     /// moves to.
-    public static String[] sources(String to) {
-        if (RideStates.OFFERED.equals(to)) {
+    public static RideState[] sources(RideState to) {
+        if (RideState.OFFERED == to) {
             return FROM_REQUESTED;
         }
-        if (RideStates.REQUESTED.equals(to) || RideStates.ACCEPTED.equals(to)) {
+        if (RideState.REQUESTED == to || RideState.ACCEPTED == to) {
             return FROM_OFFERED;
         }
-        if (RideStates.ARRIVED.equals(to)) {
+        if (RideState.ARRIVED == to) {
             return FROM_ACCEPTED;
         }
-        if (RideStates.IN_PROGRESS.equals(to)) {
+        if (RideState.IN_PROGRESS == to) {
             return FROM_ARRIVED;
         }
-        if (RideStates.COMPLETED.equals(to)) {
+        if (RideState.COMPLETED == to) {
             return FROM_IN_PROGRESS;
         }
-        if (RideStates.CANCELLED_BY_RIDER.equals(to)) {
+        if (RideState.CANCELLED_BY_RIDER == to) {
             return BEFORE_THE_TRIP;
         }
-        if (RideStates.CANCELLED_BY_DRIVER.equals(to)) {
+        if (RideState.CANCELLED_BY_DRIVER == to) {
             return TAKEN_NOT_STARTED;
         }
-        if (RideStates.CANCELLED_BY_ADMIN.equals(to)) {
+        if (RideState.CANCELLED_BY_ADMIN == to) {
             return UNDER_WAY;
         }
-        if (RideStates.NO_DRIVERS.equals(to)) {
+        if (RideState.NO_DRIVERS == to) {
             return FROM_REQUESTED;
         }
         return NONE;
     }
 
-    public static boolean allowed(String from, String to) {
-        String[] sources = sources(to);
+    public static boolean allowed(RideState from, RideState to) {
+        RideState[] sources = sources(to);
         for (int iter = 0; iter < sources.length; iter++) {
-            if (sources[iter].equals(from)) {
+            if (sources[iter] == from) {
                 return true;
             }
         }

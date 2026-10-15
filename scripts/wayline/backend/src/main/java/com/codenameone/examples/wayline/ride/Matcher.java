@@ -25,15 +25,24 @@ package com.codenameone.examples.wayline.ride;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codename1.backend.security.core.userdetails.JdbcUserDetailsManager;
+import com.codenameone.examples.wayline.api.RideState;
 import com.codenameone.examples.wayline.domain.DriverApplication;
 import com.codenameone.examples.wayline.domain.DriverState;
+import com.codenameone.examples.wayline.domain.Profile;
 import com.codenameone.examples.wayline.domain.Ride;
-import com.codenameone.examples.wayline.driver.DriverRepository;
+import com.codenameone.examples.wayline.domain.RidePassed;
+import com.codenameone.examples.wayline.driving.Applications;
 import com.codenameone.examples.wayline.geo.Geo;
+import com.codenameone.examples.wayline.repository.DriverApplicationRepository;
+import com.codenameone.examples.wayline.repository.DriverStateRepository;
+import com.codenameone.examples.wayline.repository.ProfileRepository;
+import com.codenameone.examples.wayline.repository.RidePassedRepository;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /// Finds the drivers near a point.
 ///
@@ -58,13 +67,24 @@ public class Matcher {
     /// How long a ride waits before the search widens.
     static final long WIDEN_AFTER_MILLIS = 20000L;
 
-    private final DriverRepository drivers;
-    private final RideRepository rides;
+    /// The states of a ride that keep its driver from being offered another.
+    private static final RideState[] WITH_RIDE = {RideState.OFFERED, RideState.ACCEPTED,
+        RideState.ARRIVED, RideState.IN_PROGRESS};
+    private static final String FEMALE = "female";
+
+    private final DriverStateRepository drivers;
+    private final DriverApplicationRepository applications;
+    private final ProfileRepository profiles;
+    private final RidePassedRepository passes;
     private final JdbcUserDetailsManager users;
 
-    public Matcher(DriverRepository drivers, RideRepository rides, JdbcUserDetailsManager users) {
+    public Matcher(DriverStateRepository drivers, DriverApplicationRepository applications,
+            ProfileRepository profiles, RidePassedRepository passes,
+            JdbcUserDetailsManager users) {
         this.drivers = drivers;
-        this.rides = rides;
+        this.applications = applications;
+        this.profiles = profiles;
+        this.passes = passes;
         this.users = users;
     }
 
@@ -83,10 +103,10 @@ public class Matcher {
 
         Candidate(DriverState state, String product, double meters) {
             this.state = state;
-            this.username = state.username;
-            this.lat = state.lat;
-            this.lng = state.lng;
-            this.heading = state.heading;
+            this.username = state.getUsername();
+            this.lat = state.getLat();
+            this.lng = state.getLng();
+            this.heading = state.getHeading();
             this.product = product;
             this.meters = meters;
         }
@@ -112,9 +132,11 @@ public class Matcher {
     /// and their account is not blocked. Both are read here, each time, and
     /// not trusted to have been put right elsewhere: an approval withdrawn or
     /// an account blocked takes a driver out of matching at once, whatever
-    /// their state still says. The approval is part of the query. Whether the
-    /// account is blocked is the sign-in's to say, and its tables are its own,
-    /// so each of the handful the query answers is asked about there.
+    /// their state still says. The approval is part of the query. What the
+    /// rider asked of the car and the driver is read from the applications
+    /// and profiles of the handful the query answers. Whether the account is
+    /// blocked is the sign-in's to say, and its tables are its own, so each
+    /// driver still fit for the ride is asked about there.
     ///
     /// @param product the kind of car the ride asks for, or null for any
     /// @param womenOnly whether the rider asked for a woman driver
@@ -127,44 +149,61 @@ public class Matcher {
         double shrink = Math.max(0.01d, Math.cos(Math.toRadians(lat)));
         double dLng = radiusMeters / (Geo.METERS_PER_DEGREE * shrink);
         List<DriverState> boxed = drivers.freeInBox(System.currentTimeMillis() - FRESH_MILLIS,
-                lat - dLat, lat + dLat, lng - dLng, lng + dLng, product, womenOnly, wheelchair,
-                pets);
+                lat - dLat, lat + dLat, lng - dLng, lng + dLng, Applications.APPROVED, WITH_RIDE);
         List<DriverState> inReach = new ArrayList<DriverState>();
         List<String> names = new ArrayList<String>();
         for (int iter = 0; iter < boxed.size(); iter++) {
             DriverState state = boxed.get(iter);
-            if (Geo.meters(lat, lng, state.lat, state.lng) > radiusMeters) {
+            if (Geo.meters(lat, lng, state.getLat(), state.getLng()) > radiusMeters) {
                 // Inside the box but outside the circle: a corner of it.
                 continue;
             }
-            if (!enabled(state.username)) {
-                continue;
-            }
             inReach.add(state);
-            names.add(state.username);
+            names.add(state.getUsername());
         }
-        List<DriverApplication> applications = drivers.applications(names);
+        if (inReach.isEmpty()) {
+            return new ArrayList<Candidate>();
+        }
+        Map<String, DriverApplication> cars = new HashMap<String, DriverApplication>();
+        List<DriverApplication> rows = applications.findByUsernameIn(names);
+        for (int iter = 0; iter < rows.size(); iter++) {
+            cars.put(rows.get(iter).getUsername(), rows.get(iter));
+        }
+        Map<String, Profile> people = new HashMap<String, Profile>();
+        if (womenOnly) {
+            List<Profile> found = profiles.findByUsernameIn(names);
+            for (int iter = 0; iter < found.size(); iter++) {
+                people.put(found.get(iter).getUsername(), found.get(iter));
+            }
+        }
         List<Candidate> near = new ArrayList<Candidate>();
         for (int iter = 0; iter < inReach.size(); iter++) {
             DriverState state = inReach.get(iter);
-            String kind = null;
-            for (int a = 0; a < applications.size(); a++) {
-                if (state.username.equals(applications.get(a).username)) {
-                    kind = applications.get(a).product;
-                    break;
-                }
-            }
-            if (kind == null) {
+            DriverApplication car = cars.get(state.getUsername());
+            if (car == null) {
                 // The application went between the two queries, and the
                 // approval with it.
                 continue;
             }
-            double meters = Geo.meters(lat, lng, state.lat, state.lng);
+            if (product != null && !product.equals(car.getProduct())
+                    || wheelchair && !car.isWheelchair() || pets && !car.isPets()) {
+                continue;
+            }
+            if (womenOnly) {
+                Profile who = people.get(state.getUsername());
+                if (who == null || !FEMALE.equals(who.getGender())) {
+                    continue;
+                }
+            }
+            if (!enabled(state.getUsername())) {
+                continue;
+            }
+            double meters = Geo.meters(lat, lng, state.getLat(), state.getLng());
             int at = 0;
             while (at < near.size() && near.get(at).meters <= meters) {
                 at++;
             }
-            near.add(at, new Candidate(state, kind, meters));
+            near.add(at, new Candidate(state, car.getProduct(), meters));
         }
         return near;
     }
@@ -178,12 +217,16 @@ public class Matcher {
     /// or null when there is none in reach.
     @Transactional(readOnly = true)
     public String pick(Ride ride, long waitedMillis) throws IOException {
-        List<Candidate> near = nearby(ride.pickupLat, ride.pickupLng, radius(waitedMillis),
-                ride.product, ride.womenOnly, ride.wheelchair, ride.pets);
+        List<Candidate> near = nearby(ride.getPickupLat(), ride.getPickupLng(), radius(waitedMillis),
+                ride.getProduct(), ride.isWomenOnly(), ride.isWheelchair(), ride.isPets());
         if (near.isEmpty()) {
             return null;
         }
-        List<String> passed = rides.passedOn(ride.id);
+        List<RidePassed> rows = passes.findByRideId(ride.getId());
+        List<String> passed = new ArrayList<String>();
+        for (int iter = 0; iter < rows.size(); iter++) {
+            passed.add(rows.get(iter).getDriver());
+        }
         for (int iter = 0; iter < near.size(); iter++) {
             String driver = near.get(iter).username;
             if (!passed.contains(driver)) {

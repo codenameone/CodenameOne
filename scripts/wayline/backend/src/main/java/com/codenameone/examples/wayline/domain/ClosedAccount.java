@@ -28,15 +28,31 @@ import com.codename1.annotations.Id;
 
 /// What is left of an account that was closed: the hash of its e-mail, kept so
 /// that the address cannot be registered again.
-@Entity(table = "wl_closed_account")
+@Entity
 public class ClosedAccount {
     @Id(autoIncrement = false)
-    @Column(name = "username_hash", nullable = false)
-    public String usernameHash = "";
+    @Column(nullable = false)
+    private String usernameHash = "";
 
-    @Column(name = "closed_at", nullable = false)
-    public long closedAt;
+    @Column(nullable = false)
+    private long closedAt;
 
     public ClosedAccount() {
+    }
+
+    public String getUsernameHash() {
+        return usernameHash;
+    }
+
+    public void setUsernameHash(String usernameHash) {
+        this.usernameHash = usernameHash;
+    }
+
+    public long getClosedAt() {
+        return closedAt;
+    }
+
+    public void setClosedAt(long closedAt) {
+        this.closedAt = closedAt;
     }
 }

@@ -20,27 +20,16 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codenameone.examples.wayline.account;
+package com.codenameone.examples.wayline.repository;
 
-import com.codename1.backend.annotations.Component;
-import com.codename1.orm.session.Session;
-import com.codenameone.examples.wayline.domain.Preference;
+import com.codename1.orm.repository.CrudRepository;
+import com.codename1.orm.repository.Repository;
+import com.codenameone.examples.wayline.domain.Pricing;
 
-/// Where an account's preferences are read from and written to.
-@Component
-public class PreferenceRepository {
-    private final Session session;
-
-    public PreferenceRepository(Session session) {
-        this.session = session;
-    }
-
-    /// The preferences of an account, or null for someone who never saved any.
-    public Preference find(String username) {
-        return session.find(Preference.class, username);
-    }
-
-    public void add(Preference preference) {
-        session.persist(preference);
-    }
+/// The admin's prices: one row, whose key is [#ONLY], or none while the prices
+/// are still the settings'.
+@Repository(entity = Pricing.class, key = Integer.class)
+public interface PricingRepository extends CrudRepository<Pricing, Integer> {
+    /// The key of the one row there is.
+    Integer ONLY = Integer.valueOf(1);
 }

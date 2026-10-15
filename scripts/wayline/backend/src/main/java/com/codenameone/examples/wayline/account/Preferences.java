@@ -30,6 +30,8 @@ import com.codenameone.examples.wayline.api.PreferencesDto;
 import com.codenameone.examples.wayline.domain.Preference;
 import com.codenameone.examples.wayline.domain.Profile;
 import com.codenameone.examples.wayline.pay.Payments;
+import com.codenameone.examples.wayline.repository.PreferenceRepository;
+import com.codenameone.examples.wayline.repository.ProfileRepository;
 
 import java.io.IOException;
 
@@ -62,13 +64,13 @@ public class Preferences {
 
     @Transactional(readOnly = true)
     public PreferencesDto get(String username) throws IOException {
-        Profile profile = profiles.find(username);
+        Profile profile = profiles.findById(username);
         if (profile == null) {
             throw new ResponseStatusException(404, "No such account");
         }
-        Preference row = preferences.find(username);
+        Preference row = preferences.findById(username);
         PreferencesDto dto = new PreferencesDto();
-        dto.language = profile.language;
+        dto.language = profile.getLanguage();
         dto.defaultPaymentMethodId = payments.defaultMethod(username);
         if (row == null) {
             // What someone who never opened the settings gets.
@@ -80,17 +82,17 @@ public class Preferences {
             dto.shareTripsWith = "";
             return dto;
         }
-        dto.theme = row.theme;
-        dto.units = row.units;
-        dto.notifyRideUpdates = row.notifyRides;
-        dto.notifyReceipts = row.notifyReceipts;
-        dto.notifyPromotions = row.notifyPromotions;
-        dto.driverGender = row.driverGender;
-        dto.quietRide = row.quietRide;
-        dto.accessibleVehicle = row.wheelchair;
-        dto.petFriendly = row.petFriendly;
-        dto.defaultTipPercent = row.defaultTip;
-        dto.shareTripsWith = row.shareTripsWith;
+        dto.theme = row.getTheme();
+        dto.units = row.getUnits();
+        dto.notifyRideUpdates = row.isNotifyRides();
+        dto.notifyReceipts = row.isNotifyReceipts();
+        dto.notifyPromotions = row.isNotifyPromotions();
+        dto.driverGender = row.getDriverGender();
+        dto.quietRide = row.isQuietRide();
+        dto.accessibleVehicle = row.isWheelchair();
+        dto.petFriendly = row.isPetFriendly();
+        dto.defaultTipPercent = row.getDefaultTip();
+        dto.shareTripsWith = row.getShareTripsWith();
         return dto;
     }
 
@@ -129,30 +131,30 @@ public class Preferences {
         // Read after the card was marked, not before: marking one may be a
         // statement over every card of the account, and what was read before
         // such a statement is no longer the session's to write.
-        Profile profile = profiles.find(username);
+        Profile profile = profiles.findById(username);
         if (profile == null) {
             throw new ResponseStatusException(404, "No such account");
         }
-        profile.language = language;
-        Preference row = preferences.find(username);
+        profile.setLanguage(language);
+        Preference row = preferences.findById(username);
         boolean unsaved = row == null;
         if (unsaved) {
             row = new Preference();
-            row.username = username;
+            row.setUsername(username);
         }
-        row.theme = theme;
-        row.units = units;
-        row.notifyRides = wanted.notifyRideUpdates;
-        row.notifyReceipts = wanted.notifyReceipts;
-        row.notifyPromotions = wanted.notifyPromotions;
-        row.driverGender = driverGender;
-        row.quietRide = wanted.quietRide;
-        row.wheelchair = wanted.accessibleVehicle;
-        row.petFriendly = wanted.petFriendly;
-        row.defaultTip = tip;
-        row.shareTripsWith = shareWith;
+        row.setTheme(theme);
+        row.setUnits(units);
+        row.setNotifyRides(wanted.notifyRideUpdates);
+        row.setNotifyReceipts(wanted.notifyReceipts);
+        row.setNotifyPromotions(wanted.notifyPromotions);
+        row.setDriverGender(driverGender);
+        row.setQuietRide(wanted.quietRide);
+        row.setWheelchair(wanted.accessibleVehicle);
+        row.setPetFriendly(wanted.petFriendly);
+        row.setDefaultTip(tip);
+        row.setShareTripsWith(shareWith);
         if (unsaved) {
-            preferences.add(row);
+            preferences.insert(row);
         }
         return get(username);
     }

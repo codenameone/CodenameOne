@@ -22,40 +22,46 @@
  */
 package com.codenameone.examples.wayline.api;
 
-/// The states of a ride, as they are written in [RideDto#state].
-///
-/// Strings and not an enum, on purpose: a state is a word on the wire and in a
-/// database column, and both sides compare it as one. An app built before a
-/// state was added then meets a word it does not know instead of failing to
-/// decode the whole ride.
-public final class RideStates {
+/// The states of a ride, as [RideDto#state] carries them and the server stores
+/// them: by name, on the wire and in the database column.
+public enum RideState {
     /// No ride. Never stored; it answers "is there one?".
-    public static final String NONE = "NONE";
+    NONE,
     /// Asked for; no driver has been offered it yet.
-    public static final String REQUESTED = "REQUESTED";
+    REQUESTED,
     /// Offered to one driver, who has a few seconds to answer.
-    public static final String OFFERED = "OFFERED";
+    OFFERED,
     /// A driver took it and is on the way to the pickup.
-    public static final String ACCEPTED = "ACCEPTED";
+    ACCEPTED,
     /// The driver is at the pickup.
-    public static final String ARRIVED = "ARRIVED";
+    ARRIVED,
     /// The rider is in the car.
-    public static final String IN_PROGRESS = "IN_PROGRESS";
-    public static final String COMPLETED = "COMPLETED";
-    public static final String CANCELLED_BY_RIDER = "CANCELLED_BY_RIDER";
-    public static final String CANCELLED_BY_DRIVER = "CANCELLED_BY_DRIVER";
+    IN_PROGRESS,
+    COMPLETED,
+    CANCELLED_BY_RIDER,
+    CANCELLED_BY_DRIVER,
     /// Stopped by an admin, at any point before it completed.
-    public static final String CANCELLED_BY_ADMIN = "CANCELLED_BY_ADMIN";
+    CANCELLED_BY_ADMIN,
     /// Nobody was near enough, or nobody took it.
-    public static final String NO_DRIVERS = "NO_DRIVERS";
+    NO_DRIVERS;
 
-    private RideStates() {
+    /// Whether a ride in this state is still going on: someone is waiting for a
+    /// driver, or a driver is involved and the trip is not over.
+    public boolean isActive() {
+        return this == REQUESTED || this == OFFERED || this == ACCEPTED || this == ARRIVED
+                || this == IN_PROGRESS;
     }
 
-    /// Whether a ride in `state` is still going on: someone is waiting for a
-    /// driver, or a driver is involved and the trip is not over.
-    public static boolean isActive(String state) {
-        return REQUESTED.equals(state) || OFFERED.equals(state) || ACCEPTED.equals(state)
-                || ARRIVED.equals(state) || IN_PROGRESS.equals(state);
+    /// The state called `name`, or null for a name that is none of them -- one
+    /// a newer server sends, say. Unlike `valueOf` it never throws, so a
+    /// caller reading a name off the wire needs no `catch`.
+    public static RideState named(String name) {
+        RideState[] all = values();
+        for (int iter = 0; iter < all.length; iter++) {
+            if (all[iter].name().equals(name)) {
+                return all[iter];
+            }
+        }
+        return null;
     }
 }

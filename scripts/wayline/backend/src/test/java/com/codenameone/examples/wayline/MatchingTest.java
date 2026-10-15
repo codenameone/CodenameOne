@@ -74,7 +74,7 @@ class MatchingTest {
         String standard = People.driver(accounts, "vie-standard");
         String comfort = People.driver(accounts, "vie-comfort");
         // What an admin's review of the application would have recorded.
-        db.execute("UPDATE wl_driver_application SET product = 'comfort' WHERE username = ?",
+        db.execute("UPDATE driver_application SET product = 'comfort' WHERE username = ?",
                 new Object[] {comfort});
         Trips.online(mvc, standard, LAT, LNG);
         Trips.online(mvc, comfort, LAT + 0.001, LNG);
@@ -137,7 +137,7 @@ class MatchingTest {
                         ask(rider, "\"driverGender\":\"men\"")), rider))
                 .andExpect(status().isBadRequest());
         expect(rider, "\"driverGender\":\"women\"", "REQUESTED");
-        db.execute("UPDATE wl_profile SET gender = 'female' WHERE username = ?",
+        db.execute("UPDATE profile SET gender = 'female' WHERE username = ?",
                 new Object[] {comfort});
         // Still not for a standard ride: she drives a comfort car.
         expect(rider, "\"driverGender\":\"women\"", "REQUESTED");
@@ -158,7 +158,7 @@ class MatchingTest {
 
         // A car that takes a wheelchair.
         expect(rider, "\"accessibleVehicle\":true", "REQUESTED");
-        db.execute("UPDATE wl_driver_application SET wheelchair = 1 WHERE username = ?",
+        db.execute("UPDATE driver_application SET wheelchair = 1 WHERE username = ?",
                 new Object[] {standard});
         expect(rider, "\"accessibleVehicle\":true", "OFFERED");
 
@@ -167,19 +167,19 @@ class MatchingTest {
         mvc.perform(People.asRider(Trips.body(post("/api/rides/quote"),
                         ask(rider, "\"petFriendly\":true")), rider))
                 .andExpect(jsonPath("$.driversNearby").value(0));
-        db.execute("UPDATE wl_driver_application SET pets = 1 WHERE username = ?",
+        db.execute("UPDATE driver_application SET pets = 1 WHERE username = ?",
                 new Object[] {standard});
         expect(rider, "\"petFriendly\":true", "OFFERED");
 
         // An approval withdrawn takes a driver out of matching at once, on
         // line or not.
         expect(rider, "\"product\":\"standard\"", "OFFERED");
-        db.execute("UPDATE wl_driver_application SET status = 'rejected' WHERE username = ?",
+        db.execute("UPDATE driver_application SET status = 'rejected' WHERE username = ?",
                 new Object[] {standard});
         expect(rider, "\"product\":\"standard\"", "REQUESTED");
         mvc.perform(People.asRider(get("/api/rides/nearby?lat=" + LAT + "&lng=" + LNG), rider))
                 .andExpect(jsonPath("$.length()").value(1));
-        db.execute("UPDATE wl_driver_application SET status = 'approved' WHERE username = ?",
+        db.execute("UPDATE driver_application SET status = 'approved' WHERE username = ?",
                 new Object[] {standard});
         Trips.offline(mvc, standard);
         Trips.offline(mvc, comfort);
@@ -197,7 +197,7 @@ class MatchingTest {
 
         // What an account that is half gone leaves behind: on line, approved,
         // and nobody. Whatever the ride asks for, it is not sent there.
-        db.execute("DELETE FROM wl_profile WHERE username = ?", new Object[] {driver});
+        db.execute("DELETE FROM profile WHERE username = ?", new Object[] {driver});
         mvc.perform(People.asRider(Trips.body(post("/api/rides/quote"), ride), rider))
                 .andExpect(jsonPath("$.driversNearby").value(0));
         Map asked = Trips.json(mvc, People.asRider(Trips.body(post("/api/rides"), ride), rider));

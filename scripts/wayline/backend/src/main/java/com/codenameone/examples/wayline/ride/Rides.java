@@ -28,27 +28,32 @@ import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Scheduled;
 import com.codename1.backend.annotations.Transactional;
 import com.codename1.backend.annotations.Value;
+import com.codename1.orm.repository.PageRequest;
+import com.codename1.orm.session.Identifier;
 import com.codename1.orm.session.PersistenceException;
 import com.codenameone.examples.wayline.Ids;
 import com.codenameone.examples.wayline.Text;
 import com.codenameone.examples.wayline.account.Moderation;
-import com.codenameone.examples.wayline.account.ProfileRepository;
 import com.codenameone.examples.wayline.api.FareOptionDto;
 import com.codenameone.examples.wayline.api.FareQuoteDto;
 import com.codenameone.examples.wayline.api.NearbyDriverDto;
 import com.codenameone.examples.wayline.api.PricingDto;
 import com.codenameone.examples.wayline.api.RideDto;
 import com.codenameone.examples.wayline.api.RideRequestDto;
-import com.codenameone.examples.wayline.api.RideStates;
+import com.codenameone.examples.wayline.api.RideState;
 import com.codenameone.examples.wayline.domain.DriverState;
 import com.codenameone.examples.wayline.domain.Profile;
 import com.codenameone.examples.wayline.domain.Ride;
 import com.codenameone.examples.wayline.domain.RideEvent;
 import com.codenameone.examples.wayline.domain.RidePassed;
-import com.codenameone.examples.wayline.driver.DriverRepository;
 import com.codenameone.examples.wayline.geo.Geo;
 import com.codenameone.examples.wayline.live.LiveHub;
 import com.codenameone.examples.wayline.pay.Payments;
+import com.codenameone.examples.wayline.repository.DriverStateRepository;
+import com.codenameone.examples.wayline.repository.ProfileRepository;
+import com.codenameone.examples.wayline.repository.RideEventRepository;
+import com.codenameone.examples.wayline.repository.RidePassedRepository;
+import com.codenameone.examples.wayline.repository.RideRepository;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -83,9 +88,21 @@ public class Rides {
         {"Wayline", "Affordable everyday rides", "4"},
         {"Comfort", "Newer cars with extra legroom", "4"},
         {"XL", "Room for up to six", "6"}};
+    /// The two people a move can be held to; see [#tryMove].
+    private static final String RIDER = "rider";
+    private static final String DRIVER = "driver";
+    private static final RideState[] ACTIVE = {RideState.REQUESTED, RideState.OFFERED,
+        RideState.ACCEPTED, RideState.ARRIVED, RideState.IN_PROGRESS};
+    private static final RideState[] WITH_DRIVER = {RideState.OFFERED, RideState.ACCEPTED,
+        RideState.ARRIVED, RideState.IN_PROGRESS};
+    private static final RideState[] ENDED_WITH_DRIVER = {RideState.COMPLETED,
+        RideState.CANCELLED_BY_RIDER, RideState.CANCELLED_BY_DRIVER,
+        RideState.CANCELLED_BY_ADMIN};
 
     private final RideRepository rides;
-    private final DriverRepository drivers;
+    private final RideEventRepository events;
+    private final RidePassedRepository passes;
+    private final DriverStateRepository drivers;
     private final ProfileRepository profiles;
     private final Matcher matcher;
     private final Fares fares;
@@ -97,11 +114,13 @@ public class Rides {
 
     /// @param offerSeconds how long a driver has to answer an offer
     /// @param searchSeconds how long a ride looks for a driver before giving up
-    public Rides(RideRepository rides, DriverRepository drivers, ProfileRepository profiles,
-            Matcher matcher, Fares fares, Payments payments, LiveHub live, Moderation moderation,
+    public Rides(RideRepository rides, RideEventRepository events, RidePassedRepository passes,
+            DriverStateRepository drivers, ProfileRepository profiles, Matcher matcher, Fares fares, Payments payments, LiveHub live, Moderation moderation,
             @Value("${wayline.offer.seconds:15}") int offerSeconds,
             @Value("${wayline.search.seconds:90}") int searchSeconds) {
         this.rides = rides;
+        this.events = events;
+        this.passes = passes;
         this.drivers = drivers;
         this.profiles = profiles;
         this.moderation = moderation;
@@ -192,7 +211,7 @@ public class Rides {
     public RideDto request(String rider, RideRequestDto request) throws IOException {
         validate(request);
         String id = attempt(() -> open(rider, request));
-        live.rideChanged(id, RideStates.REQUESTED, rider, "", "");
+        live.rideChanged(id, RideState.REQUESTED, rider, "", "");
         search(id);
         return read(id, rider);
     }
@@ -204,11 +223,11 @@ public class Rides {
         // has committed its own. Without it both look, both find none, and
         // the rider has two rides.
         profiles.hold(rider);
-        Profile profile = profiles.find(rider);
-        if (profile == null || !profile.phoneVerified) {
+        Profile profile = profiles.findById(rider);
+        if (profile == null || !profile.isPhoneVerified()) {
             throw new ResponseStatusException(403, "Verify your phone number before you ride");
         }
-        if (rides.activeForRider(rider) != null) {
+        if (rides.findFirstByRiderAndStateIn(rider, ACTIVE) != null) {
             throw new ResponseStatusException(409, "You already have a ride under way");
         }
         String product = Fares.product(request.product);
@@ -227,50 +246,50 @@ public class Rides {
         // while the ride is under way is for the rides after it. The quote the
         // rider was shown is not sent back and would not be believed.
         Ride ride = new Ride();
-        ride.id = Ids.next();
-        ride.state = RideStates.REQUESTED;
-        ride.rider = rider;
-        ride.pickupLat = request.pickupLat;
-        ride.pickupLng = request.pickupLng;
-        ride.pickupAddress = address(request.pickupAddress);
-        ride.dropoffLat = request.dropoffLat;
-        ride.dropoffLng = request.dropoffLng;
-        ride.dropoffAddress = address(request.dropoffAddress);
-        ride.fareCents = price.fare;
-        ride.currency = fares.currency();
-        ride.distanceMeters = meters;
-        ride.durationSeconds = seconds;
-        ride.requestedAt = now;
-        ride.updatedAt = now;
-        ride.searchUntil = now + searchMillis;
-        ride.paymentStatus = Payments.PENDING;
-        ride.product = product;
-        ride.methodId = method[0];
-        ride.methodLabel = method[1];
-        ride.baseCents = price.base;
-        ride.distanceCents = price.distance;
-        ride.timeCents = price.time;
-        ride.feeCents = price.fee;
-        ride.driverCents = price.fare - Fares.commission(pricing, price.fare);
-        ride.womenOnly = womenOnly;
-        ride.quiet = request.quietRide;
-        ride.wheelchair = request.accessibleVehicle;
-        ride.note = address(request.note);
-        ride.pets = request.petFriendly;
-        rides.add(ride);
-        event(ride.id, RideStates.REQUESTED, rider);
-        return ride.id;
+        ride.setId(Ids.next());
+        ride.setState(RideState.REQUESTED);
+        ride.setRider(rider);
+        ride.setPickupLat(request.pickupLat);
+        ride.setPickupLng(request.pickupLng);
+        ride.setPickupAddress(address(request.pickupAddress));
+        ride.setDropoffLat(request.dropoffLat);
+        ride.setDropoffLng(request.dropoffLng);
+        ride.setDropoffAddress(address(request.dropoffAddress));
+        ride.setFareCents(price.fare);
+        ride.setCurrency(fares.currency());
+        ride.setDistanceMeters(meters);
+        ride.setDurationSeconds(seconds);
+        ride.setRequestedAt(now);
+        ride.setUpdatedAt(now);
+        ride.setSearchUntil(now + searchMillis);
+        ride.setPaymentStatus(Payments.PENDING);
+        ride.setProduct(product);
+        ride.setMethodId(method[0]);
+        ride.setMethodLabel(method[1]);
+        ride.setBaseCents(price.base);
+        ride.setDistanceCents(price.distance);
+        ride.setTimeCents(price.time);
+        ride.setFeeCents(price.fee);
+        ride.setDriverCents(price.fare - Fares.commission(pricing, price.fare));
+        ride.setWomenOnly(womenOnly);
+        ride.setQuiet(request.quietRide);
+        ride.setWheelchair(request.accessibleVehicle);
+        ride.setNote(address(request.note));
+        ride.setPets(request.petFriendly);
+        rides.insert(ride);
+        event(ride.getId(), RideState.REQUESTED, rider);
+        return ride.getId();
     }
 
     @Transactional(readOnly = true)
     public RideDto activeForRider(String rider) throws IOException {
-        Ride ride = rides.activeForRider(rider);
+        Ride ride = rides.findFirstByRiderAndStateIn(rider, ACTIVE);
         return ride == null ? none() : toDto(ride, rider, new HashMap<String, Profile>());
     }
 
     @Transactional(readOnly = true)
     public List<RideDto> historyForRider(String rider) throws IOException {
-        return list(rides.historyForRider(rider), rider);
+        return list(rides.findTop50ByRiderOrderByRequestedAtDesc(rider), rider);
     }
 
     public RideDto cancelByRider(String rider, String id) throws IOException {
@@ -281,9 +300,9 @@ public class Rides {
 
     @Transactional
     private Change cancelAsRider(String rider, String id) throws IOException {
-        Ride before = owned(id, RideRepository.RIDER, rider);
-        move(id, RideStates.CANCELLED_BY_RIDER, rider, RideRepository.RIDER, null, null);
-        return new Change(id, RideStates.CANCELLED_BY_RIDER, rider, before.driver, "",
+        Ride before = owned(id, RIDER, rider);
+        move(id, RideState.CANCELLED_BY_RIDER, rider, RIDER, null, null);
+        return new Change(id, RideState.CANCELLED_BY_RIDER, rider, before.getDriver(), "",
                 view(id, rider));
     }
 
@@ -297,7 +316,7 @@ public class Rides {
 
     @Transactional
     private RideDto rated(String rider, String id, int stars) throws IOException {
-        String driver = owned(id, RideRepository.RIDER, rider).driver;
+        String driver = owned(id, RIDER, rider).getDriver();
         if (rides.rate(id, rider, stars) != 1) {
             throw new ResponseStatusException(409, "That ride cannot be rated now");
         }
@@ -310,17 +329,18 @@ public class Rides {
     /// The offer waiting for this driver's answer, or the ride they are on.
     @Transactional(readOnly = true)
     public RideDto activeForDriver(String driver) throws IOException {
-        Ride ride = rides.activeForDriver(driver);
+        Ride ride = rides.findFirstByDriverAndStateIn(driver, WITH_DRIVER);
         return ride == null ? none() : toDto(ride, driver, new HashMap<String, Profile>());
     }
 
     @Transactional(readOnly = true)
     public List<RideDto> historyForDriver(String driver) throws IOException {
-        return list(rides.historyForDriver(driver), driver);
+        return list(rides.findTop50ByDriverAndStateInOrderByRequestedAtDesc(driver,
+                ENDED_WITH_DRIVER), driver);
     }
 
     public RideDto accept(String driver, String id) throws IOException {
-        return tell(attempt(() -> step(driver, id, RideStates.ACCEPTED)));
+        return tell(attempt(() -> step(driver, id, RideState.ACCEPTED)));
     }
 
     /// Passes on an offer. The ride goes back to looking, and not at this
@@ -333,18 +353,18 @@ public class Rides {
 
     @Transactional
     private Change pass(String driver, String id) throws IOException {
-        Ride ride = owned(id, RideRepository.DRIVER, driver);
-        move(id, RideStates.REQUESTED, driver, RideRepository.DRIVER, "", null);
+        Ride ride = owned(id, DRIVER, driver);
+        move(id, RideState.REQUESTED, driver, DRIVER, "", null);
         passed(id, driver);
-        return new Change(id, RideStates.REQUESTED, ride.rider, "", driver, null);
+        return new Change(id, RideState.REQUESTED, ride.getRider(), "", driver, null);
     }
 
     public RideDto arrived(String driver, String id) throws IOException {
-        return tell(attempt(() -> step(driver, id, RideStates.ARRIVED)));
+        return tell(attempt(() -> step(driver, id, RideState.ARRIVED)));
     }
 
     public RideDto start(String driver, String id) throws IOException {
-        return tell(attempt(() -> step(driver, id, RideStates.IN_PROGRESS)));
+        return tell(attempt(() -> step(driver, id, RideState.IN_PROGRESS)));
     }
 
     /// Ends the trip and charges the rider.
@@ -363,8 +383,8 @@ public class Rides {
 
     @Transactional
     private Ride finish(String driver, String id) throws IOException {
-        Ride ride = owned(id, RideRepository.DRIVER, driver);
-        move(id, RideStates.COMPLETED, driver, RideRepository.DRIVER, null, null);
+        Ride ride = owned(id, DRIVER, driver);
+        move(id, RideState.COMPLETED, driver, DRIVER, null, null);
         return ride;
     }
 
@@ -400,7 +420,7 @@ public class Rides {
         for (int iter = 0; iter < unsettled.size(); iter++) {
             Ride ride = unsettled.get(iter);
             try {
-                tell(settled(ride.driver, ride.id, payments.settle(ride)));
+                tell(settled(ride.getDriver(), ride.getId(), payments.settle(ride)));
             } catch (IOException err) {
                 failed = failed == null ? err : failed;
             } catch (RuntimeException err) {
@@ -417,26 +437,26 @@ public class Rides {
 
     @Transactional(readOnly = true)
     private List<Ride> unsettled(long after, long before) {
-        return rides.unsettled(after, before, 50);
+        return rides.unsettled(after, before, new PageRequest(0, 50));
     }
 
     @Transactional
     private Change settled(String driver, String id, String status) throws IOException {
         rides.paymentStatus(id, status);
-        Ride ride = rides.find(id);
-        return new Change(id, ride.state, ride.rider, ride.driver, "",
+        Ride ride = find(id);
+        return new Change(id, ride.getState(), ride.getRider(), ride.getDriver(), "",
                 toDto(ride, driver, new HashMap<String, Profile>()));
     }
 
     public RideDto cancelByDriver(String driver, String id) throws IOException {
-        return tell(attempt(() -> step(driver, id, RideStates.CANCELLED_BY_DRIVER)));
+        return tell(attempt(() -> step(driver, id, RideState.CANCELLED_BY_DRIVER)));
     }
 
     /// One of a driver's own moves of a ride that is theirs, and the ride as
     /// they see it afterwards.
     @Transactional
-    private Change step(String driver, String id, String to) throws IOException {
-        if (RideStates.ACCEPTED.equals(to)) {
+    private Change step(String driver, String id, RideState to) throws IOException {
+        if (RideState.ACCEPTED == to) {
             // Blocking a driver is refused while they have a ride taken, and
             // takes the driver's profile to look. Taking an offer holds the
             // same row first and then asks whether the account is still
@@ -449,10 +469,10 @@ public class Rides {
                 throw new ResponseStatusException(403, "This account has been blocked");
             }
         }
-        owned(id, RideRepository.DRIVER, driver);
-        move(id, to, driver, RideRepository.DRIVER, null, null);
-        Ride ride = rides.find(id);
-        return new Change(id, ride.state, ride.rider, ride.driver, "",
+        owned(id, DRIVER, driver);
+        move(id, to, driver, DRIVER, null, null);
+        Ride ride = find(id);
+        return new Change(id, ride.getState(), ride.getRider(), ride.getDriver(), "",
                 toDto(ride, driver, new HashMap<String, Profile>()));
     }
 
@@ -468,16 +488,16 @@ public class Rides {
 
     @Transactional
     private Change cancelAsAdmin(String by, String id, String why) throws IOException {
-        Ride before = rides.find(id);
+        Ride before = find(id);
         if (before == null) {
             throw new ResponseStatusException(404, "No such ride");
         }
-        String rider = before.rider;
-        String driver = before.driver;
-        move(id, RideStates.CANCELLED_BY_ADMIN, by, null, null, null);
+        String rider = before.getRider();
+        String driver = before.getDriver();
+        move(id, RideState.CANCELLED_BY_ADMIN, by, null, null, null);
         moderation.record(rider, by, "cancel_ride", why);
-        return new Change(id, RideStates.CANCELLED_BY_ADMIN, rider, driver, "",
-                toDto(rides.find(id), driver, new HashMap<String, Profile>(), false));
+        return new Change(id, RideState.CANCELLED_BY_ADMIN, rider, driver, "",
+                toDto(find(id), driver, new HashMap<String, Profile>(), false));
     }
 
     // ---------------------------------------------------------------- anyone
@@ -487,24 +507,24 @@ public class Rides {
     /// learn about it.
     @Transactional(readOnly = true)
     public RideDto get(String viewer, boolean admin, String id) throws IOException {
-        Ride ride = rides.find(id);
-        if (ride == null || !(admin || viewer.equals(ride.rider)
-                || viewer.equals(ride.driver))) {
+        Ride ride = find(id);
+        if (ride == null || !(admin || viewer.equals(ride.getRider())
+                || viewer.equals(ride.getDriver()))) {
             throw new ResponseStatusException(404, "No such ride");
         }
-        return toDto(ride, admin ? ride.driver : viewer, new HashMap<String, Profile>(),
+        return toDto(ride, admin ? ride.getDriver() : viewer, new HashMap<String, Profile>(),
                 !admin);
     }
 
     /// The most recent rides, for the admin.
     @Transactional(readOnly = true)
     public List<RideDto> recent() throws IOException {
-        List<Ride> rows = rides.recent(100);
+        List<Ride> rows = rides.newest(new PageRequest(0, 100));
         Map<String, Profile> cache = new HashMap<String, Profile>();
         List<RideDto> out = new ArrayList<RideDto>();
         for (int iter = 0; iter < rows.size(); iter++) {
             Ride ride = rows.get(iter);
-            out.add(toDto(ride, ride.driver, cache, false));
+            out.add(toDto(ride, ride.getDriver(), cache, false));
         }
         return out;
     }
@@ -533,16 +553,16 @@ public class Rides {
     @Transactional
     private Change choose(String id, String[] chosen) throws IOException {
         chosen[0] = null;
-        Ride ride = rides.find(id);
-        if (ride == null || !RideStates.REQUESTED.equals(ride.state)) {
+        Ride ride = find(id);
+        if (ride == null || RideState.REQUESTED != ride.getState()) {
             return null;
         }
         long now = System.currentTimeMillis();
-        if (now > ride.searchUntil) {
-            return tryMove(id, RideStates.NO_DRIVERS, "", null, null, null)
-                    ? new Change(id, RideStates.NO_DRIVERS, ride.rider, "", "", null) : null;
+        if (now > ride.getSearchUntil()) {
+            return tryMove(id, RideState.NO_DRIVERS, "", null, null, null)
+                    ? new Change(id, RideState.NO_DRIVERS, ride.getRider(), "", "", null) : null;
         }
-        chosen[0] = matcher.pick(ride, now - ride.requestedAt);
+        chosen[0] = matcher.pick(ride, now - ride.getRequestedAt());
         return null;
     }
 
@@ -557,16 +577,17 @@ public class Rides {
     /// of the two has a row of its own.
     @Transactional
     private Change offer(String id, String driver) throws IOException {
-        if (!drivers.hold(driver) || rides.activeForDriver(driver) != null) {
+        if (drivers.hold(driver) == 0
+                || rides.findFirstByDriverAndStateIn(driver, WITH_DRIVER) != null) {
             return null;
         }
-        Ride ride = rides.find(id);
-        if (ride == null || !RideStates.REQUESTED.equals(ride.state)) {
+        Ride ride = find(id);
+        if (ride == null || RideState.REQUESTED != ride.getState()) {
             return null;
         }
         long now = System.currentTimeMillis();
-        return tryMove(id, RideStates.OFFERED, "", null, driver, Long.valueOf(now + offerMillis))
-                ? new Change(id, RideStates.OFFERED, ride.rider, driver, "", null) : null;
+        return tryMove(id, RideState.OFFERED, "", null, driver, Long.valueOf(now + offerMillis))
+                ? new Change(id, RideState.OFFERED, ride.getRider(), driver, "", null) : null;
     }
 
     /// Takes back the offers nobody answered and looks again for every ride
@@ -583,7 +604,7 @@ public class Rides {
         for (int iter = 0; iter < lapsed.size(); iter++) {
             Ride ride = lapsed.get(iter);
             try {
-                tell(attempt(() -> lapse(ride.id, ride.rider, ride.driver)));
+                tell(attempt(() -> lapse(ride.getId(), ride.getRider(), ride.getDriver())));
             } catch (IOException err) {
                 failed = failed == null ? err : failed;
             } catch (RuntimeException err) {
@@ -593,7 +614,7 @@ public class Rides {
         List<Ride> waiting = waitingRides();
         for (int iter = 0; iter < waiting.size(); iter++) {
             try {
-                search(waiting.get(iter).id);
+                search(waiting.get(iter).getId());
             } catch (IOException err) {
                 failed = failed == null ? err : failed;
             } catch (RuntimeException err) {
@@ -610,12 +631,12 @@ public class Rides {
 
     @Transactional(readOnly = true)
     private List<Ride> lapsedOffers(long now) throws IOException {
-        return rides.lapsedOffers(now);
+        return rides.findByStateAndOfferExpiresAtLessThan(RideState.OFFERED, now);
     }
 
     @Transactional(readOnly = true)
     private List<Ride> waitingRides() throws IOException {
-        return rides.waiting();
+        return rides.findByStateOrderByRequestedAtAsc(RideState.REQUESTED);
     }
 
     /// Takes a lapsed offer back from the driver it was made to, or changes
@@ -624,11 +645,11 @@ public class Rides {
     private Change lapse(String id, String rider, String driver) throws IOException {
         // Held to the driver it lapsed for: if they accepted in the instant
         // since the query, this changes nothing and the ride is theirs.
-        if (!tryMove(id, RideStates.REQUESTED, driver, RideRepository.DRIVER, "", null)) {
+        if (!tryMove(id, RideState.REQUESTED, driver, DRIVER, "", null)) {
             return null;
         }
         passed(id, driver);
-        return new Change(id, RideStates.REQUESTED, rider, "", driver, null);
+        return new Change(id, RideState.REQUESTED, rider, "", driver, null);
     }
 
     // ------------------------------------------------------------- internals
@@ -639,14 +660,14 @@ public class Rides {
     /// begin and commit their transactions has to be able to name it.
     static final class Change {
         final String id;
-        final String state;
+        final RideState state;
         final String rider;
         final String driver;
         /// Someone else to tell: the driver an offer was taken back from.
         final String also;
         final RideDto view;
 
-        Change(String id, String state, String rider, String driver, String also, RideDto view) {
+        Change(String id, RideState state, String rider, String driver, String also, RideDto view) {
             this.id = id;
             this.state = state;
             this.rider = rider;
@@ -711,12 +732,12 @@ public class Rides {
     }
 
     /// Moves a ride to `to`, or answers 409 when its state does not allow it.
-    private void move(String id, String to, String actor, String ownerField, String newDriver,
+    private void move(String id, RideState to, String actor, String ownerField, String newDriver,
             Long newOfferExpiresAt) throws IOException {
         if (!tryMove(id, to, actor, ownerField, newDriver, newOfferExpiresAt)) {
-            Ride now = rides.find(id);
+            Ride now = find(id);
             throw new ResponseStatusException(409, "That ride is "
-                    + (now == null ? "gone" : describe(now.state)));
+                    + (now == null ? "gone" : describe(now.getState())));
         }
     }
 
@@ -727,56 +748,79 @@ public class Rides {
     /// read before this is no longer the session's, and is read again by
     /// whoever needs it as it is now.
     ///
-    /// @param ownerField [RideRepository#RIDER] or [RideRepository#DRIVER] to
-    ///     hold the change to rides whose rider or driver is `actor`, or null
-    ///     for a change the server makes itself
-    /// @param newDriver the driver to write with the change, or null
+    /// @param ownerField [#RIDER] or [#DRIVER] to hold the change to rides
+    ///     whose rider or driver is `actor`, or null for a change the server
+    ///     makes itself
+    /// @param newDriver the driver to write with the change, or null to leave
+    ///     it as it is
     /// @param newOfferExpiresAt when the offer this change makes lapses, or null
-    private boolean tryMove(String id, String to, String actor, String ownerField,
+    private boolean tryMove(String id, RideState to, String actor, String ownerField,
             String newDriver, Long newOfferExpiresAt) throws IOException {
-        String[] sources = RideStateMachine.sources(to);
+        RideState[] sources = RideStateMachine.sources(to);
         if (sources.length == 0) {
             return false;
         }
-        // An offer that has lapsed cannot be taken, even in the moment before
-        // the sweep takes it back.
-        boolean offerOpen = RideStates.ACCEPTED.equals(to);
-        if (rides.move(id, sources, to, System.currentTimeMillis(), ownerField, actor, newDriver,
-                newOfferExpiresAt, offerOpen) != 1) {
+        long now = System.currentTimeMillis();
+        int moved;
+        if (newOfferExpiresAt != null) {
+            moved = rides.offer(id, sources, to, now, newDriver, newOfferExpiresAt.longValue());
+        } else if (RIDER.equals(ownerField)) {
+            moved = rides.moveAsRider(id, sources, to, now, actor);
+        } else if (!DRIVER.equals(ownerField)) {
+            moved = rides.moveByServer(id, sources, to, now);
+        } else if (newDriver != null) {
+            moved = rides.giveBack(id, sources, to, now, actor, newDriver);
+        } else if (RideState.ACCEPTED == to) {
+            // An offer that has lapsed cannot be taken, even in the moment
+            // before the sweep takes it back.
+            moved = rides.takeOffer(id, sources, to, now, actor);
+        } else {
+            moved = rides.moveAsDriver(id, sources, to, now, actor);
+        }
+        if (moved != 1) {
             return false;
         }
         event(id, to, actor);
         return true;
     }
 
-    private void event(String id, String state, String actor) throws IOException {
+    private void event(String id, RideState state, String actor) throws IOException {
         RideEvent event = new RideEvent();
-        event.id = Ids.next();
-        event.rideId = id;
-        event.state = state;
-        event.actor = actor;
-        event.createdAt = System.currentTimeMillis();
-        rides.add(event);
+        event.setId(Ids.next());
+        event.setRideId(id);
+        event.setState(state);
+        event.setActor(actor);
+        event.setCreatedAt(System.currentTimeMillis());
+        events.insert(event);
     }
 
     private void passed(String id, String driver) {
-        if (!rides.hasPassed(id, driver)) {
+        if (!passes.existsById(Identifier.of(id, driver))) {
             RidePassed passed = new RidePassed();
-            passed.rideId = id;
-            passed.driver = driver;
-            rides.add(passed);
+            passed.setRideId(id);
+            passed.setDriver(driver);
+            passes.insert(passed);
         }
     }
 
     /// The ride, when `actor` is its rider or its driver, whichever `field`
     /// names; 404 otherwise.
     private Ride owned(String id, String field, String actor) {
-        Ride ride = rides.find(id);
-        if (ride == null || !actor.equals(RideRepository.RIDER.equals(field) ? ride.rider
-                : ride.driver)) {
+        Ride ride = find(id);
+        if (ride == null || !actor.equals(RIDER.equals(field) ? ride.getRider()
+                : ride.getDriver())) {
             throw new ResponseStatusException(404, "No such ride");
         }
         return ride;
+    }
+
+    /// The ride of this id, or null when there is none. An id that cannot be
+    /// one is not looked for.
+    private Ride find(String id) {
+        if (id == null || id.length() == 0 || id.length() > 32) {
+            return null;
+        }
+        return rides.findById(id);
     }
 
     /// The ride as `viewer` sees it, read in a transaction of its own.
@@ -786,7 +830,7 @@ public class Rides {
     }
 
     private RideDto view(String id, String viewer) throws IOException {
-        return toDto(rides.find(id), viewer, new HashMap<String, Profile>());
+        return toDto(find(id), viewer, new HashMap<String, Profile>());
     }
 
     private List<RideDto> list(List<Ride> rows, String viewer) throws IOException {
@@ -800,7 +844,7 @@ public class Rides {
 
     static RideDto none() {
         RideDto dto = new RideDto();
-        dto.state = RideStates.NONE;
+        dto.state = RideState.NONE;
         return dto;
     }
 
@@ -816,46 +860,46 @@ public class Rides {
     private RideDto toDto(Ride ride, String viewer, Map<String, Profile> cache, boolean party)
             throws IOException {
         RideDto dto = new RideDto();
-        dto.id = ride.id;
-        dto.state = ride.state;
+        dto.id = ride.getId();
+        dto.state = ride.getState();
         // An account's name is the e-mail it signs in with. The other party
         // to a ride is shown a display name, and a phone number while the two
         // are meeting; the address is for its owner and for an admin.
-        boolean asRider = !party || (viewer != null && viewer.equals(ride.rider));
-        boolean asDriver = !party || (viewer != null && viewer.equals(ride.driver));
+        boolean asRider = !party || (viewer != null && viewer.equals(ride.getRider()));
+        boolean asDriver = !party || (viewer != null && viewer.equals(ride.getDriver()));
         if (asRider) {
-            dto.riderUsername = ride.rider;
+            dto.riderUsername = ride.getRider();
         }
-        Profile rider = profile(ride.rider, cache);
-        dto.riderName = rider == null ? "" : rider.displayName;
-        dto.pickupLat = ride.pickupLat;
-        dto.pickupLng = ride.pickupLng;
-        dto.pickupAddress = ride.pickupAddress;
-        dto.dropoffLat = ride.dropoffLat;
-        dto.dropoffLng = ride.dropoffLng;
-        dto.dropoffAddress = ride.dropoffAddress;
-        dto.fareCents = ride.fareCents;
-        dto.currency = ride.currency;
-        dto.distanceMeters = ride.distanceMeters;
-        dto.durationSeconds = ride.durationSeconds;
-        dto.requestedAt = ride.requestedAt;
-        dto.updatedAt = ride.updatedAt;
-        dto.rating = ride.stars;
-        dto.paymentStatus = ride.paymentStatus;
-        dto.product = ride.product;
-        dto.paymentMethodLabel = ride.methodLabel;
-        dto.cash = Payments.CASH.equals(ride.methodId);
-        dto.serviceFee = ride.feeCents;
-        dto.tip = ride.tipCents;
+        Profile rider = profile(ride.getRider(), cache);
+        dto.riderName = rider == null ? "" : rider.getDisplayName();
+        dto.pickupLat = ride.getPickupLat();
+        dto.pickupLng = ride.getPickupLng();
+        dto.pickupAddress = ride.getPickupAddress();
+        dto.dropoffLat = ride.getDropoffLat();
+        dto.dropoffLng = ride.getDropoffLng();
+        dto.dropoffAddress = ride.getDropoffAddress();
+        dto.fareCents = ride.getFareCents();
+        dto.currency = ride.getCurrency();
+        dto.distanceMeters = ride.getDistanceMeters();
+        dto.durationSeconds = ride.getDurationSeconds();
+        dto.requestedAt = ride.getRequestedAt();
+        dto.updatedAt = ride.getUpdatedAt();
+        dto.rating = ride.getStars();
+        dto.paymentStatus = ride.getPaymentStatus();
+        dto.product = ride.getProduct();
+        dto.paymentMethodLabel = ride.getMethodLabel();
+        dto.cash = Payments.CASH.equals(ride.getMethodId());
+        dto.serviceFee = ride.getFeeCents();
+        dto.tip = ride.getTipCents();
         dto.total = dto.fareCents + dto.serviceFee + dto.tip;
-        dto.driverGender = ride.womenOnly ? WOMEN : DRIVER_GENDERS[0];
-        dto.quietRide = ride.quiet;
-        dto.accessibleVehicle = ride.wheelchair;
-        dto.petFriendly = ride.pets;
-        dto.note = ride.note;
+        dto.driverGender = ride.isWomenOnly() ? WOMEN : DRIVER_GENDERS[0];
+        dto.quietRide = ride.isQuiet();
+        dto.accessibleVehicle = ride.isWheelchair();
+        dto.petFriendly = ride.isPets();
+        dto.note = ride.getNote();
         dto.driverPhotoInitials = "";
-        String driver = ride.driver;
-        boolean offered = RideStates.OFFERED.equals(dto.state);
+        String driver = ride.getDriver();
+        boolean offered = RideState.OFFERED == dto.state;
         // An offer is between the server and one driver. Until it is taken the
         // rider has no driver, and is not shown who was asked.
         if (driver.length() > 0 && (!offered || driver.equals(viewer))) {
@@ -864,22 +908,22 @@ public class Rides {
             }
             Profile who = profile(driver, cache);
             if (who != null) {
-                dto.driverName = who.displayName;
+                dto.driverName = who.getDisplayName();
                 dto.driverPhotoInitials = Text.initials(dto.driverName);
-                dto.vehicle = who.vehicle;
-                dto.plate = who.plate;
+                dto.vehicle = who.getVehicle();
+                dto.plate = who.getPlate();
             }
-            boolean meeting = RideStates.ACCEPTED.equals(dto.state)
-                    || RideStates.ARRIVED.equals(dto.state)
-                    || RideStates.IN_PROGRESS.equals(dto.state);
+            boolean meeting = RideState.ACCEPTED == dto.state
+                    || RideState.ARRIVED == dto.state
+                    || RideState.IN_PROGRESS == dto.state;
             if (party && meeting && viewer != null) {
-                if (viewer.equals(ride.rider) && who != null) {
-                    dto.driverPhone = who.phone;
+                if (viewer.equals(ride.getRider()) && who != null) {
+                    dto.driverPhone = who.getPhone();
                 } else if (viewer.equals(driver) && rider != null) {
-                    dto.riderPhone = rider.phone;
+                    dto.riderPhone = rider.getPhone();
                 }
             }
-            DriverState car = drivers.find(driver);
+            DriverState car = drivers.findById(driver);
             if (car != null) {
                 dto.driverRating = car.rating();
             }
@@ -889,15 +933,15 @@ public class Rides {
             // where they are for other people's rides: read from here, a past
             // rider could follow them indefinitely.
             if (car != null && meeting) {
-                dto.driverLat = car.lat;
-                dto.driverLng = car.lng;
-                dto.driverHeading = car.heading;
+                dto.driverLat = car.getLat();
+                dto.driverLng = car.getLng();
+                dto.driverHeading = car.getHeading();
                 // How long until the car is where it is going next: the pickup
                 // until the rider is in it, the destination after.
-                if (RideStates.ACCEPTED.equals(dto.state)) {
+                if (RideState.ACCEPTED == dto.state) {
                     dto.etaMinutes = minutes(dto.driverLat, dto.driverLng, dto.pickupLat,
                             dto.pickupLng);
-                } else if (RideStates.IN_PROGRESS.equals(dto.state)) {
+                } else if (RideState.IN_PROGRESS == dto.state) {
                     dto.etaMinutes = minutes(dto.driverLat, dto.driverLng, dto.dropoffLat,
                             dto.dropoffLng);
                 }
@@ -905,7 +949,7 @@ public class Rides {
         }
         if (offered) {
             dto.offerExpiresInSeconds = (int) Math.max(0L,
-                    (ride.offerExpiresAt - System.currentTimeMillis()) / 1000L);
+                    (ride.getOfferExpiresAt() - System.currentTimeMillis()) / 1000L);
         }
         return dto;
     }
@@ -924,7 +968,7 @@ public class Rides {
         if (cache.containsKey(username)) {
             return cache.get(username);
         }
-        Profile row = profiles.find(username);
+        Profile row = profiles.findById(username);
         cache.put(username, row);
         return row;
     }
@@ -949,17 +993,17 @@ public class Rides {
         return text.length() > 255 ? text.substring(0, 255) : text;
     }
 
-    private static String describe(String state) {
-        if (RideStates.COMPLETED.equals(state)) {
+    private static String describe(RideState state) {
+        if (RideState.COMPLETED == state) {
             return "already completed";
         }
-        if (RideStates.IN_PROGRESS.equals(state)) {
+        if (RideState.IN_PROGRESS == state) {
             return "already under way";
         }
-        if (RideStates.ACCEPTED.equals(state) || RideStates.ARRIVED.equals(state)) {
+        if (RideState.ACCEPTED == state || RideState.ARRIVED == state) {
             return "already taken";
         }
-        if (RideStates.REQUESTED.equals(state) || RideStates.OFFERED.equals(state)) {
+        if (RideState.REQUESTED == state || RideState.OFFERED == state) {
             return "no longer on offer to you";
         }
         return "no longer available";

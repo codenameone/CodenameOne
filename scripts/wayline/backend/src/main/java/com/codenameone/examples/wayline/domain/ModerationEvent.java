@@ -27,27 +27,75 @@ import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
 
 /// One thing an admin did to an account, and why. Written once, never changed.
-@Entity(table = "wl_moderation_event")
+@Entity
 public class ModerationEvent {
     @Id(autoIncrement = false)
-    @Column(name = "id", nullable = false)
-    public String id = "";
+    @Column(nullable = false)
+    private String id = "";
 
-    @Column(name = "username", nullable = false)
-    public String username = "";
+    @Column(nullable = false)
+    private String username = "";
 
-    @Column(name = "created_at", nullable = false)
-    public long createdAt;
+    @Column(nullable = false)
+    private long createdAt;
 
-    @Column(name = "actor", nullable = false)
-    public String actor = "";
+    @Column(nullable = false)
+    private String actor = "";
 
-    @Column(name = "action", nullable = false)
-    public String action = "";
+    @Column(nullable = false)
+    private String action = "";
 
-    @Column(name = "reason", nullable = false)
-    public String reason = "";
+    @Column(nullable = false)
+    private String reason = "";
 
     public ModerationEvent() {
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public long getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(long createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public String getActor() {
+        return actor;
+    }
+
+    public void setActor(String actor) {
+        this.actor = actor;
+    }
+
+    public String getAction() {
+        return action;
+    }
+
+    public void setAction(String action) {
+        this.action = action;
+    }
+
+    public String getReason() {
+        return reason;
+    }
+
+    public void setReason(String reason) {
+        this.reason = reason;
     }
 }

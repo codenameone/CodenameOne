@@ -52,7 +52,7 @@ import com.codename1.ui.plaf.UIManager;
 import com.codenameone.examples.wayline.net.Net;
 import com.codenameone.examples.wayline.Prefs;
 import com.codenameone.examples.wayline.Telemetry;
-import com.codenameone.examples.wayline.api.RideStates;
+import com.codenameone.examples.wayline.api.RideState;
 
 import java.util.Date;
 
@@ -692,43 +692,43 @@ public final class Ui {
     }
 
     /// A ride's state in words.
-    public static String state(String state) {
-        if (RideStates.REQUESTED.equals(state) || RideStates.OFFERED.equals(state)) {
+    public static String state(RideState state) {
+        if (RideState.REQUESTED == state || RideState.OFFERED == state) {
             return "Finding a driver";
         }
-        if (RideStates.ACCEPTED.equals(state)) {
+        if (RideState.ACCEPTED == state) {
             return "Driver on the way";
         }
-        if (RideStates.ARRIVED.equals(state)) {
+        if (RideState.ARRIVED == state) {
             return "Driver at pickup";
         }
-        if (RideStates.IN_PROGRESS.equals(state)) {
+        if (RideState.IN_PROGRESS == state) {
             return "On the trip";
         }
-        if (RideStates.COMPLETED.equals(state)) {
+        if (RideState.COMPLETED == state) {
             return "Completed";
         }
-        if (RideStates.CANCELLED_BY_RIDER.equals(state)) {
+        if (RideState.CANCELLED_BY_RIDER == state) {
             return "Cancelled by rider";
         }
-        if (RideStates.CANCELLED_BY_DRIVER.equals(state)) {
+        if (RideState.CANCELLED_BY_DRIVER == state) {
             return "Cancelled by driver";
         }
-        if (RideStates.CANCELLED_BY_ADMIN.equals(state)) {
+        if (RideState.CANCELLED_BY_ADMIN == state) {
             return "Cancelled by Wayline";
         }
-        if (RideStates.NO_DRIVERS.equals(state)) {
+        if (RideState.NO_DRIVERS == state) {
             return "No driver found";
         }
         return "";
     }
 
     /// The style of the badge a state is shown in.
-    public static String stateBadge(String state) {
-        if (RideStates.COMPLETED.equals(state)) {
+    public static String stateBadge(RideState state) {
+        if (RideState.COMPLETED == state) {
             return "WlBadgeGood";
         }
-        if (RideStates.isActive(state)) {
+        if (state != null && state.isActive()) {
             return "WlBadgeWarn";
         }
         return "WlBadgeBad";

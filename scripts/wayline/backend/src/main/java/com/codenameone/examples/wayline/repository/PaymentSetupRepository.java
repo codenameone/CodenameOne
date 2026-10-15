@@ -20,34 +20,27 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codenameone.examples.wayline.ride;
+package com.codenameone.examples.wayline.repository;
 
-import com.codename1.backend.annotations.Component;
-import com.codename1.orm.session.Session;
-import com.codenameone.examples.wayline.domain.Pricing;
+import com.codename1.orm.repository.CrudRepository;
+import com.codename1.orm.repository.Modifying;
+import com.codename1.orm.repository.Param;
+import com.codename1.orm.repository.Query;
+import com.codename1.orm.repository.Repository;
+import com.codenameone.examples.wayline.domain.PaymentSetup;
 
-/// Where the admin's prices are kept: one row, or none while the prices are
-/// still the settings'.
-@Component
-public class PricingRepository {
-    private static final Integer ONLY = Integer.valueOf(1);
+/// The card setups accounts began with the payment processor.
+@Repository(entity = PaymentSetup.class, key = String.class)
+public interface PaymentSetupRepository extends CrudRepository<PaymentSetup, String> {
+    /// A card setup an account began, or null.
+    PaymentSetup findFirstByIdAndUsername(String id, String username);
 
-    private final Session session;
+    /// Marks a setup finished, if it is not yet.
+    ///
+    /// @return 1 for the one caller that finished it
+    @Modifying
+    @Query("update PaymentSetup s set s.completed = TRUE where s.id = :id and s.completed = FALSE")
+    int claim(@Param("id") String id);
 
-    public PricingRepository(Session session) {
-        this.session = session;
-    }
-
-    /// The prices the admin set, or null when they have set none.
-    public Pricing find() {
-        return session.find(Pricing.class, ONLY);
-    }
-
-    /// Stores the admin's prices for the first time, as the one row there is.
-    /// Changing them afterwards needs no call: the transaction writes what
-    /// changed in the row [#find] answered.
-    public void add(Pricing pricing) {
-        pricing.id = ONLY.intValue();
-        session.persist(pricing);
-    }
+    int deleteByUsername(String username);
 }

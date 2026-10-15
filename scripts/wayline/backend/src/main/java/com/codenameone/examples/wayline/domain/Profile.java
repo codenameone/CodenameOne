@@ -30,54 +30,174 @@ import com.codename1.annotations.Id;
 ///
 /// The sign-in -- password hash, roles, whether it is enabled -- is the backend's
 /// own user store, under the same name.
-@Entity(table = "wl_profile")
+@Entity
 public class Profile {
     @Id(autoIncrement = false)
-    @Column(name = "username", nullable = false)
-    public String username = "";
+    @Column(nullable = false)
+    private String username = "";
 
-    @Column(name = "display_name", nullable = false)
-    public String displayName = "";
+    @Column(nullable = false)
+    private String displayName = "";
 
-    @Column(name = "phone", nullable = false)
-    public String phone = "";
+    @Column(nullable = false)
+    private String phone = "";
 
-    @Column(name = "phone_verified", nullable = false)
-    public boolean phoneVerified;
+    @Column(nullable = false)
+    private boolean phoneVerified;
 
-    @Column(name = "vehicle", nullable = false)
-    public String vehicle = "";
+    @Column(nullable = false)
+    private String vehicle = "";
 
-    @Column(name = "plate", nullable = false)
-    public String plate = "";
+    @Column(nullable = false)
+    private String plate = "";
 
-    @Column(name = "created_at", nullable = false)
-    public long createdAt;
+    @Column(nullable = false)
+    private long createdAt;
 
-    @Column(name = "gender", nullable = false)
-    public String gender = "unspecified";
+    @Column(nullable = false)
+    private String gender = "unspecified";
 
-    @Column(name = "lang", nullable = false)
-    public String language = "en";
+    @Column(nullable = false)
+    private String language = "en";
 
-    @Column(name = "flagged", nullable = false)
-    public boolean flagged;
+    @Column(nullable = false)
+    private boolean flagged;
 
-    @Column(name = "flag_reason", nullable = false)
-    public String flagReason = "";
+    @Column(nullable = false)
+    private String flagReason = "";
 
-    @Column(name = "emergency_name", nullable = false)
-    public String emergencyName = "";
+    @Column(nullable = false)
+    private String emergencyName = "";
 
-    @Column(name = "emergency_phone", nullable = false)
-    public String emergencyPhone = "";
+    @Column(nullable = false)
+    private String emergencyPhone = "";
 
-    @Column(name = "home_address", nullable = false)
-    public String homeAddress = "";
+    @Column(nullable = false)
+    private String homeAddress = "";
 
-    @Column(name = "work_address", nullable = false)
-    public String workAddress = "";
+    @Column(nullable = false)
+    private String workAddress = "";
 
     public Profile() {
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public void setDisplayName(String displayName) {
+        this.displayName = displayName;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
+    public boolean isPhoneVerified() {
+        return phoneVerified;
+    }
+
+    public void setPhoneVerified(boolean phoneVerified) {
+        this.phoneVerified = phoneVerified;
+    }
+
+    public String getVehicle() {
+        return vehicle;
+    }
+
+    public void setVehicle(String vehicle) {
+        this.vehicle = vehicle;
+    }
+
+    public String getPlate() {
+        return plate;
+    }
+
+    public void setPlate(String plate) {
+        this.plate = plate;
+    }
+
+    public long getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(long createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public String getGender() {
+        return gender;
+    }
+
+    public void setGender(String gender) {
+        this.gender = gender;
+    }
+
+    public String getLanguage() {
+        return language;
+    }
+
+    public void setLanguage(String language) {
+        this.language = language;
+    }
+
+    public boolean isFlagged() {
+        return flagged;
+    }
+
+    public void setFlagged(boolean flagged) {
+        this.flagged = flagged;
+    }
+
+    public String getFlagReason() {
+        return flagReason;
+    }
+
+    public void setFlagReason(String flagReason) {
+        this.flagReason = flagReason;
+    }
+
+    public String getEmergencyName() {
+        return emergencyName;
+    }
+
+    public void setEmergencyName(String emergencyName) {
+        this.emergencyName = emergencyName;
+    }
+
+    public String getEmergencyPhone() {
+        return emergencyPhone;
+    }
+
+    public void setEmergencyPhone(String emergencyPhone) {
+        this.emergencyPhone = emergencyPhone;
+    }
+
+    public String getHomeAddress() {
+        return homeAddress;
+    }
+
+    public void setHomeAddress(String homeAddress) {
+        this.homeAddress = homeAddress;
+    }
+
+    public String getWorkAddress() {
+        return workAddress;
+    }
+
+    public void setWorkAddress(String workAddress) {
+        this.workAddress = workAddress;
     }
 }

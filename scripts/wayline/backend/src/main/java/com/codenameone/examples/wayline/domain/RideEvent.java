@@ -25,26 +25,67 @@ package com.codenameone.examples.wayline.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import com.codenameone.examples.wayline.api.RideState;
 
 /// One change of a ride's state: what it became, who made it so, and when.
-@Entity(table = "wl_ride_event")
+@Entity
 public class RideEvent {
     @Id(autoIncrement = false)
-    @Column(name = "id", nullable = false)
-    public String id = "";
+    @Column(nullable = false)
+    private String id = "";
 
-    @Column(name = "ride_id", nullable = false)
-    public String rideId = "";
+    @Column(nullable = false)
+    private String rideId = "";
 
-    @Column(name = "state", nullable = false)
-    public String state = "";
+    @Column(nullable = false)
+    private RideState state;
 
-    @Column(name = "actor", nullable = false)
-    public String actor = "";
+    @Column(nullable = false)
+    private String actor = "";
 
-    @Column(name = "created_at", nullable = false)
-    public long createdAt;
+    @Column(nullable = false)
+    private long createdAt;
 
     public RideEvent() {
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getRideId() {
+        return rideId;
+    }
+
+    public void setRideId(String rideId) {
+        this.rideId = rideId;
+    }
+
+    public RideState getState() {
+        return state;
+    }
+
+    public void setState(RideState state) {
+        this.state = state;
+    }
+
+    public String getActor() {
+        return actor;
+    }
+
+    public void setActor(String actor) {
+        this.actor = actor;
+    }
+
+    public long getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(long createdAt) {
+        this.createdAt = createdAt;
     }
 }

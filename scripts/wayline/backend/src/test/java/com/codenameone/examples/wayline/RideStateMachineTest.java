@@ -22,7 +22,7 @@
  */
 package com.codenameone.examples.wayline;
 
-import com.codenameone.examples.wayline.api.RideStates;
+import com.codenameone.examples.wayline.api.RideState;
 import com.codenameone.examples.wayline.ride.RideStateMachine;
 import org.junit.jupiter.api.Test;
 
@@ -31,53 +31,53 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RideStateMachineTest {
-    private static final String[] ALL = {RideStates.REQUESTED, RideStates.OFFERED,
-        RideStates.ACCEPTED, RideStates.ARRIVED, RideStates.IN_PROGRESS, RideStates.COMPLETED,
-        RideStates.CANCELLED_BY_RIDER, RideStates.CANCELLED_BY_DRIVER, RideStates.NO_DRIVERS};
+    private static final RideState[] ALL = {RideState.REQUESTED, RideState.OFFERED,
+        RideState.ACCEPTED, RideState.ARRIVED, RideState.IN_PROGRESS, RideState.COMPLETED,
+        RideState.CANCELLED_BY_RIDER, RideState.CANCELLED_BY_DRIVER, RideState.NO_DRIVERS};
 
     @Test
     void aRideGoesForwardOneStepAtATime() {
-        assertTrue(RideStateMachine.allowed(RideStates.REQUESTED, RideStates.OFFERED));
-        assertTrue(RideStateMachine.allowed(RideStates.OFFERED, RideStates.ACCEPTED));
-        assertTrue(RideStateMachine.allowed(RideStates.ACCEPTED, RideStates.ARRIVED));
-        assertTrue(RideStateMachine.allowed(RideStates.ARRIVED, RideStates.IN_PROGRESS));
-        assertTrue(RideStateMachine.allowed(RideStates.IN_PROGRESS, RideStates.COMPLETED));
+        assertTrue(RideStateMachine.allowed(RideState.REQUESTED, RideState.OFFERED));
+        assertTrue(RideStateMachine.allowed(RideState.OFFERED, RideState.ACCEPTED));
+        assertTrue(RideStateMachine.allowed(RideState.ACCEPTED, RideState.ARRIVED));
+        assertTrue(RideStateMachine.allowed(RideState.ARRIVED, RideState.IN_PROGRESS));
+        assertTrue(RideStateMachine.allowed(RideState.IN_PROGRESS, RideState.COMPLETED));
         // No skipping: a ride nobody accepted cannot start, and one that has
         // not started cannot be completed.
-        assertFalse(RideStateMachine.allowed(RideStates.REQUESTED, RideStates.ACCEPTED));
-        assertFalse(RideStateMachine.allowed(RideStates.OFFERED, RideStates.IN_PROGRESS));
-        assertFalse(RideStateMachine.allowed(RideStates.ACCEPTED, RideStates.COMPLETED));
+        assertFalse(RideStateMachine.allowed(RideState.REQUESTED, RideState.ACCEPTED));
+        assertFalse(RideStateMachine.allowed(RideState.OFFERED, RideState.IN_PROGRESS));
+        assertFalse(RideStateMachine.allowed(RideState.ACCEPTED, RideState.COMPLETED));
     }
 
     @Test
     void anOfferNobodyTookGoesBackToWaiting() {
-        assertTrue(RideStateMachine.allowed(RideStates.OFFERED, RideStates.REQUESTED));
-        assertFalse(RideStateMachine.allowed(RideStates.ACCEPTED, RideStates.REQUESTED));
+        assertTrue(RideStateMachine.allowed(RideState.OFFERED, RideState.REQUESTED));
+        assertFalse(RideStateMachine.allowed(RideState.ACCEPTED, RideState.REQUESTED));
     }
 
     @Test
     void cancellingStopsWhenTheTripStarts() {
-        assertTrue(RideStateMachine.allowed(RideStates.REQUESTED, RideStates.CANCELLED_BY_RIDER));
-        assertTrue(RideStateMachine.allowed(RideStates.ARRIVED, RideStates.CANCELLED_BY_RIDER));
-        assertFalse(RideStateMachine.allowed(RideStates.IN_PROGRESS, RideStates.CANCELLED_BY_RIDER));
+        assertTrue(RideStateMachine.allowed(RideState.REQUESTED, RideState.CANCELLED_BY_RIDER));
+        assertTrue(RideStateMachine.allowed(RideState.ARRIVED, RideState.CANCELLED_BY_RIDER));
+        assertFalse(RideStateMachine.allowed(RideState.IN_PROGRESS, RideState.CANCELLED_BY_RIDER));
         // A driver can only cancel a ride they took.
-        assertFalse(RideStateMachine.allowed(RideStates.OFFERED, RideStates.CANCELLED_BY_DRIVER));
-        assertTrue(RideStateMachine.allowed(RideStates.ACCEPTED, RideStates.CANCELLED_BY_DRIVER));
-        assertFalse(RideStateMachine.allowed(RideStates.IN_PROGRESS, RideStates.CANCELLED_BY_DRIVER));
+        assertFalse(RideStateMachine.allowed(RideState.OFFERED, RideState.CANCELLED_BY_DRIVER));
+        assertTrue(RideStateMachine.allowed(RideState.ACCEPTED, RideState.CANCELLED_BY_DRIVER));
+        assertFalse(RideStateMachine.allowed(RideState.IN_PROGRESS, RideState.CANCELLED_BY_DRIVER));
     }
 
     @Test
     void nothingLeavesAFinishedState() {
-        String[] finished = {RideStates.COMPLETED, RideStates.CANCELLED_BY_RIDER,
-            RideStates.CANCELLED_BY_DRIVER, RideStates.NO_DRIVERS};
+        RideState[] finished = {RideState.COMPLETED, RideState.CANCELLED_BY_RIDER,
+            RideState.CANCELLED_BY_DRIVER, RideState.NO_DRIVERS};
         for (int from = 0; from < finished.length; from++) {
             for (int to = 0; to < ALL.length; to++) {
                 assertFalse(RideStateMachine.allowed(finished[from], ALL[to]),
                         finished[from] + " -> " + ALL[to]);
             }
         }
-        assertEquals(0, RideStateMachine.sources(RideStates.NONE).length);
-        assertTrue(RideStates.isActive(RideStates.ARRIVED));
-        assertFalse(RideStates.isActive(RideStates.COMPLETED));
+        assertEquals(0, RideStateMachine.sources(RideState.NONE).length);
+        assertTrue(RideState.ARRIVED.isActive());
+        assertFalse(RideState.COMPLETED.isActive());
     }
 }

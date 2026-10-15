@@ -27,45 +27,141 @@ import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
 
 /// How one person wants the app and their rides, when they have said.
-@Entity(table = "wl_preferences")
+@Entity
 public class Preference {
     @Id(autoIncrement = false)
-    @Column(name = "username", nullable = false)
-    public String username = "";
+    @Column(nullable = false)
+    private String username = "";
 
-    @Column(name = "theme", nullable = false)
-    public String theme = "";
+    @Column(nullable = false)
+    private String theme = "";
 
-    @Column(name = "units", nullable = false)
-    public String units = "";
+    @Column(nullable = false)
+    private String units = "";
 
-    @Column(name = "notify_rides", nullable = false)
-    public boolean notifyRides;
+    @Column(nullable = false)
+    private boolean notifyRides;
 
-    @Column(name = "notify_receipts", nullable = false)
-    public boolean notifyReceipts;
+    @Column(nullable = false)
+    private boolean notifyReceipts;
 
-    @Column(name = "notify_promotions", nullable = false)
-    public boolean notifyPromotions;
+    @Column(nullable = false)
+    private boolean notifyPromotions;
 
-    @Column(name = "driver_gender", nullable = false)
-    public String driverGender = "";
+    @Column(nullable = false)
+    private String driverGender = "";
 
-    @Column(name = "quiet_ride", nullable = false)
-    public boolean quietRide;
+    @Column(nullable = false)
+    private boolean quietRide;
 
-    @Column(name = "wheelchair", nullable = false)
-    public boolean wheelchair;
+    @Column(nullable = false)
+    private boolean wheelchair;
 
-    @Column(name = "pet_friendly", nullable = false)
-    public boolean petFriendly;
+    @Column(nullable = false)
+    private boolean petFriendly;
 
-    @Column(name = "default_tip", nullable = false)
-    public int defaultTip;
+    @Column(nullable = false)
+    private int defaultTip;
 
-    @Column(name = "share_trips_with", nullable = false)
-    public String shareTripsWith = "";
+    @Column(nullable = false)
+    private String shareTripsWith = "";
 
     public Preference() {
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getTheme() {
+        return theme;
+    }
+
+    public void setTheme(String theme) {
+        this.theme = theme;
+    }
+
+    public String getUnits() {
+        return units;
+    }
+
+    public void setUnits(String units) {
+        this.units = units;
+    }
+
+    public boolean isNotifyRides() {
+        return notifyRides;
+    }
+
+    public void setNotifyRides(boolean notifyRides) {
+        this.notifyRides = notifyRides;
+    }
+
+    public boolean isNotifyReceipts() {
+        return notifyReceipts;
+    }
+
+    public void setNotifyReceipts(boolean notifyReceipts) {
+        this.notifyReceipts = notifyReceipts;
+    }
+
+    public boolean isNotifyPromotions() {
+        return notifyPromotions;
+    }
+
+    public void setNotifyPromotions(boolean notifyPromotions) {
+        this.notifyPromotions = notifyPromotions;
+    }
+
+    public String getDriverGender() {
+        return driverGender;
+    }
+
+    public void setDriverGender(String driverGender) {
+        this.driverGender = driverGender;
+    }
+
+    public boolean isQuietRide() {
+        return quietRide;
+    }
+
+    public void setQuietRide(boolean quietRide) {
+        this.quietRide = quietRide;
+    }
+
+    public boolean isWheelchair() {
+        return wheelchair;
+    }
+
+    public void setWheelchair(boolean wheelchair) {
+        this.wheelchair = wheelchair;
+    }
+
+    public boolean isPetFriendly() {
+        return petFriendly;
+    }
+
+    public void setPetFriendly(boolean petFriendly) {
+        this.petFriendly = petFriendly;
+    }
+
+    public int getDefaultTip() {
+        return defaultTip;
+    }
+
+    public void setDefaultTip(int defaultTip) {
+        this.defaultTip = defaultTip;
+    }
+
+    public String getShareTripsWith() {
+        return shareTripsWith;
+    }
+
+    public void setShareTripsWith(String shareTripsWith) {
+        this.shareTripsWith = shareTripsWith;
     }
 }

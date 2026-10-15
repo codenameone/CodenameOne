@@ -28,36 +28,108 @@ import com.codename1.annotations.Id;
 
 /// A saved card: what the provider calls it and what to show for it. The
 /// number itself is never here.
-@Entity(table = "wl_payment_method")
+@Entity
 public class PaymentMethod {
     @Id(autoIncrement = false)
-    @Column(name = "id", nullable = false)
-    public String id = "";
+    @Column(nullable = false)
+    private String id = "";
 
-    @Column(name = "username", nullable = false)
-    public String username = "";
+    @Column(nullable = false)
+    private String username = "";
 
-    @Column(name = "brand", nullable = false)
-    public String brand = "";
+    @Column(nullable = false)
+    private String brand = "";
 
-    @Column(name = "last4", nullable = false)
-    public String last4 = "";
+    @Column(nullable = false)
+    private String last4 = "";
 
-    @Column(name = "exp_month", nullable = false)
-    public int expMonth;
+    @Column(nullable = false)
+    private int expMonth;
 
-    @Column(name = "exp_year", nullable = false)
-    public int expYear;
+    @Column(nullable = false)
+    private int expYear;
 
-    @Column(name = "token", nullable = false)
-    public String token = "";
+    @Column(nullable = false)
+    private String token = "";
 
-    @Column(name = "is_default", nullable = false)
-    public boolean preferred;
+    @Column(nullable = false)
+    private boolean preferred;
 
-    @Column(name = "created_at", nullable = false)
-    public long createdAt;
+    @Column(nullable = false)
+    private long createdAt;
 
     public PaymentMethod() {
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getBrand() {
+        return brand;
+    }
+
+    public void setBrand(String brand) {
+        this.brand = brand;
+    }
+
+    public String getLast4() {
+        return last4;
+    }
+
+    public void setLast4(String last4) {
+        this.last4 = last4;
+    }
+
+    public int getExpMonth() {
+        return expMonth;
+    }
+
+    public void setExpMonth(int expMonth) {
+        this.expMonth = expMonth;
+    }
+
+    public int getExpYear() {
+        return expYear;
+    }
+
+    public void setExpYear(int expYear) {
+        this.expYear = expYear;
+    }
+
+    public String getToken() {
+        return token;
+    }
+
+    public void setToken(String token) {
+        this.token = token;
+    }
+
+    public boolean isPreferred() {
+        return preferred;
+    }
+
+    public void setPreferred(boolean preferred) {
+        this.preferred = preferred;
+    }
+
+    public long getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(long createdAt) {
+        this.createdAt = createdAt;
     }
 }

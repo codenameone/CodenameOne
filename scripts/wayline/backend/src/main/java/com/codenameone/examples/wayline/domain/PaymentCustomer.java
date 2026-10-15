@@ -27,15 +27,31 @@ import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
 
 /// The payment provider's name for an account.
-@Entity(table = "wl_payment_customer")
+@Entity
 public class PaymentCustomer {
     @Id(autoIncrement = false)
-    @Column(name = "username", nullable = false)
-    public String username = "";
+    @Column(nullable = false)
+    private String username = "";
 
-    @Column(name = "reference", nullable = false)
-    public String reference = "";
+    @Column(nullable = false)
+    private String reference = "";
 
     public PaymentCustomer() {
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getReference() {
+        return reference;
+    }
+
+    public void setReference(String reference) {
+        this.reference = reference;
     }
 }

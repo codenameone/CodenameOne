@@ -27,7 +27,7 @@ import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.wayline.Days;
 import com.codenameone.examples.wayline.Ids;
 import com.codenameone.examples.wayline.api.PricingDto;
-import com.codenameone.examples.wayline.api.RideStates;
+import com.codenameone.examples.wayline.api.RideState;
 import com.codenameone.examples.wayline.domain.DriverApplication;
 import com.codenameone.examples.wayline.domain.DriverState;
 import com.codenameone.examples.wayline.domain.Payment;
@@ -36,9 +36,16 @@ import com.codenameone.examples.wayline.domain.PayoutAccount;
 import com.codenameone.examples.wayline.domain.Ride;
 import com.codenameone.examples.wayline.domain.RideEvent;
 import com.codenameone.examples.wayline.domain.RidePassed;
-import com.codenameone.examples.wayline.driver.DriverRepository;
 import com.codenameone.examples.wayline.geo.Geo;
 import com.codenameone.examples.wayline.pay.Payments;
+import com.codenameone.examples.wayline.repository.DriverApplicationRepository;
+import com.codenameone.examples.wayline.repository.DriverStateRepository;
+import com.codenameone.examples.wayline.repository.PaymentRepository;
+import com.codenameone.examples.wayline.repository.PayoutAccountRepository;
+import com.codenameone.examples.wayline.repository.PayoutRepository;
+import com.codenameone.examples.wayline.repository.RideEventRepository;
+import com.codenameone.examples.wayline.repository.RidePassedRepository;
+import com.codenameone.examples.wayline.repository.RideRepository;
 
 import java.io.IOException;
 
@@ -68,15 +75,29 @@ public class DemoRides {
     private static final int[] HOURS = {7, 8, 8, 9, 12, 13, 15, 17, 18, 18, 19, 20, 22, 23};
 
     private final RideRepository rides;
-    private final DriverRepository cars;
+    private final RideEventRepository events;
+    private final RidePassedRepository passes;
+    private final PaymentRepository paid;
+    private final DriverStateRepository cars;
+    private final DriverApplicationRepository applications;
+    private final PayoutAccountRepository payoutAccounts;
+    private final PayoutRepository payouts;
     private final Fares fares;
     private final Payments payments;
     private long sequence = 20240229L;
 
-    public DemoRides(RideRepository rides, DriverRepository cars, Fares fares,
-            Payments payments) {
+    public DemoRides(RideRepository rides, RideEventRepository events,
+            RidePassedRepository passes, PaymentRepository paid, DriverStateRepository cars,
+            DriverApplicationRepository applications, PayoutAccountRepository payoutAccounts,
+            PayoutRepository payouts, Fares fares, Payments payments) {
         this.rides = rides;
+        this.events = events;
+        this.passes = passes;
+        this.paid = paid;
         this.cars = cars;
+        this.applications = applications;
+        this.payoutAccounts = payoutAccounts;
+        this.payouts = payouts;
         this.fares = fares;
         this.payments = payments;
     }
@@ -99,8 +120,8 @@ public class DemoRides {
         long[] lastSeen = new long[drivers.length];
         String[] products = new String[drivers.length];
         for (int iter = 0; iter < drivers.length; iter++) {
-            DriverApplication made = cars.application(drivers[iter]);
-            products[iter] = made == null ? Fares.STANDARD : made.product;
+            DriverApplication made = applications.findById(drivers[iter]);
+            products[iter] = made == null ? Fares.STANDARD : made.getProduct();
         }
         int count = 0;
         for (int day = DAYS - 1; day >= 0; day--) {
@@ -126,14 +147,14 @@ public class DemoRides {
                 at = Math.min(at, now - whole - 60000L);
 
                 int roll = next(20);
-                String state = roll < 15 ? RideStates.COMPLETED
-                        : roll == 17 ? RideStates.CANCELLED_BY_DRIVER
-                        : roll == 18 ? RideStates.NO_DRIVERS : RideStates.CANCELLED_BY_RIDER;
-                boolean completed = RideStates.COMPLETED.equals(state);
+                RideState state = roll < 15 ? RideState.COMPLETED
+                        : roll == 17 ? RideState.CANCELLED_BY_DRIVER
+                        : roll == 18 ? RideState.NO_DRIVERS : RideState.CANCELLED_BY_RIDER;
+                boolean completed = RideState.COMPLETED == state;
                 // A rider who cancels does it before a driver is found half the
                 // time, and after one has taken the ride the other half.
-                boolean taken = completed || RideStates.CANCELLED_BY_DRIVER.equals(state)
-                        || (RideStates.CANCELLED_BY_RIDER.equals(state) && next(2) == 0);
+                boolean taken = completed || RideState.CANCELLED_BY_DRIVER == state
+                        || (RideState.CANCELLED_BY_RIDER == state && next(2) == 0);
                 String[] method = next(3) == 0 ? new String[] {Payments.CASH, Payments.CASH_LABEL}
                         : payments.choose(rider, null);
                 boolean cash = Payments.CASH.equals(method[0]);
@@ -146,118 +167,118 @@ public class DemoRides {
                     rated[driverIndex]++;
                 }
                 long ended = completed ? at + whole : taken ? at + wait + pickup / 2L
-                        : RideStates.NO_DRIVERS.equals(state) ? at + 90000L : at + 30000L;
+                        : RideState.NO_DRIVERS == state ? at + 90000L : at + 30000L;
                 String id = Ids.next();
                 Ride ride = new Ride();
-                ride.id = id;
-                ride.state = state;
-                ride.rider = rider;
-                ride.driver = taken ? driver : "";
-                ride.pickupLat = real(from, 1);
-                ride.pickupLng = real(from, 2);
-                ride.pickupAddress = String.valueOf(PLACES[from][0]);
-                ride.dropoffLat = real(to, 1);
-                ride.dropoffLng = real(to, 2);
-                ride.dropoffAddress = String.valueOf(PLACES[to][0]);
-                ride.fareCents = price.fare;
-                ride.currency = fares.currency();
-                ride.distanceMeters = meters;
-                ride.durationSeconds = seconds;
-                ride.requestedAt = at;
-                ride.updatedAt = ended;
-                ride.searchUntil = at + 90000L;
-                ride.stars = given;
-                ride.paymentStatus = completed ? Payments.PAID : Payments.PENDING;
-                ride.product = products[driverIndex];
-                ride.methodId = method[0];
-                ride.methodLabel = method[1];
-                ride.baseCents = price.base;
-                ride.distanceCents = price.distance;
-                ride.timeCents = price.time;
-                ride.feeCents = price.fee;
-                ride.tipCents = tip;
-                ride.driverCents = price.fare - Fares.commission(pricing, price.fare);
-                rides.add(ride);
-                event(id, RideStates.REQUESTED, rider, at);
+                ride.setId(id);
+                ride.setState(state);
+                ride.setRider(rider);
+                ride.setDriver(taken ? driver : "");
+                ride.setPickupLat(real(from, 1));
+                ride.setPickupLng(real(from, 2));
+                ride.setPickupAddress(String.valueOf(PLACES[from][0]));
+                ride.setDropoffLat(real(to, 1));
+                ride.setDropoffLng(real(to, 2));
+                ride.setDropoffAddress(String.valueOf(PLACES[to][0]));
+                ride.setFareCents(price.fare);
+                ride.setCurrency(fares.currency());
+                ride.setDistanceMeters(meters);
+                ride.setDurationSeconds(seconds);
+                ride.setRequestedAt(at);
+                ride.setUpdatedAt(ended);
+                ride.setSearchUntil(at + 90000L);
+                ride.setStars(given);
+                ride.setPaymentStatus(completed ? Payments.PAID : Payments.PENDING);
+                ride.setProduct(products[driverIndex]);
+                ride.setMethodId(method[0]);
+                ride.setMethodLabel(method[1]);
+                ride.setBaseCents(price.base);
+                ride.setDistanceCents(price.distance);
+                ride.setTimeCents(price.time);
+                ride.setFeeCents(price.fee);
+                ride.setTipCents(tip);
+                ride.setDriverCents(price.fare - Fares.commission(pricing, price.fare));
+                rides.insert(ride);
+                event(id, RideState.REQUESTED, rider, at);
                 if (taken) {
-                    event(id, RideStates.OFFERED, "", at + 1000L);
-                    event(id, RideStates.ACCEPTED, driver, at + wait);
+                    event(id, RideState.OFFERED, "", at + 1000L);
+                    event(id, RideState.ACCEPTED, driver, at + wait);
                     if (count % 7 == 3 && drivers.length > 1) {
                         // Now and then the first driver asked let it go by.
                         RidePassed passed = new RidePassed();
-                        passed.rideId = id;
-                        passed.driver = drivers[(driverIndex + 1) % drivers.length];
-                        rides.add(passed);
+                        passed.setRideId(id);
+                        passed.setDriver(drivers[(driverIndex + 1) % drivers.length]);
+                        passes.insert(passed);
                     }
                 }
                 if (completed) {
-                    event(id, RideStates.ARRIVED, driver, at + wait + pickup);
-                    event(id, RideStates.IN_PROGRESS, driver, at + wait + pickup + 60000L);
+                    event(id, RideState.ARRIVED, driver, at + wait + pickup);
+                    event(id, RideState.IN_PROGRESS, driver, at + wait + pickup + 60000L);
                     event(id, state, driver, ended);
                     Payment payment = new Payment();
-                    payment.rideId = id;
-                    payment.amountCents = price.fare + price.fee;
-                    payment.currency = fares.currency();
-                    payment.status = Payments.PAID;
-                    payment.providerRef = cash ? Payments.CASH : "sim_ch_ride-" + id;
-                    payment.createdAt = ended;
-                    rides.add(payment);
+                    payment.setRideId(id);
+                    payment.setAmountCents(price.fare + price.fee);
+                    payment.setCurrency(fares.currency());
+                    payment.setStatus(Payments.PAID);
+                    payment.setProviderRef(cash ? Payments.CASH : "sim_ch_ride-" + id);
+                    payment.setCreatedAt(ended);
+                    paid.insert(payment);
                     lastSeen[driverIndex] = Math.max(lastSeen[driverIndex], ended);
                     if (ended < now - 7L * Days.MILLIS) {
                         earnedEarlier[driverIndex] += price.fare
                                 - Fares.commission(pricing, price.fare) + tip;
                     }
                 } else {
-                    event(id, state, RideStates.CANCELLED_BY_DRIVER.equals(state) ? driver
-                            : RideStates.NO_DRIVERS.equals(state) ? "" : rider, ended);
+                    event(id, state, RideState.CANCELLED_BY_DRIVER == state ? driver
+                            : RideState.NO_DRIVERS == state ? "" : rider, ended);
                 }
             }
         }
         for (int iter = 0; iter < drivers.length; iter++) {
             // Off line, parked where the last ride might have ended, with the
             // rating those rides gave.
-            DriverState car = cars.find(drivers[iter]);
+            DriverState car = cars.findById(drivers[iter]);
             boolean first = car == null;
             if (first) {
                 car = new DriverState();
-                car.username = drivers[iter];
+                car.setUsername(drivers[iter]);
             }
-            car.lat = real(iter % PLACES.length, 1);
-            car.lng = real(iter % PLACES.length, 2);
-            car.lastSeen = lastSeen[iter];
-            car.ratingSum = stars[iter];
-            car.ratingCount = rated[iter];
+            car.setLat(real(iter % PLACES.length, 1));
+            car.setLng(real(iter % PLACES.length, 2));
+            car.setLastSeen(lastSeen[iter]);
+            car.setRatingSum(stars[iter]);
+            car.setRatingCount(rated[iter]);
             if (first) {
-                cars.add(car);
+                cars.insert(car);
             }
             if (earnedEarlier[iter] > 0L) {
                 // What the first week earned was cashed out at the end of it.
                 PayoutAccount account = new PayoutAccount();
-                account.username = drivers[iter];
-                account.holder = drivers[iter];
-                account.bankName = "Bay Credit Union";
-                account.last4 = "67" + (10 + iter);
-                cars.add(account);
+                account.setUsername(drivers[iter]);
+                account.setHolder(drivers[iter]);
+                account.setBankName("Bay Credit Union");
+                account.setLast4("67" + (10 + iter));
+                payoutAccounts.insert(account);
                 Payout payout = new Payout();
-                payout.id = Ids.next();
-                payout.driver = drivers[iter];
-                payout.amountCents = earnedEarlier[iter];
-                payout.status = "paid";
-                payout.createdAt = now - 7L * Days.MILLIS;
-                payout.destination = "Bay Credit Union ****67" + (10 + iter);
-                cars.add(payout);
+                payout.setId(Ids.next());
+                payout.setDriver(drivers[iter]);
+                payout.setAmountCents(earnedEarlier[iter]);
+                payout.setStatus("paid");
+                payout.setCreatedAt(now - 7L * Days.MILLIS);
+                payout.setDestination("Bay Credit Union ****67" + (10 + iter));
+                payouts.insert(payout);
             }
         }
     }
 
-    private void event(String ride, String state, String actor, long at) throws IOException {
+    private void event(String ride, RideState state, String actor, long at) throws IOException {
         RideEvent event = new RideEvent();
-        event.id = Ids.next();
-        event.rideId = ride;
-        event.state = state;
-        event.actor = actor;
-        event.createdAt = at;
-        rides.add(event);
+        event.setId(Ids.next());
+        event.setRideId(ride);
+        event.setState(state);
+        event.setActor(actor);
+        event.setCreatedAt(at);
+        events.insert(event);
     }
 
     private static double real(int place, int column) {

@@ -318,7 +318,7 @@ class PaymentsTest {
 
         // A tip as it stands between being claimed and its charge coming back:
         // on the ride, and with no charge recorded for it.
-        db.execute("UPDATE wl_ride SET tip_cents = 300 WHERE id = ?", new Object[] {id});
+        db.execute("UPDATE ride SET tip_cents = 300 WHERE id = ?", new Object[] {id});
         mvc.perform(admin(Trips.body(post("/api/admin/rides/" + id + "/refund"),
                         "{\"reason\":\"Too soon\"}")))
                 .andExpect(status().isConflict());
@@ -336,7 +336,7 @@ class PaymentsTest {
         assertEquals(fareOnly, Trips.number(before, "month"));
 
         // The charge came back.
-        db.execute("UPDATE wl_payment SET tip_ref = 'sim_ch_tip' WHERE ride_id = ?",
+        db.execute("UPDATE payment SET tip_ref = 'sim_ch_tip' WHERE ride_id = ?",
                 new Object[] {id});
         Map after = Trips.json(mvc, People.asDriver(get("/api/driver/earnings/summary"),
                 driver));
@@ -362,7 +362,7 @@ class PaymentsTest {
 
         // A refund as a server that stopped half way leaves it: the ride
         // marked, the processor perhaps asked, and nothing written down.
-        db.execute("UPDATE wl_ride SET payment_status = 'REFUNDED' WHERE id = ?",
+        db.execute("UPDATE ride SET payment_status = 'REFUNDED' WHERE id = ?",
                 new Object[] {id});
         mvc.perform(admin(Trips.body(post("/api/admin/rides/" + id + "/refund"),
                         "{\"reason\":\"Again\"}")))
@@ -402,7 +402,7 @@ class PaymentsTest {
 
         // And one the processor then fails is recorded as failed, never as
         // refunded, and is not tried again from here.
-        db.execute("UPDATE wl_payment_method SET token = 'sim_pm_lost_card' WHERE id = ?",
+        db.execute("UPDATE payment_method SET token = 'sim_pm_lost_card' WHERE id = ?",
                 new Object[] {card});
         String lost = (String) Trips.complete(mvc, rider, driver, Trips.ride(57.7089, 11.9746,
                 57.7189, 11.9846, method)).get("id");
@@ -434,8 +434,8 @@ class PaymentsTest {
 
         // The server stopped after the ride completed and before its payment
         // was written.
-        db.execute("DELETE FROM wl_payment WHERE ride_id = ?", new Object[] {id});
-        db.execute("UPDATE wl_ride SET payment_status = 'PENDING' WHERE id = ?",
+        db.execute("DELETE FROM payment WHERE ride_id = ?", new Object[] {id});
+        db.execute("UPDATE ride SET payment_status = 'PENDING' WHERE id = ?",
                 new Object[] {id});
 
         // Completed a moment ago, it may still be at the processor: left alone.
@@ -443,7 +443,7 @@ class PaymentsTest {
         mvc.perform(People.asRider(get("/api/rides/" + id), rider))
                 .andExpect(jsonPath("$.paymentStatus").value("PENDING"));
 
-        db.execute("UPDATE wl_ride SET updated_at = ? WHERE id = ?",
+        db.execute("UPDATE ride SET updated_at = ? WHERE id = ?",
                 new Object[] {Long.valueOf(System.currentTimeMillis() - 5L * 60L * 1000L), id});
         rides.settleLeftBehind();
         mvc.perform(People.asRider(get("/api/rides/" + id), rider))
@@ -484,14 +484,14 @@ class PaymentsTest {
         mvc.perform(People.asRider(Trips.body(post("/api/account/delete"),
                         "{\"password\":\"" + People.PASSWORD + "\"}"), rider))
                 .andExpect(status().isConflict());
-        db.execute("UPDATE wl_ride SET updated_at = ? WHERE id = ?",
+        db.execute("UPDATE ride SET updated_at = ? WHERE id = ?",
                 new Object[] {Long.valueOf(System.currentTimeMillis() - 5L * 60L * 1000L), id});
         rides.settleLeftBehind();
         mvc.perform(People.asRider(get("/api/rides/" + id), rider))
                 .andExpect(jsonPath("$.paymentStatus").value("PENDING"));
 
         // The processor answers again, and the same ride is asked about.
-        db.execute("UPDATE wl_payment_method SET token = 'sim_pm_recovered' WHERE id = ?",
+        db.execute("UPDATE payment_method SET token = 'sim_pm_recovered' WHERE id = ?",
                 new Object[] {card});
         rides.settleLeftBehind();
         mvc.perform(People.asRider(get("/api/rides/" + id), rider))
@@ -518,7 +518,7 @@ class PaymentsTest {
                 48.2182, 16.3838)).get("id");
 
         // The processor stops answering, and a tip is asked for.
-        db.execute("UPDATE wl_payment_method SET token = 'sim_pm_fault_now' WHERE id = ?",
+        db.execute("UPDATE payment_method SET token = 'sim_pm_fault_now' WHERE id = ?",
                 new Object[] {card});
         assertEquals(502, Trips.statusOf(mvc, People.asRider(Trips.body(
                 post("/api/rides/" + id + "/tip"), "{\"amount\":300}"), rider)));
@@ -533,7 +533,7 @@ class PaymentsTest {
                 .andExpect(status().isConflict());
 
         // Asked for again with the same amount once the processor is back.
-        db.execute("UPDATE wl_payment_method SET token = 'sim_pm_recovered' WHERE id = ?",
+        db.execute("UPDATE payment_method SET token = 'sim_pm_recovered' WHERE id = ?",
                 new Object[] {card});
         mvc.perform(People.asRider(Trips.body(post("/api/rides/" + id + "/tip"),
                         "{\"amount\":300}"), rider))

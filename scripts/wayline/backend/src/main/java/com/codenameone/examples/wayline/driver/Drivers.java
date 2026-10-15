@@ -26,11 +26,13 @@ import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.wayline.Days;
-import com.codenameone.examples.wayline.account.ProfileRepository;
+import com.codenameone.examples.wayline.Rows;
 import com.codenameone.examples.wayline.api.DriverDto;
 import com.codenameone.examples.wayline.api.DriverStatusDto;
 import com.codenameone.examples.wayline.api.EarningsDto;
+import com.codenameone.examples.wayline.api.RideState;
 import com.codenameone.examples.wayline.domain.DriverApplication;
+import com.codenameone.examples.wayline.domain.DriverHours;
 import com.codenameone.examples.wayline.domain.DriverState;
 import com.codenameone.examples.wayline.domain.Profile;
 import com.codenameone.examples.wayline.domain.Ride;
@@ -38,8 +40,14 @@ import com.codenameone.examples.wayline.driving.Applications;
 import com.codenameone.examples.wayline.geo.Geo;
 import com.codenameone.examples.wayline.live.LiveHub;
 import com.codenameone.examples.wayline.ride.Fares;
+import com.codenameone.examples.wayline.repository.DriverApplicationRepository;
+import com.codenameone.examples.wayline.repository.DriverHoursRepository;
+import com.codenameone.examples.wayline.repository.DriverStateRepository;
+import com.codenameone.examples.wayline.repository.ProfileRepository;
+import com.codenameone.examples.wayline.repository.RideEventRepository;
+import com.codenameone.examples.wayline.repository.RidePassedRepository;
+import com.codenameone.examples.wayline.repository.RideRepository;
 import com.codenameone.examples.wayline.ride.Matcher;
-import com.codenameone.examples.wayline.ride.RideRepository;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -52,17 +60,31 @@ import java.util.Map;
 public class Drivers {
     private static final long DAY_MILLIS = 86400000L;
 
-    private final DriverRepository drivers;
+    /// The states of a ride a driver has taken and has yet to finish.
+    private static final RideState[] TAKEN = {RideState.ACCEPTED, RideState.ARRIVED,
+        RideState.IN_PROGRESS};
+
+    private final DriverStateRepository drivers;
+    private final DriverHoursRepository hours;
+    private final DriverApplicationRepository made;
     private final RideRepository rides;
+    private final RideEventRepository events;
+    private final RidePassedRepository passes;
     private final ProfileRepository profiles;
     private final LiveHub live;
     private final Fares fares;
     private final Applications applications;
 
-    public Drivers(DriverRepository drivers, RideRepository rides, ProfileRepository profiles,
-            LiveHub live, Fares fares, Applications applications) {
+    public Drivers(DriverStateRepository drivers, DriverHoursRepository hours,
+            DriverApplicationRepository made, RideRepository rides, RideEventRepository events,
+            RidePassedRepository passes, ProfileRepository profiles, LiveHub live, Fares fares,
+            Applications applications) {
         this.drivers = drivers;
+        this.hours = hours;
+        this.made = made;
         this.rides = rides;
+        this.events = events;
+        this.passes = passes;
         this.profiles = profiles;
         this.applications = applications;
         this.live = live;
@@ -109,7 +131,7 @@ public class Drivers {
         // reports would both find none and both insert one under the same
         // name. They take turns on the profile instead, the order blocking an
         // account takes them in, and the second then finds the first's row.
-        if (!drivers.hold(driver)) {
+        if (drivers.hold(driver) == 0) {
             profiles.hold(driver);
         }
         // The role lets a driver into this part of the API; the approval is
@@ -118,60 +140,73 @@ public class Drivers {
         if (status.online && !applications.approved(driver)) {
             throw new ResponseStatusException(403, "Your application to drive is not approved");
         }
-        Ride ride = rides.takenBy(driver);
+        Ride ride = rides.findFirstByDriverAndStateIn(driver, TAKEN);
         if (!status.online && ride != null) {
             throw new ResponseStatusException(409, "Finish the ride before going off line");
         }
         long now = System.currentTimeMillis();
-        DriverState state = drivers.find(driver);
-        if (state != null && state.online) {
+        DriverState state = drivers.findById(driver);
+        if (state != null && state.isOnline()) {
             // The time since the last report was time on line, unless it was
             // so long ago that the app had plainly stopped reporting.
-            long since = now - state.lastSeen;
+            long since = now - state.getLastSeen();
             if (since > 0L && since < Matcher.FRESH_MILLIS) {
-                drivers.addHours(driver, Days.number(now), since);
+                addHours(driver, Days.number(now), since);
             }
         }
         boolean first = state == null;
         if (first) {
             state = new DriverState();
-            state.username = driver;
+            state.setUsername(driver);
         }
-        state.online = status.online;
-        state.lastSeen = now;
+        state.setOnline(status.online);
+        state.setLastSeen(now);
         // Off line keeps the last position: there is none to report. A first
         // report stores whatever came with it.
         if (status.online || first) {
-            state.lat = status.lat;
-            state.lng = status.lng;
-            state.heading = status.heading;
+            state.setLat(status.lat);
+            state.setLng(status.lng);
+            state.setHeading(status.heading);
         }
         if (first) {
-            drivers.add(state);
+            drivers.insert(state);
         }
         Report made = new Report();
         made.driver = view(driver, state);
         if (ride != null) {
-            made.rideId = ride.id;
-            made.rider = ride.rider;
+            made.rideId = ride.getId();
+            made.rider = ride.getRider();
         }
         return made;
     }
 
     @Transactional(readOnly = true)
     public DriverDto describe(String driver) throws IOException {
-        return view(driver, drivers.find(driver));
+        return view(driver, drivers.findById(driver));
     }
 
     private DriverDto view(String driver, DriverState state) {
-        Profile profile = profiles.find(driver);
+        Profile profile = profiles.findById(driver);
         if (profile == null) {
             throw new ResponseStatusException(404, "No such driver");
         }
-        DriverDto dto = toDto(profile, drivers.application(driver), state,
-                (int) rides.completedBy(driver));
-        dto.acceptanceRate = acceptanceRate(rides.acceptedBy(driver), rides.passedBy(driver));
+        DriverDto dto = toDto(profile, made.findById(driver), state,
+                (int) rides.countByDriverAndState(driver, RideState.COMPLETED));
+        dto.acceptanceRate = acceptanceRate(events.countByActorAndState(driver,
+                RideState.ACCEPTED), passes.countByDriver(driver));
         return dto;
+    }
+
+    /// Adds time on line to a driver's day. The addition is the database's,
+    /// so reports that overlap are both counted.
+    private void addHours(String driver, long dayNumber, long millis) {
+        if (hours.addMillis(driver, dayNumber, millis) == 0) {
+            DriverHours day = new DriverHours();
+            day.setUsername(driver);
+            day.setDayNumber(dayNumber);
+            day.setMillis(millis);
+            hours.insert(day);
+        }
     }
 
     /// The share of the offers a driver answered that they took: 1 before they
@@ -185,33 +220,33 @@ public class Drivers {
     /// view; those on line first.
     @Transactional(readOnly = true)
     public List<DriverDto> all() throws IOException {
-        Map<String, Long> done = rides.completedByDriver();
-        Map<String, Long> accepted = rides.acceptedByDriver();
-        Map<String, Long> passed = rides.passedByDriver();
+        Map<String, Long> done = Rows.counts(rides.countByDriver(RideState.COMPLETED));
+        Map<String, Long> accepted = Rows.counts(events.countByActor(RideState.ACCEPTED));
+        Map<String, Long> passed = Rows.counts(passes.countByDriver());
         Map<String, Profile> people = new HashMap<String, Profile>();
-        List<Profile> profilesOfAll = drivers.profilesOfAll();
+        List<Profile> profilesOfAll = profiles.drivers();
         for (int iter = 0; iter < profilesOfAll.size(); iter++) {
-            people.put(profilesOfAll.get(iter).username, profilesOfAll.get(iter));
+            people.put(profilesOfAll.get(iter).getUsername(), profilesOfAll.get(iter));
         }
-        Map<String, DriverApplication> made = new HashMap<String, DriverApplication>();
-        List<DriverApplication> applicationsOfAll = drivers.applicationsOfAll();
+        Map<String, DriverApplication> forms = new HashMap<String, DriverApplication>();
+        List<DriverApplication> applicationsOfAll = made.ofDrivers();
         for (int iter = 0; iter < applicationsOfAll.size(); iter++) {
-            made.put(applicationsOfAll.get(iter).username, applicationsOfAll.get(iter));
+            forms.put(applicationsOfAll.get(iter).getUsername(), applicationsOfAll.get(iter));
         }
-        List<DriverState> states = drivers.all();
+        List<DriverState> states = drivers.onLineFirst();
         List<DriverDto> out = new ArrayList<DriverDto>();
         for (int iter = 0; iter < states.size(); iter++) {
             DriverState state = states.get(iter);
-            Profile profile = people.get(state.username);
+            Profile profile = people.get(state.getUsername());
             if (profile == null) {
                 // A state left behind by an account that is gone.
                 continue;
             }
-            Long rode = done.get(state.username);
-            DriverDto dto = toDto(profile, made.get(state.username), state,
+            Long rode = done.get(state.getUsername());
+            DriverDto dto = toDto(profile, forms.get(state.getUsername()), state,
                     rode == null ? 0 : (int) rode.longValue());
-            Long took = accepted.get(state.username);
-            Long left = passed.get(state.username);
+            Long took = accepted.get(state.getUsername());
+            Long left = passed.get(state.getUsername());
             dto.acceptanceRate = acceptanceRate(took == null ? 0L : took.longValue(),
                     left == null ? 0L : left.longValue());
             out.add(dto);
@@ -227,11 +262,11 @@ public class Drivers {
         long now = System.currentTimeMillis();
         EarningsDto dto = new EarningsDto();
         dto.currency = fares.currency();
-        dto.todayCents = rides.paidSince(driver, now - now % DAY_MILLIS);
-        dto.weekCents = rides.paidSince(driver, now - 7 * DAY_MILLIS);
-        long[] total = rides.paidTotals(driver);
-        dto.rides = (int) total[0];
-        dto.totalCents = total[1];
+        dto.todayCents = Rows.number(rides.paidSince(driver, now - now % DAY_MILLIS));
+        dto.weekCents = Rows.number(rides.paidSince(driver, now - 7 * DAY_MILLIS));
+        Object[] total = rides.paidTotals(driver);
+        dto.rides = total == null ? 0 : (int) Rows.number(total[0]);
+        dto.totalCents = total == null ? 0L : Rows.number(total[1]);
         return dto;
     }
 
@@ -240,29 +275,29 @@ public class Drivers {
     private static DriverDto toDto(Profile profile, DriverApplication application,
             DriverState car, int rides) {
         DriverDto dto = new DriverDto();
-        dto.username = profile.username;
-        dto.displayName = profile.displayName;
-        dto.vehicle = profile.vehicle;
-        dto.plate = profile.plate;
+        dto.username = profile.getUsername();
+        dto.displayName = profile.getDisplayName();
+        dto.vehicle = profile.getVehicle();
+        dto.plate = profile.getPlate();
         dto.rides = rides;
-        dto.approved = application != null && Applications.APPROVED.equals(application.status);
+        dto.approved = application != null && Applications.APPROVED.equals(application.getStatus());
         // An account with no application has no product; the app is told the
         // standard one so that it always has a word it knows.
-        String product = application == null ? "" : application.product;
+        String product = application == null ? "" : application.getProduct();
         dto.product = product.length() == 0 ? Fares.STANDARD : product;
-        dto.gender = profile.gender;
-        dto.accessible = application != null && application.wheelchair;
-        dto.flagged = profile.flagged;
+        dto.gender = profile.getGender();
+        dto.accessible = application != null && application.isWheelchair();
+        dto.flagged = profile.isFlagged();
         dto.acceptanceRate = 1d;
         dto.rating = 5d;
         if (car != null) {
-            dto.lastSeen = car.lastSeen;
+            dto.lastSeen = car.getLastSeen();
             // On line means said so and heard from lately; see Matcher.
-            dto.online = car.online
+            dto.online = car.isOnline()
                     && System.currentTimeMillis() - dto.lastSeen < Matcher.FRESH_MILLIS;
-            dto.lat = car.lat;
-            dto.lng = car.lng;
-            dto.heading = car.heading;
+            dto.lat = car.getLat();
+            dto.lng = car.getLng();
+            dto.heading = car.getHeading();
             dto.rating = car.rating();
         }
         return dto;

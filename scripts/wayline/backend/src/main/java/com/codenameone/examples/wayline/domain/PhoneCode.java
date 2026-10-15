@@ -27,36 +27,100 @@ import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
 
 /// The verification code an account was last sent, as its hash.
-@Entity(table = "wl_phone_code")
+@Entity
 public class PhoneCode {
     @Id(autoIncrement = false)
-    @Column(name = "username", nullable = false)
-    public String username = "";
+    @Column(nullable = false)
+    private String username = "";
 
-    @Column(name = "code_hash", nullable = false)
-    public String codeHash = "";
+    @Column(nullable = false)
+    private String codeHash = "";
 
-    @Column(name = "expires_at", nullable = false)
-    public long expiresAt;
+    @Column(nullable = false)
+    private long expiresAt;
 
-    @Column(name = "attempts", nullable = false)
-    public int attempts;
+    @Column(nullable = false)
+    private int attempts;
 
-    @Column(name = "sent_at", nullable = false)
-    public long sentAt;
+    @Column(nullable = false)
+    private long sentAt;
 
     /// The code sent before this one, while it is still good, or empty.
-    @Column(name = "previous_hash", nullable = false)
-    public String previousHash = "";
+    @Column(nullable = false)
+    private String previousHash = "";
 
-    @Column(name = "previous_expires_at", nullable = false)
-    public long previousExpiresAt;
+    @Column(nullable = false)
+    private long previousExpiresAt;
 
     /// The guesses already taken at the code before, which keeps the budget
     /// it had rather than starting a new one when another code is sent.
-    @Column(name = "previous_attempts", nullable = false)
-    public int previousAttempts;
+    @Column(nullable = false)
+    private int previousAttempts;
 
     public PhoneCode() {
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getCodeHash() {
+        return codeHash;
+    }
+
+    public void setCodeHash(String codeHash) {
+        this.codeHash = codeHash;
+    }
+
+    public long getExpiresAt() {
+        return expiresAt;
+    }
+
+    public void setExpiresAt(long expiresAt) {
+        this.expiresAt = expiresAt;
+    }
+
+    public int getAttempts() {
+        return attempts;
+    }
+
+    public void setAttempts(int attempts) {
+        this.attempts = attempts;
+    }
+
+    public long getSentAt() {
+        return sentAt;
+    }
+
+    public void setSentAt(long sentAt) {
+        this.sentAt = sentAt;
+    }
+
+    public String getPreviousHash() {
+        return previousHash;
+    }
+
+    public void setPreviousHash(String previousHash) {
+        this.previousHash = previousHash;
+    }
+
+    public long getPreviousExpiresAt() {
+        return previousExpiresAt;
+    }
+
+    public void setPreviousExpiresAt(long previousExpiresAt) {
+        this.previousExpiresAt = previousExpiresAt;
+    }
+
+    public int getPreviousAttempts() {
+        return previousAttempts;
+    }
+
+    public void setPreviousAttempts(int previousAttempts) {
+        this.previousAttempts = previousAttempts;
     }
 }

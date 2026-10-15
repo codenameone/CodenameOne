@@ -29,6 +29,7 @@ import com.codename1.backend.test.BackendTest;
 import com.codename1.backend.test.MockMvc;
 import com.codenameone.examples.wayline.account.Accounts;
 import com.codenameone.examples.wayline.api.RideDto;
+import com.codenameone.examples.wayline.api.RideState;
 import com.codenameone.examples.wayline.ride.Rides;
 import org.junit.jupiter.api.Test;
 
@@ -113,7 +114,7 @@ class RideRaceTest {
             public void run() {
                 try {
                     RideDto ride = rides.accept(driver, id);
-                    outcomes[slot] = "ACCEPTED".equals(ride.state) ? TAKEN : -1;
+                    outcomes[slot] = RideState.ACCEPTED == ride.state ? TAKEN : -1;
                 } catch (ResponseStatusException refused) {
                     outcomes[slot] = refused.getStatus();
                 } catch (Throwable err) {
@@ -143,7 +144,7 @@ class RideRaceTest {
     }
 
     private long events(String id, String state) throws Exception {
-        Map row = db.queryOne("SELECT COUNT(*) AS n FROM wl_ride_event WHERE ride_id = ? "
+        Map row = db.queryOne("SELECT COUNT(*) AS n FROM ride_event WHERE ride_id = ? "
                 + "AND state = ?", new Object[] {id, state});
         return ((Number) row.get("n")).longValue();
     }
@@ -193,7 +194,7 @@ class RideRaceTest {
 
         // Time is moved on by hand: the offer lapsed, and nothing has swept it
         // up yet. Taking it is refused already.
-        db.execute("UPDATE wl_ride SET offer_expires_at = 1 WHERE id = ?", new Object[] {id});
+        db.execute("UPDATE ride SET offer_expires_at = 1 WHERE id = ?", new Object[] {id});
         int[] alone = new int[1];
         Throwable[] none = new Throwable[1];
         accept(driver, id, alone, none, 0).run();
@@ -246,7 +247,7 @@ class RideRaceTest {
         // The offer lapses and the sweep takes it back. The ride is no longer
         // this driver's, and a ride that is not theirs is answered as no ride
         // at all: 404, as it is for any ride of somebody else's.
-        db.execute("UPDATE wl_ride SET offer_expires_at = 1 WHERE id = ?", new Object[] {id});
+        db.execute("UPDATE ride SET offer_expires_at = 1 WHERE id = ?", new Object[] {id});
         rides.tick();
         int[] outcome = new int[1];
         Throwable[] none = new Throwable[1];

@@ -29,6 +29,7 @@ import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.wayline.Ids;
 import com.codenameone.examples.wayline.api.TicketDto;
 import com.codenameone.examples.wayline.domain.LiveTicket;
+import com.codenameone.examples.wayline.repository.LiveTicketRepository;
 
 import java.io.IOException;
 
@@ -54,10 +55,10 @@ public class LiveTickets {
     public TicketDto issue(String username) throws IOException {
         String ticket = Ids.hex(Crypto.randomBytes(24));
         LiveTicket row = new LiveTicket();
-        row.ticketHash = Ids.sha256(ticket);
-        row.username = username;
-        row.expiresAt = System.currentTimeMillis() + TICKET_SECONDS * 1000L;
-        tickets.add(row);
+        row.setTicketHash(Ids.sha256(ticket));
+        row.setUsername(username);
+        row.setExpiresAt(System.currentTimeMillis() + TICKET_SECONDS * 1000L);
+        tickets.insert(row);
         TicketDto dto = new TicketDto();
         dto.ticket = ticket;
         dto.expiresInSeconds = TICKET_SECONDS;
@@ -74,15 +75,15 @@ public class LiveTickets {
             return null;
         }
         String hash = Ids.sha256(ticket);
-        LiveTicket row = tickets.find(hash);
+        LiveTicket row = tickets.findById(hash);
         if (row == null) {
             return null;
         }
-        String username = row.username;
-        long expiresAt = row.expiresAt;
+        String username = row.getUsername();
+        long expiresAt = row.getExpiresAt();
         // One delete statement: the count it answers is what says this
         // connection, and not another presenting the same ticket, used it.
-        int removed = tickets.delete(hash);
+        int removed = tickets.deleteByTicketHash(hash);
         if (removed != 1 || expiresAt < System.currentTimeMillis()) {
             return null;
         }
@@ -93,12 +94,12 @@ public class LiveTickets {
     @Scheduled(fixedDelay = 60000, initialDelay = 60000)
     @Transactional
     public void sweep() throws IOException {
-        tickets.deleteExpired(System.currentTimeMillis());
+        tickets.deleteByExpiresAtLessThan(System.currentTimeMillis());
     }
 
     /// Forgets the tickets of an account that is being closed.
     @Transactional
     public void forget(String username) {
-        tickets.deleteOf(username);
+        tickets.deleteByUsername(username);
     }
 }

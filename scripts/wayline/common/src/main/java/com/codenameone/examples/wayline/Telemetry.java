@@ -29,6 +29,7 @@ import com.codename1.analytics.AnalyticsProvider;
 import com.codename1.analytics.CodenameOneAnalyticsProvider;
 import com.codename1.analytics.LoggingAnalyticsProvider;
 import com.codename1.ui.CN;
+import com.codenameone.examples.wayline.api.RideState;
 import com.codenameone.examples.wayline.ui.Lang;
 
 /// What the app reports about how it is used, and whether it may.
@@ -234,8 +235,8 @@ public final class Telemetry {
 
     /// @param by `rider`, `driver` or `admin`
     /// @param state the state the ride was in
-    public static void rideCancelled(String by, String state) {
-        send(RIDE, "ride_cancelled", "by", by, "state", state);
+    public static void rideCancelled(String by, RideState state) {
+        send(RIDE, "ride_cancelled", "by", by, "state", state == null ? "" : state.name());
     }
 
     /// @param side whose device saw it end: `rider` or `driver`. A ride that

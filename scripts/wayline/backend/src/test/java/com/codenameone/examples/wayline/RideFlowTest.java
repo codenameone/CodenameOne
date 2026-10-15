@@ -225,7 +225,7 @@ class RideFlowTest {
                 .andExpect(jsonPath("$.state").value("OFFERED"));
 
         // That one says nothing. Time is moved on by hand: the offer lapsed.
-        db.execute("UPDATE wl_ride SET offer_expires_at = 1 WHERE id = ?", new Object[] {id});
+        db.execute("UPDATE ride SET offer_expires_at = 1 WHERE id = ?", new Object[] {id});
         mvc.perform(People.asDriver(post("/api/driver/offers/" + id + "/accept"), far))
                 .andExpect(status().isConflict());
         rides.tick();
@@ -236,7 +236,7 @@ class RideFlowTest {
                 .andExpect(jsonPath("$.state").value("NONE"));
 
         // And when the search runs out of time, the rider is told so.
-        db.execute("UPDATE wl_ride SET search_until = 1 WHERE id = ?", new Object[] {id});
+        db.execute("UPDATE ride SET search_until = 1 WHERE id = ?", new Object[] {id});
         rides.tick();
         mvc.perform(People.asRider(get("/api/rides/" + id), rider))
                 .andExpect(jsonPath("$.state").value("NO_DRIVERS"));

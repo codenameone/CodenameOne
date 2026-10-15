@@ -27,45 +27,141 @@ import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
 
 /// The prices an admin set. One row, with the id 1, once they have set any.
-@Entity(table = "wl_pricing")
+@Entity
 public class Pricing {
     @Id(autoIncrement = false)
-    @Column(name = "id", nullable = false)
-    public int id;
+    @Column(nullable = false)
+    private int id;
 
-    @Column(name = "base_cents", nullable = false)
-    public long baseCents;
+    @Column(nullable = false)
+    private long baseCents;
 
-    @Column(name = "per_km_cents", nullable = false)
-    public long perKmCents;
+    @Column(nullable = false)
+    private long perKmCents;
 
-    @Column(name = "per_minute_cents", nullable = false)
-    public long perMinuteCents;
+    @Column(nullable = false)
+    private long perMinuteCents;
 
-    @Column(name = "minimum_cents", nullable = false)
-    public long minimumCents;
+    @Column(nullable = false)
+    private long minimumCents;
 
-    @Column(name = "fee_percent", nullable = false)
-    public double feePercent;
+    @Column(nullable = false)
+    private double feePercent;
 
-    @Column(name = "commission_percent", nullable = false)
-    public double commissionPercent;
+    @Column(nullable = false)
+    private double commissionPercent;
 
-    @Column(name = "surge", nullable = false)
-    public double surge;
+    @Column(nullable = false)
+    private double surge;
 
-    @Column(name = "comfort", nullable = false)
-    public double comfort;
+    @Column(nullable = false)
+    private double comfort;
 
-    @Column(name = "xl", nullable = false)
-    public double xl;
+    @Column(nullable = false)
+    private double xl;
 
-    @Column(name = "updated_at", nullable = false)
-    public long updatedAt;
+    @Column(nullable = false)
+    private long updatedAt;
 
-    @Column(name = "updated_by", nullable = false)
-    public String updatedBy = "";
+    @Column(nullable = false)
+    private String updatedBy = "";
 
     public Pricing() {
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public long getBaseCents() {
+        return baseCents;
+    }
+
+    public void setBaseCents(long baseCents) {
+        this.baseCents = baseCents;
+    }
+
+    public long getPerKmCents() {
+        return perKmCents;
+    }
+
+    public void setPerKmCents(long perKmCents) {
+        this.perKmCents = perKmCents;
+    }
+
+    public long getPerMinuteCents() {
+        return perMinuteCents;
+    }
+
+    public void setPerMinuteCents(long perMinuteCents) {
+        this.perMinuteCents = perMinuteCents;
+    }
+
+    public long getMinimumCents() {
+        return minimumCents;
+    }
+
+    public void setMinimumCents(long minimumCents) {
+        this.minimumCents = minimumCents;
+    }
+
+    public double getFeePercent() {
+        return feePercent;
+    }
+
+    public void setFeePercent(double feePercent) {
+        this.feePercent = feePercent;
+    }
+
+    public double getCommissionPercent() {
+        return commissionPercent;
+    }
+
+    public void setCommissionPercent(double commissionPercent) {
+        this.commissionPercent = commissionPercent;
+    }
+
+    public double getSurge() {
+        return surge;
+    }
+
+    public void setSurge(double surge) {
+        this.surge = surge;
+    }
+
+    public double getComfort() {
+        return comfort;
+    }
+
+    public void setComfort(double comfort) {
+        this.comfort = comfort;
+    }
+
+    public double getXl() {
+        return xl;
+    }
+
+    public void setXl(double xl) {
+        this.xl = xl;
+    }
+
+    public long getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(long updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
+    public String getUpdatedBy() {
+        return updatedBy;
+    }
+
+    public void setUpdatedBy(String updatedBy) {
+        this.updatedBy = updatedBy;
     }
 }

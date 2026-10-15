@@ -45,7 +45,7 @@ import com.codenameone.examples.wayline.api.PlaceDto;
 import com.codenameone.examples.wayline.api.RatingDto;
 import com.codenameone.examples.wayline.api.RideDto;
 import com.codenameone.examples.wayline.api.RideRequestDto;
-import com.codenameone.examples.wayline.api.RideStates;
+import com.codenameone.examples.wayline.api.RideState;
 import com.codenameone.examples.wayline.api.TipDto;
 import com.codenameone.examples.wayline.api.UserDto;
 import com.codenameone.examples.wayline.live.LiveChannel;
@@ -120,7 +120,7 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
         menu.item(FontImage.MATERIAL_HISTORY, "Your rides", "history",
                 () -> RideListForm.show(form, "Your rides", cb -> Api.rider().history(cb), false,
                         (list, picked) -> {
-                            if (RideStates.COMPLETED.equals(picked.state)) {
+                            if (RideState.COMPLETED == picked.state) {
                                 ReceiptForm.open(list, picked.id);
                             }
                         }));
@@ -177,7 +177,7 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
 
     private void poll() {
         polls++;
-        if (ride == null || !RideStates.isActive(ride.state)) {
+        if (ride == null || !ride.state.isActive()) {
             // Nothing to follow, so the map shows who is about: often enough
             // to see them move, seldom enough to cost nothing.
             if (ride == null && polls % 2 == 0) {
@@ -216,13 +216,13 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
     }
 
     private void update(RideDto latest) {
-        if (latest == null || RideStates.NONE.equals(latest.state)) {
+        if (latest == null || RideState.NONE == latest.state) {
             return;
         }
         boolean first = ride == null || !ride.id.equals(latest.id);
         // Seen to end here, and not found already over when the app started.
-        if (!first && !RideStates.COMPLETED.equals(ride.state)
-                && RideStates.COMPLETED.equals(latest.state)) {
+        if (!first && RideState.COMPLETED != ride.state
+                && RideState.COMPLETED == latest.state) {
             Telemetry.rideCompleted("rider", latest.fareCents, latest.cash);
         }
         ride = latest;
@@ -362,8 +362,8 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
         // By the driver's name: the server keeps the driver's sign-in address
         // to the driver.
         boolean assigned = ride != null && ride.driverName != null
-                && ride.driverName.length() > 0 && RideStates.isActive(ride.state)
-                && !RideStates.OFFERED.equals(ride.state)
+                && ride.driverName.length() > 0 && ride.state.isActive()
+                && RideState.OFFERED != ride.state
                 && (ride.driverLat != 0 || ride.driverLng != 0);
         if (!assigned) {
             if (car != null) {
@@ -384,11 +384,11 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
             car.moveTo(at, ride.driverHeading);
         }
         stage.map.repaint();
-        if (RideStates.ARRIVED.equals(ride.state)) {
+        if (RideState.ARRIVED == ride.state) {
             stage.chip(Lang.tr("Your driver is here"), FontImage.MATERIAL_PLACE);
             return;
         }
-        boolean aboard = RideStates.IN_PROGRESS.equals(ride.state);
+        boolean aboard = RideState.IN_PROGRESS == ride.state;
         double meters = Maps.meters(at, aboard ? new LatLng(ride.dropoffLat, ride.dropoffLng)
                 : new LatLng(ride.pickupLat, ride.pickupLng));
         stage.chip(Lang.tr(aboard ? "{0} to destination" : "Pickup in {0}",
@@ -401,7 +401,7 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
     }
 
     private void recentre() {
-        if (ride != null && RideStates.isActive(ride.state)) {
+        if (ride != null && ride.state.isActive()) {
             stage.frame(new LatLng(ride.pickupLat, ride.pickupLng),
                     new LatLng(ride.dropoffLat, ride.dropoffLng), car == null ? null
                             : car.position());
@@ -686,35 +686,35 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
     /// A ride exists: the sheet is its state.
     private void rideDisplay() {
         sheet.reset();
-        String state = ride.state;
+        RideState state = ride.state;
         Label title = Ui.label(Ui.state(state), "WlHeading");
         title.setName("rideState");
         Container peek = sheet.peek();
         header(ride.dropoffAddress);
-        if (RideStates.REQUESTED.equals(state) || RideStates.OFFERED.equals(state)) {
+        if (RideState.REQUESTED == state || RideState.OFFERED == state) {
             stage.chip(null, (char) 0);
             peek.add(title);
             peek.add(Ui.label(Lang.tr("To {0}", ride.dropoffAddress), "WlMuted"));
             peek.add(FlowLayout.encloseCenter(new Pulse()));
             peek.add(cancelButton());
-        } else if (RideStates.isActive(state)) {
+        } else if (state.isActive()) {
             peek.add(title);
             peek.add(driverCard());
-            peek.add(actions(!RideStates.IN_PROGRESS.equals(state)));
+            peek.add(actions(RideState.IN_PROGRESS != state));
             Container more = sheet.more();
             more.add(Ui.row(FontImage.MATERIAL_TRIP_ORIGIN, ride.pickupAddress, null, null));
             more.add(Ui.row(FontImage.MATERIAL_PLACE, ride.dropoffAddress, null,
                     Ui.label(Ui.money(ride.fareCents, ride.currency), "WlRowValue")));
             more.add(Ui.row(FontImage.MATERIAL_PAYMENTS, "Payment", paid(), null));
-        } else if (RideStates.COMPLETED.equals(state)) {
+        } else if (RideState.COMPLETED == state) {
             stage.chip(null, (char) 0);
             receipt();
         } else {
             stage.chip(null, (char) 0);
             peek.add(title);
-            peek.add(Ui.text(RideStates.NO_DRIVERS.equals(state)
+            peek.add(Ui.text(RideState.NO_DRIVERS == state
                     ? "Nobody could take the ride just now. You have not been charged."
-                    : RideStates.CANCELLED_BY_DRIVER.equals(state)
+                    : RideState.CANCELLED_BY_DRIVER == state
                             ? "Your driver had to cancel. You have not been charged."
                             : "The ride was cancelled.", "WlText"));
             peek.add(Ui.primary("OK", "dismiss", e -> idle()));
@@ -771,7 +771,7 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
                         ride.driverName, ride.vehicle, ride.plate), null, null)));
         if (cancellable) {
             final String id = ride.id;
-            final String state = ride.state;
+            final RideState state = ride.state;
             Button cancel = Ui.action(FontImage.MATERIAL_CLOSE, "Cancel", "cancel",
                     e -> Api.rider().cancel(id, Net.to(cancelled -> {
                         Telemetry.rideCancelled("rider", state);
@@ -812,7 +812,7 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
 
     private Button cancelButton() {
         final String id = ride.id;
-        final String state = ride.state;
+        final RideState state = ride.state;
         return Ui.danger("Cancel ride", "cancel",
                 e -> Api.rider().cancel(id, Net.to(cancelled -> {
                     Telemetry.rideCancelled("rider", state);

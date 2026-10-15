@@ -28,28 +28,76 @@ import com.codename1.annotations.Id;
 
 /// A document an applicant uploaded, one of each kind. `data` is the file in
 /// Base64, which is text on every database.
-@Entity(table = "wl_driver_document")
+@Entity
 public class DriverDocument {
     @Id(autoIncrement = false)
-    @Column(name = "username", nullable = false)
-    public String username = "";
+    @Column(nullable = false)
+    private String username = "";
 
     @Id(autoIncrement = false)
-    @Column(name = "kind", nullable = false)
-    public String kind = "";
+    @Column(nullable = false)
+    private String kind = "";
 
-    @Column(name = "content_type", nullable = false)
-    public String contentType = "";
+    @Column(nullable = false)
+    private String contentType = "";
 
-    @Column(name = "status", nullable = false)
-    public String status = "";
+    @Column(nullable = false)
+    private String status = "";
 
-    @Column(name = "uploaded_at", nullable = false)
-    public long uploadedAt;
+    @Column(nullable = false)
+    private long uploadedAt;
 
-    @Column(name = "data", nullable = false)
-    public String data = "";
+    @Column(nullable = false)
+    private String data = "";
 
     public DriverDocument() {
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getKind() {
+        return kind;
+    }
+
+    public void setKind(String kind) {
+        this.kind = kind;
+    }
+
+    public String getContentType() {
+        return contentType;
+    }
+
+    public void setContentType(String contentType) {
+        this.contentType = contentType;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public long getUploadedAt() {
+        return uploadedAt;
+    }
+
+    public void setUploadedAt(long uploadedAt) {
+        this.uploadedAt = uploadedAt;
+    }
+
+    public String getData() {
+        return data;
+    }
+
+    public void setData(String data) {
+        this.data = data;
     }
 }

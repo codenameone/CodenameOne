@@ -37,6 +37,9 @@ import com.codenameone.examples.wayline.domain.DriverDocument;
 import com.codenameone.examples.wayline.domain.Profile;
 import com.codenameone.examples.wayline.driving.Applications;
 import com.codenameone.examples.wayline.pay.Payments;
+import com.codenameone.examples.wayline.repository.DriverApplicationRepository;
+import com.codenameone.examples.wayline.repository.DriverDocumentRepository;
+import com.codenameone.examples.wayline.repository.ProfileRepository;
 import com.codenameone.examples.wayline.ride.DemoRides;
 import com.codenameone.examples.wayline.ride.Fares;
 
@@ -85,14 +88,15 @@ public class DemoAccounts {
     private final Payments payments;
     private final DemoRides rides;
     private final ProfileRepository profiles;
-    private final DemoAccountRepository demo;
+    private final DriverApplicationRepository forms;
+    private final DriverDocumentRepository documents;
     private final Config config;
     private final String adminEmail;
     private final String adminPassword;
 
     public DemoAccounts(Accounts accounts, Applications applications, Moderation moderation,
             Payments payments, DemoRides rides, ProfileRepository profiles,
-            DemoAccountRepository demo, Config config,
+            DriverApplicationRepository forms, DriverDocumentRepository documents, Config config,
             @Value("${wayline.admin.email:}") String adminEmail,
             @Value("${wayline.admin.password:}") String adminPassword) {
         this.accounts = accounts;
@@ -101,7 +105,8 @@ public class DemoAccounts {
         this.payments = payments;
         this.rides = rides;
         this.profiles = profiles;
-        this.demo = demo;
+        this.forms = forms;
+        this.documents = documents;
         this.config = config;
         this.adminEmail = adminEmail;
         this.adminPassword = adminPassword;
@@ -158,9 +163,9 @@ public class DemoAccounts {
     /// event that says who did and why.
     @Transactional(rollbackFor = IOException.class)
     void flag(String username, String why, int daysAgo) throws IOException {
-        Profile profile = profiles.find(username);
-        profile.flagged = true;
-        profile.flagReason = why;
+        Profile profile = profiles.findById(username);
+        profile.setFlagged(true);
+        profile.setFlagReason(why);
         moderation.record(username, ADMIN, Moderation.FLAG, why,
                 System.currentTimeMillis() - daysAgo * Days.MILLIS);
     }
@@ -230,31 +235,31 @@ public class DemoAccounts {
             String model, String plate, int seats, boolean wheelchair, boolean pets, int daysAgo)
             throws IOException {
         long handedIn = System.currentTimeMillis() - (daysAgo + 1) * Days.MILLIS;
-        DriverApplication form = demo.application(username);
-        form.legalName = name;
-        form.dateOfBirth = "1988-04-12";
-        form.licenceNumber = "D" + (4400000 + plate.charAt(plate.length() - 1) * 7919);
-        form.licenceExpiry = (year() + 2) + "-06-30";
-        form.vehicleMake = make;
-        form.vehicleModel = model;
-        form.vehicleYear = year() - 3;
-        form.vehicleColor = colour;
-        form.vehiclePlate = plate;
-        form.vehicleSeats = seats;
-        form.product = product;
-        form.wheelchair = wheelchair;
-        form.pets = pets;
-        form.submittedAt = handedIn;
-        form.reviewedBy = ADMIN;
+        DriverApplication form = forms.findById(username);
+        form.setLegalName(name);
+        form.setDateOfBirth("1988-04-12");
+        form.setLicenceNumber("D" + (4400000 + plate.charAt(plate.length() - 1) * 7919));
+        form.setLicenceExpiry((year() + 2) + "-06-30");
+        form.setVehicleMake(make);
+        form.setVehicleModel(model);
+        form.setVehicleYear(year() - 3);
+        form.setVehicleColor(colour);
+        form.setVehiclePlate(plate);
+        form.setVehicleSeats(seats);
+        form.setProduct(product);
+        form.setWheelchair(wheelchair);
+        form.setPets(pets);
+        form.setSubmittedAt(handedIn);
+        form.setReviewedBy(ADMIN);
         for (int iter = 0; iter < Applications.KINDS.length; iter++) {
             DriverDocument picture = new DriverDocument();
-            picture.username = username;
-            picture.kind = Applications.KINDS[iter];
-            picture.contentType = "image/png";
-            picture.status = "accepted";
-            picture.uploadedAt = handedIn;
-            picture.data = PLACEHOLDER_PICTURE;
-            demo.add(picture);
+            picture.setUsername(username);
+            picture.setKind(Applications.KINDS[iter]);
+            picture.setContentType("image/png");
+            picture.setStatus("accepted");
+            picture.setUploadedAt(handedIn);
+            picture.setData(PLACEHOLDER_PICTURE);
+            documents.insert(picture);
         }
     }
 
@@ -296,8 +301,8 @@ public class DemoAccounts {
     /// the admins' queue shows one that has been waiting.
     @Transactional(rollbackFor = IOException.class)
     void handedIn(String username, int daysAgo) throws IOException {
-        DriverApplication form = demo.application(username);
-        form.submittedAt = System.currentTimeMillis() - daysAgo * Days.MILLIS;
+        DriverApplication form = forms.findById(username);
+        form.setSubmittedAt(System.currentTimeMillis() - daysAgo * Days.MILLIS);
     }
 
     /// When an account opened that many days ago was opened, so that the chart

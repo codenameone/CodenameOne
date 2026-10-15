@@ -31,7 +31,7 @@ import com.codename1.ui.layouts.FlowLayout;
 import com.codenameone.examples.wayline.Telemetry;
 import com.codenameone.examples.wayline.api.ReasonDto;
 import com.codenameone.examples.wayline.api.RideDto;
-import com.codenameone.examples.wayline.api.RideStates;
+import com.codenameone.examples.wayline.api.RideState;
 import com.codenameone.examples.wayline.net.Api;
 import com.codenameone.examples.wayline.net.Net;
 import com.codenameone.examples.wayline.ui.Lang;
@@ -107,13 +107,13 @@ public final class AdminRidesForm {
 
     private boolean passes(RideDto ride) {
         if ("active".equals(filter)) {
-            return RideStates.isActive(ride.state);
+            return ride.state.isActive();
         }
         if ("completed".equals(filter)) {
-            return RideStates.COMPLETED.equals(ride.state);
+            return RideState.COMPLETED == ride.state;
         }
         if ("cancelled".equals(filter)) {
-            return !RideStates.isActive(ride.state) && !RideStates.COMPLETED.equals(ride.state);
+            return !ride.state.isActive() && RideState.COMPLETED != ride.state;
         }
         return true;
     }
@@ -148,7 +148,7 @@ public final class AdminRidesForm {
         page.add(Ui.fact("Paid with", ride.cash ? Lang.tr("Cash") : ride.paymentMethodLabel));
         page.add(Ui.fact("Payment", Lang.tr(payment(ride.paymentStatus))));
 
-        if (RideStates.isActive(ride.state)) {
+        if (ride.state.isActive()) {
             page.add(Ui.danger("Cancel this ride", "cancelRide", e -> panes.reason(
                     "Cancel ride", Lang.tr("The rider and the driver are both told, and "
                             + "nobody is charged."), "Cancel ride", why -> {

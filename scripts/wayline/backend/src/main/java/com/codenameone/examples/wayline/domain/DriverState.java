@@ -27,32 +27,32 @@ import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
 
 /// Where a driver's car is, whether they are on line, and what riders made of them.
-@Entity(table = "wl_driver")
+@Entity
 public class DriverState {
     @Id(autoIncrement = false)
-    @Column(name = "username", nullable = false)
-    public String username = "";
+    @Column(nullable = false)
+    private String username = "";
 
-    @Column(name = "online", nullable = false)
-    public boolean online;
+    @Column(nullable = false)
+    private boolean online;
 
-    @Column(name = "lat", nullable = false)
-    public double lat;
+    @Column(nullable = false)
+    private double lat;
 
-    @Column(name = "lng", nullable = false)
-    public double lng;
+    @Column(nullable = false)
+    private double lng;
 
-    @Column(name = "heading", nullable = false)
-    public double heading;
+    @Column(nullable = false)
+    private double heading;
 
-    @Column(name = "last_seen", nullable = false)
-    public long lastSeen;
+    @Column(nullable = false)
+    private long lastSeen;
 
-    @Column(name = "rating_sum", nullable = false)
-    public long ratingSum;
+    @Column(nullable = false)
+    private long ratingSum;
 
-    @Column(name = "rating_count", nullable = false)
-    public long ratingCount;
+    @Column(nullable = false)
+    private long ratingCount;
 
     public DriverState() {
     }
@@ -60,5 +60,69 @@ public class DriverState {
     /// The mean of the stars given, or 5 before any were.
     public double rating() {
         return ratingCount == 0 ? 5d : Math.round(ratingSum * 10d / ratingCount) / 10d;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public boolean isOnline() {
+        return online;
+    }
+
+    public void setOnline(boolean online) {
+        this.online = online;
+    }
+
+    public double getLat() {
+        return lat;
+    }
+
+    public void setLat(double lat) {
+        this.lat = lat;
+    }
+
+    public double getLng() {
+        return lng;
+    }
+
+    public void setLng(double lng) {
+        this.lng = lng;
+    }
+
+    public double getHeading() {
+        return heading;
+    }
+
+    public void setHeading(double heading) {
+        this.heading = heading;
+    }
+
+    public long getLastSeen() {
+        return lastSeen;
+    }
+
+    public void setLastSeen(long lastSeen) {
+        this.lastSeen = lastSeen;
+    }
+
+    public long getRatingSum() {
+        return ratingSum;
+    }
+
+    public void setRatingSum(long ratingSum) {
+        this.ratingSum = ratingSum;
+    }
+
+    public long getRatingCount() {
+        return ratingCount;
+    }
+
+    public void setRatingCount(long ratingCount) {
+        this.ratingCount = ratingCount;
     }
 }

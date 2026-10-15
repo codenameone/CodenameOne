@@ -31,6 +31,7 @@ import com.codenameone.examples.wayline.api.PricingDto;
 import com.codenameone.examples.wayline.api.RideRequestDto;
 import com.codenameone.examples.wayline.domain.Pricing;
 import com.codenameone.examples.wayline.geo.Geo;
+import com.codenameone.examples.wayline.repository.PricingRepository;
 
 import java.io.IOException;
 
@@ -95,7 +96,7 @@ public class Fares {
     /// otherwise.
     @Transactional(readOnly = true)
     public PricingDto pricing() throws IOException {
-        return toDto(prices.find());
+        return toDto(prices.findById(PricingRepository.ONLY));
     }
 
     private PricingDto toDto(Pricing row) {
@@ -115,15 +116,15 @@ public class Fares {
             dto.xlMultiplier = defaults.xlMultiplier;
             return dto;
         }
-        dto.baseFare = row.baseCents;
-        dto.perKm = row.perKmCents;
-        dto.perMinute = row.perMinuteCents;
-        dto.minimumFare = row.minimumCents;
-        dto.serviceFeePercent = row.feePercent;
-        dto.commissionPercent = row.commissionPercent;
-        dto.surgeMultiplier = row.surge;
-        dto.comfortMultiplier = row.comfort;
-        dto.xlMultiplier = row.xl;
+        dto.baseFare = row.getBaseCents();
+        dto.perKm = row.getPerKmCents();
+        dto.perMinute = row.getPerMinuteCents();
+        dto.minimumFare = row.getMinimumCents();
+        dto.serviceFeePercent = row.getFeePercent();
+        dto.commissionPercent = row.getCommissionPercent();
+        dto.surgeMultiplier = row.getSurge();
+        dto.comfortMultiplier = row.getComfort();
+        dto.xlMultiplier = row.getXl();
         return dto;
     }
 
@@ -144,24 +145,25 @@ public class Fares {
         between(wanted.surgeMultiplier, 1d, 5d, "the surge multiplier");
         between(wanted.comfortMultiplier, 1d, 5d, "the comfort multiplier");
         between(wanted.xlMultiplier, 1d, 5d, "the XL multiplier");
-        Pricing row = prices.find();
+        Pricing row = prices.findById(PricingRepository.ONLY);
         boolean first = row == null;
         if (first) {
             row = new Pricing();
         }
-        row.baseCents = wanted.baseFare;
-        row.perKmCents = wanted.perKm;
-        row.perMinuteCents = wanted.perMinute;
-        row.minimumCents = wanted.minimumFare;
-        row.feePercent = wanted.serviceFeePercent;
-        row.commissionPercent = wanted.commissionPercent;
-        row.surge = wanted.surgeMultiplier;
-        row.comfort = wanted.comfortMultiplier;
-        row.xl = wanted.xlMultiplier;
-        row.updatedAt = System.currentTimeMillis();
-        row.updatedBy = by;
+        row.setBaseCents(wanted.baseFare);
+        row.setPerKmCents(wanted.perKm);
+        row.setPerMinuteCents(wanted.perMinute);
+        row.setMinimumCents(wanted.minimumFare);
+        row.setFeePercent(wanted.serviceFeePercent);
+        row.setCommissionPercent(wanted.commissionPercent);
+        row.setSurge(wanted.surgeMultiplier);
+        row.setComfort(wanted.comfortMultiplier);
+        row.setXl(wanted.xlMultiplier);
+        row.setUpdatedAt(System.currentTimeMillis());
+        row.setUpdatedBy(by);
         if (first) {
-            prices.add(row);
+            row.setId(PricingRepository.ONLY.intValue());
+            prices.insert(row);
         }
         return toDto(row);
     }

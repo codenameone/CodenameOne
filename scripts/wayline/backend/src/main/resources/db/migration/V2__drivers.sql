@@ -1,5 +1,5 @@
 -- A driver's live state: on line or not, and where the car was last seen.
-CREATE TABLE wl_driver (
+CREATE TABLE driver_state (
     username VARCHAR(190) NOT NULL PRIMARY KEY,
     online SMALLINT NOT NULL,
     lat DOUBLE PRECISION NOT NULL,
@@ -10,12 +10,12 @@ CREATE TABLE wl_driver (
     rating_count BIGINT NOT NULL
 );
 -- Matching asks for the drivers on line inside a latitude band.
-CREATE INDEX wl_driver_online ON wl_driver (online, lat);
+CREATE INDEX driver_online ON driver_state (online, lat);
 
 -- An application to drive: one per account, edited as a draft, handed in, and
 -- then approved or rejected by an admin. The DRIVER role follows `approved`,
 -- and matching reads the car's product from here.
-CREATE TABLE wl_driver_application (
+CREATE TABLE driver_application (
     username VARCHAR(190) NOT NULL PRIMARY KEY,
     status VARCHAR(16) NOT NULL,
     legal_name VARCHAR(120) NOT NULL,
@@ -39,11 +39,11 @@ CREATE TABLE wl_driver_application (
     reviewed_by VARCHAR(190) NOT NULL,
     pets SMALLINT NOT NULL
 );
-CREATE INDEX wl_driver_application_status ON wl_driver_application (status, submitted_at);
+CREATE INDEX driver_application_status ON driver_application (status, submitted_at);
 
 -- How long a driver was on line on each day (days since the epoch, UTC), added
 -- to by every position report.
-CREATE TABLE wl_driver_hours (
+CREATE TABLE driver_hours (
     username VARCHAR(190) NOT NULL,
     day_number BIGINT NOT NULL,
     millis BIGINT NOT NULL,

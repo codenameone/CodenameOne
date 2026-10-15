@@ -27,6 +27,7 @@ import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.wayline.Ids;
 import com.codenameone.examples.wayline.api.ModerationEventDto;
 import com.codenameone.examples.wayline.domain.ModerationEvent;
+import com.codenameone.examples.wayline.repository.ModerationEventRepository;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -47,9 +48,9 @@ public class Moderation {
     public static final String REJECT = "reject";
     public static final String ROLES = "roles";
 
-    private final ModerationRepository events;
+    private final ModerationEventRepository events;
 
-    public Moderation(ModerationRepository events) {
+    public Moderation(ModerationEventRepository events) {
         this.events = events;
     }
 
@@ -72,27 +73,27 @@ public class Moderation {
             throws IOException {
         String why = reason == null ? "" : reason.trim();
         ModerationEvent event = new ModerationEvent();
-        event.id = Ids.next();
-        event.username = username;
-        event.createdAt = at;
-        event.actor = by;
-        event.action = action;
-        event.reason = why.length() > 255 ? why.substring(0, 255) : why;
-        events.add(event);
+        event.setId(Ids.next());
+        event.setUsername(username);
+        event.setCreatedAt(at);
+        event.setActor(by);
+        event.setAction(action);
+        event.setReason(why.length() > 255 ? why.substring(0, 255) : why);
+        events.insert(event);
     }
 
     /// An account's events, newest first.
     @Transactional(readOnly = true)
     public List<ModerationEventDto> events(String username) throws IOException {
-        List<ModerationEvent> rows = events.of(username, 100);
+        List<ModerationEvent> rows = events.findTop100ByUsernameOrderByCreatedAtDescIdAsc(username);
         List<ModerationEventDto> out = new ArrayList<ModerationEventDto>();
         for (int iter = 0; iter < rows.size(); iter++) {
             ModerationEvent row = rows.get(iter);
             ModerationEventDto dto = new ModerationEventDto();
-            dto.at = row.createdAt;
-            dto.by = row.actor;
-            dto.action = row.action;
-            dto.reason = row.reason;
+            dto.at = row.getCreatedAt();
+            dto.by = row.getActor();
+            dto.action = row.getAction();
+            dto.reason = row.getReason();
             out.add(dto);
         }
         return out;
@@ -100,6 +101,6 @@ public class Moderation {
 
     @Transactional
     public void forget(String username) throws IOException {
-        events.removeAll(username);
+        events.deleteByUsername(username);
     }
 }

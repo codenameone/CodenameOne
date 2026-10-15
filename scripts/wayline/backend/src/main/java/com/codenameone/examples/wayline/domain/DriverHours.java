@@ -27,19 +27,43 @@ import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
 
 /// How long a driver was on line on one day, counted in UTC days.
-@Entity(table = "wl_driver_hours")
+@Entity
 public class DriverHours {
     @Id(autoIncrement = false)
-    @Column(name = "username", nullable = false)
-    public String username = "";
+    @Column(nullable = false)
+    private String username = "";
 
     @Id(autoIncrement = false)
-    @Column(name = "day_number", nullable = false)
-    public long dayNumber;
+    @Column(nullable = false)
+    private long dayNumber;
 
-    @Column(name = "millis", nullable = false)
-    public long millis;
+    @Column(nullable = false)
+    private long millis;
 
     public DriverHours() {
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public long getDayNumber() {
+        return dayNumber;
+    }
+
+    public void setDayNumber(long dayNumber) {
+        this.dayNumber = dayNumber;
+    }
+
+    public long getMillis() {
+        return millis;
+    }
+
+    public void setMillis(long millis) {
+        this.millis = millis;
     }
 }

@@ -8,7 +8,7 @@
 --
 -- This is the one script written per engine: a document outgrows the 64 KB of
 -- MySQL's TEXT, and LONGTEXT is a type the other two do not have.
-CREATE TABLE wl_driver_document (
+CREATE TABLE driver_document (
     username VARCHAR(190) NOT NULL,
     kind VARCHAR(24) NOT NULL,
     content_type VARCHAR(32) NOT NULL,

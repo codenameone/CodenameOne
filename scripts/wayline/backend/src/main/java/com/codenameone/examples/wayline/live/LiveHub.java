@@ -25,6 +25,7 @@ package com.codenameone.examples.wayline.live;
 import com.codename1.backend.Json;
 import com.codename1.backend.WebSocketSession;
 import com.codename1.backend.annotations.Component;
+import com.codenameone.examples.wayline.api.RideState;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -106,11 +107,11 @@ public class LiveHub {
     /// Tells a ride's rider and driver, and the admins, that it changed.
     /// `also` is one more account to tell, or empty: the driver an offer was
     /// taken back from is no longer the ride's driver, and still has to hear.
-    public void rideChanged(String id, String state, String rider, String driver, String also) {
+    public void rideChanged(String id, RideState state, String rider, String driver, String also) {
         Map<String, Object> frame = new LinkedHashMap<String, Object>();
         frame.put("type", "ride");
         frame.put("id", id);
-        frame.put("state", state);
+        frame.put("state", state.name());
         String text = Json.write(frame);
         List<WebSocketSession> to = new ArrayList<WebSocketSession>();
         synchronized (this) {

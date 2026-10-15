@@ -27,42 +27,130 @@ import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
 
 /// What a completed ride was charged, and what was given back.
-@Entity(table = "wl_payment")
+@Entity
 public class Payment {
     @Id(autoIncrement = false)
-    @Column(name = "ride_id", nullable = false)
-    public String rideId = "";
+    @Column(nullable = false)
+    private String rideId = "";
 
-    @Column(name = "amount_cents", nullable = false)
-    public long amountCents;
+    @Column(nullable = false)
+    private long amountCents;
 
-    @Column(name = "currency", nullable = false)
-    public String currency = "";
+    @Column(nullable = false)
+    private String currency = "";
 
-    @Column(name = "status", nullable = false)
-    public String status = "";
+    @Column(nullable = false)
+    private String status = "";
 
-    @Column(name = "provider_ref", nullable = false)
-    public String providerRef = "";
+    @Column(nullable = false)
+    private String providerRef = "";
 
-    @Column(name = "created_at", nullable = false)
-    public long createdAt;
+    @Column(nullable = false)
+    private long createdAt;
 
-    @Column(name = "tip_ref", nullable = false)
-    public String tipRef = "";
+    @Column(nullable = false)
+    private String tipRef = "";
 
-    @Column(name = "refund_ref", nullable = false)
-    public String refundRef = "";
+    @Column(nullable = false)
+    private String refundRef = "";
 
-    @Column(name = "tip_refund_ref", nullable = false)
-    public String tipRefundRef = "";
+    @Column(nullable = false)
+    private String tipRefundRef = "";
 
-    @Column(name = "refund_reason", nullable = false)
-    public String refundReason = "";
+    @Column(nullable = false)
+    private String refundReason = "";
 
-    @Column(name = "refunded_at", nullable = false)
-    public long refundedAt;
+    @Column(nullable = false)
+    private long refundedAt;
 
     public Payment() {
+    }
+
+    public String getRideId() {
+        return rideId;
+    }
+
+    public void setRideId(String rideId) {
+        this.rideId = rideId;
+    }
+
+    public long getAmountCents() {
+        return amountCents;
+    }
+
+    public void setAmountCents(long amountCents) {
+        this.amountCents = amountCents;
+    }
+
+    public String getCurrency() {
+        return currency;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public String getProviderRef() {
+        return providerRef;
+    }
+
+    public void setProviderRef(String providerRef) {
+        this.providerRef = providerRef;
+    }
+
+    public long getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(long createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public String getTipRef() {
+        return tipRef;
+    }
+
+    public void setTipRef(String tipRef) {
+        this.tipRef = tipRef;
+    }
+
+    public String getRefundRef() {
+        return refundRef;
+    }
+
+    public void setRefundRef(String refundRef) {
+        this.refundRef = refundRef;
+    }
+
+    public String getTipRefundRef() {
+        return tipRefundRef;
+    }
+
+    public void setTipRefundRef(String tipRefundRef) {
+        this.tipRefundRef = tipRefundRef;
+    }
+
+    public String getRefundReason() {
+        return refundReason;
+    }
+
+    public void setRefundReason(String refundReason) {
+        this.refundReason = refundReason;
+    }
+
+    public long getRefundedAt() {
+        return refundedAt;
+    }
+
+    public void setRefundedAt(long refundedAt) {
+        this.refundedAt = refundedAt;
     }
 }

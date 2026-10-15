@@ -6,7 +6,7 @@
 -- Every script here is written once for SQLite, PostgreSQL and MySQL: no
 -- generated keys, no native boolean or timestamp. A yes/no is a SMALLINT 0/1 and
 -- a time is milliseconds since the epoch in a BIGINT.
-CREATE TABLE wl_profile (
+CREATE TABLE profile (
     username VARCHAR(190) NOT NULL PRIMARY KEY,
     display_name VARCHAR(120) NOT NULL,
     phone VARCHAR(32) NOT NULL,
@@ -19,7 +19,7 @@ CREATE TABLE wl_profile (
     -- a default: that is the one form of ALTER TABLE all three engines accept, and
     -- the default is what the accounts opened before this script read as.
     gender VARCHAR(16) NOT NULL,
-    lang VARCHAR(8) NOT NULL,
+    language VARCHAR(8) NOT NULL,
     flagged SMALLINT NOT NULL,
     flag_reason VARCHAR(255) NOT NULL,
     emergency_name VARCHAR(120) NOT NULL,
@@ -30,7 +30,7 @@ CREATE TABLE wl_profile (
 
 -- How one person wants the app and their rides. A row exists once they have
 -- saved something; until then the defaults are the server's.
-CREATE TABLE wl_preferences (
+CREATE TABLE preference (
     username VARCHAR(190) NOT NULL PRIMARY KEY,
     theme VARCHAR(8) NOT NULL,
     units VARCHAR(4) NOT NULL,
@@ -48,7 +48,7 @@ CREATE TABLE wl_preferences (
 -- The e-mails of accounts that were closed, as hashes. A closed account's rides
 -- stay under its e-mail, so the address is never registered again; the hash is
 -- enough to refuse it without keeping a list of who has left.
-CREATE TABLE wl_closed_account (
+CREATE TABLE closed_account (
     username_hash VARCHAR(64) NOT NULL PRIMARY KEY,
     closed_at BIGINT NOT NULL
 );
@@ -56,7 +56,7 @@ CREATE TABLE wl_closed_account (
 -- The verification code an account is waiting on. Only its hash is kept, and
 -- that of the code before it while it is still good: text messages are not
 -- delivered in the order they were sent.
-CREATE TABLE wl_phone_code (
+CREATE TABLE phone_code (
     username VARCHAR(190) NOT NULL PRIMARY KEY,
     code_hash VARCHAR(64) NOT NULL,
     expires_at BIGINT NOT NULL,
@@ -71,7 +71,7 @@ CREATE TABLE wl_phone_code (
 -- presents it, which is what makes a ticket good for one connection only -- and
 -- keeping them here and not in memory is what lets a second server instance
 -- redeem a ticket the first one issued.
-CREATE TABLE wl_live_ticket (
+CREATE TABLE live_ticket (
     ticket_hash VARCHAR(64) NOT NULL PRIMARY KEY,
     username VARCHAR(190) NOT NULL,
     expires_at BIGINT NOT NULL
@@ -79,7 +79,7 @@ CREATE TABLE wl_live_ticket (
 
 -- What the admins did to an account and why: flagged it, blocked it, approved
 -- or rejected its driving application. Never changed once written.
-CREATE TABLE wl_moderation_event (
+CREATE TABLE moderation_event (
     id VARCHAR(32) NOT NULL PRIMARY KEY,
     username VARCHAR(190) NOT NULL,
     created_at BIGINT NOT NULL,
@@ -87,4 +87,4 @@ CREATE TABLE wl_moderation_event (
     action VARCHAR(16) NOT NULL,
     reason VARCHAR(255) NOT NULL
 );
-CREATE INDEX wl_moderation_event_user ON wl_moderation_event (username, created_at);
+CREATE INDEX moderation_event_user ON moderation_event (username, created_at);

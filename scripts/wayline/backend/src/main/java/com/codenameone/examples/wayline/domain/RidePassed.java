@@ -27,16 +27,32 @@ import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
 
 /// A driver who passed on a ride, or let its offer lapse, and is not asked again.
-@Entity(table = "wl_ride_passed")
+@Entity
 public class RidePassed {
     @Id(autoIncrement = false)
-    @Column(name = "ride_id", nullable = false)
-    public String rideId = "";
+    @Column(nullable = false)
+    private String rideId = "";
 
     @Id(autoIncrement = false)
-    @Column(name = "driver", nullable = false)
-    public String driver = "";
+    @Column(nullable = false)
+    private String driver = "";
 
     public RidePassed() {
+    }
+
+    public String getRideId() {
+        return rideId;
+    }
+
+    public void setRideId(String rideId) {
+        this.rideId = rideId;
+    }
+
+    public String getDriver() {
+        return driver;
+    }
+
+    public void setDriver(String driver) {
+        this.driver = driver;
     }
 }

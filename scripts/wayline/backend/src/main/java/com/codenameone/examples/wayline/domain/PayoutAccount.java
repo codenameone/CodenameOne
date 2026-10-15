@@ -27,21 +27,53 @@ import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
 
 /// Where a driver's earnings are paid out to.
-@Entity(table = "wl_payout_account")
+@Entity
 public class PayoutAccount {
     @Id(autoIncrement = false)
-    @Column(name = "username", nullable = false)
-    public String username = "";
+    @Column(nullable = false)
+    private String username = "";
 
-    @Column(name = "holder", nullable = false)
-    public String holder = "";
+    @Column(nullable = false)
+    private String holder = "";
 
-    @Column(name = "bank_name", nullable = false)
-    public String bankName = "";
+    @Column(nullable = false)
+    private String bankName = "";
 
-    @Column(name = "last4", nullable = false)
-    public String last4 = "";
+    @Column(nullable = false)
+    private String last4 = "";
 
     public PayoutAccount() {
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getHolder() {
+        return holder;
+    }
+
+    public void setHolder(String holder) {
+        this.holder = holder;
+    }
+
+    public String getBankName() {
+        return bankName;
+    }
+
+    public void setBankName(String bankName) {
+        this.bankName = bankName;
+    }
+
+    public String getLast4() {
+        return last4;
+    }
+
+    public void setLast4(String last4) {
+        this.last4 = last4;
     }
 }

@@ -27,27 +27,75 @@ import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
 
 /// One payment of earnings to a driver.
-@Entity(table = "wl_payout")
+@Entity
 public class Payout {
     @Id(autoIncrement = false)
-    @Column(name = "id", nullable = false)
-    public String id = "";
+    @Column(nullable = false)
+    private String id = "";
 
-    @Column(name = "driver", nullable = false)
-    public String driver = "";
+    @Column(nullable = false)
+    private String driver = "";
 
-    @Column(name = "amount_cents", nullable = false)
-    public long amountCents;
+    @Column(nullable = false)
+    private long amountCents;
 
-    @Column(name = "status", nullable = false)
-    public String status = "";
+    @Column(nullable = false)
+    private String status = "";
 
-    @Column(name = "created_at", nullable = false)
-    public long createdAt;
+    @Column(nullable = false)
+    private long createdAt;
 
-    @Column(name = "destination", nullable = false)
-    public String destination = "";
+    @Column(nullable = false)
+    private String destination = "";
 
     public Payout() {
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getDriver() {
+        return driver;
+    }
+
+    public void setDriver(String driver) {
+        this.driver = driver;
+    }
+
+    public long getAmountCents() {
+        return amountCents;
+    }
+
+    public void setAmountCents(long amountCents) {
+        this.amountCents = amountCents;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public long getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(long createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public String getDestination() {
+        return destination;
+    }
+
+    public void setDestination(String destination) {
+        this.destination = destination;
     }
 }

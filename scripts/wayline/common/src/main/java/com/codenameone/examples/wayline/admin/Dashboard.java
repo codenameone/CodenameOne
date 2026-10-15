@@ -36,6 +36,7 @@ import com.codenameone.examples.wayline.api.AdminStatsDto;
 import com.codenameone.examples.wayline.api.DayStatsDto;
 import com.codenameone.examples.wayline.api.DriverDto;
 import com.codenameone.examples.wayline.api.NameCountDto;
+import com.codenameone.examples.wayline.api.RideState;
 import com.codenameone.examples.wayline.api.StatsSeriesDto;
 import com.codenameone.examples.wayline.live.LiveChannel;
 import com.codenameone.examples.wayline.net.Api;
@@ -322,7 +323,7 @@ final class Dashboard extends LiveChannel.Adapter {
         }
         for (int iter = 0; parts != null && iter < parts.size(); iter++) {
             NameCountDto part = parts.get(iter);
-            String name = states ? Ui.state(part.name) : Ui.product(part.name);
+            String name = states ? Ui.state(RideState.named(part.name)) : Ui.product(part.name);
             tile.add(Ui.fact(name.length() == 0 ? part.name : name, String.valueOf(part.count)));
             // A total of nothing has no shares; the bars are then empty.
             tile.add(new Chart.Meter(total == 0 ? 0 : part.count / (double) total));

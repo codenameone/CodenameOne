@@ -164,7 +164,7 @@ class AccountTest {
         String bearer = bearer("resend@example.com", "a-long-password");
         String first = code(bearer);
         // The wait between codes has passed.
-        db.execute("UPDATE wl_phone_code SET sent_at = sent_at - 60000 WHERE username = ?",
+        db.execute("UPDATE phone_code SET sent_at = sent_at - 60000 WHERE username = ?",
                 new Object[] {"resend@example.com"});
         String second = code(bearer);
 
@@ -180,10 +180,10 @@ class AccountTest {
 
         // Once the first has expired it is no longer good, though the second is.
         String third = code(bearer);
-        db.execute("UPDATE wl_phone_code SET sent_at = sent_at - 60000 WHERE username = ?",
+        db.execute("UPDATE phone_code SET sent_at = sent_at - 60000 WHERE username = ?",
                 new Object[] {"resend@example.com"});
         String fourth = code(bearer);
-        db.execute("UPDATE wl_phone_code SET previous_expires_at = 1 WHERE username = ?",
+        db.execute("UPDATE phone_code SET previous_expires_at = 1 WHERE username = ?",
                 new Object[] {"resend@example.com"});
         if (!third.equals(fourth)) {
             mvc.perform(post("/api/account/phone/verify").header("Host", SignIn.HOST)
@@ -210,7 +210,7 @@ class AccountTest {
         for (int iter = 0; iter < 4; iter++) {
             verify(bearer, other(first, first)).andExpect(status().isBadRequest());
         }
-        db.execute("UPDATE wl_phone_code SET sent_at = sent_at - 60000 WHERE username = ?",
+        db.execute("UPDATE phone_code SET sent_at = sent_at - 60000 WHERE username = ?",
                 new Object[] {"budget@example.com"});
         String second = code(bearer);
         // The first code's last guess, spent on a wrong one.

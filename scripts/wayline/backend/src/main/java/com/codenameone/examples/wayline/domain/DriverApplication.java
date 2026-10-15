@@ -27,69 +27,229 @@ import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
 
 /// An account's application to drive, and what became of it.
-@Entity(table = "wl_driver_application")
+@Entity
 public class DriverApplication {
     @Id(autoIncrement = false)
-    @Column(name = "username", nullable = false)
-    public String username = "";
+    @Column(nullable = false)
+    private String username = "";
 
-    @Column(name = "status", nullable = false)
-    public String status = "";
+    @Column(nullable = false)
+    private String status = "";
 
-    @Column(name = "legal_name", nullable = false)
-    public String legalName = "";
+    @Column(nullable = false)
+    private String legalName = "";
 
-    @Column(name = "date_of_birth", nullable = false)
-    public String dateOfBirth = "";
+    @Column(nullable = false)
+    private String dateOfBirth = "";
 
-    @Column(name = "licence_number", nullable = false)
-    public String licenceNumber = "";
+    @Column(nullable = false)
+    private String licenceNumber = "";
 
-    @Column(name = "licence_expiry", nullable = false)
-    public String licenceExpiry = "";
+    @Column(nullable = false)
+    private String licenceExpiry = "";
 
-    @Column(name = "vehicle_make", nullable = false)
-    public String vehicleMake = "";
+    @Column(nullable = false)
+    private String vehicleMake = "";
 
-    @Column(name = "vehicle_model", nullable = false)
-    public String vehicleModel = "";
+    @Column(nullable = false)
+    private String vehicleModel = "";
 
-    @Column(name = "vehicle_year", nullable = false)
-    public int vehicleYear;
+    @Column(nullable = false)
+    private int vehicleYear;
 
-    @Column(name = "vehicle_color", nullable = false)
-    public String vehicleColor = "";
+    @Column(nullable = false)
+    private String vehicleColor = "";
 
-    @Column(name = "vehicle_plate", nullable = false)
-    public String vehiclePlate = "";
+    @Column(nullable = false)
+    private String vehiclePlate = "";
 
-    @Column(name = "vehicle_seats", nullable = false)
-    public int vehicleSeats;
+    @Column(nullable = false)
+    private int vehicleSeats;
 
-    @Column(name = "product", nullable = false)
-    public String product = "";
+    @Column(nullable = false)
+    private String product = "";
 
-    @Column(name = "wheelchair", nullable = false)
-    public boolean wheelchair;
+    @Column(nullable = false)
+    private boolean wheelchair;
 
-    @Column(name = "pets", nullable = false)
-    public boolean pets;
+    @Column(nullable = false)
+    private boolean pets;
 
-    @Column(name = "rejection_reason", nullable = false)
-    public String rejectionReason = "";
+    @Column(nullable = false)
+    private String rejectionReason = "";
 
-    @Column(name = "created_at", nullable = false)
-    public long createdAt;
+    @Column(nullable = false)
+    private long createdAt;
 
-    @Column(name = "submitted_at", nullable = false)
-    public long submittedAt;
+    @Column(nullable = false)
+    private long submittedAt;
 
-    @Column(name = "reviewed_at", nullable = false)
-    public long reviewedAt;
+    @Column(nullable = false)
+    private long reviewedAt;
 
-    @Column(name = "reviewed_by", nullable = false)
-    public String reviewedBy = "";
+    @Column(nullable = false)
+    private String reviewedBy = "";
 
     public DriverApplication() {
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public String getLegalName() {
+        return legalName;
+    }
+
+    public void setLegalName(String legalName) {
+        this.legalName = legalName;
+    }
+
+    public String getDateOfBirth() {
+        return dateOfBirth;
+    }
+
+    public void setDateOfBirth(String dateOfBirth) {
+        this.dateOfBirth = dateOfBirth;
+    }
+
+    public String getLicenceNumber() {
+        return licenceNumber;
+    }
+
+    public void setLicenceNumber(String licenceNumber) {
+        this.licenceNumber = licenceNumber;
+    }
+
+    public String getLicenceExpiry() {
+        return licenceExpiry;
+    }
+
+    public void setLicenceExpiry(String licenceExpiry) {
+        this.licenceExpiry = licenceExpiry;
+    }
+
+    public String getVehicleMake() {
+        return vehicleMake;
+    }
+
+    public void setVehicleMake(String vehicleMake) {
+        this.vehicleMake = vehicleMake;
+    }
+
+    public String getVehicleModel() {
+        return vehicleModel;
+    }
+
+    public void setVehicleModel(String vehicleModel) {
+        this.vehicleModel = vehicleModel;
+    }
+
+    public int getVehicleYear() {
+        return vehicleYear;
+    }
+
+    public void setVehicleYear(int vehicleYear) {
+        this.vehicleYear = vehicleYear;
+    }
+
+    public String getVehicleColor() {
+        return vehicleColor;
+    }
+
+    public void setVehicleColor(String vehicleColor) {
+        this.vehicleColor = vehicleColor;
+    }
+
+    public String getVehiclePlate() {
+        return vehiclePlate;
+    }
+
+    public void setVehiclePlate(String vehiclePlate) {
+        this.vehiclePlate = vehiclePlate;
+    }
+
+    public int getVehicleSeats() {
+        return vehicleSeats;
+    }
+
+    public void setVehicleSeats(int vehicleSeats) {
+        this.vehicleSeats = vehicleSeats;
+    }
+
+    public String getProduct() {
+        return product;
+    }
+
+    public void setProduct(String product) {
+        this.product = product;
+    }
+
+    public boolean isWheelchair() {
+        return wheelchair;
+    }
+
+    public void setWheelchair(boolean wheelchair) {
+        this.wheelchair = wheelchair;
+    }
+
+    public boolean isPets() {
+        return pets;
+    }
+
+    public void setPets(boolean pets) {
+        this.pets = pets;
+    }
+
+    public String getRejectionReason() {
+        return rejectionReason;
+    }
+
+    public void setRejectionReason(String rejectionReason) {
+        this.rejectionReason = rejectionReason;
+    }
+
+    public long getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(long createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public long getSubmittedAt() {
+        return submittedAt;
+    }
+
+    public void setSubmittedAt(long submittedAt) {
+        this.submittedAt = submittedAt;
+    }
+
+    public long getReviewedAt() {
+        return reviewedAt;
+    }
+
+    public void setReviewedAt(long reviewedAt) {
+        this.reviewedAt = reviewedAt;
+    }
+
+    public String getReviewedBy() {
+        return reviewedBy;
+    }
+
+    public void setReviewedBy(String reviewedBy) {
+        this.reviewedBy = reviewedBy;
     }
 }
