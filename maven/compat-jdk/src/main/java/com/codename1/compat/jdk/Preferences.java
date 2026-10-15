@@ -47,9 +47,6 @@ public class Preferences {
     public static final int MAX_VALUE_LENGTH = 8192;
     public static final int MAX_NAME_LENGTH = 80;
 
-    /// Under the node's prefix, where no key can be: a key holds no newline.
-    private static final String INDEX = "\nkeys";
-
     private final String path;
 
     protected Preferences(String path) {
@@ -113,11 +110,42 @@ public class Preferences {
         return true;
     }
 
+    /// Where `key` of this node is kept in Codename One's flat store: the
+    /// node's path and the key, each escaped, around one line break.
+    ///
+    /// A key may hold a `/`, so joining the two with one aliased entries:
+    /// `node("a").put("b/c", ...)` and `node("a/b").put("c", ...)` both
+    /// wrote `/a/b/c`. A node name may hold anything but `/`, a line break
+    /// too, so both halves are escaped and the one raw line break left is
+    /// where they meet. The index ([#indexKey()]) ends in a second raw line
+    /// break, which no escaped key can be.
     private String storeKey(String key) {
         if (key == null) {
             throw new NullPointerException("Null key");
         }
-        return "/".equals(path) ? "/" + key : path + "/" + key;
+        return escape(path) + '\n' + escape(key);
+    }
+
+    private String indexKey() {
+        return escape(path) + "\n\n";
+    }
+
+    private static String escape(String text) {
+        if (text.indexOf('\\') < 0 && text.indexOf('\n') < 0) {
+            return text;
+        }
+        StringBuilder out = new StringBuilder(text.length() + 8);
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '\\') {
+                out.append("\\\\");
+            } else if (c == '\n') {
+                out.append("\\n");
+            } else {
+                out.append(c);
+            }
+        }
+        return out.toString();
     }
 
     /// Guards every use of the store, from every node. Codename One's
@@ -135,7 +163,7 @@ public class Preferences {
     /// `\\` and `\n`; see [#saveIndex].
     private List<String> index() {
         List<String> keys = new ArrayList<String>();
-        String all = com.codename1.io.Preferences.get(storeKey(INDEX), "");
+        String all = com.codename1.io.Preferences.get(indexKey(), "");
         StringBuilder key = new StringBuilder();
         for (int i = 0; i < all.length(); i++) {
             char c = all.charAt(i);
@@ -157,7 +185,7 @@ public class Preferences {
 
     private void saveIndex(List<String> keys) {
         if (keys.isEmpty()) {
-            com.codename1.io.Preferences.delete(storeKey(INDEX));
+            com.codename1.io.Preferences.delete(indexKey());
             return;
         }
         StringBuilder all = new StringBuilder();
@@ -174,7 +202,7 @@ public class Preferences {
             }
             all.append('\n');
         }
-        com.codename1.io.Preferences.set(storeKey(INDEX), all.toString());
+        com.codename1.io.Preferences.set(indexKey(), all.toString());
     }
 
     public void put(String key, String value) {

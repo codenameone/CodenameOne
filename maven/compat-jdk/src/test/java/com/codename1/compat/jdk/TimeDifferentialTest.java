@@ -344,6 +344,25 @@ public class TimeDifferentialTest {
         // The most negative long: JDK 8 overflows on the way and throws,
         // later JDKs borrow a second first and answer it, as this does.
         assertEquals(Long.MIN_VALUE, JdkDates.toNanos(Duration.ofNanos(Long.MIN_VALUE)));
+        for (final Duration d : new Duration[] {Duration.ZERO, Duration.ofSeconds(-5, 1), Duration.ofSeconds(5),
+            Duration.ofSeconds(Long.MIN_VALUE), Duration.ofSeconds(Long.MIN_VALUE, 1),
+            Duration.ofSeconds(Long.MAX_VALUE, 999999999)}) {
+            same("negated " + d, () -> d.negated(), () -> JdkDates.negated(d));
+            for (final long n : new long[] {Long.MAX_VALUE, Long.MIN_VALUE, Long.MAX_VALUE / 60, -1}) {
+                same("pd " + d + n, () -> d.plusDays(n), () -> JdkDates.plusDays(d, n));
+                same("ph " + d + n, () -> d.plusHours(n), () -> JdkDates.plusHours(d, n));
+                same("pmi " + d + n, () -> d.plusMinutes(n), () -> JdkDates.plusMinutes(d, n));
+                same("ps " + d + n, () -> d.plusSeconds(n), () -> JdkDates.plusSeconds(d, n));
+                same("pms " + d + n, () -> d.plusMillis(n), () -> JdkDates.plusMillis(d, n));
+                same("pn " + d + n, () -> d.plusNanos(n), () -> JdkDates.plusNanos(d, n));
+                same("md " + d + n, () -> d.minusDays(n), () -> JdkDates.minusDays(d, n));
+                same("mh " + d + n, () -> d.minusHours(n), () -> JdkDates.minusHours(d, n));
+                same("mmi " + d + n, () -> d.minusMinutes(n), () -> JdkDates.minusMinutes(d, n));
+                same("ms " + d + n, () -> d.minusSeconds(n), () -> JdkDates.minusSeconds(d, n));
+                same("mms " + d + n, () -> d.minusMillis(n), () -> JdkDates.minusMillis(d, n));
+                same("mn " + d + n, () -> d.minusNanos(n), () -> JdkDates.minusNanos(d, n));
+            }
+        }
         for (final Duration d : extremes) {
             same("nanos " + d, () -> d.toNanos(), () -> JdkDates.toNanos(d));
             for (final long n : new long[] {-3, 2, 1000000007L, -999999999999L, Long.MAX_VALUE, Long.MIN_VALUE}) {

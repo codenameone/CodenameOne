@@ -427,7 +427,22 @@ public final class JdkNumbers {
             // their difference is lost (1e-20 gave 0); the series keeps it.
             return sinhSeries(x);
         }
+        if (Math.abs(x) > 22) {
+            return x < 0 ? -halfExp(-x) : halfExp(x);
+        }
         return (MathUtil.exp(x) - MathUtil.exp(-x)) / 2;
+    }
+
+    /// `exp(x) / 2` for `x > 22`, where `exp(-x)` no longer reaches the last
+    /// digit of either sinh or cosh. Past 709 `exp(x)` itself overflows
+    /// though half of it does not, up to about 710.47, so it is taken as
+    /// two halves: sinh(710) is 1.117e308, not infinity.
+    private static double halfExp(double x) {
+        if (x < 709) {
+            return MathUtil.exp(x) / 2;
+        }
+        double half = MathUtil.exp(x / 2);
+        return half * (half / 2);
     }
 
     /// sinh by its Taylor series, for `|x| < 1`, where it converges within
@@ -448,6 +463,9 @@ public final class JdkNumbers {
     }
 
     public static double cosh(double x) {
+        if (Math.abs(x) > 22) {
+            return halfExp(Math.abs(x));
+        }
         return (MathUtil.exp(x) + MathUtil.exp(-x)) / 2;
     }
 

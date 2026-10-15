@@ -184,23 +184,33 @@ public final class JdkStrings {
 
     /// The lines of `s`, without their terminators: a line feed, a carriage
     /// return, or the two together. A terminator at the very end starts no
-    /// empty last line.
-    public static Stream<String> lines(String s) {
-        List<String> out = new ArrayList<String>();
-        int n = s.length();
-        int start = 0;
-        while (start < n) {
-            int end = start;
-            while (end < n && s.charAt(end) != '\n' && s.charAt(end) != '\r') {
-                end++;
-            }
-            out.add(s.substring(start, end));
-            if (end < n && s.charAt(end) == '\r' && end + 1 < n && s.charAt(end + 1) == '\n') {
-                end++;
-            }
-            start = end + 1;
+    /// empty last line. Found as the stream asks for them, as the JDK's
+    /// are, so `findFirst` on a long text reads its first line only.
+    public static Stream<String> lines(final String s) {
+        if (s == null) {
+            throw new NullPointerException();
         }
-        return JdkCollections.stream(out);
+        return ObjPipeline.over(new PullIterator<String>() {
+            private int start;
+
+            @Override
+            boolean advance() {
+                int n = s.length();
+                if (start >= n) {
+                    return false;
+                }
+                int end = start;
+                while (end < n && s.charAt(end) != '\n' && s.charAt(end) != '\r') {
+                    end++;
+                }
+                emit(s.substring(start, end));
+                if (end < n && s.charAt(end) == '\r' && end + 1 < n && s.charAt(end + 1) == '\n') {
+                    end++;
+                }
+                start = end + 1;
+                return true;
+            }
+        });
     }
 
     public static String[] split(String s, String regex) {

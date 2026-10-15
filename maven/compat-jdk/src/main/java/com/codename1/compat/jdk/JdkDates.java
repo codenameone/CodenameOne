@@ -907,8 +907,11 @@ public final class JdkDates {
     // Duration
     // ---------------------------------------------------------------
 
+    /// A duration of `seconds` and `nanos`, or ArithmeticException when it
+    /// is longer than a Duration holds, as the JDK throws.
     private static Duration duration(long seconds, long nanos) {
-        return Duration.ofSeconds(seconds + floorDiv(nanos, NANOS_PER_SECOND), floorMod(nanos, NANOS_PER_SECOND));
+        return Duration.ofSeconds(addExact(seconds, floorDiv(nanos, NANOS_PER_SECOND)),
+                floorMod(nanos, NANOS_PER_SECOND));
     }
 
     /// The duration in nanoseconds, or ArithmeticException for one longer
@@ -1023,55 +1026,58 @@ public final class JdkDates {
     }
 
     public static Duration plusDays(Duration d, long days) {
-        return duration(d.getSeconds() + days * SECONDS_PER_DAY, d.getNano());
+        return duration(addExact(d.getSeconds(), multiplyExact(days, SECONDS_PER_DAY)), d.getNano());
     }
 
     public static Duration plusHours(Duration d, long hours) {
-        return duration(d.getSeconds() + hours * 3600, d.getNano());
+        return duration(addExact(d.getSeconds(), multiplyExact(hours, 3600)), d.getNano());
     }
 
     public static Duration plusMinutes(Duration d, long minutes) {
-        return duration(d.getSeconds() + minutes * 60, d.getNano());
+        return duration(addExact(d.getSeconds(), multiplyExact(minutes, 60)), d.getNano());
     }
 
     public static Duration plusSeconds(Duration d, long seconds) {
-        return duration(d.getSeconds() + seconds, d.getNano());
+        return duration(addExact(d.getSeconds(), seconds), d.getNano());
     }
 
     public static Duration plusMillis(Duration d, long millis) {
-        return duration(d.getSeconds() + millis / 1000, d.getNano() + millis % 1000 * 1000000);
+        return duration(addExact(d.getSeconds(), millis / 1000), d.getNano() + millis % 1000 * 1000000);
     }
 
     public static Duration plusNanos(Duration d, long nanos) {
-        return duration(d.getSeconds() + nanos / NANOS_PER_SECOND, d.getNano() + nanos % NANOS_PER_SECOND);
+        return duration(addExact(d.getSeconds(), nanos / NANOS_PER_SECOND), d.getNano() + nanos % NANOS_PER_SECOND);
     }
 
     public static Duration minusDays(Duration d, long days) {
-        return plusDays(d, -days);
+        // Long.MIN_VALUE has no negation; the JDK adds MAX_VALUE and one.
+        return days == Long.MIN_VALUE ? plusDays(plusDays(d, Long.MAX_VALUE), 1) : plusDays(d, -days);
     }
 
     public static Duration minusHours(Duration d, long hours) {
-        return plusHours(d, -hours);
+        return hours == Long.MIN_VALUE ? plusHours(plusHours(d, Long.MAX_VALUE), 1) : plusHours(d, -hours);
     }
 
     public static Duration minusMinutes(Duration d, long minutes) {
-        return plusMinutes(d, -minutes);
+        return minutes == Long.MIN_VALUE ? plusMinutes(plusMinutes(d, Long.MAX_VALUE), 1) : plusMinutes(d, -minutes);
     }
 
     public static Duration minusSeconds(Duration d, long seconds) {
-        return plusSeconds(d, -seconds);
+        return seconds == Long.MIN_VALUE ? plusSeconds(plusSeconds(d, Long.MAX_VALUE), 1) : plusSeconds(d, -seconds);
     }
 
     public static Duration minusMillis(Duration d, long millis) {
-        return plusMillis(d, -millis);
+        return millis == Long.MIN_VALUE ? plusMillis(plusMillis(d, Long.MAX_VALUE), 1) : plusMillis(d, -millis);
     }
 
     public static Duration minusNanos(Duration d, long nanos) {
-        return plusNanos(d, -nanos);
+        return nanos == Long.MIN_VALUE ? plusNanos(plusNanos(d, Long.MAX_VALUE), 1) : plusNanos(d, -nanos);
     }
 
+    /// As the JDK's, which multiplies by -1: the most negative duration
+    /// has no positive counterpart and throws.
     public static Duration negated(Duration d) {
-        return duration(-d.getSeconds(), -(long) d.getNano());
+        return multipliedBy(d, -1);
     }
 
     public static Duration abs(Duration d) {
@@ -1092,8 +1098,11 @@ public final class JdkDates {
         }
         long high = floorDiv(factor, NANOS_PER_SECOND);
         long rest = nanos * floorMod(factor, NANOS_PER_SECOND);
-        long total = addExact(addExact(multiplyExact(seconds, factor), nanos * high),
-                floorDiv(rest, NANOS_PER_SECOND));
+        // The nanosecond terms are summed first: together they are the
+        // carry of nanos * factor, which is never larger than the factor,
+        // while the first alone can push a result that fits past the range.
+        long carry = addExact(nanos * high, floorDiv(rest, NANOS_PER_SECOND));
+        long total = addExact(multiplyExact(seconds, factor), carry);
         return Duration.ofSeconds(total, floorMod(rest, NANOS_PER_SECOND));
     }
 

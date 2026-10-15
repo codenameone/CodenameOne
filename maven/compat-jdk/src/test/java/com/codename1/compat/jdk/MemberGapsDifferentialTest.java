@@ -163,6 +163,25 @@ public class MemberGapsDifferentialTest {
         assertEquals(Arrays.asList("solo"), JdkStrings.lines("solo").collect(Collectors.toList()));
     }
 
+    /// The JDK splits a line only when the stream asks for it, so the first
+    /// line of a long text costs one line.
+    @Test
+    public void linesAreSplitAsTheStreamAsksForThem() {
+        StringBuilder text = new StringBuilder();
+        for (int i = 0; i < 10000; i++) {
+            text.append("line ").append(i).append('\n');
+        }
+        final int[] seen = {0};
+        assertEquals("line 0", JdkStrings.lines(text.toString()).peek(l -> seen[0]++).findFirst().get());
+        assertEquals(1, seen[0]);
+        try {
+            JdkStrings.lines(null);
+            fail("null text");
+        } catch (NullPointerException expected) {
+            // the JDK's answer
+        }
+    }
+
     @Test
     public void formatted() {
         assertEquals(String.format("%s has %d", "list", 3), JdkStrings.formatted("%s has %d", "list", 3));

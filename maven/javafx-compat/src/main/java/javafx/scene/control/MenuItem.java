@@ -309,6 +309,11 @@ public class MenuItem implements EventTarget, Styleable {
     }
 
     /// Chooses the item: sends it an `ActionEvent`.
+    ///
+    /// A disabled item fires too, as in OpenJFX, whose `MenuItem.fire()`
+    /// dispatches with no check (checked against javafx-controls 23): a
+    /// disabled item is kept from being chosen by the menu that shows it,
+    /// not by this method, and code that calls it directly gets the event.
     public void fire() {
         Event.fireEvent(this, new ActionEvent(this, this));
     }

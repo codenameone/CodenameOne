@@ -697,17 +697,57 @@ public final class Files {
     }
 
     /// The position of the first byte two files differ in, or -1 when they
-    /// hold the same bytes.
+    /// hold the same bytes. Both are read a block at a time, as the JDK
+    /// reads them, so two large files that differ early are not loaded
+    /// whole, and a file larger than an array can be compared at all.
     public static long mismatch(Path path, Path path2) throws IOException {
-        byte[] a = readAllBytes(path);
-        byte[] b = readAllBytes(path2);
-        int n = Math.min(a.length, b.length);
-        for (int i = 0; i < n; i++) {
-            if (a[i] != b[i]) {
-                return i;
-            }
+        if (isSameFile(path, path2)) {
+            return -1L;
         }
-        return a.length == b.length ? -1L : n;
+        InputStream a = newInputStream(path);
+        try {
+            InputStream b = newInputStream(path2);
+            try {
+                byte[] bufA = new byte[8192];
+                byte[] bufB = new byte[8192];
+                long at = 0;
+                while (true) {
+                    int na = fill(a, bufA);
+                    int nb = fill(b, bufB);
+                    int n = Math.min(na, nb);
+                    for (int i = 0; i < n; i++) {
+                        if (bufA[i] != bufB[i]) {
+                            return at + i;
+                        }
+                    }
+                    if (na != nb) {
+                        return at + n;
+                    }
+                    if (na < bufA.length) {
+                        return -1L;
+                    }
+                    at += n;
+                }
+            } finally {
+                b.close();
+            }
+        } finally {
+            a.close();
+        }
+    }
+
+    /// Reads into `buf` until it is full or the stream ends; how many bytes
+    /// were read. A stream may answer fewer than asked before its end.
+    private static int fill(InputStream in, byte[] buf) throws IOException {
+        int total = 0;
+        while (total < buf.length) {
+            int n = in.read(buf, total, buf.length - total);
+            if (n < 0) {
+                break;
+            }
+            total += n;
+        }
+        return total;
     }
 
     // ---- directories ----

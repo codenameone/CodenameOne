@@ -559,6 +559,28 @@ public class ExecutorsTest {
         assertEquals("gone", prefs.get("c\\nd", "gone"));
     }
 
+    /// A key may hold a `/` or a line break, and a node name a line break:
+    /// none of it makes one entry another's.
+    @Test
+    public void preferenceKeysNeverAliasAnotherNodesEntries() throws Exception {
+        Preferences a = Preferences.userRoot().node("/cn1/test/alias/a");
+        Preferences ab = Preferences.userRoot().node("/cn1/test/alias/a/b");
+        a.put("b/c", "x");
+        ab.put("c", "y");
+        a.put("\nkeys", "not the index");
+        a.put("\n", "line break");
+        assertEquals("x", a.get("b/c", null));
+        assertEquals("y", ab.get("c", null));
+        assertEquals("not the index", a.get("\nkeys", null));
+        assertEquals("line break", a.get("\n", null));
+        assertEquals(Arrays.asList("b/c", "\nkeys", "\n"), Arrays.asList(a.keys()));
+        assertEquals(Arrays.asList("c"), Arrays.asList(ab.keys()));
+        a.clear();
+        ab.clear();
+        assertEquals("y", ab.get("c", "y"));
+        assertEquals(0, a.keys().length);
+    }
+
     /// Desktop code sets properties from its workers; the JDK's table takes
     /// that, and a plain map written from several threads loses entries.
     @Test

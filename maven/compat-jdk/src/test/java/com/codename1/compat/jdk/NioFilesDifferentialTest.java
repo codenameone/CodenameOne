@@ -596,6 +596,26 @@ public class NioFilesDifferentialTest {
         assertFalse(found.hasNext());
     }
 
+    /// Files longer than one block of the comparison: a difference in a
+    /// later block, a difference only in length, and none.
+    @Test
+    public void largeFilesAreComparedBlockByBlock() throws Exception {
+        byte[] data = new byte[20000];
+        for (int i = 0; i < data.length; i++) {
+            data[i] = (byte) (i * 31);
+        }
+        java.nio.file.Files.write(new java.io.File(deviceRoot, "big1.bin").toPath(), data);
+        java.nio.file.Files.write(new java.io.File(deviceRoot, "big2.bin").toPath(), data);
+        assertEquals(-1L, Files.mismatch(Paths.get("/big1.bin"), Paths.get("/big2.bin")));
+        byte[] other = data.clone();
+        other[12345]++;
+        java.nio.file.Files.write(new java.io.File(deviceRoot, "big2.bin").toPath(), other);
+        assertEquals(12345L, Files.mismatch(Paths.get("/big1.bin"), Paths.get("/big2.bin")));
+        java.nio.file.Files.write(new java.io.File(deviceRoot, "big2.bin").toPath(),
+                java.util.Arrays.copyOf(data, 16384));
+        assertEquals(16384L, Files.mismatch(Paths.get("/big1.bin"), Paths.get("/big2.bin")));
+    }
+
     @Test
     public void linesAreReadAsTheStreamAsksForThem() throws Exception {
         java.io.File file = new java.io.File(deviceRoot, "grows.txt");

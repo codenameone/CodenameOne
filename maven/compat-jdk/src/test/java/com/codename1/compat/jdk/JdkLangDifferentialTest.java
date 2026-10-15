@@ -59,6 +59,19 @@ public class JdkLangDifferentialTest {
         assertEquals(1e-20, JdkNumbers.tanh(1e-20), 0);
     }
 
+    /// Near the top of the double range half an exponential is finite
+    /// where the exponential is not: sinh(710) is 1.117e308.
+    @Test
+    public void hyperbolicFunctionsReachTheTopOfTheRange() {
+        double[] xs = {22.5, -30, 100, 700, 709.5, 710, -710, 710.4, 710.5, -711, 800, Double.POSITIVE_INFINITY};
+        for (double x : xs) {
+            assertEquals("sinh " + x, Math.sinh(x), JdkNumbers.sinh(x), Math.abs(Math.sinh(x)) * 1e-14);
+            assertEquals("cosh " + x, Math.cosh(x), JdkNumbers.cosh(x), Math.abs(Math.cosh(x)) * 1e-14);
+        }
+        assertTrue(!Double.isInfinite(JdkNumbers.sinh(710)));
+        assertTrue(!Double.isInfinite(JdkNumbers.cosh(-710)));
+    }
+
     @Test
     public void bitOperationsMatch() {
         for (int i : INTS) {
