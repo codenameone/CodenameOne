@@ -223,6 +223,26 @@
     }
    }
   },
+  "macos-arm64": {
+   "recursion": {
+    "all": {
+     "from": {
+      "memory": 0.118,
+      "time": 1.235,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.118,
+     "reason": "Code placement, not code: com_bench_CommonWorkloads_fib is byte-identical C and the same 40 arm64 instructions on master and this branch; unrelated runtime code before it grew 0x218 bytes (GC resume handshake inlined into codenameOneGcMalloc, cn1StartupPhase), moving fib from 64-byte offset 0x0c to 0x24. Fast/slow on CI's M1 tracks that offset on 4 of 4 commits; on an M4 Max the two builds time identically (87-89ms) with CI's Xcode 26.3. Run 38535043785 at 6245994207",
+     "runs": 1,
+     "time": 1.534,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   }
+  },
   "windows-arm64@armv8-64-bit-family-8-model-d49-microsoft-corporation": {
    "translator": {
     "all": {
@@ -234,6 +254,26 @@
      "reason": "MethodDependencyGraph.getCallers returns a read-only view instead of copying the caller set on every lookup (a4254d5453): ~3.26GB allocated instead of ~3.84GB translating the hello suite, which lowers the self-hosted translator's peak RSS; windows-arm64 translator RAM 0.51x -> 0.43x on top of #6010's record, run 38499309506 at a1e23b56c1",
      "runs": 1,
      "time": 0.838
+    }
+   }
+  },
+  "windows-x64@amd64-family-25-model-17-authenticamd": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.551,
+      "time": 0.777,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.454,
+     "reason": "MethodDependencyGraph.getCallers returns a read-only view instead of copying the caller set on every lookup (a4254d5453): ~3.26GB allocated instead of ~3.84GB translating the hello suite; windows-x64 translator RAM 0.55x -> 0.45x, run 38535042911 at 6245994207",
+     "runs": 1,
+     "time": 0.777,
+     "tolerance": {
+      "time": 0.2
+     }
     }
    }
   },
