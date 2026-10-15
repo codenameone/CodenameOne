@@ -254,6 +254,21 @@ class JavascriptRuntimeSemanticsTest {
 
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void langMembersTakenFromCompatJdkKeepJavaSemantics(CompilerHelper.CompilerConfig config) throws Exception {
+        // The String, wrapper, Character, Math, Objects, Locale and Charset members
+        // JavaAPI took over from compat-jdk, in the browser runtime. One bit per
+        // property; LangMembersIntegrationTest holds the same members to HotSpot
+        // on the native target.
+        WorkerRunResult result = translateAndRunFixture(config, "JsLangMembersApp.java", "JsLangMembersApp");
+
+        assertEquals(0x3fffffff, result.result,
+                "java.lang and java.util members must keep Java semantics. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
     void executesLocaleTimeZoneAndDateFormatInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
         WorkerRunResult result = translateAndRunFixture(config, "JsLocaleTimeZoneApp.java", "JsLocaleTimeZoneApp");
 

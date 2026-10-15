@@ -110,4 +110,62 @@ public final class Short extends Number implements Comparable<Short> {
     public static int compare(short s1, short s2) {
         return s1 < s2 ? -1 : s1 > s2 ? 1 : 0;
     }
+
+    public static final Class<Short> TYPE = null;
+
+    /// The size of a short in bytes.
+    public static final int BYTES = 2;
+
+    /// The size of a short in bits.
+    public static final int SIZE = 16;
+
+    /// A Short of `parseShort(s)`.
+    @Deprecated
+    public Short(String s) throws NumberFormatException {
+    }
+
+    /// The decimal string of `s`.
+    public static String toString(short s) {
+        return null;
+    }
+
+    /// A Short of `parseShort(s)`.
+    public static Short valueOf(String s) throws NumberFormatException {
+        return null;
+    }
+
+    /// A Short of `parseShort(s, radix)`.
+    public static Short valueOf(String s, int radix) throws NumberFormatException {
+        return null;
+    }
+
+    /// Decodes a decimal, hexadecimal or octal short, as `Integer.decode`.
+    public static Short decode(String nm) throws NumberFormatException {
+        return null;
+    }
+
+    /// The value itself.
+    public static int hashCode(short value) {
+        return 0;
+    }
+
+    /// Compares the two as unsigned values.
+    public static int compareUnsigned(short x, short y) {
+        return 0;
+    }
+
+    /// The value as an unsigned int.
+    public static int toUnsignedInt(short x) {
+        return 0;
+    }
+
+    /// The value as an unsigned long.
+    public static long toUnsignedLong(short x) {
+        return 0;
+    }
+
+    /// The bytes in reverse order.
+    public static short reverseBytes(short i) {
+        return 0;
+    }
 }

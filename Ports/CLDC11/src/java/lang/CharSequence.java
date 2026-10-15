@@ -81,4 +81,15 @@ public interface CharSequence {
     ///
     /// a string based on this sequence.
     public String toString();
+
+    /// Whether the sequence has no characters.
+    default boolean isEmpty() {
+        return false;
+    }
+
+    /// Compares two sequences lexicographically, char by char, the shorter
+    /// first when one is a prefix of the other.
+    public static int compare(CharSequence cs1, CharSequence cs2) {
+        return 0;
+    }
 }

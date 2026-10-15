@@ -138,19 +138,21 @@ public final class Long extends Number implements Comparable<Long> {
      * parseLong("0", 10) returns 0L parseLong("473", 10) returns 473L parseLong("-0", 10) returns 0L parseLong("-FF", 16) returns -255L parseLong("1100110", 2) returns 102L parseLong("99", 8) throws a NumberFormatException parseLong("Hazelnut", 10) throws a NumberFormatException parseLong("Hazelnut", 36) returns 1356099454469L
      */
     public static long parseLong(String string, int radix) throws NumberFormatException {
-        if (radix < Character.MIN_RADIX || radix > Character.MAX_RADIX) {
-            throw new NumberFormatException("Invalid radix: " + radix);
-        }
         if (string == null) {
-            throw invalidLong(string);
+            throw new NumberFormatException("Cannot parse null string");
         }
+        Integer.checkRadix(radix);
         int length = string.length(), i = 0;
         if (length == 0) {
-            throw invalidLong(string);
+            throw invalidLong(string, radix);
         }
         boolean negative = string.charAt(i) == '-';
         if (negative && ++i == length) {
-            throw invalidLong(string);
+            throw invalidLong(string, radix);
+        }
+        boolean positive = !negative && string.charAt(i) == '+';
+        if (positive && ++i == length) {
+            throw invalidLong(string, radix);
         }
 
         return parse(string, i, radix, negative);
@@ -162,28 +164,29 @@ public final class Long extends Number implements Comparable<Long> {
         while (offset < length) {
             int digit = Character.digit(string.charAt(offset++), radix);
             if (digit == -1) {
-                throw invalidLong(string);
+                throw invalidLong(string, radix);
             }
             if (max > result) {
-                throw invalidLong(string);
+                throw invalidLong(string, radix);
             }
             long next = result * radix - digit;
             if (next > result) {
-                throw invalidLong(string);
+                throw invalidLong(string, radix);
             }
             result = next;
         }
         if (!negative) {
             result = -result;
             if (result < 0) {
-                throw invalidLong(string);
+                throw invalidLong(string, radix);
             }
         }
         return result;
     }
 
-    private static NumberFormatException invalidLong(String s) {
-        throw new NumberFormatException("Invalid long: \"" + s + "\"");
+    private static NumberFormatException invalidLong(String s, int radix) {
+        return new NumberFormatException("For input string: \"" + s + "\""
+                + (radix == 10 ? "" : " under radix " + radix));
     }
 
     /**
@@ -285,5 +288,319 @@ public final class Long extends Number implements Comparable<Long> {
      */
     public static long min(long a, long b) {
         return Math.min(a, b);
+    }
+
+    // ---------------------------------------------------------------------
+    // Members of the JDK's class this one did not have, in plain Java.
+    // ---------------------------------------------------------------------
+
+    /// The size of a long in bytes.
+    public static final int BYTES = 8;
+
+    /// The size of a long in bits.
+    public static final int SIZE = 64;
+
+    /// A Long of `parseLong(s)`.
+    @Deprecated
+    public Long(String s) throws NumberFormatException {
+        this(parseLong(s));
+    }
+
+    /// A Long of `parseLong(s)`.
+    public static Long valueOf(String s) throws NumberFormatException {
+        return valueOf(parseLong(s, 10));
+    }
+
+    /// A Long of `parseLong(s, radix)`.
+    public static Long valueOf(String s, int radix) throws NumberFormatException {
+        return valueOf(parseLong(s, radix));
+    }
+
+    /// The number of one bits.
+    public static int bitCount(long i) {
+        return Integer.bitCount((int) i) + Integer.bitCount((int) (i >>> 32));
+    }
+
+    /// The highest one bit alone, or 0.
+    public static long highestOneBit(long i) {
+        return i == 0 ? 0 : 0x8000000000000000L >>> numberOfLeadingZeros(i);
+    }
+
+    /// The lowest one bit alone, or 0.
+    public static long lowestOneBit(long i) {
+        return i & -i;
+    }
+
+    /// The number of zero bits above the highest one bit; 64 for zero.
+    public static int numberOfLeadingZeros(long i) {
+        int high = (int) (i >>> 32);
+        return high != 0 ? Integer.numberOfLeadingZeros(high) : 32 + Integer.numberOfLeadingZeros((int) i);
+    }
+
+    /// The number of zero bits below the lowest one bit; 64 for zero.
+    public static int numberOfTrailingZeros(long i) {
+        int low = (int) i;
+        return low != 0 ? Integer.numberOfTrailingZeros(low) : 32 + Integer.numberOfTrailingZeros((int) (i >>> 32));
+    }
+
+    /// The bits in reverse order.
+    public static long reverse(long i) {
+        return ((long) Integer.reverse((int) i) << 32) | (Integer.reverse((int) (i >>> 32)) & 0xffffffffL);
+    }
+
+    /// The bytes in reverse order.
+    public static long reverseBytes(long i) {
+        return ((long) Integer.reverseBytes((int) i) << 32) | (Integer.reverseBytes((int) (i >>> 32)) & 0xffffffffL);
+    }
+
+    /// The bits rotated left by `distance`.
+    public static long rotateLeft(long i, int distance) {
+        return (i << distance) | (i >>> -distance);
+    }
+
+    /// The bits rotated right by `distance`.
+    public static long rotateRight(long i, int distance) {
+        return (i >>> distance) | (i << -distance);
+    }
+
+    /// -1, 0 or 1 by the sign of `i`.
+    public static int signum(long i) {
+        return (int) ((i >> 63) | (-i >>> 63));
+    }
+
+    /// The value as unsigned hexadecimal digits.
+    public static String toHexString(long i) {
+        return toPow2String(i, 4);
+    }
+
+    /// The value as unsigned octal digits.
+    public static String toOctalString(long i) {
+        return toPow2String(i, 3);
+    }
+
+    /// The value as unsigned binary digits.
+    public static String toBinaryString(long i) {
+        return toPow2String(i, 1);
+    }
+
+    private static String toPow2String(long i, int shift) {
+        char[] buf = new char[64];
+        int at = 64;
+        long mask = (1L << shift) - 1;
+        do {
+            buf[--at] = Character.forDigit((int) (i & mask), 1 << shift);
+            i >>>= shift;
+        } while (i != 0);
+        return new String(buf, at, 64 - at);
+    }
+
+    /// Compares the two as unsigned values.
+    public static int compareUnsigned(long x, long y) {
+        return compare(x + MIN_VALUE, y + MIN_VALUE);
+    }
+
+    /// The unsigned quotient.
+    public static long divideUnsigned(long dividend, long divisor) {
+        if (divisor == 0) {
+            throw new ArithmeticException("/ by zero");
+        }
+        if (divisor < 0) {
+            return compareUnsigned(dividend, divisor) < 0 ? 0 : 1;
+        }
+        if (dividend >= 0) {
+            return dividend / divisor;
+        }
+        long quotient = ((dividend >>> 1) / divisor) << 1;
+        long rem = dividend - quotient * divisor;
+        return quotient + (compareUnsigned(rem, divisor) >= 0 ? 1 : 0);
+    }
+
+    /// The unsigned remainder.
+    public static long remainderUnsigned(long dividend, long divisor) {
+        if (divisor == 0) {
+            throw new ArithmeticException("/ by zero");
+        }
+        return dividend - divideUnsigned(dividend, divisor) * divisor;
+    }
+
+    /// The value as an unsigned decimal string.
+    public static String toUnsignedString(long i) {
+        return toUnsignedString(i, 10);
+    }
+
+    /// The value as an unsigned string in `radix`.
+    public static String toUnsignedString(long i, int radix) {
+        if (i >= 0) {
+            return toString(i, radix);
+        }
+        if (radix < Character.MIN_RADIX || radix > Character.MAX_RADIX) {
+            radix = 10;
+        }
+        long quotient = divideUnsigned(i, radix);
+        long rem = i - quotient * radix;
+        return toString(quotient, radix) + Character.forDigit((int) rem, radix);
+    }
+
+    /// Parses an unsigned decimal long.
+    public static long parseUnsignedLong(String s) throws NumberFormatException {
+        return parseUnsignedLong(s, 10);
+    }
+
+    /// Parses an unsigned long in `radix`.
+    public static long parseUnsignedLong(String s, int radix) throws NumberFormatException {
+        if (s == null) {
+            throw new NumberFormatException("Cannot parse null string: null");
+        }
+        int len = s.length();
+        if (len == 0) {
+            throw new NumberFormatException("For input string: \"\"" + (radix == 10 ? "" : " under radix " + radix));
+        }
+        if (s.charAt(0) == '-') {
+            throw new NumberFormatException("Illegal leading minus sign on unsigned string " + s + ".");
+        }
+        if (radix < Character.MIN_RADIX || radix > Character.MAX_RADIX) {
+            throw new NumberFormatException("radix " + radix + " out of range");
+        }
+        int start = s.charAt(0) == '+' ? 1 : 0;
+        if (start == len) {
+            throw new NumberFormatException("For input string: \"" + s + "\"" + (radix == 10 ? "" : " under radix " + radix));
+        }
+        long limit = divideUnsigned(-1L, radix);
+        long result = 0;
+        for (int i = start; i < len; i++) {
+            int d = Character.digit(s.charAt(i), radix);
+            if (d < 0) {
+                throw new NumberFormatException("For input string: \"" + s + "\"" + (radix == 10 ? "" : " under radix " + radix));
+            }
+            if (compareUnsigned(result, limit) > 0) {
+                throw new NumberFormatException("String value " + s + " exceeds range of unsigned long.");
+            }
+            long shifted = result * radix;
+            long next = shifted + d;
+            if (compareUnsigned(next, shifted) < 0) {
+                throw new NumberFormatException("String value " + s + " exceeds range of unsigned long.");
+            }
+            result = next;
+        }
+        return result;
+    }
+
+    /// Parses `s` from `beginIndex` to `endIndex` as a signed long.
+    public static long parseLong(CharSequence s, int beginIndex, int endIndex, int radix)
+            throws NumberFormatException {
+        if (beginIndex < 0 || beginIndex > endIndex || endIndex > s.length()) {
+            throw new IndexOutOfBoundsException();
+        }
+        return parseLong(s.subSequence(beginIndex, endIndex).toString(), radix);
+    }
+
+    /// Parses `s` from `beginIndex` to `endIndex` as an unsigned long.
+    public static long parseUnsignedLong(CharSequence s, int beginIndex, int endIndex, int radix)
+            throws NumberFormatException {
+        if (beginIndex < 0 || beginIndex > endIndex || endIndex > s.length()) {
+            throw new IndexOutOfBoundsException();
+        }
+        return parseUnsignedLong(s.subSequence(beginIndex, endIndex).toString(), radix);
+    }
+
+    /// Decodes a decimal, `0x`, `0X`, `#` or leading-zero octal long, with an
+    /// optional sign.
+    public static Long decode(String nm) throws NumberFormatException {
+        int[] radix = new int[1];
+        String digits = decodeDigits(nm, radix);
+        return valueOf(parseLong(digits, radix[0]));
+    }
+
+    /// The number `decode` reads from `nm`, in the JDK's grammar: an
+    /// optional sign, then `0x`, `0X` or `#` for hexadecimal or a leading zero
+    /// for octal. Answers the signed digits to parse; the radix goes in
+    /// `radixOut[0]`.
+    static String decodeDigits(String nm, int[] radixOut) throws NumberFormatException {
+        if (nm.length() == 0) {
+            throw new NumberFormatException("Zero length string");
+        }
+        int radix = 10;
+        int index = 0;
+        boolean negative = false;
+        char first = nm.charAt(0);
+        if (first == '-') {
+            negative = true;
+            index++;
+        } else if (first == '+') {
+            index++;
+        }
+        if (nm.startsWith("0x", index) || nm.startsWith("0X", index)) {
+            index += 2;
+            radix = 16;
+        } else if (nm.startsWith("#", index)) {
+            index++;
+            radix = 16;
+        } else if (nm.startsWith("0", index) && nm.length() > 1 + index) {
+            index++;
+            radix = 8;
+        }
+        if (nm.startsWith("-", index) || nm.startsWith("+", index)) {
+            throw new NumberFormatException("Sign character in wrong position");
+        }
+        radixOut[0] = radix;
+        return negative ? "-" + nm.substring(index) : nm.substring(index);
+    }
+
+    /// The system property `nm` as a Long, or null.
+    public static Long getLong(String nm) {
+        return getLong(nm, null);
+    }
+
+    /// The system property `nm` as a Long, or `val`.
+    public static Long getLong(String nm, long val) {
+        Long result = getLong(nm, null);
+        return result == null ? valueOf(val) : result;
+    }
+
+    /// The system property `nm` decoded as a Long, or `val` when it is unset
+    /// or not a number.
+    public static Long getLong(String nm, Long val) {
+        String v = null;
+        if (nm != null && nm.length() > 0) {
+            v = System.getProperty(nm);
+        }
+        if (v != null) {
+            try {
+                return decode(v);
+            } catch (NumberFormatException e) {
+                // fall through to the default, as the JDK does
+            }
+        }
+        return val;
+    }
+
+    /// The bits of `i` selected by `mask`, packed to the low end.
+    public static long compress(long i, long mask) {
+        long result = 0;
+        int out = 0;
+        for (int bit = 0; bit < 64; bit++) {
+            if ((mask & (1L << bit)) != 0) {
+                if ((i & (1L << bit)) != 0) {
+                    result |= 1L << out;
+                }
+                out++;
+            }
+        }
+        return result;
+    }
+
+    /// The low bits of `i` spread to the positions of the one bits of `mask`.
+    public static long expand(long i, long mask) {
+        long result = 0;
+        int in = 0;
+        for (int bit = 0; bit < 64; bit++) {
+            if ((mask & (1L << bit)) != 0) {
+                if ((i & (1L << in)) != 0) {
+                    result |= 1L << bit;
+                }
+                in++;
+            }
+        }
+        return result;
     }
 }

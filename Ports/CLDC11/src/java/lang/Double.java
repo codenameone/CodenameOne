@@ -206,6 +206,56 @@ public final class Double extends Number implements Comparable<Double> {
     public int compareTo(Double d) {
         return compare(this, d);
     }
-    
-    
+
+    public static final int MAX_EXPONENT = 1023;
+
+    public static final int MIN_EXPONENT = -1022;
+
+    public static final int SIZE = 64;
+
+    public static long doubleToRawLongBits(double value) {
+        return 0;
+    }
+
+    public static double sum(double a, double b) {
+        return 0;
+    }
+
+    public static double max(double a, double b) {
+        return 0;
+    }
+
+    public static double min(double a, double b) {
+        return 0;
+    }
+
+    /// The size of a double in bytes.
+    public static final int BYTES = 8;
+
+    /// The bits of precision of a double's significand.
+    public static final int PRECISION = 53;
+
+    /// The smallest positive normal double, 2 to the power -1022.
+    public static final double MIN_NORMAL = 0x1.0p-1022;
+
+    /// A Double of `parseDouble(s)`.
+    @Deprecated
+    public Double(String s) throws NumberFormatException {
+    }
+
+    /// Whether `d` is neither infinite nor NaN.
+    public static boolean isFinite(double d) {
+        return false;
+    }
+
+    /// The hash the JDK gives `value`: its bits folded to an int.
+    public static int hashCode(double value) {
+        return 0;
+    }
+
+    /// The value as a hexadecimal floating point literal, as the JDK writes
+    /// it: `0x1.8p1` for 3.0, `0x0.0p0` for zero.
+    public static String toHexString(double d) {
+        return null;
+    }
 }

@@ -71,6 +71,46 @@ public class OutputStreamWriter extends java.io.Writer {
          utf8 = isUtf8Name(enc);
     }
 
+    /// An OutputStreamWriter that encodes with `cs`.
+    public OutputStreamWriter(java.io.OutputStream os, java.nio.charset.Charset cs) {
+        if (cs == null) {
+            throw new NullPointerException("charset");
+        }
+        this.os = os;
+        this.enc = cs.name();
+        utf8 = isUtf8Name(enc);
+    }
+
+    /// The historical name of the encoding: `UTF8`, `ASCII`, `ISO8859_1`.
+    public String getEncoding() {
+        return historicalName(enc);
+    }
+
+    /// The historical name the JDK's `getEncoding` answers for the standard
+    /// charsets: `UTF8`, `ASCII`, `ISO8859_1`. Any other name is answered
+    /// as it was given.
+    private static String historicalName(String name) {
+        StringBuilder folded = new StringBuilder(name.length());
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (c == '-' || c == '_') {
+                continue;
+            }
+            folded.append(c >= 'a' && c <= 'z' ? (char) (c - ('a' - 'A')) : c);
+        }
+        String key = folded.toString();
+        if ("UTF8".equals(key)) {
+            return "UTF8";
+        }
+        if ("USASCII".equals(key) || "ASCII".equals(key)) {
+            return "ASCII";
+        }
+        if ("ISO88591".equals(key) || "LATIN1".equals(key)) {
+            return "ISO8859_1";
+        }
+        return name;
+    }
+
     /* The encoding name is ASCII by specification, so it is folded by hand.
      * String.toLowerCase is locale sensitive and would fold the I of "UTF-8" to a
      * dotless i on a Turkish device, quietly sending every write down the slow path

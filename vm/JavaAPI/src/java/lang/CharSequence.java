@@ -71,4 +71,28 @@ public interface CharSequence {
      * @return a string based on this sequence.
      */
     public String toString();
+
+    /// Whether the sequence has no characters.
+    default boolean isEmpty() {
+        return length() == 0;
+    }
+
+    /// Compares two sequences lexicographically, char by char, the shorter
+    /// first when one is a prefix of the other.
+    public static int compare(CharSequence cs1, CharSequence cs2) {
+        if (cs1 == cs2) {
+            return 0;
+        }
+        int len1 = cs1.length();
+        int len2 = cs2.length();
+        int n = len1 < len2 ? len1 : len2;
+        for (int i = 0; i < n; i++) {
+            char a = cs1.charAt(i);
+            char b = cs2.charAt(i);
+            if (a != b) {
+                return a - b;
+            }
+        }
+        return len1 - len2;
+    }
 }

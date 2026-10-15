@@ -373,4 +373,55 @@ public final class Float extends Number implements Comparable<Float> {
     public static float min(float a, float b) {
         return Math.min(a, b);
     }
+
+    // ---------------------------------------------------------------------
+    // Members of the JDK's class this one did not have, in plain Java.
+    // ---------------------------------------------------------------------
+
+    /// The size of a float in bytes.
+    public static final int BYTES = 4;
+
+    /// The size of a float in bits.
+    public static final int SIZE = 32;
+
+    /// The bits of precision of a float's significand.
+    public static final int PRECISION = 24;
+
+    /// The largest exponent of a finite float.
+    public static final int MAX_EXPONENT = 127;
+
+    /// The smallest exponent of a normal float.
+    public static final int MIN_EXPONENT = -126;
+
+    /// The smallest positive normal float, 2 to the power -126.
+    public static final float MIN_NORMAL = 0x1.0p-126f;
+
+    /// A Float of `parseFloat(s)`.
+    @Deprecated
+    public Float(String s) throws NumberFormatException {
+        this(parseFloat(s));
+    }
+
+    /// Whether `f` is neither infinite nor NaN.
+    public static boolean isFinite(float f) {
+        return f - f == 0.0f;
+    }
+
+    /// The hash the JDK gives `value`: its bits.
+    public static int hashCode(float value) {
+        return floatToIntBits(value);
+    }
+
+    /// The value as a hexadecimal floating point literal, as the JDK writes
+    /// it.
+    public static String toHexString(float f) {
+        if (f != 0.0f && Math.abs(f) < MIN_NORMAL) {
+            // A subnormal float is a normal double; scale it to the double
+            // subnormal with the same significand bits, exactly, and name the
+            // float exponent instead of the double one.
+            String s = Double.toHexString((double) f * 0x1.0p-896);
+            return s.substring(0, s.length() - "p-1022".length()) + "p-126";
+        }
+        return Double.toHexString(f);
+    }
 }
