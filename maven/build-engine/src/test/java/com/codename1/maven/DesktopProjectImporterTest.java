@@ -269,6 +269,39 @@ public class DesktopProjectImporterTest {
                 + "org.example:managed:null compile\n", libraries.toString());
     }
 
+    /// What the desktop host supplies -- Maven's provided scope, Gradle's
+    /// compileOnly -- stays provided, so it is never bundled into the app;
+    /// declared both ways, it ships.
+    @Test
+    public void hostSuppliedLibrariesStayProvided() throws Exception {
+        File maven = tmp.newFolder("providedmaven");
+        write(maven, "pom.xml", "<project>\n<dependencies>\n"
+                + "<dependency><groupId>org.host</groupId><artifactId>api</artifactId><version>2</version>"
+                + "<scope>provided</scope></dependency>\n"
+                + "<dependency><groupId>org.app</groupId><artifactId>lib</artifactId><version>3</version>"
+                + "</dependency>\n"
+                + "</dependencies>\n</project>\n");
+        assertEquals("org.host:api:2 provided\norg.app:lib:3 compile\n", described(maven));
+        File gradle = tmp.newFolder("providedgradle");
+        write(gradle, "build.gradle", "dependencies {\n"
+                + "    compileOnly 'org.host:api:2'\n"
+                + "    implementation(\"org.app:lib:3\")\n"
+                + "    compileOnly 'org.both:lib:4'\n"
+                + "    runtimeOnly 'org.both:lib:4'\n"
+                + "}\n");
+        assertEquals("org.host:api:2 provided\norg.app:lib:3 compile\norg.both:lib:4 compile\n",
+                described(gradle));
+    }
+
+    private static String described(File moduleDir) throws Exception {
+        StringBuilder libraries = new StringBuilder();
+        for (DesktopProjectImporter.Library lib : DesktopProjectImporter.librariesOf(moduleDir)) {
+            libraries.append(lib.coordinate()).append(':').append(lib.version)
+                    .append(lib.provided ? " provided\n" : " compile\n");
+        }
+        return libraries.toString();
+    }
+
     private File swingProject(String folder) throws IOException {
         File source = tmp.newFolder(folder);
         write(source, "src/main/java/com/acme/swing/Main.java", SWING_MAIN);

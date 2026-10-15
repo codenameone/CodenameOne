@@ -260,4 +260,17 @@ public class CodingDifferentialTest {
         assertEquals(Arrays.asList("9", "b", "a", "0"), back);
         assertTrue("" + compared, compared > 20);
     }
+
+    /// A StringBuilder's code points are read when the stream runs, as the
+    /// JDK's are, so what was appended in between is among them.
+    @Test
+    public void codePointsAreReadWhenTheStreamRuns() {
+        StringBuilder theirs = new StringBuilder("a");
+        StringBuilder mine = new StringBuilder("a");
+        java.util.stream.IntStream jdk = theirs.codePoints();
+        IntStream shim = JdkText.codePoints(mine);
+        theirs.append("b\uD83D\uDE00");
+        mine.append("b\uD83D\uDE00");
+        assertEquals(Arrays.toString(jdk.toArray()), Arrays.toString(shim.toArray()));
+    }
 }

@@ -155,6 +155,16 @@ public final class JdkStrings {
         if (count == 1) {
             return s;
         }
+        // Anything repeated no times, and nothing repeated any number of
+        // times, is empty at once; looping count times to say so tied the
+        // thread up for "".repeat(Integer.MAX_VALUE).
+        if (count == 0 || s.length() == 0) {
+            return "";
+        }
+        if ((long) s.length() * count > Integer.MAX_VALUE) {
+            // What the JDK throws for a result no String can hold.
+            throw new OutOfMemoryError("Required length exceeds implementation limit");
+        }
         StringBuilder out = new StringBuilder(s.length() * count);
         for (int i = 0; i < count; i++) {
             out.append(s);

@@ -42,6 +42,7 @@ import org.junit.rules.TemporaryFolder;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /// `Files`, run step by step through this module's class on a Codename One
 /// file system and through the JDK's on this machine's, from the same script.
@@ -593,6 +594,30 @@ public class NioFilesDifferentialTest {
         assertEquals(Paths.get("/lazy/sub/deep.txt"), found.next());
         assertEquals(Paths.get("/lazy/sub/deeper.txt"), found.next());
         assertFalse(found.hasNext());
+    }
+
+    @Test
+    public void linesAreReadAsTheStreamAsksForThem() throws Exception {
+        java.io.File file = new java.io.File(deviceRoot, "grows.txt");
+        java.nio.file.Files.write(file.toPath(), "a\r\nb\n".getBytes("UTF-8"));
+        Stream<String> lines = Files.lines(Paths.get("/grows.txt"));
+        // Nothing is read until the stream is consumed, so a line added
+        // after the stream was made is among its lines.
+        java.nio.file.Files.write(file.toPath(), "c\n".getBytes("UTF-8"),
+                java.nio.file.StandardOpenOption.APPEND);
+        Iterator<String> it = lines.iterator();
+        assertEquals("a", it.next());
+        assertEquals("b", it.next());
+        assertEquals("c", it.next());
+        assertFalse(it.hasNext());
+        lines.close();
+        assertEquals("a", Files.lines(Paths.get("/grows.txt")).findFirst().get());
+        try {
+            Files.lines(Paths.get("/missing.txt"));
+            fail("a missing file was opened");
+        } catch (IOException expected) {
+            // thrown by lines itself, as the JDK's is
+        }
     }
 
     @Test

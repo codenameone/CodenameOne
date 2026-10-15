@@ -120,11 +120,15 @@ public class Preferences {
         return "/".equals(path) ? "/" + key : path + "/" + key;
     }
 
-    /// Guards every read-modify-write of an index, of any node: two threads
+    /// Guards every use of the store, from every node. Codename One's
+    /// Preferences, and the Storage under it, are written for its one
+    /// thread: two workers saving at once threw inside Storage, which logs
+    /// the failure and goes on, so a value could be lost without a word.
+    /// It also makes each read-modify-write of an index whole: two threads
     /// adding different keys to one node each read the same index, and the
     /// one that saved last dropped the other's key for good. Static, since
     /// two instances can stand for one node.
-    private static final Object INDEX_LOCK = new Object();
+    private static final Object STORE_LOCK = new Object();
 
     /// The node's keys, one per line. A key may hold any character, a line
     /// break too, so a backslash and a line break inside one are written as
@@ -177,8 +181,8 @@ public class Preferences {
         if (value == null) {
             throw new NullPointerException("Null value");
         }
-        com.codename1.io.Preferences.set(storeKey(key), value);
-        synchronized (INDEX_LOCK) {
+        synchronized (STORE_LOCK) {
+            com.codename1.io.Preferences.set(storeKey(key), value);
             List<String> keys = index();
             if (!keys.contains(key)) {
                 keys.add(key);
@@ -188,12 +192,14 @@ public class Preferences {
     }
 
     public String get(String key, String def) {
-        return com.codename1.io.Preferences.get(storeKey(key), def);
+        synchronized (STORE_LOCK) {
+            return com.codename1.io.Preferences.get(storeKey(key), def);
+        }
     }
 
     public void remove(String key) {
-        com.codename1.io.Preferences.delete(storeKey(key));
-        synchronized (INDEX_LOCK) {
+        synchronized (STORE_LOCK) {
+            com.codename1.io.Preferences.delete(storeKey(key));
             List<String> keys = index();
             if (keys.remove(key)) {
                 saveIndex(keys);
@@ -202,7 +208,7 @@ public class Preferences {
     }
 
     public void clear() throws BackingStoreException {
-        synchronized (INDEX_LOCK) {
+        synchronized (STORE_LOCK) {
             for (String key : index()) {
                 com.codename1.io.Preferences.delete(storeKey(key));
             }
@@ -211,8 +217,10 @@ public class Preferences {
     }
 
     public String[] keys() throws BackingStoreException {
-        List<String> keys = index();
-        return keys.toArray(new String[keys.size()]);
+        synchronized (STORE_LOCK) {
+            List<String> keys = index();
+            return keys.toArray(new String[keys.size()]);
+        }
     }
 
     public String[] childrenNames() throws BackingStoreException {
@@ -220,7 +228,9 @@ public class Preferences {
     }
 
     public boolean nodeExists(String pathName) throws BackingStoreException {
-        return !node(pathName).index().isEmpty() || pathName.length() == 0;
+        synchronized (STORE_LOCK) {
+            return !node(pathName).index().isEmpty() || pathName.length() == 0;
+        }
     }
 
     public void removeNode() throws BackingStoreException {

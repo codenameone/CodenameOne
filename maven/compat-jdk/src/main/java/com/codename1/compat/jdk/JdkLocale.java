@@ -75,6 +75,23 @@ public final class JdkLocale {
     private JdkLocale() {
     }
 
+    /// `new Locale(language)` as a method, for a constructor reference
+    /// (`Locale::new`), which cannot add the empty country a direct call
+    /// gets: the device's Locale is a language and a country.
+    public static Locale newLocale(String language) {
+        return new Locale(language, "");
+    }
+
+    /// `new Locale(language, country, variant)` as a method, for a
+    /// constructor reference. The variant has nowhere to go and is dropped,
+    /// as it is from a direct call.
+    public static Locale newLocale(String language, String country, String variant) {
+        if (variant == null) {
+            throw new NullPointerException();
+        }
+        return new Locale(language, country);
+    }
+
     /// The locale an IETF language tag names: `fr`, `en-US`, `zh-Hans-CN`.
     /// The first subtag is the language, the first later subtag that is two
     /// letters or three digits the country; anything else is dropped. `und`

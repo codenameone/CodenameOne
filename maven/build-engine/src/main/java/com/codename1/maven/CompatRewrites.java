@@ -543,6 +543,18 @@ final class CompatRewrites {
     /// descriptor of the constructor called instead.
     private static final Map<String, String[]> CONSTRUCTORS = new HashMap<String, String[]>();
 
+    /// The constructors adapted on a call ([#CONSTRUCTORS], and Locale's)
+    /// as the static methods a constructor reference to one is sent to:
+    /// `owner.<init> descriptor` to `class#method`, which takes the same
+    /// arguments and answers the instance.
+    private static final Map<String, String> CONSTRUCTOR_REFS = new HashMap<String, String>();
+
+    static {
+        String locale = Relocation.JDK_PACKAGE + "JdkLocale#newLocale";
+        CONSTRUCTOR_REFS.put("java/util/Locale.<init>(" + STRING + ")V", locale);
+        CONSTRUCTOR_REFS.put("java/util/Locale.<init>(" + STRING + STRING + STRING + ")V", locale);
+    }
+
     private static final String CHARSETS = Relocation.JDK_PACKAGE + "JdkCharsets";
     private static final String CHARSET = "Ljava/nio/charset/Charset;";
 
@@ -557,6 +569,14 @@ final class CompatRewrites {
                 new String[] {byName[0], byName[1], byName[2], "(Ljava/io/InputStream;" + STRING + ")V"});
         CONSTRUCTORS.put("java/io/OutputStreamWriter.<init>(Ljava/io/OutputStream;" + CHARSET + ")V",
                 new String[] {byName[0], byName[1], byName[2], "(Ljava/io/OutputStream;" + STRING + ")V"});
+        // A constructor reference (InputStreamReader::new) holds a handle,
+        // and a handle cannot convert an argument on its way in: it is sent
+        // to a static method that converts and constructs.
+        CONSTRUCTOR_REFS.put("java/lang/String.<init>([BII" + CHARSET + ")V", CHARSETS + "#decode");
+        CONSTRUCTOR_REFS.put("java/io/InputStreamReader.<init>(Ljava/io/InputStream;" + CHARSET + ")V",
+                CHARSETS + "#reader");
+        CONSTRUCTOR_REFS.put("java/io/OutputStreamWriter.<init>(Ljava/io/OutputStream;" + CHARSET + ")V",
+                CHARSETS + "#writer");
         String cs = "java/nio/charset/Charset.";
         STATIC.put(cs + "forName(" + STRING + ")" + CHARSET, CHARSETS);
         STATIC.put(cs + "defaultCharset()" + CHARSET, CHARSETS);
@@ -1002,7 +1022,17 @@ final class CompatRewrites {
 
         /// The handle a method reference should hold instead of `h`, or `h`.
         private static Handle rewrite(Handle h) {
-            if (h.getTag() == Opcodes.H_INVOKESTATIC) {
+            if (h.getTag() == Opcodes.H_NEWINVOKESPECIAL) {
+                // Locale::new, InputStreamReader::new: the factory takes the
+                // constructor's arguments and answers what it made, which
+                // is what the reference's functional method answers too.
+                String target = CONSTRUCTOR_REFS.get(h.getOwner() + "." + h.getName() + h.getDesc());
+                if (target != null) {
+                    return new Handle(Opcodes.H_INVOKESTATIC, targetOwner(target), targetName(target, h.getName()),
+                            Type.getMethodDescriptor(Type.getObjectType(h.getOwner()),
+                                    Type.getArgumentTypes(h.getDesc())), false);
+                }
+            } else if (h.getTag() == Opcodes.H_INVOKESTATIC) {
                 String target = STATIC.get(h.getOwner() + "." + h.getName() + h.getDesc());
                 if (target != null) {
                     return new Handle(Opcodes.H_INVOKESTATIC, targetOwner(target), targetName(target, h.getName()),

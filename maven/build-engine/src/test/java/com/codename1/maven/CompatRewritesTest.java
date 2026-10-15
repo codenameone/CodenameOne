@@ -216,6 +216,56 @@ public class CompatRewritesTest {
         assertTrue(after.contains("java/lang/Class.getResourceAsStream"));
     }
 
+    private static final String REFS_SOURCE = "package q;\n"
+            + "import java.io.ByteArrayInputStream;\n"
+            + "import java.io.InputStream;\n"
+            + "import java.io.InputStreamReader;\n"
+            + "import java.io.Reader;\n"
+            + "import java.nio.charset.Charset;\n"
+            + "import java.util.Locale;\n"
+            + "import java.util.function.BiFunction;\n"
+            + "import java.util.function.Function;\n"
+            + "public class C {\n"
+            + "    interface Tri<A, B, D, R> { R apply(A a, B b, D d); }\n"
+            + "    public static Object[] run() throws Exception {\n"
+            + "        Function<String, Locale> one = Locale::new;\n"
+            + "        Tri<String, String, String, Locale> three = Locale::new;\n"
+            + "        BiFunction<InputStream, Charset, Reader> reader = InputStreamReader::new;\n"
+            + "        Locale fr = one.apply(\"fr\");\n"
+            + "        Locale ch = three.apply(\"de\", \"CH\", \"1996\");\n"
+            + "        Reader r = reader.apply(new ByteArrayInputStream(new byte[] {104, 105}), Charset.forName(\"UTF-8\"));\n"
+            + "        char[] buf = new char[2];\n"
+            + "        r.read(buf);\n"
+            + "        return new Object[] {fr.getLanguage() + \"|\" + fr.getCountry(),\n"
+            + "            ch.getLanguage() + \"|\" + ch.getCountry() + \"|\" + ch.getVariant(), new String(buf)};\n"
+            + "    }\n"
+            + "}\n";
+
+    /// A constructor reference to a constructor the device lacks goes to a
+    /// factory that takes the same arguments, as a direct call is adapted:
+    /// a handle cannot convert an argument on its own.
+    @Test
+    public void aConstructorReferenceIsAdaptedAsACallIs() throws Exception {
+        File classes = tmp.newFolder();
+        CompatFixtures.compile(tmp.newFolder(), classes, "q/C.java", REFS_SOURCE);
+        byte[] original = Files.readAllBytes(new File(classes, "q/C.class").toPath());
+        assertTrue(CompatFixtures.members(original).contains("java/util/Locale.<init>"));
+        byte[] relocated = new ClassRelocator(CompatLayers.SWING).remap(original);
+        Set<String> after = CompatFixtures.members(relocated);
+        assertFalse(after.toString(), after.contains("java/util/Locale.<init>"));
+        assertFalse(after.toString(), after.contains("java/io/InputStreamReader.<init>"));
+        assertTrue(after.toString(), after.contains(Relocation.JDK_PACKAGE + "JdkLocale.newLocale"));
+        assertTrue(after.toString(), after.contains(Relocation.JDK_PACKAGE + "JdkCharsets.reader"));
+        CompatFixtures.Defining loader = new CompatFixtures.Defining(getClass().getClassLoader());
+        loader.define(new ClassRelocator(CompatLayers.SWING).remap(
+                Files.readAllBytes(new File(classes, "q/C$Tri.class").toPath())));
+        Class<?> c = loader.define(relocated);
+        Object[] out = (Object[]) c.getMethod("run").invoke(null);
+        // As from a direct call: a language alone is the empty country, and
+        // the variant is dropped.
+        assertEquals(Arrays.asList("fr|", "de|CH|", "hi"), Arrays.asList(out));
+    }
+
     private static final String TIME_SOURCE = "package q;\n"
             + "import java.time.Instant;\n"
             + "import java.time.LocalTime;\n"

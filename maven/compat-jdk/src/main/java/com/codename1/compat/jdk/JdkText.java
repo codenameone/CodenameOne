@@ -76,24 +76,35 @@ public final class JdkText {
     }
 
     /// The code points of `s`: a surrogate pair is one element, a
-    /// surrogate without its other half is itself.
-    public static IntStream codePoints(CharSequence s) {
-        int n = s.length();
-        int[] points = new int[n];
-        int count = 0;
-        for (int i = 0; i < n; i++) {
-            char c = s.charAt(i);
-            if (c >= 0xD800 && c <= 0xDBFF && i + 1 < n) {
-                char d = s.charAt(i + 1);
-                if (d >= 0xDC00 && d <= 0xDFFF) {
-                    points[count++] = 0x10000 + ((c - 0xD800) << 10) + (d - 0xDC00);
-                    i++;
-                    continue;
-                }
-            }
-            points[count++] = c;
+    /// surrogate without its other half is itself. Read as the stream asks
+    /// for them, as `chars()` is, so a StringBuilder that grows between the
+    /// call and the traversal is read as it is then, as the JDK's is.
+    public static IntStream codePoints(final CharSequence s) {
+        if (s == null) {
+            throw new NullPointerException();
         }
-        return IntPipeline.ofArray(points, 0, count);
+        return new IntPipeline(ObjPipeline.over(new PullIterator<Integer>() {
+            private int at;
+
+            @Override
+            boolean advance() {
+                int n = s.length();
+                if (at >= n) {
+                    return false;
+                }
+                char c = s.charAt(at++);
+                if (c >= 0xD800 && c <= 0xDBFF && at < n) {
+                    char d = s.charAt(at);
+                    if (d >= 0xDC00 && d <= 0xDFFF) {
+                        at++;
+                        emit(Integer.valueOf(0x10000 + ((c - 0xD800) << 10) + (d - 0xDC00)));
+                        return true;
+                    }
+                }
+                emit(Integer.valueOf(c));
+                return true;
+            }
+        }));
     }
 
     // ---------------------------------------------------------------

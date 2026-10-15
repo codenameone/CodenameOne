@@ -131,6 +131,14 @@ public class MemberGapsDifferentialTest {
         assertEquals("", JdkStrings.repeat("ab", 0));
         assertEquals("ab", JdkStrings.repeat("ab", 1));
         assertEquals("ababab", JdkStrings.repeat("ab", 3));
+        // Nothing repeated is nothing at once, however many times.
+        assertEquals("", JdkStrings.repeat("", Integer.MAX_VALUE));
+        try {
+            JdkStrings.repeat("ab", Integer.MAX_VALUE);
+            org.junit.Assert.fail("a String longer than a String can be");
+        } catch (OutOfMemoryError expected) {
+            // what the JDK throws, before it allocates anything
+        }
         assertEquals("", JdkStrings.repeat("", 1000));
         assertEquals(4096, JdkStrings.repeat("x", 4096).length());
         try {

@@ -369,8 +369,38 @@ public final class Files {
         return lines(path, StandardCharsets.UTF_8);
     }
 
+    /// The lines of the file, by the rules of [#readAllLines(Path, Charset)],
+    /// read as the stream asks for them, as the JDK's are: `findFirst` reads
+    /// the start of a large file, not all of it. The file is opened here, so
+    /// a missing one throws now, and closing the stream closes it; a read
+    /// that fails later surfaces as an UncheckedIOException.
     public static Stream<String> lines(Path path, Charset cs) throws IOException {
-        return JdkCollections.defaultStream(readAllLines(path, cs));
+        final BufferedReader reader = newBufferedReader(path, cs);
+        return ObjPipeline.over(new PullIterator<String>() {
+            @Override
+            boolean advance() {
+                String line;
+                try {
+                    line = reader.readLine();
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+                if (line == null) {
+                    return false;
+                }
+                emit(line);
+                return true;
+            }
+        }).onClose(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    reader.close();
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
+        });
     }
 
     // ---- writing ----

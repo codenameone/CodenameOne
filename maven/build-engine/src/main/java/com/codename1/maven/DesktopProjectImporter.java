@@ -861,7 +861,7 @@ public final class DesktopProjectImporter {
 
     private static final Pattern POM_DEPENDENCY = Pattern.compile("<dependency>(.*?)</dependency>", Pattern.DOTALL);
     private static final Pattern GRADLE_DEPENDENCY = Pattern.compile(
-            "(?:implementation|api|compileOnly|runtimeOnly)\\s*\\(?\\s*[\"']([^\"':]+:[^\"':]+)(?::([^\"':@]*)[^\"']*)?[\"']");
+            "(implementation|api|compileOnly|runtimeOnly)\\s*\\(?\\s*[\"']([^\"':]+:[^\"':]+)(?::([^\"':@]*)[^\"']*)?[\"']");
     private static final Pattern GRADLE_FX_MODULES = Pattern.compile("\\bmodules\\s*(?:=|\\()([^\\n]*)");
     private static final Pattern GRADLE_FX_MODULE = Pattern.compile("[\"']javafx\\.(\\w+)[\"']");
 
@@ -1009,6 +1009,12 @@ public final class DesktopProjectImporter {
     static void readDependencies(File moduleDir, Result r) throws IOException {
         Set<String> coords = new LinkedHashSet<String>();
         Map<String, String> versions = new java.util.HashMap<String, String>();
+        // What the desktop host supplies (Maven's provided scope, Gradle's
+        // compileOnly): compiled against and never shipped, so it is
+        // declared provided here too rather than bundled into the app.
+        // Declared both ways, the shipped declaration wins.
+        Set<String> provided = new java.util.HashSet<String>();
+        Set<String> shipped = new java.util.HashSet<String>();
         boolean catalog = false;
         // The module's own POM, then its parents': Maven hands a parent's
         // <dependencies> down to every module, so they are this module's as
@@ -1023,10 +1029,12 @@ public final class DesktopProjectImporter {
             while (dep.find()) {
                 String group = element(dep.group(1), "groupId");
                 String artifact = element(dep.group(1), "artifactId");
-                if (group != null && artifact != null && !"test".equals(element(dep.group(1), "scope"))
+                String scope = element(dep.group(1), "scope");
+                if (group != null && artifact != null && !"test".equals(scope)
                         && !coords.contains(group + ":" + artifact)) {
                     // The nearest declaration wins, as it does in Maven.
                     coords.add(group + ":" + artifact);
+                    ("provided".equals(scope) ? provided : shipped).add(group + ":" + artifact);
                     String version = element(dep.group(1), "version");
                     version = version == null ? null : resolveIn(version, pom, poms);
                     if (version != null && version.indexOf("${") < 0) {
@@ -1039,10 +1047,11 @@ public final class DesktopProjectImporter {
             String gradle = read(new File(moduleDir, name));
             Matcher g = GRADLE_DEPENDENCY.matcher(gradle);
             while (g.find()) {
-                coords.add(g.group(1));
-                String version = g.group(2);
+                coords.add(g.group(2));
+                ("compileOnly".equals(g.group(1)) ? provided : shipped).add(g.group(2));
+                String version = g.group(3);
                 if (version != null && version.length() > 0 && version.indexOf('$') < 0) {
-                    versions.put(g.group(1), version);
+                    versions.put(g.group(2), version);
                 }
             }
             // The JavaFX Gradle plugin's javafx { modules = [...] }.
@@ -1085,7 +1094,7 @@ public final class DesktopProjectImporter {
             if (compiledAgainst || (covered == null && !isToolkitModule(coord))) {
                 int colon = coord.indexOf(':');
                 r.libraries.add(new Library(coord.substring(0, colon), coord.substring(colon + 1), versions.get(coord),
-                        compiledAgainst));
+                        compiledAgainst || (provided.contains(coord) && !shipped.contains(coord))));
             }
         }
         if (catalog) {

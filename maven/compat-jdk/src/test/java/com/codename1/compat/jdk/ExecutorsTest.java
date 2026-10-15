@@ -31,6 +31,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -390,7 +391,7 @@ public class ExecutorsTest {
         final AtomicInteger runs = new AtomicInteger();
         final AtomicInteger active = new AtomicInteger();
         final AtomicInteger overlap = new AtomicInteger();
-        final long[] ended = new long[1];
+        final AtomicLong ended = new AtomicLong();
         final List<Long> starts = java.util.Collections.synchronizedList(new ArrayList<Long>());
         pool.scheduleAtFixedRate(new Runnable() {
             @Override
@@ -405,12 +406,14 @@ public class ExecutorsTest {
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                     }
-                    ended[0] = System.currentTimeMillis();
+                    ended.set(System.currentTimeMillis());
                 }
                 active.decrementAndGet();
             }
         }, 0, 20, TimeUnit.MILLISECONDS);
-        for (int i = 0; i < 400 && runs.get() < 15; i++) {
+        // Bounded generously: a loaded runner can hold the timer's thread
+        // for a while, and fifteen runs is what the count below needs.
+        for (int i = 0; i < 2000 && runs.get() < 15; i++) {
             Thread.sleep(5);
         }
         pool.shutdownNow();
@@ -418,14 +421,15 @@ public class ExecutorsTest {
         int soon = 0;
         synchronized (starts) {
             for (Long at : starts) {
-                if (at.longValue() >= ended[0] && at.longValue() - ended[0] < 40) {
+                if (at.longValue() >= ended.get() && at.longValue() - ended.get() < 40) {
                     soon++;
                 }
             }
         }
         // About nine firings fell inside the 200 ms run. Dropped, at most
         // two would start within 40 ms of its end.
-        assertTrue("the overrun's firings were not run late: " + soon, soon >= 5);
+        assertTrue("the overrun's firings were not run late: " + soon + " of " + runs.get() + " runs, "
+                + starts + " after the overrun ended at " + ended.get(), soon >= 5);
     }
 
     /// A task cancelled after it was handed to a busy pool, before it got a
@@ -534,6 +538,13 @@ public class ExecutorsTest {
         }
         Preferences prefs = Preferences.userRoot().node(node);
         assertEquals(200, prefs.keys().length);
+        // Every value too: the store under them is not made for several
+        // threads, and a save that failed in it was only logged.
+        for (int t = 0; t < writers.length; t++) {
+            for (int i = 0; i < 50; i++) {
+                assertEquals("k" + t + "." + i, "v", prefs.get("k" + t + "." + i, null));
+            }
+        }
 
         prefs.put("a\nb", "1");
         prefs.put("c\\nd", "2");
