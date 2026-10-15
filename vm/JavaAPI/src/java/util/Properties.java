@@ -24,162 +24,77 @@ package java.util;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.Writer;
 
-public class Properties extends HashMap<String, String> {
+/// String keys and values, a second table of defaults behind them, and the
+/// `.properties` text format.
+///
+/// The format is read as the JDK reads it: `#` and `!` comments, `=`, `:` or
+/// white space between key and value, a trailing backslash continuing a line
+/// (the next line's indentation dropped), and the escapes `\t`, `\n`, `\r`,
+/// `\f` and backslash-u followed by four hexadecimal digits; a backslash
+/// before any other character stands for that character. A stream is
+/// ISO 8859-1; a reader is whatever its characters are. [#store] writes text
+/// that [#load] reads back to the same table, escaping what the format
+/// requires and, on a stream, every character outside printable ASCII.
+///
+/// The XML form (`loadFromXML`, `storeToXML`) and `list` are not provided.
+public class Properties extends Hashtable<Object, Object> {
 
-    /**
-     * The default values for keys not found in this {@code Properties}
-     * instance.
-     */
+    private static final long serialVersionUID = 4112578634029874840L;
+
+    private static final String HEX = "0123456789ABCDEF";
+
+    /// The table consulted for a key this one does not have, or null.
     protected Properties defaults;
 
     private static final int NONE = 0, SLASH = 1, UNICODE = 2, CONTINUE = 3,
             KEY_DONE = 4, IGNORE = 5;
 
-    /**
-     * Constructs a new {@code Properties} object.
-     */
+    /// An empty table with no defaults.
     public Properties() {
     }
 
-    /**
-     * Constructs a new {@code Properties} object using the specified default
-     * {@code Properties}.
-     *
-     * @param properties
-     *            the default {@code Properties}.
-     */
-    public Properties(Properties properties) {
-        defaults = properties;
+    /// An empty table with `defaults` behind it.
+    public Properties(Properties defaults) {
+        this.defaults = defaults;
     }
 
-    private void dumpString(StringBuilder buffer, String string, boolean key) {
-        int i = 0;
-        if (!key && i < string.length() && string.charAt(i) == ' ') {
-            buffer.append("\\ ");
-            i++;
-        }
-        int slen = string.length();
-        for (; i < slen; i++) {
-            char ch = string.charAt(i);
-            switch (ch) {
-            case '\t':
-                buffer.append("\\t");
-                break;
-            case '\n':
-                buffer.append("\\n");
-                break;
-            case '\f':
-                buffer.append("\\f");
-                break;
-            case '\r':
-                buffer.append("\\r");
-                break;
-            default:
-                if ("\\#!=:".indexOf(ch) >= 0 || (key && ch == ' ')) {
-                    buffer.append('\\');
-                }
-                if (ch >= ' ' && ch <= '~') {
-                    buffer.append(ch);
-                } else {
-                    String hex = Integer.toHexString(ch);
-                    buffer.append("\\u");
-                    int hlen = hex.length();
-                    for (int j = 0; j < 4 - hlen; j++) {
-                        buffer.append("0");
-                    }
-                    buffer.append(hex);
-                }
-            }
-        }
-    }
-
-    /**
-     * Searches for the property with the specified name. If the property is not
-     * found, the default {@code Properties} are checked. If the property is not
-     * found in the default {@code Properties}, {@code null} is returned.
-     *
-     * @param name
-     *            the name of the property to find.
-     * @return the named property value, or {@code null} if it can't be found.
-     */
+    /// The value for `name` here, else in the defaults, else null. A value
+    /// that is not a `String` counts as absent, as in the JDK.
     public String getProperty(String name) {
-        Object result = super.get(name);
-        String property = result instanceof String ? (String) result : null;
-        if (property == null && defaults != null) {
-            property = defaults.getProperty(name);
+        Object result = get(name);
+        if (result instanceof String) {
+            return (String) result;
         }
-        return property;
+        return defaults == null ? null : defaults.getProperty(name);
     }
 
-    /**
-     * Searches for the property with the specified name. If the property is not
-     * found, it looks in the default {@code Properties}. If the property is not
-     * found in the default {@code Properties}, it returns the specified
-     * default.
-     *
-     * @param name
-     *            the name of the property to find.
-     * @param defaultValue
-     *            the default value.
-     * @return the named property value.
-     */
+    /// The value for `name` as [#getProperty(String)] finds it, or
+    /// `defaultValue` when there is none.
     public String getProperty(String name, String defaultValue) {
-        Object result = super.get(name);
-        String property = result instanceof String ? (String) result : null;
-        if (property == null && defaults != null) {
-            property = defaults.getProperty(name);
-        }
-        if (property == null) {
-            return defaultValue;
-        }
-        return property;
+        String property = getProperty(name);
+        return property == null ? defaultValue : property;
     }
 
-    /**
-     * Loads properties from the specified {@code InputStream}, assumed to be ISO-8859-1.
-     * See "<a href="#character_encoding">Character Encoding</a>".
-     *
-     * @param in the {@code InputStream}
-     * @throws IOException
-     */
+    /// Maps `name` to `value` in this table, answering the value it replaced.
+    public Object setProperty(String name, String value) {
+        return put(name, value);
+    }
+
+    /// Reads ISO 8859-1 `.properties` text, adding to what is here. The
+    /// stream is left open.
     public synchronized void load(InputStream in) throws IOException {
         if (in == null) {
             throw new NullPointerException("in == null");
         }
-        load(new InputStreamReader(in, "UTF-8"));
+        load(new Latin1Reader(in));
     }
 
-    /**
-     * Loads properties from the specified {@code Reader}.
-     * The properties file is interpreted according to the following rules:
-     * <ul>
-     * <li>Empty lines are ignored.</li>
-     * <li>Lines starting with either a "#" or a "!" are comment lines and are
-     * ignored.</li>
-     * <li>A backslash at the end of the line escapes the following newline
-     * character ("\r", "\n", "\r\n"). If there's whitespace after the
-     * backslash it will just escape that whitespace instead of concatenating
-     * the lines. This does not apply to comment lines.</li>
-     * <li>A property line consists of the key, the space between the key and
-     * the value, and the value. The key goes up to the first whitespace, "=" or
-     * ":" that is not escaped. The space between the key and the value contains
-     * either one whitespace, one "=" or one ":" and any amount of additional
-     * whitespace before and after that character. The value starts with the
-     * first character after the space between the key and the value.</li>
-     * <li>Following escape sequences are recognized: "\ ", "\\", "\r", "\n",
-     * "\!", "\#", "\t", "\b", "\f", and "&#92;uXXXX" (unicode character).</li>
-     * </ul>
-     *
-     * @param in the {@code Reader}
-     * @throws IOException
-     * @since 1.6
-     */
+    /// Reads `.properties` text, adding to what is here. The reader is left
+    /// open.
     @SuppressWarnings("fallthrough")
     public synchronized void load(Reader in) throws IOException {
         if (in == null) {
@@ -212,7 +127,7 @@ public class Properties extends HashMap<String, String> {
                         continue;
                     }
                 } else if (count <= 4) {
-                    throw new IllegalArgumentException("Invalid Unicode sequence: illegal character");
+                    throw new IllegalArgumentException("Malformed \\uxxxx encoding.");
                 }
                 mode = NONE;
                 buf[offset++] = (char) unicode;
@@ -229,9 +144,6 @@ public class Properties extends HashMap<String, String> {
                 case '\n':
                     mode = IGNORE; // Ignore whitespace on the next line
                     continue;
-                case 'b':
-                    nextChar = '\b';
-                    break;
                 case 'f':
                     nextChar = '\f';
                     break;
@@ -248,6 +160,10 @@ public class Properties extends HashMap<String, String> {
                     mode = UNICODE;
                     unicode = count = 0;
                     continue;
+                default:
+                    // Any other escaped character is that character, `\b`
+                    // included: the JDK has no backspace escape.
+                    break;
                 }
             } else {
                 switch (nextChar) {
@@ -281,8 +197,7 @@ public class Properties extends HashMap<String, String> {
                             keyLength = offset;
                         }
                         String temp = new String(buf, 0, offset);
-                        put(temp.substring(0, keyLength), temp
-                                .substring(keyLength));
+                        put(temp.substring(0, keyLength), temp.substring(keyLength));
                     }
                     keyLength = -1;
                     offset = 0;
@@ -301,8 +216,11 @@ public class Properties extends HashMap<String, String> {
                         continue;
                     }
                     break;
+                default:
+                    break;
                 }
-                if (nextChar == ' ' || nextChar == '\n' || nextChar == '\r' || nextChar == '\t') {
+                if (nextChar == ' ' || nextChar == '\n' || nextChar == '\r' || nextChar == '\t'
+                        || nextChar == '\f') {
                     if (mode == CONTINUE) {
                         mode = IGNORE;
                     }
@@ -327,141 +245,226 @@ public class Properties extends HashMap<String, String> {
             buf[offset++] = nextChar;
         }
         if (mode == UNICODE && count <= 4) {
-            throw new IllegalArgumentException("Invalid Unicode sequence: expected format \\uxxxx");
+            throw new IllegalArgumentException("Malformed \\uxxxx encoding.");
         }
         if (keyLength == -1 && offset > 0) {
             keyLength = offset;
         }
         if (keyLength >= 0) {
             String temp = new String(buf, 0, offset);
-            String key = temp.substring(0, keyLength);
-            String value = temp.substring(keyLength);
-            if (mode == SLASH) {
-                value += "\u0000";
-            }
-            put(key, value);
+            put(temp.substring(0, keyLength), temp.substring(keyLength));
         }
     }
 
-    /**
-     * Returns all of the property names (keys) in this {@code Properties} object.
-     */
+    /// Every key of this table and of its defaults.
     public Enumeration<?> propertyNames() {
-        Hashtable<Object, Object> selected = new Hashtable<Object, Object>();
-        selectProperties(selected, false);
-        return selected.keys();
+        Hashtable<Object, Object> all = new Hashtable<Object, Object>();
+        collect(all, false);
+        return all.keys();
     }
 
-    /**
-     * Returns those property names (keys) in this {@code Properties} object for which
-     * both key and value are strings.
-     *
-     * @return a set of keys in the property list
-     * @since 1.6
-     */
+    /// The keys, of this table and of its defaults, whose key and value are
+    /// both strings.
     public Set<String> stringPropertyNames() {
-        Hashtable<String, Object> stringProperties = new Hashtable<String, Object>();
-        selectProperties(stringProperties, true);
-        return Collections.unmodifiableSet(stringProperties.keySet());
+        Hashtable<Object, Object> all = new Hashtable<Object, Object>();
+        collect(all, true);
+        Set<String> names = new HashSet<String>();
+        for (Object key : all.keySet()) {
+            if (key instanceof String) {
+                names.add((String) key);
+            }
+        }
+        return Collections.unmodifiableSet(names);
     }
 
-    private <K> void selectProperties(Hashtable<K, Object> selectProperties, final boolean isStringOnly) {
+    /// Defaults first, so that this table's own entries replace them.
+    private void collect(Hashtable<Object, Object> into, boolean stringsOnly) {
         if (defaults != null) {
-            defaults.selectProperties(selectProperties, isStringOnly);
+            defaults.collect(into, stringsOnly);
         }
-        Iterator<String> keys = keySet().iterator();
-        while (keys.hasNext()) {
-            @SuppressWarnings("unchecked")
-            K key = (K) keys.next();
-            if (isStringOnly && !(key instanceof String)) {
-                // Only select property with string key and value
+        for (Map.Entry<Object, Object> e : entrySet()) {
+            Object key = e.getKey();
+            Object value = e.getValue();
+            if (stringsOnly && !(key instanceof String && value instanceof String)) {
                 continue;
             }
-            Object value = get(key);
-            selectProperties.put(key, value);
+            into.put(key, value);
         }
     }
 
-    /**
-     * Saves the mappings in this {@code Properties} to the specified {@code
-     * OutputStream}, putting the specified comment at the beginning. The output
-     * from this method is suitable for being read by the
-     * {@link #load(InputStream)} method.
-     *
-     * @param out the {@code OutputStream} to write to.
-     * @param comment the comment to add at the beginning.
-     * @throws ClassCastException if the key or value of a mapping is not a
-     *                String.
-     * @deprecated This method ignores any {@code IOException} thrown while
-     *             writing -- use {@link #store} instead for better exception
-     *             handling.
-     */
+    /// Writes this table as [#store(OutputStream, String)] does, ignoring any
+    /// `IOException`.
+    ///
+    /// #### Deprecated
+    ///
+    /// An error writing is lost; use [#store(OutputStream, String)].
     @Deprecated
-    public void save(OutputStream out, String comment) {
+    public void save(OutputStream out, String comments) {
         try {
-            store(out, comment);
+            store(out, comments);
         } catch (IOException e) {
+            // As documented: save reports nothing.
         }
     }
 
-    /**
-     * Maps the specified key to the specified value. If the key already exists,
-     * the old value is replaced. The key and value cannot be {@code null}.
-     *
-     * @param name
-     *            the key.
-     * @param value
-     *            the value.
-     * @return the old value mapped to the key, or {@code null}.
-     */
-    public Object setProperty(String name, String value) {
-        return put(name, value);
+    /// Writes this table (not its defaults) as ISO 8859-1 `.properties`
+    /// text: the comment lines, a line with the current date, then one
+    /// `key=value` line per entry. The stream is flushed and left open.
+    ///
+    /// #### Throws
+    ///
+    /// - `ClassCastException`: if a key or value is not a `String`
+    public void store(OutputStream out, String comments) throws IOException {
+        if (out == null) {
+            throw new NullPointerException();
+        }
+        String text = render(comments, true);
+        byte[] bytes = new byte[text.length()];
+        for (int i = 0; i < bytes.length; i++) {
+            // Everything outside ASCII was escaped by render.
+            bytes[i] = (byte) text.charAt(i);
+        }
+        out.write(bytes);
+        out.flush();
     }
 
-    /**
-     * Stores properties to the specified {@code OutputStream}, using ISO-8859-1.
-     * See "<a href="#character_encoding">Character Encoding</a>".
-     *
-     * @param out the {@code OutputStream}
-     * @param comment an optional comment to be written, or null
-     * @throws IOException
-     * @throws ClassCastException if a key or value is not a string
-     */
-    public synchronized void store(OutputStream out, String comment) throws IOException {
-        store(new OutputStreamWriter(out, "UTF-8"), comment);
-    }
-
-    /**
-     * Stores the mappings in this {@code Properties} object to {@code out},
-     * putting the specified comment at the beginning.
-     *
-     * @param writer the {@code Writer}
-     * @param comment an optional comment to be written, or null
-     * @throws IOException
-     * @throws ClassCastException if a key or value is not a string
-     * @since 1.6
-     */
-    public synchronized void store(Writer writer, String comment) throws IOException {
-        if (comment != null && comment.length() > 0) {
-            writer.write("#");
-            writer.write(comment);
-            writer.write("\n");
-            writer.write("#");
-            writer.write(new Date().toString());
-            writer.write("\n");
+    /// Writes this table as `.properties` text, leaving characters outside
+    /// ASCII as they are. The writer is flushed and left open.
+    ///
+    /// #### Throws
+    ///
+    /// - `ClassCastException`: if a key or value is not a `String`
+    public void store(Writer writer, String comments) throws IOException {
+        if (writer == null) {
+            throw new NullPointerException();
         }
-
-        StringBuilder sb = new StringBuilder(200);
-        ArrayList<String> k = new ArrayList<String>(keySet());
-        Collections.sort(k, new CaseInsensitiveOrder());
-        for (String key : k) {
-            dumpString(sb, key, true);
-            sb.append('=');
-            dumpString(sb, (String) get(key), false);
-            sb.append("\n");
-            writer.write(sb.toString());
-            sb.setLength(0);
-        }
+        writer.write(render(comments, false));
         writer.flush();
+    }
+
+    private synchronized String render(String comments, boolean escapeUnicode) {
+        StringBuilder out = new StringBuilder();
+        if (comments != null) {
+            writeComments(out, comments, escapeUnicode);
+        }
+        out.append('#').append(new Date().toString()).append('\n');
+        for (Map.Entry<Object, Object> e : entrySet()) {
+            Object key = e.getKey();
+            Object value = e.getValue();
+            if (!(key instanceof String) || !(value instanceof String)) {
+                // The JDK fails here with a ClassCastException, which a
+                // device cannot be relied on to raise from a cast.
+                throw new ClassCastException("Properties holds a key or value that is not a String");
+            }
+            escape(out, (String) key, true, escapeUnicode);
+            out.append('=');
+            escape(out, (String) value, false, escapeUnicode);
+            out.append('\n');
+        }
+        return out.toString();
+    }
+
+    /// Every line of `comments` as a comment line: a line that does not
+    /// start one already gets `#`.
+    private static void writeComments(StringBuilder out, String comments, boolean escapeUnicode) {
+        out.append('#');
+        int n = comments.length();
+        for (int i = 0; i < n; i++) {
+            char c = comments.charAt(i);
+            if (c == '\n' || c == '\r') {
+                if (c == '\r' && i + 1 < n && comments.charAt(i + 1) == '\n') {
+                    i++;
+                }
+                out.append('\n');
+                if (i + 1 >= n || (comments.charAt(i + 1) != '#' && comments.charAt(i + 1) != '!')) {
+                    out.append('#');
+                }
+            } else if (escapeUnicode && c > 0xff) {
+                unicode(out, c);
+            } else {
+                out.append(c);
+            }
+        }
+        out.append('\n');
+    }
+
+    private static void unicode(StringBuilder out, char c) {
+        out.append('\\').append('u');
+        out.append(HEX.charAt((c >> 12) & 0xf)).append(HEX.charAt((c >> 8) & 0xf));
+        out.append(HEX.charAt((c >> 4) & 0xf)).append(HEX.charAt(c & 0xf));
+    }
+
+    private static void escape(StringBuilder out, String s, boolean key, boolean escapeUnicode) {
+        int n = s.length();
+        for (int i = 0; i < n; i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case ' ':
+                    // Only a leading space of a value would be dropped on
+                    // reading; in a key every space ends the key.
+                    if (key || i == 0) {
+                        out.append('\\');
+                    }
+                    out.append(' ');
+                    break;
+                case '\t':
+                    out.append("\\t");
+                    break;
+                case '\n':
+                    out.append("\\n");
+                    break;
+                case '\r':
+                    out.append("\\r");
+                    break;
+                case '\f':
+                    out.append("\\f");
+                    break;
+                case '=':
+                case ':':
+                case '#':
+                case '!':
+                case '\\':
+                    out.append('\\').append(c);
+                    break;
+                default:
+                    if (escapeUnicode && (c < 0x20 || c > 0x7e)) {
+                        unicode(out, c);
+                    } else {
+                        out.append(c);
+                    }
+            }
+        }
+    }
+
+    /// A stream's bytes as ISO 8859-1 characters, one for one.
+    private static final class Latin1Reader extends Reader {
+        private final InputStream in;
+
+        Latin1Reader(InputStream in) {
+            this.in = in;
+        }
+
+        @Override
+        public int read() throws IOException {
+            return in.read();
+        }
+
+        @Override
+        public int read(char[] cbuf, int off, int len) throws IOException {
+            int n = 0;
+            while (n < len) {
+                int b = in.read();
+                if (b < 0) {
+                    return n == 0 ? -1 : n;
+                }
+                cbuf[off + n++] = (char) b;
+            }
+            return n;
+        }
+
+        @Override
+        public void close() throws IOException {
+            // The caller's stream stays open.
+        }
     }
 }
