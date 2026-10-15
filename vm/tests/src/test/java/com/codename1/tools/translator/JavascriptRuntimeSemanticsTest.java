@@ -257,7 +257,7 @@ class JavascriptRuntimeSemanticsTest {
     void langMembersTakenFromCompatJdkKeepJavaSemantics(CompilerHelper.CompilerConfig config) throws Exception {
         // The String, wrapper, Character, Math, Objects, Locale and Charset members
         // JavaAPI took over from compat-jdk, in the browser runtime. One bit per
-        // property; LangMembersIntegrationTest holds the same members to HotSpot
+        // property; BulkConformanceIntegrationTest (LangMembersChecks) holds the same members to HotSpot
         // on the native target.
         WorkerRunResult result = translateAndRunFixture(config, "JsLangMembersApp.java", "JsLangMembersApp");
 

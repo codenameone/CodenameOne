@@ -1,0 +1,7 @@
+# The providers of the differential test, with everything a services file may hold.
+ServiceLoaderEnglish   # a comment after a name
+
+   ServiceLoaderFrench
+#ServiceLoaderCommented
+ServiceLoaderEnglish
+	ServiceLoaderGerman	

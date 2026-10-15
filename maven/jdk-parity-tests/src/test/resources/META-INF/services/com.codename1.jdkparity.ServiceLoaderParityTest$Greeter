@@ -1,7 +1,0 @@
-# The providers of the differential test, with everything a services file may hold.
-com.codename1.jdkparity.ServiceLoaderParityTest$English   # a comment after a name
-
-   com.codename1.jdkparity.ServiceLoaderParityTest$French
-#com.codename1.jdkparity.ServiceLoaderParityTest$Commented
-com.codename1.jdkparity.ServiceLoaderParityTest$English
-	com.codename1.jdkparity.ServiceLoaderParityTest$German	
