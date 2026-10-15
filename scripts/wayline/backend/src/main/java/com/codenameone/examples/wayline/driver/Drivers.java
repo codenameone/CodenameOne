@@ -172,7 +172,12 @@ public class Drivers {
             drivers.insert(state);
         }
         if (since > 0L && since < Matcher.FRESH_MILLIS) {
-            addHours(driver, Days.number(now), since);
+            // Cut at midnight: a stretch on line across it belongs half to
+            // each day, not all to the new one.
+            long[] days = Days.split(now - since, now);
+            for (int iter = 0; iter < days.length; iter += 2) {
+                addHours(driver, days[iter], days[iter + 1]);
+            }
         }
         Report made = new Report();
         made.driver = view(driver, state);

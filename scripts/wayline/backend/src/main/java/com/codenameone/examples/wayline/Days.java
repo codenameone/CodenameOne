@@ -44,6 +44,28 @@ public final class Days {
         return millis - millis % MILLIS;
     }
 
+    /// The stretch of time from `from` to `to` cut at each midnight: the
+    /// number of each day it touches followed by how many of its milliseconds
+    /// fall in that day, day after day. Empty when `to` is not after `from`.
+    ///
+    /// Time on line is credited to the days it was spent in. Credited whole
+    /// to the day it ended in, a driver on line across midnight had the
+    /// minutes before it counted as the next day's.
+    public static long[] split(long from, long to) {
+        if (to <= from) {
+            return new long[0];
+        }
+        long[] out = new long[(int) (number(to - 1) - number(from) + 1) * 2];
+        long at = from;
+        for (int iter = 0; iter < out.length; iter += 2) {
+            long end = Math.min(to, start(at) + MILLIS);
+            out[iter] = number(at);
+            out[iter + 1] = end - at;
+            at = end;
+        }
+        return out;
+    }
+
     /// The day `millis` falls in, as `yyyy-MM-dd`.
     public static String iso(long millis) {
         // Days since the epoch to a civil date, by the usual era arithmetic:
