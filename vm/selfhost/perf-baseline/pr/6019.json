@@ -1,0 +1,27 @@
+{
+ "pr": 6019,
+ "rebaseline": {
+  "windows-x64@amd64-family-26-model-2-authenticamd": {
+   "stringBuilding": {
+    "all": {
+     "from": {
+      "memory": 0.175,
+      "time": 1.386,
+      "tolerance": {
+       "memory": 0.35,
+       "time": 0.2
+      }
+     },
+     "memory": 0.267,
+     "reason": "Recalibrate Windows x64 AMD Family 26 Model 2 stringBuilding RAM from three existing five-round runs: 38681883624 at ba1172ca65 (0.266562x), 38689265151 at 8f3119a162 (0.266736x), and independent PR 5976 run 38688282220 at 0890827888 (0.268x). Median of run medians is 0.267x, matching the separately documented PR 5976 calibration. Native peaks are 79.3-80.7 MB across these runs; the JDK reference peaks are 247.2-300.0 MB. The 0.175x row originated from a single run recorded in PR 6010. This title/input PR does not change the string benchmark, allocator or collector. Preserve the 35% RAM tolerance and 1.386x timing baseline; source URLs, artifact hashes and gate replay are documented in evidence/pr-6019-windows-x64.md.",
+     "runs": 3,
+     "time": 1.386,
+     "tolerance": {
+      "memory": 0.35,
+      "time": 0.2
+     }
+    }
+   }
+  }
+ }
+}
