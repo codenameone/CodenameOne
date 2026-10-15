@@ -85,6 +85,11 @@ public class AnimationController extends Animation<Double> {
     private boolean repeatReverse;
     private double repeatMin;
     private double repeatMax;
+    /** No {@code count} given to {@link #repeat}: repeats until stopped, as Flutter's does. */
+    private static final int NO_COUNT = -1;
+    private int repeatCount = NO_COUNT;
+    /** Legs (forward or reverse passes) completed since this {@link #repeat} call started. */
+    private int repeatLegsDone;
 
     public AnimationController() {
     }
@@ -279,12 +284,17 @@ public class AnimationController extends Animation<Double> {
     private static final long FLING_FALLBACK_MS = 300;
 
     public dart.async.Future<Object> animateTo(double target, Duration duration, Curve curve) {
-        AnimationStatus dir = target >= currentValue
-                ? AnimationStatus.forward : AnimationStatus.reverse;
-        long d = simulationMillis("animateTo", target, duration, dir);
+        // ALWAYS forward, whichever side of the current value the target falls on --
+        // Flutter's own doc comment on animateTo: "status is reported as
+        // AnimationStatus.forward regardless of whether target > value or not", and
+        // the implicit-duration arithmetic scales the FORWARD direction's duration
+        // (this.duration), never reverseDuration. Picking the direction from the
+        // target made a call that happened to retreat use reverseDuration and finish
+        // dismissed instead of completed -- animateBack is the method that does that.
+        long d = simulationMillis("animateTo", target, duration, AnimationStatus.forward);
         repeating = false;
         dart.async.Future<Object> done = newRun();
-        beginRun(clamp(target), d, dir, curve);
+        beginRun(clamp(target), d, AnimationStatus.forward, curve);
         return done;
     }
 
@@ -343,12 +353,23 @@ public class AnimationController extends Animation<Double> {
         return c.future();
     }
 
-    public void repeat(Double min, Double max, Boolean reverse, Duration period) {
+    /**
+     * Flutter's {@code AnimationController.repeat}: runs forward (optionally bouncing
+     * between {@code min}/{@code max} with {@code reverse}) until {@code count} legs have
+     * played, or forever when {@code count} is null -- {@link #stop} is then the only way
+     * out. Returns the run's future, exactly like {@link #forward}: it never completes on
+     * its own without a {@code count} (a canceled {@link #stop} never completes it either,
+     * matching Flutter's {@code TickerFuture}), and completes once {@code count} legs
+     * finish.
+     */
+    public dart.async.Future<Object> repeat(Double min, Double max, Boolean reverse, Duration period, Integer count) {
         long d = period != null ? period.inMilliseconds() : requireDuration("repeat", AnimationStatus.forward);
         repeating = true;
         repeatReverse = reverse != null && reverse;
         repeatMin = min != null ? min : lowerBound;
         repeatMax = max != null ? max : upperBound;
+        repeatCount = count != null ? count.intValue() : NO_COUNT;
+        repeatLegsDone = 0;
         currentValue = repeatMin;
         // Detaches whatever run's completer was installed (an active forward/reverse/
         // animateTo, superseded here) the same way forward()/reverse()/animateTo() do
@@ -358,8 +379,9 @@ public class AnimationController extends Animation<Double> {
         // run's completer installed, and a later stop(canceled: false) -- meant to
         // settle THIS repeat -- completed that old, unrelated future successfully
         // instead, even though the run it belonged to never reached its target.
-        newRun();
+        dart.async.Future<Object> done = newRun();
         beginRun(repeatMax, d, AnimationStatus.forward);
+        return done;
     }
 
     public void stop(Boolean canceled) {
@@ -545,29 +567,56 @@ public class AnimationController extends Animation<Double> {
         currentValue = runTargetValue;
         running = false;
         notifyListeners();
-        AnimationStatus terminal = statusForValue(currentValue);
+
+        if (repeating) {
+            repeatLegsDone++;
+            boolean exhausted = repeatCount != NO_COUNT && repeatLegsDone >= repeatCount;
+            if (!exhausted) {
+                if (Display.isInitialized()) {
+                    // Mid-repeat: only the direction flips (when reversing) -- it never
+                    // snaps to completed/dismissed between legs. Flutter's
+                    // _RepeatingSimulation only ever calls directionSetter (forward/
+                    // reverse) for a leg boundary; the completed/dismissed branch fires
+                    // once, when the ticker itself is done.
+                    if (repeatReverse) {
+                        double nextTarget = currentValue >= repeatMax ? repeatMin : repeatMax;
+                        AnimationStatus phase = nextTarget >= currentValue
+                                ? AnimationStatus.forward : AnimationStatus.reverse;
+                        beginRun(nextTarget, runDurationMs, phase);
+                    } else {
+                        currentValue = repeatMin;
+                        beginRun(repeatMax, runDurationMs, AnimationStatus.forward);
+                    }
+                    return;
+                }
+                // Headless, no count (or not yet reached): there is no frame clock to
+                // drive a further leg, and Flutter's repeat() never completes on its
+                // own without a count -- the run simply sits at this leg's end, exactly
+                // as a canceled run would, until stop() settles it.
+                return;
+            }
+            // count exhausted: falls through to the same completion as any other run,
+            // exactly as Flutter's Ticker completes the repeating simulation once
+            // isDone() finally answers true.
+            repeating = false;
+        }
+
+        // A run's terminal status follows its OWN direction, never the value it lands
+        // on -- Flutter's Ticker: forward -> completed, reverse -> dismissed, regardless
+        // of whether the target is a bound or an interior value (an animateTo(0.4) that
+        // never gets near upperBound still finishes "completed", not "forward").
+        AnimationStatus terminal = runStatus == AnimationStatus.reverse
+                ? AnimationStatus.dismissed : AnimationStatus.completed;
         if (terminal != status) {
             status = terminal;
             notifyStatusListeners(status);
         }
         // Completed after the listeners have seen the final value, so code that
-        // awaited the run observes the finished state. A repeating run never
-        // completes -- it has no end -- which is also Flutter's behaviour.
-        if (!repeating && runCompleter != null) {
+        // awaited the run observes the finished state.
+        if (runCompleter != null) {
             dart.async.Completer<Object> c = runCompleter;
             runCompleter = null;
             c.complete(null);
-        }
-        if (repeating && Display.isInitialized()) {
-            if (repeatReverse) {
-                double nextTarget = currentValue >= repeatMax ? repeatMin : repeatMax;
-                AnimationStatus phase = nextTarget >= currentValue
-                        ? AnimationStatus.forward : AnimationStatus.reverse;
-                beginRun(nextTarget, runDurationMs, phase);
-            } else {
-                currentValue = repeatMin;
-                beginRun(repeatMax, runDurationMs, AnimationStatus.forward);
-            }
         }
     }
 

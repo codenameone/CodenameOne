@@ -86,7 +86,7 @@ class RepeatDetachesPreviousCompleterTest {
                         + "-- RasterDisplay must have kept beginRun from finishing synchronously");
 
         // repeat() supersedes the still-active forward() run.
-        c.repeat(null, null, null, Duration.of(0, 0, 0, 0, 100, 0));
+        c.repeat(null, null, null, Duration.of(0, 0, 0, 0, 100, 0), null);
         // A non-canceled stop settles whatever run is CURRENTLY installed -- the
         // repeat run repeat() just started, never forward's superseded one.
         c.stop(Boolean.FALSE);
@@ -104,7 +104,7 @@ class RepeatDetachesPreviousCompleterTest {
         AnimationController c = new AnimationController();
         c.duration(Duration.of(0, 0, 0, 0, 300, 0));
         c.forward();
-        c.repeat(null, null, null, Duration.of(0, 0, 0, 0, 100, 0));
+        c.repeat(null, null, null, Duration.of(0, 0, 0, 0, 100, 0), null);
         c.stop(Boolean.FALSE);
 
         Future<Object> laterFuture = c.forward();

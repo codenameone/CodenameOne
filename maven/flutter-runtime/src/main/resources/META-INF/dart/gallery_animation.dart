@@ -87,7 +87,7 @@ class AnimationController extends Animation<double> {
   external Future<void> reverse({double? from});
   external Future<void> animateTo(double target, {Duration? duration, Curve? curve});
   external Future<void> animateBack(double target, {Duration? duration, Curve? curve});
-  external void repeat({double? min, double? max, bool? reverse, Duration? period});
+  external Future<void> repeat({double? min, double? max, bool? reverse, Duration? period, int? count});
   external void stop({bool? canceled});
   external void reset();
   external void dispose();

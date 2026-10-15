@@ -112,7 +112,7 @@ class AnimateToDurationTest {
         assertNull(c.duration());
         assertThrows(FlutterError.class, () -> c.forward());
         assertThrows(FlutterError.class, () -> c.reverse());
-        assertThrows(FlutterError.class, () -> c.repeat(null, null, null, null));
+        assertThrows(FlutterError.class, () -> c.repeat(null, null, null, null, null));
         assertThrows(FlutterError.class, () -> runMillis(c, 1.0, null, AnimationStatus.forward));
         assertEquals(200, runMillis(c, 1.0, Duration.of(0, 0, 0, 0, 200, 0), AnimationStatus.forward));
         c.reverseDuration(Duration.of(0, 0, 0, 0, 100, 0));

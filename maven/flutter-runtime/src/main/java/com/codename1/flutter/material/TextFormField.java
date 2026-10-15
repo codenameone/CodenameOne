@@ -24,7 +24,8 @@
 package com.codename1.flutter.material;
 
 import com.codename1.flutter.BuildContext;
-import com.codename1.flutter.StatelessWidget;
+import com.codename1.flutter.State;
+import com.codename1.flutter.StatefulWidget;
 import com.codename1.flutter.Widget;
 import com.codename1.flutter.widgets.FormFieldSetter;
 import com.codename1.flutter.widgets.FormFieldValidator;
@@ -37,8 +38,15 @@ import dart.runtime.Funcs;
  * (this pass forwards the controller/decoration/obscure/enabled it can map);
  * {@code validator}/{@code onSaved} are captured so a later pass can register the
  * field with its enclosing form. All values are String-valued in new_gallery.
+ *
+ * <p>A {@link StatefulWidget}, not a stateless one, for the same reason Flutter's own
+ * {@code TextFormField} is: when no {@link #controller} is given, {@code initialValue}
+ * has to seed an internal {@link TextEditingController} kept alive by the {@code State}
+ * across rebuilds -- a FRESH {@code TextFormField} instance arrives on every rebuild
+ * (the app's own {@code build()} constructs one), so anything stashed on the widget
+ * itself would be rebuilt away with it. See {@link TextFormFieldState}.</p>
  */
-public class TextFormField extends StatelessWidget {
+public class TextFormField extends StatefulWidget {
 
     private TextEditingController controller;
     private String initialValue;
@@ -94,38 +102,110 @@ public class TextFormField extends StatelessWidget {
     public void buildCounter(Object v) { }
 
     @Override
-    public Widget build(BuildContext context) {
-        TextField field = new TextField();
-        if (controller != null) {
-            field.controller(controller);
+    public State<TextFormField> createState() {
+        return new TextFormFieldState();
+    }
+
+    /**
+     * Mirrors Flutter's {@code _TextFormFieldState}: owns the internal controller a
+     * field with no {@link #controller} gets, seeded ONCE (in {@link #initState}) with
+     * {@code initialValue} and then left alone -- neither a later change of
+     * {@code initialValue} nor anything the user types is touched again on a rebuild,
+     * because {@link #build} keeps handing the SAME controller instance to the
+     * {@link TextField} it builds, every time.
+     */
+    private static final class TextFormFieldState extends State<TextFormField> {
+
+        /** The controller this state owns, or null while an external one is in use. */
+        private TextEditingController localController;
+
+        @Override
+        public void initState() {
+            TextFormField w = widget();
+            if (w.controller == null) {
+                localController = new TextEditingController();
+                if (w.initialValue != null) {
+                    localController.setText(w.initialValue);
+                }
+            }
         }
-        if (decoration != null) {
-            field.decoration(decoration);
+
+        @Override
+        public void didUpdateWidget(TextFormField oldWidget) {
+            TextFormField w = widget();
+            if (w.controller == oldWidget.controller) {
+                // Same controller identity (both null, or the same external instance):
+                // initialValue is consulted only once, at initState -- a later change
+                // must not overwrite what is already showing, user edits included.
+                return;
+            }
+            if (w.controller == null) {
+                // Switched FROM an external controller back to none: Flutter's
+                // _createLocalController(oldWidget.controller!.value) -- a fresh local
+                // controller, seeded with whatever the external one currently holds, so
+                // the switch does not blank the field.
+                localController = new TextEditingController();
+                localController.setText(oldWidget.controller.text());
+            } else {
+                // Switched TO an external controller: it is now authoritative and the
+                // local one (if there was one) is dropped, exactly as Flutter disposes
+                // its RestorableTextEditingController here.
+                if (localController != null) {
+                    localController.dispose();
+                    localController = null;
+                }
+            }
         }
-        field.obscureText(obscureText);
-        if (enabled != null) {
-            field.enabled(enabled);
+
+        @Override
+        public void dispose() {
+            if (localController != null) {
+                localController.dispose();
+                localController = null;
+            }
         }
-        if (onChanged != null) {
-            field.onChanged(onChanged);
+
+        private TextEditingController effectiveController() {
+            TextFormField w = widget();
+            return w.controller != null ? w.controller : localController;
         }
-        // maxLength, maxLines and minLines were accepted here and dropped on the
-        // way to the field, so a form field could not count its characters or
-        // grow past one line however it was configured. The text-field demo is
-        // all TextFormField: its phone number asks for a 14-character counter
-        // and its life story for three lines.
-        if (maxLength instanceof Number) {
-            field.maxLength(((Number) maxLength).longValue());
+
+        @Override
+        public Widget build(BuildContext context) {
+            TextFormField w = widget();
+            TextField field = new TextField();
+            TextEditingController effective = effectiveController();
+            if (effective != null) {
+                field.controller(effective);
+            }
+            if (w.decoration != null) {
+                field.decoration(w.decoration);
+            }
+            field.obscureText(w.obscureText);
+            if (w.enabled != null) {
+                field.enabled(w.enabled);
+            }
+            if (w.onChanged != null) {
+                field.onChanged(w.onChanged);
+            }
+            // maxLength, maxLines and minLines were accepted here and dropped on the
+            // way to the field, so a form field could not count its characters or
+            // grow past one line however it was configured. The text-field demo is
+            // all TextFormField: its phone number asks for a 14-character counter
+            // and its life story for three lines.
+            if (w.maxLength instanceof Number) {
+                field.maxLength(((Number) w.maxLength).longValue());
+            }
+            if (w.maxLines instanceof Number) {
+                field.maxLines(((Number) w.maxLines).longValue());
+            }
+            if (w.minLines instanceof Number) {
+                field.minLines(((Number) w.minLines).longValue());
+            }
+            if (w.keyboardType != null) {
+                field.keyboardType(w.keyboardType);
+            }
+            return field;
         }
-        if (maxLines instanceof Number) {
-            field.maxLines(((Number) maxLines).longValue());
-        }
-        if (minLines instanceof Number) {
-            field.minLines(((Number) minLines).longValue());
-        }
-        if (keyboardType != null) {
-            field.keyboardType(keyboardType);
-        }
-        return field;
     }
 }

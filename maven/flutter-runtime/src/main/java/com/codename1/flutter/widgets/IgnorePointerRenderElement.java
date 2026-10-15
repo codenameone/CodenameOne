@@ -45,6 +45,14 @@ import com.codename1.ui.Container;
  * <p>Codename One's hit test walks UP from the component it lands on for as long as each
  * one ignores pointer events, so the flag has to be set across the whole subtree rather
  * than on its root: a touch landing on a deep child would otherwise stop there.</p>
+ *
+ * <p>With nested {@code IgnorePointer}s, each one's {@code ignoring} has to stand on its
+ * own -- effectively the OR of every {@code IgnorePointer} ancestor, because Flutter's own
+ * {@code RenderIgnorePointer.hitTest} is {@code !ignoring && super.hitTest(...)}: an
+ * ignoring ancestor returns {@code false} before its child's hitTest ever runs, so nothing
+ * further down -- however it is configured -- is ever reachable. An {@code ignoring: false}
+ * wrapper must therefore never clear a NESTED {@code IgnorePointer}'s own {@code true}; see
+ * {@link #applyToRenderSubtree}.</p>
  */
 public class IgnorePointerRenderElement extends PassThroughRenderElement {
 
@@ -69,6 +77,20 @@ public class IgnorePointerRenderElement extends PassThroughRenderElement {
     private static void applyToRenderSubtree(com.codename1.flutter.RenderElement e,
             boolean deaf) {
         for (com.codename1.flutter.RenderElement child : e.renderChildren()) {
+            if (!deaf && child instanceof IgnorePointerRenderElement) {
+                // A nested IgnorePointer owns its own subtree and has already applied its
+                // own decision there -- position() runs top-down, so the nested wrapper's
+                // positionChildren() (and this same method, with ITS OWN "deaf") already
+                // ran, as part of the super.positionChildren(x, y) call above, before this
+                // one. "Not ignoring" here must never overwrite that: only an ignoring
+                // ancestor is allowed to override a nested wrapper, which is exactly the
+                // case this skip does NOT apply to -- deaf == true still descends below,
+                // through the normal branch beneath, and stamps true over whatever the
+                // nested wrapper decided, matching Flutter's hitTest short-circuit (an
+                // ignoring ancestor's subtree is unreachable regardless of what is nested
+                // inside it).
+                continue;
+            }
             Component c = child.component();
             if (c != null) {
                 apply(c, deaf);
