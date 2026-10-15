@@ -239,6 +239,7 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
             draw();
         }
         car();
+        RideCard.follow(latest);
         String now = latest.id() + ":" + latest.state();
         if (!now.equals(showing)) {
             showing = now;
