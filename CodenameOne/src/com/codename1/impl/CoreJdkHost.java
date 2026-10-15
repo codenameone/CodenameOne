@@ -426,18 +426,22 @@ public class CoreJdkHost extends JdkHost {
             this.hash = hash;
         }
 
+        @Override
         public void update(byte[] data, int offset, int length) {
             hash.update(data, offset, length);
         }
 
+        @Override
         public byte[] digest() {
             return hash.digest();
         }
 
+        @Override
         public void reset() {
             hash.reset();
         }
 
+        @Override
         public int length() {
             return hash.digestLength();
         }

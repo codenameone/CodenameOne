@@ -136,14 +136,13 @@ public final class Float extends Number implements Comparable<Float> {
      * method, will produce a floating-point value equal to the argument to floatToIntBits.
      */
     /**
-     * The raw IEEE 754 bits of {@code value}, without collapsing NaN to the
-     * canonical NaN.
+     * The raw IEEE 754 bits of {@code value}.
      *
-     * Delegates rather than declaring a second native. ParparVM's floatToIntBits
-     * is a bare union punt that does not collapse NaN to the canonical NaN -- so it
-     * is already the raw operation, and the two differ in the spec but not here. A
-     * separate native would be one more mangled symbol to get wrong, silently, for
-     * no behavioural difference.
+     * Delegates rather than declaring a second native, so a NaN comes back as
+     * the canonical NaN here too: floatToIntBits collapses it, as the spec asks
+     * and as Float.equals needs, and a NaN's payload is the one thing this
+     * cannot report. A separate native would be one more mangled symbol to get
+     * wrong, silently, for that alone.
      */
     public static int floatToRawIntBits(float value) {
         return floatToIntBits(value);

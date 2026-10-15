@@ -198,8 +198,8 @@ public final class Resources {
         String[] providers = JdkHost.getRegistry().providers(service);
         StringBuilder out = new StringBuilder();
         if (providers != null) {
-            for (int i = 0; i < providers.length; i++) {
-                out.append(providers[i]).append('\n');
+            for (String provider : providers) {
+                out.append(provider).append('\n');
             }
         }
         return out.toString();
@@ -361,7 +361,8 @@ public final class Resources {
         if (index != null && (index.contains(p) || p.indexOf('/') >= 0)) {
             return index.contains(p);
         }
-        InputStream in = read(p);
+        // Closed just below; PMD does not follow a close inside a catch.
+        InputStream in = read(p); //NOPMD CloseResource
         if (in == null) {
             return false;
         }
@@ -369,7 +370,6 @@ public final class Resources {
             in.close();
         } catch (IOException e) {
             // It was there to be opened, which is all that was asked.
-            return true;
         }
         return true;
     }

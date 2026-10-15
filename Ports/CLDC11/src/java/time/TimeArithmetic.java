@@ -58,7 +58,10 @@ final class TimeArithmetic {
         long r = a * b;
         long absA = a < 0 ? -a : a;
         long absB = b < 0 ? -b : b;
-        if (((absA | absB) >>> 31) != 0 && (b != 0 && (r / b != a) || a == Long.MIN_VALUE && b == -1)) {
+        // MIN_VALUE * -1 is tested before the division: ParparVM divides in
+        // C, where MIN_VALUE / -1 is undefined and traps (SIGFPE) on x86.
+        if (((absA | absB) >>> 31) != 0
+                && (a == Long.MIN_VALUE && b == -1 || b != 0 && r / b != a)) {
             throw new ArithmeticException("long overflow");
         }
         return r;

@@ -1589,6 +1589,12 @@ JAVA_LONG java_lang_Double_doubleToLongBits___double_R_long(CODENAME_ONE_THREAD_
         JAVA_LONG   l;
     } u;
     
+    // Java collapses every NaN to the canonical one, and Double.equals and
+    // hashCode depend on it. The hardware does not: x86 produces 0xfff8...
+    // for Infinity + -Infinity where ARM produces 0x7ff8...
+    if (n1 != n1) {
+        return 0x7ff8000000000000LL;
+    }
     u.d = n1;
     return u.l;
 }
@@ -1611,6 +1617,10 @@ JAVA_INT java_lang_Float_floatToIntBits___float_R_int(CODENAME_ONE_THREAD_STATE,
         JAVA_INT    i;
     } u;
     
+    // The canonical NaN, as doubleToLongBits above.
+    if (n1 != n1) {
+        return 0x7fc00000;
+    }
     u.f = n1;
     return u.i;
 }
