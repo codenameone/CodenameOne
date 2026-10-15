@@ -25,6 +25,16 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 `Property` fields work the same way; the dao calls `Property#get` and
 `Property#set` for read and write.
 
+Every field that isn't `static` or `transient` is stored, whatever its access:
+a `private` field with a getter and a setter is mapped the same way a `public`
+one is. The build weaves a static accessor into the class that declares each
+non-public field and the generated code calls it, so no reflection is involved
+on any platform. A field is left out of the table when it's `static`, marked
+with the Java `transient` modifier, annotated `@DbTransient`, or is a non-public
+`final` field without a mapping annotation, such as a `PropertyIndex`. A `final`
+field that does carry a mapping annotation fails the build, since nothing could
+write a loaded value into it.
+
 ==== Field-level annotations
 
 [cols="1,3", options="header"]
@@ -377,7 +387,7 @@ are rejected before pending changes are flushed.
 ==== Supported boundary
 
 This API provides managed persistence through CN1 annotations; it's not a JPA
-provider or a Hibernate binary replacement. Entity access uses public fields.
+provider or a Hibernate binary replacement. Entity access is by field, public or not.
 Getter/setter access mappings, property-backed associations, joined/table-per-class
 inheritance, embeddable element collections, and independently stored entity-map
 keys aren't supported. Nested fetch graphs and mixed entity/scalar JPQL

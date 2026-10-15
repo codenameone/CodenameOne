@@ -62,9 +62,12 @@ import java.lang.annotation.Target;
 /// GENERATES from it: against the core the processor emits a dao over
 /// `com.codename1.db.Database`, against the backend one over
 /// `com.codename1.backend.Database`, whose SQL is built for whichever engine the
-/// connection turns out to be. On the server the class needs public fields and a
-/// public no-arg constructor, because the generated dao reads and writes them
-/// directly.
+/// connection turns out to be. The class needs a public no-arg constructor.
+///
+/// Every field that is not `static` or `transient` is persistent, whatever its
+/// access; `@DbTransient` leaves one out. A non-public field is read and written
+/// through a static accessor the build weaves into the class that declares it,
+/// so the generated dao needs no reflection on any platform.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 @com.codename1.impl.SharedWithBackend

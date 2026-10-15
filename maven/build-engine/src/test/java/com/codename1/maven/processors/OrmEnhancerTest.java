@@ -138,6 +138,111 @@ public class OrmEnhancerTest {
         assertTrue(Files.exists(output.resolve("overlay/Reader.class")));
     }
 
+    @Test
+    public void routesGeneratedAccessToAPrivateInheritedFieldOfADependencyThroughAWovenAccessor() throws Exception {
+        // model.Base declares a private id; model.Thing extends it; both live in a
+        // dependency jar. The generated model, compiled against public stand-ins,
+        // reads the field through Thing -- the static type javac names.
+        Path output = temporary.newFolder("classes").toPath();
+        File jar = temporary.newFile("entities.jar");
+        try (JarOutputStream stream = new JarOutputStream(Files.newOutputStream(jar.toPath()))) {
+            stream.putNextEntry(new JarEntry("model/Base.class"));
+            stream.write(entityClass("model/Base", "java/lang/Object", true));
+            stream.closeEntry();
+            stream.putNextEntry(new JarEntry("model/Thing.class"));
+            stream.write(entityClass("model/Thing", "model/Base", false));
+            stream.closeEntry();
+        }
+        Files.createDirectories(output.resolve("model"));
+        Files.write(output.resolve("model/ThingCn1BackendModel.class"), generatedModel());
+        ProcessorContext context = new ProcessorContext(output.toFile(), temporary.newFolder(), null,
+                new SystemStreamLog(), null, null, null, Collections.<String>emptyList(), "UTF-8",
+                Collections.singletonList(jar.getAbsolutePath()));
+        OrmAnnotationProcessor.EntityClass thing = new OrmAnnotationProcessor.EntityClass();
+        thing.binaryName = "model.Thing";
+        thing.daoBinaryName = "model.ThingCn1BackendDao";
+        thing.hiddenFields.add(new String[] {"model/Base", "id", "J"});
+
+        File stubs = OrmEnhancer.publicStubs(Collections.singletonMap(thing.binaryName, thing), context);
+        try {
+            assertTrue(Files.isRegularFile(stubs.toPath().resolve("model/Base.class")));
+            final int[] access = {0};
+            new org.objectweb.asm.ClassReader(Files.readAllBytes(stubs.toPath().resolve("model/Base.class")))
+                    .accept(new org.objectweb.asm.ClassVisitor(Opcodes.ASM9) {
+                        @Override public org.objectweb.asm.FieldVisitor visitField(int a, String n, String d, String sig, Object v) {
+                            if (n.equals("id")) access[0] = a;
+                            return null;
+                        }
+                    }, 0);
+            assertEquals(Opcodes.ACC_PUBLIC, access[0] & (Opcodes.ACC_PUBLIC | Opcodes.ACC_PRIVATE));
+        } finally {
+            org.apache.commons.io.FileUtils.deleteDirectory(stubs);
+        }
+
+        OrmEnhancer.enhance(Collections.singletonMap(thing.binaryName, thing), context);
+        // The declaring class is woven and written over the dependency's copy;
+        // the subclass, which declares nothing hidden, is left alone.
+        assertTrue(Files.isRegularFile(output.resolve("model/Base.class")));
+        assertFalse(Files.exists(output.resolve("model/Thing.class")));
+        java.net.URLClassLoader loader = new java.net.URLClassLoader(
+                new java.net.URL[] {output.toUri().toURL(), jar.toURI().toURL()}, null);
+        try {
+            Class<?> type = loader.loadClass("model.Thing");
+            Object instance = type.newInstance();
+            Class<?> model = loader.loadClass("model.ThingCn1BackendModel");
+            model.getMethod("write", type, long.class).invoke(null, instance, Long.valueOf(42L));
+            assertEquals(Long.valueOf(42L), model.getMethod("read", type).invoke(null, instance));
+            assertTrue(java.lang.reflect.Modifier.isPrivate(
+                    loader.loadClass("model.Base").getDeclaredField("id").getModifiers()));
+        } finally {
+            loader.close();
+        }
+    }
+
+    /// A class with a private long `id` when `declaresId`, and a public no-arg
+    /// constructor.
+    private static byte[] entityClass(String name, String superName, boolean declaresId) {
+        ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, name, null, superName, null);
+        if (declaresId) {
+            writer.visitField(Opcodes.ACC_PRIVATE, "id", "J", null, null).visitEnd();
+        }
+        MethodVisitor init = writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        init.visitCode();
+        init.visitVarInsn(Opcodes.ALOAD, 0);
+        init.visitMethodInsn(Opcodes.INVOKESPECIAL, superName, "<init>", "()V", false);
+        init.visitInsn(Opcodes.RETURN);
+        init.visitMaxs(0, 0);
+        init.visitEnd();
+        writer.visitEnd();
+        return writer.toByteArray();
+    }
+
+    /// What javac emits for `e.id` and `e.id = v` against the public stand-in.
+    private static byte[] generatedModel() {
+        ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "model/ThingCn1BackendModel", null, "java/lang/Object", null);
+        MethodVisitor read = writer.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "read",
+                "(Lmodel/Thing;)J", null, null);
+        read.visitCode();
+        read.visitVarInsn(Opcodes.ALOAD, 0);
+        read.visitFieldInsn(Opcodes.GETFIELD, "model/Thing", "id", "J");
+        read.visitInsn(Opcodes.LRETURN);
+        read.visitMaxs(0, 0);
+        read.visitEnd();
+        MethodVisitor write = writer.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "write",
+                "(Lmodel/Thing;J)V", null, null);
+        write.visitCode();
+        write.visitVarInsn(Opcodes.ALOAD, 0);
+        write.visitVarInsn(Opcodes.LLOAD, 1);
+        write.visitFieldInsn(Opcodes.PUTFIELD, "model/Thing", "id", "J");
+        write.visitInsn(Opcodes.RETURN);
+        write.visitMaxs(0, 0);
+        write.visitEnd();
+        writer.visitEnd();
+        return writer.toByteArray();
+    }
+
     private ProcessorContext context(Path output, String entry) throws IOException {
         File jar = temporary.newFile("dependency-" + System.nanoTime() + ".jar");
         try (JarOutputStream stream = new JarOutputStream(Files.newOutputStream(jar.toPath()))) {
