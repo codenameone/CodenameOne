@@ -28,6 +28,7 @@ import com.codename1.dart.transpiler.harness.TestSupport;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -36,10 +37,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code whereType<T>()} used to pass a {@code null} witness for exactly that case, and
  * {@code DartIterable.whereType} reads a null witness the way Dart reads {@code whereType
  * <dynamic>()}: "keep every non-null element" -- so {@code only<T>([1, 'a']).toList()}
- * silently kept the {@code 'a'} too, for ANY {@code T}. {@code is T} and {@code as T} have
- * the same missing witness, but surface it differently: a bare type-variable {@code
- * instanceof}/class-literal is a javac error in the generated sources, not a silently wrong
- * answer. All three now report E0142 at transpile time instead of lowering.
+ * silently kept the {@code 'a'} too, for ANY {@code T}. {@code is T} has the same missing
+ * witness but surfaced as a javac error in the generated sources (a bare type-variable
+ * {@code instanceof}). Both now report E0142 at transpile time instead of lowering.
+ * {@code as T} is the exception: it lowers to an unchecked cast, right whenever the value
+ * is a T, so rejecting it would break working code.
  *
  * <p>{@code whereType<int>()}/{@code whereType<MyClass>()} -- a CONCRETE type argument --
  * must keep working exactly as before; that is covered by the {@code dart_review_round28}
@@ -86,15 +88,19 @@ public class TypeVariableWitnessTest {
         assertTrue(count(r, "E0142") >= 1, "expected E0142: " + r.diags.asList());
     }
 
-    /** {@code x as T} where T is the enclosing generic method's type parameter. */
+    /**
+     * {@code x as T} where T is the enclosing generic method's type parameter is NOT
+     * diagnosed: it lowers to an unchecked cast, which is right whenever the value is a
+     * T (the common {@code json['x'] as T}); only the mismatch fails late. See
+     * JavaEmitter.emitAsCast.
+     */
     @Test
-    public void asCastOfATypeVariableIsDiagnosed() {
+    public void asCastOfATypeVariableLowersToAnUncheckedCast() {
         String src =
                 "T cast<T>(Object x) => x as T;\n"
               + "void main() {}\n";
         TestSupport.Result r = TestSupport.transpile(new String[][] {{"main.dart", src}});
-        assertTrue(r.diags.hasErrors(), "x as T on a type variable must be diagnosed");
-        assertTrue(count(r, "E0142") >= 1, "expected E0142: " + r.diags.asList());
+        assertEquals(0, count(r, "E0142"), "as T must not be rejected: " + r.diags.asList());
     }
 
     /** whereType<int>() -- a CONCRETE type argument -- must not be diagnosed. */

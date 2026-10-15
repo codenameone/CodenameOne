@@ -4035,11 +4035,14 @@ public final class JavaEmitter {
         Out o = emitExpr(c.operand, null, ctx);
         String jt = javaType(c.type, true, ctx);
         TypeRef target = c.type;
-        // No class to test a type variable against; Dart reifies it, Java erases it. An
-        // unchecked cast here would never throw even when the value is not a T -- silently
-        // wrong, the same way an unwitnessed whereType<T>() was -- so this is diagnosed
-        // rather than lowered. See reportTypeVariableWitness.
-        if (reportTypeVariableWitness(c, target, ctx, "'as " + target.name + "'")) {
+        // No class to test a type variable against: Dart reifies it, Java erases it. Unlike
+        // `is T` or whereType<T>(), an `as T` is lowered anyway, as an unchecked cast: it
+        // yields the right value whenever the value IS a T, which is what the common
+        // `json['x'] as T` / `value as T` in generic code relies on, and rejecting it would
+        // break code that works. What it cannot do is throw on a mismatch -- the failure
+        // surfaces later, at the first use of the value as a T. A documented limitation
+        // (reified generics are not modelled), not a silent wrong answer on the happy path.
+        if (isTypeVariable(target, ctx)) {
             return new Out("((" + jt + ") " + o.code + ")", c.type, true);
         }
         boolean unchecked = target.is("dynamic") || target.is("var")
