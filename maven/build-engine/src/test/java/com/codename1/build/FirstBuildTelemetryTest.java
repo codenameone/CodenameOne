@@ -110,15 +110,31 @@ class FirstBuildTelemetryTest {
         // run.sh simulator, and the IDE configurations generated with the project
         assertEquals("simulator", FirstBuildTelemetry.target(null, Arrays.asList("verify"), Arrays.asList("simulator")));
         assertEquals("simulator", FirstBuildTelemetry.target(null, Arrays.asList("verify"), Arrays.asList("debug-simulator")));
+        assertEquals("simulator", FirstBuildTelemetry.target(null, Arrays.asList("verify"), Arrays.asList("idea-simulator")));
+        assertEquals("simulator", FirstBuildTelemetry.target(null, Arrays.asList("verify"), Arrays.asList("debug-eclipse")));
+        assertEquals("simulator", FirstBuildTelemetry.target(null, Arrays.asList("install"), Arrays.asList("+simulator")));
         assertEquals("desktop", FirstBuildTelemetry.target(null, Arrays.asList("verify"), Arrays.asList("run-desktop")));
-        // Gradle's simulator tasks
-        assertEquals("simulator", FirstBuildTelemetry.target(null, Arrays.asList(":run"), null));
-        assertEquals("simulator", FirstBuildTelemetry.target(null, Arrays.asList("debug"), null));
+        // The simulator goals and tasks, wherever they are in the request
+        assertEquals("simulator", FirstBuildTelemetry.target(null, Arrays.asList("clean", "cn1:run"), null));
+        assertEquals("simulator", FirstBuildTelemetry.target(null,
+                Arrays.asList("com.codenameone:codenameone-maven-plugin:7.0.277:debug"), null));
+        assertEquals("simulator", FirstBuildTelemetry.target(null, Arrays.asList("clean", "run"), null));
+        assertEquals("simulator", FirstBuildTelemetry.target(null, Arrays.asList(":javase:debug"), null));
         // Neither is a cloud build, which names its target and wins
         assertEquals("android-device", FirstBuildTelemetry.target("android-device", Arrays.asList("package"),
                 Arrays.asList("simulator")));
         // Other profiles leave the goal as the target
         assertEquals("verify", FirstBuildTelemetry.target(null, Arrays.asList("verify"), Arrays.asList("ios-debug")));
+    }
+
+    @Test
+    void aProfileAloneDoesNotStartTheApp() {
+        // The profiles start the app at verify; an earlier phase only builds.
+        assertEquals("package", FirstBuildTelemetry.target(null, Arrays.asList("package"), Arrays.asList("run-desktop")));
+        assertEquals("test", FirstBuildTelemetry.target(null, Arrays.asList("test"), Arrays.asList("simulator")));
+        // Another plugin's run goal is not the simulator.
+        assertEquals("run", FirstBuildTelemetry.target(null, Arrays.asList("spring-boot:run"), null));
+        assertEquals("exec", FirstBuildTelemetry.target(null, Arrays.asList("exec:exec"), null));
     }
 
     @Test
