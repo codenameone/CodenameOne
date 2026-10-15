@@ -27,10 +27,8 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
-/**
- * A container that may or may not hold a non-null value (the Java 8 API). The
- * stream terminals that may find nothing answer one.
- */
+/// A container that may or may not hold a non-null value (the Java 8 API). The
+/// stream terminals that may find nothing answer one.
 public final class Optional<T> {
     private static final Optional<?> EMPTY = new Optional<Object>(null);
 

@@ -60,8 +60,12 @@ APP_ROOTS = [
 # which the workflow watches. Triggering on Ports/**, vm/** and maven/**
 # instead would run this job -- maven install, the demo build and the
 # screenshots -- for nearly every change in the repository.
+# docs/demos is the guide's own code: every snippet compiles there, so a class
+# a chapter defines and then names -- the game builder's Level1, a near miss
+# for java.util.logging.Level once the class library had that -- is real.
 IDENTIFIER_ROOTS = [os.path.join(ROOT, d)
-                    for d in ('CodenameOne', 'Ports', 'vm', 'maven')]
+                    for d in ('CodenameOne', 'Ports', 'vm', 'maven',
+                              os.path.join('docs', 'demos'))]
 IDENTIFIER_SUFFIXES = ('.java', '.m', '.h', '.mm', '.kt', '.js', '.c', '.cpp',
                        '.xml', '.gradle', '.swift', '.cs')
 

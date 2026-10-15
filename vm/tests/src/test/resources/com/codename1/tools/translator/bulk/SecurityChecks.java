@@ -106,7 +106,9 @@ public final class SecurityChecks {
                 }
             });
             SecureRandom random = new SecureRandom();
-            random.setSeed(1L);
+            // A caller's seed only supplements the host's source; the output
+            // below is still the host's bytes.
+            random.setSeed(random.generateSeed(8));
             byte[] bytes = new byte[9];
             random.nextBytes(bytes);
             byte[] expected = new byte[9];
@@ -114,7 +116,7 @@ public final class SecurityChecks {
             Bulk.expect(Arrays.equals(expected, bytes), "nextBytes is the host's: " + Arrays.toString(bytes));
             Bulk.expect(Arrays.equals(new byte[] {0x5A, 0x5A}, random.generateSeed(2)), "generateSeed");
             Bulk.expectEquals(Integer.valueOf(0x5A5A5A5A), Integer.valueOf(random.nextInt()), "nextInt");
-            Bulk.expectEquals(Integer.valueOf(15), Integer.valueOf(asked[0]), "bytes asked of the host");
+            Bulk.expectEquals(Integer.valueOf(23), Integer.valueOf(asked[0]), "bytes asked of the host");
             Bulk.expectEquals("IllegalArgumentException",
                     Bulk.thrown(IllegalArgumentException.class, () -> random.generateSeed(-1)), "generateSeed(-1)");
             Bulk.expectEquals("NativePRNG", SecureRandom.getInstanceStrong().getAlgorithm(), "getInstanceStrong");

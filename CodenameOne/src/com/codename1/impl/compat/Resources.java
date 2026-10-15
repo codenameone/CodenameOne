@@ -321,16 +321,24 @@ public final class Resources {
         return portLoader != null ? portLoader : ClassLoader.getSystemClassLoader();
     }
 
-    /// `loader.loadClass(name)`: the class of that name when the application
-    /// has it, which is all a class loader can answer where no class is ever
-    /// loaded at run time. Desktop code asks this way to find out whether an
-    /// optional class is present; one that is not throws
-    /// `ClassNotFoundException`, as on a desktop.
+    /// `loader.loadClass(name)`: the class of that name when the generated
+    /// registry knows it -- the application's resource bundle classes and
+    /// service providers, the classes it may need by name. Anything else
+    /// throws `ClassNotFoundException`, as a desktop does for a class that is
+    /// absent, which is how desktop code probing for an optional class reads
+    /// it. No class is looked up by its string name: a device loads nothing
+    /// at run time, and an obfuscated Android or JavaScript build has renamed
+    /// it, so the answer is the registry's on every port alike.
     public static Class<?> loadClass(ClassLoader loader, String name) throws ClassNotFoundException {
         if (loader == null || name == null) {
             throw new NullPointerException();
         }
-        return Class.forName(name);
+        JdkHost.Registry registry = JdkHost.getRegistry();
+        Class<?> type = registry == null ? null : registry.type(name);
+        if (type == null) {
+            throw new ClassNotFoundException(name);
+        }
+        return type;
     }
 
     /// `Thread.setContextClassLoader(loader)`. There is one loader, so this

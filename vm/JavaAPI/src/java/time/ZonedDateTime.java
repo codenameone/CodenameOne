@@ -31,7 +31,7 @@ import java.time.temporal.TemporalAmount;
 import java.time.temporal.TemporalUnit;
 
 /// A date and a time of day in a time zone, such as
-/// 2007-12-03T10:15:30+01:00[Europe/Paris].
+/// `2007-12-03T10:15:30+01:00[Europe/Paris]`.
 ///
 /// Adding a date-based amount moves the wall clock and keeps the offset where
 /// the zone allows it; adding a time-based amount moves the instant. Across a

@@ -395,12 +395,32 @@ public class CompilerHelper {
             command.add("UTF-8");
         }
 
-        command.addAll(args);
+        // Everything else goes through an @argfile. The JavaAPI compile names
+        // every source of the class library, and that command line outgrew
+        // Windows' 32K limit (CreateProcess error=206) once java.* gained the
+        // classes a desktop application needs. javac reads argfiles on JDK 8
+        // too; each argument is quoted, with backslashes and quotes escaped,
+        // so Windows paths and spaces survive.
+        Path argFile = Files.createTempFile("cn1-javac", ".args");
+        StringBuilder argText = new StringBuilder();
+        for (String arg : args) {
+            argText.append('"')
+                    .append(arg.replace("\\", "\\\\").replace("\"", "\\\""))
+                    .append("\"\n");
+        }
+        Files.write(argFile, argText.toString().getBytes(StandardCharsets.UTF_8));
+        command.add("@" + argFile.toAbsolutePath());
 
         ProcessBuilder pb = new ProcessBuilder(command);
         // Inherit IO so we see errors in the log
         pb.redirectErrorStream(true);
-        Process p = pb.start();
+        Process p;
+        try {
+            p = pb.start();
+        } catch (IOException e) {
+            Files.deleteIfExists(argFile);
+            throw e;
+        }
         lastErrorLog = "";
         try (InputStream is = p.getInputStream();
              ByteArrayOutputStream buffer = new ByteArrayOutputStream()) {
@@ -413,7 +433,11 @@ public class CompilerHelper {
 
             lastErrorLog = buffer.toString("UTF-8");
         }
-        return p.waitFor();
+        try {
+            return p.waitFor();
+        } finally {
+            Files.deleteIfExists(argFile);
+        }
     }
 
     public static String getLastErrorLog() {
