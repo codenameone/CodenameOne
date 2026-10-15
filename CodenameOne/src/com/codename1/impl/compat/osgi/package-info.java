@@ -35,4 +35,4 @@
 /// This is not an OSGi implementation and will not grow into one. No bundle,
 /// context or service reference is ever created; the three interfaces exist
 /// so that the probe's descriptors resolve.
-package com.codename1.compat.jdk.osgi;
+package com.codename1.impl.compat.osgi;

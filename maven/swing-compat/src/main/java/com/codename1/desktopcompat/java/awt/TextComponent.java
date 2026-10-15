@@ -22,7 +22,7 @@
  */
 package com.codename1.desktopcompat.java.awt;
 
-import com.codename1.compat.jdk.LinkOnly;
+import com.codename1.annotations.LinkOnly;
 
 /// The base of AWT's heavyweight text widgets. Like [TextField] it exists so
 /// that `component instanceof TextComponent` links in a bundled library

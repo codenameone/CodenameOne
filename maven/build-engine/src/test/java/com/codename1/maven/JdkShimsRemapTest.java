@@ -167,13 +167,13 @@ public class JdkShimsRemapTest {
     @Test
     public void aLibraryThatAsksIsToldItIsNotInAnOsgiFramework() {
         ClassRelocator relocator = new ClassRelocator(CompatLayers.SWING);
-        org.junit.Assert.assertEquals("com/codename1/compat/jdk/osgi/FrameworkUtil", relocator.map("org/osgi/framework/FrameworkUtil"));
-        org.junit.Assert.assertEquals("com/codename1/compat/jdk/osgi/Bundle", relocator.map("org/osgi/framework/Bundle"));
-        org.junit.Assert.assertEquals("com/codename1/compat/jdk/osgi/BundleContext", relocator.map("org/osgi/framework/BundleContext"));
-        org.junit.Assert.assertEquals("com/codename1/compat/jdk/osgi/ServiceReference",
+        org.junit.Assert.assertEquals("com/codename1/impl/compat/osgi/FrameworkUtil", relocator.map("org/osgi/framework/FrameworkUtil"));
+        org.junit.Assert.assertEquals("com/codename1/impl/compat/osgi/Bundle", relocator.map("org/osgi/framework/Bundle"));
+        org.junit.Assert.assertEquals("com/codename1/impl/compat/osgi/BundleContext", relocator.map("org/osgi/framework/BundleContext"));
+        org.junit.Assert.assertEquals("com/codename1/impl/compat/osgi/ServiceReference",
                 relocator.map("org/osgi/framework/ServiceReference"));
         org.junit.Assert.assertEquals("org/osgi/framework/BundleActivator", relocator.map("org/osgi/framework/BundleActivator"));
-        org.junit.Assert.assertNull(com.codename1.compat.jdk.osgi.FrameworkUtil.getBundle(String.class));
+        org.junit.Assert.assertNull(com.codename1.impl.compat.osgi.FrameworkUtil.getBundle(String.class));
     }
 
     @Test

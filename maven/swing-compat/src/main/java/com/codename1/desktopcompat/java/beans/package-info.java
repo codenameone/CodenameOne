@@ -34,7 +34,7 @@
 /// Long-term persistence ([XMLEncoder], [XMLDecoder], [Encoder],
 /// [PersistenceDelegate], [Statement], [Expression]) is reflection from end
 /// to end and does not work. Those classes are here, marked
-/// `com.codename1.compat.jdk.LinkOnly`, because libraries written against
+/// `com.codename1.annotations.LinkOnly`, because libraries written against
 /// Swing offer to save themselves that way beside everything else they do
 /// and could not be bundled otherwise: the build accepts a reference from a
 /// bundled library and reports one from an application's own code, as it

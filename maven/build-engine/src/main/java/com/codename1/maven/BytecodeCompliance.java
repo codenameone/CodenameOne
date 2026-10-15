@@ -147,8 +147,8 @@ public class BytecodeCompliance {
     }
 
     /// The annotation that marks a layer class as there to be linked against
-    /// and nothing more (`com.codename1.compat.jdk.LinkOnly`).
-    private static final String LINK_ONLY_DESCRIPTOR = "L" + Relocation.JDK_PACKAGE + "LinkOnly;";
+    /// and nothing more (`com.codename1.annotations.LinkOnly`).
+    private static final String LINK_ONLY_DESCRIPTOR = "Lcom/codename1/annotations/LinkOnly;";
 
     /// The jar each bundled library class came from, by internal name.
     private Map<String, String> libraryOrigins = Collections.emptyMap();
@@ -2240,7 +2240,7 @@ public class BytecodeCompliance {
         /// under: the name the application was compiled against.
         private String originalName(String internalName) {
             String original = layerNames.original(internalName);
-            if (original.startsWith(Relocation.JDK_PACKAGE)) {
+            if (original.startsWith(Relocation.JDK_PACKAGE) || original.startsWith(Relocation.OSGI_PACKAGE)) {
                 for (String[] shim : Relocation.JDK_SHIMS) {
                     if (shim[1].equals(original)) {
                         return shim[0];

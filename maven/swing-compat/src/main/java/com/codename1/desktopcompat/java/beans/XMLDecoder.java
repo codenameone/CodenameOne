@@ -22,7 +22,7 @@
  */
 package com.codename1.desktopcompat.java.beans;
 
-import com.codename1.compat.jdk.LinkOnly;
+import com.codename1.annotations.LinkOnly;
 
 import java.io.InputStream;
 

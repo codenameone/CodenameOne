@@ -22,7 +22,7 @@
  */
 package com.codename1.desktopcompat.java.awt;
 
-import com.codename1.compat.jdk.LinkOnly;
+import com.codename1.annotations.LinkOnly;
 
 /// AWT's heavyweight `TextField`, a one-line text field drawn by the desktop's own
 /// toolkit. There is no such widget here, and `javax.swing.JTextField` is the component

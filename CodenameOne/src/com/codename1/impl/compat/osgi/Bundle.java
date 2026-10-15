@@ -20,9 +20,12 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.compat.jdk.osgi;
+package com.codename1.impl.compat.osgi;
 
-/// `org.osgi.framework.ServiceReference`, as a type only. Nothing implements
-/// it: see the package description.
-public interface ServiceReference<S> {
+/// `org.osgi.framework.Bundle`, as the type [FrameworkUtil#getBundle(Class)]
+/// is declared to answer. Nothing implements it: see the package description.
+public interface Bundle {
+
+    /// The bundle's execution context.
+    BundleContext getBundleContext();
 }

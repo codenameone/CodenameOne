@@ -20,7 +20,12 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.compat.jdk;
+package com.codename1.annotations;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /// Marks a class of a compatibility layer that exists so that a library
 /// naming it LINKS, and that does nothing useful when it is reached.
@@ -46,5 +51,7 @@ package com.codename1.compat.jdk;
 ///
 /// Retained in the class file and no further: the build reads it there, and
 /// nothing reads it on a device.
+@Retention(RetentionPolicy.CLASS)
+@Target(ElementType.TYPE)
 public @interface LinkOnly {
 }

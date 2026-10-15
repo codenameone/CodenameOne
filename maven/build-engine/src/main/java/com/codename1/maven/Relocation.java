@@ -37,6 +37,11 @@ public final class Relocation {
     public static final String JDK_ARTIFACT = "codenameone-compat-jdk";
     public static final String JDK_PACKAGE = "com/codename1/compat/jdk/";
 
+    /// Where `org.osgi.framework`'s "not in a framework" answer lives: core,
+    /// because every layer shares [#JDK_SHIMS] and the core jar ships with
+    /// every application.
+    static final String OSGI_PACKAGE = "com/codename1/impl/compat/osgi/";
+
     /// JDK classes the Codename One runtime lacks, redirected to the
     /// implementations in [#JDK_ARTIFACT].
     static final String[][] JDK_SHIMS = {
@@ -262,10 +267,10 @@ public final class Relocation {
         // "Not running in OSGi", for a library that asks before it takes its
         // class path route. These four types and no more: nothing here is an
         // OSGi framework.
-        {"org/osgi/framework/FrameworkUtil", JDK_PACKAGE + "osgi/FrameworkUtil"},
-        {"org/osgi/framework/Bundle", JDK_PACKAGE + "osgi/Bundle"},
-        {"org/osgi/framework/BundleContext", JDK_PACKAGE + "osgi/BundleContext"},
-        {"org/osgi/framework/ServiceReference", JDK_PACKAGE + "osgi/ServiceReference"},
+        {"org/osgi/framework/FrameworkUtil", OSGI_PACKAGE + "FrameworkUtil"},
+        {"org/osgi/framework/Bundle", OSGI_PACKAGE + "Bundle"},
+        {"org/osgi/framework/BundleContext", OSGI_PACKAGE + "BundleContext"},
+        {"org/osgi/framework/ServiceReference", OSGI_PACKAGE + "ServiceReference"},
     };
 
     private final String name;

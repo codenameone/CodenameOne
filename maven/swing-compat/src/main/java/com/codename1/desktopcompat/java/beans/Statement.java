@@ -22,7 +22,7 @@
  */
 package com.codename1.desktopcompat.java.beans;
 
-import com.codename1.compat.jdk.LinkOnly;
+import com.codename1.annotations.LinkOnly;
 
 /// One method call on one object, held as data: `target.methodName(args)`.
 ///

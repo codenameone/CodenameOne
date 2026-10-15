@@ -20,18 +20,9 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.compat.jdk.osgi;
+package com.codename1.impl.compat.osgi;
 
-/// `org.osgi.framework.FrameworkUtil`, outside any framework: see the
-/// package description. Only [#getBundle(Class)] is here.
-public final class FrameworkUtil {
-
-    private FrameworkUtil() {
-    }
-
-    /// Null, for every class: no class of the application was loaded by an
-    /// OSGi bundle, which is how the real method says "not running in OSGi".
-    public static Bundle getBundle(Class<?> classFromBundle) {
-        return null;
-    }
+/// `org.osgi.framework.ServiceReference`, as a type only. Nothing implements
+/// it: see the package description.
+public interface ServiceReference<S> {
 }

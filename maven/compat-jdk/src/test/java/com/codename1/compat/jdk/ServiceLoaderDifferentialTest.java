@@ -430,6 +430,5 @@ public class ServiceLoaderDifferentialTest {
         } catch (NullPointerException expected) {
             // Calling getModule() on a null reference.
         }
-        assertEquals(null, com.codename1.compat.jdk.osgi.FrameworkUtil.getBundle(Greeter.class));
     }
 }
