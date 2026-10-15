@@ -505,17 +505,52 @@ public final class FirstBuildTelemetry {
         return v.matches("\\d{1,3}") ? v : "unknown";
     }
 
+    /// The target of a run that opens the simulator rather than building anything.
+    public static final String SIMULATOR_TARGET = "simulator";
+
+    /// The target of a run that starts the app as a desktop program.
+    public static final String DESKTOP_TARGET = "desktop";
+
     /// What is being built, as one short token: the build target when one was asked
     /// for (`android-device`, `javascript`, `local-javascript`, ...), otherwise the
-    /// first goal or task the developer ran (`run`, `package`, ...).
+    /// first goal or task the developer ran (`package`, `install`, ...).
     public static String target(String buildTarget, Iterable<String> goalsOrTasks) {
+        return target(buildTarget, goalsOrTasks, null);
+    }
+
+    /// As [#target(String, Iterable)], but a run of the simulator or of the desktop app
+    /// is named for what it is -- [#SIMULATOR_TARGET], [#DESKTOP_TARGET] -- not for the
+    /// goal that starts it. The project's own scripts and IDE configurations open the
+    /// simulator with `mvn verify -Psimulator`, so by its goal it is a `verify`, the
+    /// same as a build. And a simulator session ends when the developer closes the
+    /// window, often from the IDE's Stop button, which reports it as interrupted: by
+    /// its goal it would look like a build that never finishes.
+    ///
+    /// @param activeProfiles the Maven profiles asked for with `-P`; null for Gradle
+    public static String target(String buildTarget, Iterable<String> goalsOrTasks, Iterable<String> activeProfiles) {
         if (!isBlank(buildTarget)) {
             return token(buildTarget);
+        }
+        if (activeProfiles != null) {
+            for (String p : activeProfiles) {
+                String id = p == null ? "" : p.trim();
+                if ("simulator".equals(id) || "debug-simulator".equals(id)) {
+                    return SIMULATOR_TARGET;
+                }
+                if ("run-desktop".equals(id)) {
+                    return DESKTOP_TARGET;
+                }
+            }
         }
         if (goalsOrTasks != null) {
             for (String g : goalsOrTasks) {
                 if (!isBlank(g)) {
                     String last = g.substring(g.lastIndexOf(':') + 1);
+                    // cn1:run / cn1:debug (Maven) and run / debug (Gradle) are the
+                    // simulator, plainly or waiting for a debugger.
+                    if ("run".equals(last) || "debug".equals(last)) {
+                        return SIMULATOR_TARGET;
+                    }
                     return token(last);
                 }
             }

@@ -106,9 +106,25 @@ class FirstBuildTelemetryTest {
     }
 
     @Test
+    void aSimulatorOrDesktopRunIsNamedForWhatItIs() {
+        // run.sh simulator, and the IDE configurations generated with the project
+        assertEquals("simulator", FirstBuildTelemetry.target(null, Arrays.asList("verify"), Arrays.asList("simulator")));
+        assertEquals("simulator", FirstBuildTelemetry.target(null, Arrays.asList("verify"), Arrays.asList("debug-simulator")));
+        assertEquals("desktop", FirstBuildTelemetry.target(null, Arrays.asList("verify"), Arrays.asList("run-desktop")));
+        // Gradle's simulator tasks
+        assertEquals("simulator", FirstBuildTelemetry.target(null, Arrays.asList(":run"), null));
+        assertEquals("simulator", FirstBuildTelemetry.target(null, Arrays.asList("debug"), null));
+        // Neither is a cloud build, which names its target and wins
+        assertEquals("android-device", FirstBuildTelemetry.target("android-device", Arrays.asList("package"),
+                Arrays.asList("simulator")));
+        // Other profiles leave the goal as the target
+        assertEquals("verify", FirstBuildTelemetry.target(null, Arrays.asList("verify"), Arrays.asList("ios-debug")));
+    }
+
+    @Test
     void theTargetIsTheBuildTargetOrTheFirstGoal() {
         assertEquals("android-device", FirstBuildTelemetry.target("android-device", Arrays.asList("package")));
-        assertEquals("run", FirstBuildTelemetry.target(null, Arrays.asList("cn1:run", "package")));
+        assertEquals("simulator", FirstBuildTelemetry.target(null, Arrays.asList("cn1:run", "package")));
         assertEquals("package", FirstBuildTelemetry.target("", Arrays.asList("package")));
         assertNull(FirstBuildTelemetry.target(null, null));
         assertEquals("bad_target_", FirstBuildTelemetry.token("Bad Target!"));

@@ -89,6 +89,9 @@ public class CN1RunMojo extends AbstractCN1Mojo {
         }
         request.setProperties(props);
         request.setBaseDirectory(rootMavenProjectDir);
+        // This build is already reported, as the simulator, for as long as the nested
+        // one runs; the nested build would report the same session a second time.
+        request.addShellEnvironment(com.codename1.build.FirstBuildTelemetry.LAUNCHER_ENV, "1");
 
         Invoker invoker = new DefaultInvoker();
         try {

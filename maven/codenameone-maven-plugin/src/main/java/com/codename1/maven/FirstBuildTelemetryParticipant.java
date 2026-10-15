@@ -74,7 +74,9 @@ public class FirstBuildTelemetryParticipant extends AbstractMavenLifecyclePartic
                 return;
             }
             FirstBuildTelemetry t = FirstBuildTelemetry.start(endpoint, project,
-                    FirstBuildTelemetry.target(buildTarget, goals), System.getenv(), System.getProperties());
+                    FirstBuildTelemetry.target(buildTarget, goals,
+                            session.getRequest() == null ? null : session.getRequest().getActiveProfiles()),
+                    System.getenv(), System.getProperties());
             if (t == null) {
                 return;
             }
