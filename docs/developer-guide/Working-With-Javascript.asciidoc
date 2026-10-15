@@ -637,9 +637,9 @@ NOTE: The `javascript.manifest.related_applications` build hint expects a JSON f
 
 ParparVM JavaScript application builds generate `manifest.json`, home-screen icons, and `sw.js` automatically. No PWA enablement hint is required. Deploy the complete bundle over HTTPS (or localhost for testing), including its subdirectories. Relative manifest and asset URLs allow deployment under a path such as `/cn1test/`.
 
-The service worker caches the generated application files, including the runtime, translated JavaScript chunks, themes and bundled resources. Wait for its first installation to finish while online before testing offline launch. API responses, proxy requests and external resources are not included; application features that need those services still require a connection.
+The service worker caches the generated application files, including the runtime, translated JavaScript chunks, themes and bundled resources. Wait for its first installation to finish while online before testing offline launch. API responses, proxy requests and external resources aren't included; application features that need those services still require a connection.
 
-A content change creates a new cache even when the application version is unchanged. An update waits until the previous app's tabs/windows close before activating, so a running app does not mix runtime and resource versions. Each deployment path has its own cache. Keep `sw.js` revalidatable and deploy the files together.
+A content change creates a new cache even when the application version is unchanged. An update waits until the previous app's tabs/windows close before activating, so a running app doesn't mix runtime and resource versions. Each deployment path has its own cache. Allow browsers to revalidate `sw.js` and deploy the files together.
 
 ==== Related applications
 
@@ -651,7 +651,7 @@ NOTE: According to the https://developer.mozilla.org/en-US/docs/Web/Manifest[app
 
 ==== Device/Browser support for PWAs
 
-Installation controls vary by browser. Chrome on Android and Chromium browsers on desktop can install a web app from its manifest. On iOS and iPadOS, use Safari's Share menu and choose `Add to Home Screen`. Home Screen web apps support offline service workers; https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/[Web Push is available starting with iOS and iPadOS 16.4]. Browser support does not by itself configure an application's push provider or permissions.
+Installation controls vary by browser. Chrome on Android and Chromium browsers on desktop can install a web app from its manifest. On iOS and iPadOS, use Safari's Share menu and choose `Add to Home Screen`. Home Screen web apps support offline service workers; https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/[Web Push is available starting with iOS and iPadOS 16.4]. Browser support doesn't by itself configure an application's push provider or permissions.
 
 On the desktop, Chrome provides an analogous feature to "add to your homescreen": `Add to shelf`. If it looks like the user is using the app on a regular basis, and it isn't yet installed, it will show a banner at the top of the page asking the user if they want to add to their shelf.
 

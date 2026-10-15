@@ -29,6 +29,17 @@
     var assets = new Set(self.cn1Pwa.assets.map(function (path) {
         return new URL(path, self.registration.scope).href;
     }));
+    var shell = new URL('index.html', self.registration.scope);
+    var startRoute;
+    try {
+        startRoute = new URL(self.cn1Pwa.startUrl || 'index.html', self.registration.scope);
+        startRoute.search = '';
+        startRoute.hash = '';
+        if (startRoute.origin !== shell.origin ||
+                !startRoute.pathname.startsWith(new URL(self.registration.scope).pathname)) {
+            startRoute = null;
+        }
+    } catch (_) { startRoute = null; }
     self.addEventListener('install', function (event) {
         event.waitUntil(caches.open(cacheName).then(function (cache) {
             return cache.addAll(Array.from(assets).map(function (url) {
@@ -50,7 +61,11 @@
         // copy of the shell. Never intercept unknown URLs, APIs or proxy traffic.
         if (event.request.mode === 'navigate') {
             url.search = '';
-            if (url.href === self.registration.scope) url = new URL('index.html', url);
+            url.hash = '';
+            if (url.href === self.registration.scope ||
+                    (!assets.has(url.href) && startRoute && url.href === startRoute.href)) {
+                url = shell;
+            }
         }
         if (!assets.has(url.href)) return;
         event.respondWith(caches.open(cacheName).then(function (cache) {

@@ -69,6 +69,7 @@ class JavaScriptPwaTest {
         assertEquals("standalone", manifest.get("display"));
         assertEquals("./index.html", manifest.get("start_url"));
         assertEquals("./", manifest.get("scope"));
+        assertFalse(manifest.containsKey("orientation"), "responsive apps must not be locked to portrait");
         Set<String> sizes = new HashSet<String>();
         for (Object item : (List) manifest.get("icons")) {
             Map icon = (Map) item;
@@ -81,6 +82,17 @@ class JavaScriptPwaTest {
         assertTrue(html.contains("rel=\"manifest\" href=\"manifest.json\""));
         assertTrue(html.contains("apple-touch-icon"));
         assertTrue(html.contains("src=\"cn1-pwa.js\""));
+    }
+
+    @Test void orientationHintsAreExplicitAndManifestOverridesLegacy() throws Exception {
+        File app = bundle();
+        BuildRequest request = request();
+        request.putArgument("javascript.orientation", "portrait-primary");
+        JavaScriptPwa.write(app, request);
+        assertEquals("portrait-primary", parse(new File(app, "manifest.json")).get("orientation"));
+        request.putArgument("javascript.manifest.orientation", "landscape");
+        JavaScriptPwa.write(app, request);
+        assertEquals("landscape", parse(new File(app, "manifest.json")).get("orientation"));
     }
 
     @Test void preservesHintsAndStructuredManifestValues() throws Exception {
@@ -125,6 +137,7 @@ class JavaScriptPwaTest {
     @Test void proxyDisabledAndPackagedBuildsBothContainPwa() throws Exception {
         File app = bundle();
         BuildRequest request = request();
+        request.putArgument("javascript.manifest.start_url", "./dashboard?installed=1");
         request.putArgument("javascript.inject_proxy", "false");
         assertNull(JavaScriptProxyPackager.packageProxy(app, temp.toFile(), "App", request, message -> {}));
         assertEquals("standalone", parse(new File(app, "manifest.json")).get("display"));
@@ -136,6 +149,7 @@ class JavaScriptPwaTest {
             assertNotNull(archive.getEntry("public/sw.js"));
             assertNotNull(archive.getEntry("public/_icons/icon-512.png"));
         }
+        assertTrue(read(new File(app, "sw.js")).contains("./dashboard?installed=1"));
         // Optional local browser proof uses the real packaged output from this test.
         String fixture = System.getProperty("cn1.pwa.fixture");
         if (fixture != null) {

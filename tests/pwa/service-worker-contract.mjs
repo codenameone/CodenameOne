@@ -13,7 +13,7 @@ const context = {
     URL, Set, Request, Promise, encodeURIComponent,
     self: {
         registration: {scope},
-        cn1Pwa: {version:'new', assets:['index.html', 'worker.js', 'translated_app_1.js', 'assets/font%20name.ttf']},
+        cn1Pwa: {version:'new', startUrl:'./dashboard?installed=1#section', assets:['index.html', 'worker.js', 'translated_app_1.js', 'assets/font%20name.ttf']},
         clients: {claim:async () => { claimed = true; }},
         addEventListener: (name, handler) => handlers.set(name, handler),
         skipWaiting: () => assert.fail('must not replace the worker of an open app')
@@ -54,8 +54,20 @@ async function cached(url, mode = 'cors', method = 'GET') {
 assert.equal((await cached(scope+'?installed=1', 'navigate')).cached, scope+'index.html');
 assert.equal((await cached(scope+'index.html?installed=1', 'navigate')).cached, scope+'index.html');
 assert.equal((await cached(scope+'translated_app_1.js')).cached, scope+'translated_app_1.js');
+assert.equal((await cached(scope+'dashboard?installed=1', 'navigate')).cached, scope+'index.html');
+assert.equal(await cached(scope+'dashboard'), null, 'only navigations get the configured shell');
+assert.equal(await cached(scope+'unrelated', 'navigate'), null, 'unknown routes still reach the server');
 for (const url of [scope+'api/private', scope+'cn1-cors-proxy?_target=x', 'https://example.com/other/', 'https://cdn.example.com/file.js', scope+'worker.js?dynamic=1']) {
     assert.equal(await cached(url), null, url);
 }
 assert.equal(await cached(scope+'index.html', 'cors', 'POST'), null);
+context.self.cn1Pwa.startUrl = 'https://elsewhere.example/dashboard';
+vm.runInNewContext(source, context);
+assert.equal(await cached('https://elsewhere.example/dashboard', 'navigate'), null);
+context.self.cn1Pwa.startUrl = '/outside/dashboard';
+vm.runInNewContext(source, context);
+assert.equal(await cached('https://example.com/outside/dashboard', 'navigate'), null);
+context.self.cn1Pwa.startUrl = './worker.js';
+vm.runInNewContext(source, context);
+assert.equal((await cached(scope+'worker.js', 'navigate')).cached, scope+'worker.js', 'existing files keep their own content');
 console.log('PASS: atomic precache, waiting updates, scope isolation, navigation queries and API exclusion');

@@ -22,8 +22,9 @@
  */
 package com.codename1.builders;
 
-import com.codename1.io.JSONParser;
-import com.codename1.processing.Result;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.json.JSONTokener;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
@@ -56,7 +57,8 @@ final class JavaScriptPwa {
         manifest.put("scope", "./");
         manifest.put("background_color", request.getArg("javascript.background_color", "#ffffff"));
         manifest.put("theme_color", request.getArg("javascript.theme_color", "#2367f1"));
-        manifest.put("orientation", request.getArg("javascript.orientation", "portrait-primary"));
+        String orientation = request.getArg("javascript.orientation", null);
+        if (orientation != null) manifest.put("orientation", orientation);
         if (request.getArg("gcm.sender_id", null) != null) {
             manifest.put("gcm_sender_id", request.getArg("gcm.sender_id", ""));
         }
@@ -110,7 +112,7 @@ final class JavaScriptPwa {
         if (!related.isEmpty() && !manifest.containsKey("related_applications")) {
             manifest.put("related_applications", new ArrayList<Map<String, String>>(related.values()));
         }
-        write(new File(app, "manifest.json"), Result.fromContent(manifest).toString());
+        write(new File(app, "manifest.json"), json(manifest));
         File page = new File(app, "index.html");
         String html = read(page);
         if (!html.contains(HEAD)) html = html.replace("</head>", HEAD + "</head>");
@@ -152,7 +154,8 @@ final class JavaScriptPwa {
         Map<String, Object> config = new LinkedHashMap<String, Object>();
         config.put("version", version.toString());
         config.put("assets", urls);
-        write(worker, push + MARKER + "self.cn1Pwa = " + Result.fromContent(config).toString() + ";\n" + cacheWorker);
+        config.put("startUrl", manifest.get("start_url"));
+        write(worker, push + MARKER + "self.cn1Pwa = " + json(config) + ";\n" + cacheWorker);
     }
 
     private static Object manifestValue(String field, String value) throws IOException {
@@ -163,11 +166,26 @@ final class JavaScriptPwa {
         String trimmed = value.trim();
         if ("true".equals(trimmed) || "false".equals(trimmed)) return Boolean.valueOf(trimmed);
         if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
-            JSONParser parser = new JSONParser();
-            parser.setUseBooleanInstance(true);
-            return parser.parseJSON(new StringReader("{\"value\":" + trimmed + "}")).get("value");
+            try {
+                JSONTokener tokens = new JSONTokener(trimmed);
+                Object parsed = tokens.nextValue();
+                if (tokens.nextClean() != 0) throw new JSONException("Trailing content");
+                return parsed;
+            } catch (JSONException invalid) {
+                throw new IOException("Invalid JSON in javascript.manifest." + field, invalid);
+            }
         }
         return value;
+    }
+
+    // org.json is already part of the daemon's JavaPNS runtime. Do not use the
+    // Codename One UI runtime here: the production daemon's classpath omits it.
+    private static String json(Map<String, Object> value) throws IOException {
+        try {
+            return new JSONObject(value).toString(2);
+        } catch (JSONException invalid) {
+            throw new IOException("Cannot encode PWA metadata", invalid);
+        }
     }
 
     private static void collect(File dir, List<File> files) throws IOException {

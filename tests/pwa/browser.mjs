@@ -14,7 +14,8 @@ const server = http.createServer(async (req, res) => {
         const url = new URL(req.url, 'http://localhost');
         const prefix = url.pathname.startsWith('/second/') ? '/second/' : '/cn1test/';
         if (!url.pathname.startsWith(prefix)) { res.writeHead(404).end(); return; }
-        const relative = decodeURIComponent(url.pathname.slice(prefix.length)) || 'index.html';
+        let relative = decodeURIComponent(url.pathname.slice(prefix.length)) || 'index.html';
+        if (relative === 'dashboard') relative = 'index.html';
         if (relative.split('/').includes('..')) { res.writeHead(400).end(); return; }
         let body = await fs.readFile(path.join(fixture, relative));
         if (version === 2 && prefix === '/cn1test/') {
@@ -35,7 +36,7 @@ const waitForControl = async page => {
 };
 try {
     const page = await context.newPage();
-    await page.goto(origin + '/cn1test/');
+    await page.goto(origin + '/cn1test/dashboard?installed=1');
     await waitForControl(page);
     const cdp = await context.newCDPSession(page);
     const manifest = await cdp.send('Page.getAppManifest');
@@ -50,6 +51,8 @@ try {
     await context.setOffline(true);
     await page.reload();
     await page.goto(origin + '/cn1test/index.html?installed=1');
+    await page.goto(origin + '/cn1test/dashboard?installed=1');
+    await page.reload();
     for (const resource of ['worker.js', 'translated_app.js', 'translated_app_1.js', 'assets/theme.res', 'assets/font%20with%20spaces.ttf']) {
         assert.equal(await page.evaluate(async name => (await fetch(name)).status, resource), 200, resource);
     }
