@@ -161,7 +161,8 @@ BOOL cn1WinChromeMessage(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, LRESULT* res
         return TRUE;
     }
     if (msg == WM_SETTINGCHANGE || msg == WM_THEMECHANGED) cn1ChromeAppearance(hwnd);
-    if (msg == WM_ACTIVATE || msg == WM_DWMCOMPOSITIONCHANGED) {
+    // DWM margins are physical pixels and must follow the new monitor DPI too.
+    if (msg == WM_ACTIVATE || msg == WM_DWMCOMPOSITIONCHANGED || msg == WM_DPICHANGED) {
         MARGINS margins = {0, 0, cn1ChromeMetric(hwnd, SM_CYCAPTION) + cn1ChromeMetric(hwnd, SM_CYSIZEFRAME), 0};
         DwmExtendFrameIntoClientArea(hwnd, &margins);
     }

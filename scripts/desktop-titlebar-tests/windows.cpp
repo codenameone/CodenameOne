@@ -23,7 +23,19 @@
 
 
 
+#include "cn1_windows.h"
+#include <dwmapi.h>
+static int marginUpdates;
+static MARGINS lastMargins;
+static HRESULT WINAPI recordFrameMargins(HWND window, const MARGINS* margins) {
+    marginUpdates++;
+    lastMargins = *margins;
+    return DwmExtendFrameIntoClientArea(window, margins);
+}
+// Observe the real DWM call while retaining its native implementation.
+#define DwmExtendFrameIntoClientArea recordFrameMargins
 #include "cn1_windows_chrome.cpp"
+#undef DwmExtendFrameIntoClientArea
 #include <assert.h>
 #include <stdio.h>
 extern "C" {
@@ -85,6 +97,20 @@ int main(void) {
     SendMessageW(window, WM_CN1_CHROME_REGIONS, 8, (LPARAM)regions);
     cn1ChromeEnabled = TRUE;
     SetWindowPos(window, NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+    int beforeDpi = marginUpdates;
+    RECT suggested;
+    GetWindowRect(window, &suggested);
+    LRESULT result = 0;
+    UINT dpi = cn1ChromeDpi(window);
+    // Processing the chrome message must refresh DWM and leave the event for
+    // the outer window proc to resize the HWND and publish the Java DPI event.
+    assert(!cn1WinChromeMessage(window, WM_DPICHANGED, MAKELONG(dpi, dpi),
+            (LPARAM)&suggested, &result));
+    assert(marginUpdates == beforeDpi + 1);
+    assert(lastMargins.cyTopHeight == cn1ChromeMetric(window, SM_CYCAPTION)
+            + cn1ChromeMetric(window, SM_CYSIZEFRAME));
+    assert(lastMargins.cxLeftWidth == 0 && lastMargins.cxRightWidth == 0
+            && lastMargins.cyBottomHeight == 0);
     assert(hit(window, 30, 25) == HTCLIENT);
     assert(hit(window, 200, 25) == HTCAPTION);
     assert(hit(window, 200, 100) == HTCLIENT);
@@ -107,6 +133,10 @@ int main(void) {
     SendMessageW(window, WM_CN1_CHROME_REGIONS, 0, 0);
     assert(!cn1ChromeEnabled);
     assert(!cn1ChromeRegions);
+    beforeDpi = marginUpdates;
+    assert(!cn1WinChromeMessage(window, WM_DPICHANGED, MAKELONG(dpi, dpi),
+            (LPARAM)&suggested, &result));
+    assert(marginUpdates == beforeDpi); // native-frame mode needs no custom margin
     SendMessageW(window, WM_CLOSE, 0, 0);
     assert(!IsWindow(window));
     puts("WINDOWS_TITLEBAR_OK");

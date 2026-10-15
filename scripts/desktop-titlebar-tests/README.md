@@ -28,7 +28,8 @@ directory. No Maven repository is used by these harnesses.
   X11 validation; acceptance under a Wayland compositor remains separate.
 * **Windows:** requires Clang, an x86_64 MinGW sysroot/linker, and Wine. Compiles
   the production chrome, window, and menu sources. Checks hit testing, system
-  commands, resizing regions, and the native-frame fallback. Use `--build-only`
+  commands, resizing regions, DWM margin refresh on DPI changes with event
+  fallthrough, and the native-frame fallback. Use `--build-only`
   to copy the executable to a separate Windows/Wine environment. Wine without
   DWM cannot verify caption rendering or Windows 11 Snap hover behavior; the
   executable prints this limitation explicitly. Test these on Windows with
