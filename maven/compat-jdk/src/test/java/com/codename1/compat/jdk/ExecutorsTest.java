@@ -374,6 +374,69 @@ public class ExecutorsTest {
         assertFalse(once.isCancelled());
     }
 
+    /// An action of `whenComplete` that fails on a stage that failed: the
+    /// stage's own failure stays the one reported, and since JDK 9 the
+    /// action's rides along suppressed in it rather than being lost.
+    @Test
+    public void whenCompleteKeepsAFailingActionAsSuppressed() throws Exception {
+        final RuntimeException source = new RuntimeException("source");
+        final IllegalStateException action = new IllegalStateException("action");
+        CompletableFuture<String> f = new CompletableFuture<String>();
+        CompletableFuture<String> g = f.whenComplete(new java.util.function.BiConsumer<String, Throwable>() {
+            @Override
+            public void accept(String value, Throwable failure) {
+                throw action;
+            }
+        });
+        f.completeExceptionally(source);
+        try {
+            g.join();
+            fail("the stage completed normally");
+        } catch (CompletionException e) {
+            assertSame(source, e.getCause());
+            assertEquals(Arrays.asList(action), Arrays.asList(source.getSuppressed()));
+        }
+
+        // An action that rethrows the very failure it was given adds nothing.
+        CompletableFuture<String> h = new CompletableFuture<String>();
+        CompletableFuture<String> k = h.whenComplete(new java.util.function.BiConsumer<String, Throwable>() {
+            @Override
+            public void accept(String value, Throwable failure) {
+                throw (RuntimeException) failure;
+            }
+        });
+        final RuntimeException same = new RuntimeException("same");
+        h.completeExceptionally(same);
+        assertTrue(k.isCompletedExceptionally());
+        assertEquals(0, same.getSuppressed().length);
+    }
+
+    /// A dropped task's future never completes, so nothing ever took it out
+    /// of the pool's own list: a pool kept after `shutdownNow()` held every
+    /// dropped task, and whatever its work held, for good.
+    @Test
+    public void shutdownNowLetsGoOfTheWorkItDrops() throws Exception {
+        ScheduledExecutorService pool = Executors.newScheduledThreadPool(1);
+        java.lang.ref.WeakReference<Object> payload = scheduleHolding(pool);
+        assertEquals(1, pool.shutdownNow().size());
+        assertTrue(pool.awaitTermination(10, TimeUnit.SECONDS));
+        assertTrue("the pool still holds a task it dropped", collected(payload));
+        // The pool itself is still reachable here, which is the point.
+        assertTrue(pool.isShutdown());
+    }
+
+    private static java.lang.ref.WeakReference<Object> scheduleHolding(ScheduledExecutorService pool) {
+        final Object held = new byte[1 << 16];
+        ScheduledFuture<Object> future = pool.schedule(new Callable<Object>() {
+            @Override
+            public Object call() {
+                return held;
+            }
+        }, 1, TimeUnit.HOURS);
+        assertFalse(future.isDone());
+        return new java.lang.ref.WeakReference<Object>(held);
+    }
+
     private static boolean collected(java.lang.ref.WeakReference<?> ref) throws Exception {
         for (int i = 0; i < 100 && ref.get() != null; i++) {
             System.gc();
@@ -579,6 +642,71 @@ public class ExecutorsTest {
         ab.clear();
         assertEquals("y", ab.get("c", "y"));
         assertEquals(0, a.keys().length);
+    }
+
+    /// `removeNode` removes the subtree, not just the node's own keys, and
+    /// leaves every instance for a removed node throwing, as the JDK does;
+    /// the root cannot be removed at all. Each expectation below is what
+    /// `java.util.prefs` answers on JDK 8 and 17.
+    @Test
+    public void removeNodeRemovesTheWholeSubtree() throws Exception {
+        try {
+            Preferences.userRoot().removeNode();
+            fail("the root was removed");
+        } catch (UnsupportedOperationException expected) {
+            // As the JDK: "Can't remove the root!"
+        }
+        Preferences root = Preferences.userRoot();
+        Preferences a = root.node("/cn1/test/remove/a");
+        Preferences b = a.node("b");
+        a.put("k", "v");
+        b.put("x", "y");
+        Preferences.userRoot().node("/cn1/test/remove/keep").put("z", "w");
+        Preferences top = root.node("/cn1/test/remove");
+        assertEquals(Arrays.asList("a", "keep"), Arrays.asList(top.childrenNames()));
+        assertTrue(root.nodeExists("/cn1/test/remove/a/b"));
+
+        Preferences doomed = root.node("/cn1/test/remove/a");
+        doomed.removeNode();
+        // The instance removed, another one made before for the same node,
+        // and one for a node below it: all of them are gone.
+        for (Preferences gone : new Preferences[] {doomed, a, b}) {
+            try {
+                gone.get("k", "d");
+                fail("a removed node answered get");
+            } catch (IllegalStateException expected) {
+                // As the JDK: "Node has been removed."
+            }
+            try {
+                gone.put("k", "d");
+                fail("a removed node took put");
+            } catch (IllegalStateException expected) {
+                // As the JDK.
+            }
+            assertFalse(gone.nodeExists(""));
+        }
+        try {
+            doomed.removeNode();
+            fail("a node was removed twice");
+        } catch (IllegalStateException expected) {
+            // As the JDK: "Node already removed."
+        }
+        assertEquals("a", doomed.name());
+        assertEquals("/cn1/test/remove/a", doomed.absolutePath());
+
+        assertFalse(root.nodeExists("/cn1/test/remove/a"));
+        assertFalse(root.nodeExists("/cn1/test/remove/a/b"));
+        assertEquals(Arrays.asList("keep"), Arrays.asList(top.childrenNames()));
+        assertEquals("w", root.node("/cn1/test/remove/keep").get("z", null));
+        // Asked for again, the node is a new and empty one, descendants too.
+        Preferences fresh = root.node("/cn1/test/remove/a");
+        assertEquals("gone", fresh.get("k", "gone"));
+        assertEquals("gone", fresh.node("b").get("x", "gone"));
+        assertEquals(0, fresh.node("b").keys().length);
+        fresh.put("k", "again");
+        assertEquals("again", root.node("/cn1/test/remove/a").get("k", null));
+        top.removeNode();
+        assertFalse(root.nodeExists("/cn1/test/remove"));
     }
 
     /// Desktop code sets properties from its workers; the JDK's table takes

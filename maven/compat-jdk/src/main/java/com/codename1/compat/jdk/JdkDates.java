@@ -688,28 +688,56 @@ public final class JdkDates {
         return plusYears(value, -years);
     }
 
+    /// `ZonedDateTime.plusSeconds(long)`. A sum that does not fit a long is
+    /// far outside the date-time range, which the JDK reports as a
+    /// `DateTimeException` (its `LocalDate.plusDays` range check) rather
+    /// than the `ArithmeticException` or the silent wrap of plain addition.
     public static ZonedDateTime plusSeconds(ZonedDateTime value, long seconds) {
-        return ZonedDateTime.ofInstant(value.toInstant().plusSeconds(seconds), value.getZone());
+        Instant at = value.toInstant();
+        long epoch = at.getEpochSecond();
+        long sum = epoch + seconds;
+        if (((epoch ^ sum) & (seconds ^ sum)) < 0) {
+            throw outOfRange();
+        }
+        return ZonedDateTime.ofInstant(Instant.ofEpochSecond(sum, at.getNano()), value.getZone());
     }
 
     public static ZonedDateTime minusSeconds(ZonedDateTime value, long seconds) {
+        if (seconds == Long.MIN_VALUE) {
+            // -Long.MIN_VALUE is itself; no instant is that far away anyway.
+            throw outOfRange();
+        }
         return plusSeconds(value, -seconds);
     }
 
     public static ZonedDateTime plusMinutes(ZonedDateTime value, long minutes) {
-        return plusSeconds(value, minutes * 60);
+        return plusSeconds(value, unitSeconds(minutes, 60));
     }
 
     public static ZonedDateTime minusMinutes(ZonedDateTime value, long minutes) {
-        return plusSeconds(value, -minutes * 60);
+        // A whole multiple of 60 is never Long.MIN_VALUE, so it negates.
+        return plusSeconds(value, -unitSeconds(minutes, 60));
     }
 
     public static ZonedDateTime plusHours(ZonedDateTime value, long hours) {
-        return plusSeconds(value, hours * 3600);
+        return plusSeconds(value, unitSeconds(hours, 3600));
     }
 
     public static ZonedDateTime minusHours(ZonedDateTime value, long hours) {
-        return plusSeconds(value, -hours * 3600);
+        return plusSeconds(value, -unitSeconds(hours, 3600));
+    }
+
+    /// `amount` units of `perUnit` seconds each, refused as out of range
+    /// when the product does not fit a long instead of wrapping around.
+    private static long unitSeconds(long amount, long perUnit) {
+        if (amount > Long.MAX_VALUE / perUnit || amount < -(Long.MAX_VALUE / perUnit)) {
+            throw outOfRange();
+        }
+        return amount * perUnit;
+    }
+
+    private static DateTimeException outOfRange() {
+        return new DateTimeException("Instant exceeds minimum or maximum instant");
     }
 
     /// `ZonedDateTime.isBefore(ChronoZonedDateTime)`.
@@ -970,7 +998,7 @@ public final class JdkDates {
             long per = NANOS_PER_SECOND / u.nanos();
             return duration(amount / per, amount % per * u.nanos());
         }
-        return Duration.ofSeconds(amount * u.seconds());
+        return Duration.ofSeconds(multiplyExact(amount, u.seconds()));
     }
 
     public static long toDays(Duration d) {

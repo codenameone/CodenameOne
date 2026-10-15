@@ -378,7 +378,13 @@ final class ScheduledPool implements ScheduledExecutorService {
         shutdown.set(true);
         stopped.set(true);
         List<Runnable> dropped = new ArrayList<Runnable>(pool.shutdownNow());
-        for (Scheduled<?> task : live.get()) {
+        // Taken out of `live` here: a dropped task's future never completes,
+        // so the forget() its completion would run never comes, and the
+        // pool would hold every dropped task (and what its work holds) for
+        // as long as the pool itself is reachable. Nothing reads `live`
+        // after this -- `stopped` is set, so stopWhenIdle() is done with it
+        // -- and a task still running forgets itself into an empty array.
+        for (Scheduled<?> task : live.getAndSet(NONE)) {
             task.disarm();
             if (!task.outcome.isDone() && !task.running.get()) {
                 dropped.add(task);

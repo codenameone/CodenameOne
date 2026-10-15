@@ -23,6 +23,8 @@
 package javafx.scene;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -36,6 +38,7 @@ import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.ReadOnlyBooleanWrapper;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
+import javafx.collections.ModifiableObservableListBase;
 import javafx.collections.ObservableList;
 import javafx.geometry.BoundingBox;
 import javafx.geometry.Bounds;
@@ -51,7 +54,7 @@ import javafx.geometry.Bounds;
 /// bounds are the union of its children's bounds.
 public abstract class Parent extends Node {
 
-    private final ObservableList<Node> children = FXCollections.observableArrayList();
+    private final ObservableList<Node> children = new Children(this);
     private final ObservableList<Node> unmodifiableChildren = FXCollections.unmodifiableObservableList(children);
     private ObservableList<String> stylesheets;
     private final ReadOnlyBooleanWrapper needsLayout = new ReadOnlyBooleanWrapper(this, "needsLayout", true);
@@ -84,28 +87,17 @@ public abstract class Parent extends Node {
                     n.setSceneInternal(null);
                 }
             }
+            // Every added node was checked by Children.validate before the
+            // list changed; what is left here is moving it in.
             List<? extends Node> added = change.getAddedSubList();
             for (int i = 0; i < added.size(); i++) {
                 Node n = added.get(i);
-                if (n == null) {
-                    throw new NullPointerException("A child must not be null");
-                }
                 Parent old = n.getParent();
                 if (old == this) {
-                    if (children.indexOf(n) != children.lastIndexOf(n)) {
-                        throw new IllegalArgumentException("Duplicate child added: " + n);
-                    }
                     continue;
-                }
-                for (Node up = this; up != null; up = up.getParent()) {
-                    if (up == n) {
-                        throw new IllegalArgumentException("A node cannot be its own ancestor: " + n);
-                    }
                 }
                 if (old != null) {
                     old.children.remove(n);
-                } else if (n.getScene() != null && n.getScene().getRoot() == n) {
-                    throw new IllegalArgumentException("The root of a scene cannot be added as a child: " + n);
                 }
                 n.setParentInternal(this);
                 n.setSceneInternal(getScene());
@@ -532,5 +524,185 @@ public abstract class Parent extends Node {
             }
         }
         return super.getBaselineOffset();
+    }
+
+    /// The children list, which refuses a change before making it, as
+    /// OpenJFX's does (a `VetoableListDecorator` whose `onProposedChange`
+    /// throws): a rejected `add` leaves the list, and every node, as it
+    /// was. Checked in a change listener instead, the node had already gone
+    /// in when the exception came, and stayed.
+    ///
+    /// Every way in is covered by the four entry points that take new
+    /// nodes: `add(E)`, `addAll(E...)`, sub lists and list iterators all
+    /// end in `add(int, E)`, `set`, `addAll(int, Collection)` or `setAll`.
+    private static final class Children extends ModifiableObservableListBase<Node>
+            implements java.util.RandomAccess {
+        private final Parent owner;
+        private final ArrayList<Node> items = new ArrayList<Node>();
+        /// Above zero while a checked batch adds its nodes one at a time.
+        private int batch;
+
+        Children(Parent owner) {
+            this.owner = owner;
+        }
+
+        @Override
+        public Node get(int index) {
+            return items.get(index);
+        }
+
+        @Override
+        public int size() {
+            return items.size();
+        }
+
+        @Override
+        protected void doAdd(int index, Node element) {
+            items.add(index, element);
+        }
+
+        @Override
+        protected Node doSet(int index, Node element) {
+            return items.set(index, element);
+        }
+
+        @Override
+        protected Node doRemove(int index) {
+            return items.remove(index);
+        }
+
+        @Override
+        public void add(int index, Node element) {
+            if (batch == 0) {
+                if (index < 0 || index > items.size()) {
+                    throw new IndexOutOfBoundsException("Index: " + index + ", Size: " + items.size());
+                }
+                validate(java.util.Collections.singletonList(element), 0, 0);
+            }
+            super.add(index, element);
+        }
+
+        @Override
+        public Node set(int index, Node element) {
+            if (batch == 0) {
+                if (index < 0 || index >= items.size()) {
+                    throw new IndexOutOfBoundsException("Index: " + index + ", Size: " + items.size());
+                }
+                validate(java.util.Collections.singletonList(element), index, index + 1);
+            }
+            return super.set(index, element);
+        }
+
+        @Override
+        public boolean addAll(Collection<? extends Node> c) {
+            return addAll(items.size(), c);
+        }
+
+        @Override
+        public boolean addAll(int index, Collection<? extends Node> c) {
+            List<Node> copy = new ArrayList<Node>(c);
+            if (batch == 0) {
+                if (index < 0 || index > items.size()) {
+                    throw new IndexOutOfBoundsException("Index: " + index + ", Size: " + items.size());
+                }
+                validate(copy, 0, 0);
+            }
+            batch++;
+            try {
+                return super.addAll(index, copy);
+            } finally {
+                batch--;
+            }
+        }
+
+        @Override
+        public boolean setAll(Collection<? extends Node> col) {
+            List<Node> copy = new ArrayList<Node>(col);
+            validate(copy, 0, items.size());
+            batch++;
+            try {
+                return super.setAll(copy);
+            } finally {
+                batch--;
+            }
+        }
+
+        /// Sorts in place and reports a permutation, as the list this
+        /// replaced did. The default `List.sort` sets the elements back one
+        /// at a time, and a node set where it is still in the list
+        /// elsewhere is a duplicate the check above refuses.
+        @Override
+        public void sort(java.util.Comparator<? super Node> comparator) {
+            int count = items.size();
+            if (count < 2) {
+                return;
+            }
+            Node[] sorted = items.toArray(new Node[count]);
+            // Stable, as the list this replaced sorted. Every child is in
+            // the list once, so a node's old position is found by identity.
+            java.util.Arrays.sort(sorted, comparator);
+            java.util.IdentityHashMap<Node, Integer> was = new java.util.IdentityHashMap<Node, Integer>();
+            for (int i = 0; i < count; i++) {
+                was.put(items.get(i), Integer.valueOf(i));
+            }
+            int[] perm = new int[count];
+            boolean moved = false;
+            for (int i = 0; i < count; i++) {
+                int old = was.get(sorted[i]).intValue();
+                perm[old] = i;
+                moved |= old != i;
+            }
+            if (!moved) {
+                return;
+            }
+            beginChange();
+            try {
+                for (int i = 0; i < count; i++) {
+                    items.set(i, sorted[i]);
+                }
+                modCount++;
+                nextPermutation(0, count, perm);
+            } finally {
+                endChange();
+            }
+        }
+
+        /// Throws, as OpenJFX does, if adding `added` in place of the
+        /// children in `[removeFrom, removeTo)` would leave a null child, a
+        /// child twice, a node inside itself or the root of a scene as a
+        /// child. A node already here is one whose parent is the owner, so
+        /// only such a node is looked for in the list.
+        private void validate(List<Node> added, int removeFrom, int removeTo) {
+            Set<Node> seen = added.size() > 1 ? new HashSet<Node>() : null;
+            for (int i = 0; i < added.size(); i++) {
+                Node n = added.get(i);
+                if (n == null) {
+                    throw new NullPointerException("Children: child node is null: parent = " + owner);
+                }
+                if ((seen != null && !seen.add(n)) || (n.getParent() == owner && kept(n, removeFrom, removeTo))) {
+                    throw new IllegalArgumentException("Children: duplicate children added: parent = " + owner);
+                }
+                for (Node up = owner; up != null; up = up.getParent()) {
+                    if (up == n) {
+                        throw new IllegalArgumentException("Children: cycle detected: parent = " + owner
+                                + ", node = " + n);
+                    }
+                }
+                if (n.getParent() == null && n.getScene() != null && n.getScene().getRoot() == n) {
+                    throw new IllegalArgumentException("Children: " + n
+                            + " is already set as a root of a scene: parent = " + owner);
+                }
+            }
+        }
+
+        /// Whether `n` is in the list outside `[removeFrom, removeTo)`.
+        private boolean kept(Node n, int removeFrom, int removeTo) {
+            for (int i = 0; i < items.size(); i++) {
+                if (items.get(i) == n && (i < removeFrom || i >= removeTo)) {
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 }

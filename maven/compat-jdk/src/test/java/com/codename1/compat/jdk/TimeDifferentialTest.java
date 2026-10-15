@@ -383,6 +383,31 @@ public class TimeDifferentialTest {
         assertTrue("" + compared, compared > 1500);
     }
 
+    /// Amounts too large for the seconds they stand for. Scaling them with
+    /// plain multiplication wrapped around: `Duration.of(Long.MAX_VALUE, DAYS)`
+    /// was a small negative duration and `plusMinutes(2^62)` landed back on
+    /// the starting moment. The JDK refuses every one of them.
+    @Test
+    public void amountsThatOverflowAreRefusedAsTheJdkRefusesThem() {
+        final long[] huge = {4611686018427387904L, -4611686018427387904L, Long.MAX_VALUE, Long.MIN_VALUE,
+            Long.MAX_VALUE / 60 + 1, Long.MAX_VALUE / 3600 + 1, 153722867280912930L, 2562047788015215L,
+            31556889864403199L, -31557014167219200L, 1000000L * 365 * 24 * 3600};
+        for (final long n : huge) {
+            for (final java.time.temporal.ChronoUnit u : java.time.temporal.ChronoUnit.values()) {
+                same("of " + n + u, () -> Duration.of(n, u), () -> JdkDates.of(n, unit(u)));
+            }
+            for (final ZoneId zone : ZONES) {
+                final ZonedDateTime z = Instant.ofEpochSecond(1700000000L, 5).atZone(zone);
+                same("pmi " + z + n, () -> z.plusMinutes(n), () -> JdkDates.plusMinutes(z, n));
+                same("mmi " + z + n, () -> z.minusMinutes(n), () -> JdkDates.minusMinutes(z, n));
+                same("ph " + z + n, () -> z.plusHours(n), () -> JdkDates.plusHours(z, n));
+                same("mh " + z + n, () -> z.minusHours(n), () -> JdkDates.minusHours(z, n));
+                same("ps " + z + n, () -> z.plusSeconds(n), () -> JdkDates.plusSeconds(z, n));
+                same("ms " + z + n, () -> z.minusSeconds(n), () -> JdkDates.minusSeconds(z, n));
+            }
+        }
+    }
+
     /// A date alone and a time alone, formatted and parsed with a pattern.
     /// The device's formatter throws for both, so the stand-in hands it a
     /// date with a time; what comes out, and what is refused because the

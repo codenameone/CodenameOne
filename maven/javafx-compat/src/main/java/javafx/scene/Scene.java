@@ -134,6 +134,12 @@ public class Scene implements EventTarget {
     private final ObjectProperty<Parent> root = new ObjectPropertyBase<Parent>() {
         private Parent old;
 
+        /// Validates after the value is stored, as OpenJFX does: its
+        /// `Scene.rootProperty()` checks in `invalidated()` too (OpenJFX 23,
+        /// `Scene$8`), so a rejected `setRoot` throws and the property keeps
+        /// the rejected value there as well. Only the scene's own state --
+        /// the old root and its scene -- is left untouched, since every
+        /// check comes before it is changed.
         @Override
         protected void invalidated() {
             Parent value = get();

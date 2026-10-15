@@ -146,6 +146,8 @@ public class MessageFormatDifferentialTest {
         String[] patterns = {
             "{", "{0", "{x}", "{-1}", "{0,bogus}", "{0,number,#.#.#}", "{0}}", "}", "{ 0 }", "{0,}", "{}",
             "{0,number", "{0,choice,1#a|0#b}", "{1.5}",
+            // Ending inside a nested brace is NOT rejected by the JDK (8 through 25).
+            "{0,choice,0#{", "a{0}b{0,choice,0#{1", "x{0,choice,0#{1}", "{0,choice,0#'{'",
         };
         List<String> failures = new ArrayList<String>();
         for (String pattern : patterns) {

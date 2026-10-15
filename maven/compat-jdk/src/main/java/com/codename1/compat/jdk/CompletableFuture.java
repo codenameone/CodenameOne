@@ -746,7 +746,13 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
                     try {
                         action.accept(null, ((Failure) outcome).cause);
                     } catch (Throwable t) {
-                        // The stage keeps the failure it was told about.
+                        // The stage keeps the failure it was told about, and
+                        // since JDK 9 the action's own failure rides along as
+                        // a suppressed exception of it (JDK 8 dropped it).
+                        Throwable cause = ((Failure) outcome).cause;
+                        if (cause != null && cause != t) {
+                            cause.addSuppressed(t);
+                        }
                         stage.relay(outcome);
                         return;
                     }

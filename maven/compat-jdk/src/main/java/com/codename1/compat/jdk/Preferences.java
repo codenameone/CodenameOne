@@ -23,7 +23,9 @@
 package com.codename1.compat.jdk;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /// `java.util.prefs.Preferences` for the Codename One runtime, kept in
 /// `com.codename1.io.Preferences`.
@@ -36,8 +38,11 @@ import java.util.List;
 /// something written with `put` reads it back.
 ///
 /// Each node keeps the list of its keys beside them, which is what `keys`
-/// and `clear` answer from; the store cannot be asked for it. Child nodes
-/// are not listed: `childrenNames` answers none.
+/// and `clear` answer from; the store cannot be asked for it. A node also
+/// keeps the names of its children that hold a key, or have a descendant
+/// that does: that is what `childrenNames` answers and what `removeNode`
+/// walks to remove a whole subtree. A node that only ever was asked for,
+/// and never written to, is not listed.
 ///
 /// Writes are saved as they are made. `flush` and `sync` do nothing, and
 /// there are no change listeners.
@@ -49,8 +54,15 @@ public class Preferences {
 
     private final String path;
 
+    /// [#removalCount] as it stood when this instance was made: a removal
+    /// of this node, or of one above it, numbered higher happened to it.
+    private final long born;
+
     protected Preferences(String path) {
         this.path = path;
+        synchronized (STORE_LOCK) {
+            born = removalCount;
+        }
     }
 
     public static Preferences userRoot() {
@@ -81,6 +93,7 @@ public class Preferences {
     /// The node at `pathName`: absolute when it starts with a slash, else
     /// below this one.
     public Preferences node(String pathName) {
+        checkLive();
         if (pathName.length() == 0) {
             return this;
         }
@@ -99,6 +112,7 @@ public class Preferences {
     }
 
     public Preferences parent() {
+        checkLive();
         if ("/".equals(path)) {
             return null;
         }
@@ -130,6 +144,21 @@ public class Preferences {
         return escape(path) + "\n\n";
     }
 
+    /// Where the names of the node's children are kept: three raw line
+    /// breaks, which neither a key ([#storeKey]) nor the index can end in.
+    private String childrenKey() {
+        return childrenKey(path);
+    }
+
+    private static String childrenKey(String nodePath) {
+        return escape(nodePath) + "\n\n\n";
+    }
+
+    private static String parentPath(String nodePath) {
+        int slash = nodePath.lastIndexOf('/');
+        return slash <= 0 ? "/" : nodePath.substring(0, slash);
+    }
+
     private static String escape(String text) {
         if (text.indexOf('\\') < 0 && text.indexOf('\n') < 0) {
             return text;
@@ -158,12 +187,55 @@ public class Preferences {
     /// two instances can stand for one node.
     private static final Object STORE_LOCK = new Object();
 
+    /// The nodes removed in this run, each with the number of its removal.
+    /// Nodes are not cached -- two calls to `node` hand out two instances
+    /// for one path -- so an instance cannot be told it was removed; it
+    /// asks here instead, for its path and every one above it.
+    private static final Map<String, Long> REMOVALS = new HashMap<String, Long>();
+
+    private static long removalCount;
+
+    /// Throws as the JDK does for any use of a removed node.
+    private void checkLive() {
+        synchronized (STORE_LOCK) {
+            if (isRemoved()) {
+                throw new IllegalStateException("Node has been removed.");
+            }
+        }
+    }
+
+    /// Called under [#STORE_LOCK].
+    private boolean isRemoved() {
+        if (REMOVALS.isEmpty()) {
+            return false;
+        }
+        String at = path;
+        while (true) {
+            Long when = REMOVALS.get(at);
+            if (when != null && when.longValue() > born) {
+                return true;
+            }
+            if ("/".equals(at)) {
+                return false;
+            }
+            at = parentPath(at);
+        }
+    }
+
     /// The node's keys, one per line. A key may hold any character, a line
     /// break too, so a backslash and a line break inside one are written as
     /// `\\` and `\n`; see [#saveIndex].
     private List<String> index() {
+        return readList(indexKey());
+    }
+
+    private void saveIndex(List<String> keys) {
+        saveList(indexKey(), keys);
+    }
+
+    private static List<String> readList(String storeKey) {
         List<String> keys = new ArrayList<String>();
-        String all = com.codename1.io.Preferences.get(indexKey(), "");
+        String all = com.codename1.io.Preferences.get(storeKey, "");
         StringBuilder key = new StringBuilder();
         for (int i = 0; i < all.length(); i++) {
             char c = all.charAt(i);
@@ -183,9 +255,9 @@ public class Preferences {
         return keys;
     }
 
-    private void saveIndex(List<String> keys) {
+    private static void saveList(String storeKey, List<String> keys) {
         if (keys.isEmpty()) {
-            com.codename1.io.Preferences.delete(indexKey());
+            com.codename1.io.Preferences.delete(storeKey);
             return;
         }
         StringBuilder all = new StringBuilder();
@@ -202,7 +274,39 @@ public class Preferences {
             }
             all.append('\n');
         }
-        com.codename1.io.Preferences.set(indexKey(), all.toString());
+        com.codename1.io.Preferences.set(storeKey, all.toString());
+    }
+
+    /// Lists this node with its parent, and so on up, so that removing an
+    /// ancestor finds it. Stops at the first one already listed: a node is
+    /// only ever listed after everything above it.
+    private void register() {
+        String at = path;
+        while (!"/".equals(at)) {
+            String parent = parentPath(at);
+            String name = at.substring(at.lastIndexOf('/') + 1);
+            String key = childrenKey(parent);
+            List<String> names = readList(key);
+            if (names.contains(name)) {
+                return;
+            }
+            names.add(name);
+            saveList(key, names);
+            at = parent;
+        }
+    }
+
+    /// Deletes every entry of `nodePath` and of every node listed below it.
+    private static void removeTree(String nodePath) {
+        for (String child : readList(childrenKey(nodePath))) {
+            removeTree("/".equals(nodePath) ? "/" + child : nodePath + "/" + child);
+        }
+        String prefix = escape(nodePath) + '\n';
+        for (String key : readList(prefix + '\n')) {
+            com.codename1.io.Preferences.delete(prefix + escape(key));
+        }
+        com.codename1.io.Preferences.delete(prefix + '\n');
+        com.codename1.io.Preferences.delete(childrenKey(nodePath));
     }
 
     public void put(String key, String value) {
@@ -210,23 +314,27 @@ public class Preferences {
             throw new NullPointerException("Null value");
         }
         synchronized (STORE_LOCK) {
+            checkLive();
             com.codename1.io.Preferences.set(storeKey(key), value);
             List<String> keys = index();
             if (!keys.contains(key)) {
                 keys.add(key);
                 saveIndex(keys);
             }
+            register();
         }
     }
 
     public String get(String key, String def) {
         synchronized (STORE_LOCK) {
+            checkLive();
             return com.codename1.io.Preferences.get(storeKey(key), def);
         }
     }
 
     public void remove(String key) {
         synchronized (STORE_LOCK) {
+            checkLive();
             com.codename1.io.Preferences.delete(storeKey(key));
             List<String> keys = index();
             if (keys.remove(key)) {
@@ -237,6 +345,7 @@ public class Preferences {
 
     public void clear() throws BackingStoreException {
         synchronized (STORE_LOCK) {
+            checkLive();
             for (String key : index()) {
                 com.codename1.io.Preferences.delete(storeKey(key));
             }
@@ -246,23 +355,61 @@ public class Preferences {
 
     public String[] keys() throws BackingStoreException {
         synchronized (STORE_LOCK) {
+            checkLive();
             List<String> keys = index();
             return keys.toArray(new String[keys.size()]);
         }
     }
 
+    /// The children that hold a key, or have a descendant that does; see
+    /// the class description.
     public String[] childrenNames() throws BackingStoreException {
-        return new String[0];
-    }
-
-    public boolean nodeExists(String pathName) throws BackingStoreException {
         synchronized (STORE_LOCK) {
-            return !node(pathName).index().isEmpty() || pathName.length() == 0;
+            checkLive();
+            List<String> names = readList(childrenKey());
+            return names.toArray(new String[names.size()]);
         }
     }
 
+    /// As the JDK: `nodeExists("")` answers whether this node is still
+    /// there, and is the one question a removed node may still be asked.
+    public boolean nodeExists(String pathName) throws BackingStoreException {
+        synchronized (STORE_LOCK) {
+            if (pathName.length() == 0) {
+                return !isRemoved();
+            }
+            Preferences node = node(pathName);
+            return !node.index().isEmpty() || !readList(node.childrenKey()).isEmpty();
+        }
+    }
+
+    /// Removes this node and everything below it, as the JDK does: their
+    /// entries are deleted, this instance and every other one for the
+    /// removed nodes throw `IllegalStateException` from then on, and a node
+    /// asked for again by its path afterwards is a new, empty one. The root
+    /// cannot be removed.
     public void removeNode() throws BackingStoreException {
-        clear();
+        if ("/".equals(path)) {
+            throw new UnsupportedOperationException("Can't remove the root!");
+        }
+        synchronized (STORE_LOCK) {
+            if (isRemoved()) {
+                throw new IllegalStateException("Node already removed.");
+            }
+            removeTree(path);
+            String parentKey = childrenKey(parentPath(path));
+            List<String> siblings = readList(parentKey);
+            if (siblings.remove(path.substring(path.lastIndexOf('/') + 1))) {
+                saveList(parentKey, siblings);
+            }
+            recordRemoval(path);
+        }
+    }
+
+    /// Called under [#STORE_LOCK].
+    private static void recordRemoval(String nodePath) {
+        removalCount++;
+        REMOVALS.put(nodePath, Long.valueOf(removalCount));
     }
 
     public void putInt(String key, int value) {
@@ -349,7 +496,9 @@ public class Preferences {
     }
 
     public void sync() throws BackingStoreException {
-        // Saved as written; see the class description.
+        // Saved as written; see the class description. A removed node
+        // cannot be synced, as with the JDK (flushing one is allowed).
+        checkLive();
     }
 
     @Override

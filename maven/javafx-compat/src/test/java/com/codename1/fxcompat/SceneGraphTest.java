@@ -124,6 +124,102 @@ public class SceneGraphTest {
         p.getChildren().addAll(child, child);
     }
 
+    /// A change OpenJFX refuses leaves the children, and every node, as they
+    /// were: it is checked before the list changes. Checked afterwards, the
+    /// rejected node had gone in and stayed. Messages and outcomes are
+    /// OpenJFX 23's for each case.
+    @Test
+    public void aRejectedChildChangeLeavesTheChildrenAsTheyWere() {
+        final Pane p = new Pane();
+        final Region a = box(1, 1);
+        final Region b = box(1, 1);
+        p.getChildren().add(a);
+        rejected(NullPointerException.class, new Runnable() {
+            public void run() {
+                p.getChildren().add(null);
+            }
+        });
+        rejected(IllegalArgumentException.class, new Runnable() {
+            public void run() {
+                p.getChildren().add(a);
+            }
+        });
+        rejected(IllegalArgumentException.class, new Runnable() {
+            public void run() {
+                p.getChildren().addAll(b, b);
+            }
+        });
+        rejected(NullPointerException.class, new Runnable() {
+            public void run() {
+                p.getChildren().addAll(b, null);
+            }
+        });
+        assertNull("a node of a rejected batch was adopted", b.getParent());
+        final Pane inner = new Pane();
+        p.getChildren().add(inner);
+        rejected(IllegalArgumentException.class, new Runnable() {
+            public void run() {
+                inner.getChildren().add(p);
+            }
+        });
+        assertTrue(inner.getChildren().isEmpty());
+        rejected(IllegalArgumentException.class, new Runnable() {
+            public void run() {
+                p.getChildren().add(p);
+            }
+        });
+        final Pane root = new Pane();
+        new Scene(root, 10, 10);
+        rejected(IllegalArgumentException.class, new Runnable() {
+            public void run() {
+                p.getChildren().add(root);
+            }
+        });
+        assertNull(root.getParent());
+        rejected(IllegalArgumentException.class, new Runnable() {
+            public void run() {
+                p.getChildren().set(1, a);
+            }
+        });
+        rejected(IllegalArgumentException.class, new Runnable() {
+            public void run() {
+                p.getChildren().setAll(a, a);
+            }
+        });
+        assertEquals(2, p.getChildren().size());
+        assertSame(a, p.getChildren().get(0));
+        assertSame(inner, p.getChildren().get(1));
+        assertSame(p, a.getParent());
+        assertSame(p, inner.getParent());
+
+        // What is allowed still is: the same node at its own index, a
+        // replacement that keeps a node, a move from another parent, and a
+        // sort, which reorders without adding anything.
+        p.getChildren().set(0, a);
+        p.getChildren().setAll(inner, a, b);
+        assertSame(p, b.getParent());
+        inner.getChildren().add(b);
+        assertSame(inner, b.getParent());
+        assertEquals(2, p.getChildren().size());
+        p.getChildren().sort(new java.util.Comparator<Node>() {
+            public int compare(Node x, Node y) {
+                return x == a ? -1 : y == a ? 1 : 0;
+            }
+        });
+        assertSame(a, p.getChildren().get(0));
+        assertSame(inner, p.getChildren().get(1));
+    }
+
+    private static void rejected(Class<? extends RuntimeException> type, Runnable change) {
+        try {
+            change.run();
+        } catch (RuntimeException e) {
+            assertSame(e.toString(), type, e.getClass());
+            return;
+        }
+        throw new AssertionError("accepted a change OpenJFX refuses");
+    }
+
     @Test
     public void paneSizesChildrenAndPeersFollowInDevicePixels() {
         Pane root = new Pane();

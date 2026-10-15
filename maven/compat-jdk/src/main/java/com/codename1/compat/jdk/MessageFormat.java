@@ -182,6 +182,12 @@ public class MessageFormat implements Cloneable {
                 parts[part].append(ch);
             }
         }
+        // Only an element left open at depth zero is refused. A pattern that
+        // ends inside a NESTED brace ("{0,choice,0#{") is accepted by every
+        // JDK from 8 to 25 -- java.text.MessageFormat tests braceStack == 0
+        // at this point too -- so refusing it would reject what the desktop
+        // accepts. MessageFormatDifferentialTest.rejectsWhatTheJdkRejects
+        // holds both sides to it.
         if (braceDepth == 0 && part >= 0) {
             throw new IllegalArgumentException("Unmatched braces in the pattern.");
         }
