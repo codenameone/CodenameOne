@@ -9072,7 +9072,9 @@ static void cn1AddFileChooserDocumentType(NSMutableArray *types, CFStringRef tag
     // Unknown extensions produce dynamic UTIs. Filesystem URLs classify these
     // as data, so creating an unconstrained dynamic UTI makes the picker reject
     // the very extension requested by the caller (e.g. a saved .cn1doc file).
-    CFStringRef uti = UTTypeCreatePreferredIdentifierForTag(tagClass, (CFStringRef)tag, kUTTypeData);
+    // The stable UTI string also works on older iOS versions, without referencing
+    // the kUTTypeData constant deprecated in iOS 15.
+    CFStringRef uti = UTTypeCreatePreferredIdentifierForTag(tagClass, (CFStringRef)tag, CFSTR("public.data"));
     if (uti != NULL) {
 #if __has_feature(objc_arc)
         NSString *type = CFBridgingRelease(uti);
