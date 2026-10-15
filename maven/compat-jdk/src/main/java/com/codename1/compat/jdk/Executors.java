@@ -271,9 +271,13 @@ public final class Executors {
             } finally {
                 // Interrupted while waiting, or a submission refused: the
                 // tasks not yet finished are cancelled, as the contract asks.
+                // The last first: workers take tasks in submission order, so
+                // cancelling the front frees a worker that then starts the
+                // next task before this loop reaches it. From the back, every
+                // task behind the one being cancelled is already cancelled.
                 if (!done) {
-                    for (Future<T> future : futures) {
-                        future.cancel(true);
+                    for (int i = futures.size() - 1; i >= 0; i--) {
+                        futures.get(i).cancel(true);
                     }
                 }
             }

@@ -58,6 +58,11 @@ class FunctionalApiIntegrationTest {
         assertSameOnParparVM("StreamPipelineApp");
     }
 
+    @Test
+    void executorsFuturesAndConcurrentCollectionsMatchTheJvm() throws Exception {
+        assertSameOnParparVM("ConcurrentApiApp");
+    }
+
     static String assertSameOnParparVM(String app) throws Exception {
         Parser.cleanup();
         Path sourceDir = Files.createTempDirectory(app + "-sources");

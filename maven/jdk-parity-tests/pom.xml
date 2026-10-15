@@ -49,7 +49,25 @@
         <jdkparity.relocate>java/util/Optional,java/util/prefs/Preferences,java/util/prefs/BackingStoreException,java/util/logging/Logger,java/util/logging/Level,java/net/URL,java/net/MalformedURLException,java/security/MessageDigest,java/security/SecureRandom,java/security/GeneralSecurityException,java/security/NoSuchAlgorithmException,java/util/ResourceBundle,java/util/PropertyResourceBundle,java/util/ListResourceBundle,java/util/MissingResourceException,java/util/ServiceLoader,java/util/ServiceConfigurationError,java/util/StringJoiner,java/util/UUID,java/util/Base64,java/util/HexFormat,java/util/WeakHashMap,java/util/EventObject,java/util/Properties,java/io/UncheckedIOException,java/lang/MatchException,java/lang/reflect/InvocationTargetException,java/io/BufferedReader,java/io/BufferedWriter,java/io/BufferedInputStream,java/io/BufferedOutputStream,java/io/PrintWriter,java/nio/file/AccessDeniedException,java/nio/file/CopyOption,java/nio/file/DirectoryIteratorException,java/nio/file/DirectoryNotEmptyException,java/nio/file/DirectoryStream,java/nio/file/FileAlreadyExistsException,java/nio/file/FileSystemException,java/nio/file/FileVisitOption,java/nio/file/FileVisitResult,java/nio/file/FileVisitor,java/nio/file/Files,java/nio/file/Glob,java/nio/file/InvalidPathException,java/nio/file/LinkOption,java/nio/file/NoSuchFileException,java/nio/file/NotDirectoryException,java/nio/file/OpenOption,java/nio/file/Path,java/nio/file/PathImpl,java/nio/file/Paths,java/nio/file/SimpleFileVisitor,java/nio/file/StandardCopyOption,java/nio/file/StandardOpenOption,java/nio/file/attribute/BasicFileAttributes,java/nio/file/attribute/FileAttribute,java/nio/file/attribute/FileTime,
             ${jdkparity.relocate.function},
             ${jdkparity.relocate.stream},
-            ${jdkparity.relocate.collections}</jdkparity.relocate>
+            ${jdkparity.relocate.collections},
+            ${jdkparity.relocate.concurrent}</jdkparity.relocate>
+        <!-- The executors, futures and concurrent collections, with their
+             package private helpers; their tests live in the relocated
+             package, jdkparity.java.util.concurrent, to reach those. TimeUnit
+             and the atomics stay the JDK's. -->
+        <jdkparity.relocate.concurrent>java/util/concurrent/AbstractExecutorService,
+            java/util/concurrent/AsyncPool,java/util/concurrent/BlockingWait,java/util/concurrent/Callable,
+            java/util/concurrent/CancellationException,java/util/concurrent/CompletableFuture,
+            java/util/concurrent/CompletionException,java/util/concurrent/CompletionStage,
+            java/util/concurrent/ConcurrentHashMap,java/util/concurrent/ConcurrentMap,
+            java/util/concurrent/CopyOnWriteArrayList,java/util/concurrent/CopyOnWriteArraySet,
+            java/util/concurrent/CountDownLatch,java/util/concurrent/Delayed,java/util/concurrent/Delays,
+            java/util/concurrent/ExecutionException,java/util/concurrent/Executor,
+            java/util/concurrent/ExecutorService,java/util/concurrent/Executors,java/util/concurrent/Future,
+            java/util/concurrent/FutureTask,java/util/concurrent/RejectedExecutionException,
+            java/util/concurrent/RunnableFuture,java/util/concurrent/ScheduledExecutorService,
+            java/util/concurrent/ScheduledFuture,java/util/concurrent/ScheduledPool,
+            java/util/concurrent/ThreadFactory,java/util/concurrent/TimeoutException</jdkparity.relocate.concurrent>
         <!-- What List.of, Set.of, Map.of, their copyOf forms, Map.ofEntries
              and Map.entry delegate to. It is package private, so its test
              lives in the relocated package, jdkparity.java.util. -->
