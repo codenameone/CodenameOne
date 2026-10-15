@@ -66,10 +66,58 @@ public class URLEncoder {
         if (enc == null) {
             throw new NullPointerException("charsetName");
         }
-        if (enc.length() == 0) {
-            throw new UnsupportedEncodingException(enc);
+        // Named and checked before anything is converted, as the JDK does: a
+        // charset this runtime cannot write is refused for any input, and not
+        // only for the input that happens to need a byte converted.
+        return encodeWith(s, charset(enc));
+    }
+
+    /**
+     * The canonical name of the charset {@code enc} names, or an
+     * {@link UnsupportedEncodingException} when it names none this class
+     * converts.
+     *
+     * Support is decided here, by name, and not by asking the runtime to
+     * convert something. {@code String.getBytes(String)} cannot answer that
+     * question: the native conversion behind it writes UTF-8 for any name it
+     * does not know rather than refusing it, so a misspelt charset would encode
+     * and decode without complaint. The names accepted are those of the three
+     * charsets {@link Charset#forName(String)} and {@code StandardCharsets}
+     * provide, with the JDK's common aliases for them, and all three are
+     * converted in Java by this class and {@link URLDecoder}, so the same bytes
+     * come out on every runtime. Names are compared without case, as the JDK
+     * compares them, and with {@code equalsIgnoreCase}, which does not depend
+     * on the device's locale.
+     */
+    static String charset(String enc) throws UnsupportedEncodingException {
+        if (enc == null) {
+            throw new NullPointerException("charsetName");
         }
-        return encodeWith(s, enc);
+        if (is(enc, UTF8_NAMES)) {
+            return "UTF-8";
+        }
+        if (is(enc, LATIN1_NAMES)) {
+            return "ISO-8859-1";
+        }
+        if (is(enc, ASCII_NAMES)) {
+            return "US-ASCII";
+        }
+        throw new UnsupportedEncodingException(enc);
+    }
+
+    private static final String[] UTF8_NAMES = {"UTF-8", "UTF8"};
+    private static final String[] LATIN1_NAMES = {"ISO-8859-1", "ISO8859-1", "ISO8859_1",
+        "ISO_8859_1", "ISO_8859-1", "8859_1", "LATIN1", "L1"};
+    private static final String[] ASCII_NAMES = {"US-ASCII", "ASCII", "US", "ISO646-US",
+        "ASCII7", "646"};
+
+    private static boolean is(String enc, String[] names) {
+        for (int i = 0; i < names.length; i++) {
+            if (names[i].equalsIgnoreCase(enc)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -80,13 +128,13 @@ public class URLEncoder {
             throw new NullPointerException("charset");
         }
         try {
-            return encodeWith(s, charset.name());
+            return encodeWith(s, charset(charset.name()));
         } catch (UnsupportedEncodingException e) {
             throw new IllegalArgumentException(e.toString());
         }
     }
 
-    private static String encodeWith(String s, String enc) throws UnsupportedEncodingException {
+    private static String encodeWith(String s, String enc) {
         int length = s.length();
         StringBuilder out = null;
         int i = 0;
@@ -130,13 +178,28 @@ public class URLEncoder {
     }
 
     /**
-     * UTF-8 is converted here rather than by the runtime's charset support, so
-     * that a lone surrogate is written the way the JDK writes it -- as the
-     * replacement byte {@code ?} -- whatever the native conversion would do.
+     * Converted here rather than by the runtime's charset support, so that a
+     * character the charset cannot hold is written the way the JDK writes it
+     * -- as the replacement byte {@code ?}, once for a surrogate pair --
+     * whatever the native conversion would do. {@code enc} is a canonical name
+     * from {@link #charset(String)}.
      */
-    private static byte[] bytes(String run, String enc) throws UnsupportedEncodingException {
-        if (!"UTF-8".equalsIgnoreCase(enc) && !"UTF8".equalsIgnoreCase(enc)) {
-            return run.getBytes(enc);
+    private static byte[] bytes(String run, String enc) {
+        if (!"UTF-8".equals(enc)) {
+            int max = "US-ASCII".equals(enc) ? 0x80 : 0x100;
+            byte[] narrow = new byte[run.length()];
+            int count = 0;
+            for (int i = 0; i < run.length(); i++) {
+                int c = run.charAt(i);
+                if (c >= 0xD800 && c <= 0xDBFF && i + 1 < run.length()
+                        && run.charAt(i + 1) >= 0xDC00 && run.charAt(i + 1) <= 0xDFFF) {
+                    i++;
+                }
+                narrow[count++] = (byte) (c < max ? c : '?');
+            }
+            byte[] result = new byte[count];
+            System.arraycopy(narrow, 0, result, 0, count);
+            return result;
         }
         // At most three bytes per char: a pair is two chars and four bytes.
         byte[] out = new byte[run.length() * 3];

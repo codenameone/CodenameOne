@@ -64,7 +64,9 @@ public class URLDecoder {
         if (enc.length() == 0) {
             throw new UnsupportedEncodingException("URLDecoder: empty string enc parameter");
         }
-        return decodeWith(s, enc);
+        // Checked before anything is decoded, as the JDK does, so a charset
+        // that is not supported is refused even for text with no escapes.
+        return decodeWith(s, URLEncoder.charset(enc));
     }
 
     /**
@@ -75,7 +77,7 @@ public class URLDecoder {
             throw new NullPointerException("Charset");
         }
         try {
-            return decodeWith(s, charset.name());
+            return decodeWith(s, URLEncoder.charset(charset.name()));
         } catch (UnsupportedEncodingException e) {
             throw new IllegalArgumentException(e.toString());
         }
@@ -122,8 +124,28 @@ public class URLDecoder {
                 throw new IllegalArgumentException(
                         "URLDecoder: Incomplete trailing escape (%) pattern");
             }
-            out.append(new String(bytes, 0, count, enc));
+            text(out, bytes, count, enc);
         }
         return out == null ? s : out.toString();
+    }
+
+    /**
+     * Appends {@code count} bytes decoded in {@code enc}, a canonical name from
+     * {@link URLEncoder#charset(String)}. The two single byte charsets are
+     * decoded here, so they answer the same on every runtime: ISO-8859-1 maps
+     * each byte to the character of that number, and US-ASCII maps a byte
+     * above 0x7F to U+FFFD, as the JDK's decoder replaces it.
+     */
+    private static void text(StringBuilder out, byte[] bytes, int count, String enc)
+            throws UnsupportedEncodingException {
+        if ("UTF-8".equals(enc)) {
+            out.append(new String(bytes, 0, count, enc));
+            return;
+        }
+        boolean ascii = "US-ASCII".equals(enc);
+        for (int i = 0; i < count; i++) {
+            int b = bytes[i] & 0xff;
+            out.append(ascii && b > 0x7F ? (char) 0xFFFD : (char) b);
+        }
     }
 }
