@@ -24,9 +24,15 @@ package com.codename1.util.regex;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Spliterator;
+import java.util.Spliterators;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 /// `java.util.regex.Pattern` for the Codename One runtime: a backtracking
 /// matcher written for this module, with the JDK's syntax and the JDK's
@@ -183,6 +189,95 @@ public final class Pattern {
             out[i] = list.get(i);
         }
         return out;
+    }
+
+    /// The pieces [#split(CharSequence)] would answer, found one at a time
+    /// as the stream asks for them, as the JDK's are: the search starts on
+    /// the first request, so a `limit` stops it and a change to a mutable
+    /// input before then is seen.
+    public Stream<String> splitAsStream(final CharSequence input) {
+        return StreamSupport.stream(Spliterators.spliteratorUnknownSize(new Pieces(this, input),
+                Spliterator.ORDERED | Spliterator.NONNULL), false);
+    }
+
+    /// The pieces of one [#splitAsStream(CharSequence)]. Empty pieces are
+    /// held back until a non-empty one follows them, because trailing ones
+    /// are dropped, as `split` drops them.
+    private static final class Pieces implements Iterator<String> {
+        private final Pattern pattern;
+        private final CharSequence input;
+        private Matcher matcher;
+        private int current;
+        private String pending;
+        private int empties;
+        private String next;
+
+        Pieces(Pattern pattern, CharSequence input) {
+            this.pattern = pattern;
+            this.input = input;
+        }
+
+        @Override
+        public boolean hasNext() {
+            if (next == null) {
+                next = advance();
+            }
+            return next != null;
+        }
+
+        @Override
+        public String next() {
+            if (!hasNext()) {
+                throw new NoSuchElementException();
+            }
+            String out = next;
+            next = null;
+            return out;
+        }
+
+        private String advance() {
+            if (matcher == null) {
+                matcher = pattern.matcher(input);
+                // An empty input is one empty piece, as split answers.
+                if (input.length() == 0) {
+                    empties = 1;
+                }
+            }
+            while (true) {
+                if (empties > 0) {
+                    empties--;
+                    return "";
+                }
+                if (pending != null) {
+                    String out = pending;
+                    pending = null;
+                    return out;
+                }
+                if (current == input.length()) {
+                    return null;
+                }
+                while (pending == null && matcher.find()) {
+                    String piece = input.subSequence(current, matcher.start()).toString();
+                    current = matcher.end();
+                    if (piece.length() > 0) {
+                        pending = piece;
+                    } else if (current > 0) {
+                        // No empty leading piece for a zero-width match at the start.
+                        empties++;
+                    }
+                }
+                if (pending == null) {
+                    String last = input.subSequence(current, input.length()).toString();
+                    current = input.length();
+                    if (last.length() == 0) {
+                        // Only trailing empty pieces were owed: dropped.
+                        empties = 0;
+                        return null;
+                    }
+                    pending = last;
+                }
+            }
+        }
     }
 
     /// A pattern that matches `s` and nothing else.

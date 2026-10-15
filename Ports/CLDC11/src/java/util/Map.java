@@ -89,7 +89,53 @@ public interface Map<K,V> {
         ///
         /// object the replaced value of this entry.
         public V setValue(V object);
-    };
+
+        /// Orders entries by the natural order of their keys.
+        static <K extends Comparable<? super K>, V> Comparator<Map.Entry<K, V>> comparingByKey() {
+            return new Comparator<Map.Entry<K, V>>() {
+                @Override
+                public int compare(Map.Entry<K, V> a, Map.Entry<K, V> b) {
+                    return a.getKey().compareTo(b.getKey());
+                }
+            };
+        }
+
+        /// Orders entries by the natural order of their values.
+        static <K, V extends Comparable<? super V>> Comparator<Map.Entry<K, V>> comparingByValue() {
+            return new Comparator<Map.Entry<K, V>>() {
+                @Override
+                public int compare(Map.Entry<K, V> a, Map.Entry<K, V> b) {
+                    return a.getValue().compareTo(b.getValue());
+                }
+            };
+        }
+
+        /// Orders entries by their keys, as `comparator` orders them.
+        static <K, V> Comparator<Map.Entry<K, V>> comparingByKey(final Comparator<? super K> comparator) {
+            if (comparator == null) {
+                throw new NullPointerException();
+            }
+            return new Comparator<Map.Entry<K, V>>() {
+                @Override
+                public int compare(Map.Entry<K, V> a, Map.Entry<K, V> b) {
+                    return comparator.compare(a.getKey(), b.getKey());
+                }
+            };
+        }
+
+        /// Orders entries by their values, as `comparator` orders them.
+        static <K, V> Comparator<Map.Entry<K, V>> comparingByValue(final Comparator<? super V> comparator) {
+            if (comparator == null) {
+                throw new NullPointerException();
+            }
+            return new Comparator<Map.Entry<K, V>>() {
+                @Override
+                public int compare(Map.Entry<K, V> a, Map.Entry<K, V> b) {
+                    return comparator.compare(a.getValue(), b.getValue());
+                }
+            };
+        }
+    }
 
     /// Removes all elements from this `Map`, leaving it empty.
     ///
@@ -373,4 +419,88 @@ public interface Map<K,V> {
             BiFunction<? super V, ? super V, ? extends V> remappingFunction) {
         return null;
     }
+
+    /// An unmodifiable map of no mappings.
+    static <K, V> Map<K, V> of() {
+        return ImmutableCollections.map(new Object[0]);
+    }
+
+    /// An unmodifiable map of the given keys and values, none of which may be
+    /// null, and no key given twice.
+    static <K, V> Map<K, V> of(K k1, V v1) {
+        return ImmutableCollections.map(new Object[] {k1, v1});
+    }
+
+    /// An unmodifiable map of the given keys and values, none of which may be
+    /// null, and no key given twice.
+    static <K, V> Map<K, V> of(K k1, V v1, K k2, V v2) {
+        return ImmutableCollections.map(new Object[] {k1, v1, k2, v2});
+    }
+
+    /// An unmodifiable map of the given keys and values, none of which may be
+    /// null, and no key given twice.
+    static <K, V> Map<K, V> of(K k1, V v1, K k2, V v2, K k3, V v3) {
+        return ImmutableCollections.map(new Object[] {k1, v1, k2, v2, k3, v3});
+    }
+
+    /// An unmodifiable map of the given keys and values, none of which may be
+    /// null, and no key given twice.
+    static <K, V> Map<K, V> of(K k1, V v1, K k2, V v2, K k3, V v3, K k4, V v4) {
+        return ImmutableCollections.map(new Object[] {k1, v1, k2, v2, k3, v3, k4, v4});
+    }
+
+    /// An unmodifiable map of the given keys and values, none of which may be
+    /// null, and no key given twice.
+    static <K, V> Map<K, V> of(K k1, V v1, K k2, V v2, K k3, V v3, K k4, V v4, K k5, V v5) {
+        return ImmutableCollections.map(new Object[] {k1, v1, k2, v2, k3, v3, k4, v4, k5, v5});
+    }
+
+    /// An unmodifiable map of the given keys and values, none of which may be
+    /// null, and no key given twice.
+    static <K, V> Map<K, V> of(K k1, V v1, K k2, V v2, K k3, V v3, K k4, V v4, K k5, V v5, K k6, V v6) {
+        return ImmutableCollections.map(new Object[] {k1, v1, k2, v2, k3, v3, k4, v4, k5, v5, k6, v6});
+    }
+
+    /// An unmodifiable map of the given keys and values, none of which may be
+    /// null, and no key given twice.
+    static <K, V> Map<K, V> of(K k1, V v1, K k2, V v2, K k3, V v3, K k4, V v4, K k5, V v5, K k6, V v6, K k7, V v7) {
+        return ImmutableCollections.map(new Object[] {k1, v1, k2, v2, k3, v3, k4, v4, k5, v5, k6, v6, k7, v7});
+    }
+
+    /// An unmodifiable map of the given keys and values, none of which may be
+    /// null, and no key given twice.
+    static <K, V> Map<K, V> of(K k1, V v1, K k2, V v2, K k3, V v3, K k4, V v4, K k5, V v5, K k6, V v6, K k7, V v7, K k8, V v8) {
+        return ImmutableCollections.map(new Object[] {k1, v1, k2, v2, k3, v3, k4, v4, k5, v5, k6, v6, k7, v7, k8, v8});
+    }
+
+    /// An unmodifiable map of the given keys and values, none of which may be
+    /// null, and no key given twice.
+    static <K, V> Map<K, V> of(K k1, V v1, K k2, V v2, K k3, V v3, K k4, V v4, K k5, V v5, K k6, V v6, K k7, V v7, K k8, V v8, K k9, V v9) {
+        return ImmutableCollections.map(new Object[] {k1, v1, k2, v2, k3, v3, k4, v4, k5, v5, k6, v6, k7, v7, k8, v8, k9, v9});
+    }
+
+    /// An unmodifiable map of the given keys and values, none of which may be
+    /// null, and no key given twice.
+    static <K, V> Map<K, V> of(K k1, V v1, K k2, V v2, K k3, V v3, K k4, V v4, K k5, V v5, K k6, V v6, K k7, V v7, K k8, V v8, K k9, V v9, K k10, V v10) {
+        return ImmutableCollections.map(new Object[] {k1, v1, k2, v2, k3, v3, k4, v4, k5, v5, k6, v6, k7, v7, k8, v8, k9, v9, k10, v10});
+    }
+
+    /// An unmodifiable map of the keys and values of `entries`, none of which
+    /// may be null, and no key given twice.
+    @SafeVarargs
+    static <K, V> Map<K, V> ofEntries(Map.Entry<? extends K, ? extends V>... entries) {
+        return ImmutableCollections.mapOfEntries(entries);
+    }
+
+    /// An unmodifiable entry of `key` and `value`, neither of which may be null.
+    static <K, V> Map.Entry<K, V> entry(K key, V value) {
+        return new ImmutableCollections.ImmutableEntry<K, V>(key, value);
+    }
+
+    /// An unmodifiable map of the mappings of `map`, which may not hold null;
+    /// `map` itself when it is already such a map.
+    static <K, V> Map<K, V> copyOf(Map<? extends K, ? extends V> map) {
+        return ImmutableCollections.mapCopyOf(map);
+    }
+
 }

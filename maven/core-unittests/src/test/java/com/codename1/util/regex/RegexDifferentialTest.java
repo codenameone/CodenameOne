@@ -22,7 +22,11 @@
  */
 package com.codename1.util.regex;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
 
@@ -83,6 +87,41 @@ class RegexDifferentialTest {
         "\\x4", "\\u004", "\\p{NoSuchThing}", "\\p{Alpha", "[[a]", "\\c", "\\0", "\\08", "x{2}{3}", "(?i", "[a&&]",
         "\\x{110000}"};
 
+    /// `splitAsStream` and `results()` read their input only as the stream
+    /// asks: a change to a mutable input before the terminal operation is
+    /// seen, and `limit` stops the search.
+    @Test
+    void streamsAreLazy() {
+        StringBuilder text = new StringBuilder("a,b");
+        java.util.stream.Stream<String> mine = Pattern.compile(",").splitAsStream(text);
+        text.append(",c,,");
+        // What JDK 9 and later answer. JDK 8, which this suite also runs on,
+        // bounded the search by the length at the time the stream was made
+        // and answered [a, b,c,,].
+        assertEquals(Arrays.asList("a", "b", "c"), mine.collect(Collectors.toList()));
+        assertEquals(java.util.regex.Pattern.compile(",").splitAsStream("x,y,z").limit(2).collect(Collectors.toList()),
+                Pattern.compile(",").splitAsStream("x,y,z").limit(2).collect(Collectors.toList()));
+        // One empty piece, as split("") answers; JDK 9 and later agree, JDK 8
+        // answered none.
+        assertEquals(Arrays.asList(""), Pattern.compile(",").splitAsStream("").collect(Collectors.toList()));
+
+        Matcher m = Pattern.compile("\\d").matcher("1a2b3");
+        final List<String> found = new ArrayList<String>();
+        m.results().limit(1).forEach(new Consumer<MatchResult>() {
+            @Override
+            public void accept(MatchResult r) {
+                found.add(r.group());
+            }
+        });
+        assertEquals(Arrays.asList("1"), found);
+        // Only the first match was searched for, so the matcher carries on
+        // from it, and results() answers from where the matcher is.
+        assertTrue(m.find());
+        assertEquals("2", m.group());
+        assertEquals(1L, m.results().count());
+        assertEquals(0L, m.results().count());
+    }
+
     /// Patterns for which a JDK older than the ones applications are
     /// written against answers differently; they are checked against
     /// expected values instead.
@@ -121,6 +160,14 @@ class RegexDifferentialTest {
             sb.append('|').append(Arrays.toString(p.split(input)));
             sb.append('|').append(Arrays.toString(p.split(input, -1)));
             sb.append('|').append(Arrays.toString(p.split(input, 2)));
+            sb.append('|').append(p.splitAsStream(input).collect(Collectors.toList()));
+            // results() is the find loop below; JDK 8 has no Matcher.results().
+            m.reset();
+            sb.append('|');
+            int r = 0;
+            while (m.find() && r++ < 200) {
+                sb.append(m.start()).append('-').append(m.end()).append(m.group()).append(';');
+            }
             sb.append('|').append(p.flags());
             sb.append('|').append(m.find(input.length() / 2) ? m.start() : -1);
             m.region(input.length() / 3, input.length() - input.length() / 4);
@@ -162,6 +209,15 @@ class RegexDifferentialTest {
             sb.append('|').append(Arrays.toString(p.split(input)));
             sb.append('|').append(Arrays.toString(p.split(input, -1)));
             sb.append('|').append(Arrays.toString(p.split(input, 2)));
+            sb.append('|').append(p.splitAsStream(input).collect(Collectors.toList()));
+            m.reset();
+            final StringBuilder results = sb.append('|');
+            m.results().limit(200).forEach(new Consumer<MatchResult>() {
+                @Override
+                public void accept(MatchResult r) {
+                    results.append(r.start()).append('-').append(r.end()).append(r.group()).append(';');
+                }
+            });
             sb.append('|').append(p.flags());
             sb.append('|').append(m.find(input.length() / 2) ? m.start() : -1);
             m.region(input.length() / 3, input.length() - input.length() / 4);

@@ -446,4 +446,72 @@ public interface List<E> extends Collection<E> {
     /// implementation comes from the platform's JDK at runtime.
     default void sort(Comparator<? super E> c) {
     }
+
+    /// An unmodifiable list of no elements.
+    static <E> List<E> of() {
+        return ImmutableCollections.list(new Object[] {});
+    }
+
+    /// An unmodifiable list of the given elements, none of which may be null.
+    static <E> List<E> of(E e1) {
+        return ImmutableCollections.list(new Object[] {e1});
+    }
+
+    /// An unmodifiable list of the given elements, none of which may be null.
+    static <E> List<E> of(E e1, E e2) {
+        return ImmutableCollections.list(new Object[] {e1, e2});
+    }
+
+    /// An unmodifiable list of the given elements, none of which may be null.
+    static <E> List<E> of(E e1, E e2, E e3) {
+        return ImmutableCollections.list(new Object[] {e1, e2, e3});
+    }
+
+    /// An unmodifiable list of the given elements, none of which may be null.
+    static <E> List<E> of(E e1, E e2, E e3, E e4) {
+        return ImmutableCollections.list(new Object[] {e1, e2, e3, e4});
+    }
+
+    /// An unmodifiable list of the given elements, none of which may be null.
+    static <E> List<E> of(E e1, E e2, E e3, E e4, E e5) {
+        return ImmutableCollections.list(new Object[] {e1, e2, e3, e4, e5});
+    }
+
+    /// An unmodifiable list of the given elements, none of which may be null.
+    static <E> List<E> of(E e1, E e2, E e3, E e4, E e5, E e6) {
+        return ImmutableCollections.list(new Object[] {e1, e2, e3, e4, e5, e6});
+    }
+
+    /// An unmodifiable list of the given elements, none of which may be null.
+    static <E> List<E> of(E e1, E e2, E e3, E e4, E e5, E e6, E e7) {
+        return ImmutableCollections.list(new Object[] {e1, e2, e3, e4, e5, e6, e7});
+    }
+
+    /// An unmodifiable list of the given elements, none of which may be null.
+    static <E> List<E> of(E e1, E e2, E e3, E e4, E e5, E e6, E e7, E e8) {
+        return ImmutableCollections.list(new Object[] {e1, e2, e3, e4, e5, e6, e7, e8});
+    }
+
+    /// An unmodifiable list of the given elements, none of which may be null.
+    static <E> List<E> of(E e1, E e2, E e3, E e4, E e5, E e6, E e7, E e8, E e9) {
+        return ImmutableCollections.list(new Object[] {e1, e2, e3, e4, e5, e6, e7, e8, e9});
+    }
+
+    /// An unmodifiable list of the given elements, none of which may be null.
+    static <E> List<E> of(E e1, E e2, E e3, E e4, E e5, E e6, E e7, E e8, E e9, E e10) {
+        return ImmutableCollections.list(new Object[] {e1, e2, e3, e4, e5, e6, e7, e8, e9, e10});
+    }
+
+    /// An unmodifiable list of `elements`, none of which may be null.
+    @SafeVarargs
+    static <E> List<E> of(E... elements) {
+        return ImmutableCollections.listCopy(elements);
+    }
+
+    /// An unmodifiable list of the elements of `collection`, which may not hold
+    /// null; `collection` itself when it is already such a list.
+    static <E> List<E> copyOf(Collection<? extends E> collection) {
+        return ImmutableCollections.listCopyOf(collection);
+    }
+
 }

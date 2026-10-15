@@ -193,4 +193,72 @@ public interface Set<E> extends Collection<E> {
      * @see Collection#toArray(Object[])
      */
     public <T> T[] toArray(T[] array);
+
+    /// An unmodifiable set of no elements.
+    static <E> Set<E> of() {
+        return ImmutableCollections.set(new Object[] {}, true);
+    }
+
+    /// An unmodifiable set of the given elements, none of which may be null and no two equal.
+    static <E> Set<E> of(E e1) {
+        return ImmutableCollections.set(new Object[] {e1}, true);
+    }
+
+    /// An unmodifiable set of the given elements, none of which may be null and no two equal.
+    static <E> Set<E> of(E e1, E e2) {
+        return ImmutableCollections.set(new Object[] {e1, e2}, true);
+    }
+
+    /// An unmodifiable set of the given elements, none of which may be null and no two equal.
+    static <E> Set<E> of(E e1, E e2, E e3) {
+        return ImmutableCollections.set(new Object[] {e1, e2, e3}, true);
+    }
+
+    /// An unmodifiable set of the given elements, none of which may be null and no two equal.
+    static <E> Set<E> of(E e1, E e2, E e3, E e4) {
+        return ImmutableCollections.set(new Object[] {e1, e2, e3, e4}, true);
+    }
+
+    /// An unmodifiable set of the given elements, none of which may be null and no two equal.
+    static <E> Set<E> of(E e1, E e2, E e3, E e4, E e5) {
+        return ImmutableCollections.set(new Object[] {e1, e2, e3, e4, e5}, true);
+    }
+
+    /// An unmodifiable set of the given elements, none of which may be null and no two equal.
+    static <E> Set<E> of(E e1, E e2, E e3, E e4, E e5, E e6) {
+        return ImmutableCollections.set(new Object[] {e1, e2, e3, e4, e5, e6}, true);
+    }
+
+    /// An unmodifiable set of the given elements, none of which may be null and no two equal.
+    static <E> Set<E> of(E e1, E e2, E e3, E e4, E e5, E e6, E e7) {
+        return ImmutableCollections.set(new Object[] {e1, e2, e3, e4, e5, e6, e7}, true);
+    }
+
+    /// An unmodifiable set of the given elements, none of which may be null and no two equal.
+    static <E> Set<E> of(E e1, E e2, E e3, E e4, E e5, E e6, E e7, E e8) {
+        return ImmutableCollections.set(new Object[] {e1, e2, e3, e4, e5, e6, e7, e8}, true);
+    }
+
+    /// An unmodifiable set of the given elements, none of which may be null and no two equal.
+    static <E> Set<E> of(E e1, E e2, E e3, E e4, E e5, E e6, E e7, E e8, E e9) {
+        return ImmutableCollections.set(new Object[] {e1, e2, e3, e4, e5, e6, e7, e8, e9}, true);
+    }
+
+    /// An unmodifiable set of the given elements, none of which may be null and no two equal.
+    static <E> Set<E> of(E e1, E e2, E e3, E e4, E e5, E e6, E e7, E e8, E e9, E e10) {
+        return ImmutableCollections.set(new Object[] {e1, e2, e3, e4, e5, e6, e7, e8, e9, e10}, true);
+    }
+
+    /// An unmodifiable set of `elements`, none of which may be null and no two equal.
+    @SafeVarargs
+    static <E> Set<E> of(E... elements) {
+        return ImmutableCollections.set(elements, true);
+    }
+
+    /// An unmodifiable set of the elements of `collection`, which may not hold
+    /// null; `collection` itself when it is already such a set.
+    static <E> Set<E> copyOf(Collection<? extends E> collection) {
+        return ImmutableCollections.setCopyOf(collection);
+    }
+
 }

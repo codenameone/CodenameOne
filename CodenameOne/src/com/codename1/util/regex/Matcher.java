@@ -22,14 +22,20 @@
  */
 package com.codename1.util.regex;
 
+import java.util.Iterator;
+import java.util.NoSuchElementException;
+import java.util.Spliterator;
+import java.util.Spliterators;
 import java.util.function.Function;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 /// The same shape as `java.util.regex.Matcher`, over this package's [Pattern].
 ///
 /// Everything a match is read through is here -- `matches`, `lookingAt`,
 /// `find`, groups by number and by name, regions, and the replacement
 /// methods with the JDK's `$1` and `${name}` syntax. `hitEnd`,
-/// `requireEnd`, the two bounds switches and `results()` are not provided.
+/// `requireEnd` and the two bounds switches are not provided.
 public final class Matcher implements MatchResult {
 
     private Pattern pattern;
@@ -381,6 +387,51 @@ public final class Matcher implements MatchResult {
         @Override
         public int groupCount() {
             return starts.length - 1;
+        }
+    }
+
+    /// Each match from here on, as [#toMatchResult()] would answer it: from
+    /// after the last match found, or from the start of the region when
+    /// there is none. The matcher is not reset, so a match already consumed
+    /// is not answered again and a region stays in force.
+    ///
+    /// Lazy, as the JDK's is: each match is found only when the stream asks
+    /// for it, so `results().limit(1)` scans no further than the first.
+    public Stream<MatchResult> results() {
+        return StreamSupport.stream(Spliterators.spliteratorUnknownSize(new Results(this),
+                Spliterator.ORDERED | Spliterator.NONNULL), false);
+    }
+
+    /// The matches of one [#results()].
+    private static final class Results implements Iterator<MatchResult> {
+        private final Matcher matcher;
+        private MatchResult next;
+        private boolean done;
+
+        Results(Matcher matcher) {
+            this.matcher = matcher;
+        }
+
+        @Override
+        public boolean hasNext() {
+            if (next == null && !done) {
+                if (matcher.find()) {
+                    next = matcher.toMatchResult();
+                } else {
+                    done = true;
+                }
+            }
+            return next != null;
+        }
+
+        @Override
+        public MatchResult next() {
+            if (!hasNext()) {
+                throw new NoSuchElementException();
+            }
+            MatchResult out = next;
+            next = null;
+            return out;
         }
     }
 

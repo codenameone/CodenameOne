@@ -17,6 +17,7 @@
 
 package java.util;
 
+import java.util.function.IntFunction;
 import java.util.function.Predicate;
 
 
@@ -335,13 +336,27 @@ public interface Collection<E> extends java.lang.Iterable<E> {
         return removed;
     }
 
-    /**
-     * A sequential stream over a snapshot of this collection's elements.
-     *
-     * @return a stream of the elements
-     */
-    @SuppressWarnings("unchecked")
+    /// A sequential stream of the elements, read when a terminal operation
+    /// asks for them, so elements added before then are seen.
     default java.util.stream.Stream<E> stream() {
-        return (java.util.stream.Stream<E>) java.util.stream.Stream.of(toArray());
+        return java.util.stream.StreamSupport.stream(spliterator(), false);
     }
+
+    /// The same as [#stream()]: streams here are sequential, which the JDK
+    /// allows a parallel stream to be.
+    default java.util.stream.Stream<E> parallelStream() {
+        return java.util.stream.StreamSupport.stream(spliterator(), true);
+    }
+
+    /// The elements, read from [#iterator()] when the first one is asked for.
+    @Override
+    default Spliterator<E> spliterator() {
+        return Spliterators.spliterator(this, 0);
+    }
+
+    /// The elements in an array `generator` makes, as `toArray(generator.apply(0))`.
+    default <T> T[] toArray(IntFunction<T[]> generator) {
+        return toArray(generator.apply(0));
+    }
+
 }
