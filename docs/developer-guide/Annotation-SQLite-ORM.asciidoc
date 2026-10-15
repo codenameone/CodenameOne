@@ -202,10 +202,10 @@ predicates. On MySQL and MariaDB, nested queries that read the bulk mutation tar
 table are rejected during query creation. They flush pending
 managed changes and bypass per-entity callbacks and cascades. As in JPA, they
 don't clear the session: an entity it already manages stays managed and keeps
-the values it had before the statement, and a change made to it afterwards is
+the values it had before the statement, and a change made to it afterward is
 still written. Call `refresh(entity)` to read what the statement wrote, or
 `clear()` and read again. An entity whose row a bulk DELETE removed fails with an
-`OptimisticLockException` if it's changed or removed afterwards. Bulk assignments to required subtype
+`OptimisticLockException` if it's changed or removed afterward. Bulk assignments to required subtype
 fields need a non-null literal or named parameter. Other assignment expressions
 are rejected for those fields. Literal and bound null assignments to primitive
 Java fields are rejected on both runtimes. Primitive assignments also reject
@@ -393,7 +393,7 @@ are rejected before pending changes are flushed.
 ==== Supported boundary
 
 This API provides managed persistence through CN1 annotations; it's not a JPA
-provider or a Hibernate binary replacement. Entity access is by field, public or not.
+provider or a Hibernate binary replacement. Entity access is by field, whether the field is public or private.
 Getter/setter access mappings, property-backed associations, joined/table-per-class
 inheritance, embeddable element collections, and independently stored entity-map
 keys aren't supported. Nested fetch graphs and mixed entity/scalar JPQL
@@ -509,12 +509,12 @@ Derived methods support the following bounded grammar:
 `@Param("name")` matching the query exactly. SQL values are bound, never
 interpolated. `@Modifying` is required for declared UPDATE/DELETE and forbidden
 for SELECT. Such methods return `int` or `void`. They behave like
-`executeUpdate()`: pending changes are flushed first, and the session is left as
-it is, so an entity the caller read before the call is still managed and a
-change made to it afterwards is written. `@Modifying(clearAutomatically = true)`
+`executeUpdate()`: pending changes are flushed first, and the session is left
+unchanged, so an entity the caller read before the call is still managed and a
+change made to it afterward is written. `@Modifying(clearAutomatically = true)`
 empties the session after the statement instead, so what's read next comes from
-the database; an entity read before the call is then detached, and a later
-change to it is never written. `flushAutomatically` is accepted for
+the database; an entity read before the call is then detached, and nothing
+written to it later reaches the database. `flushAutomatically` is accepted for
 compatibility with Spring Data and changes nothing, because the flush always
 happens. A derived `deleteBy` method is a bulk DELETE too and leaves the session
 the same way. Native SQL uses

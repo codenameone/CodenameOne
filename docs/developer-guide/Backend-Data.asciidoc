@@ -100,7 +100,7 @@ local SQLite database, and a module compiled against this runtime gets one whose
 statements are built for whichever engine the connection turns out to be. The
 class says what the data is; the module says where its rows live.
 
-The names differ too. A table or column the entity does not name is called
+The names differ too. A table or column the entity doesn't name is called
 after the class or field in the app's database, and after the same name in
 snake case on the server, the way Spring Boot names it: `RideEvent` is stored in
 `ride_event` and `fareCents` in `fare_cents`. An underscore goes before an upper

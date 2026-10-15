@@ -447,7 +447,7 @@ the driver can cash out, and a refund takes the tip back with the fare. The
 earnings screen's totals for the day, week and month count the same money as
 the balance, so a refunded or unpaid ride counts as a trip and earns nothing.
 
-A statement that changes rows in bulk leaves the session as it is, so an
+A statement that changes rows in bulk leaves the session unchanged, so an
 entity read before it keeps the values it had. Every move of a ride is marked
 `@Modifying(clearAutomatically = true)`, which empties the session after the
 statement, so a `Ride` read before a move is read again after it. The services
