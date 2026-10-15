@@ -75,6 +75,9 @@ draw frame=200 commands=4 background=ff1a1a33
   text "Hits: 2" layer=0 order=0 at=500,1000 size=15000x2000 font=1200 fit=0 min=500 max=2000 align=3 style=1 wrap=1 color=ffffffff
 axes frame 201 glide=200 snappy=50 plain=100 raw=1
 inverted frame 201 flipped=-100 raw=-1
+input frame=205 pointer=100,100 move
+input frame=206 pointer=120,100 move
+mixed frame 206 raw=1000
 axes frame 214 glide=1000 snappy=375 plain=750 raw=1
 inverted frame 214 flipped=-750 raw=-1
 input frame=215 key=101 up
@@ -86,6 +89,9 @@ inverted frame 216 flipped=100 raw=1
 input frame=230 key=113 up
 axes frame 231 glide=-467 snappy=-175 plain=-650 raw=0
 inverted frame 231 flipped=650 raw=0
+input frame=235 pointer=100,100 move
+input frame=236 pointer=120,100 move
+mixed frame 236 raw=200
 axes frame 240 glide=-317 snappy=0 plain=-200 raw=0
 inverted frame 240 flipped=200 raw=0
 frame 240 objects=10 Shot=2 drawn=4 text="Hits: 2"

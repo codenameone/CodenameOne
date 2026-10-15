@@ -64,3 +64,20 @@ InputManager:
     invert: 1
     type: 0
     axis: 0
+  - serializedVersion: 3
+    m_Name: Mixed
+    negativeButton: q
+    positiveButton: e
+    altNegativeButton:
+    altPositiveButton:
+    type: 0
+    axis: 0
+  - serializedVersion: 3
+    m_Name: Mixed
+    negativeButton:
+    positiveButton:
+    altNegativeButton:
+    altPositiveButton:
+    sensitivity: 0.01
+    type: 1
+    axis: 0

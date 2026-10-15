@@ -674,8 +674,10 @@ public final class ParticleSystem extends Component {
     public void $tick(float dt) {
         if (!begun) {
             begun = true;
+            // Each system's own setting, and only its own: a child plays on
+            // awake by its own flag.
             if (playOnAwake && !playing) {
-                Play();
+                playSelf();
             }
         }
         if (paused || (!playing && count == 0)) {
@@ -919,9 +921,26 @@ public final class ParticleSystem extends Component {
         clock = value < 0f ? 0f : value;
     }
 
+    // Every overload without `withChildren` means it as true: Unity
+    // declares `Play(bool withChildren = true)`, and the same of `Stop`,
+    // `Pause` and `Clear`, so a script's `Play()` plays the child systems
+    // too. `Stop`'s `stopBehavior` defaults to StopEmitting (1), which lets
+    // the particles there are live out their lives.
+
+    public void Play() {
+        Play(true);
+    }
+
+    public void Play(boolean withChildren) {
+        playSelf();
+        if (withChildren) {
+            children(0);
+        }
+    }
+
     /// Starts the system, or carries on one that was paused. One that was
     /// stopped starts from the beginning, with the same random numbers.
-    public void Play() {
+    private void playSelf() {
         begun = true;
         if (paused) {
             paused = false;
@@ -936,31 +955,21 @@ public final class ParticleSystem extends Component {
         emitting = true;
     }
 
-    public void Play(boolean withChildren) {
-        Play();
-        if (withChildren) {
-            children(0);
-        }
+    public void Stop() {
+        Stop(true, 1);
     }
 
-    /// Stops emitting. The particles there are live out their lives.
-    public void Stop() {
+    public void Stop(boolean withChildren) {
+        Stop(withChildren, 1);
+    }
+
+    /// Stops emitting. The particles there are live out their lives, unless
+    /// `stopBehavior` is 0, which removes them as well.
+    public void Stop(boolean withChildren, int stopBehavior) {
         begun = true;
         playing = false;
         emitting = false;
         paused = false;
-    }
-
-    public void Stop(boolean withChildren) {
-        Stop();
-        if (withChildren) {
-            children(1);
-        }
-    }
-
-    /// `stopBehavior` 0 removes the particles there are as well.
-    public void Stop(boolean withChildren, int stopBehavior) {
-        Stop();
         if (stopBehavior == 0) {
             count = 0;
         }
@@ -970,22 +979,22 @@ public final class ParticleSystem extends Component {
     }
 
     public void Pause() {
-        paused = true;
+        Pause(true);
     }
 
     public void Pause(boolean withChildren) {
-        Pause();
+        paused = true;
         if (withChildren) {
             children(3);
         }
     }
 
     public void Clear() {
-        count = 0;
+        Clear(true);
     }
 
     public void Clear(boolean withChildren) {
-        Clear();
+        count = 0;
         if (withChildren) {
             children(4);
         }

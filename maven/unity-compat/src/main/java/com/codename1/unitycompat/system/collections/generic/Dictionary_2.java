@@ -26,7 +26,6 @@ import com.codename1.unitycompat.system.ArgumentException;
 import com.codename1.unitycompat.system.ArgumentNullException;
 import com.codename1.unitycompat.system.Interop;
 import com.codename1.unitycompat.system.InvalidOperationException;
-import com.codename1.unitycompat.system.NotSupportedException;
 import com.codename1.unitycompat.system.Struct;
 import java.util.HashMap;
 
@@ -244,12 +243,20 @@ public class Dictionary_2 implements IDictionary_2 {
         return new ValueCollection(this);
     }
 
-    /// Advances a walk over the slots: the first live slot at or after
-    /// `from`, or -1 at the end.
-    int advance(int from, int startedAt) {
+    /// Refuses a walk begun before the dictionary last changed. `Reset`
+    /// makes the same check as `MoveNext`: .NET's enumerators start the walk
+    /// again rather than throw NotSupportedException, unless the dictionary
+    /// changed under them.
+    void checkUnchanged(int startedAt) {
         if (startedAt != version) {
             throw new InvalidOperationException("Collection was modified; enumeration operation may not execute.");
         }
+    }
+
+    /// Advances a walk over the slots: the first live slot at or after
+    /// `from`, or -1 at the end.
+    int advance(int from, int startedAt) {
+        checkUnchanged(startedAt);
         for (int i = from; i < high; i++) {
             if (next[i] == LIVE) {
                 return i;
@@ -338,7 +345,12 @@ public class Dictionary_2 implements IDictionary_2 {
 
         @Override
         public void Reset() {
-            throw new NotSupportedException();
+            // One nothing filled in has nothing to check, as in MoveNext.
+            if (dictionary != null) {
+                dictionary.checkUnchanged(version);
+            }
+            index = 0;
+            current = 0;
         }
 
         @Override
@@ -422,7 +434,12 @@ public class Dictionary_2 implements IDictionary_2 {
 
             @Override
             public void Reset() {
-                throw new NotSupportedException();
+                // One nothing filled in has nothing to check, as in MoveNext.
+                if (dictionary != null) {
+                    dictionary.checkUnchanged(version);
+                }
+                index = 0;
+                current = 0;
             }
 
             @Override
@@ -506,7 +523,12 @@ public class Dictionary_2 implements IDictionary_2 {
 
             @Override
             public void Reset() {
-                throw new NotSupportedException();
+                // One nothing filled in has nothing to check, as in MoveNext.
+                if (dictionary != null) {
+                    dictionary.checkUnchanged(version);
+                }
+                index = 0;
+                current = 0;
             }
 
             @Override

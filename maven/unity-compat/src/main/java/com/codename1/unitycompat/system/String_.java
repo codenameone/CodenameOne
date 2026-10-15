@@ -72,7 +72,13 @@ public final class String_ {
         return new StringBuilder().append(text(a)).append(text(b)).append(text(c)).append(text(d)).toString();
     }
 
+    /// A null element is an empty string, but a null array is no list at
+    /// all: .NET throws ArgumentNullException for it, as it does in
+    /// `Concat(object[])`, `Format` and `Join`.
     public static String Concat(String[] parts) {
+        if (parts == null) {
+            throw new ArgumentNullException();
+        }
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < parts.length; i++) { // NOPMD ForLoopCanBeForeach
             sb.append(text(parts[i]));
@@ -93,6 +99,9 @@ public final class String_ {
     }
 
     public static String Concat(Object[] parts) {
+        if (parts == null) {
+            throw new ArgumentNullException();
+        }
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < parts.length; i++) { // NOPMD ForLoopCanBeForeach
             sb.append(text(parts[i]));
@@ -116,6 +125,15 @@ public final class String_ {
     /// Alignment and format strings are not implemented and are rejected
     /// rather than ignored.
     public static String Format(String format, Object[] args) {
+        // Every overload ends here, so this is where .NET's null checks go:
+        // a null format, or a null params array, is ArgumentNullException,
+        // never the NullReferenceException dereferencing it would give.
+        if (format == null) {
+            throw new ArgumentNullException();
+        }
+        if (args == null) {
+            throw new ArgumentNullException();
+        }
         StringBuilder sb = new StringBuilder();
         int n = format.length();
         for (int i = 0; i < n; i++) {

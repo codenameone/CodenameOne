@@ -742,11 +742,16 @@ public final class Input {
 
     // ----------------------------------------------------- axes and buttons
 
+    /// Of several axes of one name, the one farthest from rest, as for
+    /// `GetAxis`: Unity's input manual says a query of a name two axes
+    /// share answers with the largest absolute value, not with the last
+    /// axis that moved -- a key and a weaker mouse axis together read as
+    /// the key.
     public static float GetAxisRaw(String axisName) {
         float v = 0f;
         for (int i = axis(axisName, 0); i >= 0; i = axis(axisName, i + 1)) {
             float r = raw(axes[i]);
-            if (r != 0f) {
+            if ((r < 0f ? -r : r) > (v < 0f ? -v : v)) {
                 v = r;
             }
         }

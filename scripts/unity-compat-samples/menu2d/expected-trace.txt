@@ -78,6 +78,7 @@ input frame=90 key=32 down
 key frame 90 over interface=False panel=False clicks=1
 input frame=92 key=32 up
 bounce 1 on Floor at y=-210 frame 100
+pitch clamped 300 -300
 sought to 40ms of 100 playing=True
 caught: Input Axis Nope is not setup.
 caught a child out of range=True

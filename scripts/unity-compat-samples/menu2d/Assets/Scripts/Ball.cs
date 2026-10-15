@@ -63,6 +63,12 @@ public class Ball : MonoBehaviour
     private void Seek()
     {
         source.clip = beep;
+        // A pitch is clamped to [-3, 3] when it is set, so it reads back
+        // clamped.
+        source.pitch = 10f;
+        float high = source.pitch;
+        source.pitch = -10f;
+        Debug.Log("pitch clamped " + Mathf.RoundToInt(high * 100f) + " " + Mathf.RoundToInt(source.pitch * 100f));
         source.pitch = 0.5f;
         source.Play();
         source.time = 0.04f;

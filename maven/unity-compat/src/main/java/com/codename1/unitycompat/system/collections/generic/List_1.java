@@ -28,7 +28,6 @@ import com.codename1.unitycompat.system.ArgumentOutOfRangeException;
 import com.codename1.unitycompat.system.ArrayView;
 import com.codename1.unitycompat.system.Interop;
 import com.codename1.unitycompat.system.InvalidOperationException;
-import com.codename1.unitycompat.system.NotSupportedException;
 import com.codename1.unitycompat.system.Struct;
 
 /// `System.Collections.Generic.List<T>`. Elements are `Object`: the
@@ -308,8 +307,16 @@ public class List_1 implements ICollection_1 {
         }
 
         @Override
+        /// .NET's enumerator starts the walk again, after the same check
+        /// `MoveNext` makes: a list changed since the walk began refuses.
+        /// Only an iterator method's enumerator throws NotSupportedException.
         public void Reset() {
-            throw new NotSupportedException();
+            if (version != list.version) {
+                throw new InvalidOperationException(
+                        "Collection was modified; enumeration operation may not execute.");
+            }
+            index = 0;
+            current = null;
         }
 
         @Override

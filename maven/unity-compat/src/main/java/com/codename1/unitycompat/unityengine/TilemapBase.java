@@ -45,10 +45,19 @@ public class TilemapBase extends GridLayout {
     static final int COLLIDES_AS_SPRITE = 1;
     static final int COLLIDES_AS_CELL = 2;
 
+    /// The cells there is storage for, which is more than the map's
+    /// bounds once it has grown: a map grows with room to spare.
     int originX;
     int originY;
     int width;
     int height;
+    /// The map's bounds, what `origin` and `size` say: the scene's, grown
+    /// by exactly the cells a script set outside them, and shrunk to the
+    /// cells that hold a tile by `CompressBounds`.
+    private int boundsX;
+    private int boundsY;
+    private int boundsWidth;
+    private int boundsHeight;
     /// A variant's number plus one for each cell, row by row from the
     /// bottom; zero is an empty cell.
     int[] cells = new int[0];
@@ -163,6 +172,10 @@ public class TilemapBase extends GridLayout {
         height = cellsUp > 0 ? cellsUp : 0;
         cells = new int[width * height];
         tileCount = 0;
+        boundsX = originX;
+        boundsY = originY;
+        boundsWidth = width;
+        boundsHeight = height;
     }
 
     /// Fills runs of cells: four whole numbers to a run, separated by
@@ -254,6 +267,9 @@ public class TilemapBase extends GridLayout {
             cx = x - originX;
             cy = y - originY;
         }
+        if (value != 0) {
+            include(x, y);
+        }
         int at = cy * width + cx;
         int was = cells[at];
         if (was == value) {
@@ -265,6 +281,29 @@ public class TilemapBase extends GridLayout {
             tileCount--;
         }
         cells[at] = value;
+    }
+
+    /// Grows the bounds by as little as takes in a cell with a tile in it.
+    private void include(int x, int y) {
+        if (boundsWidth == 0 || boundsHeight == 0) {
+            boundsX = x;
+            boundsY = y;
+            boundsWidth = 1;
+            boundsHeight = 1;
+            return;
+        }
+        if (x < boundsX) {
+            boundsWidth += boundsX - x;
+            boundsX = x;
+        } else if (x >= boundsX + boundsWidth) {
+            boundsWidth = x - boundsX + 1;
+        }
+        if (y < boundsY) {
+            boundsHeight += boundsY - y;
+            boundsY = y;
+        } else if (y >= boundsY + boundsHeight) {
+            boundsHeight = y - boundsY + 1;
+        }
     }
 
     /// Puts a variant in a cell, or with -1 empties it, and has whatever
@@ -327,20 +366,60 @@ public class TilemapBase extends GridLayout {
     public void RefreshAllTiles() {
     }
 
-    /// Nothing to do: the bounds only say which cells have storage.
+    /// "Compresses the origin and size of the Tilemap to bounds where
+    /// Tiles exist" (Unity's documentation): the bounds become the
+    /// smallest rectangle around the cells that hold a tile, and the
+    /// storage is cut down to it. A map with no tile has no size left.
     public void CompressBounds() {
+        int fromX = Integer.MAX_VALUE;
+        int fromY = Integer.MAX_VALUE;
+        int toX = Integer.MIN_VALUE;
+        int toY = Integer.MIN_VALUE;
+        for (int cy = 0; cy < height; cy++) {
+            for (int cx = 0; cx < width; cx++) {
+                if (cells[cy * width + cx] != 0) {
+                    fromX = cx < fromX ? cx : fromX;
+                    toX = cx > toX ? cx : toX;
+                    fromY = cy < fromY ? cy : fromY;
+                    toY = cy > toY ? cy : toY;
+                }
+            }
+        }
+        if (toX < fromX) {
+            boundsWidth = 0;
+            boundsHeight = 0;
+            width = 0;
+            height = 0;
+            cells = new int[0];
+            return;
+        }
+        int w = toX - fromX + 1;
+        int h = toY - fromY + 1;
+        int[] kept = new int[w * h];
+        for (int row = 0; row < h; row++) {
+            System.arraycopy(cells, (row + fromY) * width + fromX, kept, row * w, w);
+        }
+        cells = kept;
+        originX += fromX;
+        originY += fromY;
+        width = w;
+        height = h;
+        boundsX = originX;
+        boundsY = originY;
+        boundsWidth = w;
+        boundsHeight = h;
     }
 
     public Vector3Int get_origin(Vector3Int ret) {
-        ret.x = originX;
-        ret.y = originY;
+        ret.x = boundsX;
+        ret.y = boundsY;
         ret.z = 0;
         return ret;
     }
 
     public Vector3Int get_size(Vector3Int ret) {
-        ret.x = width;
-        ret.y = height;
+        ret.x = boundsWidth;
+        ret.y = boundsHeight;
         ret.z = 1;
         return ret;
     }
@@ -368,6 +447,10 @@ public class TilemapBase extends GridLayout {
         originY = m.originY;
         width = m.width;
         height = m.height;
+        boundsX = m.boundsX;
+        boundsY = m.boundsY;
+        boundsWidth = m.boundsWidth;
+        boundsHeight = m.boundsHeight;
         cells = new int[m.cells.length];
         System.arraycopy(m.cells, 0, cells, 0, cells.length);
         tileCount = m.tileCount;

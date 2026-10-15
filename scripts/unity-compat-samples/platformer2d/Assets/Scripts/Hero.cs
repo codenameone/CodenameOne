@@ -77,6 +77,35 @@ public class Hero : MonoBehaviour
         Debug.Log("wall=" + ground.HasTile(wall) + " centre " + Cm(at.x) + "," + Cm(at.y) + " corner " + Cm(corner.x)
             + "," + Cm(corner.y) + " post=" + ground.HasTile(post) + " sign=" + sign.text + " follows="
             + follow.Follow.name);
+        // CompressBounds shrinks the bounds to the cells that hold a tile:
+        // around a tile set far outside them, then back once it is gone.
+        Vector3Int far = new Vector3Int(30, 6, 0);
+        ground.SetTile(far, block);
+        ground.CompressBounds();
+        string grown = ground.origin.x + "," + ground.origin.y + "+" + ground.size.x + "x" + ground.size.y;
+        ground.SetTile(far, null);
+        ground.CompressBounds();
+        Debug.Log("bounds with a far tile " + grown + " without " + ground.origin.x + "," + ground.origin.y + "+"
+            + ground.size.x + "x" + ground.size.y + " far=" + ground.HasTile(far) + " wall=" + ground.HasTile(wall));
+        // Play, Pause, Stop and Clear with no argument take the child
+        // systems along; Stop's default lets the particles there are live.
+        GameObject puff = new GameObject("Puff");
+        ParticleSystem top = puff.AddComponent<ParticleSystem>();
+        GameObject inner = new GameObject("Puff child");
+        inner.transform.SetParent(puff.transform, false);
+        ParticleSystem child = inner.AddComponent<ParticleSystem>();
+        top.Play();
+        string played = "" + child.isEmitting;
+        top.Pause();
+        string paused = "" + child.isPaused;
+        top.Play();
+        child.Emit(3);
+        top.Stop();
+        string stopped = child.isEmitting + "," + child.particleCount;
+        top.Clear();
+        Debug.Log("particle children play=" + played + " pause=" + paused + " stop=" + stopped + " clear="
+            + child.particleCount);
+        DestroyImmediate(puff);
         // A copy of a camera rig whose camera follows an object inside the
         // rig follows the copy of that object; one it looks at outside the
         // rig is the same object in the copy.

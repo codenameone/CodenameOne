@@ -176,7 +176,7 @@ public final class AudioSource extends Behaviour {
     public void $setup(AudioClip clip, float volume, float pitch, boolean loop, boolean mute, boolean playOnAwake) {
         this.clip = clip;
         this.volume = volume;
-        this.pitch = pitch;
+        this.pitch = clampPitch(pitch);
         this.loop = loop;
         this.mute = mute;
         this.playOnAwake = playOnAwake;
@@ -256,6 +256,14 @@ public final class AudioSource extends Behaviour {
         return pitch;
     }
 
+    /// Unity's AudioSource.pitch: "When resource is an AudioClip, the
+    /// pitch property is clamped to the range [-3..3]." The clamped value is
+    /// what is kept, so `pitch = 10` reads back 3 and plays at three times
+    /// the speed. A NaN is passed on as it is.
+    private static float clampPitch(float value) {
+        return value > 3f ? 3f : value < -3f ? -3f : value;
+    }
+
     /// A change of speed counts from now: what has played so far played at
     /// the old one. On a voice that is sounding it goes to the output as
     /// well, as the volume does; it used to change this account alone, and
@@ -278,9 +286,9 @@ public final class AudioSource extends Behaviour {
             startedFrom = position();
             startedAt = paused ? pausedAt : now();
         }
-        pitch = value;
+        pitch = clampPitch(value);
         if (playing && output != null) {
-            output.pitch(voice, value);
+            output.pitch(voice, pitch);
         }
     }
 

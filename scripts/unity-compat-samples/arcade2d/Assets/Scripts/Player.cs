@@ -119,6 +119,12 @@ public class Player : MonoBehaviour
             Debug.Log("inverted frame " + f + " flipped=" + Mathf.RoundToInt(Input.GetAxis("Flipped") * 1000f)
                 + " raw=" + Input.GetAxisRaw("Flipped"));
         }
+        // Of two axes with one name, GetAxisRaw answers with the one of the
+        // largest absolute value, whichever of them comes last.
+        if (f == 206 || f == 236)
+        {
+            Debug.Log("mixed frame " + f + " raw=" + Mathf.RoundToInt(Input.GetAxisRaw("Mixed") * 1000f));
+        }
     }
 
     private void Fire()

@@ -428,4 +428,15 @@ Dictionary`2 System.Collections.Generic.Dictionary`2[System.String,System.Int32]
 System.Collections.Generic.List`1[System.Collections.Generic.List`1[System.Int32]] System.Collections.Generic.List`1[System.Int32[]] List`1 System.Collections.Generic.KeyValuePair`2[System.Int32,System.Boolean] System.Action`1[System.Int32] Func`2
 Inner Spike.DkNest`1+Inner[System.Int32] Spike.DkKeyed`1[Spike.GsVec]
 from generic code True False System.Collections.Generic.List`1[System.String] True System.Collections.Generic.Dictionary`2[System.String,System.Boolean]
+== enumerator reset
+list 1,2,3, 1,2,3,
+list changed InvalidOperation
+dictionary 2 a,b, 1,2,
+dictionary changed InvalidOperation InvalidOperation InvalidOperation
+array 5,6,
+iterator NotSupported
+== null params arrays
+concat ArgumentNull ArgumentNull [] [] 1 x
+format ArgumentNull ArgumentNull [] ArgumentNull ArgumentNull ArgumentNull ArgumentNull
+join ArgumentNull ab
 done

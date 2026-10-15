@@ -14,3 +14,10 @@
 215 e up
 215 q down
 230 q up
+# Two axes named Mixed, e and the mouse's x at a hundredth: while e is held
+# the mouse moving 20 pixels is the weaker of the two, and with e let go it
+# is all there is.
+205 pointer:100,100 move
+206 pointer:120,100 move
+235 pointer:100,100 move
+236 pointer:120,100 move

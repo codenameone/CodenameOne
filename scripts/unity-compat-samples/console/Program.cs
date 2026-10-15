@@ -3037,6 +3037,123 @@ namespace Spike
                 + (DkMethods.ListOf<int>() == typeof(Dictionary<string, int>)) + " " + DkMethods.ListOf<bool>());
         }
 
+        // ---- enumerator Reset and null params arrays -----------------------
+
+        private static string Refusal(Func<string> f)
+        {
+            try
+            {
+                return f();
+            }
+            catch (ArgumentNullException)
+            {
+                return "ArgumentNull";
+            }
+            catch (ArgumentException)
+            {
+                return "Argument";
+            }
+            catch (InvalidOperationException)
+            {
+                return "InvalidOperation";
+            }
+            catch (NotSupportedException)
+            {
+                return "NotSupported";
+            }
+            catch (NullReferenceException)
+            {
+                return "NullReference";
+            }
+            catch (Exception)
+            {
+                return "another exception";
+            }
+        }
+
+        private static string Rest(IEnumerator e)
+        {
+            string s = "";
+            while (e.MoveNext())
+            {
+                s += e.Current + ",";
+            }
+            return s;
+        }
+
+        private static int Steps(IEnumerator e)
+        {
+            int n = 0;
+            while (e.MoveNext())
+            {
+                n++;
+            }
+            return n;
+        }
+
+        // A collection's enumerator starts again on Reset, unless the
+        // collection changed since the walk began; only an iterator method's
+        // enumerator refuses with NotSupportedException.
+        private static void EnumeratorReset()
+        {
+            Section("enumerator reset");
+            List<int> list = new List<int> { 1, 2, 3 };
+            IEnumerator le = list.GetEnumerator();
+            le.MoveNext();
+            le.MoveNext();
+            Log("list " + Refusal(() => { le.Reset(); return Rest(le); }) + " " + Refusal(() => { le.Reset(); return Rest(le) + Rest(le); }));
+            IEnumerator stale = list.GetEnumerator();
+            stale.MoveNext();
+            list.Add(4);
+            Log("list changed " + Refusal(() => { stale.Reset(); return "reset"; }));
+            Dictionary<string, int> d = new Dictionary<string, int> { { "a", 1 }, { "b", 2 } };
+            IEnumerator de = d.GetEnumerator();
+            de.MoveNext();
+            IEnumerator ke = d.Keys.GetEnumerator();
+            ke.MoveNext();
+            ke.MoveNext();
+            IEnumerator ve = d.Values.GetEnumerator();
+            ve.MoveNext();
+            Log("dictionary " + Refusal(() => { de.Reset(); return "" + Steps(de); }) + " " + Refusal(() => { ke.Reset(); return Rest(ke); })
+                + " " + Refusal(() => { ve.Reset(); return Rest(ve); }));
+            IEnumerator de2 = d.GetEnumerator();
+            IEnumerator ke2 = d.Keys.GetEnumerator();
+            IEnumerator ve2 = d.Values.GetEnumerator();
+            d["c"] = 3;
+            Log("dictionary changed " + Refusal(() => { de2.Reset(); return "reset"; }) + " " + Refusal(() => { ke2.Reset(); return "reset"; })
+                + " " + Refusal(() => { ve2.Reset(); return "reset"; }));
+            int[] arr = { 5, 6 };
+            IEnumerator ae = arr.GetEnumerator();
+            ae.MoveNext();
+            Log("array " + Refusal(() => { ae.Reset(); return Rest(ae); }));
+            IEnumerator ie = Countdown(2).GetEnumerator();
+            ie.MoveNext();
+            Log("iterator " + Refusal(() => { ie.Reset(); return "reset"; }));
+        }
+
+        private static IEnumerable<int> Countdown(int n)
+        {
+            while (n > 0)
+            {
+                yield return n--;
+            }
+        }
+
+        // A null element is an empty string; a null array, or a null format,
+        // is ArgumentNullException.
+        private static void NullParamsArrays()
+        {
+            Section("null params arrays");
+            Log("concat " + Refusal(() => string.Concat((object[])null)) + " " + Refusal(() => string.Concat((string[])null))
+                + " [" + Refusal(() => string.Concat((object)null)) + "] [" + Refusal(() => string.Concat((string)null, (string)null))
+                + "] " + Refusal(() => string.Concat(new object[] { null, 1 })) + " " + Refusal(() => string.Concat(new string[] { null, "x" })));
+            Log("format " + Refusal(() => string.Format(null, 1)) + " " + Refusal(() => string.Format("{0}", (object[])null))
+                + " [" + Refusal(() => string.Format("{0}", (object)null)) + "] " + Refusal(() => string.Format(null, 1, 2))
+                + " " + Refusal(() => string.Format(null, 1, 2, 3)) + " " + Refusal(() => string.Format(null, new object[] { 1 }))
+                + " " + Refusal(() => string.Format("x", null)));
+            Log("join " + Refusal(() => string.Join(",", (string[])null)) + " " + Refusal(() => string.Join(null, new string[] { "a", "b" })));
+        }
+
         public static void Main(string[] args)
         {
             ValueTypes();
@@ -3076,6 +3193,8 @@ namespace Spike
             StringReceivers();
             DelegateTypeArguments();
             ConstructedTypes();
+            EnumeratorReset();
+            NullParamsArrays();
             Console.WriteLine("done");
         }
     }
