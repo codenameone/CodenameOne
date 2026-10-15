@@ -191,15 +191,37 @@ public class OutputStreamWriter extends java.io.Writer {
                 // caller asked for -- or throws when len < off.
                 str = str.substring(off, off + len);
             }
-            byte[] b = str.getBytes(enc);
-            if(b.length > 0 && "UTF-16".equals(enc)) {
-                // The JDK writes UTF-16's byte order mark once, at the start of
-                // the stream, and getBytes writes one per call: the rest of the
-                // stream is the same big endian units without it.
-                enc = "UTF-16BE";
+            // getBytes sees one call's characters only, so the two halves of a pair
+            // split across writes were each encoded as a lone surrogate: two
+            // replacements (two U+FFFD in UTF-16, two '?' in a single byte charset)
+            // where the JDK's writer emits the character, or one '?' for the pair.
+            // The high half is held for the next write, as encodeChar holds it for
+            // UTF-8, and joined to whatever that write starts with.
+            if(pendingHigh != 0) {
+                str = pendingHigh + str;
+                pendingHigh = 0;
             }
-            writeBytes(b, 0, b.length);
+            int n = str.length();
+            if(n > 0) {
+                char last = str.charAt(n - 1);
+                if(last >= 0xd800 && last <= 0xdbff) {
+                    pendingHigh = last;
+                    str = str.substring(0, n - 1);
+                }
+            }
+            encodeString(str);
         }
+    }
+
+    private void encodeString(String str) throws java.io.IOException {
+        byte[] b = str.getBytes(enc);
+        if(b.length > 0 && "UTF-16".equals(enc)) {
+            // The JDK writes UTF-16's byte order mark once, at the start of
+            // the stream, and getBytes writes one per call: the rest of the
+            // stream is the same big endian units without it.
+            enc = "UTF-16BE";
+        }
+        writeBytes(b, 0, b.length);
     }
 
     private void writeBytes(byte[] b, int off, int len) throws java.io.IOException {
@@ -275,6 +297,14 @@ public class OutputStreamWriter extends java.io.Writer {
     /* Only the end of the stream can decide that a held high surrogate will never be
      * completed. flush does not, because more characters may still follow it. */
     private void finishPending() throws java.io.IOException {
+        if(pendingHigh != 0 && !utf8) {
+            // The JDK's encoder replaces the dangling half at close with the
+            // charset's replacement, which is what getBytes gives a lone surrogate.
+            char hi = pendingHigh;
+            pendingHigh = 0;
+            encodeString(String.valueOf(hi));
+            return;
+        }
         if(pendingHigh != 0) {
             pendingHigh = 0;
             if(count + 1 > buf.length) {

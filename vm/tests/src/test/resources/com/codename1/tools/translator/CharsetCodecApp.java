@@ -128,6 +128,8 @@ public class CharsetCodecApp {
             sb.append(codePoints(read(blobs[2], name))).append(';');
             sb.append(codePoints(read(blobs[9], name))).append(';');
             sb.append(hex(write(name, texts))).append(';');
+            sb.append(hex(splitPairs(name))).append(';');
+            sb.append(hex(dangling(name))).append(';');
             Charset charset = Charset.forName(name);
             sb.append(charset.name()).append('|');
             sb.append(hex(accented.getBytes(charset))).append('|');
@@ -224,6 +226,49 @@ public class CharsetCodecApp {
         w.write(new char[] {'q', (char) 0xE9}, 0, 2);
         w.close();
         return bytes.toByteArray();
+    }
+
+    /**
+     * The two halves of a pair in separate writes, through every overload and
+     * across a flush, which must not resolve the held half. Then a held half
+     * followed by something that does not complete it, and two highs in a row.
+     */
+    private static byte[] splitPairs(String name) throws Exception {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        OutputStreamWriter w = new OutputStreamWriter(bytes, name);
+        w.write("a" + (char) 0xD83D);
+        w.write("" + (char) 0xDE00 + "b");
+        w.write((int) 0xD83D);
+        w.write((int) 0xDE01);
+        w.write(new char[] {'c', (char) 0xD83D}, 0, 2);
+        w.flush();
+        w.write(new char[] {(char) 0xDE02, 'd'}, 0, 2);
+        w.write("x" + (char) 0xD83D + "y", 1, 1);
+        w.write("");
+        w.write("" + (char) 0xDE03);
+        w.write("" + (char) 0xD800);
+        w.write("e");
+        w.write("" + (char) 0xD800);
+        w.write("" + (char) 0xD801);
+        w.write("" + (char) 0xDC00);
+        w.write("" + (char) 0xDC00);
+        w.close();
+        return bytes.toByteArray();
+    }
+
+    /** A high half that is still held when the writer is closed, after a flush. */
+    private static byte[] dangling(String name) throws Exception {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        OutputStreamWriter w = new OutputStreamWriter(bytes, name);
+        w.write("f" + (char) 0xD83D);
+        w.flush();
+        int flushed = bytes.size();
+        w.close();
+        byte[] all = bytes.toByteArray();
+        byte[] out = new byte[all.length + 1];
+        out[0] = (byte) flushed;
+        System.arraycopy(all, 0, out, 1, all.length);
+        return out;
     }
 
     private static String repeat(String s, int times) {
