@@ -117,6 +117,12 @@ void CN1MacTextInputNotifyEditorAction(void);
 /// text the user has already moved past.
 - (int)currentEditSeq;
 
+/// Main-thread barrier for commands whose result is computed by the Java editor.
+- (BOOL)deferNativeEdit:(void (^)(void))edit;
+- (int)beginEditorCommand;
+- (void)completeEditorCommand:(int)sequence;
+- (void)resetDeferredEditsIfNeeded;
+
 /// Caret rectangle in Codename One pixels, as last reported by the framework.
 @property (nonatomic) CGRect caretRect;
 

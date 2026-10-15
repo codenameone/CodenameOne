@@ -167,6 +167,13 @@
     </build>
 
     <dependencies>
+        <!-- Exercise the Java-side Apple input lifecycle with stubbed native bindings. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-ios</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>cn1-ads-mock</artifactId>
