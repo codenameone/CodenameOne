@@ -45,7 +45,9 @@ write a loaded value into it.
                      `autoIncrement=true` (the default) emits
                      `INTEGER PRIMARY KEY AUTOINCREMENT` and back-fills
                      the field after `insert`.
-| `@Column(name)`  | Rename the column. Default: the field name.
+| `@Column(name)`  | Rename the column. Default: the field name in the app;
+                     on the backend the field name in snake case
+                     (`fareCents -> fare_cents`), as Spring Boot names it.
 | `@Column(type)`  | Override the SQL type. Default: inferred from the
                      Java type (`String -> TEXT`, `int/long -> INTEGER`,
                      `float/double -> REAL`, `boolean -> INTEGER`,
@@ -264,8 +266,8 @@ correlated nested queries. `LENGTH` counts characters on every backend.
 
 ==== Values and callbacks
 
-`@MappedSuperclass` contributes public inherited fields to a concrete entity.
-`@Embedded` flattens a public `@Embeddable` value into columns prefixed with the
+`@MappedSuperclass` contributes its inherited fields to a concrete entity.
+`@Embedded` flattens an `@Embeddable` value into columns prefixed with the
 embedding field name. An all-null embedded value reads as null. Embedded fields
 can be used in query paths. Enums are stored by name. Mapped query parameters and
 literals accept the declared enum type, a valid constant name, or null. Invalid

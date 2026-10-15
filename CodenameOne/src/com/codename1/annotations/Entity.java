@@ -72,7 +72,9 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 @com.codename1.impl.SharedWithBackend
 public @interface Entity {
-    /// SQL table name. Defaults to the simple class name when blank.
+    /// SQL table name. When blank the app names the table after the simple
+    /// class name, and the backend after the same name in snake case
+    /// (`RideEvent` becomes `ride_event`), as Spring Boot does.
     String table() default "";
     /// Additional indexes created with the entity table.
     /// @return index declarations, empty by default

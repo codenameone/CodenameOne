@@ -159,6 +159,50 @@ public class OrmAnnotationProcessorTest {
         assertEquals(riderMethods,methodNames(new File(classes,"hidden/Rider.class")));
     }
 
+    @Test
+    public void snakeCaseFollowsSpringPhysicalNaming() {
+        String[][] cases={{"fareCents","fare_cents"},{"distanceMeters","distance_meters"},{"RideEvent","ride_event"},
+            {"userID","userid"},{"URLValue","urlvalue"},{"home_zipCode","home_zip_code"},{"a1B2c","a1_b2c"},{"x","x"},{"already_snake","already_snake"},{"pdfURLs","pdfurls"}};
+        for(String[] c:cases) assertEquals(c[0],c[1],OrmAnnotationProcessor.snakeCase(c[0]));
+    }
+
+    @Test
+    public void backendNamesTablesAndColumnsInSnakeCaseAndTheClientKeepsFieldNames() throws Exception {
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("naming.RiderAccount","package naming; import com.codename1.annotations.*; @Entity public class RiderAccount { @Id public long id; }");
+        sources.put("naming.HomePlace","package naming; import com.codename1.annotations.db.*; @Embeddable public class HomePlace { public String cityName; public int zipCode; }");
+        sources.put("naming.RideEvent","package naming; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class RideEvent { @Id public long id; public long fareCents; public double distanceMeters; public String userID; "
+            + "@Column(name=\"Kept_As_Written\") public String renamed; @Embedded public HomePlace homePlace; @ManyToOne public RiderAccount riderAccount; }");
+        sources.put("naming.Fixed","package naming; import com.codename1.annotations.*; @Entity(table=\"FixedTable\") public class Fixed { @Id public long id; public String someValue; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        for(boolean backend:new boolean[]{false,true}) {
+            ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+            java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+            loader.loadClass(backend ? "cn1app.BackendDaoBootstrap" : "cn1app.DaoBootstrap").newInstance();
+            com.codename1.backend.orm.EntityManager server=backend ? com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:")) : null;
+            com.codename1.orm.EntityManager client=backend ? null : com.codename1.orm.EntityManager.open(new com.codename1.impl.javase.SEDatabase(java.sql.DriverManager.getConnection("jdbc:sqlite::memory:")));
+            com.codename1.orm.session.Session session=backend ? server.openSession() : client.openSession();
+            try {
+                session.createTables();
+                java.util.Set<String> tables=new java.util.TreeSet<String>(session.createNativeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite%' AND name NOT LIKE 'cn1%'",String.class).list());
+                String ride=backend?"ride_event":"RideEvent";
+                assertEquals(new java.util.TreeSet<String>(Arrays.asList(ride,backend?"rider_account":"RiderAccount","FixedTable")),tables);
+                java.util.Set<String> columns=new java.util.TreeSet<String>(session.createNativeQuery("SELECT name FROM pragma_table_info('"+ride+"')",String.class).list());
+                assertEquals(backend
+                        ? new java.util.TreeSet<String>(Arrays.asList("id","fare_cents","distance_meters","userid","Kept_As_Written","home_place_city_name","home_place_zip_code","rider_account_id"))
+                        : new java.util.TreeSet<String>(Arrays.asList("id","fareCents","distanceMeters","userID","Kept_As_Written","homePlace_cityName","homePlace_zipCode","riderAccount_id")),
+                        columns);
+                assertEquals(new java.util.TreeSet<String>(Arrays.asList("id",backend?"some_value":"someValue")),
+                        new java.util.TreeSet<String>(session.createNativeQuery("SELECT name FROM pragma_table_info('FixedTable')",String.class).list()));
+                // JPQL keeps speaking in field names whatever the columns are called.
+                session.beginTransaction();Object event=loader.loadClass("naming.RideEvent").newInstance();
+                event.getClass().getField("fareCents").setLong(event,250L);session.persist(event);session.commitTransaction();
+                assertEquals(Long.valueOf(1),session.createQuery("SELECT COUNT(e) FROM naming.RideEvent e WHERE e.fareCents = :f",Long.class).setParameter("f",Long.valueOf(250)).first());
+            } finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
+        }
+    }
+
     private static java.util.Set<String> methodNames(File classFile) throws Exception {
         final java.util.Set<String> names=new java.util.TreeSet<String>();
         java.util.List<String> all=new java.util.ArrayList<String>();

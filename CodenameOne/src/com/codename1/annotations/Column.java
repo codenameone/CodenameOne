@@ -28,15 +28,17 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /// Renames or constrains an `@Entity` field's column. Optional -- when absent,
-/// the column name defaults to the field name and the type is inferred from
-/// the Java field type (`String -> TEXT`, `int/long -> INTEGER`,
+/// the column name defaults to the field name (in snake case on the backend)
+/// and the type is inferred from the Java field type (`String -> TEXT`, `int/long -> INTEGER`,
 /// `float/double -> REAL`, `boolean -> INTEGER`, `byte[] -> BLOB`,
 /// `java.util.Date -> INTEGER`).
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
 @com.codename1.impl.SharedWithBackend
 public @interface Column {
-    /// Column name. Defaults to the field name when blank.
+    /// Column name. When blank the app uses the field name and the backend
+    /// the field name in snake case (`fareCents` becomes `fare_cents`), the
+    /// default Spring Boot applies.
     String name() default "";
 
     /// When false the column gets a `NOT NULL` constraint at table-create time.

@@ -409,7 +409,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         Object indexes=entityAnn.get("indexes");
         if(indexes instanceof List) for(Object index:(List)indexes) ec.indexes.add((AnnotationValues)index);
         String table = entityAnn.getString("table");
-        ec.tableName = (table == null || table.length() == 0) ? ec.simpleName : table;
+        ec.tableName = (table == null || table.length() == 0) ? physical(ec.simpleName) : table;
         if (backend && tooLongForAnEngine(ec.tableName)) {
             ctx.error(cls, "@Entity " + ec.binaryName + " is stored in a table named '"
                     + ec.tableName + "', which is " + utf8Length(ec.tableName) + " bytes. "
@@ -498,7 +498,8 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 colType = col.getString("type");
                 nullable = col.getBoolOrDefault("nullable", true);
             }
-            pf.columnName = (colName == null || colName.length() == 0) ? pf.fieldName.replace('.', '_') : fieldPath.prefix.replace('.', '_')+colName;
+            pf.columnName = (colName == null || colName.length() == 0) ? physical(pf.fieldName)
+                    : physical(fieldPath.prefix)+colName;
             pf.sqlType = (colType == null || colType.length() == 0) ? defaultSqlType(pf.kind) : colType;
             // The EXPLICIT type, separately: the client flavour needs a type for
             // every column and defaults it to SQLite's, while the backend one
@@ -1036,6 +1037,43 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         visiting.remove(cls.getBinaryName());return result;
     }
 
+    /// The table or column name a Java name gets when the developer names none.
+    ///
+    /// On the BACKEND it is Spring Boot's physical naming
+    /// (CamelCaseToUnderscoresNamingStrategy): dots become underscores, an
+    /// underscore goes before an upper case letter that sits between a lower case
+    /// letter or digit and another lower case letter or digit, and the whole is
+    /// lower cased. So `fareCents` is `fare_cents`, `RideEvent` is `ride_event`,
+    /// an embedded `home.zipCode` is `home_zip_code`, and an acronym such as
+    /// `userID` stays one word, `userid`. A server developer expects the schema
+    /// Spring would have made, and an explicit `@Column(name)` or
+    /// `@Entity(table)` still wins.
+    ///
+    /// The CLIENT keeps the Java name, dots made underscores. Applications already
+    /// ship SQLite files whose columns are named after their fields, and
+    /// `CREATE TABLE IF NOT EXISTS` would leave those tables alone while the
+    /// generated SQL went looking for columns they do not have.
+    String physical(String name) {
+        String flat=name.replace('.','_');
+        return backend ? snakeCase(flat) : flat;
+    }
+
+    /// Spring's algorithm character for character, Character classes included,
+    /// so that a name gets the column it would get under Spring.
+    static String snakeCase(String name) {
+        StringBuilder out=new StringBuilder(name.length()+8);
+        for(int i=0;i<name.length();i++) {
+            char c=name.charAt(i);
+            if(i>0 && i+1<name.length() && Character.isUpperCase(c)
+                    && lowerOrDigit(name.charAt(i-1)) && lowerOrDigit(name.charAt(i+1)))
+                out.append('_');
+            out.append(c);
+        }
+        return out.toString().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private static boolean lowerOrDigit(char c) { return Character.isLowerCase(c) || Character.isDigit(c); }
+
     /// THE JPA RULE: every field that is not static and not transient is
     /// persistent, whatever its access. `@DbTransient` and the Java `transient`
     /// modifier both opt a field out; so does being synthetic, which covers an
@@ -1144,14 +1182,16 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 ctx.error("Relationship collection must use List, Set or Map: "+owner.binaryName+"."+relation.field);
         }
         AnnotationValues join=field.getAnnotation(prefix+"JoinColumn;");
-        relation.columnName=join==null?relation.field+"_id":join.getStringOrDefault("name",relation.field+"_id");
-        if(relation.columnName.length()==0) relation.columnName=relation.field+"_id";
+        String joinDefault=physical(relation.field)+"_id";
+        relation.columnName=join==null?joinDefault:join.getStringOrDefault("name",joinDefault);
+        if(relation.columnName.length()==0) relation.columnName=joinDefault;
         relation.nullable=annotation.getBoolOrDefault("optional",true) && (join==null || join.getBoolOrDefault("nullable",true));
         AnnotationValues table=field.getAnnotation(prefix+"JoinTable;");
-        relation.table=table==null?owner.tableName+"_"+relation.field:table.getStringOrDefault("name",owner.tableName+"_"+relation.field);
+        String tableDefault=owner.tableName+"_"+physical(relation.field);
+        relation.table=table==null?tableDefault:table.getStringOrDefault("name",tableDefault);
         relation.ownerColumn=table==null?"owner_id":table.getStringOrDefault("joinColumn","owner_id");
         relation.targetColumn=table==null?"target_id":table.getStringOrDefault("inverseJoinColumn","target_id");
-        if(relation.table.length()==0) relation.table=owner.tableName+"_"+relation.field;
+        if(relation.table.length()==0) relation.table=tableDefault;
         if(relation.ownerColumn.length()==0) relation.ownerColumn="owner_id";
         if(relation.targetColumn.length()==0) relation.targetColumn="target_id";
         if(relation.mappedBy.length()>0 && (join!=null || table!=null)) ctx.error("Inverse associations must not declare join columns or tables: "+relation.field);
