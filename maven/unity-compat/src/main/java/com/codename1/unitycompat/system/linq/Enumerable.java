@@ -57,9 +57,28 @@ public final class Enumerable {
     }
 
     private static IEnumerator_1 walk(IEnumerable_1 source) {
-        if (source == null) {
+        need(source);
+        return source.GetEnumerator();
+    }
+
+    /// .NET checks every argument before it asks the source for anything,
+    /// so a null predicate or selector is `ArgumentNullException` even over
+    /// an empty sequence, where it would never be called, and an iterator
+    /// source never starts. Checking the function only when the first
+    /// element reaches it answered an empty source without an error, and
+    /// ran a source's side effects before throwing.
+    private static void need(Object argument) {
+        if (argument == null) {
             throw new ArgumentNullException();
         }
+    }
+
+    /// [#walk] of a source with a predicate or selector: the source is
+    /// checked first, then the function, as .NET does, and only then is an
+    /// enumerator asked for.
+    private static IEnumerator_1 walk(IEnumerable_1 source, Func_2 function) {
+        need(source);
+        need(function);
         return source.GetEnumerator();
     }
 
@@ -123,7 +142,7 @@ public final class Enumerable {
     }
 
     public static boolean Any(IEnumerable_1 source, Func_2 predicate, Class t) {
-        IEnumerator_1 e = walk(source);
+        IEnumerator_1 e = walk(source, predicate);
         try {
             while (e.MoveNext()) {
                 if (yes(predicate.Invoke(e.get_Current()))) {
@@ -137,7 +156,7 @@ public final class Enumerable {
     }
 
     public static boolean All(IEnumerable_1 source, Func_2 predicate, Class t) {
-        IEnumerator_1 e = walk(source);
+        IEnumerator_1 e = walk(source, predicate);
         try {
             while (e.MoveNext()) {
                 if (!yes(predicate.Invoke(e.get_Current()))) {
@@ -168,7 +187,7 @@ public final class Enumerable {
 
     public static int Count(IEnumerable_1 source, Func_2 predicate, Class t) {
         int n = 0;
-        IEnumerator_1 e = walk(source);
+        IEnumerator_1 e = walk(source, predicate);
         try {
             while (e.MoveNext()) {
                 if (yes(predicate.Invoke(e.get_Current()))) {
@@ -208,7 +227,7 @@ public final class Enumerable {
     }
 
     public static Object First(IEnumerable_1 source, Func_2 predicate, Class t) {
-        IEnumerator_1 e = walk(source);
+        IEnumerator_1 e = walk(source, predicate);
         try {
             while (e.MoveNext()) {
                 Object o = e.get_Current();
@@ -232,7 +251,7 @@ public final class Enumerable {
     }
 
     public static Object FirstOrDefault(IEnumerable_1 source, Func_2 predicate, Class t) {
-        IEnumerator_1 e = walk(source);
+        IEnumerator_1 e = walk(source, predicate);
         try {
             while (e.MoveNext()) {
                 Object o = e.get_Current();
@@ -276,6 +295,12 @@ public final class Enumerable {
     }
 
     public static Object ElementAt(IEnumerable_1 source, int index, Class t) {
+        need(source);
+        // No element has a negative index, and .NET says so before it asks
+        // the source for anything: an iterator source never starts.
+        if (index < 0) {
+            throw new com.codename1.unitycompat.system.ArgumentOutOfRangeException();
+        }
         IEnumerator_1 e = walk(source);
         try {
             int at = 0;
@@ -293,7 +318,7 @@ public final class Enumerable {
 
     public static IEnumerable_1 Where(IEnumerable_1 source, Func_2 predicate, Class t) {
         List_1 out = new List_1();
-        IEnumerator_1 e = walk(source);
+        IEnumerator_1 e = walk(source, predicate);
         try {
             while (e.MoveNext()) {
                 Object o = e.get_Current();
@@ -309,7 +334,7 @@ public final class Enumerable {
 
     public static IEnumerable_1 Select(IEnumerable_1 source, Func_2 selector, Class t, Class r) {
         List_1 out = new List_1();
-        IEnumerator_1 e = walk(source);
+        IEnumerator_1 e = walk(source, selector);
         try {
             while (e.MoveNext()) {
                 out.Add(selector.Invoke(e.get_Current()));
@@ -373,6 +398,9 @@ public final class Enumerable {
     }
 
     public static IEnumerable_1 Concat(IEnumerable_1 first, IEnumerable_1 second, Class t) {
+        // Both are checked before either is walked, as .NET does.
+        need(first);
+        need(second);
         List_1 out = ToList(first, t);
         IEnumerator_1 e = walk(second);
         try {

@@ -80,6 +80,8 @@ find Menu/Panel/Button Menu/Panel/Button 12 Menu Menu/Panel none none none none 
 children 3 Panel Button
 inactive 1 Panel 1 Button 1 none none Panel/Button
 inactive root none 0 Button
+inactive coroutine ran=0 null=True
+format (100000002004087734272.00, -299999995292024832.00, 999999986991104.00) (340282346638528859811704183484516925440.00, 16777216.00) RGBA(10000000272564224.000, -123456790519087104.000, Infinity, 0.500)
 outer starts frame=1
 inner a starts frame=1
 touch supported=True multi=True simulate=True count=0

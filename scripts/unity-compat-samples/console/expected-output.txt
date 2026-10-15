@@ -439,4 +439,10 @@ iterator NotSupported
 concat ArgumentNull ArgumentNull [] [] 1 x
 format ArgumentNull ArgumentNull [] ArgumentNull ArgumentNull ArgumentNull ArgumentNull
 join ArgumentNull ab
+== argument checks
+clear ArgumentNull ArgumentNull ArgumentNull ArgumentNull
+null predicate ArgumentNull ArgumentNull ArgumentNull ArgumentNull ArgumentNull ArgumentNull ArgumentNull
+null source ArgumentNull ArgumentNull ArgumentNull ArgumentNull ArgumentNull
+element at Argument walks=0 Argument walks=1 ArgumentNull walks=1
+take skip [] [1,2,]
 done

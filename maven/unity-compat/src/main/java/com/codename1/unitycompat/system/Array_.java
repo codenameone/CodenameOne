@@ -188,10 +188,21 @@ public final class Array_ {
         }
     }
 
+    /// `Array.Clear` is a static method that takes the array as an
+    /// argument, so a null one is `ArgumentNullException`, as .NET answers
+    /// for every shape of array -- not the `NullReferenceException` of a
+    /// call on a null receiver, which is what `Clone` or `Length` throw.
+    private static void notNull(Object array) {
+        if (array == null) {
+            throw new ArgumentNullException();
+        }
+    }
+
     /// `Array.Clear(array, index, length)`: the elements go back to their
     /// default. An array of more dimensions is cleared by flat index, which
     /// is how .NET counts here too.
     public static void Clear(Object array, int index, int count) {
+        notNull(array);
         if (array instanceof MdArray) {
             MdArray md = (MdArray) array;
             range(md.length(), index, count);
@@ -251,6 +262,7 @@ public final class Array_ {
     /// `Array.Clear` of a one-dimensional array the translator knows to hold
     /// structs: each element is reset where it is.
     public static void $clearStructs(Object array, int index, int count) {
+        notNull(array);
         Object[] a = (Object[]) array;
         range(a.length, index, count);
         for (int i = index; i < index + count; i++) {

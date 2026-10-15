@@ -534,7 +534,11 @@ namespace UnityEngine
             {
                 v = -v;
             }
-            if (v > 1e15)
+            // Only an infinity has no difference from itself that is a
+            // number; written that way so no target compares a float with a
+            // constant.
+            double self = v - v;
+            if (self != self)
             {
                 return negative ? "-Infinity" : "Infinity";
             }
@@ -542,6 +546,17 @@ namespace UnityEngine
             for (int i = 0; i < decimals; i++)
             {
                 scale *= 10;
+            }
+            // From here on a float is a whole number -- its 24 bits of
+            // mantissa sit far above the point -- but it can run to 39
+            // digits, more than a long holds once scaled. .NET writes every
+            // one of them, the float's exact value (1E+20 is
+            // "100000002004087734272.00"), and the decimals as zeros.
+            if (v >= 1e15)
+            {
+                string zeros = scale.ToString().Substring(1);
+                string big = Whole(v) + "." + zeros;
+                return negative ? "-" + big : big;
             }
             long n = (long)(v * scale + 0.5);
             long whole = n / scale;
@@ -553,6 +568,48 @@ namespace UnityEngine
             }
             string text = whole.ToString() + "." + digits;
             return negative && n != 0 ? "-" + text : text;
+        }
+
+        // The decimal digits of a whole number too large for a long. Halving
+        // is exact on a whole number with so few significant bits, so the
+        // value is m * 2^k with m a long; the digits of m are then doubled k
+        // times, one digit at a time, which needs nothing wider than an int.
+        private static string Whole(double v)
+        {
+            int doublings = 0;
+            while (v >= 1e18)
+            {
+                v *= 0.5;
+                doublings++;
+            }
+            long m = (long)v;
+            int[] digits = new int[48];
+            int count = 0;
+            while (m > 0)
+            {
+                digits[count++] = (int)(m % 10);
+                m /= 10;
+            }
+            for (int d = 0; d < doublings; d++)
+            {
+                int carry = 0;
+                for (int i = 0; i < count; i++)
+                {
+                    int x = digits[i] * 2 + carry;
+                    digits[i] = x % 10;
+                    carry = x / 10;
+                }
+                if (carry > 0)
+                {
+                    digits[count++] = carry;
+                }
+            }
+            char[] text = new char[count];
+            for (int i = 0; i < count; i++)
+            {
+                text[i] = (char)('0' + digits[count - 1 - i]);
+            }
+            return new string(text);
         }
     }
 

@@ -1722,6 +1722,19 @@ public final class UnityRuntime {
     private static final int EMPTY_CHILDREN = 1000000;
 
     static Coroutine startCoroutine(MonoBehaviour owner, IEnumerator routine) {
+        // "If you deactivate a GameObject, coroutines attached to it are
+        // stopped" (Manual, Deactivate GameObjects), and `runCoroutines` drops
+        // one whose object is inactive before it steps it again. Started on
+        // an object that is already inactive in the hierarchy, the routine
+        // would be stopped before its first step; running that step here
+        // anyway ran code -- and its side effects -- that no frame would
+        // ever have run. It is not run at all, and there is nothing to wait
+        // for or to stop, so the answer is null, as for a routine that is
+        // over before StartCoroutine returns. Unity's documentation names no
+        // message for this case, so none is logged.
+        if (!owner.gameObject.activeInHierarchy()) {
+            return null;
+        }
         Coroutine c = new Coroutine();
         c.owner = owner;
         c.routine = routine;

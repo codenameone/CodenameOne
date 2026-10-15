@@ -157,6 +157,15 @@ public class Probe : MonoBehaviour
         Debug.Log("inactive root " + Name(loose.GetComponentInChildren<SpriteRenderer>()) + " "
             + loose.GetComponentsInChildren<SpriteRenderer>().Length + " "
             + Name(stray.GetComponentInChildren<SpriteRenderer>()));
+        // A coroutine started on an inactive object would be stopped before
+        // its first step, so not even that step runs.
+        Probe asleep = button.AddComponent<Probe>();
+        Coroutine never = asleep.StartCoroutine(Asleep());
+        Debug.Log("inactive coroutine ran=" + asleepSteps + " null=" + (never == null));
+        // Large finite components are written whole, digit for digit as .NET
+        // writes the float with F2 and F3, never as Infinity.
+        Debug.Log("format " + new Vector3(1e20f, -3e17f, 1e15f) + " " + new Vector2(3.4028235e38f, 16777216f) + " "
+            + new Color(1e16f, -1.2345679e17f, float.PositiveInfinity, 0.5f));
         Destroy(menu);
         Destroy(loose);
     }
@@ -191,6 +200,15 @@ public class Probe : MonoBehaviour
     {
         yield return new WaitForFixedUpdate();
         Debug.Log("deep " + name + " step=" + frame + " frame=" + Time.frameCount);
+    }
+
+    private static int asleepSteps;
+
+    private static IEnumerator Asleep()
+    {
+        asleepSteps++;
+        yield return null;
+        asleepSteps++;
     }
 
     private IEnumerator Empty()

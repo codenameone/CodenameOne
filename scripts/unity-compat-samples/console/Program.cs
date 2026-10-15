@@ -3154,6 +3154,44 @@ namespace Spike
             Log("join " + Refusal(() => string.Join(",", (string[])null)) + " " + Refusal(() => string.Join(null, new string[] { "a", "b" })));
         }
 
+        private static int noisyWalks;
+
+        private static IEnumerable<int> Noisy()
+        {
+            noisyWalks++;
+            yield return 1;
+        }
+
+        // Array.Clear takes the array as an argument: a null one is
+        // ArgumentNullException, whatever shape it would have had. LINQ checks
+        // its source and its function before it asks for an element, so an
+        // empty source with a null predicate still refuses, and a negative
+        // ElementAt never starts the source.
+        private static void ArgumentChecks()
+        {
+            Section("argument checks");
+            Log("clear " + Refusal(() => { Array.Clear((int[])null, 0, 0); return "ok"; }) + " "
+                + Refusal(() => { Array.Clear((Vec2[])null, 0, 0); return "ok"; }) + " "
+                + Refusal(() => { Array.Clear((int[,])null, 0, 0); return "ok"; }) + " "
+                + Refusal(() => { Array.Clear((string[])null, 0, 0); return "ok"; }));
+            List<int> empty = new List<int>();
+            Func<int, bool> np = null;
+            Func<int, int> ns = null;
+            Log("null predicate " + Refusal(() => "" + empty.Any(np)) + " " + Refusal(() => "" + empty.All(np)) + " "
+                + Refusal(() => "" + empty.Count(np)) + " " + Refusal(() => "" + empty.First(np)) + " "
+                + Refusal(() => "" + empty.FirstOrDefault(np)) + " " + Refusal(() => "" + empty.Where(np).Count()) + " "
+                + Refusal(() => "" + empty.Select(ns).Count()));
+            IEnumerable<int> none = null;
+            Log("null source " + Refusal(() => "" + none.Any()) + " " + Refusal(() => "" + none.Count()) + " "
+                + Refusal(() => "" + none.Concat(empty).Count()) + " " + Refusal(() => "" + empty.Concat(none).Count()) + " "
+                + Refusal(() => "" + none.ElementAt(0)));
+            noisyWalks = 0;
+            Log("element at " + Refusal(() => "" + Noisy().ElementAt(-1)) + " walks=" + noisyWalks + " "
+                + Refusal(() => "" + Noisy().ElementAt(5)) + " walks=" + noisyWalks + " "
+                + Refusal(() => "" + Noisy().Where(np).Count()) + " walks=" + noisyWalks);
+            Log("take skip [" + Rest(new int[] { 1, 2 }.Take(-1).GetEnumerator()) + "] [" + Rest(new int[] { 1, 2 }.Skip(-1).GetEnumerator()) + "]");
+        }
+
         public static void Main(string[] args)
         {
             ValueTypes();
@@ -3195,6 +3233,7 @@ namespace Spike
             ConstructedTypes();
             EnumeratorReset();
             NullParamsArrays();
+            ArgumentChecks();
             Console.WriteLine("done");
         }
     }
