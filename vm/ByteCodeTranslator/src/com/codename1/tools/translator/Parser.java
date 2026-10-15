@@ -1785,6 +1785,11 @@ public class Parser extends ClassVisitor {
                 if(JavascriptNativeRegistry.isRuntimeDelegateTarget(bc.getClsName(), mtd.getMethodName())) {
                     continue;
                 }
+                // Called from the clean target's generated main() before the
+                // program's own main; no bytecode call site exists.
+                if(ByteCodeClass.isCleanTargetStartup(bc.getClsName(), mtd)) {
+                    continue;
+                }
                 if(mtd.isEliminated() || mtd.isMain() || mtd.getMethodName().equals("__CLINIT__") || mtd.getMethodName().equals("finalize") || mtd.isNative()) {
                     if (!mtd.isEliminated() && mtd.getMethodName().contains("yield")) {
                         if(ByteCodeTranslator.verbose) {

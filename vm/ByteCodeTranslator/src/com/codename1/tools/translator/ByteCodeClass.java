@@ -662,6 +662,47 @@ public class ByteCodeClass {
         return response;
     }
     
+    /// The backend runtime's file-system install. The class library reaches the
+    /// file system through `com.codename1.impl.JdkHost`, and a backend program
+    /// has no Codename One core to install one -- `Backend`'s static initializer
+    /// did, so a program that wrote a file before touching `Backend` (the
+    /// runtime self test does, through `FileIo` and `StaticFiles`) got "No file
+    /// system". The clean target's main() now runs it before the program's main.
+    /// Only a translation that carries the backend runtime has the class.
+    private static final String CLEAN_STARTUP_CLASS = "com_codename1_backend_FileIo";
+    private static final String CLEAN_STARTUP_METHOD = "installJdkHost";
+
+    static boolean isCleanTargetStartup(String clsName, BytecodeMethod m) {
+        return ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_CLEAN
+                && CLEAN_STARTUP_CLASS.equals(clsName)
+                && CLEAN_STARTUP_METHOD.equals(m.getMethodName())
+                && m.isStatic();
+    }
+
+    private void appendCleanTargetStartup(StringBuilder b, List<ByteCodeClass> allClasses) {
+        // Only a class in the emitted set: calling into one that is not
+        // emitted would not link.
+        ByteCodeClass cls = null;
+        for (ByteCodeClass c : allClasses) {
+            if (CLEAN_STARTUP_CLASS.equals(c.getClsName())) {
+                cls = c;
+                break;
+            }
+        }
+        if (cls == null) {
+            return;
+        }
+        for (BytecodeMethod m : cls.getMethods()) {
+            if (!m.isEliminated() && isCleanTargetStartup(CLEAN_STARTUP_CLASS, m)
+                    && m.getSignature().equals("()V")) {
+                String fn = CLEAN_STARTUP_CLASS + "_" + CLEAN_STARTUP_METHOD + "__";
+                b.append("    extern void ").append(fn).append("(CODENAME_ONE_THREAD_STATE);\n");
+                b.append("    ").append(fn).append("(getThreadLocalData());\n");
+                return;
+            }
+        }
+    }
+
     private ByteCodeClass findClass(String s, List<ByteCodeClass> lst) {
         // lst is always Parser.classes here (markDependencies -> markDependent), so
         // the shared name index gives the same first-match result in O(1) instead of
@@ -1844,6 +1885,7 @@ public class ByteCodeClass {
                         b.append("    struct ThreadLocalData* mainThread = getThreadLocalData();\n");
                         b.append("    mainThread->lightweightThread = JAVA_TRUE;\n");
                         b.append("    mainThread->threadActive = JAVA_TRUE;\n");
+                        appendCleanTargetStartup(b, allClasses);
                     }
                     // UI host threads remain native: AppKit's event loop enters
                     // Java through callbacks rather than running a Java main to

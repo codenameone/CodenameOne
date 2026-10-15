@@ -35,7 +35,10 @@ public final class FileIo {
 
     /// Hands the class library its file system: a backend has no Codename One
     /// core to serve it, so it gets the POSIX host over the file natives this
-    /// runtime links anyway. Called once, from `Backend`'s static initializer.
+    /// runtime links anyway. The translator's generated main() calls it before
+    /// the program's own main, so a program that writes a file before it touches
+    /// `Backend` has a file system too; `Backend`'s static initializer calls it
+    /// again, which is harmless.
     static void installJdkHost() {
         com.codename1.impl.JdkHost.install(new com.codename1.impl.PosixJdkHost());
     }
