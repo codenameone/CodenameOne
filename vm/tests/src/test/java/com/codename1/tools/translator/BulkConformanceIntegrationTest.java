@@ -446,8 +446,9 @@ class BulkConformanceIntegrationTest {
     }
 
     private static CompilerHelper.CompilerConfig selectCompiler() {
-        // The checks use Java 17 API, so nothing older can compile them.
-        for (String target : new String[] {"17", "21", "25"}) {
+        // The checks use Java 21 API (SwitchoverMembersApp calls the sequenced
+        // List methods), so prefer 21; 17 is the last resort for the rest.
+        for (String target : new String[] {"21", "25", "17"}) {
             for (CompilerHelper.CompilerConfig config : CompilerHelper.getAvailableCompilers(target)) {
                 if (CompilerHelper.isJavaApiCompatible(config)) {
                     return config;

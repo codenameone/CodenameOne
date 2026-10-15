@@ -25,8 +25,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Objects;
 
-/// The java.lang / java.util members JavaAPI took over from compat-jdk, in the
-/// browser runtime. One bit per property; all of them is 0x3fffffff (30 bits).
+/// The java.lang / java.util members JavaAPI provides, in the browser
+/// runtime. One bit per property; all of them is 0x3fffffff (30 bits).
 /// Java 11 API only.
 public class JsLangMembersApp {
     public static int result;

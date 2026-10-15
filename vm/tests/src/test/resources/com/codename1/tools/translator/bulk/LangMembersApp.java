@@ -32,7 +32,7 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-/// The java.lang / java.util members JavaAPI gained from compat-jdk, run on
+/// The java.lang / java.util members JavaAPI provides, run on
 /// HotSpot (the JDK's own classes) and on ParparVM; the RESULT lines must
 /// match. Every case answers a string, or the class and message of what it
 /// threw, so a difference names the member. Java 17 API only.

@@ -43,9 +43,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-/// The members an application compiled against the JDK reached through
-/// compat-jdk's stand-ins until the class library carried them under their
-/// own names: the sequenced methods of `List`, `CharSequence.chars` and
+/// Members an application compiled against the JDK calls, which the class
+/// library carries under their own names: the sequenced methods of `List`, `CharSequence.chars` and
 /// `codePoints`, `Throwable.printStackTrace(PrintWriter)`, the lazy `Files`
 /// streams, `BufferedReader.lines`, `ServiceLoader.findFirst` and the URL
 /// coders. Run on HotSpot (the JDK's own classes) and on ParparVM; the
@@ -57,21 +56,9 @@ public class SwitchoverMembersApp {
 
     static Path dir;
 
-    /// Gives the translated runtime its file system. Its own class, so the
-    /// JDK run, where the JDK's java.io needs no host, fails to load only
-    /// this.
-    static final class PosixHost {
-        static void install() {
-            com.codename1.impl.JdkHost.install(new com.codename1.impl.PosixJdkHost());
-        }
-    }
-
-    public static void main(String[] args) throws Exception {
-        try {
-            PosixHost.install();
-        } catch (LinkageError onTheJdk) {
-            // The JDK's own file system.
-        }
+    /// Runs every case; the bulk program has installed its file system host
+    /// on the ParparVM side (the translator allows one `main` per program).
+    public static void fixtureMain(String[] args) throws Exception {
         dir = Files.createTempDirectory("switchover");
         Files.write(dir.resolve("a.txt"), Arrays.asList("x", "y", "z"), StandardCharsets.UTF_8);
         Files.createDirectories(dir.resolve("sub"));

@@ -46,7 +46,7 @@ import java.util.TreeSet;
 import java.util.UUID;
 
 /// StringJoiner, UUID, Properties, HexFormat, EventObject and the exceptions
-/// JavaAPI took over from compat-jdk.
+/// JavaAPI provides.
 public final class UtilClassesChecks {
     // A backslash, kept out of string literals next to a 'u': javac reads
     // that pair as an escape wherever it appears.

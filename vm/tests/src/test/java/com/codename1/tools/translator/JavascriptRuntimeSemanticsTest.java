@@ -254,9 +254,9 @@ class JavascriptRuntimeSemanticsTest {
 
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
-    void langMembersTakenFromCompatJdkKeepJavaSemantics(CompilerHelper.CompilerConfig config) throws Exception {
+    void langMembersKeepJavaSemantics(CompilerHelper.CompilerConfig config) throws Exception {
         // The String, wrapper, Character, Math, Objects, Locale and Charset members
-        // JavaAPI took over from compat-jdk, in the browser runtime. One bit per
+        // JavaAPI provides, in the browser runtime. One bit per
         // property; BulkConformanceIntegrationTest (LangMembersChecks) holds the same members to HotSpot
         // on the native target.
         WorkerRunResult result = translateAndRunFixture(config, "JsLangMembersApp.java", "JsLangMembersApp");
