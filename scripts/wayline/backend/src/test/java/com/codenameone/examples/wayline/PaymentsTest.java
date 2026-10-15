@@ -372,6 +372,33 @@ class PaymentsTest {
         Trips.offline(mvc, driver);
     }
 
+    /// A card tip whose charge nobody can vouch for is retried with the
+    /// ride's card, so that card stays, and so does its account, until the
+    /// tip is settled one way or the other.
+    @Test
+    void aCardWithATipNobodyCanVouchForStays() throws Exception {
+        // Bergen.
+        String rider = People.rider(accounts, "bgo-tip-rider");
+        String driver = People.driver(accounts, "bgo-tip-driver");
+        String card = (String) Trips.addCard(mvc, rider, Trips.VISA).get("id");
+        Trips.online(mvc, driver, 60.3913, 5.3221);
+        String id = (String) Trips.complete(mvc, rider, driver, People.ride(60.3913, 5.3221,
+                60.4013, 5.3321)).get("id");
+        Trips.offline(mvc, driver);
+        db.execute("UPDATE ride SET tip_cents = 300 WHERE id = ?", new Object[] {id});
+        mvc.perform(People.asRider(post("/api/payments/methods/" + card + "/remove"), rider))
+                .andExpect(status().isConflict());
+        mvc.perform(People.asRider(Trips.body(post("/api/account/delete"),
+                        "{\"password\":\"" + People.PASSWORD + "\"}"), rider))
+                .andExpect(status().isConflict());
+
+        // The charge came back: nothing is left to ask about.
+        db.execute("UPDATE payment SET tip_ref = 'sim_ch_tip' WHERE ride_id = ?",
+                new Object[] {id});
+        mvc.perform(People.asRider(post("/api/payments/methods/" + card + "/remove"), rider))
+                .andExpect(status().isOk());
+    }
+
     @Test
     void aRideIsNotRefundedWhileItsTipIsBeingCharged() throws Exception {
         // Oslo.

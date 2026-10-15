@@ -1047,7 +1047,19 @@ public class Payments {
     /// Whether a completed ride of the rider's is still to be charged to this
     /// method -- or to any card, for a null `methodId` -- and will be asked
     /// about again: its payment is pending and it ended after `since`.
+    ///
+    /// A card tip left unknown counts too, with no time limit: see [#tip].
+    /// Its retry charges the ride's card under the same key, so with the card
+    /// gone a tip that may have been charged would be cleared as refused.
     private boolean awaitsCharge(String rider, String methodId, long since) {
+        List<Ride> tipped = rides.findByRiderAndPaymentStatusAndTipCentsGreaterThan(rider, PAID,
+                0L);
+        for (Ride ride : tipped) {
+            if ((methodId == null || methodId.equals(ride.getMethodId()))
+                    && tipLeftUnknown(ride, ride.getTipCents())) {
+                return true;
+            }
+        }
         if (methodId == null) {
             return rides.existsByRiderAndStateAndPaymentStatusAndUpdatedAtGreaterThanAndMethodIdNot(
                     rider, RideState.COMPLETED, PENDING, since, CASH);

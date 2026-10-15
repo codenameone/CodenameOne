@@ -447,6 +447,13 @@ public final class BackendWebApp {
         int count = 0;
         for (File child : children) {
             File target = new File(to, child.getName());
+            // Follows symbolic links on purpose. The source is the project's
+            // own web build output, and a link its author put there (a shared
+            // asset folder, say) is content they mean to publish, as the
+            // Maven resources plugin treats it. A link back to an ancestor
+            // fails the build, which is the right outcome. The OUTPUT side is
+            // different: delete() never descends into a link there, because
+            // emptying it would delete the target's files.
             if (child.isDirectory()) {
                 if (!target.mkdirs() && !target.isDirectory()) {
                     throw new IOException("Could not create " + target);

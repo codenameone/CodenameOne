@@ -80,6 +80,10 @@ public interface RideRepository extends CrudRepository<Ride, String> {
     boolean existsByRiderAndStateAndPaymentStatusAndUpdatedAtGreaterThanAndMethodIdNot(
             String rider, RideState state, String paymentStatus, long since, String methodId);
 
+    /// A rider's rides whose payment is `paymentStatus` and that carry a tip.
+    List<Ride> findByRiderAndPaymentStatusAndTipCentsGreaterThan(String rider,
+            String paymentStatus, long tipCents);
+
     /// A rider's last fifty rides, newest first.
     List<Ride> findTop50ByRiderOrderByRequestedAtDesc(String rider);
 

@@ -199,7 +199,14 @@ public final class Session {
     /// Asks the server who this is. The roles in the answer decide which modes
     /// the app offers, so it is asked again whenever that could have changed.
     public static void refreshUser(final Runnable done, Net.Failed failed) {
+        // An answer from a server the app has since been moved off (Settings
+        // can change it while an approval poll is waiting) describes an
+        // account on that server, not this one; it is dropped.
+        final String asked = base;
         Api.account().me(Net.to(described -> {
+            if (asked == null || !asked.equals(base)) {
+                return;
+            }
             setUser(described);
             done.run();
         }, failed));

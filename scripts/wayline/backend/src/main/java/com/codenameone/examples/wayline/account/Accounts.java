@@ -313,6 +313,13 @@ public class Accounts {
     @Transactional(rollbackFor = IOException.class)
     public UserDto flag(String by, String username, boolean flagged, String reason)
             throws IOException {
+        // The profile row first, as the other admin changes hold it: a flag
+        // racing the account's closure either lands before erase() (which
+        // then forgets it with the rest) or finds no account. Otherwise the
+        // moderation row recorded below would outlive the closure's cleanup.
+        if (profiles.hold(username) == 0) {
+            throw new ResponseStatusException(404, "No such account");
+        }
         load(username);
         String why = Text.optional(reason, 255, "the reason");
         if (flagged && why.length() == 0) {
