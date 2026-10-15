@@ -110,6 +110,42 @@ public class Ball : MonoBehaviour
         Listener(since);
         Loop(since);
         Placed(since);
+        Reverse(since);
+    }
+
+    // "Reverse/pause playback from the pitch", as Unity's page for pitch puts
+    // it: at zero the voice stands still and is still playing long after the
+    // clip's length; at a negative pitch it runs back to the start and ends
+    // there, not when the distance to the far end has gone by.
+    private void Reverse(int since)
+    {
+        if (since == 80)
+        {
+            source.Stop();
+            source.pitch = 0f;
+            source.Play();
+            source.time = 0.03f;
+        }
+        else if (since == 92)
+        {
+            Debug.Log("pitch 0 12 frames on: " + Voice());
+        }
+        else if (since == 93)
+        {
+            source.pitch = 1f;
+            source.Play();
+            source.time = 0.08f;
+            source.pitch = -1f;
+        }
+        else if (since == 95 || since == 99)
+        {
+            Debug.Log("reversed " + (since - 93) + " frames: " + Voice());
+        }
+        else if (since == 100)
+        {
+            source.Stop();
+            source.pitch = 1f;
+        }
     }
 
     // `time` set on a silent source is where the next Play starts, and reads

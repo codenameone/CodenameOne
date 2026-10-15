@@ -76,7 +76,10 @@ public final class DrawList {
         count--;
     }
 
-    private static boolean inOrder(DrawCommand a, DrawCommand b) {
+    /// Whether `a` is drawn before `b`, or with it: true for equals. The
+    /// pointer asks it too, of a canvas's keys, so that a click lands on
+    /// the canvas drawn on top and not on one ranked some other way.
+    static boolean inOrder(DrawCommand a, DrawCommand b) {
         if (a.group != b.group) {
             return a.group < b.group;
         }

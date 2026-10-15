@@ -285,4 +285,49 @@ class GameViewTest extends UITestBase {
         assertEquals(35, v.getInput().getPointerX(), "the release was moved to where the press was");
         assertEquals(30, v.getInput().getPointerY(), "the release was moved to where the press was");
     }
+
+    /// The form's pointer listeners, which feed the view until it has been
+    /// handed a touch of its own, hear every component of the form. A press on a
+    /// host's button beside the view reached the game as a touch, and the click
+    /// that followed as its release. Here the peer takes the view's own touches,
+    /// as a native one does, so the listeners are the only way in, and a gesture
+    /// that starts on the view still ends when the finger is lifted off it.
+    @Test
+    void aPressBesideTheViewIsNotTheGames() {
+        CountingView v = new CountingView();
+        com.codename1.ui.Button host = new com.codename1.ui.Button("Pause");
+        Form f = new Form("Game", new BorderLayout());
+        f.add(BorderLayout.CENTER, v);
+        f.add(BorderLayout.SOUTH, host);
+        f.show();
+        flushSerialCalls();
+        v.start();
+        v.getComponentAt(0).setIgnorePointerEvents(false);
+        f.revalidate();
+        int ox = v.getAbsoluteX();
+        int oy = v.getAbsoluteY();
+        assertTrue(v.getWidth() > 40 && v.getHeight() > 40, "the view was laid out");
+        int bx = host.getAbsoluteX() + host.getWidth() / 2;
+        int by = host.getAbsoluteY() + host.getHeight() / 2;
+        assertFalse(v.contains(bx, by), "the button is beside the view");
+
+        implementation.dispatchPointerPress(bx, by);
+        flushSerialCalls();
+        assertFalse(v.getInput().isPointerDown(), "a press on the host's button reached the game");
+        assertFalse(v.getInput().wasPointerPressed(), "a press on the host's button reached the game");
+        implementation.dispatchPointerRelease(bx, by);
+        flushSerialCalls();
+        assertFalse(v.getInput().wasPointerReleased(), "the release of the host's button reached the game");
+        v.frame(1.0 / 60);
+
+        implementation.dispatchPointerPress(ox + 12, oy + 14);
+        flushSerialCalls();
+        assertTrue(v.getInput().isPointerDown(), "a press on the view did not reach the game");
+        assertTrue(v.getInput().wasPointerPressed());
+        assertEquals(12, v.getInput().getPointerX());
+        implementation.dispatchPointerRelease(bx, by);
+        flushSerialCalls();
+        assertFalse(v.getInput().isPointerDown(), "a gesture let go of off the view is still down");
+        assertTrue(v.getInput().wasPointerReleased(), "a gesture let go of off the view was not released");
+    }
 }

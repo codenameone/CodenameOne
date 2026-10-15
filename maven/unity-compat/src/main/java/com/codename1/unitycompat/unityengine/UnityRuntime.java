@@ -188,6 +188,10 @@ public final class UnityRuntime {
     private static GameObject mouseObject;
     private static final Vector3 mousePoint = new Vector3();
     private static final float[] rect = new float[6];
+    /// The draw keys of the canvas the pointer is over so far, and of the
+    /// one it is tried against; see [#canvasKeys]. Kept, not made per frame.
+    private static final DrawCommand pointerBest = new DrawCommand();
+    private static final DrawCommand pointerCandidate = new DrawCommand();
 
     private static final class Invocation {
         MonoBehaviour owner;
@@ -1569,7 +1573,6 @@ public final class UnityRuntime {
 
     private static Graphic pointerGraphic() {
         Graphic best = null;
-        int bestOrder = 0;
         for (int i = 0; i < canvases.size(); i++) { // NOPMD ForLoopCanBeForeach
             Canvas canvas = (Canvas) canvases.get(i);
             // A canvas answers the pointer through its GraphicRaycaster, and
@@ -1583,7 +1586,10 @@ public final class UnityRuntime {
                     && canvas.gameObject.transform.parent.gameObject.GetComponentInParent(Canvas.class) != null)) {
                 continue;
             }
-            if (best != null && canvas.sortingOrder < bestOrder) {
+            // Drawn under the canvas found so far, it cannot take the click.
+            // Equals go to the later canvas, which is drawn over the other.
+            canvasKeys(canvas, pointerCandidate);
+            if (best != null && !DrawList.inOrder(pointerBest, pointerCandidate)) {
                 continue;
             }
             float s = canvasScale(canvas);
@@ -1591,7 +1597,7 @@ public final class UnityRuntime {
                     Input.mouseY / s);
             if (found != null) {
                 best = found;
-                bestOrder = canvas.sortingOrder;
+                canvasKeys(canvas, pointerBest);
             }
         }
         return best;
@@ -2031,6 +2037,21 @@ public final class UnityRuntime {
         return drawList;
     }
 
+    /// The keys every command of `canvas` is sorted by: an overlay over
+    /// everything a camera draws, then the sorting layer, the order in it,
+    /// and the plane distance. The pointer ranks canvases by the same keys
+    /// and the same `DrawList.inOrder`, so that what is clicked is what is
+    /// seen on top; ranked by the order in layer alone, a camera canvas
+    /// with the larger one took the clicks meant for an overlay drawn over
+    /// it.
+    private static void canvasKeys(Canvas canvas, DrawCommand d) {
+        d.sortingOrder = canvas.sortingOrder;
+        boolean overlay = canvas.renderMode == 0 || canvas.worldCamera == null;
+        d.group = overlay ? 1 : 0;
+        d.sortingLayer = overlay ? 0 : sortingLayer(canvas.sortingLayerID);
+        d.depth = canvas.planeDistance;
+    }
+
     private static void drawCanvas(Canvas canvas, GameObject go, float s) {
         int n = go.components.size();
         for (int i = 0; i < n; i++) {
@@ -2066,11 +2087,7 @@ public final class UnityRuntime {
             d.rotation = 0f;
             d.flipX = false;
             d.flipY = false;
-            d.sortingOrder = canvas.sortingOrder;
-            boolean overlay = canvas.renderMode == 0 || canvas.worldCamera == null;
-            d.group = overlay ? 1 : 0;
-            d.sortingLayer = overlay ? 0 : sortingLayer(canvas.sortingLayerID);
-            d.depth = canvas.planeDistance;
+            canvasKeys(canvas, d);
             if (c instanceof Text) {
                 ((Text) c).$fill(d, s * rect[5]);
             } else if (c instanceof Image) {

@@ -44,6 +44,10 @@ public final class AudioSource extends Behaviour {
     private static AudioOutput output;
     private static int nextVoice = 1;
     private static final ArrayList log = new ArrayList();
+    /// The sources that have a voice of their own: added by `Play`, taken
+    /// out by `Stop` and when a new output finds them run out. What a new
+    /// output is given voices for; see [#$output(AudioOutput)].
+    private static final ArrayList voiced = new ArrayList();
     private static boolean logging;
     static float listenerVolume = 1f;
     /// `AudioListener.pause`, and the two numbers that make it stand still
@@ -75,7 +79,18 @@ public final class AudioSource extends Behaviour {
     private boolean autoPlayed;
 
     /// Installs what makes the sound, or null for silence.
+    ///
+    /// An output that was not the one installed before is given a voice
+    /// for every source that is playing, at the place in its clip the
+    /// source has reached. A view taken off its form silences its output
+    /// and withdraws it, and is given a new one when it is shown again,
+    /// while the sources go on counting: without this the music of a game
+    /// shown again was silent for good, with `isPlaying` true. A source
+    /// paused by itself gets its voice paused, so that `UnPause` has
+    /// something to resume. The same output installed again is left as it
+    /// is: it has those voices already, and would sound each one twice.
     public static void $output(AudioOutput o) {
+        boolean fresh = o != null && o != output; // NOPMD CompareObjectsWithEquals
         output = o;
         if (o != null) {
             o.listenerVolume(listenerVolume);
@@ -85,6 +100,38 @@ public final class AudioSource extends Behaviour {
         if (o != null && listenerPaused) {
             o.hold(true);
         }
+        if (fresh) {
+            // Backwards, since a source that has run out leaves the list.
+            for (int i = voiced.size() - 1; i >= 0; i--) {
+                java.lang.Object s = voiced.get(i); // NOPMD UnnecessaryFullyQualifiedName
+                if (!(s instanceof AudioSource) || !((AudioSource) s).revoice(o)) {
+                    voiced.remove(i);
+                }
+            }
+        }
+    }
+
+    /// Starts this source's voice again on a new output, where the voice
+    /// has got to; false if it has no voice left to start. Logged as
+    /// `revoice clip milliseconds`.
+    private boolean revoice(AudioOutput o) {
+        expire();
+        if (!playing || clip == null) {
+            return false;
+        }
+        float at = get_time();
+        voice = newVoice();
+        if (logging) {
+            log.add("revoice " + clip.name + " " + (int) (at * 1000f + 0.5f));
+        }
+        o.play(voice, clip, level(1f), pitch, loop);
+        if (at > 0f) {
+            o.seek(voice, at);
+        }
+        if (paused) {
+            o.pause(voice, true);
+        }
+        return true;
     }
 
     /// The clock every source counts on: the game's unscaled one, less the
@@ -158,6 +205,7 @@ public final class AudioSource extends Behaviour {
 
     static void resetAll() {
         log.clear();
+        voiced.clear();
         listenerVolume = 1f;
         if (output != null) {
             output.listenerVolume(1f);
@@ -361,15 +409,39 @@ public final class AudioSource extends Behaviour {
 
     /// Ends a voice that does not loop and has reached the end of its
     /// clip, as of now or of the moment it was paused.
+    ///
+    /// The end is the one the voice is heading for. Unity's page for
+    /// `pitch` speaks of "reverse/pause playback from the pitch": a voice
+    /// at a negative pitch runs back to the start of the clip and ends
+    /// there, and one at a pitch of zero stands still and never ends. This
+    /// used to count every pitch as running forward, at a speed of one when
+    /// it was zero, so a voice held at zero was over after a clip's length
+    /// with `time` still where it stood, and a reversed one ended when the
+    /// distance to the far end had gone by. Both ends are now where
+    /// [#position()] reaches them, so `time` and `isPlaying` agree.
     private void expire() {
         if (!playing || loop) {
             return;
         }
-        // What is left of the clip from where the voice last started, was
-        // moved to or changed speed, at the speed it has now.
-        float speed = pitch < 0f ? -pitch : pitch;
-        if (clip == null || !((paused ? pausedAt : now()) - startedAt // NOPMD LogicInversion
-                < (clip.get_length() - startedFrom) / (speed > 0f ? speed : 1f))) {
+        if (clip == null) {
+            playing = false;
+            return;
+        }
+        float elapsed = (paused ? pausedAt : now()) - startedAt;
+        float left;
+        if (pitch > 0f) {
+            left = (clip.get_length() - startedFrom) / pitch;
+        } else if (pitch < 0f) {
+            left = startedFrom / -pitch;
+        } else if (pitch != pitch) { // NOPMD ComparisonWithNaN
+            // A NaN has no direction; the clip runs out at its own speed,
+            // as it always did here.
+            left = clip.get_length() - startedFrom;
+        } else {
+            // Zero: the voice is held where it is.
+            return;
+        }
+        if (!(elapsed < left)) { // NOPMD LogicInversion
             playing = false;
         }
     }
@@ -431,6 +503,16 @@ public final class AudioSource extends Behaviour {
         return nextVoice++;
     }
 
+    /// Takes this source out of [#voiced], by identity: an object's
+    /// `Equals` is a script's to define.
+    private void unvoice() {
+        for (int i = voiced.size() - 1; i >= 0; i--) {
+            if (voiced.get(i) == this) { // NOPMD CompareObjectsWithEquals
+                voiced.remove(i);
+            }
+        }
+    }
+
     public void Play() {
         if (clip == null || !live()) {
             return;
@@ -451,6 +533,8 @@ public final class AudioSource extends Behaviour {
         float from = pendingFrom > length ? length : pendingFrom;
         pendingFrom = 0f;
         voice = newVoice();
+        unvoice();
+        voiced.add(this);
         playing = true;
         paused = false;
         startedFrom = from;
@@ -483,6 +567,9 @@ public final class AudioSource extends Behaviour {
         if (voice != 0 && output != null) {
             output.stop(voice);
         }
+        // Whether or not the account has the voice over: a destroyed source
+        // whose clip ran out must not be kept alive by the list.
+        unvoice();
         playing = false;
         paused = false;
         pendingFrom = 0f;

@@ -367,6 +367,7 @@ public final class OffscreenCheck {
         resized(view, surface, png);
         clock(view, surface);
         texts(view, surface);
+        audio(view);
         multiKey(view);
         System.out.println(FAILURES.isEmpty() ? "OFFSCREEN OK" : "OFFSCREEN FAILED: " + FAILURES.size());
         return FAILURES.isEmpty() ? 0 : 1;
@@ -875,6 +876,140 @@ public final class OffscreenCheck {
         System.out.println("texts: " + frames + " frames of a text that never repeats: at most " + cachedMost
                 + " painted texts (from " + cachedBefore + ") and " + texturesMost + " textures (from "
                 + texturesBefore + "); " + cachedAfter + " and " + texturesAfter + " once it was left alone");
+    }
+
+    /// The `Media` the core unit tests' implementation hands out for every
+    /// sound, which writes down what was asked of it.
+    private static final class RecordingMedia implements com.codename1.media.Media {
+        final List<String> events = new ArrayList<String>();
+
+        public void play() {
+            events.add("play");
+        }
+
+        public void pause() {
+            events.add("pause");
+        }
+
+        public void prepare() {
+        }
+
+        public void cleanup() {
+            events.add("cleanup");
+        }
+
+        public int getTime() {
+            return 0;
+        }
+
+        public void setTime(int time) {
+            events.add("time " + time);
+        }
+
+        public int getDuration() {
+            return -1;
+        }
+
+        public int getVolume() {
+            return 100;
+        }
+
+        public void setVolume(int vol) {
+            events.add("volume " + vol);
+        }
+
+        public boolean isPlaying() {
+            return false;
+        }
+
+        public com.codename1.ui.Component getVideoComponent() {
+            return null;
+        }
+
+        public boolean isVideo() {
+            return false;
+        }
+
+        public boolean isFullScreen() {
+            return false;
+        }
+
+        public void setFullScreen(boolean fullScreen) {
+        }
+
+        public boolean isNativePlayerMode() {
+            return false;
+        }
+
+        public void setNativePlayerMode(boolean nativePlayer) {
+        }
+
+        public void setVariable(String key, Object value) {
+        }
+
+        public Object getVariable(String key) {
+            return null;
+        }
+    }
+
+    /// A view taken off its form silences its sound and is given a new
+    /// output when it is shown again, while a looping source goes on
+    /// playing in the game's account. The new output must be given that
+    /// source's voice again, where the clip had got to; it used to get
+    /// nothing, and the music of a game shown again was silent with
+    /// `isPlaying` true. Before `multiKey`, which takes the view away for
+    /// good.
+    private static void audio(final UnityGameView view) {
+        java.lang.Object found = com.codename1.unitycompat.unityengine.Object.FindObjectOfType(
+                com.codename1.unitycompat.unityengine.AudioSource.class);
+        if (!(found instanceof com.codename1.unitycompat.unityengine.AudioSource)
+                || ((com.codename1.unitycompat.unityengine.AudioSource) found).get_clip() == null) {
+            System.out.println("audio: the scene has no audio source with a clip; a view shown again was not "
+                    + "checked for its sound");
+            return;
+        }
+        final com.codename1.unitycompat.unityengine.AudioSource source =
+                (com.codename1.unitycompat.unityengine.AudioSource) found;
+        final float length = source.get_clip().get_length();
+        final int at = (int) (length * 500f);
+        final RecordingMedia media = new RecordingMedia();
+        final Display display = Display.getInstance();
+        final com.codename1.ui.Container parent = view.getParent();
+        final boolean[] seen = new boolean[3];
+        final String[] heard = new String[2];
+        display.callSeriallyAndWait(new Runnable() {
+            public void run() {
+                impl.setMedia(media);
+                boolean wasLooping = source.get_loop();
+                source.set_loop(true);
+                source.Play();
+                source.set_time(at / 1000f);
+                seen[0] = media.events.contains("play");
+                heard[0] = media.events.toString();
+                parent.removeComponent(view);
+                seen[1] = media.events.contains("cleanup");
+                media.events.clear();
+                parent.add(com.codename1.ui.layouts.BorderLayout.CENTER, view);
+                parent.revalidate();
+                heard[1] = media.events.toString();
+                seen[2] = source.get_isPlaying();
+                source.Stop();
+                source.set_loop(wasLooping);
+                impl.setMedia(null);
+            }
+        });
+        if (!seen[0]) {
+            System.out.println("audio: a Play on the view's output made no media (" + heard[0] + "): the clip is "
+                    + "not a resource here, or the listener is paused; a view shown again was not checked for its "
+                    + "sound");
+            return;
+        }
+        check(seen[1], "the view taken off its form did not silence its output");
+        check(seen[2], "a looping source is not playing after its view was shown again");
+        check(heard[1].contains("play") && heard[1].contains("time " + at), "a looping source playing at " + at
+                + " ms when its view was taken away was not given a voice at that place when the view was shown "
+                + "again; its new output heard " + heard[1]);
+        System.out.println("audio: a looping source at " + at + " ms, its view taken away and shown again: " + heard[1]);
     }
 
     /// Multi key mode is the whole application's: a view turns it on while

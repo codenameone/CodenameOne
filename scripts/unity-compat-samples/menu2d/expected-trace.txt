@@ -123,10 +123,17 @@ audio frame=172 seek beep 60
 placed 2 frames on: 93ms playing=True
 placed then stopped: 0ms playing=True
 audio frame=174 play beep
+audio frame=180 play beep
+audio frame=180 seek beep 30
 frame 180 objects=19 Ledge=1 drawn=10 text="hard" text="Best: 1 Hard"
 bounce 2 on Floor at y=-220 frame 186
 audio frame=186 shot beep
+pitch 0 12 frames on: 30ms playing=True
+audio frame=193 play beep
+audio frame=193 seek beep 80
+reversed 2 frames: 47ms playing=True
 tick, frame 198 clicks=1 selected=True
+reversed 6 frames: 0ms playing=False
 frame 200 objects=19 Ledge=1 drawn=10 text="hard" text="Best: 2 Hard"
 draw frame=200 commands=10 background=ff141a29
   count 3 tile.png@0,0+16x16
@@ -146,4 +153,8 @@ draw frame=200 commands=10 background=ff141a29
   text "Best: 2 Hard" layer=0 order=0 at=29000,1000 size=10000x2000 font=1200 fit=0 min=500 max=2000 align=2 style=0 wrap=1 color=ffe6e64d
   unity-ui-white.png src=0,0+4x4 layer=0 order=5 at=0,0 size=40000x30000 anchor=0,0 rotation=0 color=ffffff flip=00
 tick, frame 229 clicks=1 selected=True
+input frame=232 pointer=200,170 down
+input frame=234 pointer=200,170 up
+play, frame 234 clicks=1
+overlay over a camera canvas: panel=False label=hard clicks=2
 frame 240 objects=19 Ledge=1 drawn=10 text="hard" text="Best: 2 Hard"

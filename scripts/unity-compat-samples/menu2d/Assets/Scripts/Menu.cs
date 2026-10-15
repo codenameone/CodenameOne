@@ -96,6 +96,36 @@ public class Menu : MonoBehaviour
             Debug.Log("key frame " + Time.frameCount + " over interface=" + EventSystem.current.IsPointerOverGameObject()
                 + " panel=" + panel.activeSelf + " clicks=" + clicks);
         }
+        Overlaid(Time.frameCount);
+    }
+
+    // An overlay canvas is drawn over every camera canvas whatever their
+    // orders in layer, and the click goes to what is drawn on top: the
+    // curtain, made a camera canvas with the larger order and a raycaster
+    // that hears, is under the panel shown again, and the play button takes
+    // the click and hides the panel. Ranked by order alone, the curtain took
+    // it and set the level to nine.
+    private void Overlaid(int frame)
+    {
+        if (frame == 230)
+        {
+            Canvas curtain = GameObject.Find("Curtain").GetComponent<Canvas>();
+            curtain.renderMode = RenderMode.ScreenSpaceCamera;
+            curtain.worldCamera = Camera.main;
+            curtain.sortingOrder = 50;
+            curtain.GetComponent<GraphicRaycaster>().enabled = true;
+            panel.SetActive(true);
+        }
+        else if (frame == 236)
+        {
+            Debug.Log("overlay over a camera canvas: panel=" + panel.activeSelf + " label=" + label.text + " clicks="
+                + clicks);
+            Canvas curtain = GameObject.Find("Curtain").GetComponent<Canvas>();
+            curtain.GetComponent<GraphicRaycaster>().enabled = false;
+            curtain.renderMode = RenderMode.ScreenSpaceOverlay;
+            curtain.worldCamera = null;
+            curtain.sortingOrder = 5;
+        }
     }
 
     // The three the button lists, in order.

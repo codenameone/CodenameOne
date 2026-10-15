@@ -86,6 +86,12 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
     /// Set once the form has delivered a pointer event to this view directly,
     /// with every finger in it. See `#addFormPointerListeners()`.
     private boolean touchesArrive;
+    /// Whether a press reached the game and its release has not: by either
+    /// path, the form's listeners or this view's own callbacks. The form's
+    /// listeners hear every pointer event on the form, the host's own
+    /// buttons beside the view included, and only a gesture the game began
+    /// may be moved or ended through them.
+    private boolean gesture;
 
     public GameView() {
         super(new SpriteRenderer());
@@ -268,6 +274,9 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
     @Override
     protected void deinitialize() {
         removeFormPointerListeners();
+        // A gesture cut off by the view leaving its form is not resumed by the
+        // first release on the form it is shown on next.
+        gesture = false;
         super.deinitialize();
     }
 
@@ -276,9 +285,16 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
     /// until `#pointerPressed(int[], int[])` and its siblings have been seen to
     /// arrive -- those carry every finger, and once they do, a press or a drag
     /// heard here as well would take the on-screen controls back to one finger
-    /// between two reports of all of them. A release is always routed: it means
-    /// the last finger lifted, saying so twice changes nothing, and it must not be
-    /// lost when the form delivers it to another component.
+    /// between two reports of all of them. A release is routed whenever a gesture
+    /// of the game's is in progress: it means the last finger lifted, saying so
+    /// twice changes nothing, and it must not be lost when the form delivers it to
+    /// another component.
+    ///
+    /// They hear the form's other components too. A press is the game's only
+    /// inside the view's bounds; a press on a host's button beside the view used
+    /// to be handed to the game as well, as a touch outside its area. A drag or
+    /// a release goes to the game only when the press before it did, and then
+    /// wherever it is, so that a finger that slides off the view still lets go.
     private void addFormPointerListeners() {
         if (formListenersAdded) {
             return;
@@ -291,7 +307,7 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
             pressListener = new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    if (!touchesArrive) {
+                    if (!touchesArrive && contains(e.getX(), e.getY())) {
                         routeFormTouch(e.getX(), e.getY(), true, true, false);
                     }
                 }
@@ -299,7 +315,7 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
             dragListener = new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    if (!touchesArrive) {
+                    if (!touchesArrive && gesture) {
                         routeFormTouch(e.getX(), e.getY(), true, false, false);
                     }
                 }
@@ -307,7 +323,9 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
             releaseListener = new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    routeFormTouch(e.getX(), e.getY(), false, false, true);
+                    if (gesture) {
+                        routeFormTouch(e.getX(), e.getY(), false, false, true);
+                    }
                 }
             };
         }
@@ -335,6 +353,7 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
     private void routeFormTouch(int x, int y, boolean down, boolean pressed, boolean released) {
         int lx = x - getAbsoluteX();
         int ly = y - getAbsoluteY();
+        gesture = down;
         controls.onTouches(new int[]{lx}, new int[]{ly}, down);
         input.pointer(lx, ly, down, pressed, released);
     }
@@ -473,6 +492,7 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
         int oy = getAbsoluteY();
         int[] lx = new int[x.length];
         int[] ly = new int[y.length];
+        gesture = down;
         for (int i = 0; i < x.length; i++) {
             lx[i] = x[i] - ox;
             ly[i] = y[i] - oy;
