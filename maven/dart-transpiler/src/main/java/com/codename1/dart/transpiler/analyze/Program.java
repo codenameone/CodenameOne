@@ -117,10 +117,87 @@ public final class Program {
         return byName.get(byName.size() - 1);
     }
 
+    /**
+     * The Dart package name(s) of the sources being transpiled (the pubspec name), so
+     * {@code package:<name>/x.dart} resolves to the project's own x.dart.
+     */
+    public final Set<String> ownPackages = new HashSet<String>();
+
+    /** {@code part of} files whose owning library has not been added yet. */
+    private final List<Ast.Library> pendingParts = new ArrayList<Ast.Library>();
+
     public void add(Ast.Library lib) {
+        if (lib.isPart()) {
+            // A part is not a library of its own: its declarations join the owner's,
+            // sharing its imports and its library privacy. Files arrive in any order,
+            // so a part seen before its owner waits for it.
+            for (Ast.Library owner : libraries) {
+                if (ownsPart(owner, lib)) {
+                    mergePart(owner, lib);
+                    return;
+                }
+            }
+            pendingParts.add(lib);
+            return;
+        }
         libraries.add(lib);
+        register(lib, lib);
+        for (java.util.Iterator<Ast.Library> it = pendingParts.iterator(); it.hasNext();) {
+            Ast.Library part = it.next();
+            if (ownsPart(lib, part)) {
+                it.remove();
+                mergePart(lib, part);
+            }
+        }
+    }
+
+    /**
+     * Parts whose owner never arrived (the owner was not among the sources). They are
+     * registered as libraries of their own so their declarations are not silently lost;
+     * {@code JavaEmitter} calls this before it emits anything.
+     */
+    public void finishParts() {
+        List<Ast.Library> orphans = new ArrayList<Ast.Library>(pendingParts);
+        pendingParts.clear();
+        for (Ast.Library part : orphans) {
+            libraries.add(part);
+            register(part, part);
+        }
+    }
+
+    private boolean ownsPart(Ast.Library owner, Ast.Library part) {
+        String partFile = normalizePath(part.fileName.replace('\\', '/'));
+        for (String uri : owner.partUris) {
+            if (partFile.equals(resolveRelative(owner, uri))) {
+                return true;
+            }
+        }
+        if (part.partOfUri != null) {
+            return normalizePath(owner.fileName.replace('\\', '/')).equals(resolveRelative(part, part.partOfUri));
+        }
+        return part.partOfName != null && part.partOfName.equals(owner.libraryName);
+    }
+
+    private void mergePart(Ast.Library owner, Ast.Library part) {
+        owner.classes.addAll(part.classes);
+        owner.enums.addAll(part.enums);
+        owner.functions.addAll(part.functions);
+        owner.topLevelVars.addAll(part.topLevelVars);
+        owner.typedefs.addAll(part.typedefs);
+        register(owner, part);
+    }
+
+    private static String resolveRelative(Ast.Library from, String uri) {
+        String base = from.fileName.replace('\\', '/');
+        int slash = base.lastIndexOf('/');
+        String dir = slash >= 0 ? base.substring(0, slash) : "";
+        return normalizePath(dir.isEmpty() ? uri : dir + "/" + uri);
+    }
+
+    /** Registers {@code decls}' declarations in the lookup tables as {@code lib}'s. */
+    private void register(Ast.Library lib, Ast.Library decls) {
         importPrefixes.addAll(lib.importPrefixes);
-        for (Ast.ClassDecl c : lib.classes) {
+        for (Ast.ClassDecl c : decls.classes) {
             c.ownerLibrary = lib;
             if (c.extensionOn != null) {
                 extensions.add(c);
@@ -134,7 +211,7 @@ public final class Program {
                 byName.add(c);
             }
         }
-        for (Ast.EnumDecl e : lib.enums) {
+        for (Ast.EnumDecl e : decls.enums) {
             e.ownerLibrary = lib;
             enums.put(e.name, e);
             List<Ast.EnumDecl> byName = enumsByName.get(e.name);
@@ -144,7 +221,7 @@ public final class Program {
             }
             byName.add(e);
         }
-        for (Ast.FunctionDecl f : lib.functions) {
+        for (Ast.FunctionDecl f : decls.functions) {
             // A top-level setter shares its name with the getter/field it backs; keep the
             // read-side (getter/plain function) in the lookup maps and track setters apart.
             if (f.isSetter) {
@@ -155,12 +232,12 @@ public final class Program {
             functionOwners.put(f.name, lib);
             addOwner(functionOwnersByName, f.name, lib);
         }
-        for (Ast.FieldDecl v : lib.topLevelVars) {
+        for (Ast.FieldDecl v : decls.topLevelVars) {
             topLevelVars.put(v.name, v);
             topLevelVarOwners.put(v.name, lib);
             addOwner(topLevelVarOwnersByName, v.name, lib);
         }
-        for (Ast.TypedefDecl t : lib.typedefs) {
+        for (Ast.TypedefDecl t : decls.typedefs) {
             typedefs.put(t.name, t);
         }
     }
@@ -258,13 +335,28 @@ public final class Program {
 
     /** Resolves a (relative) import uri against the importing library's directory to a user library. */
     public Ast.Library resolveImportedLibrary(Ast.Library from, String uri) {
-        if (uri == null || from == null || uri.startsWith("dart:") || uri.startsWith("package:")) {
+        if (uri == null || from == null || uri.startsWith("dart:")) {
             return null;
         }
-        String base = from.fileName.replace('\\', '/');
-        int slash = base.lastIndexOf('/');
-        String dir = slash >= 0 ? base.substring(0, slash) : "";
-        String combined = normalizePath(dir.isEmpty() ? uri : dir + "/" + uri);
+        String combined;
+        if (uri.startsWith("package:")) {
+            // package:<own>/x.dart is this project's lib/x.dart; any other package is
+            // external (a stub or unsupported) and never a user library.
+            int slash = uri.indexOf('/');
+            if (slash < 0 || !ownPackages.contains(uri.substring("package:".length(), slash))) {
+                return null;
+            }
+            String rest = normalizePath(uri.substring(slash + 1));
+            for (Ast.Library lib : libraries) {
+                String f = normalizePath(lib.fileName.replace('\\', '/'));
+                if (f.equals(rest) || f.equals("lib/" + rest)) {
+                    return lib;
+                }
+            }
+            return null;
+        } else {
+            combined = resolveRelative(from, uri);
+        }
         for (Ast.Library lib : libraries) {
             if (normalizePath(lib.fileName.replace('\\', '/')).equals(combined)) {
                 return lib;

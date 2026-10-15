@@ -311,6 +311,25 @@ public class FlutterProjectImporterTest {
         assertFalse(settings, settings.contains("ios.bundleVersion"));
     }
 
+    /// lib/ is copied flat and pubspec.yaml is not copied, so the transpiler
+    /// learns the project's package name -- which `package:<name>/x.dart`
+    /// imports of its own files use -- only from this record.
+    @Test
+    public void recordsThePubspecNameForPackageSelfImports() throws Exception {
+        File root = Files.createTempDirectory("flutter-package-name").toFile();
+        File flutterProject = new File(root, "demo");
+        write(new File(flutterProject, "pubspec.yaml"), "name: my_demo\nversion: 1.0.0\n"
+                + "dependencies:\n  flutter:\n    sdk: flutter\n");
+        write(new File(flutterProject, "lib/main.dart"), "void main() {}\n");
+
+        File common = new File(root, "common");
+        new FlutterProjectImporter(new com.codename1.build.SystemStreamLog())
+                .importProject(flutterProject, common, null, null);
+
+        File record = new File(common, "src/main/flutter/" + FlutterProjectImporter.PACKAGE_NAME_RECORD);
+        assertEquals("my_demo", read(record).trim());
+    }
+
     /// Flutter allows an asset or font declared anywhere project-relative, not
     /// only under `assets/` or `packages/` -- `fonts/MyFont.ttf` is exactly the
     /// shape a font-only pubspec entry takes. The importer must both copy the

@@ -377,6 +377,24 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
         add((int) index, element);
     }
 
+    /**
+     * Dart's {@code List.insertAll(index, iterable)}. The elements are copied out first,
+     * so any Iterable works (a lazy where/map view, a Set) and {@code list.insertAll(0,
+     * list)} inserts the ORIGINAL elements once, as Dart does.
+     */
+    public void insertAll(long index, Iterable<? extends E> elements) {
+        checkGrowable("insertAll");
+        RangeError.checkValueInInterval(index, 0, size(), "index");
+        java.util.ArrayList<E> copy = new java.util.ArrayList<E>();
+        for (E e : elements) {
+            copy.add(e);
+        }
+        int at = (int) index;
+        for (E e : copy) {
+            add(at++, e);
+        }
+    }
+
     public E removeAt(long index) {
         checkGrowable("removeAt");
         RangeError.checkValidIndex(index, size());
@@ -732,6 +750,14 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
 
     public DartIterable<E> skip(long count) {
         return asIterable().skip(count);
+    }
+
+    public DartIterable<E> takeWhile(Funcs.Func1<E, Boolean> test) {
+        return asIterable().takeWhile(test);
+    }
+
+    public DartIterable<E> skipWhile(Funcs.Func1<E, Boolean> test) {
+        return asIterable().skipWhile(test);
     }
 
     /**

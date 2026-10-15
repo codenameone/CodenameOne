@@ -107,6 +107,9 @@ public class BehaviorTest {
                 sources.add(new String[] {n, TestSupport.read(new File(dir, n))});
             } else if (n.endsWith(".java")) {
                 javaSupportFiles.add(new File(dir, n));
+            } else if (n.equals(com.codename1.dart.transpiler.api.DartTranspiler.PACKAGE_NAME_RECORD)) {
+                // The import's package-name record, as cn1:import-flutter-project writes it.
+                sources.add(new String[] {n, TestSupport.read(new File(dir, n))});
             }
         }
         TestSupport.Result r = TestSupport.transpile(sources.toArray(new String[0][]), stubEntries, extraStubs);

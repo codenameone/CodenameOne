@@ -529,6 +529,14 @@ public class DartSet<E> extends LinkedHashSet<E> {
         return asIterable().skip(count);
     }
 
+    public DartIterable<E> takeWhile(Funcs.Func1<E, Boolean> test) {
+        return asIterable().takeWhile(test);
+    }
+
+    public DartIterable<E> skipWhile(Funcs.Func1<E, Boolean> test) {
+        return asIterable().skipWhile(test);
+    }
+
     public DartMap<Long, E> asMap() {
         return asIterable().asMap();
     }

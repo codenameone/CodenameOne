@@ -88,6 +88,11 @@ public final class TestSupport {
         AstBuilder builder = new AstBuilder(diags);
         Program program = new Program();
         for (String[] s : sources) {
+            if (s[0].equals(com.codename1.dart.transpiler.api.DartTranspiler.PACKAGE_NAME_RECORD)) {
+                // The project's own package name, as DartTranspiler reads it from a source root.
+                program.ownPackages.add(s[1].trim());
+                continue;
+            }
             program.add(builder.parse(s[0], s[1]));
         }
         // loadFromClasspath falls back to the embedded set when nothing contributes, so an

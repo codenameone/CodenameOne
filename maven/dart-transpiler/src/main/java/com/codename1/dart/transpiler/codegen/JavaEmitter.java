@@ -74,6 +74,7 @@ public final class JavaEmitter {
         this.stubs = stubs;
         this.diags = diags;
         this.pkg = pkg;
+        program.finishParts();
     }
 
     // ==================================================================
@@ -8027,6 +8028,10 @@ public final class JavaEmitter {
                 return new Out(target.code + ".insert(" + emitExpr(pos.get(0), TypeRef.INT, ctx).code
                         + ", " + emitExpr(pos.get(1), elem, ctx).code + ")", TypeRef.VOID);
             }
+            if (n.equals("insertAll") && tt.is("List")) {
+                return new Out(target.code + ".insertAll(" + emitExpr(pos.get(0), TypeRef.INT, ctx).code
+                        + ", " + emitExpr(pos.get(1), null, ctx).code + ")", TypeRef.VOID);
+            }
             if (n.equals("removeAt")) {
                 return new Out(target.code + ".removeAt(" + emitExpr(pos.get(0), TypeRef.INT, ctx).code + ")", elem);
             }
@@ -8240,6 +8245,10 @@ public final class JavaEmitter {
             if (n.equals("take") || n.equals("skip")) {
                 return new Out(target.code + "." + n + "(" + emitExpr(pos.get(0), TypeRef.INT, ctx).code + ")",
                         TypeRef.of("Iterable", elem));
+            }
+            if (n.equals("takeWhile") || n.equals("skipWhile")) {
+                Out f = emitExpr(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx);
+                return new Out(target.code + "." + n + "(" + f.code + ")", TypeRef.of("Iterable", elem));
             }
             if (n.equals("getRange")) {
                 String args = emitExpr(pos.get(0), TypeRef.INT, ctx).code + ", "

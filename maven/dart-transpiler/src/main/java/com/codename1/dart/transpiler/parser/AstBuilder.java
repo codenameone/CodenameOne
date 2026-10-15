@@ -82,6 +82,18 @@ public final class AstBuilder {
         pos(lib, unit);
         if (unit.libraryDeclaration() != null) {
             buildLibrary(unit.libraryDeclaration(), lib);
+        } else if (unit.partDeclaration() != null) {
+            // `part of` file: its declarations belong to the owning library, which
+            // Program.add merges them into (a Dart library is its primary file plus
+            // every part it names).
+            Dart2Parser.PartDeclarationContext part = unit.partDeclaration();
+            Dart2Parser.PartHeaderContext header = part.partHeader();
+            if (header.uri() != null) {
+                lib.partOfUri = stripQuotes(header.uri().getText());
+            } else {
+                lib.partOfName = header.dottedIdentifierList().getText();
+            }
+            buildDeclarations(part.topLevelDeclaration(), part.metadata(), lib);
         }
         return lib;
     }
@@ -134,7 +146,7 @@ public final class AstBuilder {
         for (Dart2Parser.ImportOrExportContext ie : ctx.importOrExport()) {
             if (ie.libraryImport() != null) {
                 Dart2Parser.ImportSpecificationContext spec = ie.libraryImport().importSpecification();
-                String uri = spec.configurableUri().getText();
+                String uri = selectUri(spec.configurableUri());
                 lib.imports.add(stripQuotes(uri));
                 // `import '...' as prefix;` — record the prefix so prefixed member
                 // access (prefix.topLevelConst) resolves against the whole program.
@@ -145,11 +157,52 @@ public final class AstBuilder {
                 lib.importDirectives.add(directive(stripQuotes(uri), spec.combinator()));
             } else if (ie.libraryExport() != null) {
                 Dart2Parser.LibraryExportContext ex = ie.libraryExport();
-                lib.exportDirectives.add(directive(stripQuotes(ex.configurableUri().getText()), ex.combinator()));
+                lib.exportDirectives.add(directive(stripQuotes(selectUri(ex.configurableUri())), ex.combinator()));
             }
         }
-        List<Dart2Parser.TopLevelDeclarationContext> decls = ctx.topLevelDeclaration();
-        List<Dart2Parser.MetadataContext> metas = ctx.metadata();
+        if (ctx.libraryName() != null) {
+            lib.libraryName = ctx.libraryName().dottedIdentifierList().getText();
+        }
+        for (Dart2Parser.PartDirectiveContext pd : ctx.partDirective()) {
+            lib.partUris.add(stripQuotes(pd.uri().getText()));
+        }
+        buildDeclarations(ctx.topLevelDeclaration(), ctx.metadata(), lib);
+    }
+
+    /**
+     * The {@code dart:} libraries this runtime implements, i.e. the {@code dart.library.X}
+     * conditions that are true here. {@code dart:io}, {@code dart:html}, {@code dart:ffi}
+     * and the JS interop libraries are not provided, so a conditional import keyed on one
+     * of them takes its default (usually the portable stub), exactly as Dart picks it on
+     * a platform without that library.
+     */
+    private static final java.util.Set<String> SUPPORTED_DART_LIBRARIES = new java.util.HashSet<String>(
+            java.util.Arrays.asList("core", "async", "collection", "math", "typed_data", "ui"));
+
+    /**
+     * Picks the uri a configurable import/export names on this platform: the first
+     * {@code if (test) 'uri'} clause whose test holds, else the default uri. getText() of
+     * the whole rule would concatenate every alternative into one bogus path.
+     */
+    private String selectUri(Dart2Parser.ConfigurableUriContext ctx) {
+        for (Dart2Parser.ConfigurationUriContext c : ctx.configurationUri()) {
+            Dart2Parser.UriTestContext test = c.uriTest();
+            String name = test.dottedIdentifierList().getText();
+            String expected = test.stringLiteral() == null ? "true" : stripQuotes(test.stringLiteral().getText());
+            String actual = "false";
+            if (name.startsWith("dart.library.")
+                    && SUPPORTED_DART_LIBRARIES.contains(name.substring("dart.library.".length()))) {
+                actual = "true";
+            }
+            if (actual.equals(expected)) {
+                return c.uri().getText();
+            }
+        }
+        return ctx.uri().getText();
+    }
+
+    private void buildDeclarations(List<Dart2Parser.TopLevelDeclarationContext> decls,
+                                   List<Dart2Parser.MetadataContext> metas, Library lib) {
         for (int i = 0; i < decls.size(); i++) {
             buildTopLevel(decls.get(i), metas.size() > i ? metas.get(i) : null, lib);
         }

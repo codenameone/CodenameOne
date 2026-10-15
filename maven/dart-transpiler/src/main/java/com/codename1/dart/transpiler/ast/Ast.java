@@ -140,6 +140,18 @@ public final class Ast {
         public List<Directive> importDirectives = new ArrayList<Directive>();
         /** Every export with its show/hide combinators, in source order. */
         public List<Directive> exportDirectives = new ArrayList<Directive>();
+        /** {@code library a.b;} name, or null. */
+        public String libraryName;
+        /** Raw uris of this library's {@code part '...';} directives. */
+        public List<String> partUris = new ArrayList<String>();
+        /** {@code part of '...';} uri when this file is a part, else null. */
+        public String partOfUri;
+        /** {@code part of a.b;} library name when this file is a part, else null. */
+        public String partOfName;
+
+        public boolean isPart() {
+            return partOfUri != null || partOfName != null;
+        }
     }
 
     /** An import or export: its (raw) uri and the names its combinators show or hide. */

@@ -82,6 +82,12 @@ public final class DartTranspiler {
         }
 
         Program program = new Program();
+        for (File root : req.sourceRoots) {
+            String own = ownPackageName(root);
+            if (own != null) {
+                program.ownPackages.add(own);
+            }
+        }
         AstBuilder builder = new AstBuilder(diags);
         for (File f : dartFiles) {
             try {
@@ -135,6 +141,45 @@ public final class DartTranspiler {
             }
         }
         return new TranspileResult(diags.asList(), files, false);
+    }
+
+    /**
+     * Written by {@code cn1:import-flutter-project} beside the copied {@code lib/}: the
+     * pubspec name, so {@code package:<name>/x.dart} resolves to the project's own x.dart.
+     */
+    public static final String PACKAGE_NAME_RECORD = ".flutter-package";
+
+    /**
+     * The Dart package a source root is: its import record, or the {@code name:} of a
+     * {@code pubspec.yaml} at the root for a tree laid out by hand; null when neither.
+     */
+    public static String ownPackageName(File root) {
+        try {
+            File record = new File(root, PACKAGE_NAME_RECORD);
+            if (record.isFile()) {
+                String n = new String(Files.readAllBytes(record.toPath()), StandardCharsets.UTF_8).trim();
+                return n.isEmpty() ? null : n;
+            }
+            File pubspec = new File(root, "pubspec.yaml");
+            if (pubspec.isFile()) {
+                for (String line : Files.readAllLines(pubspec.toPath(), StandardCharsets.UTF_8)) {
+                    if (line.startsWith("name:")) {
+                        String n = line.substring("name:".length()).trim();
+                        int hash = n.indexOf('#');
+                        if (hash >= 0) {
+                            n = n.substring(0, hash).trim();
+                        }
+                        if (n.length() >= 2 && (n.charAt(0) == '\'' || n.charAt(0) == '"')) {
+                            n = n.substring(1, n.length() - 1);
+                        }
+                        return n.isEmpty() ? null : n;
+                    }
+                }
+            }
+        } catch (IOException e) {
+            return null;
+        }
+        return null;
     }
 
     private void writeOutput(TranspileRequest req, List<GeneratedFile> files, Diagnostics diags) {

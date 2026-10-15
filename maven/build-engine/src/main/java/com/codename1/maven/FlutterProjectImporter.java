@@ -276,6 +276,7 @@ public final class FlutterProjectImporter {
             removeStaleImports(target, previous, imported);
             writeImportRecord(target, imported);
             writeDeclaredAssetKeys(target, declaredAssetKeys);
+            writePackageName(target, pubspec.name);
 
             if (mainPackage != null && mainClass != null) {
                 writeEntryPoint(new File(commonDir, "src/main/java"), mainPackage, mainClass, entryPointPackage);
@@ -477,6 +478,24 @@ public final class FlutterProjectImporter {
     /// too. A hand-wired project (no import, so no such file) is unaffected
     /// -- the mojo falls back to its existing assets/+packages scan alone.
     static final String ASSET_KEYS_RECORD = ".flutter-asset-keys";
+
+    /// The pubspec `name:`, recorded beside the copied `lib/` so the transpiler
+    /// can resolve the project's own `package:<name>/...` imports to those files
+    /// (lib/ is copied flat, and pubspec.yaml is not copied). Read by
+    /// `com.codename1.dart.transpiler.api.DartTranspiler`, which owns the name.
+    static final String PACKAGE_NAME_RECORD = ".flutter-package";
+
+    private static void writePackageName(File target, String name) throws IOException {
+        File record = new File(target, PACKAGE_NAME_RECORD);
+        if (name == null || name.trim().isEmpty()) {
+            if (record.exists() && !record.delete()) {
+                throw new IOException("Cannot remove " + record);
+            }
+            return;
+        }
+        target.mkdirs();
+        Files.write(record.toPath(), (name.trim() + "\n").getBytes(Charset.forName("UTF-8")));
+    }
 
     private static void writeDeclaredAssetKeys(File target, Set<String> keys) throws IOException {
         StringBuilder b = new StringBuilder();
