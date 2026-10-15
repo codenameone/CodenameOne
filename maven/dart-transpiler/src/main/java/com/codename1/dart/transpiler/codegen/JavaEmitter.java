@@ -8207,6 +8207,16 @@ public final class JavaEmitter {
                 return new Out(target.code + ".containsAll(" + emitExpr(pos.get(0), null, ctx).code + ")",
                         TypeRef.BOOL);
             }
+            if (tt.is("Set") && n.equals("removeAll")) {
+                // DartSet.removeAll(Iterable) already existed; only this table lacked a
+                // case for it, so the call fell through to the generic E0137 error.
+                return new Out(target.code + ".removeAll(" + emitExpr(pos.get(0), null, ctx).code + ")",
+                        TypeRef.VOID);
+            }
+            if (tt.is("Set") && n.equals("retainAll")) {
+                return new Out(target.code + ".retainAll(" + emitExpr(pos.get(0), null, ctx).code + ")",
+                        TypeRef.VOID);
+            }
         }
         if (tt.is("Map")) {
             if (n.equals("containsKey")) {

@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -198,6 +199,22 @@ class FlutterAssetsTest {
         } finally {
             resetManifestState();
         }
+    }
+
+    /**
+     * Regression: {@code open()} ran its candidate-probing loop even when
+     * {@link com.codename1.ui.Display} had not been initialized yet -- unlike
+     * {@code variantCandidates()}/{@code manifest()}, which guard exactly this case,
+     * nothing stopped {@code open()} from calling
+     * {@code Display.getInstance().getResourceAsStream(...)} while the static
+     * {@code impl} field was still null, throwing a {@code NullPointerException}
+     * instead of answering a clean miss.
+     */
+    @Test
+    void openBeforeDisplayInitIsACleanMissNotANpe() {
+        assertTrue(!com.codename1.ui.Display.isInitialized(), "test assumes a headless start");
+        FlutterAssets.Resolved r = FlutterAssets.open(FlutterAssetsTest.class, "assets/does/not/exist.png");
+        assertNull(r, "no Display implementation exists yet to resolve anything from");
     }
 
     private static Object currentUtilImplementation() throws Exception {

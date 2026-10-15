@@ -1,0 +1,17 @@
+eq after removeAll(equal-not-identical): 2
+eq contains a: true
+eq contains b: false
+eq2 after retainAll(equal-not-identical): 2
+eq2 contains a: true
+eq2 contains b: false
+eq2 contains c: true
+id after removeAll(equal-not-identical): 3
+id after removeAll(identical): 2
+id2 after retainAll(identity semantics): 1
+id2 contains k2: true
+id2 contains k1: false
+id3 after large-argument removeAll(equal-not-identical): 2
+id3 contains k1: true
+copy.add(equal-not-identical) succeeded: true
+copy length: 2
+copy contains k1 and k1b separately: true

@@ -162,13 +162,23 @@ public class FlutterAssets {
      * screen density, or null when no candidate resolves.
      */
     public static Resolved open(Class<?> cls, String assetPath) {
+        if (!com.codename1.ui.Display.isInitialized()) {
+            // Same guard as manifest(): before Display.init() runs, the static `impl`
+            // field is null, so Display.getInstance().getResourceAsStream() below would
+            // throw a NullPointerException instead of a clean miss. A classpath fallback
+            // (Class.getResourceAsStream) is not the answer here: it is a permanent no-op
+            // on CLDC11 and on ParparVM/iOS (both return/resolve to null for an
+            // application's bundled resources), so it would only ever find anything in
+            // the javase/simulator case -- inconsistent with every other port, and this
+            // call has no state to cache, so there is nothing to retry later either.
+            return null;
+        }
         double dpr = 1;
         try {
-            if (com.codename1.ui.Display.isInitialized()) {
-                dpr = com.codename1.flutter.rendering.Dp.scale();
-            }
+            dpr = com.codename1.flutter.rendering.Dp.scale();
         } catch (Throwable t) {
-            // headless: keep the unscaled asset
+            // headless or density lookup failed for some other reason: keep the
+            // unscaled asset
         }
         // Every variant is probed and the choice made from what is there: Flutter's
         // rule depends on WHICH variants exist, so no fixed probe order can express

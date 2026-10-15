@@ -86,4 +86,11 @@ public final class DartIdentitySet<E> extends DartSet<E> {
     public Iterator<E> iterator() {
         return inner.keySet().iterator();
     }
+
+    /// Keeps {@code toSet}/{@code union}/{@code intersection}/{@code difference}/
+    /// {@code retainAll} identity-kind when the receiver is: see {@link DartSet#newEmpty}.
+    @Override
+    DartSet<E> newEmpty() {
+        return new DartIdentitySet<E>();
+    }
 }

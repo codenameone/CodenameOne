@@ -192,6 +192,21 @@ public class DartSet<E> extends LinkedHashSet<E> {
         return new DartIdentitySet<E>();
     }
 
+    /**
+     * An empty set of this set's own kind (plain or identity) -- what {@link #toSet},
+     * {@link #union}, {@link #intersection} and {@link #difference} copy into. Dart's own
+     * {@code _HashSet} picks this through an identical {@code _newSet()} override in
+     * {@code _IdentityHashSet}; without it, every one of those on an identity set
+     * silently collapsed distinct-but-equal elements into one, because the copy came
+     * back a plain, equality-based set. {@link #from}/{@link #of} are NOT routed through
+     * this: Dart's own {@code Set.from}/{@code Set.of} constructors always build a plain
+     * set regardless of the iterable's own kind, and that is unaffected by the receiver
+     * here.
+     */
+    DartSet<E> newEmpty() {
+        return new DartSet<E>();
+    }
+
     public long length() {
         return size();
     }
@@ -206,9 +221,9 @@ public class DartSet<E> extends LinkedHashSet<E> {
 
     // --- set algebra ---------------------------------------------------
 
-    /** Dart's {@code Set.difference(other)} — elements not in {@code other}. */
+    /** Dart's {@code Set.difference(other)} -- elements not in {@code other}, same kind as this. */
     public DartSet<E> difference(java.util.Set<?> other) {
-        DartSet<E> s = new DartSet<>();
+        DartSet<E> s = newEmpty();
         for (E e : this) {
             if (other == null || !other.contains(e)) {
                 s.add(e);
@@ -217,9 +232,9 @@ public class DartSet<E> extends LinkedHashSet<E> {
         return s;
     }
 
-    /** Dart's {@code Set.intersection(other)} — elements also in {@code other}. */
+    /** Dart's {@code Set.intersection(other)} -- elements also in {@code other}, same kind as this. */
     public DartSet<E> intersection(java.util.Set<?> other) {
-        DartSet<E> s = new DartSet<>();
+        DartSet<E> s = newEmpty();
         for (E e : this) {
             if (other != null && other.contains(e)) {
                 s.add(e);
@@ -228,9 +243,9 @@ public class DartSet<E> extends LinkedHashSet<E> {
         return s;
     }
 
-    /** Dart's {@code Set.union(other)} — elements in either set. */
+    /** Dart's {@code Set.union(other)} -- elements in either set, same kind as this. */
     public DartSet<E> union(java.util.Set<? extends E> other) {
-        DartSet<E> s = new DartSet<>();
+        DartSet<E> s = newEmpty();
         s.addAll(this);
         if (other != null) {
             s.addAll(other);
@@ -266,12 +281,97 @@ public class DartSet<E> extends LinkedHashSet<E> {
         }
     }
 
-    public void removeAll(Iterable<?> elements) {
+    /**
+     * Dart's {@code Set.removeAll(elements)}: removes every element of {@code elements}
+     * that this set has, matched by this set's own equality (identity for an identity
+     * set) -- {@link #remove} already gets that right, so this is just a loop over it.
+     */
+    private boolean removeAllInternal(Iterable<?> elements) {
+        boolean modified = false;
         if (elements != null) {
             for (Object o : elements) {
-                remove(o);
+                if (remove(o)) {
+                    modified = true;
+                }
             }
         }
+        return modified;
+    }
+
+    public void removeAll(Iterable<?> elements) {
+        removeAllInternal(elements);
+    }
+
+    /**
+     * Overrides {@code java.util.Set.removeAll(Collection)} with the identical semantics
+     * as {@link #removeAll(Iterable)} above -- needed because the Java type a transpiled
+     * Dart list/set literal gets (DartList, DartSet) is ALSO a {@code java.util.Collection},
+     * so the call's static argument type makes the compiler prefer a {@code Collection}
+     * parameter over an {@code Iterable} one whenever both are applicable; every ordinary
+     * call site lands here, not on the method above. Left unoverridden, the inherited
+     * {@code java.util.AbstractSet.removeAll(Collection)} ran instead: its small-collection
+     * fast path (iterate the ARGUMENT, call this.remove() per element) happened to stay
+     * identity-correct, but only while the argument was smaller than the receiver -- past
+     * that size it falls back to the OTHER branch, which asks the ARGUMENT's equality
+     * (c.contains(...)) rather than this set's, so an identity set silently went
+     * equality-based for exactly the larger argument a quick test would miss.
+     */
+    @Override
+    public boolean removeAll(java.util.Collection<?> c) {
+        return removeAllInternal(c);
+    }
+
+    /**
+     * Dart's {@code Set.retainAll(elements)}: keeps only the elements of this set that
+     * are also elements of {@code elements}, matched by this set's own equality --
+     * identity for an identity set, {@code equals} otherwise (measured against the real
+     * SDK: {@code Set.identity()..retainAll([equalButNotIdenticalCopy])} removes the
+     * element, where a plain set's {@code retainAll} keeps it).
+     *
+     * <p>{@code elements} is a loose {@code Iterable}, not necessarily a fast-lookup
+     * {@code Set}, and even when it is one its OWN equality notion may differ from this
+     * set's -- so it is first copied into a same-kind set ({@link #newEmpty}, the same
+     * trick {@link #toSet}/{@link #union}/{@link #intersection}/{@link #difference} use),
+     * and that copy's {@code contains} does the matching under the receiver's equality.</p>
+     */
+    @SuppressWarnings("unchecked")
+    private boolean retainAllInternal(Iterable<?> elements) {
+        DartSet<E> lookup = newEmpty();
+        if (elements != null) {
+            for (Object o : elements) {
+                lookup.add((E) o);
+            }
+        }
+        boolean modified = false;
+        java.util.Iterator<E> it = iterator();
+        while (it.hasNext()) {
+            if (!lookup.contains(it.next())) {
+                it.remove();
+                modified = true;
+            }
+        }
+        return modified;
+    }
+
+    public void retainAll(Iterable<?> elements) {
+        checkWritable();
+        retainAllInternal(elements);
+    }
+
+    /**
+     * Overrides {@code java.util.Set.retainAll(Collection)} for the same reason as
+     * {@link #removeAll(java.util.Collection)} above: a real call site's argument is
+     * almost always a {@code Collection} (DartList, DartSet), which the compiler prefers
+     * over the {@code Iterable} parameter of {@link #retainAll(Iterable)}. Unlike
+     * {@code removeAll}, {@code java.util.AbstractCollection.retainAll(Collection)} has no
+     * size-based fast path at all: it unconditionally asks the ARGUMENT's equality
+     * (c.contains(...)), so without this override every identity-set {@code retainAll}
+     * call was silently equality-based, regardless of argument size.
+     */
+    @Override
+    public boolean retainAll(java.util.Collection<?> c) {
+        checkWritable();
+        return retainAllInternal(c);
     }
 
     public void removeWhere(Funcs.Func1<E, Boolean> test) {
@@ -326,8 +426,11 @@ public class DartSet<E> extends LinkedHashSet<E> {
         return asIterable().toList();
     }
 
+    /** Dart's {@code Set.toSet()} -- a copy of the same kind as this set, per the real SDK. */
     public DartSet<E> toSet() {
-        return from(this);
+        DartSet<E> s = newEmpty();
+        s.addAll(this);
+        return s;
     }
 
     public String join(String separator) {
