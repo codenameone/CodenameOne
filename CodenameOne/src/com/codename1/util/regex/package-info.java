@@ -4,5 +4,10 @@
     Author     : Shai Almog
 */
 
-/// A simple regular expression API that is portable across all platforms
+/// Regular expressions that are portable across all platforms.
+///
+/// [Pattern] and [Matcher] have the shape and the syntax of
+/// `java.util.regex`, and [StringRegex] holds the regular expression methods
+/// of `java.lang.String` over them. [RE] is the older, smaller evaluator with
+/// its own dialect.
 package com.codename1.util.regex;
