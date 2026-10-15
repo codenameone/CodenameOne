@@ -146,14 +146,13 @@ public class Drivers {
         }
         long now = System.currentTimeMillis();
         DriverState state = drivers.findById(driver);
-        if (state != null && state.isOnline()) {
-            // The time since the last report was time on line, unless it was
-            // so long ago that the app had plainly stopped reporting.
-            long since = now - state.getLastSeen();
-            if (since > 0L && since < Matcher.FRESH_MILLIS) {
-                addHours(driver, Days.number(now), since);
-            }
-        }
+        // The time since the last report was time on line, unless it was so
+        // long ago that the app had plainly stopped reporting. It is counted
+        // here and added last: adding it runs a bulk update, which flushes
+        // what this session changed and then detaches every row it holds. Run
+        // before the row below is changed, it detached the row first and the
+        // change was never written -- a driver going off line stayed on line.
+        long since = state != null && state.isOnline() ? now - state.getLastSeen() : 0L;
         boolean first = state == null;
         if (first) {
             state = new DriverState();
@@ -170,6 +169,9 @@ public class Drivers {
         }
         if (first) {
             drivers.insert(state);
+        }
+        if (since > 0L && since < Matcher.FRESH_MILLIS) {
+            addHours(driver, Days.number(now), since);
         }
         Report made = new Report();
         made.driver = view(driver, state);

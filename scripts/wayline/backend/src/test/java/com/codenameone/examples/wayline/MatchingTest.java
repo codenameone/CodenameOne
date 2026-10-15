@@ -205,4 +205,25 @@ class MatchingTest {
         mvc.perform(People.asRider(post("/api/rides/" + asked.get("id") + "/cancel"), rider))
                 .andExpect(status().isOk());
     }
+
+    @Test
+    void aDriverWhoGoesOffLineIsOffLine() throws Exception {
+        // Two reports close together, so the second counts the time between
+        // them as time on line: adding that time is a bulk update, and the
+        // driver's row must already be written when it runs. The pause is
+        // what makes that time more than nothing: two reports in the same
+        // millisecond add no time and run no update.
+        String driver = People.driver(accounts, "ldn-driver");
+        Trips.online(mvc, driver, 51.5072, -0.1276);
+        Thread.sleep(50);
+        mvc.perform(People.asDriver(Trips.body(post("/api/driver/status"),
+                People.position(false, 0, 0)), driver))
+                .andExpect(jsonPath("$.online").value(false));
+        mvc.perform(People.asDriver(get("/api/driver/me"), driver))
+                .andExpect(jsonPath("$.online").value(false));
+        String ride = People.ride(51.5074, -0.1278, 51.5155, -0.0922);
+        mvc.perform(People.asRider(Trips.body(post("/api/rides/quote"), ride),
+                People.rider(accounts, "ldn-rider")))
+                .andExpect(jsonPath("$.driversNearby").value(0));
+    }
 }
