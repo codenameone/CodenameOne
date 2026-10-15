@@ -77,4 +77,17 @@ public interface AccountApi {
     /// holds too, and this cannot be taken back.
     @POST("/api/account/delete")
     void deleteAccount(@Body AccountClosureDto closure, OnComplete<Response<UserDto>> callback);
+
+    // tag::wayline-push-contract[]
+    /// Records a device the signed-in account is to be sent notifications on.
+    /// Registering the same token again moves it to this account: a phone
+    /// belongs to whoever signed in on it last.
+    @POST("/api/account/push")
+    void registerPush(@Body PushDeviceDto device, OnComplete<Response<PushDeviceDto>> callback);
+
+    /// Forgets a device, on signing out: the next person to use the phone is
+    /// not to be told about this account's rides.
+    @POST("/api/account/push/remove")
+    void unregisterPush(@Body PushDeviceDto device, OnComplete<Response<PushDeviceDto>> callback);
+    // end::wayline-push-contract[]
 }

@@ -26,6 +26,7 @@ import com.codename1.backend.Config;
 import com.codename1.backend.annotations.Bean;
 import com.codename1.backend.annotations.Configuration;
 import com.codename1.backend.annotations.Value;
+import com.codename1.backend.push.CloudPush;
 import com.codenameone.examples.wayline.geo.Geocoder;
 import com.codenameone.examples.wayline.geo.PhotonGeocoder;
 import com.codenameone.examples.wayline.geo.StubGeocoder;
@@ -33,6 +34,11 @@ import com.codenameone.examples.wayline.pay.MisconfiguredPayments;
 import com.codenameone.examples.wayline.pay.PaymentProvider;
 import com.codenameone.examples.wayline.pay.SimulatedPayments;
 import com.codenameone.examples.wayline.pay.StripePayments;
+import com.codenameone.examples.wayline.push.CloudPushSender;
+import com.codenameone.examples.wayline.push.ConsolePushSender;
+import com.codenameone.examples.wayline.push.MisconfiguredPushSender;
+import com.codenameone.examples.wayline.push.PushSender;
+import com.codenameone.examples.wayline.push.RecordingPushSender;
 import com.codenameone.examples.wayline.sms.ConsoleSmsSender;
 import com.codenameone.examples.wayline.sms.MessageBirdSmsSender;
 import com.codenameone.examples.wayline.sms.MisconfiguredSmsSender;
@@ -45,10 +51,10 @@ import java.io.IOException;
 /// The services this server reaches outside itself for, each behind an
 /// interface and each chosen here from the settings.
 ///
-/// Each is named by one setting -- `wayline.sms.provider` and
-/// `wayline.payments.provider` -- and, when that is not set, a development
-/// profile (dev, test, local) gets the one that needs no account: codes printed
-/// on the console, cards simulated. Any other profile gets the real provider,
+/// Each is named by one setting -- `wayline.sms.provider`,
+/// `wayline.payments.provider` and `wayline.push.provider` -- and, when that is
+/// not set, a development profile (dev, test, local) gets the one that needs no
+/// account: codes and notifications printed on the console, cards simulated. Any other profile gets the real provider,
 /// and when its settings are missing the server still starts, logs a
 /// configuration error naming each missing setting, and fails every call to
 /// that provider with the same message. It never quietly falls back to a
@@ -167,6 +173,57 @@ public class Services {
         return new StripePayments(secret, address + "/pay/return");
     }
     // end::wayline-payment-choice[]
+
+    // tag::wayline-push-choice[]
+    /// `wayline.push.provider` is one of:
+    ///
+    /// - `cloud`: the Codename One push service. It needs `wayline.push.app`,
+    ///   the app's push id, and `wayline.push.key`, a server key with the push
+    ///   scope; both are in the Push section of the Codename One console.
+    /// - `console`: prints each notification, on a development profile only.
+    /// - `recording`: keeps each notification for the tests to read, on a
+    ///   development profile only.
+    ///
+    /// Unset, it is `recording` on the `test` profile, `console` on the other
+    /// development profiles and `cloud` otherwise. A server whose push settings
+    /// are missing still starts and still serves rides: it logs a configuration
+    /// error at start-up and again for every notification it could not send.
+    @Bean
+    public PushSender pushSender(Config config,
+            @Value("${wayline.push.provider:}") String chosen,
+            @Value("${wayline.push.app:}") String app,
+            @Value("${wayline.push.key:}") String key,
+            @Value("${wayline.push.url:}") String url) {
+        String kind = chosen.trim().length() > 0 ? chosen.trim()
+                : "test".equals(config.getProfile()) ? "recording"
+                : config.isDevelopmentProfile() ? "console" : "cloud";
+        if ("console".equalsIgnoreCase(kind) || "recording".equalsIgnoreCase(kind)) {
+            if (!config.isDevelopmentProfile()) {
+                return new MisconfiguredPushSender("wayline.push.provider=" + kind
+                        + " sends nothing and is refused on the '" + config.getProfile()
+                        + "' profile; set it to cloud");
+            }
+            return "console".equalsIgnoreCase(kind) ? new ConsolePushSender()
+                    : new RecordingPushSender();
+        }
+        if (!"cloud".equalsIgnoreCase(kind)) {
+            return new MisconfiguredPushSender("wayline.push.provider is '" + kind
+                    + "', which is none of cloud, console or recording");
+        }
+        String missing = missing("wayline.push.", new String[] {"app", app, "key", key});
+        if (missing.length() > 0) {
+            return new MisconfiguredPushSender(unset("push", "cloud", missing));
+        }
+        try {
+            CloudPush push = new CloudPush(app.trim(), key.trim());
+            return new CloudPushSender(url.trim().length() > 0 ? push.withEndpoint(url.trim())
+                    : push);
+        } catch (IllegalArgumentException err) {
+            return new MisconfiguredPushSender("push provider 'cloud' is misconfigured: "
+                    + err.getMessage());
+        }
+    }
+    // end::wayline-push-choice[]
 
     /// The names, after `prefix`, of the settings in `namesAndValues` whose
     /// value is empty, separated by commas.

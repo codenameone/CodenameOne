@@ -42,6 +42,12 @@ public final class AppConfig {
     /// The path the server hands the code back on when the app runs in a
     /// browser. The same constant is in the server's `SecurityConfig`.
     public static final String WEB_REDIRECT_PATH = "/signin/code";
+    // tag::wayline-push-key[]
+    /// The app's push key, from the Push section of the Codename One console.
+    /// Empty, the app registers for no notifications: everything still works,
+    /// and a phone in a pocket simply hears nothing until it is opened.
+    public static final String PUSH_APP_KEY = "";
+    // end::wayline-push-key[]
     /// Where the map opens when the device will not say where it is.
     public static final double DEFAULT_LAT = 37.8080;
     public static final double DEFAULT_LNG = -122.4120;

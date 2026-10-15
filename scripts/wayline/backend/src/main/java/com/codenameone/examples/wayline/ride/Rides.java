@@ -49,6 +49,7 @@ import com.codenameone.examples.wayline.domain.RidePassed;
 import com.codenameone.examples.wayline.geo.Geo;
 import com.codenameone.examples.wayline.live.LiveHub;
 import com.codenameone.examples.wayline.pay.Payments;
+import com.codenameone.examples.wayline.push.RidePushes;
 import com.codenameone.examples.wayline.repository.DriverStateRepository;
 import com.codenameone.examples.wayline.repository.ProfileRepository;
 import com.codenameone.examples.wayline.repository.RideEventRepository;
@@ -111,6 +112,7 @@ public class Rides {
     private final Fares fares;
     private final Payments payments;
     private final LiveHub live;
+    private final RidePushes pushes;
     private final Moderation moderation;
     private final long offerMillis;
     private final long searchMillis;
@@ -118,7 +120,8 @@ public class Rides {
     /// @param offerSeconds how long a driver has to answer an offer
     /// @param searchSeconds how long a ride looks for a driver before giving up
     public Rides(RideRepository rides, RideEventRepository events, RidePassedRepository passes,
-            DriverStateRepository drivers, ProfileRepository profiles, Matcher matcher, Fares fares, Payments payments, LiveHub live, Moderation moderation,
+            DriverStateRepository drivers, ProfileRepository profiles, Matcher matcher, Fares fares, Payments payments, LiveHub live, RidePushes pushes,
+            Moderation moderation,
             @Value("${wayline.offer.seconds:15}") int offerSeconds,
             @Value("${wayline.search.seconds:90}") int searchSeconds) {
         this.rides = rides;
@@ -131,6 +134,7 @@ public class Rides {
         this.fares = fares;
         this.payments = payments;
         this.live = live;
+        this.pushes = pushes;
         offerMillis = offerSeconds * 1000L;
         searchMillis = searchSeconds * 1000L;
     }
@@ -706,6 +710,9 @@ public class Rides {
             return null;
         }
         live.rideChanged(change.id, change.state, change.rider, change.driver, change.also);
+        // The same moment, and for the same reason: a phone told of a change
+        // must find it made.
+        pushes.rideChanged(change.id, change.state, change.rider, change.driver);
         return change.view;
     }
 
@@ -944,10 +951,10 @@ public class Rides {
                 // How long until the car is where it is going next: the pickup
                 // until the rider is in it, the destination after.
                 if (RideState.ACCEPTED == state) {
-                    etaMinutes = minutes(driverLat, driverLng, ride.getPickupLat(),
+                    etaMinutes = etaMinutes(driverLat, driverLng, ride.getPickupLat(),
                             ride.getPickupLng());
                 } else if (RideState.IN_PROGRESS == state) {
-                    etaMinutes = minutes(driverLat, driverLng, ride.getDropoffLat(),
+                    etaMinutes = etaMinutes(driverLat, driverLng, ride.getDropoffLat(),
                             ride.getDropoffLng());
                 }
             }
@@ -1004,7 +1011,9 @@ public class Rides {
                 riderPhone);
     }
 
-    private static int minutes(double fromLat, double fromLng, double toLat, double toLng) {
+    /// Minutes for a car to drive from one point to another, by the same
+    /// estimate the fares are made with. Never less than one.
+    public static int etaMinutes(double fromLat, double fromLng, double toLat, double toLng) {
         double seconds = Geo.meters(fromLat, fromLng, toLat, toLng) * Fares.ROAD_FACTOR
                 / Fares.METERS_PER_SECOND;
         return Math.max(1, (int) Math.ceil(seconds / 60d));

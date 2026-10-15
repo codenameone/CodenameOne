@@ -31,10 +31,12 @@ import com.codenameone.examples.wayline.api.PhoneChallengeDto;
 import com.codenameone.examples.wayline.api.PhoneCodeDto;
 import com.codenameone.examples.wayline.api.PreferencesDto;
 import com.codenameone.examples.wayline.api.ProfileDto;
+import com.codenameone.examples.wayline.api.PushDeviceDto;
 import com.codenameone.examples.wayline.api.RegisterDto;
 import com.codenameone.examples.wayline.api.TicketDto;
 import com.codenameone.examples.wayline.api.UserDto;
 import com.codenameone.examples.wayline.live.LiveTickets;
+import com.codenameone.examples.wayline.push.PushDevices;
 
 /// The server's half of `AccountApi`.
 ///
@@ -47,13 +49,15 @@ public class AccountEndpoint implements AccountApiServer {
     private final PhoneVerification phones;
     private final LiveTickets tickets;
     private final Preferences preferences;
+    private final PushDevices devices;
 
     public AccountEndpoint(Accounts accounts, PhoneVerification phones, LiveTickets tickets,
-            Preferences preferences) {
+            Preferences preferences, PushDevices devices) {
         this.accounts = accounts;
         this.phones = phones;
         this.tickets = tickets;
         this.preferences = preferences;
+        this.devices = devices;
     }
 
     @Override
@@ -110,5 +114,15 @@ public class AccountEndpoint implements AccountApiServer {
     @Override
     public UserDto deleteAccount(AccountClosureDto closure) throws Exception {
         return accounts.close(Caller.name(), closure == null ? null : closure.password());
+    }
+
+    @Override
+    public PushDeviceDto registerPush(PushDeviceDto device) throws Exception {
+        return devices.register(Caller.name(), device);
+    }
+
+    @Override
+    public PushDeviceDto unregisterPush(PushDeviceDto device) throws Exception {
+        return devices.unregister(Caller.name(), device);
     }
 }

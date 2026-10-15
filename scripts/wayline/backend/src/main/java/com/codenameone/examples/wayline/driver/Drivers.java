@@ -39,6 +39,7 @@ import com.codenameone.examples.wayline.domain.Ride;
 import com.codenameone.examples.wayline.driving.Applications;
 import com.codenameone.examples.wayline.geo.Geo;
 import com.codenameone.examples.wayline.live.LiveHub;
+import com.codenameone.examples.wayline.push.RidePushes;
 import com.codenameone.examples.wayline.ride.Fares;
 import com.codenameone.examples.wayline.repository.DriverApplicationRepository;
 import com.codenameone.examples.wayline.repository.DriverHoursRepository;
@@ -72,13 +73,14 @@ public class Drivers {
     private final RidePassedRepository passes;
     private final ProfileRepository profiles;
     private final LiveHub live;
+    private final RidePushes pushes;
     private final Fares fares;
     private final Applications applications;
 
     public Drivers(DriverStateRepository drivers, DriverHoursRepository hours,
             DriverApplicationRepository made, RideRepository rides, RideEventRepository events,
-            RidePassedRepository passes, ProfileRepository profiles, LiveHub live, Fares fares,
-            Applications applications) {
+            RidePassedRepository passes, ProfileRepository profiles, LiveHub live, RidePushes pushes,
+            Fares fares, Applications applications) {
         this.drivers = drivers;
         this.hours = hours;
         this.made = made;
@@ -88,6 +90,7 @@ public class Drivers {
         this.profiles = profiles;
         this.applications = applications;
         this.live = live;
+        this.pushes = pushes;
         this.fares = fares;
     }
 
@@ -106,6 +109,7 @@ public class Drivers {
         DriverDto dto = made.driver;
         if (made.rideId != null) {
             live.driverMoved(made.rider, made.rideId, dto.lat(), dto.lng(), dto.heading());
+            pushes.driverMoved(made.rideId, dto.lat(), dto.lng());
         }
         live.fleetChanged(dto.username(), dto.online(), dto.lat(), dto.lng(), dto.heading());
         return dto;

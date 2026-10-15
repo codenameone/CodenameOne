@@ -28,9 +28,11 @@ import com.codenameone.examples.wayline.Roles;
 import com.codenameone.examples.wayline.api.FareQuoteDto;
 import com.codenameone.examples.wayline.api.NearbyDriverDto;
 import com.codenameone.examples.wayline.api.RatingDto;
+import com.codenameone.examples.wayline.api.RideActivityDto;
 import com.codenameone.examples.wayline.api.RideDto;
 import com.codenameone.examples.wayline.api.RideRequestDto;
 import com.codenameone.examples.wayline.api.RiderApiServer;
+import com.codenameone.examples.wayline.push.RidePushes;
 
 import java.util.List;
 
@@ -40,9 +42,11 @@ import java.util.List;
 @Component
 public class RiderEndpoint implements RiderApiServer {
     private final Rides rides;
+    private final RidePushes pushes;
 
-    public RiderEndpoint(Rides rides) {
+    public RiderEndpoint(Rides rides, RidePushes pushes) {
         this.rides = rides;
+        this.pushes = pushes;
     }
 
     @Override
@@ -85,5 +89,10 @@ public class RiderEndpoint implements RiderApiServer {
     @Override
     public RideDto rate(String id, RatingDto rating) throws Exception {
         return rides.rate(Caller.name(), id, rating == null ? 0 : rating.stars());
+    }
+
+    @Override
+    public RideActivityDto activity(String id, RideActivityDto activity) throws Exception {
+        return pushes.attach(Caller.name(), id, activity);
     }
 }

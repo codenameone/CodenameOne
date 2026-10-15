@@ -30,6 +30,8 @@ import com.codenameone.examples.wayline.repository.LiveTicketRepository;
 import com.codenameone.examples.wayline.repository.PayoutAccountRepository;
 import com.codenameone.examples.wayline.repository.PhoneCodeRepository;
 import com.codenameone.examples.wayline.repository.PreferenceRepository;
+import com.codenameone.examples.wayline.repository.PushDeviceRepository;
+import com.codenameone.examples.wayline.repository.RideActivityRepository;
 import com.codenameone.examples.wayline.repository.RideRepository;
 
 /// What closing or restricting an account does to the rows other parts of the
@@ -57,11 +59,14 @@ public class AccountCleanup {
     private final PayoutAccountRepository payoutAccounts;
     private final PhoneCodeRepository codes;
     private final LiveTicketRepository tickets;
+    private final PushDeviceRepository pushDevices;
+    private final RideActivityRepository activities;
 
     public AccountCleanup(RideRepository rides, DriverStateRepository drivers,
             DriverHoursRepository hours, PreferenceRepository preferences,
             PayoutAccountRepository payoutAccounts, PhoneCodeRepository codes,
-            LiveTicketRepository tickets) {
+            LiveTicketRepository tickets, PushDeviceRepository pushDevices,
+            RideActivityRepository activities) {
         this.rides = rides;
         this.drivers = drivers;
         this.hours = hours;
@@ -69,6 +74,8 @@ public class AccountCleanup {
         this.payoutAccounts = payoutAccounts;
         this.codes = codes;
         this.tickets = tickets;
+        this.pushDevices = pushDevices;
+        this.activities = activities;
     }
 
     /// Whether the account is the rider or the driver of a ride that has not
@@ -100,8 +107,9 @@ public class AccountCleanup {
 
     /// Deletes what an account leaves in the tables that are keyed by it and
     /// belong to nobody's `forget`: its preferences, where it is paid, the
-    /// hours it drove, its place on the map, a code it was texted and the
-    /// tickets it held for the live connection.
+    /// hours it drove, its place on the map, a code it was texted, the
+    /// tickets it held for the live connection, and the phones it was sent
+    /// notifications on.
     public void removeEverythingOf(String username) {
         preferences.deleteByUsername(username);
         payoutAccounts.deleteByUsername(username);
@@ -109,5 +117,7 @@ public class AccountCleanup {
         drivers.deleteByUsername(username);
         codes.deleteByUsername(username);
         tickets.deleteByUsername(username);
+        pushDevices.deleteByUsername(username);
+        activities.deleteByUsername(username);
     }
 }

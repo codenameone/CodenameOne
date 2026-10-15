@@ -25,6 +25,7 @@ package com.codenameone.examples.wayline;
 import com.codename1.system.Lifecycle;
 import com.codenameone.examples.wayline.net.Account;
 import com.codenameone.examples.wayline.net.Session;
+import com.codenameone.examples.wayline.notify.Notifications;
 import com.codenameone.examples.wayline.pay.CardForm;
 import com.codenameone.examples.wayline.ui.Lang;
 import com.codenameone.examples.wayline.ui.Look;
@@ -38,6 +39,7 @@ import com.codenameone.examples.wayline.ui.Nav;
 /// - `net` -- the session, and the typed clients generated from the contracts in
 ///   the `shared` module. Nothing else in the app builds a URL.
 /// - `live` -- the WebSocket the server pushes changes down.
+/// - `notify` -- push notifications, for a phone that is not looking.
 /// - `ui`, `rider`, `driver`, `admin` -- the screens.
 /// - `map` -- the map, its markers and the device's position.
 /// - `src/main/css/theme.css` -- every colour, font and margin.
@@ -60,10 +62,14 @@ public class Wayline extends Lifecycle {
 
     /// Coming back to the app is how a card added on the payment provider's
     /// page is noticed: the browser it opened in tells the app nothing.
+    ///
+    /// It is also when the app asks for its push token, which the platform
+    /// answers at once when nothing has changed.
     @Override
     public void start() {
         super.start();
         CardForm.resumed();
+        Notifications.start();
     }
 
     /// The app is put away, which is the last sure moment to send the usage

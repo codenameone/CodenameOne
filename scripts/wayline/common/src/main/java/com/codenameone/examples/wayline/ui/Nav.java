@@ -22,6 +22,7 @@
  */
 package com.codenameone.examples.wayline.ui;
 
+import com.codename1.ui.CN;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BorderLayout;
@@ -35,6 +36,7 @@ import com.codenameone.examples.wayline.driver.DriverForm;
 import com.codenameone.examples.wayline.live.LiveChannel;
 import com.codenameone.examples.wayline.net.Account;
 import com.codenameone.examples.wayline.net.Session;
+import com.codenameone.examples.wayline.notify.Notifications;
 import com.codenameone.examples.wayline.rider.RiderForm;
 
 /// Decides which screen the app is on.
@@ -60,6 +62,10 @@ public final class Nav {
         Form form();
     }
 
+    /// The home screen last built, and the mode it is the home of.
+    private static Form homeForm;
+    private static String homeMode = "";
+
     private Nav() {
     }
 
@@ -80,6 +86,9 @@ public final class Nav {
     /// account's settings are fetched, applied, and then their home is shown in
     /// the language and the colours they chose.
     public static void enter() {
+        // Where this phone is to be sent notifications, now that there is
+        // someone to send them to.
+        Notifications.signedIn();
         Account.load(() -> {
             Look.apply();
             Lang.apply();
@@ -119,7 +128,9 @@ public final class Nav {
                 : !DRIVER.equals(mode) ? new RiderForm()
                 : user.driver() ? new DriverForm() : new ApplyForm();
         home.start();
-        return home.form();
+        homeForm = home.form();
+        homeMode = mode;
+        return homeForm;
     }
 
     /// The mode to open for `user`.
@@ -152,24 +163,53 @@ public final class Nav {
         home();
     }
 
+    /// A notification about a ride was opened: the home that shows that ride,
+    /// as the rider or as the driver the notification was for. Nothing
+    /// changes when that home is already on screen; it hears of the change
+    /// over the live channel too.
+    public static void showRide(String role) {
+        UserDto user = Session.user();
+        if (user == null) {
+            return;
+        }
+        String wanted = DRIVER.equals(role) && user.driver() ? DRIVER : RIDER;
+        if (wanted.equals(homeMode) && homeForm != null && CN.getCurrentForm() == homeForm) {
+            return;
+        }
+        AppConfig.setMode(wanted, user.username());
+        home();
+    }
+
     public static void signOut() {
-        leave("user");
+        leave("user", true);
     }
 
     /// The account was closed: signed out, and what the device kept for the
     /// usage reports forgotten with it.
     public static void deleted() {
-        leave("deleted");
+        // Closing the account already made the server forget its devices.
+        leave("deleted", false);
         Telemetry.forget();
         // Nobody is coming back for where that account went.
         Prefs.ownedBy("");
     }
 
-    private static void leave(String reason) {
+    private static void leave(final String reason, boolean forgetDevice) {
         Account.flush();
         LiveChannel.stop();
-        Telemetry.signedOut(reason);
-        Session.signOut(WelcomeForm::show);
+        homeForm = null;
+        homeMode = "";
+        // The server forgets this phone for the account first, while there is
+        // still a session to ask with.
+        Runnable out = () -> {
+            Telemetry.signedOut(reason);
+            Session.signOut(WelcomeForm::show);
+        };
+        if (forgetDevice) {
+            Notifications.signingOut(out);
+        } else {
+            out.run();
+        }
     }
 
     /// Points the app at another server, which ends the session with this one.

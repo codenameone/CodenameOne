@@ -63,5 +63,11 @@ public interface RiderApi {
     @GET("/api/rides/nearby")
     void nearby(@Query("lat") double lat, @Query("lng") double lng,
             OnComplete<Response<List<NearbyDriverDto>>> callback);
+
+    /// Tells the server which Live Activity this phone shows the ride in, so
+    /// that it can keep it up to date while the app is in the background.
+    @POST("/api/rides/{id}/activity")
+    void activity(@Path("id") String id, @Body RideActivityDto activity,
+            OnComplete<Response<RideActivityDto>> callback);
 }
 // end::wayline-contract-api[]
