@@ -6017,9 +6017,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// native's dispatch_sync back onto the main queue it was already occupying
     /// and deadlocked.
     ///
-    /// Input suppression is updated here, immediately, and only the listener
-    /// is marshalled. A chooser keeps suppression while other requests remain
-    /// outstanding; the last completion releases it before EDT delivery.
+    /// AppKit scopes input suppression to each document sheet's owner. These
+    /// requests must not change the global dropEvents flag: another window can
+    /// remain interactive while a sheet is open, and unrelated capture requests
+    /// own their own suppression lifetime. Only the listener is marshalled.
     ///
     /// New methods rather than a change to the shared ones, so the iOS document
     /// picker and the Mac share callback keep the behaviour they have. Note
@@ -6031,7 +6032,6 @@ public class IOSImplementation extends CodenameOneImplementation {
         final EventDispatcher target;
         synchronized (macFileChooserRequests) {
             target = macFileChooserRequests.remove(requestId);
-            dropEvents = !macFileChooserRequests.isEmpty();
         }
         if (target == null) {
             return; // Duplicate or unknown completion cannot consume another request.
@@ -6673,26 +6673,24 @@ public class IOSImplementation extends CodenameOneImplementation {
         EventDispatcher callback = new EventDispatcher();
         callback.addListener(response);
         fileChooserCallback = callback;
-        dropEvents = true;
         if (isMacPlatform()) {
             final int requestId;
             synchronized (macFileChooserRequests) {
                 requestId = ++macFileChooserSequence;
                 macFileChooserRequests.put(requestId, callback);
-                dropEvents = true;
             }
             try {
                 nativeInstance.openFileChooserWithId(accept, requestId);
             } catch (RuntimeException failure) {
                 synchronized (macFileChooserRequests) {
                     macFileChooserRequests.remove(requestId);
-                    dropEvents = !macFileChooserRequests.isEmpty();
                 }
                 if (fileChooserCallback == callback) { fileChooserCallback = null; }
                 throw failure;
             }
             if (tiKeepAlive) { macFileChooserResult(null, 0); }
         } else {
+            dropEvents = true;
             nativeInstance.openFileChooser(accept);
         }
     }

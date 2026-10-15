@@ -40,6 +40,7 @@ public final class TextInputGeometry {
     private final int[] fallback;
     private final int start;
     private final int end;
+    private final int activeEnd;
 
     /// Each caret record is {UTF-16 offset, x, y, width, height}. Include visible insertion
     /// positions, in document order, including the endpoint after each visible run. Selection
@@ -52,6 +53,7 @@ public final class TextInputGeometry {
         this.fallback = copy(fallback);
         this.start = Math.min(start, end);
         this.end = Math.max(start, end);
+        this.activeEnd = end;
     }
 
     private static int[] copy(int[] value) {
@@ -114,7 +116,7 @@ public final class TextInputGeometry {
 
     /// Hit-tests only immutable visible geometry. Vertical distance takes priority across lines.
     public int offsetAtPoint(int x, int y) {
-        int best = end;
+        int best = activeEnd;
         long bestY = Long.MAX_VALUE;
         long bestX = Long.MAX_VALUE;
         for (int i = 0; i + 4 < carets.length; i += 5) {

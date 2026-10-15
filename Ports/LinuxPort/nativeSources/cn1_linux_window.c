@@ -360,7 +360,10 @@ static GtkWidget* cn1LinuxOverlayHost(int slot) {
 void cn1LinuxOverlayAdd(int slot, GtkWidget* w, int x, int y, int width, int height) {
     GtkWidget* host = cn1LinuxOverlayHost(slot);
     if (slot == CN1_MAIN_WINDOW_SLOT) {
-        if (cn1TitleHeader && y < cn1TitleHeight) {
+        // The header overlay clips to its allocation. Spanning peers belong in
+        // the body overlay so their document portion remains visible.
+        if (cn1TitleHeader && y >= 0 && y < cn1TitleHeight
+                && height >= 0 && height <= cn1TitleHeight - y) {
             host = cn1TitleFixed;
             x -= cn1TitleX;
             y -= cn1TitleY;
@@ -379,7 +382,8 @@ void cn1LinuxOverlayAdd(int slot, GtkWidget* w, int x, int y, int width, int hei
 void cn1LinuxOverlayMove(int slot, GtkWidget* w, int x, int y, int width, int height) {
     GtkWidget* host = cn1LinuxOverlayHost(slot);
     if (slot == CN1_MAIN_WINDOW_SLOT) {
-        if (cn1TitleHeader && y < cn1TitleHeight) {
+        if (cn1TitleHeader && y >= 0 && y < cn1TitleHeight
+                && height >= 0 && height <= cn1TitleHeight - y) {
             host = cn1TitleFixed;
             x -= cn1TitleX;
             y -= cn1TitleY;

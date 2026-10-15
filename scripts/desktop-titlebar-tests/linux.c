@@ -128,6 +128,18 @@ int main(int argc, char** argv) {
     cn1LinuxOverlayMove(CN1_MAIN_WINDOW_SLOT, edit, 20, cn1TitleHeight + 30, 100, 22);
     assert(gtk_widget_get_parent(edit) == cn1Fixed);
     cn1LinuxOverlayRemove(CN1_MAIN_WINDOW_SLOT, edit);
+    // A peer spanning the title/body boundary must retain its document portion.
+    GtkWidget* spanning = gtk_drawing_area_new();
+    cn1LinuxOverlayAdd(CN1_MAIN_WINDOW_SLOT, spanning, 0, 0, 300, cn1TitleHeight + 120);
+    assert(gtk_widget_get_parent(spanning) == cn1Fixed);
+    cn1LinuxOverlayMove(CN1_MAIN_WINDOW_SLOT, spanning, right[0], right[2], 100, 20);
+    assert(gtk_widget_get_parent(spanning) == cn1TitleFixed);
+    cn1LinuxOverlayMove(CN1_MAIN_WINDOW_SLOT, spanning, 0, cn1TitleHeight - 5, 300, 120);
+    assert(gtk_widget_get_parent(spanning) == cn1Fixed);
+    int spanningY;
+    gtk_container_child_get(GTK_CONTAINER(cn1Fixed), spanning, "y", &spanningY, NULL);
+    assert(spanningY == -5);
+    cn1LinuxOverlayRemove(CN1_MAIN_WINDOW_SLOT, spanning);
     g_object_set(gtk_settings_get_default(), "gtk-decoration-layout", "close,minimize,maximize:", NULL);
     settle();
     int left[5] = {0};

@@ -150,9 +150,13 @@ framework accounts for native controls while measuring and laying out the toolba
 the application's padding values and units afterward. Resize, DPI and native theme changes can
 change this space. Avoid forcing the toolbar below its preferred height.
 
-Interactive children, including disabled buttons, are excluded from native dragging. Ordinary
-labels and empty title space can start window gestures. A label with pointer listeners counts as
-interactive. Hiding or removing the toolbar clears its drag regions; the Windows and Linux ports
+Interactive children, including disabled buttons, are excluded from native dragging. Plain
+`Label` and `Container` instances allow window gestures on their passive backgrounds. Pointer,
+long-press, context-menu and stylus listeners keep their input. Subclasses and other component
+types retain input by default, including those that override pointer methods. For a custom
+component that only draws a title background, call `Toolbar.setTitleBarDragRegion(component, true)`
+to allow dragging there; interactive children and listeners remain excluded. Passing `false`
+also excludes a plain label or container. Hiding or removing the toolbar clears its drag regions; the Windows and Linux ports
 restore their ordinary title area. When DWM composition is unavailable, Windows retains its
 standard decorated frame instead of removing the user's window controls.
 

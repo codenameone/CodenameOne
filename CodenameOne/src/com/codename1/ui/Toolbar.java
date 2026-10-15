@@ -2774,6 +2774,30 @@ public class Toolbar extends Container {
 
     private int[] nativeTitleBarRegions;
 
+    /// Marks a custom title component's background as eligible for window dragging.
+    /// Plain Label and Container instances are eligible by default; subclasses and
+    /// other components keep their pointer input unless explicitly opted in here.
+    /// Focusable controls, pointer/long-press listeners and interactive descendants
+    /// remain excluded. Set false to keep even a plain label's background interactive.
+    /// Call on the EDT. Has no effect outside an integrated desktop title toolbar.
+    ///
+    /// @param component the title component to configure
+    /// @param dragRegion true for a passive background that can drag the window
+    public static void setTitleBarDragRegion(Component component, boolean dragRegion) {
+        component.putClientProperty("Toolbar.titleBarDragRegion", dragRegion ? Boolean.TRUE : Boolean.FALSE);
+        component.repaint();
+    }
+
+    private boolean isPassiveTitleBarComponent(Component component) {
+        Object configured = component.getClientProperty("Toolbar.titleBarDragRegion");
+        if (configured != null) {
+            return Boolean.TRUE.equals(configured);
+        }
+        // Without reflection there is no portable way to detect overridden pointer
+        // methods. Only known passive classes opt in implicitly; subclasses are safe.
+        return Label.class.equals(component.getClass()) || Container.class.equals(component.getClass());
+    }
+
     // Native hit testing must see the actual laid-out controls, including disabled
     // buttons. A disabled Save button is not an unexpected window-drag handle.
     private void collectTitleBarControls(Container parent, Vector<Component> controls) {
@@ -2781,11 +2805,15 @@ public class Toolbar extends Container {
             if (!child.isVisible()) {
                 continue;
             }
-            if (child instanceof Button || child.isFocusable() || child.isGrabsPointerEvents()
+            if (!isPassiveTitleBarComponent(child) || child instanceof Button || child.isFocusable() || child.isGrabsPointerEvents()
                     || child.isDraggable() || child.isScrollable() || child.getLeadComponent() != null
                     || child.pointerPressedListeners != null && child.pointerPressedListeners.hasListeners()
                     || child.pointerReleasedListeners != null && child.pointerReleasedListeners.hasListeners()
-                    || child.pointerDraggedListeners != null && child.pointerDraggedListeners.hasListeners()) {
+                    || child.pointerDraggedListeners != null && child.pointerDraggedListeners.hasListeners()
+                    || child.longPressListeners != null && child.longPressListeners.hasListeners()
+                    || child.contextMenuListeners != null && child.contextMenuListeners.hasListeners()
+                    || child.stylusListeners != null && child.stylusListeners.hasListeners()
+                    || child.getContextMenuCommands() != null && child.getContextMenuCommands().length > 0) {
                 controls.addElement(child);
             } else if (child instanceof Container) {
                 collectTitleBarControls((Container) child, controls);

@@ -93,6 +93,48 @@ class DesktopChromeTest extends UITestBase {
     }
 
     @FormTest
+    void customPointerHandlersAndLongPressListenersAreNotWindowDragRegions() {
+        desktopMode("custom");
+        Form form = new Form("Custom controls");
+        Label custom = new Label("Custom click") {
+            @Override public void pointerReleased(int x, int y) { }
+        };
+        Label longPress = new Label("Long press");
+        longPress.addLongPressListener(e -> { });
+        Label ordinary = new Label("Plain title");
+        form.getToolbar().setTitleComponent(BoxLayout.encloseX(custom, longPress, ordinary));
+        form.show();
+        DisplayTest.flushEdt();
+        assertFalse(form.getToolbar().isTitleBarDragPoint(custom.getAbsoluteX() + 1,
+                custom.getAbsoluteY() + 1), "an overridden pointer handler must keep its press");
+        assertFalse(form.getToolbar().isTitleBarDragPoint(longPress.getAbsoluteX() + 1,
+                longPress.getAbsoluteY() + 1), "a long-press listener must keep its press");
+        assertTrue(form.getToolbar().isTitleBarDragPoint(ordinary.getAbsoluteX() + 1,
+                ordinary.getAbsoluteY() + 1));
+    }
+
+    @FormTest
+    void passiveCustomTitleBackgroundCanOptInWithoutTakingChildInput() {
+        desktopMode("custom");
+        Form form = new Form("Passive custom title");
+        Container custom = new Container(BoxLayout.x()) { };
+        Label title = new Label("Title");
+        Button button = new Button("Save");
+        custom.add(title).add(button);
+        Toolbar.setTitleBarDragRegion(custom, true);
+        form.getToolbar().setTitleComponent(custom);
+        form.show();
+        DisplayTest.flushEdt();
+        assertTrue(form.getToolbar().isTitleBarDragPoint(title.getAbsoluteX() + 1, title.getAbsoluteY() + 1));
+        assertFalse(form.getToolbar().isTitleBarDragPoint(button.getAbsoluteX() + 1, button.getAbsoluteY() + 1));
+        Toolbar.setTitleBarDragRegion(title, false);
+        assertFalse(form.getToolbar().isTitleBarDragPoint(title.getAbsoluteX() + 1, title.getAbsoluteY() + 1));
+        Toolbar.setTitleBarDragRegion(title, true);
+        title.addLongPressListener(e -> { });
+        assertFalse(form.getToolbar().isTitleBarDragPoint(title.getAbsoluteX() + 1, title.getAbsoluteY() + 1));
+    }
+
+    @FormTest
     void customTitleRegionsFollowResizeAndClearWhenToolbarIsRemoved() {
         desktopMode("custom");
         Form f = new Form("Document");

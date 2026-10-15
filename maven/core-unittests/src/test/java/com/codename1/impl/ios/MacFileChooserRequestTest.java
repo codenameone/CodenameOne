@@ -25,10 +25,56 @@ package com.codename1.impl.ios;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.Component;
+import com.codename1.ui.Window;
+import com.codename1.ui.layouts.BorderLayout;
 import java.util.ArrayList;
 import static org.junit.jupiter.api.Assertions.*;
 
 class MacFileChooserRequestTest extends UITestBase {
+    private static class KeyClient extends Component {
+        int presses;
+        @Override public boolean isFocusable() { return true; }
+        @Override public void keyPressed(int keyCode) { presses++; }
+    }
+
+    @FormTest
+    void completedDocumentSheetDoesNotBlockInputWhileAnotherSheetRemains() {
+        IOSNative oldNative = IOSImplementation.nativeInstance;
+        IOSImplementation oldInstance = IOSImplementation.instance;
+        IOSImplementation port = new IOSImplementation() {
+            @Override public String getPlatformName() { return "mac"; }
+        };
+        NativeStub stub = new NativeStub();
+        implementation.setMultiWindowSupported(true);
+        Window first = new Window("First", new BorderLayout());
+        Window second = new Window("Second", new BorderLayout());
+        KeyClient client = new KeyClient();
+        try {
+            IOSImplementation.nativeInstance = stub;
+            IOSImplementation.instance = port;
+            first.add(BorderLayout.CENTER, client);
+            first.show();
+            first.setFocused(client);
+            port.openFileChooser(e -> { }, ".cn1doc");
+            second.show();
+            port.openFileChooser(e -> { }, ".docx");
+            IOSImplementation.macFileChooserResult(null, stub.requests.get(0));
+            flushSerialCalls();
+            IOSImplementation.windowKeyCallback(first.getWindowId(), 'q', true);
+            IOSImplementation.windowKeyCallback(first.getWindowId(), 'q', false);
+            flushSerialCalls();
+            assertEquals(1, client.presses, "another document's sheet must not suppress this window's input");
+        } finally {
+            for (Integer request : stub.requests) { IOSImplementation.macFileChooserResult(null, request); }
+            flushSerialCalls();
+            second.dispose();
+            first.dispose();
+            IOSImplementation.nativeInstance = oldNative;
+            IOSImplementation.instance = oldInstance;
+        }
+    }
+
     private static class NativeStub extends IOSNative {
         final ArrayList<Integer> requests = new ArrayList<Integer>();
         boolean fail;

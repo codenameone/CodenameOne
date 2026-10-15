@@ -9144,7 +9144,7 @@ void com_codename1_impl_ios_IOSNative_openFileChooserWithId___java_lang_String_i
             NSURL *picked = response == NSModalResponseOK ? panel.URL : nil;
             [panel orderOut:nil];
             if (owner != nil && owner.visible) [owner makeKeyAndOrderFront:nil];
-            // The native callback clears dropEvents, then delivers the path on the EDT.
+            // AppKit releases this sheet's owner; Java delivers the path on the EDT.
             // FileSystemStorage expects an unescaped path, not a URL string.
             struct ThreadLocalData *threadStateData = getThreadLocalData();
             com_codename1_impl_ios_IOSImplementation_macFileChooserResult___java_lang_String_int(

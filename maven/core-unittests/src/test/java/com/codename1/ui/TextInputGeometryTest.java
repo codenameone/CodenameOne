@@ -27,6 +27,16 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class TextInputGeometryTest {
+    @Test void emptyCaretGeometryKeepsTheActiveEndOfBackwardSelections() {
+        int[] selection = {20, 30, 80, 12};
+        TextInputGeometry geometry = new TextInputGeometry(new int[0], 10, 3,
+                selection, new int[]{20, 30, 1, 12});
+        assertEquals(3, geometry.offsetAtPoint(100, 100));
+        assertArrayEquals(selection, geometry.selectionRects(3, 10));
+        assertArrayEquals(selection, geometry.selectionRects(10, 3));
+        assertArrayEquals(new int[]{20, 30, 1, 12}, geometry.rectForOffset(99));
+    }
+
     @Test void snapshotDoesNotRetainMutableArrays() {
         int[] points = {0,10,20,2,12, 1,20,20,2,12, 2,30,20,2,12};
         int[] selection = {10,20,20,12};
