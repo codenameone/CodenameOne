@@ -39,6 +39,7 @@ import java.util.Properties;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -105,9 +106,41 @@ class FirstBuildTelemetryTest {
     }
 
     @Test
+    void aSimulatorOrDesktopRunIsNamedForWhatItIs() {
+        // run.sh simulator, and the IDE configurations generated with the project
+        assertEquals("simulator", FirstBuildTelemetry.target(null, Arrays.asList("verify"), Arrays.asList("simulator")));
+        assertEquals("simulator", FirstBuildTelemetry.target(null, Arrays.asList("verify"), Arrays.asList("debug-simulator")));
+        assertEquals("simulator", FirstBuildTelemetry.target(null, Arrays.asList("verify"), Arrays.asList("idea-simulator")));
+        assertEquals("simulator", FirstBuildTelemetry.target(null, Arrays.asList("verify"), Arrays.asList("debug-eclipse")));
+        assertEquals("simulator", FirstBuildTelemetry.target(null, Arrays.asList("install"), Arrays.asList("+simulator")));
+        assertEquals("desktop", FirstBuildTelemetry.target(null, Arrays.asList("verify"), Arrays.asList("run-desktop")));
+        // The simulator goals and tasks, wherever they are in the request
+        assertEquals("simulator", FirstBuildTelemetry.target(null, Arrays.asList("clean", "cn1:run"), null));
+        assertEquals("simulator", FirstBuildTelemetry.target(null,
+                Arrays.asList("com.codenameone:codenameone-maven-plugin:7.0.277:debug"), null));
+        assertEquals("simulator", FirstBuildTelemetry.target(null, Arrays.asList("clean", "run"), null));
+        assertEquals("simulator", FirstBuildTelemetry.target(null, Arrays.asList(":javase:debug"), null));
+        // Neither is a cloud build, which names its target and wins
+        assertEquals("android-device", FirstBuildTelemetry.target("android-device", Arrays.asList("package"),
+                Arrays.asList("simulator")));
+        // Other profiles leave the goal as the target
+        assertEquals("verify", FirstBuildTelemetry.target(null, Arrays.asList("verify"), Arrays.asList("ios-debug")));
+    }
+
+    @Test
+    void aProfileAloneDoesNotStartTheApp() {
+        // The profiles start the app at verify; an earlier phase only builds.
+        assertEquals("package", FirstBuildTelemetry.target(null, Arrays.asList("package"), Arrays.asList("run-desktop")));
+        assertEquals("test", FirstBuildTelemetry.target(null, Arrays.asList("test"), Arrays.asList("simulator")));
+        // Another plugin's run goal is not the simulator.
+        assertEquals("run", FirstBuildTelemetry.target(null, Arrays.asList("spring-boot:run"), null));
+        assertEquals("exec", FirstBuildTelemetry.target(null, Arrays.asList("exec:exec"), null));
+    }
+
+    @Test
     void theTargetIsTheBuildTargetOrTheFirstGoal() {
         assertEquals("android-device", FirstBuildTelemetry.target("android-device", Arrays.asList("package")));
-        assertEquals("run", FirstBuildTelemetry.target(null, Arrays.asList("cn1:run", "package")));
+        assertEquals("simulator", FirstBuildTelemetry.target(null, Arrays.asList("cn1:run", "package")));
         assertEquals("package", FirstBuildTelemetry.target("", Arrays.asList("package")));
         assertNull(FirstBuildTelemetry.target(null, null));
         assertEquals("bad_target_", FirstBuildTelemetry.token("Bad Target!"));
@@ -232,6 +265,58 @@ class FirstBuildTelemetryTest {
         }
         assertNotNull(exit);
         assertTrue(exit.contains("reason=ok"), exit);
+    }
+
+    private long exits() {
+        return bodies.stream().filter(b -> b.contains("step=exit")).count();
+    }
+
+    @Test
+    void aBuildStoppedFromTheIdeIsReportedAsInterrupted() throws Exception {
+        String url = recorder(0);
+        FirstBuildTelemetry t = FirstBuildTelemetry.start(url, ID, "verify", env(), props());
+        t.reportIfStopped();
+        // What the shutdown hook runs when the IDE stops Maven.
+        t.stopped();
+        assertEquals(1, exits());
+        String exit = bodies.get(bodies.size() - 1);
+        assertTrue(exit.contains("exit=130&reason=interrupted"), exit);
+        assertTrue(exit.contains("&secs="), exit);
+        // The build cannot also be reported as ending normally.
+        t.finished(null);
+        assertEquals(1, exits());
+    }
+
+    @Test
+    void aBuildThatEndedIsNotReportedAgainAtShutdown() throws Exception {
+        String url = recorder(0);
+        FirstBuildTelemetry t = FirstBuildTelemetry.start(url, ID, "verify", env(), props());
+        t.reportIfStopped();
+        t.finished(null);
+        t.stopped();
+        assertEquals(1, exits());
+        assertTrue(bodies.get(bodies.size() - 1).contains("reason=ok"));
+    }
+
+    @Test
+    void onlyAJvmStartedForTheBuildReportsAStop() {
+        assertTrue(FirstBuildTelemetry.jvmEndsWithBuild(props("sun.java.command",
+                "org.codehaus.plexus.classworlds.launcher.Launcher -B package")));
+        // IntelliJ IDEA's external Maven runner.
+        assertTrue(FirstBuildTelemetry.jvmEndsWithBuild(props("sun.java.command",
+                "org.codehaus.classworlds.Launcher -Didea.version=2026.2 verify")));
+        // Embedded Maven in an IDE, the Maven daemon, and an unknown host.
+        assertFalse(FirstBuildTelemetry.jvmEndsWithBuild(props("sun.java.command",
+                "org.eclipse.equinox.launcher.Main -os macosx")));
+        assertFalse(FirstBuildTelemetry.jvmEndsWithBuild(props("sun.java.command",
+                "org.mvndaemon.mvnd.daemon.Server", "mvnd.home", "/opt/mvnd")));
+        assertFalse(FirstBuildTelemetry.jvmEndsWithBuild(props()));
+    }
+
+    @Test
+    void aCancelledGradleBuildIsInterrupted() {
+        assertEquals("interrupted", reason("Build cancelled."));
+        assertEquals("interrupted", FirstBuildTelemetry.reason("", "org.gradle.api.BuildCancelledException\n"));
     }
 
     @Test

@@ -2753,6 +2753,18 @@
         "url": "https://medium.com/@Codename_One/do-you-want-your-web-app-to-feel-like-a-native-app-b2b98becca92?postPublishedType=initial",
         "syndicated_at": "2026-10-14T19:01:38+00:00"
       }
+    },
+    "friday-release-better-gates": {
+      "hashnode": {
+        "url": "https://debugagent.com/don-t-order-fish-on-monday-don-t-release-on-friday",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ad01791463389e688a37356",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-15T00:01:14+00:00"
+      }
     }
   }
 }

@@ -41,7 +41,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
-/** Packages the ParparVM web application with a selected same-origin proxy. */
+/** Finalizes the ParparVM PWA and packages its optional same-origin proxy. */
 public final class JavaScriptProxyPackager {
     public interface Logger {
         void log(String message);
@@ -61,11 +61,13 @@ public final class JavaScriptProxyPackager {
         String externalUrl = trimToNull(request.getArg("javascript.proxy.url", null));
         if (!inject) {
             logger.log("JavaScript proxy generation disabled by javascript.inject_proxy=false");
+            JavaScriptPwa.write(appDir, request);
             return null;
         }
         if (externalUrl != null && explicitTarget == null) {
             injectProxyUrl(appDir, externalUrl);
             logger.log("Using external JavaScript proxy URL " + externalUrl);
+            JavaScriptPwa.write(appDir, request);
             return null;
         }
 
@@ -76,6 +78,7 @@ public final class JavaScriptProxyPackager {
         }
         if ("none".equals(target)) {
             logger.log("JavaScript proxy bundle disabled by javascript.proxy.target=none");
+            JavaScriptPwa.write(appDir, request);
             return null;
         }
 
@@ -86,6 +89,8 @@ public final class JavaScriptProxyPackager {
             allowedTargets = "";
         }
         injectProxyUrl(appDir, externalUrl == null ? "/cn1-cors-proxy?_target=" : externalUrl);
+
+        JavaScriptPwa.write(appDir, request);
 
         File stage = new File(buildDir, "javascript-proxy-" + target);
         deleteTree(stage);
