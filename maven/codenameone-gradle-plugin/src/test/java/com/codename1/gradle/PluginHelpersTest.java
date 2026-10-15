@@ -35,6 +35,18 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 class PluginHelpersTest {
     @Test
+    void reportedTasksAreAbsolutePathsWithoutOptionsOrIdeSyncs() {
+        // `gradle app:run` names a subproject's task by a relative path; reported as
+        // is it would read as a Maven goal, and the simulator run as target=run.
+        assertEquals(Arrays.asList(":app:run", "clean", ":javase:debug"),
+                FirstBuildTelemetryAction.buildTasks(Arrays.asList("app:run", "--offline", "clean",
+                        "prepareKotlinBuildScriptModel", ":javase:debug")));
+        assertEquals("simulator", com.codename1.build.FirstBuildTelemetry.target(null,
+                FirstBuildTelemetryAction.buildTasks(Arrays.asList("clean", "app:run"))));
+        assertEquals(Collections.emptyList(), FirstBuildTelemetryAction.buildTasks(null));
+    }
+
+    @Test
     void remapReadsTheOnClickNamesWhereCompileAndroidResWritesThem() {
         // compileAndroidRes passes its state directory to the runner as the build
         // directory, and the runner nests its files under it; reading the names

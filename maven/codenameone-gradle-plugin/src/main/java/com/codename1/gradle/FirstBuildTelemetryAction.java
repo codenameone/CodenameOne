@@ -182,7 +182,10 @@ public abstract class FirstBuildTelemetryAction implements FlowAction<FirstBuild
         }
     }
 
-    /// The requested tasks that build something: options and IDE sync tasks removed.
+    /// The requested tasks that build something: options and IDE sync tasks removed,
+    /// and every path made absolute. Gradle accepts `app:run` as well as `:app:run`
+    /// for a subproject's task; the reporter tells a Gradle path from a Maven goal
+    /// (`cn1:run`) by its leading colon, so a relative path would read as a Maven goal.
     static List<String> buildTasks(List<String> requested) {
         List<String> out = new ArrayList<String>();
         if (requested == null) {
@@ -194,7 +197,7 @@ public abstract class FirstBuildTelemetryAction implements FlowAction<FirstBuild
             }
             String name = task.substring(task.lastIndexOf(':') + 1);
             if (!IDE_SYNC_TASKS.contains(name)) {
-                out.add(task);
+                out.add(task.indexOf(':') > 0 ? ":" + task : task);
             }
         }
         return out;

@@ -505,22 +505,101 @@ public final class FirstBuildTelemetry {
         return v.matches("\\d{1,3}") ? v : "unknown";
     }
 
+    /// The target of a run that opens the simulator rather than building anything.
+    public static final String SIMULATOR_TARGET = "simulator";
+
+    /// The target of a run that starts the app as a desktop program.
+    public static final String DESKTOP_TARGET = "desktop";
+
     /// What is being built, as one short token: the build target when one was asked
     /// for (`android-device`, `javascript`, `local-javascript`, ...), otherwise the
-    /// first goal or task the developer ran (`run`, `package`, ...).
+    /// first goal or task the developer ran (`package`, `install`, ...).
     public static String target(String buildTarget, Iterable<String> goalsOrTasks) {
+        return target(buildTarget, goalsOrTasks, null);
+    }
+
+    /// The profiles of a generated project that open the simulator: from run.sh and
+    /// the VS Code tasks, the debug run, IntelliJ's run configuration and Eclipse's
+    /// debug configuration.
+    private static final java.util.Set<String> SIMULATOR_PROFILES = new java.util.HashSet<String>(
+            java.util.Arrays.asList("simulator", "debug-simulator", "idea-simulator", "debug-eclipse"));
+
+    /// The profile of a generated project that starts the app as a desktop program.
+    private static final String DESKTOP_PROFILE = "run-desktop";
+
+    /// The lifecycle phases that reach `verify`, where those profiles bind the
+    /// execution that starts the app. A profile asked for with an earlier phase --
+    /// `mvn package -Prun-desktop` -- builds without starting anything.
+    private static final java.util.Set<String> LAUNCHING_PHASES = new java.util.HashSet<String>(
+            java.util.Arrays.asList("verify", "install", "deploy"));
+
+    /// As [#target(String, Iterable)], but a run of the simulator or of the desktop app
+    /// is named for what it is -- [#SIMULATOR_TARGET], [#DESKTOP_TARGET] -- not for the
+    /// goal that starts it. The project's own scripts and IDE configurations open the
+    /// simulator with `mvn verify -Psimulator` (or another profile in
+    /// [#SIMULATOR_PROFILES]), so by its goal it is a `verify`, the same as a build.
+    /// And a simulator session ends when the developer closes the window, often from
+    /// the IDE's Stop button, which reports it as interrupted: by its goal it would
+    /// look like a build that never finishes.
+    ///
+    /// Every goal is looked at, not only the first: `mvn clean cn1:run` and
+    /// `gradle clean run` are simulator runs. The first goal is still the fallback.
+    ///
+    /// @param activeProfiles the Maven profiles asked for with `-P`; null for Gradle
+    public static String target(String buildTarget, Iterable<String> goalsOrTasks, Iterable<String> activeProfiles) {
         if (!isBlank(buildTarget)) {
             return token(buildTarget);
         }
+        String first = null;
+        boolean reachesLaunch = false;
         if (goalsOrTasks != null) {
             for (String g : goalsOrTasks) {
-                if (!isBlank(g)) {
-                    String last = g.substring(g.lastIndexOf(':') + 1);
-                    return token(last);
+                if (isBlank(g)) {
+                    continue;
+                }
+                String goal = g.trim();
+                if (first == null) {
+                    first = goal.substring(goal.lastIndexOf(':') + 1);
+                }
+                if (isSimulatorGoal(goal)) {
+                    return SIMULATOR_TARGET;
+                }
+                if (LAUNCHING_PHASES.contains(goal)) {
+                    reachesLaunch = true;
                 }
             }
         }
-        return null;
+        if (reachesLaunch && activeProfiles != null) {
+            for (String p : activeProfiles) {
+                String id = p == null ? "" : p.trim();
+                if (id.startsWith("+")) {
+                    id = id.substring(1); // Maven 4's "required" marker
+                }
+                if (SIMULATOR_PROFILES.contains(id)) {
+                    return SIMULATOR_TARGET;
+                }
+                if (DESKTOP_PROFILE.equals(id)) {
+                    return DESKTOP_TARGET;
+                }
+            }
+        }
+        return token(first);
+    }
+
+    /// `cn1:run` / `cn1:debug` (Maven, also with the plugin's full coordinates) and
+    /// `run` / `debug` / `:module:run` (Gradle). Other plugins' `run` goals --
+    /// `exec:exec`, `spring-boot:run` -- are not the simulator.
+    static boolean isSimulatorGoal(String goal) {
+        int colon = goal.lastIndexOf(':');
+        String name = goal.substring(colon + 1);
+        if (!"run".equals(name) && !"debug".equals(name)) {
+            return false;
+        }
+        if (colon < 0 || goal.startsWith(":")) {
+            return true; // a Gradle task; Maven has no run or debug phase
+        }
+        String prefix = goal.substring(0, colon);
+        return "cn1".equals(prefix) || prefix.contains("codenameone-maven-plugin");
     }
 
     static String token(String v) {
