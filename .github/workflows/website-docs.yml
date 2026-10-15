@@ -314,7 +314,7 @@ jobs:
           # on a build where clicking any class left the site: Pages redirects
           # /x.html to /x before an asset is considered, so the page published at
           # the extension was one nobody could reach.
-          scripts/website/check-javadoc-urls.sh docs/website/public 8789
+          scripts/website/check-javadoc-urls.sh docs/website/public
 
       - name: Validate Port Status page output
         run: |
@@ -397,38 +397,27 @@ jobs:
       - name: Validate redirects against local Pages runtime
         run: |
           set -euo pipefail
-          PORT=8788
+          # Its own process group on a free port, stopped as a group. With a
+          # fixed 8788 and `kill $!` (npx only), build.sh's javadoc URL check
+          # left a workerd on 8788 that answered this step instead of the
+          # server it started; see scripts/website/pages-dev-server.sh.
+          . scripts/website/pages-dev-server.sh
+          trap pages_dev_stop EXIT
+          # From docs/website, so wrangler compiles docs/website/functions.
           cd docs/website
-          npx --yes "wrangler@${WRANGLER_VERSION}" pages dev public \
-            --port "${PORT}" \
-            --ip 127.0.0.1 \
-            --compatibility-date=2026-02-18 > /tmp/wrangler-pages-dev.log 2>&1 &
-          WRANGLER_PID=$!
-          cleanup() {
-            kill "${WRANGLER_PID}" >/dev/null 2>&1 || true
-          }
-          trap cleanup EXIT
+          pages_dev_start public /tmp/wrangler-pages-dev.log "" \
+            --compatibility-date=2026-02-18
+          cd ../..
           print_log_on_error() {
             echo "wrangler pages dev log (tail):" >&2
             tail -n 200 /tmp/wrangler-pages-dev.log >&2 || true
           }
           trap print_log_on_error ERR
-          for i in $(seq 1 60); do
-            if curl -sSf "http://127.0.0.1:${PORT}/" >/dev/null; then
-              break
-            fi
-            sleep 1
-          done
-          if ! curl -sSf "http://127.0.0.1:${PORT}/" >/dev/null; then
-            echo "wrangler pages dev did not become ready on port ${PORT}" >&2
-            exit 1
-          fi
-          cd ../..
           python3 scripts/website/test_redirects.py \
-            --base-url "http://127.0.0.1:${PORT}" \
+            --base-url "${PAGES_DEV_URL}" \
             --redirects-file docs/website/public/_redirects \
             --skip-auto-cases
-          node scripts/website/test_search.mjs "http://127.0.0.1:${PORT}"
+          node scripts/website/test_search.mjs "${PAGES_DEV_URL}"
 
       - name: Validate internal links and images
         uses: lycheeverse/lychee-action@v2
