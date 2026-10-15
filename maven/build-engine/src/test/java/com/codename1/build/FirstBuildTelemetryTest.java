@@ -39,6 +39,7 @@ import java.util.Properties;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -232,6 +233,58 @@ class FirstBuildTelemetryTest {
         }
         assertNotNull(exit);
         assertTrue(exit.contains("reason=ok"), exit);
+    }
+
+    private long exits() {
+        return bodies.stream().filter(b -> b.contains("step=exit")).count();
+    }
+
+    @Test
+    void aBuildStoppedFromTheIdeIsReportedAsInterrupted() throws Exception {
+        String url = recorder(0);
+        FirstBuildTelemetry t = FirstBuildTelemetry.start(url, ID, "verify", env(), props());
+        t.reportIfStopped();
+        // What the shutdown hook runs when the IDE stops Maven.
+        t.stopped();
+        assertEquals(1, exits());
+        String exit = bodies.get(bodies.size() - 1);
+        assertTrue(exit.contains("exit=130&reason=interrupted"), exit);
+        assertTrue(exit.contains("&secs="), exit);
+        // The build cannot also be reported as ending normally.
+        t.finished(null);
+        assertEquals(1, exits());
+    }
+
+    @Test
+    void aBuildThatEndedIsNotReportedAgainAtShutdown() throws Exception {
+        String url = recorder(0);
+        FirstBuildTelemetry t = FirstBuildTelemetry.start(url, ID, "verify", env(), props());
+        t.reportIfStopped();
+        t.finished(null);
+        t.stopped();
+        assertEquals(1, exits());
+        assertTrue(bodies.get(bodies.size() - 1).contains("reason=ok"));
+    }
+
+    @Test
+    void onlyAJvmStartedForTheBuildReportsAStop() {
+        assertTrue(FirstBuildTelemetry.jvmEndsWithBuild(props("sun.java.command",
+                "org.codehaus.plexus.classworlds.launcher.Launcher -B package")));
+        // IntelliJ IDEA's external Maven runner.
+        assertTrue(FirstBuildTelemetry.jvmEndsWithBuild(props("sun.java.command",
+                "org.codehaus.classworlds.Launcher -Didea.version=2026.2 verify")));
+        // Embedded Maven in an IDE, the Maven daemon, and an unknown host.
+        assertFalse(FirstBuildTelemetry.jvmEndsWithBuild(props("sun.java.command",
+                "org.eclipse.equinox.launcher.Main -os macosx")));
+        assertFalse(FirstBuildTelemetry.jvmEndsWithBuild(props("sun.java.command",
+                "org.mvndaemon.mvnd.daemon.Server", "mvnd.home", "/opt/mvnd")));
+        assertFalse(FirstBuildTelemetry.jvmEndsWithBuild(props()));
+    }
+
+    @Test
+    void aCancelledGradleBuildIsInterrupted() {
+        assertEquals("interrupted", reason("Build cancelled."));
+        assertEquals("interrupted", FirstBuildTelemetry.reason("", "org.gradle.api.BuildCancelledException\n"));
     }
 
     @Test

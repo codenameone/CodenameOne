@@ -78,13 +78,34 @@ public class FirstBuildTelemetryParticipant extends AbstractMavenLifecyclePartic
             if (t == null) {
                 return;
             }
-            String mine = Integer.toHexString(System.identityHashCode(session)) + "-" + System.nanoTime();
-            if (System.getProperties().putIfAbsent(CLAIM_PROPERTY, mine) != null) {
-                return;
+            // Every module's participant gets the same session, so this key is the same
+            // for all of them and different for the next build in a long-lived JVM.
+            java.util.Date started = session.getRequest() == null ? null : session.getRequest().getStartTime();
+            String mine = Integer.toHexString(System.identityHashCode(session)) + "@"
+                    + (started == null ? 0L : started.getTime());
+            Object existing = System.getProperties().putIfAbsent(CLAIM_PROPERTY, mine);
+            if (existing != null) {
+                if (mine.equals(existing)) {
+                    return; // another module of this build reports it
+                }
+                // Left by an earlier build in this JVM -- embedded Maven, mvnd -- that was
+                // cancelled before afterSessionEnd. Without taking it over, no build in
+                // that JVM would report again.
+                if (!System.getProperties().replace(CLAIM_PROPERTY, existing, mine)) {
+                    return;
+                }
             }
             claim = mine;
             telemetry = t;
             telemetry.launched();
+            // An IDE's Stop ends Maven without the session ending; report that too --
+            // but only where the JVM is this build's own. In a long-lived host a
+            // cancelled build does not end the JVM, so the hook would fire much later,
+            // at the host's exit, and report this build as interrupted with the host's
+            // whole lifetime as its duration.
+            if (FirstBuildTelemetry.jvmEndsWithBuild(System.getProperties())) {
+                telemetry.reportIfStopped();
+            }
         } catch (RuntimeException ignored) {
             // Reporting must never be the reason a build fails.
             telemetry = null;
