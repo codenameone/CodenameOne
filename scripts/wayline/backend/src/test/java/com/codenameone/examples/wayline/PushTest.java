@@ -23,14 +23,19 @@
 package com.codenameone.examples.wayline;
 
 import com.codename1.backend.DataSource;
+import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.Json;
 import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.test.BackendTest;
 import com.codename1.backend.test.MockMvc;
 import com.codename1.backend.test.MockRequestBuilder;
 import com.codenameone.examples.wayline.account.Accounts;
+import com.codenameone.examples.wayline.api.PushDeviceDto;
+import com.codenameone.examples.wayline.api.RideState;
+import com.codenameone.examples.wayline.push.PushDevices;
 import com.codenameone.examples.wayline.push.PushSender;
 import com.codenameone.examples.wayline.push.RecordingPushSender;
+import com.codenameone.examples.wayline.push.RidePushes;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -44,6 +49,7 @@ import static com.codename1.backend.test.MockMvcResultMatchers.status;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /// The push notifications a ride sends, the devices they go to, and the Live
 /// Activity a rider follows the driver in.
@@ -60,6 +66,10 @@ class PushTest {
     private PushSender sender;
     @Autowired
     private DataSource db;
+    @Autowired
+    private PushDevices pushDevices;
+    @Autowired
+    private RidePushes pushes;
 
     private RecordingPushSender sent;
 
@@ -386,6 +396,104 @@ class PushTest {
         assertEquals(0L, devices(other));
         assertEquals(0L, tokens("cap-full-3"));
         assertEquals(1L, tokens("cap-moving-phone"));
+    }
+
+    /// A registration that reaches the database after the account was closed
+    /// is refused, and leaves no device behind: the profile it holds first is
+    /// gone. This is the order a registration authorized just before the
+    /// closure and run just after it would see.
+    @Test
+    void aClosedAccountRegistersNoDevice() throws Exception {
+        String rider = People.rider(accounts, "push-gone-rider");
+        accounts.close(rider, People.PASSWORD);
+        try {
+            pushDevices.register(rider, new PushDeviceDto("fcm", "gone-rider-phone", "and"));
+            fail("a device was registered for a closed account");
+        } catch (ResponseStatusException refused) {
+            assertEquals(404, refused.getStatus());
+        }
+        assertEquals(0L, tokens("gone-rider-phone"));
+        assertEquals(0L, devices(rider));
+    }
+
+    /// Registrations one after another for a full account each make their
+    /// own room, oldest first. Taken together, the registrations wait for one
+    /// another behind the account's profile row, so this is also what two of
+    /// them sent at once come to.
+    @Test
+    void eachNewDeviceOfAFullAccountReplacesTheOldest() throws Exception {
+        String full = People.rider(accounts, "push-cap2-full");
+        for (int i = 0; i < 8; i++) {
+            pushDevices.register(full, new PushDeviceDto("fcm", "cap2-full-" + i, "and"));
+        }
+        db.execute("UPDATE push_device SET updated_at = 1 WHERE token = ?",
+                new Object[] {"cap2-full-5"});
+        db.execute("UPDATE push_device SET updated_at = 2 WHERE token = ?",
+                new Object[] {"cap2-full-2"});
+        pushDevices.register(full, new PushDeviceDto("fcm", "cap2-new-a", "and"));
+        pushDevices.register(full, new PushDeviceDto("apns", "cap2-new-b", "ios"));
+        assertEquals(8L, devices(full));
+        assertEquals(0L, tokens("cap2-full-5"));
+        assertEquals(0L, tokens("cap2-full-2"));
+        assertEquals(1L, tokens("cap2-new-a"));
+        assertEquals(1L, tokens("cap2-new-b"));
+    }
+
+    /// The notification of a change that is no longer the ride's latest says
+    /// nothing, in either order: composed after the ride was cancelled it does
+    /// not tell the rider a driver is coming, and composed before the
+    /// cancellation's own it leaves the Live Activity for that one to end.
+    @Test
+    void aStaleChangeSaysNothingAndLeavesTheActivityToTheLaterOne() throws Exception {
+        // Valletta: the acceptance is composed after the cancellation was.
+        String rider = People.rider(accounts, "push-mla-rider");
+        String driver = People.driver(accounts, "push-mla-driver");
+        register(rider, "apns", "mla-rider-phone");
+        Trips.online(mvc, driver, 35.8989, 14.5146);
+        String id = (String) Trips.json(mvc, People.asRider(body(post("/api/rides"),
+                People.ride(35.8990, 14.5145, 35.9100, 14.5000)), rider)).get("id");
+        mvc.perform(People.asDriver(post("/api/driver/offers/" + id + "/accept"), driver))
+                .andExpect(status().isOk());
+        mvc.perform(People.asRider(body(post("/api/rides/" + id + "/activity"),
+                "{\"activityId\":\"act-mla\"}"), rider)).andExpect(status().isOk());
+        mvc.perform(People.asRider(post("/api/rides/" + id + "/cancel"), rider))
+                .andExpect(status().isOk());
+        int told = sent.sentTo("mla-rider-phone").size();
+        assertEquals("live-end", surface(last(sent.sentTo("mla-rider-phone")))
+                .get("operation"));
+        pushes.rideChanged(id, RideState.ACCEPTED, rider, driver);
+        assertEquals(told, sent.sentTo("mla-rider-phone").size());
+
+        // Gdansk: the acceptance is composed after the ride was cancelled but
+        // before the cancellation is. It neither speaks nor forgets the
+        // activity, and the cancellation then ends it.
+        String gdnRider = People.rider(accounts, "push-gdn-rider");
+        String gdnDriver = People.driver(accounts, "push-gdn-driver");
+        register(gdnRider, "apns", "gdn-rider-phone");
+        Trips.online(mvc, gdnDriver, 54.3520, 18.6466);
+        String gdn = (String) Trips.json(mvc, People.asRider(body(post("/api/rides"),
+                People.ride(54.3521, 18.6465, 54.3650, 18.6300)), gdnRider)).get("id");
+        mvc.perform(People.asDriver(post("/api/driver/offers/" + gdn + "/accept"), gdnDriver))
+                .andExpect(status().isOk());
+        mvc.perform(People.asRider(body(post("/api/rides/" + gdn + "/activity"),
+                "{\"activityId\":\"act-gdn\"}"), gdnRider)).andExpect(status().isOk());
+        int before = sent.sentTo("gdn-rider-phone").size();
+        db.execute("UPDATE ride SET state = 'CANCELLED_BY_RIDER' WHERE id = ?",
+                new Object[] {gdn});
+        pushes.rideChanged(gdn, RideState.ACCEPTED, gdnRider, gdnDriver);
+        assertEquals(before, sent.sentTo("gdn-rider-phone").size());
+        assertEquals(1L, activities(gdn));
+        pushes.rideChanged(gdn, RideState.CANCELLED_BY_RIDER, gdnRider, gdnDriver);
+        RecordingPushSender.Sent ended = last(sent.sentTo("gdn-rider-phone"));
+        assertEquals("live-end", surface(ended).get("operation"));
+        assertEquals("act-gdn", surface(ended).get("id"));
+        assertEquals(0L, activities(gdn));
+    }
+
+    private long activities(String rideId) throws Exception {
+        Map row = db.queryOne("SELECT COUNT(*) AS n FROM ride_activity WHERE ride_id = ?",
+                new Object[] {rideId});
+        return ((Number) row.get("n")).longValue();
     }
 
     private long tokens(String token) throws Exception {

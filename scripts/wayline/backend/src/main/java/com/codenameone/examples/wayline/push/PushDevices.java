@@ -30,6 +30,7 @@ import com.codenameone.examples.wayline.Ids;
 import com.codenameone.examples.wayline.Text;
 import com.codenameone.examples.wayline.api.PushDeviceDto;
 import com.codenameone.examples.wayline.domain.PushDevice;
+import com.codenameone.examples.wayline.repository.ProfileRepository;
 import com.codenameone.examples.wayline.repository.PushDeviceRepository;
 
 import java.io.IOException;
@@ -51,9 +52,11 @@ public class PushDevices {
     static final int MAX_PER_ACCOUNT = 8;
 
     private final PushDeviceRepository devices;
+    private final ProfileRepository profiles;
 
-    public PushDevices(PushDeviceRepository devices) {
+    public PushDevices(PushDeviceRepository devices, ProfileRepository profiles) {
         this.devices = devices;
+        this.profiles = profiles;
     }
 
     @Transactional
@@ -61,6 +64,25 @@ public class PushDevices {
         PushTarget target = target(device);
         String id = key(target);
         long now = System.currentTimeMillis();
+        // Before anything is read, the account's profile row is held: a no-op
+        // update that answers 0 when the profile is gone and otherwise keeps
+        // the row locked until this commits. It settles two races.
+        //
+        // Against closing the account: Accounts.erase holds the same row
+        // first and deletes it before it commits, so a registration either
+        // runs first (and erase's cleanup then deletes the device with the
+        // rest) or waits, finds no profile and is refused. Without it, a
+        // registration authorized just before the closure could insert its
+        // device after erase removed the account's, leaving a device of an
+        // account that no longer exists and that nobody can unregister.
+        //
+        // Against itself: two devices registering at once for an account one
+        // short of the cap would both count the same rows in makeRoom(), both
+        // skip the eviction and both insert, one past the cap. Behind the hold
+        // the second counts after the first committed, and evicts.
+        if (profiles.hold(username) == 0) {
+            throw new ResponseStatusException(404, "No such account");
+        }
         PushDevice row = devices.findById(id);
         if (row == null || !username.equals(row.getUsername())) {
             // A device new to this account, whether its token is new or moves

@@ -197,6 +197,25 @@ public class RidePushes {
         if (ride == null) {
             return out;
         }
+        // The change this was called for may no longer be the ride's latest.
+        // Each transition commits and then composes on its own thread, so two
+        // in quick succession can compose out of order: an acceptance commits,
+        // the rider cancels and that commits, and only then does the
+        // acceptance get here. Switching on `state` would tell the rider their
+        // driver is on the way to a ride they just cancelled. When what was
+        // committed since differs from `state`, nothing is said: the later
+        // transition calls this with its own state and says what is true.
+        // An offer is compared by its driver too, because a lapsed offer goes
+        // back to REQUESTED and on to OFFERED again to somebody else.
+        //
+        // Nothing is cleaned up here either. A ride that has ended since is
+        // ended by that later call, which reads the Live Activity, sends its
+        // live-end and then forgets it; deleting the row here first would
+        // leave that call nothing to end and the activity on the lock screen.
+        if (ride.getState() != state || (RideState.OFFERED == state
+                && (driver == null || !driver.equals(ride.getDriver())))) {
+            return out;
+        }
         Profile who = driver == null || driver.length() == 0 ? null : profiles.findById(driver);
         String name = who == null ? "Your driver" : who.getDisplayName();
         String car = who == null ? "" : describe(who);

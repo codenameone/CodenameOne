@@ -205,6 +205,14 @@ public class PhoneVerification {
         // Both compared every time, so the answer takes as long either way. The
         // code before is good only until it would have expired; it was sent
         // first, so it never outlives the current one checked above.
+        //
+        // `counted.getPreviousAttempts()` already includes every guess made
+        // since the resend: takeGuess adds one to `previousAttempts` in the
+        // same statement that adds one to `attempts`, so it is the old code's
+        // whole count, not the snapshot store() copied. A code that used four
+        // guesses before the resend reads 5 on its first guess after it (still
+        // allowed: its fifth) and 6 on the next (refused), so its budget stays
+        // five. AccountTest.theCodeBeforeKeepsTheGuessesItHadLeft holds that.
         boolean current = Crypto.equalsConstantTime(given, expected.getBytes("UTF-8"));
         boolean previous = Crypto.equalsConstantTime(given,
                 pending.getPreviousHash().getBytes("UTF-8"))
