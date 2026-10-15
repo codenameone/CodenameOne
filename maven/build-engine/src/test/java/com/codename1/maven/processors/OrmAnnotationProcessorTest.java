@@ -72,9 +72,10 @@ public class OrmAnnotationProcessorTest {
         sources.put("repositories.Notes","package repositories; import com.codename1.orm.repository.*; import java.util.List; @Repository(entity=Note.class,key=Long.class) public interface Notes extends CrudRepository<Note,Long> { "
             + "List<Note> findByNameAndScoreGreaterThanOrderByScoreDescIdAsc(String name,long score,PageRequest page); "
             + "List<Note> findByActiveTrue(); List<Note> findByArchivedFalse(); List<Note> findByNameAndScoreIn(String name,java.util.List<Long> scores); List<Note> findByScoreIn(Long[] scores); List<Note> findByNameIn(java.util.Set<String> names); "
-            + "List<Note> findTop1ByNameOrderByScoreDesc(String name); long countByName(String name); boolean existsByName(String name); int deleteByName(String name); "
+            + "List<Note> findTop1ByNameOrderByScoreDesc(String name); java.util.Optional<Note> findFirstByNameOrderByScoreAsc(String name); long countByName(String name); boolean existsByName(String name); int deleteByName(String name); "
             + "@Lock(com.codename1.orm.session.LockMode.PESSIMISTIC_WRITE) Note findById(Long id); "
             + "@Query(\"select sum(case when e.score>=:floor then 1 else 0 end) from repositories.Note e\") Long qualified(@Param(\"floor\") long floor); "
+            + "@Query(\"select max(e.score) from repositories.Note e where e.name='other'\") java.util.Optional<Long> highest(); "
             + "@Modifying @Query(\"update repositories.Note e set e.score=:score where e.name=:name\") int revise(@Param(\"name\") String name,@Param(\"score\") long score); "
             + "@Query(value=\"SELECT COUNT(*) FROM repository_note WHERE name=:name\",nativeSql=true) Long nativeCount(@Param(\"name\") String name); }");
         // Compile the caller with the interface, before generating any implementation.
@@ -82,6 +83,7 @@ public class OrmAnnotationProcessorTest {
             + "Notes repo=Repositories.create(Notes.class,s); s.createTables(); s.beginTransaction(); Note a=new Note(); a.name=\"same\";a.score=3;a.active=true;a.archived=false;repo.insert(a);Note b=new Note();b.name=\"same\";b.score=9;repo.insert(b);s.commitTransaction(); "
             + "if(repo.count()!=2 || !repo.existsByName(\"same\") || repo.countByName(\"same\")!=2 || repo.nativeCount(\"same\")!=2) throw new AssertionError(\"counts\"); "
             + "if(repo.findByNameAndScoreGreaterThanOrderByScoreDescIdAsc(\"same\",0,new PageRequest(1,1)).get(0)!=a || repo.findTop1ByNameOrderByScoreDesc(\"same\").get(0)!=b || repo.qualified(5)!=1) throw new AssertionError(\"queries\"); "
+            + "if(repo.findFirstByNameOrderByScoreAsc(\"same\").get()!=a || repo.findFirstByNameOrderByScoreAsc(\"none\").isPresent() || repo.highest().isPresent()) throw new AssertionError(\"optional\"); "
             + "if(repo.findByActiveTrue().get(0)!=a || repo.findByArchivedFalse().get(0)!=a || repo.findByNameAndScoreIn(\"same\",java.util.Arrays.asList(3L)).get(0)!=a || repo.findByScoreIn(new Long[]{9L}).get(0)!=b || repo.findByNameIn(java.util.Collections.singleton(\"same\")).size()!=2) throw new AssertionError(\"typed finders\"); "
             + "s.beginTransaction(); a.score=4; if(repo.revise(\"same\",11)!=2 || s.contains(a)) throw new AssertionError(\"bulk\"); s.rollbackTransaction(); "
             + "if(s.find(Note.class,a.id).score!=3) throw new AssertionError(\"rollback\"); "
@@ -186,6 +188,9 @@ public class OrmAnnotationProcessorTest {
             try {
                 session.createTables();
                 java.util.Set<String> tables=new java.util.TreeSet<String>(session.createNativeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite%' AND name NOT LIKE 'cn1%'",String.class).list());
+                // The entity registry is process-wide, so tables of entities other
+                // tests registered are there too; only this test's names count.
+                tables.retainAll(Arrays.asList("RideEvent","ride_event","RiderAccount","rider_account","FixedTable","fixed_table"));
                 String ride=backend?"ride_event":"RideEvent";
                 assertEquals(new java.util.TreeSet<String>(Arrays.asList(ride,backend?"rider_account":"RiderAccount","FixedTable")),tables);
                 java.util.Set<String> columns=new java.util.TreeSet<String>(session.createNativeQuery("SELECT name FROM pragma_table_info('"+ride+"')",String.class).list());

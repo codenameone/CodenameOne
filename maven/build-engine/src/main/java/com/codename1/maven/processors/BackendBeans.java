@@ -456,6 +456,9 @@ final class BackendBeans {
     boolean needsDatabase;
     boolean needsEntities;
     boolean needsSession;
+    /// The `@Repository` interfaces injected anywhere, by internal name, each
+    /// to the field of the entry point that holds its one instance.
+    final Map<String, String> repositories = new LinkedHashMap<String, String>();
     int requestSlots;
     int sessionSlots;
     int lazySlots;
@@ -2334,6 +2337,22 @@ final class BackendBeans {
             }
             matches = named;
         }
+        if (matches.isEmpty() && p.qualifier == null && isRepository(type)) {
+            // A repository interface nothing else provides is built from the
+            // factory the ORM's bootstrap registered, over the injected Session,
+            // as Spring Data makes one a bean. One instance per interface: it
+            // holds nothing but that session, which forwards every call to the
+            // calling thread's transaction, so sharing it is as safe as sharing
+            // the session. Like the session it needs a @Transactional caller.
+            p.builtin = "repository";
+            needsDatabase = true;
+            needsEntities = true;
+            needsSession = true;
+            if (!repositories.containsKey(type)) {
+                repositories.put(type, "repository" + repositories.size());
+            }
+            return;
+        }
         if (matches.isEmpty()) {
             if (p.required) {
                 ctx.error(where, p.where + " needs a " + p.type.getClassName() + ", and no "
@@ -2400,6 +2419,14 @@ final class BackendBeans {
         // is on. Proving at build time that every combination of profiles and
         // properties is covered is not attempted -- Spring does not either.
         p.candidates.addAll(matches);
+    }
+
+    /// Whether `type` is an interface annotated `@Repository`, in this module
+    /// or a dependency.
+    private boolean isRepository(String type) {
+        AnnotatedClass cls = ctx.lookupWithDependencies(type);
+        return cls != null && cls.isInterface()
+                && cls.getClassAnnotation(RepositoryGenerator.REPOSITORY) != null;
     }
 
     /// Orders `list` by @Order, lowest first. Stable, so beans with the same

@@ -478,8 +478,11 @@ transaction.
 Derived methods support the following bounded grammar:
 
 * `findBy`, `findFirstBy`, `findTopBy`, `findFirstNBy`, and `findTopNBy` return the
-  entity or `List<Entity>`. A single result means the first row, not a uniqueness
-  assertion.
+  entity, `Optional<Entity>` or `List<Entity>`. A single result means the first row,
+  not a uniqueness assertion; an entity return answers null when there is no row,
+  and an `Optional` answers `Optional.empty()`. A declared `@Query` select can
+  return `Optional` of its scalar the same way. `Optional` is part of the backend's
+  class library, not the client's, so it's for repositories the server uses.
 * `countBy` returns `long`; `existsBy` returns `boolean`; `deleteBy` returns `int`
   (affected rows) or `void`.
 * Direct scalar property names combine with `And` and `Or`; AND has higher precedence than OR.

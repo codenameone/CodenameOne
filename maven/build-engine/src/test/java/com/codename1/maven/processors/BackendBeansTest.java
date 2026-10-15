@@ -1343,6 +1343,109 @@ public class BackendBeansTest {
         }
     }
 
+    /// A `@Repository` interface is injected like a bean: built once from the
+    /// factory the ORM's bootstrap registered, over the injected Session, so it
+    /// works inside the caller's @Transactional method and every injection point
+    /// gets the same instance.
+    @Test
+    public void aRepositoryInterfaceIsInjectedOverTheTransactionSession() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Trip", "package com.example;\n"
+                + "import com.codename1.annotations.*;\n"
+                + "@Entity(table = \"injected_trips\") public class Trip {\n"
+                + "    @Id(autoIncrement = true) public long id;\n"
+                + "    private String rider;\n"
+                + "    public String rider() { return rider; }\n"
+                + "    public void rider(String r) { rider = r; }\n"
+                + "}\n");
+        s.put("com.example.Trips", "package com.example;\n"
+                + "import com.codename1.orm.repository.*;\n"
+                + "import java.util.*;\n"
+                + "@Repository(entity = Trip.class, key = Long.class)\n"
+                + "public interface Trips extends CrudRepository<Trip, Long> {\n"
+                + "    List<Trip> findByRiderOrderByIdAsc(String rider);\n"
+                + "    long countByRider(String rider);\n"
+                + "    Optional<Trip> findFirstByRiderOrderByIdDesc(String rider);\n"
+                + "}\n");
+        s.put("com.example.TripService", PKG
+                + "@Component public class TripService {\n"
+                + "    private final Trips trips;\n"
+                + "    @Autowired Trips same;\n"
+                + "    public TripService(Trips trips) { this.trips = trips; }\n"
+                + "    @Transactional public long add(String rider) {\n"
+                + "        Trip t = new Trip(); t.rider(rider); trips.insert(t); return 1;\n"
+                + "    }\n"
+                + "    @Transactional(readOnly = true) public String describe(String rider) {\n"
+                + "        Optional<Trip> last = trips.findFirstByRiderOrderByIdDesc(rider);\n"
+                + "        Optional<Trip> none = trips.findFirstByRiderOrderByIdDesc(\"nobody\");\n"
+                + "        return trips.countByRider(rider) + \":\" + trips.findByRiderOrderByIdAsc(rider).size()\n"
+                + "                + \":\" + (last.isPresent() ? last.get().id : -1) + \":\" + none.isPresent()\n"
+                + "                + \":\" + (trips == same);\n"
+                + "    }\n"
+                + "    public String outside() {\n"
+                + "        try { trips.count(); return \"ran\"; }\n"
+                + "        catch (RuntimeException e) { return \"refused\"; }\n"
+                + "    }\n"
+                + "}\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    private final TripService service;\n"
+                + "    public Api(TripService service) { this.service = service; }\n"
+                + "    @PostMapping(\"/trips/{rider}\") public String add(@PathVariable(\"rider\") String r) {\n"
+                + "        return String.valueOf(service.add(r));\n"
+                + "    }\n"
+                + "    @GetMapping(\"/trips/{rider}\") public String get(@PathVariable(\"rider\") String r) {\n"
+                + "        return service.describe(r);\n"
+                + "    }\n"
+                + "    @GetMapping(\"/outside\") public String outside() { return service.outside(); }\n"
+                + "}\n");
+        File classes = compile(s);
+        // The ORM pass the build runs first: the entity's dao, the repository's
+        // implementation and the bootstrap that registers both.
+        Map<String, AnnotatedClass> index = ClassScanner.scan(classes);
+        List<String> cp = new ArrayList<String>();
+        for (File f : backendClasspath()) {
+            cp.add(f.getAbsolutePath());
+        }
+        ProcessorContext orm = new ProcessorContext(classes, tmp.newFolder(), index,
+                new SystemStreamLog(), null, null, null, Collections.<String>emptyList(), "UTF-8", cp);
+        OrmAnnotationProcessor ormProcessor = new OrmAnnotationProcessor();
+        ormProcessor.start(orm);
+        for (AnnotatedClass cls : index.values()) {
+            if (!cls.getClassAnnotations().isEmpty()) {
+                ormProcessor.processClass(cls, orm);
+            }
+        }
+        ormProcessor.finish(orm);
+        assertNoErrors(orm);
+        assertNoErrors(process(classes));
+        String wiring = new String(java.nio.file.Files.readAllBytes(
+                new File(classes, "com/example/BackendWiring.class").toPath()), "ISO-8859-1");
+        assertTrue(wiring.contains("com/codename1/orm/repository/Repositories"));
+        URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
+                getClass().getClassLoader());
+        loader.loadClass("cn1app.BackendDaoBootstrap").newInstance();
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        settings.setProperty(Config.DATASOURCE_URL, ":memory:");
+        Backend backend = withApplication(Backend.builder(Config.of(settings, "dev")).quiet()
+                .requiresDataSource(), (BackendApplication) loader
+                        .loadClass("com.example.BackendWiring").newInstance())
+                .start();
+        try {
+            for (String rider : new String[] {"ada", "ada", "bob"}) {
+                assertEquals("1", http("POST", port, "/trips/" + rider));
+            }
+            assertEquals("2:2:2:false:true", http("GET", port, "/trips/ada"));
+            // The same contract as the injected Session: no transaction, no work.
+            assertEquals("refused", http("GET", port, "/outside"));
+        } finally {
+            backend.stop();
+            loader.close();
+        }
+    }
+
     @Test
     public void whatTheAspectClassCannotNameAtAllIsABuildError() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();

@@ -701,6 +701,12 @@ also clears the session, since the rows it had loaded since the savepoint no lon
 exist. Used outside a transaction, it throws with a message saying to annotate the
 method, or to open a session with `EntityManager.openSession()`.
 
+A `@Repository` interface, described in the SQLite ORM chapter, is injected the
+same way, as Spring Data injects one: the generated implementation is built once,
+over this session, and handed to every bean that asks for the interface. Its
+methods therefore run in the calling `@Transactional` method's transaction, and
+refuse outside one exactly as the session does.
+
 ==== Why a call through this works
 
 Spring applies `@Transactional` with a proxy: a wrapper object stands between a

@@ -120,13 +120,18 @@ final class RepositoryGenerator {
             throw invalid("Use the inherited CRUD method; only findById may be redeclared with @Lock");
         }
         boolean list = result.getClassName().equals("java.util.List");
+        // Optional<T> is a single result that may be absent, as Spring Data
+        // reads it: the query's first row wrapped, or Optional.empty().
+        boolean optional = result.getClassName().equals("java.util.Optional");
         String scalar = result.getClassName();
-        if (list) {
+        if (list || optional) {
+            String container = list ? "List" : "Optional";
             String sig = method.getSignature();
-            int pos = sig == null ? -1 : sig.indexOf(")Ljava/util/List<");
-            if (pos < 0 || !sig.endsWith(">;")) throw invalid("Use List<ConcreteType>, not a raw List or wildcard");
-            String item = sig.substring(pos + ")Ljava/util/List<".length(), sig.length() - 2);
-            if (!item.startsWith("L") || item.indexOf('<') >= 0 || !item.endsWith(";")) throw invalid("List needs a concrete element class");
+            String marker = ")Ljava/util/" + container + "<";
+            int pos = sig == null ? -1 : sig.indexOf(marker);
+            if (pos < 0 || !sig.endsWith(">;")) throw invalid("Use " + container + "<ConcreteType>, not a raw " + container + " or wildcard");
+            String item = sig.substring(pos + marker.length(), sig.length() - 2);
+            if (!item.startsWith("L") || item.indexOf('<') >= 0 || !item.endsWith(";")) throw invalid(container + " needs a concrete element class");
             scalar = Type.getType(item).getClassName();
         }
         int page = -1;
@@ -217,7 +222,8 @@ final class RepositoryGenerator {
             if (!delete && !count && !exists && !scalar.equals(entityType)) throw invalid("Derived find returns entity or List<entity>");
         }
         boolean mutation = modifying || delete;
-        if (mutation && (!scalar.equals("int") && !scalar.equals("void") || list || page >= 0)) throw invalid("Modifying queries return int or void without pagination");
+        if (mutation && (!scalar.equals("int") && !scalar.equals("void") || list || optional || page >= 0)) throw invalid("Modifying queries return int or void without pagination");
+        if (optional && (count || exists)) throw invalid("countBy returns long; existsBy returns boolean");
         if (!mutation && result.getSort() != Type.OBJECT && !count && !exists) throw invalid("Declared scalar selects must use boxed return types for SQL NULL");
         if (page >= 0 && limit > 0) throw invalid("Do not combine PageRequest with Top/First");
         String valueType = mutation ? "Object" : count || exists ? "Long" : scalar;
@@ -226,14 +232,16 @@ final class RepositoryGenerator {
             throw invalid("Native repository selects return String, Long, Integer, Double or Boolean (or List thereof)");
         }
         String create = "session." + (nativeSql ? "createNativeQuery" : "createQuery") + "(" + quote(statement) + "," + valueType + ".class)";
-        StringBuilder body = new StringBuilder(declaration(method, args, list ? "java.util.List<" + scalar + ">" : scalar));
+        StringBuilder body = new StringBuilder(declaration(method, args, list ? "java.util.List<" + scalar + ">"
+                : optional ? "java.util.Optional<" + scalar + ">" : scalar));
         body.append("com.codename1.orm.session.JpqlQuery<").append(valueType).append("> q=").append(create).append(';');
         for (int i = 0; i < names.size(); i++) body.append("q.setParameter(").append(quote(names.get(i))).append(",p").append(i).append(");");
         if (page >= 0) body.append("q.offset(p").append(page).append(".getOffset()).limit(p").append(page).append(".getSize());");
         if (limit > 0) body.append("q.limit(").append(limit).append(");");
         body.append(mutation ? scalar.equals("void") ? "q.executeUpdate();" : "return q.executeUpdate();"
                 : count ? "return q.first().longValue();" : exists ? "return q.first().longValue()!=0;"
-                : list ? "return q.list();" : "return q.first();");
+                : list ? "return q.list();" : optional ? "return java.util.Optional.ofNullable(q.first());"
+                : "return q.first();");
         return body.append("}\n").toString();
     }
     private void checkArgument(String field, String suffix, Type argument, MethodInfo method, int parameter) {

@@ -141,6 +141,10 @@ final class BackendWiringWriter {
         sb.append("    private com.codename1.backend.orm.EntityManager entities;\n");
         sb.append("    private com.codename1.impl.backend.TransactionSession transactionSession;\n");
         sb.append("    private com.codename1.impl.backend.Scheduler scheduler;\n");
+        for (Map.Entry<String, String> r : model.repositories.entrySet()) {
+            sb.append("    private ").append(r.getKey().replace('/', '.').replace('$', '.'))
+              .append(' ').append(r.getValue()).append(";\n");
+        }
         // The controllers and endpoints this start registered, by binary name,
         // for describeRoutes(): one whose condition is off serves nothing, and
         // listing its routes anyway sent an agent to endpoints that answer 404.
@@ -187,6 +191,9 @@ final class BackendWiringWriter {
         // instance and hand it to routes, injections, tools and jobs.
         sb.append("        synchronized (this) {\n");
         sb.append("            scheduler = null;\n            transactionSession = null;\n");
+        for (String var : model.repositories.values()) {
+            sb.append("            ").append(var).append(" = null;\n");
+        }
         sb.append("            active.clear();\n");
         for (BackendBeans.Bean b : model.beans) {
             if (BackendBeans.PROTOTYPE.equals(b.scope)) {
@@ -205,6 +212,12 @@ final class BackendWiringWriter {
             sb.append("        transactionSession = new com.codename1.impl.backend."
                     + "TransactionSession(\n                com.codename1.backend.Backend."
                     + "requireEntities(entities, \"the injected Session\"));\n");
+        }
+        for (Map.Entry<String, String> r : model.repositories.entrySet()) {
+            sb.append("        ").append(r.getValue())
+              .append(" = com.codename1.orm.repository.Repositories.create(")
+              .append(r.getKey().replace('/', '.').replace('$', '.'))
+              .append(".class, transactionSession);\n");
         }
         // Stand-ins first: they hold nothing but their scope, and anything built
         // below may be given one.
@@ -560,6 +573,9 @@ final class BackendWiringWriter {
             }
             if ("session".equals(p.builtin)) {
                 return "transactionSession";
+            }
+            if ("repository".equals(p.builtin)) {
+                return model.repositories.get(p.type.getInternalName());
             }
             if ("httpSession".equals(p.builtin)) {
                 return "request.getSession(true)";
