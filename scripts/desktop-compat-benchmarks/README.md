@@ -100,7 +100,7 @@ Linux, in the container the published numbers came from:
 podman build -t bench-linux scripts/desktop-compat-benchmarks      # once
 # Codename One itself has to be in the Maven repository the run uses:
 #   cd maven && mvn -pl linux,parparvm,swing-compat,javafx-compat,fxml-compiler,\
-#     compat-jdk,codenameone-maven-plugin,cn1app-archetype -am -Plocal-dev-javase \
+#     codenameone-maven-plugin,cn1app-archetype -am -Plocal-dev-javase \
 #     -DskipTests install
 scripts/desktop-compat-benchmarks/linux-container.sh run \
   bash -c 'ARCH=$(dpkg --print-architecture)

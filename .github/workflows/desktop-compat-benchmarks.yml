@@ -43,7 +43,7 @@ concurrency:
 env:
   # The modules a native build of an imported desktop project resolves, plus
   # everything they depend on (-am). The port module is added per leg.
-  BENCH_MODULES: parparvm,compat-jdk,swing-compat,javafx-compat,fxml-compiler,codenameone-maven-plugin,cn1app-archetype
+  BENCH_MODULES: parparvm,swing-compat,javafx-compat,fxml-compiler,codenameone-maven-plugin,cn1app-archetype
 
 jobs:
   linux:

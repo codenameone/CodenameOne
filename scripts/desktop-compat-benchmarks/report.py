@@ -208,7 +208,7 @@ def build_tables(results):
         for key in sorted(dig(result, "layers") or {}):
             if key.startswith("translated_"):
                 translated = dig(result, "layers", key)
-        for layer in ("swing-compat", "javafx-compat", "compat-jdk", "application", "codenameone-core"):
+        for layer in ("swing-compat", "javafx-compat", "application", "codenameone-core"):
             if layer not in staged:
                 continue
             kept = dig(translated, layer, "classes")

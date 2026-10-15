@@ -1,10 +1,11 @@
 name: Desktop compatibility
 
 # Swing and JavaFX applications built as Codename One applications: the
-# relocated toolkits (maven/swing-compat, maven/javafx-compat), the JDK classes
-# they share with the Android layer (maven/compat-jdk), the headless harness
-# their tests run on (maven/compat-testing) and the build steps that relocate
-# and package them (build-engine, the Maven and Gradle plugins).
+# relocated toolkits (maven/swing-compat, maven/javafx-compat), the headless
+# harness their tests run on (maven/compat-testing) and the build steps that
+# relocate and package them (build-engine, the Maven and Gradle plugins). The
+# JDK API they run on is the device's class library (vm/JavaAPI,
+# Ports/CLDC11), under the JDK's own names.
 #
 #   unit tests                    the runtimes against the JDK's own behaviour,
 #                                 the remapper, the importer, and the sample
@@ -28,7 +29,6 @@ on:
       - 'maven/swing-compat/**'
       - 'maven/javafx-compat/**'
       - 'maven/fxml-compiler/**'
-      - 'maven/compat-jdk/**'
       - 'maven/compat-testing/**'
       - 'maven/build-engine/**'
       - 'maven/codenameone-maven-plugin/**'
@@ -49,7 +49,6 @@ on:
       - 'maven/swing-compat/**'
       - 'maven/javafx-compat/**'
       - 'maven/fxml-compiler/**'
-      - 'maven/compat-jdk/**'
       - 'maven/compat-testing/**'
       - 'maven/build-engine/**'
       - 'maven/codenameone-maven-plugin/**'
@@ -105,7 +104,7 @@ jobs:
       # A module added to the layer (an FXML compiler, say) joins this list.
       - name: Unit tests
         working-directory: maven
-        run: xvfb-run -a mvn -B -Plocal-dev-javase -pl compat-jdk,compat-testing,swing-compat,javafx-compat,fxml-compiler,build-engine test
+        run: xvfb-run -a mvn -B -Plocal-dev-javase -pl compat-testing,swing-compat,javafx-compat,fxml-compiler,build-engine test
       # The JavaFX sample has to stay what it claims to be: a JavaFX project
       # that builds on its own, against OpenJFX, with nothing of the layer on
       # its class path. Everything else here compiles it against the layer,

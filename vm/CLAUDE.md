@@ -358,7 +358,8 @@ assertion an assertion about nothing.
 The translator reads class files with its own `classfile` package (reader, tree,
 frame analysis, `JsrInliner`) and its JavaScript backend uses its own `regex`
 engine, `Sha256` and `java.io` -- because it compiles against `vm/JavaAPI`, which
-has no ASM, `java.util.regex` (a stub that throws), `java.security` or
+has no ASM, `java.util.regex` (none at all -- desktop code's regex is relocated
+to `com.codename1.util.regex`), `java.security` or
 `java.nio.file`. Do not reintroduce any of them into
 `vm/ByteCodeTranslator/src`: `vm/selfhost/build-selfhost.sh` compiles the sources
 against JavaAPI alone and fails, and an API JavaAPI only *stubs* compiles fine and

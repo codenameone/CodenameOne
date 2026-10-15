@@ -29,7 +29,6 @@ import zipfile
 LAYERS = [
     ("swing-compat", ("com/codename1/desktopcompat/",)),
     ("javafx-compat", ("com/codename1/fxcompat/",)),
-    ("compat-jdk", ("com/codename1/compat/jdk/",)),
     ("generated", ("com/codename1/generated/",)),
     ("codenameone-core", ("com/codename1/",)),
     ("java-api", ("java/", "javax/", "sun/", "kotlin/")),

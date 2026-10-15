@@ -351,7 +351,7 @@ recognized and never reported. Note the rule is about the *cast*: a
 
 The scope is what a translation actually sees -- `maven/core`, `maven/ios`,
 `vm/JavaAPI` and `maven/android-compat`, whose runtime an application with
-Android sources ships relocated inside its own classes, and `maven/compat-jdk`,
+Android sources ships relocated inside its own classes, and
 `maven/swing-compat` and `maven/javafx-compat`, which are relocated into an
 application with desktop sources the same way. **The Android port is not covered**, and adding it back would be a
 mistake: ART implements `CHECKCAST` to spec, so a `catch (Throwable)` around a
@@ -803,11 +803,13 @@ An Android Studio module's `src/main` dropped into `common/src/main/android`
   under its old name, kept so existing poms need no edit) relocates `android/`,
   `androidx/` and `com/google/android/material/` to
   `com/codename1/androidcompat/...`, copies the relocated runtime into the app's
-  classes, maps the JDK classes CLDC lacks (`java.io.File`, the file streams,
-  `BufferedReader`, `PrintWriter`, `Closeable`) to `com.codename1.compat.jdk`,
-  and generates the `android:onClick`, fragment-factory and WebView JS-bridge
-  dispatchers from the compiled classes. The JDK shims are their own module,
-  `maven/compat-jdk`, because the desktop layers use them too.
+  classes, and generates the `android:onClick`, fragment-factory and WebView
+  JS-bridge dispatchers from the compiled classes. The JDK API keeps its
+  names: the device's class library (`vm/JavaAPI`, mirrored by
+  `Ports/CLDC11`) carries it, and JavaSE and Android run the real JDK. Only
+  `Relocation.JDK_SHIMS` moves anything of `java.*` -- `java.util.regex` to
+  `com.codename1.util.regex`, `ProcessBuilder`/`Process` to
+  `com.codename1.io` -- and every layer shares that table.
 - **The remap is one pass over every layer**, split in `build-engine`:
   `CompatLayers` declares each layer (artifact, source prefixes, target
   package), `Relocation` holds the package and JDK-shim tables,
@@ -855,10 +857,13 @@ imported with `cn1:import-desktop-project`) builds unmodified, for every target:
   compile against its jar, and the remap moves it to `com/codename1/fxcompat/`.
   Its internals live in `com/codename1/fxcompat/runtime/`, which the remap maps
   to `com/codename1/fxcompat/rt/`.
-- **`maven/compat-jdk`** (`com.codename1.compat.jdk`) holds the JDK classes a
-  device lacks. `CompatRewrites` additionally redirects single missing
-  *members* of `Class`, `ClassLoader`, `System`, `Locale`, `String` and the
-  like, for the desktop layers only.
+- **There is no JDK module.** A JDK class a device lacks is added to
+  `vm/JavaAPI` and `Ports/CLDC11` under its real name, never shimmed in a
+  layer. `CompatRewrites` redirects the few *members* a device cannot have
+  as written -- resource and class-loader lookups, bundles and services to
+  `com.codename1.impl.compat.Resources`, the default uncaught-exception
+  handler, `String`'s regex members, `Runtime.exec`, the `Math` functions
+  CLDC lacks -- for the desktop layers only.
 - **`maven/fxml-compiler`** turns each `.fxml` into
   `com.codename1.generated.fxml.Fxml_<name>` (in the remap step, after javac)
   and each `.css` into a `.cn1css` table (from `prepare-desktop-sources`);
@@ -898,10 +903,16 @@ What holds it together:
   call sites to `cn1DesktopMain`, the main class's call included.
   `main`/`start` run on the EDT, which is the Swing EDT and the JavaFX
   application thread.
-- **Registries are generated over placeholders.** `CompatRegistry` (resources
-  and bundles, in `compat-jdk`) and the FXML dispatch class ship as empty
-  placeholders with the right shape and are replaced per application; a new
-  method on one needs the generator and the placeholder changed together.
+- **Registries are generated over placeholders.**
+  `com.codename1.generated.compat.CompatRegistry` (resources, bundle classes
+  and service providers; `ApplicationRegistry` writes it, and the lifecycles
+  and the library-mode entry points call its `cn1Install()`) and the FXML
+  dispatch class ship as empty placeholders with the right shape and are
+  replaced per application; a new method on one needs the generator and the
+  placeholder changed together. On JavaSE and Android the ports install
+  `CompatResourceSupport` from `init`, so the real JDK's `URL`,
+  `ResourceBundle` and `ServiceLoader` read the flattened bundle and the
+  registry's providers.
 - A desktop layer is active only when its jar is present **and** the compiled
   classes name its API, so a Swing app does not ship the JavaFX runtime.
   Compile- and runtime-scope dependency jars that name a layer are unpacked and relocated as
@@ -924,7 +935,7 @@ What holds it together:
   `DesktopCompat*` screenshot tests); `DesktopCompatScenesTest` in
   `build-engine` runs the same scenes headless from the remapped classes.
 
-`compat-jdk`, `swing-compat`, `javafx-compat` and `fxml-compiler` are in the
+`swing-compat`, `javafx-compat` and `fxml-compiler` are in the
 SpotBugs zero-findings gate, each with its own `spotbugs-exclude.xml`.
 
 Traps that have already cost a fix:
