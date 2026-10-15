@@ -159,10 +159,6 @@ public class PrepareDesktopSourcesMojo extends AbstractCN1Mojo {
     /// and outputs; see `CompileDesktopResourcesTask` in the Gradle plugin.
     protected void compileDesktopResources(File desktopDir, File resourcesDir, List<File> classpath, File javaOut,
                                            File resourcesOut) throws MojoExecutionException, MojoFailureException {
-        if (CompatLayers.runtimeJar(CompatLayers.JAVAFX, classpath) == null) {
-            getLog().debug("The JavaFX layer is not on the class path; no FXML or style sheet is compiled");
-            return;
-        }
         com.codename1.fxml.DesktopResourceCompiler compiler = new com.codename1.fxml.DesktopResourceCompiler(
                 java.util.Collections.singletonList(resourcesDir), javaOut, resourcesOut,
                 new com.codename1.fxml.DesktopResourceCompiler.Log() {
@@ -178,6 +174,13 @@ public class PrepareDesktopSourcesMojo extends AbstractCN1Mojo {
                 });
         List<String> errors;
         try {
+            if (CompatLayers.runtimeJar(CompatLayers.JAVAFX, classpath) == null) {
+                getLog().debug("The JavaFX layer is not on the class path; no FXML or style sheet is compiled");
+                // What an earlier build compiled names the JavaFX API and
+                // is still on the source path; it has to go with the layer.
+                compiler.clear();
+                return;
+            }
             errors = compiler.run();
         } catch (java.io.IOException e) {
             throw new MojoExecutionException("Could not compile the FXML documents and style sheets of "

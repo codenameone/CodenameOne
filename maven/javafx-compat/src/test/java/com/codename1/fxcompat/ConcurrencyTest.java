@@ -462,6 +462,53 @@ public class ConcurrencyTest {
     }
 
     @Test
+    public void aNullUpdateBetweenTwoDoesNotOutliveTheLast() {
+        final AtomicBoolean produced = new AtomicBoolean();
+        final AtomicBoolean release = new AtomicBoolean();
+        final Task<String> task = new Task<String>() {
+            @Override
+            protected String call() {
+                updateValue("a");
+                updateMessage("a");
+                updateTitle("a");
+                updateValue(null);
+                updateMessage(null);
+                updateTitle(null);
+                updateValue("b");
+                updateMessage("b");
+                updateTitle("b");
+                produced.set(true);
+                while (!release.get()) {
+                    pause();
+                }
+                return "done";
+            }
+        };
+        new Thread(task).start();
+        // Nothing is delivered while the updates are made, so all three are
+        // queued behind one another.
+        holdUntil("the updates", produced);
+        await("the updates to arrive", new Check() {
+            @Override
+            public boolean ok() {
+                return "b".equals(task.getValue());
+            }
+        });
+        MainThreadRule.drain();
+        MainThreadRule.drain();
+        assertEquals("b", task.getValue());
+        assertEquals("b", task.getMessage());
+        assertEquals("b", task.getTitle());
+        release.set(true);
+        await("the task to succeed", new Check() {
+            @Override
+            public boolean ok() {
+                return task.getState() == State.SUCCEEDED;
+            }
+        });
+    }
+
+    @Test
     public void progressNumbersAreNormalised() {
         /// Reports on the calling thread, which is the application thread.
         final class Reporter extends Task<Void> {

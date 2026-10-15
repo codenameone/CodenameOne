@@ -746,6 +746,42 @@ public class FxmlCompilerTest {
     }
 
     @Test
+    public void clearingRemovesWhatAnEarlierRunWrote() throws IOException {
+        File root = java.nio.file.Files.createTempDirectory("fxml-clear").toFile();
+        File res = new File(root, "res");
+        File gen = new File(root, "gen");
+        File out = new File(root, "out");
+        assertTrue(res.mkdirs() && out.mkdirs());
+        java.nio.file.Files.write(new File(res, "main.fxml").toPath(), ("<?xml version=\"1.0\"?>\n"
+                + "<?import javafx.scene.layout.VBox?>\n<VBox xmlns:fx=\"http://javafx.com/fxml\"/>\n")
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        java.nio.file.Files.write(new File(res, "main.css").toPath(),
+                ".root { -fx-background-color: red; }\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        DesktopResourceCompiler compiler = new DesktopResourceCompiler(java.util.Collections.singletonList(res),
+                gen, out, new DesktopResourceCompiler.Log() {
+                    @Override
+                    public void info(String message) {
+                    }
+
+                    @Override
+                    public void warn(String message) {
+                    }
+                });
+        assertTrue(compiler.run().isEmpty());
+        File marker = new File(new File(gen, FxmlCompiler.PACKAGE.replace('.', '/')),
+                FxmlClassCompiler.MARKER + ".java");
+        File sheet = new File(out, com.codename1.fxml.css.CssSheetData.compiledName(
+                com.codename1.compat.jdk.ResourceNames.flatName("main.css")));
+        assertTrue(marker.isFile());
+        assertTrue(sheet.isFile());
+        // The JavaFX layer left the build: the generated source names its
+        // API and must not stay where javac finds it.
+        compiler.clear();
+        assertFalse(marker.exists());
+        assertFalse(sheet.exists());
+    }
+
+    @Test
     public void classNamesAreStableAndDistinct() {
         assertEquals("Fxml_main", FxmlCompiler.className("main.fxml"));
         assertEquals("Fxml_ui__main_mview", FxmlCompiler.className("ui/main-view.fxml"));

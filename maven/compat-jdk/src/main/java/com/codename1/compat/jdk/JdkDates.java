@@ -911,8 +911,18 @@ public final class JdkDates {
         return Duration.ofSeconds(seconds + floorDiv(nanos, NANOS_PER_SECOND), floorMod(nanos, NANOS_PER_SECOND));
     }
 
+    /// The duration in nanoseconds, or ArithmeticException for one longer
+    /// than a long holds (about 292 years), as the JDK's `toNanos` throws. A
+    /// negative duration borrows a second first, so the most negative value
+    /// a long holds is reached without an intermediate overflow.
     private static long totalNanos(Duration d) {
-        return d.getSeconds() * NANOS_PER_SECOND + d.getNano();
+        long seconds = d.getSeconds();
+        long nanos = d.getNano();
+        if (seconds < 0) {
+            seconds++;
+            nanos -= NANOS_PER_SECOND;
+        }
+        return addExact(multiplyExact(seconds, NANOS_PER_SECOND), nanos);
     }
 
     /// A value as seconds and nanoseconds on the scale `start` counts in:
@@ -1068,11 +1078,28 @@ public final class JdkDates {
         return isNegative(d) ? negated(d) : d;
     }
 
+    /// The duration multiplied, or ArithmeticException when the product is
+    /// longer than a Duration holds, as the JDK throws. A negative duration
+    /// borrows a second first, so its seconds and nanoseconds share a sign
+    /// and neither partial product overflows while the whole fits; the
+    /// factor is split at a billion so the nanosecond product fits a long.
     public static Duration multipliedBy(Duration d, long factor) {
-        return duration(d.getSeconds() * factor, d.getNano() * factor);
+        long seconds = d.getSeconds();
+        long nanos = d.getNano();
+        if (seconds < 0 && nanos > 0) {
+            seconds++;
+            nanos -= NANOS_PER_SECOND;
+        }
+        long high = floorDiv(factor, NANOS_PER_SECOND);
+        long rest = nanos * floorMod(factor, NANOS_PER_SECOND);
+        long total = addExact(addExact(multiplyExact(seconds, factor), nanos * high),
+                floorDiv(rest, NANOS_PER_SECOND));
+        return Duration.ofSeconds(total, floorMod(rest, NANOS_PER_SECOND));
     }
 
-    /// The duration divided, exact for anything shorter than 292 years.
+    /// The duration divided. Exact for anything shorter than 292 years; a
+    /// longer one throws ArithmeticException where the JDK, which divides a
+    /// BigDecimal the device does not have, still answers.
     public static Duration dividedBy(Duration d, long divisor) {
         if (divisor == 0) {
             throw new ArithmeticException("Cannot divide by zero");

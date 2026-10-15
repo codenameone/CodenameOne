@@ -103,9 +103,11 @@ public final class Pattern {
                     "Pattern.UNICODE_CHARACTER_CLASS is not supported by the Codename One runtime");
         }
         this.regex = regex;
-        this.flags = flags;
         Parser parser = new Parser(regex, flags);
         this.root = parser.compile();
+        // As in the JDK, flags() reports the top-level state the parse ended
+        // in: (?i) outside every group counts, (?i) inside one does not.
+        this.flags = parser.topLevelFlags();
         this.groupCount = parser.groups;
         this.loopCount = parser.loops;
         this.names = parser.names;
@@ -183,13 +185,59 @@ public final class Pattern {
         return out;
     }
 
-    public Stream<String> splitAsStream(CharSequence input) {
-        String[] pieces = split(input, 0);
-        // The stream drops the one empty piece an empty input splits into.
-        if (pieces.length == 1 && pieces[0].length() == 0 && input.length() == 0) {
-            return JdkCollections.stream(new String[0]);
-        }
-        return JdkCollections.stream(pieces);
+    /// The pieces [#split(CharSequence)] would answer, found one at a time
+    /// as the stream asks for them, as the JDK's are: the matcher starts on
+    /// the first request, so a `limit` stops the search and a change to a
+    /// mutable input before then is seen.
+    public Stream<String> splitAsStream(final CharSequence input) {
+        return ObjPipeline.over(new PullIterator<String>() {
+            private Matcher matcher;
+            private int current;
+            private String pending;
+            private int empties;
+
+            @Override
+            boolean advance() {
+                if (matcher == null) {
+                    matcher = matcher(input);
+                }
+                // Empty pieces are owed only once a non-empty one follows
+                // them; trailing ones are dropped, as split drops them.
+                if (empties > 0) {
+                    empties--;
+                    emit("");
+                    return true;
+                }
+                if (pending != null) {
+                    emit(pending);
+                    pending = null;
+                    return true;
+                }
+                if (current == input.length()) {
+                    return false;
+                }
+                while (matcher.find()) {
+                    String piece = input.subSequence(current, matcher.start()).toString();
+                    current = matcher.end();
+                    if (piece.length() > 0) {
+                        pending = piece;
+                        return advance();
+                    }
+                    if (current > 0) {
+                        // No empty leading piece for a zero-width match at the start.
+                        empties++;
+                    }
+                }
+                String last = input.subSequence(current, input.length()).toString();
+                current = input.length();
+                if (last.length() > 0) {
+                    pending = last;
+                    return advance();
+                }
+                empties = 0;
+                return false;
+            }
+        });
     }
 
     /// A pattern that matches `s` and nothing else.
@@ -965,6 +1013,12 @@ public final class Pattern {
 
         private boolean has(int flag) {
             return (flags & flag) != 0;
+        }
+
+        /// The flags in force after the whole pattern, which a group's own
+        /// inline flags never reach because the group restores them.
+        int topLevelFlags() {
+            return flags;
         }
 
         Node compile() {

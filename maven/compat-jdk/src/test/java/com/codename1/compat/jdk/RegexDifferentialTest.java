@@ -122,6 +122,7 @@ public class RegexDifferentialTest {
             sb.append('|').append(Arrays.toString(p.split(input)));
             sb.append('|').append(Arrays.toString(p.split(input, -1)));
             sb.append('|').append(Arrays.toString(p.split(input, 2)));
+            sb.append('|').append(Arrays.toString(p.splitAsStream(input).toArray())).append(p.flags());
             sb.append('|').append(m.find(input.length() / 2) ? m.start() : -1);
             m.region(input.length() / 3, input.length() - input.length() / 4);
             sb.append('|').append(m.find() ? m.start() + "-" + m.end() : "none");
@@ -162,6 +163,7 @@ public class RegexDifferentialTest {
             sb.append('|').append(Arrays.toString(p.split(input)));
             sb.append('|').append(Arrays.toString(p.split(input, -1)));
             sb.append('|').append(Arrays.toString(p.split(input, 2)));
+            sb.append('|').append(Arrays.toString(p.splitAsStream(input).toArray())).append(p.flags());
             sb.append('|').append(m.find(input.length() / 2) ? m.start() : -1);
             m.region(input.length() / 3, input.length() - input.length() / 4);
             sb.append('|').append(m.find() ? m.start() + "-" + m.end() : "none");
@@ -330,6 +332,14 @@ public class RegexDifferentialTest {
         assertEquals(1L, Pattern.compile("\\d").matcher("a1b2c3").region(2, 4).results().count());
         assertEquals(3L, Pattern.compile(",").splitAsStream("a,b,c").count());
         assertEquals(0L, Pattern.compile(",").splitAsStream("").count());
+        // The split runs when the stream is consumed, over the input as it is then.
+        StringBuilder grows = new StringBuilder("a,b");
+        Stream<String> pieces = Pattern.compile(",").splitAsStream(grows);
+        grows.append(",c");
+        assertEquals(3L, pieces.count());
+        assertEquals(Pattern.CASE_INSENSITIVE, Pattern.compile("a(?i)b").flags());
+        assertEquals(0, Pattern.compile("(a(?i)b)c").flags());
+        assertEquals(0, Pattern.compile("(?-i)x", Pattern.CASE_INSENSITIVE).flags());
         assertTrue(Pattern.compile("b").asPredicate().test("abc"));
         assertTrue(!Pattern.compile("b").asMatchPredicate().test("abc"));
         assertTrue(Pattern.matches("a+", "aaa"));

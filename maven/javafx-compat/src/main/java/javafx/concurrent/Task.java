@@ -99,9 +99,34 @@ public abstract class Task<V> implements Worker<V>, EventTarget, Runnable {
     private final AtomicInteger outcome = new AtomicInteger(PENDING);
     private final AtomicReference<Thread> runner = new AtomicReference<Thread>();
     private final AtomicReference<ProgressUpdate> progressUpdate = new AtomicReference<ProgressUpdate>();
-    private final AtomicReference<String> messageUpdate = new AtomicReference<String>();
-    private final AtomicReference<String> titleUpdate = new AtomicReference<String>();
-    private final AtomicReference<V> valueUpdate = new AtomicReference<V>();
+    private final Pending<String> messageUpdate = new Pending<String>();
+    private final Pending<String> titleUpdate = new Pending<String>();
+    private final Pending<V> valueUpdate = new Pending<V>();
+
+    /// The latest update a worker thread published, coalesced into one
+    /// delivery on the FX thread. Whether a delivery is queued is its own
+    /// flag rather than a null value, because null is an update too: with
+    /// null standing for "nothing queued", `a`, `null`, `b` queued a second
+    /// delivery that overwrote `b` with null. OpenJFX coalesces that way and
+    /// has that defect; the last update must win.
+    private static final class Pending<T> {
+        private final AtomicReference<T> latest = new AtomicReference<T>();
+        private final AtomicBoolean queued = new AtomicBoolean();
+
+        /// Records an update; true when no delivery is queued and the
+        /// caller has to queue one.
+        boolean offer(T value) {
+            latest.set(value);
+            return queued.compareAndSet(false, true);
+        }
+
+        /// The update to deliver. The flag is cleared before the read, so
+        /// an update published after the read queues a delivery of its own.
+        T take() {
+            queued.set(false);
+            return latest.get();
+        }
+    }
 
     private final WorkerEvents events = new WorkerEvents(this);
     private final ReadOnlyObjectWrapper<State> state = new ReadOnlyObjectWrapper<State>(this, "state", State.READY);
@@ -437,11 +462,11 @@ public abstract class Task<V> implements Worker<V>, EventTarget, Runnable {
     protected void updateMessage(String message) {
         if (Platform.isFxApplicationThread()) {
             this.message.set(message);
-        } else if (messageUpdate.getAndSet(message) == null) {
+        } else if (messageUpdate.offer(message)) {
             Platform.runLater(new Runnable() {
                 @Override
                 public void run() {
-                    Task.this.message.set(messageUpdate.getAndSet(null));
+                    Task.this.message.set(messageUpdate.take());
                 }
             });
         }
@@ -451,11 +476,11 @@ public abstract class Task<V> implements Worker<V>, EventTarget, Runnable {
     protected void updateTitle(String title) {
         if (Platform.isFxApplicationThread()) {
             this.title.set(title);
-        } else if (titleUpdate.getAndSet(title) == null) {
+        } else if (titleUpdate.offer(title)) {
             Platform.runLater(new Runnable() {
                 @Override
                 public void run() {
-                    Task.this.title.set(titleUpdate.getAndSet(null));
+                    Task.this.title.set(titleUpdate.take());
                 }
             });
         }
@@ -466,11 +491,11 @@ public abstract class Task<V> implements Worker<V>, EventTarget, Runnable {
     protected void updateValue(V value) {
         if (Platform.isFxApplicationThread()) {
             this.value.set(value);
-        } else if (valueUpdate.getAndSet(value) == null) {
+        } else if (valueUpdate.offer(value)) {
             Platform.runLater(new Runnable() {
                 @Override
                 public void run() {
-                    Task.this.value.set(valueUpdate.getAndSet(null));
+                    Task.this.value.set(valueUpdate.take());
                 }
             });
         }

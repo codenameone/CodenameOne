@@ -61,6 +61,11 @@ public class Duration implements Comparable<Duration>, Serializable {
         if (time == null) {
             throw new NullPointerException("time");
         }
+        // The number is digits, '.' and '-' and ends at the first other
+        // character, as in OpenJFX, whose valueOf rejects "+2s" and "1e3ms"
+        // too (checked against javafx-base 23): a sign or an exponent is
+        // read as the start of the unit. Accepting them would let a value
+        // through here that the real JavaFX refuses.
         int split = -1;
         for (int i = 0; i < time.length(); i++) {
             char c = time.charAt(i);

@@ -102,38 +102,51 @@ final class StreamState {
     }
 
     /// Runs every handler, in the order they were added, even when one
-    /// throws; the first exception is thrown once all have run.
+    /// throws, an Error included; the first failure is thrown once all have
+    /// run, with each later one added to it as suppressed, as the JDK's
+    /// stream does.
     void close() {
         if (closed) {
             return;
         }
         closed = true;
-        RuntimeException first = null;
+        Throwable first = null;
         try {
             abandon(abandonable());
-        } catch (RuntimeException e) {
+        } catch (Throwable e) {
             first = e;
         }
-        if (handlers == null) {
-            if (first != null) {
-                throw first;
-            }
-            return;
-        }
-        for (int i = 0; i < handlers.size(); i++) {
-            // Read outside the try: the cast a generic get compiles to must
-            // not sit under a handler that would swallow its failure.
-            Runnable handler = handlers.get(i);
-            try {
-                handler.run();
-            } catch (RuntimeException e) {
-                if (first == null) {
-                    first = e;
+        if (handlers != null) {
+            for (int i = 0; i < handlers.size(); i++) {
+                // Read outside the try: the cast a generic get compiles to must
+                // not sit under a handler that would swallow its failure.
+                Runnable handler = handlers.get(i);
+                try {
+                    handler.run();
+                } catch (Throwable e) {
+                    first = suppress(first, e);
                 }
             }
         }
-        if (first != null) {
-            throw first;
+        if (first instanceof RuntimeException) {
+            throw (RuntimeException) first;
         }
+        if (first instanceof Error) {
+            throw (Error) first;
+        }
+        if (first != null) {
+            // Only a sneakily thrown checked exception gets here.
+            throw new RuntimeException(first);
+        }
+    }
+
+    private static Throwable suppress(Throwable first, Throwable next) {
+        if (first == null) {
+            return next;
+        }
+        if (first != next) {
+            first.addSuppressed(next);
+        }
+        return first;
     }
 }

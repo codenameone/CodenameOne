@@ -336,6 +336,20 @@ public class TimeDifferentialTest {
                 same("ofNanos " + n, () -> Duration.ofNanos(n * 1000003), () -> JdkDates.ofNanos(n * 1000003));
             }
         }
+        // Past what a long counts in nanoseconds, and at its very edges:
+        // the JDK throws rather than wrapping.
+        final Duration[] extremes = {Duration.ofDays(365L * 300), Duration.ofDays(-365L * 300),
+            Duration.ofNanos(Long.MAX_VALUE), Duration.ofNanos(Long.MIN_VALUE).plusNanos(-1),
+            Duration.ofNanos(Long.MAX_VALUE).plusNanos(1), Duration.ofSeconds(-1, 999999999), Duration.ofSeconds(-1, 1)};
+        // The most negative long: JDK 8 overflows on the way and throws,
+        // later JDKs borrow a second first and answer it, as this does.
+        assertEquals(Long.MIN_VALUE, JdkDates.toNanos(Duration.ofNanos(Long.MIN_VALUE)));
+        for (final Duration d : extremes) {
+            same("nanos " + d, () -> d.toNanos(), () -> JdkDates.toNanos(d));
+            for (final long n : new long[] {-3, 2, 1000000007L, -999999999999L, Long.MAX_VALUE, Long.MIN_VALUE}) {
+                same("times " + d + n, () -> d.multipliedBy(n), () -> JdkDates.multipliedBy(d, n));
+            }
+        }
         for (final java.time.temporal.ChronoUnit u : java.time.temporal.ChronoUnit.values()) {
             same("name " + u, () -> u.toString(), () -> unit(u).toString());
             same("length " + u, () -> u.getDuration(), () -> unit(u).getDuration());

@@ -159,6 +159,18 @@ public final class DesktopResourceCompiler {
         return messages.errors();
     }
 
+    /// Deletes everything an earlier run wrote, as a run that found no
+    /// document and no sheet does. A build calls it instead of [#run()] when
+    /// the JavaFX layer has left its class path: the generated source names
+    /// the JavaFX API, and left in place it would no longer compile.
+    public void clear() throws IOException {
+        Messages messages = new Messages();
+        prepareFxml(new TreeMap<String, File>(), messages);
+        compileCss(new TreeMap<String, File>(), messages);
+        fxmlCount = 0;
+        cssCount = 0;
+    }
+
     /// The FXML documents under `resourceDirs` by resource path, in the
     /// order of their paths.
     static Map<String, File> documents(List<File> resourceDirs) {

@@ -98,10 +98,6 @@ public abstract class CompileDesktopResourcesTask extends Cn1Task {
     @TaskAction
     public void compile() {
         List<File> classpath = new ArrayList<File>(getCompileClasspath().getFiles());
-        if (CompatLayers.runtimeJar(CompatLayers.JAVAFX, classpath) == null) {
-            getLogger().debug("The JavaFX layer is not on the class path; no FXML or style sheet is compiled");
-            return;
-        }
         File root = getResourcesRoot().get().getAsFile();
         DesktopResourceCompiler compiler = new DesktopResourceCompiler(Collections.singletonList(root),
                 getOutputDirectory().get().getAsFile(), getResourcesDirectory().get().getAsFile(),
@@ -118,6 +114,13 @@ public abstract class CompileDesktopResourcesTask extends Cn1Task {
                 });
         List<String> errors;
         try {
+            if (CompatLayers.runtimeJar(CompatLayers.JAVAFX, classpath) == null) {
+                getLogger().debug("The JavaFX layer is not on the class path; no FXML or style sheet is compiled");
+                // What an earlier build compiled names the JavaFX API and
+                // is still on the source path; it has to go with the layer.
+                compiler.clear();
+                return;
+            }
             errors = compiler.run();
         } catch (IOException ex) {
             throw new GradleException("Could not compile the FXML documents and style sheets of " + root + ": "

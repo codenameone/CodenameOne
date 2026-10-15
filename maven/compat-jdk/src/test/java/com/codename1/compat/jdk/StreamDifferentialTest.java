@@ -335,6 +335,48 @@ public class StreamDifferentialTest {
         assertEquals(Collections.singletonList("it 1"), myClosed);
     }
 
+    /// Every close handler runs, past an Error too, and the failures after
+    /// the first are suppressed in it, as the JDK's stream reports them.
+    @Test
+    public void closeRunsEveryHandlerAndKeepsEveryFailure() {
+        final IllegalStateException a = new IllegalStateException("a");
+        final AssertionError b = new AssertionError("b");
+        final IllegalArgumentException c = new IllegalArgumentException("c");
+        for (int side = 0; side < 2; side++) {
+            final List<String> ran = new ArrayList<String>();
+            Runnable first = () -> {
+                ran.add("1");
+                throw a;
+            };
+            Runnable second = () -> {
+                ran.add("2");
+                throw b;
+            };
+            Runnable third = () -> {
+                ran.add("3");
+                throw c;
+            };
+            Runnable fourth = () -> ran.add("4");
+            Runnable again = () -> {
+                ran.add("5");
+                throw a;
+            };
+            Runnable close = side == 0
+                    ? java.util.stream.Stream.of(1).onClose(first).onClose(second).onClose(third).onClose(fourth)
+                            .onClose(again)::close
+                    : Stream.of(1).onClose(first).onClose(second).onClose(third).onClose(fourth)
+                            .onClose(again)::close;
+            try {
+                close.run();
+                fail("closed without the first failure");
+            } catch (IllegalStateException e) {
+                assertSame(a, e);
+            }
+            assertEquals(Arrays.asList("1", "2", "3", "4", "5"), ran);
+            assertEquals(Arrays.asList(b, c), Arrays.asList(a.getSuppressed()).subList(2 * side, 2 * side + 2));
+        }
+    }
+
     /// Closing any stage closes the pipeline: a stage made from the closed
     /// one, before or after, runs nothing.
     @Test
