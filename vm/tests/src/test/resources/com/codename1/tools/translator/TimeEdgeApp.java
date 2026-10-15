@@ -20,16 +20,22 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
+import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.Month;
+import java.time.OffsetDateTime;
 import java.time.Period;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
+import java.util.Date;
 
 public class TimeEdgeApp {
     private static String two(int value) {
@@ -97,7 +103,62 @@ public class TimeEdgeApp {
         result.append(Duration.ofSeconds(-60, 1)).append('|');
         result.append(Duration.parse("P1DT2H3M4.5S").toMillis()).append('|');
         result.append(Duration.parse("-P1DT1H1M").toMillis());
+        result.append('|').append(newerApi());
         return result.toString();
+    }
+
+    /// The enums, units, formatter and java.util.Date members, through the
+    /// translator: what a device runs, against what the JDK answers.
+    private static String newerApi() {
+        StringBuilder out = new StringBuilder();
+        out.append(DayOfWeek.MONDAY.plus(-15)).append(',').append(Month.JANUARY.minus(25)).append(',')
+                .append(Month.FEBRUARY.length(true)).append(',').append(Month.of(11).firstMonthOfQuarter())
+                .append(',').append(LocalDate.of(2024, 2, 29).getDayOfWeek()).append('|');
+        LocalDateTime a = LocalDateTime.of(2020, 1, 31, 23, 59, 59, 999999999);
+        LocalDateTime b = LocalDateTime.of(2024, 2, 29, 0, 0);
+        for (ChronoUnit u : ChronoUnit.values()) {
+            if (u == ChronoUnit.FOREVER) {
+                continue;
+            }
+            out.append(u).append('=').append(a.until(b, u)).append(',');
+        }
+        out.append(a.truncatedTo(ChronoUnit.HOURS)).append(',').append(b.plus(3, ChronoUnit.DECADES)).append('|');
+        ZoneId ny = ZoneId.of("America/New_York");
+        out.append(ZonedDateTime.of(LocalDateTime.of(2024, 3, 10, 2, 30), ny)).append(',')
+                .append(ZonedDateTime.of(LocalDateTime.of(2024, 11, 3, 1, 30), ny).withLaterOffsetAtOverlap())
+                .append(',').append(ZonedDateTime.of(LocalDateTime.of(2024, 3, 9, 2, 30), ny).plusDays(1))
+                .append(',').append(ZonedDateTime.of(LocalDateTime.of(2024, 3, 9, 2, 30), ny).plusHours(24))
+                .append('|');
+        DateTimeFormatter pattern = DateTimeFormatter.ofPattern("EEEE, MMMM d, uuuu 'at' hh:mm:ss.SSS a");
+        out.append(LocalDateTime.of(2031, 12, 31, 13, 5, 7, 89000000).format(pattern)).append(',')
+                .append(LocalDate.parse("29.02.2024", DateTimeFormatter.ofPattern("dd.MM.yyyy"))).append(',')
+                .append(LocalTime.parse("24:00:00", DateTimeFormatter.ofPattern("HH:mm:ss"))).append(',')
+                .append(DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(
+                        OffsetDateTime.of(2024, 2, 29, 12, 30, 0, 120000000, ZoneOffset.ofHoursMinutes(-3, -30))))
+                .append(',').append(ZonedDateTime.parse("2024-06-01T12:00:00+02:00[Europe/Berlin]")).append(',')
+                .append(Instant.ofEpochSecond(31556889864403199L, 999999999)).append(',')
+                .append(Period.between(LocalDate.of(2020, 1, 31), LocalDate.of(2024, 2, 29))).append(',');
+        try {
+            LocalDate.parse("31.04.2023", DateTimeFormatter.ofPattern("dd.MM.yyyy"));
+            out.append("parsed");
+        } catch (DateTimeParseException ex) {
+            out.append("refused:").append(ex.getErrorIndex());
+        }
+        out.append('|');
+        // Noon UTC in mid month: the same date in every zone the host may
+        // have, so the default zone cannot change the answer.
+        Date date = Date.from(Instant.parse("2024-02-14T12:00:00Z"));
+        Date later = new Date(date.getTime() + 1);
+        out.append(date.toInstant()).append(',').append(date.getYear()).append(',').append(date.getMonth())
+                .append(',').append(date.getDate()).append(',').append(date.getDay()).append(',')
+                .append(later.after(date)).append(',').append(later.before(date)).append(',');
+        try {
+            Date.from(Instant.MAX);
+            out.append("made");
+        } catch (IllegalArgumentException ex) {
+            out.append("refused");
+        }
+        return out.toString();
     }
 
     public static void main(String[] args) {

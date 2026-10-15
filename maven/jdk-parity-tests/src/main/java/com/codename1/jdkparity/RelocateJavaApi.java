@@ -114,7 +114,9 @@ public final class RelocateJavaApi {
 
     static boolean isRelocated(List<String> relocated, String internalName) {
         for (String r : relocated) {
-            if (internalName.equals(r) || internalName.startsWith(r + "$")) {
+            // A name ending in a slash is a whole package, subpackages included.
+            if (r.endsWith("/") ? internalName.startsWith(r)
+                    : internalName.equals(r) || internalName.startsWith(r + "$")) {
                 return true;
             }
         }
