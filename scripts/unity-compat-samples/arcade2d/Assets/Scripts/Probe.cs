@@ -54,9 +54,24 @@ public class Probe : MonoBehaviour
         }
     }
 
+    // A [Serializable] struct is written into its holder too, and what it
+    // holds by reference with it: a Unity object inside the copied tree
+    // leads to the copy, a serializable class is the copy's own. In a field,
+    // in an array and in a list.
+    [Serializable]
+    public struct Link
+    {
+        public Transform target;
+        public Stats stats;
+        public int weight;
+    }
+
     public Stats stats = new Stats();
     public Stats[] squad;
     public List<Stats> reserve;
+    public Link link;
+    public Link[] links;
+    public List<Link> chain;
 
     private string Describe()
     {
@@ -78,6 +93,14 @@ public class Probe : MonoBehaviour
         a.squad = new Stats[] { new Stats() };
         a.reserve = new List<Stats>();
         a.reserve.Add(new Stats());
+        GameObject part = new GameObject("part");
+        part.transform.SetParent(source.transform, false);
+        a.link.target = part.transform;
+        a.link.stats = new Stats();
+        a.link.weight = 4;
+        a.links = new Link[] { a.link };
+        a.chain = new List<Link>();
+        a.chain.Add(a.link);
 
         GameObject copy = Instantiate(source);
         Probe b = copy.GetComponent<Probe>();
@@ -93,6 +116,11 @@ public class Probe : MonoBehaviour
             + (b.stats.owner == copy.transform) + (a.stats.owner == source.transform) + " own "
             + (b.stats != a.stats) + (b.stats.inner != a.stats.inner) + (b.squad[0] != a.squad[0])
             + (b.reserve[0] != a.reserve[0]));
+        Transform copied = copy.transform.GetChild(0);
+        Debug.Log("probe struct targets " + (b.link.target == copied) + (b.links[0].target == copied)
+            + (b.chain[0].target == copied) + " own " + (b.link.stats != a.link.stats)
+            + (b.links[0].stats != a.links[0].stats) + (b.chain[0].stats != a.chain[0].stats) + " weight "
+            + b.link.weight + b.links[0].weight + b.chain[0].weight + " source " + (a.link.target == part.transform));
         Destroy(source);
         Destroy(copy);
     }

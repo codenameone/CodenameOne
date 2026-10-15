@@ -111,6 +111,12 @@ public final class AudioSource extends Behaviour {
         }
     }
 
+    /// What makes the sound now, or null: for a view taken away, which
+    /// withdraws its output only if that is still the one installed.
+    public static AudioOutput $output() {
+        return output;
+    }
+
     /// Starts this source's voice again on a new output, where the voice
     /// has got to; false if it has no voice left to start. Logged as
     /// `revoice clip milliseconds`.

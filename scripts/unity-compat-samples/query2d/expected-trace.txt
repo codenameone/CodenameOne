@@ -13,6 +13,7 @@ ray ell arm Ell d=300 p=-300,350 n=100,0 f=0
 ray short none
 ray diagonal Disc d=354 p=350,100 n=-100,0 f=0
 ray empty misses, as bool false
+ray kept Post True after destroy False True
 line Disc d=350 p=350,100 n=-100,0 f=50
 line short none
 line all 2 Zone@150 Box@300

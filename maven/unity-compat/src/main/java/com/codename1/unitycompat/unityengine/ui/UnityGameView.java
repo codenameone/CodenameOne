@@ -180,7 +180,8 @@ import java.util.concurrent.atomic.AtomicReference;
 ///
 /// Unlike a pause the scripts are not told anything: the game has not lost
 /// the focus, it is being played a frame at a time. A held view takes no
-/// input; keys and touches that arrive are dropped. [#releaseClock()] gives
+/// input; keys and touches that arrive are dropped, but for the release of
+/// a key that was down, which comes up as in a pause. [#releaseClock()] gives
 /// the clock back.
 public class UnityGameView extends GameView {
     private static final int KEY_UP = 273;
@@ -453,9 +454,15 @@ public class UnityGameView extends GameView {
         }
         if (audio != null) {
             audio.stopAll();
-            AudioSource.$output(null);
+            // The output is the process's, not the view's: with two views,
+            // the one shown last installed its own, and the other taken away
+            // must not silence it. As with the preferences below.
+            if (AudioSource.$output() == audio) { // NOPMD CompareObjectsWithEquals
+                AudioSource.$output(null);
+            }
             audio = null;
         }
+        releaseKeys();
         if (PlayerPrefs.$store() == prefs) { // NOPMD CompareObjectsWithEquals
             PlayerPrefs.$store(null);
         }
@@ -646,7 +653,9 @@ public class UnityGameView extends GameView {
     private void heldFrame() {
         // What arrived is dropped, not kept for later: a press delivered
         // twenty frames after it was made is not the press that was made.
-        pending.set(NO_KEYS);
+        // A key let go is the exception, as in a pause: dropped, it would
+        // stay down in Unity once the clock is given back.
+        releasesOnly();
         pendingTouches.set(NO_TOUCHES);
         pendingMouse.set(NO_KEYS);
         int[] wanted = (int[]) stepsWanted.getAndSet(NO_KEYS);
@@ -694,6 +703,8 @@ public class UnityGameView extends GameView {
             for (int i = 0; i + 2 < ignored.length; i += 3) {
                 mouseReleaseHeldBack |= mouseHeld && ignored[i] == MOUSE_RELEASE;
             }
+            // And the keys, likewise.
+            releasesOnly();
             UnityRuntime.runFrameCalls();
             return;
         }
@@ -766,6 +777,68 @@ public class UnityGameView extends GameView {
         }
         UnityRuntime.step((float) deltaSeconds);
         show(UnityRuntime.render());
+    }
+
+    /// Takes the keys queued since the last frame, in a frame that runs no
+    /// script -- paused, or with the clock held -- and passes on only the
+    /// releases. They were left in the queue once, and the first frame after
+    /// a pause replayed a press and a release made entirely during it as
+    /// `GetKeyDown` and `GetKeyUp`. A press made then never happened, as for
+    /// the mouse; a key that was down before and came up since must still
+    /// come up, or Unity holds it for good. The runtime applies the release
+    /// when it next steps -- the first frame after -- and ignores one of a
+    /// key it does not hold, so no record of what was held is needed here.
+    private void releasesOnly() {
+        int[] keys = (int[]) pending.getAndSet(NO_KEYS);
+        for (int i = 0; i < keys.length; i++) { // NOPMD ForLoopCanBeForeach
+            if (keys[i] < 0) {
+                UnityRuntime.keyReleased(-keys[i]);
+            }
+        }
+    }
+
+    /// Lets go of every key held, for a view taken off its form. Its frames
+    /// stop, the releases of keys held then go to whatever has the focus
+    /// next, and `held` used to keep them: shown again, the view left
+    /// `Input.GetKey` true and took the next press of the key for a repeat.
+    /// Run on the event dispatch thread, which owns `held`; the releases go
+    /// through the queue, whose next frame is the first of the view shown
+    /// again, and ahead of any press made after. Presses still queued are
+    /// dropped, since Unity never saw them.
+    private void releaseKeys() {
+        int n = 0;
+        int[] releases = new int[held.size() * 2];
+        Iterator it = held.values().iterator();
+        while (it.hasNext()) {
+            int key = ((Integer) it.next()).intValue();
+            if (key == FIRE) {
+                releases[n++] = -KEY_SPACE;
+                releases[n++] = -KEY_RETURN;
+            } else {
+                releases[n++] = -key;
+            }
+        }
+        held.clear();
+        while (true) {
+            int[] before = (int[]) pending.get();
+            int kept = 0;
+            for (int i = 0; i < before.length; i++) { // NOPMD ForLoopCanBeForeach
+                if (before[i] < 0) {
+                    kept++;
+                }
+            }
+            int[] after = new int[kept + n];
+            int at = 0;
+            for (int i = 0; i < before.length; i++) { // NOPMD ForLoopCanBeForeach
+                if (before[i] < 0) {
+                    after[at++] = before[i];
+                }
+            }
+            System.arraycopy(releases, 0, after, at, n);
+            if (pending.compareAndSet(before, after)) {
+                return;
+            }
+        }
     }
 
     /// Tells the runtime of one thing the mouse did, at a point in pixels

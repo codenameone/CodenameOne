@@ -114,8 +114,11 @@ public final class RaycastHit2D implements Struct {
         return rb == null ? collider.gameObject.transform : rb.gameObject.transform;
     }
 
+    /// True if a collider was hit and still exists: a hit kept past the
+    /// destruction of its collider holds one that equals null, by Unity's
+    /// equality, and is false like any other hit of nothing.
     public static boolean op_Implicit(RaycastHit2D hit) {
-        return hit.collider != null;
+        return Object.op_Implicit(hit.collider);
     }
 
     public RaycastHit2D $copy() {

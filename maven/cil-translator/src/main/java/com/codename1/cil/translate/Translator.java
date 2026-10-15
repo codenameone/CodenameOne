@@ -826,7 +826,8 @@ public final class Translator implements Opcodes {
     ///   of an object already in the scene and for `AddComponent`.
     /// - `$copyFrom(source)` copies the serialized fields from another
     ///   instance, which is what `Instantiate` means by a copy. A struct is
-    ///   copied, an array is duplicated, a serializable class is copied
+    ///   copied, and what Unity serializes inside it copied as a class's
+    ///   is (see [#copiesSerializedStruct]), an array is duplicated, a serializable class is copied
     ///   field by field (see [#emitSerializableSupport]), and a reference
     ///   to a Unity object is passed through the runtime, which redirects
     ///   one that points into the tree being copied to the copy. A field
@@ -943,6 +944,67 @@ public final class Translator implements Opcodes {
         return copiesSerialized(def) && !def.isAbstract() && hasDefaultConstructor(def) ? def : null;
     }
 
+    /// Whether a struct gets a `$copySerialized` and an `$instantiate`: a
+    /// `[Serializable]` struct of the application's own that holds, among
+    /// the fields Unity serializes, something `$copy` alone would get wrong
+    /// in a copy made by `Instantiate`. Unity serializes such a struct into
+    /// the object that holds it, like a serializable class, so a reference
+    /// it holds to a Unity object inside the tree being copied has to lead
+    /// to the copy, and a serializable class or an array in it has to be
+    /// the copy's own. `$copy` is a plain field-by-field copy and did
+    /// neither: a `Link { Transform target; }` field of a prefab's script
+    /// went on pointing into the prefab after `Instantiate`. A struct of
+    /// numbers alone -- a `Vector3`, most structs -- is copied as before.
+    private boolean copiesSerializedStruct(TypeDef def) {
+        return def != null && (def.flags & TYPE_SERIALIZABLE) != 0 && def.isValueType() && !def.isEnum()
+                && def.genericParamCount == 0 && def.name.indexOf('<') < 0 && names.isTranslated(def.fullName())
+                && holdsDeepSerialized(def, 0);
+    }
+
+    /// Whether a serialized field of `def` needs more than a copy of its
+    /// bits. A struct cannot hold itself, so the walk ends; the level is a
+    /// guard all the same.
+    private boolean holdsDeepSerialized(TypeDef def, int level) {
+        if (level > SERIALIZED_DEPTH) {
+            return false;
+        }
+        for (FieldDef f : def.fields) {
+            if (!isSerialized(def, f)) {
+                continue;
+            }
+            CilType t = f.type;
+            if (t.kind == CilType.Kind.VALUETYPE && names.isStruct(t)) {
+                TypeDef inner = universe.find(t.name);
+                if (inner != null && (inner.flags & TYPE_SERIALIZABLE) != 0 && inner.genericParamCount == 0
+                        && names.isTranslated(inner.fullName()) && holdsDeepSerialized(inner, level + 1)) {
+                    return true;
+                }
+            } else if (names.kind(t) == Val.REF && t.kind != CilType.Kind.STRING && !names.isStruct(t)) {
+                if (t.kind == CilType.Kind.SZARRAY || t.kind == CilType.Kind.GENERICINST) {
+                    return true;
+                }
+                if (t.kind == CilType.Kind.CLASS) {
+                    TypeDef c = universe.find(t.name);
+                    if (universe.derivesFrom(t.name, "UnityEngine.Object")
+                            || (c != null && (c.flags & TYPE_SERIALIZABLE) != 0)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /// The struct of a field, or of the elements of an array or a list,
+    /// whose copy goes through its own `$instantiate`; or null.
+    private TypeDef inlineStruct(CilType t) {
+        if (t == null || t.kind != CilType.Kind.VALUETYPE) {
+            return null;
+        }
+        TypeDef def = universe.find(t.name);
+        return copiesSerializedStruct(def) ? def : null;
+    }
+
     /// What `Instantiate` needs of a `[Serializable]` class that is not a
     /// Unity object. Unity writes such a class into the object whose field
     /// holds it, by value, so a copy of that object has an instance of its
@@ -957,10 +1019,34 @@ public final class Translator implements Opcodes {
     ///   an instance of the class the *field* was declared as, whatever
     ///   the source was, which is as much of it as Unity writes.
     private void emitSerializableSupport(ClassWriter cw, TypeDef type, String name) {
+        String self = "L" + name + ";";
+        if (copiesSerializedStruct(type)) {
+            // A struct (see copiesSerializedStruct): its bits by `$copy`,
+            // then what Unity serializes in it copied again, as a class's
+            // are. Never null, and never cut off by the depth: a struct is a
+            // value, and only what it holds by reference can run in a cycle.
+            MethodVisitor mv = cw.visitMethod(ACC_PUBLIC, "$copySerialized", "(" + self + "I)V", null, null);
+            mv.visitCode();
+            emitSerializedCopies(mv, type, name, 1, 2, "copying the serializable struct " + type.fullName());
+            mv.visitInsn(RETURN);
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+            mv = cw.visitMethod(ACC_PUBLIC | ACC_STATIC, "$instantiate", "(" + self + "I)" + self, null, null);
+            mv.visitCode();
+            mv.visitVarInsn(ALOAD, 0);
+            mv.visitMethodInsn(INVOKEVIRTUAL, name, "$copy", "()" + self, false);
+            mv.visitInsn(DUP);
+            mv.visitVarInsn(ALOAD, 0);
+            mv.visitVarInsn(ILOAD, 1);
+            mv.visitMethodInsn(INVOKEVIRTUAL, name, "$copySerialized", "(" + self + "I)V", false);
+            mv.visitInsn(ARETURN);
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+            return;
+        }
         if (!copiesSerialized(type)) {
             return;
         }
-        String self = "L" + name + ";";
         MethodVisitor mv = cw.visitMethod(ACC_PUBLIC, "$copySerialized", "(" + self + "I)V", null, null);
         mv.visitCode();
         TypeDef base = type.baseType == null ? null : universe.definitionOf(type.baseType);
@@ -1038,20 +1124,30 @@ public final class Translator implements Opcodes {
                 mv.visitVarInsn(ALOAD, 0);
                 mv.visitVarInsn(ALOAD, source);
                 mv.visitFieldInsn(GETFIELD, name, fieldName, descriptor);
-                mv.visitMethodInsn(INVOKEVIRTUAL, c, "$copy", "()L" + c + ";", false);
+                TypeDef inline = inlineStruct(t);
+                if (inline != null) {
+                    // One that holds references: see copiesSerializedStruct.
+                    instantiateSerialized(mv, inline, depthSlot);
+                } else {
+                    mv.visitMethodInsn(INVOKEVIRTUAL, c, "$copy", "()L" + c + ";", false);
+                }
                 mv.visitFieldInsn(PUTFIELD, name, fieldName, descriptor);
                 continue;
             } else if (names.kind(t) != Val.REF || t.kind == CilType.Kind.STRING) {
                 helper = "";
             } else if (t.kind == CilType.Kind.SZARRAY) {
                 helper = "$copyArray";
-                structArray = names.isStruct(t.element);
-                elements = inlineClass(t.element);
+                elements = inlineStruct(t.element);
+                structArray = elements == null && names.isStruct(t.element);
+                if (elements == null) {
+                    elements = inlineClass(t.element);
+                }
             } else if (t.kind == CilType.Kind.GENERICINST) {
                 String definition = t.element.typeName();
                 if ("System.Collections.Generic.List`1".equals(definition)) {
                     helper = "$copyList";
-                    elements = t.args.length == 1 ? inlineClass(t.args[0]) : null;
+                    elements = t.args.length != 1 ? null
+                            : inlineStruct(t.args[0]) != null ? inlineStruct(t.args[0]) : inlineClass(t.args[0]);
                 }
             } else if (t.kind == CilType.Kind.CLASS) {
                 if (universe.derivesFrom(t.name, "UnityEngine.Object")) {

@@ -85,34 +85,72 @@ final class UnityGamePrefs implements PlayerPrefsStore {
         Preferences.set(PREFIX + key, kept);
     }
 
+    /// Takes the name out of the index as well. `set` adds a name whose
+    /// value is absent, so a name left behind here was added once more by
+    /// every `DeleteKey` and `Set` of it, and a game that deleted and set a
+    /// key each round grew the stored index for ever. Every copy of it goes,
+    /// which also heals an index an earlier version let grow.
     @Override
     public void delete(String key) {
         Preferences.delete(PREFIX + key);
+        String index = Preferences.get(INDEX, "");
+        if (index.length() == 0) {
+            return;
+        }
+        StringBuilder kept = new StringBuilder(index.length());
+        int[] at = {0};
+        String name = next(index, at);
+        while (name != null) {
+            if (!name.equals(key)) {
+                kept.append(name.length()).append(':').append(name);
+            }
+            name = next(index, at);
+        }
+        // What could not be read is kept as it was, not dropped with the
+        // names it may still hold.
+        kept.append(index.substring(at[0]));
+        if (kept.length() == 0) {
+            Preferences.delete(INDEX);
+        } else if (kept.length() != index.length()) {
+            Preferences.set(INDEX, kept.toString());
+        }
     }
 
     @Override
     public void deleteAll() {
         String index = Preferences.get(INDEX, "");
-        int at = 0;
-        while (at < index.length()) {
-            int colon = index.indexOf(':', at);
-            if (colon < 0) {
-                break;
-            }
-            int length;
-            try {
-                length = Integer.parseInt(index.substring(at, colon));
-            } catch (NumberFormatException e) {
-                break;
-            }
-            int end = colon + 1 + length;
-            if (length < 0 || end > index.length()) {
-                break;
-            }
-            Preferences.delete(PREFIX + index.substring(colon + 1, end));
-            at = end;
+        int[] at = {0};
+        String name = next(index, at);
+        while (name != null) {
+            Preferences.delete(PREFIX + name);
+            name = next(index, at);
         }
         Preferences.delete(INDEX);
+    }
+
+    /// The name of the index that starts at `at[0]`, moving `at[0]` past
+    /// it; null at the end, or where the index is not one this class wrote.
+    private static String next(String index, int[] at) {
+        int from = at[0];
+        if (from >= index.length()) {
+            return null;
+        }
+        int colon = index.indexOf(':', from);
+        if (colon < 0) {
+            return null;
+        }
+        int length;
+        try {
+            length = Integer.parseInt(index.substring(from, colon));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+        int end = colon + 1 + length;
+        if (length < 0 || end > index.length()) {
+            return null;
+        }
+        at[0] = end;
+        return index.substring(colon + 1, end);
     }
 
     @Override

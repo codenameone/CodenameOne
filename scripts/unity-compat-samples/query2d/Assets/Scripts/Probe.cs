@@ -290,6 +290,18 @@ public class Probe : MonoBehaviour
         {
             Debug.Log("ray empty misses, as bool false");
         }
+        // A hit kept past the destruction of what it hit is false, as the
+        // collider it holds now equals null: Unity's equality, not the
+        // reference's.
+        GameObject post = new GameObject("Post");
+        post.transform.position = new Vector3(40f, 40f, 0f);
+        post.AddComponent<BoxCollider2D>();
+        RaycastHit2D kept = Physics2D.Raycast(new Vector2(40f, 35f), Vector2.up);
+        string keptName = kept.collider == null ? "none" : kept.collider.name;
+        bool keptBefore = kept;
+        DestroyImmediate(post);
+        Debug.Log("ray kept " + keptName + " " + keptBefore + " after destroy " + (kept ? "True" : "False") + " "
+            + (kept.collider == null));
         Debug.Log("line " + Hit(Physics2D.Linecast(new Vector2(0f, 1f), new Vector2(7f, 1f))));
         Debug.Log("line short " + Hit(Physics2D.Linecast(new Vector2(0f, 1f), new Vector2(3f, 1f))));
         Debug.Log("line all " + Names(Physics2D.LinecastAll(new Vector2(0f, 3f), new Vector2(6f, 3f)), 2));

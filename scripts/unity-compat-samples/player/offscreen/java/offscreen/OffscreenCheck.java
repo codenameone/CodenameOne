@@ -367,7 +367,11 @@ public final class OffscreenCheck {
         resized(view, surface, png);
         clock(view, surface);
         texts(view, surface);
+        pausedKeys(view);
+        prefs();
         audio(view);
+        detachedKeys(view);
+        twoViews(view);
         multiKey(view);
         System.out.println(FAILURES.isEmpty() ? "OFFSCREEN OK" : "OFFSCREEN FAILED: " + FAILURES.size());
         return FAILURES.isEmpty() ? 0 : 1;
@@ -1010,6 +1014,141 @@ public final class OffscreenCheck {
                 + " ms when its view was taken away was not given a voice at that place when the view was shown "
                 + "again; its new output heard " + heard[1]);
         System.out.println("audio: a looping source at " + at + " ms, its view taken away and shown again: " + heard[1]);
+    }
+
+    /// Keys during a pause. A press made and let go while the game is
+    /// paused never happened: it was once replayed by the first frame after
+    /// the pause, as a `GetKeyDown` and a `GetKeyUp` of a key nobody held.
+    /// A press made during it and held past it is not seen either, as for
+    /// the mouse. A key held before the pause and let go during it comes up.
+    private static void pausedKeys(UnityGameView view) {
+        double dt = 1f / 60;
+        key('w', true);
+        frame(view, dt);
+        check(held('w'), "w did not go down before the pause");
+        view.pause();
+        frame(view, dt);
+        key('a', true);
+        key('a', false);
+        key('w', false);
+        frame(view, dt);
+        key('s', true);
+        frame(view, dt);
+        view.resume();
+        frame(view, dt);
+        boolean replayed = Input.GetKeyDown('a') || Input.GetKeyUp('a') || held('a');
+        check(!replayed, "a key pressed and let go during a pause was replayed after it");
+        check(!held('w') && Input.GetKeyUp('w'), "a key held before a pause and let go during it is not let go after "
+                + "it");
+        check(!held('s'), "a key pressed during a pause went down after it");
+        key('s', false);
+        frame(view, dt);
+        key('a', true);
+        frame(view, dt);
+        check(held('a') && Input.GetKeyDown('a'), "a press after a pause did not go down");
+        key('a', false);
+        frame(view, dt);
+        check(!Input.get_anyKey(), "a key is stuck after a pause");
+        System.out.println("paused keys: a tap during a pause dropped, a release kept, a press held past it unseen");
+    }
+
+    /// `DeleteKey` takes the name out of the index of names `DeleteAll`
+    /// reads; it used to leave it there, and each `Set` after it added the
+    /// name again, so that a key deleted and set every round grew the
+    /// stored index without end.
+    private static void prefs() {
+        final String key = "offscreen.probe";
+        final String[] index = new String[2];
+        final int[] value = new int[1];
+        Display.getInstance().callSeriallyAndWait(new Runnable() {
+            public void run() {
+                for (int i = 0; i < 5; i++) {
+                    com.codename1.unitycompat.unityengine.PlayerPrefs.SetInt(key, i);
+                    com.codename1.unitycompat.unityengine.PlayerPrefs.DeleteKey(key);
+                }
+                com.codename1.unitycompat.unityengine.PlayerPrefs.SetInt(key, 7);
+                index[0] = com.codename1.io.Preferences.get("unity.playerprefs", "");
+                value[0] = com.codename1.unitycompat.unityengine.PlayerPrefs.GetInt(key);
+                com.codename1.unitycompat.unityengine.PlayerPrefs.DeleteKey(key);
+                index[1] = com.codename1.io.Preferences.get("unity.playerprefs", "");
+            }
+        });
+        String entry = key.length() + ":" + key;
+        int count = 0;
+        for (int at = index[0].indexOf(entry); at >= 0; at = index[0].indexOf(entry, at + 1)) {
+            count++;
+        }
+        check(count == 1, "a key set and deleted five times, then set, is " + count + " times in the index of "
+                + "PlayerPrefs names: " + index[0]);
+        check(value[0] == 7, "a key set after being deleted reads " + value[0]);
+        check(index[1].indexOf(entry) < 0, "a deleted key is still in the index of PlayerPrefs names: " + index[1]);
+        System.out.println("prefs: a key deleted and set again is in the index once, and gone with DeleteKey");
+    }
+
+    /// A key held when the view is taken off its form, and let go while it
+    /// is away: the release goes elsewhere. The view used to keep the key
+    /// as held, so that shown again it left `Input.GetKey` true and took the
+    /// next press for a repeat.
+    private static void detachedKeys(final UnityGameView view) {
+        double dt = 1f / 60;
+        final com.codename1.ui.Container parent = view.getParent();
+        key('d', true);
+        frame(view, dt);
+        check(held('d'), "d did not go down before the view was taken away");
+        Display.getInstance().callSeriallyAndWait(new Runnable() {
+            public void run() {
+                parent.removeComponent(view);
+            }
+        });
+        key('d', false);
+        Display.getInstance().callSeriallyAndWait(new Runnable() {
+            public void run() {
+                parent.add(com.codename1.ui.layouts.BorderLayout.CENTER, view);
+                parent.revalidate();
+                view.requestFocus();
+            }
+        });
+        settle();
+        frame(view, dt);
+        check(!held('d'), "a key held when its view was taken away is still down once the view is shown again");
+        key('d', true);
+        frame(view, dt);
+        check(held('d') && Input.GetKeyDown('d'), "the first press of a key held when the view was taken away "
+                + "did not go down once the view was shown again");
+        key('d', false);
+        frame(view, dt);
+        check(!Input.get_anyKey(), "a key is stuck after the view was taken away and shown again");
+        System.out.println("detached keys: a key held when the view was taken away let go, and pressed again");
+    }
+
+    /// Two views shown at once, the first of them taken away: the sound
+    /// output is the one the second installed, and must stay. Taking either
+    /// away used to install silence, for the view still shown as well.
+    private static void twoViews(final UnityGameView view) {
+        final com.codename1.ui.Container parent = view.getParent();
+        final java.lang.Object[] seen = new java.lang.Object[4];
+        Display.getInstance().callSeriallyAndWait(new Runnable() {
+            public void run() {
+                UnityGameView second = new UnityGameView();
+                parent.add(com.codename1.ui.layouts.BorderLayout.SOUTH, second);
+                parent.revalidate();
+                seen[0] = com.codename1.unitycompat.unityengine.AudioSource.$output();
+                parent.removeComponent(view);
+                seen[1] = com.codename1.unitycompat.unityengine.AudioSource.$output();
+                parent.removeComponent(second);
+                seen[2] = com.codename1.unitycompat.unityengine.AudioSource.$output();
+                parent.add(com.codename1.ui.layouts.BorderLayout.CENTER, view);
+                parent.revalidate();
+                view.requestFocus();
+                seen[3] = com.codename1.unitycompat.unityengine.AudioSource.$output();
+            }
+        });
+        check(seen[0] != null, "a second view shown installed no sound output");
+        check(seen[1] == seen[0], "the first of two views taken away replaced the output the second installed with "
+                + seen[1]);
+        check(seen[2] == null, "the last view taken away left a sound output installed");
+        check(seen[3] != null, "the view shown again installed no sound output");
+        System.out.println("two views: the first taken away kept the second's sound output");
     }
 
     /// Multi key mode is the whole application's: a view turns it on while

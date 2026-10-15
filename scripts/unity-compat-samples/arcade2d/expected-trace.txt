@@ -2,6 +2,7 @@ player enabled
 headless seed=3 frames=300 view=400x300 rate=60 scenes=1
 player start bonus=2:20 words=2:two words tints=2 shot=Shot label=Hits: none muzzle at 0,-220
 probe copied 5/2/0/3/3/3/0/6 now 1/7/9/8/11/12/0/13 source 5/2/0/3/3/3/4/6 owner TrueTrue own TrueTrueTrueTrue
+probe struct targets TrueTrueTrue own TrueTrueTrue weight 444 source True
 mathf approximately FalseTrueTrueTrueTrueFalse atan2 -314,314,314
 pose child 100,400@120 local 100,0@30x50
 pose free 100,400@120 local 100,400@120x50 root=True
