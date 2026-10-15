@@ -28,13 +28,5 @@ import com.codename1.annotations.Mapped;
 /// keeps the brand and the last four digits and nothing else; with a real
 /// processor the card never reaches the app or this server.
 @Mapped
-public class CardDto {
-    public String number;
-    public int expMonth;
-    public int expYear;
-    public String cvc;
-    public String holder;
-
-    public CardDto() {
-    }
+public record CardDto(String number, int expMonth, int expYear, String cvc, String holder) {
 }

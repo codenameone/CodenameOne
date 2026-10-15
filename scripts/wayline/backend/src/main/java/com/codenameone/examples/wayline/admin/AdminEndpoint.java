@@ -104,8 +104,8 @@ public class AdminEndpoint implements AdminApiServer {
 
     @Override
     public UserDto setRoles(String username, RoleChangeDto roles) throws Exception {
-        UserDto user = accounts.setRoles(Caller.name(), username, roles != null && roles.driver,
-                roles != null && roles.admin);
+        UserDto user = accounts.setRoles(Caller.name(), username, roles != null && roles.driver(),
+                roles != null && roles.admin());
         // A live channel keeps the roles it was opened with: one opened by an
         // admin goes on receiving where every driver is after the role is
         // taken away, since it asks for nothing again. Closed here, the app
@@ -118,8 +118,8 @@ public class AdminEndpoint implements AdminApiServer {
     @Override
     public UserDto suspend(String username, SuspendDto suspend) throws Exception {
         UserDto user = accounts.suspend(Caller.name(), username,
-                suspend != null && suspend.suspended, suspend == null ? "" : suspend.reason);
-        if (user.suspended) {
+                suspend != null && suspend.suspended(), suspend == null ? "" : suspend.reason());
+        if (user.suspended()) {
             // The API turns a suspended account away on its next request. A
             // live channel already open makes no further request, so it is
             // closed here.
@@ -140,8 +140,8 @@ public class AdminEndpoint implements AdminApiServer {
 
     @Override
     public UserDto flag(String username, FlagDto flag) throws Exception {
-        return accounts.flag(Caller.name(), username, flag != null && flag.flagged,
-                flag == null ? "" : flag.reason);
+        return accounts.flag(Caller.name(), username, flag != null && flag.flagged(),
+                flag == null ? "" : flag.reason());
     }
 
     @Override
@@ -166,17 +166,17 @@ public class AdminEndpoint implements AdminApiServer {
 
     @Override
     public DriverApplicationDto reject(String username, ReasonDto reason) throws Exception {
-        return applications.reject(Caller.name(), username, reason == null ? "" : reason.reason);
+        return applications.reject(Caller.name(), username, reason == null ? "" : reason.reason());
     }
 
     @Override
     public RideDto cancelRide(String id, ReasonDto reason) throws Exception {
-        return rides.cancelByAdmin(Caller.name(), id, reason == null ? "" : reason.reason);
+        return rides.cancelByAdmin(Caller.name(), id, reason == null ? "" : reason.reason());
     }
 
     @Override
     public ReceiptDto refundRide(String id, ReasonDto reason) throws Exception {
-        return payments.refund(id, Text.required(reason == null ? "" : reason.reason, 255,
+        return payments.refund(id, Text.required(reason == null ? "" : reason.reason(), 255,
                 "why it is refunded"));
     }
 

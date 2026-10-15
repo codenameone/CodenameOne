@@ -52,15 +52,9 @@ final class People {
     }
 
     private static String open(Accounts accounts, String name, boolean driver) throws Exception {
-        RegisterDto request = new RegisterDto();
-        request.email = name + "@test.example";
-        request.password = PASSWORD;
-        request.displayName = name;
-        request.phone = "+15550111";
-        request.driver = driver;
-        request.vehicle = "Green Fiat 500";
-        request.plate = "T " + name;
-        String username = accounts.register(request).username;
+        RegisterDto request = new RegisterDto(name + "@test.example", PASSWORD, name, "+15550111",
+                driver, "Green Fiat 500", "T " + name, false, null);
+        String username = accounts.register(request).username();
         accounts.markPhoneVerified(username);
         if (driver) {
             // Registering asks to drive and no more. An admin's grant is what

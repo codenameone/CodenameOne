@@ -66,7 +66,7 @@ class LiveSocketTest {
 
     @Test
     void aTicketOpensTheChannelOnceAndPushesArrive() throws Exception {
-        String ticket = tickets.issue(DemoAccounts.RIDER).ticket;
+        String ticket = tickets.issue(DemoAccounts.RIDER).ticket();
         Tcp rider = open("/ws/live?ticket=" + ticket);
         try {
             readFrame(rider);
@@ -115,7 +115,7 @@ class LiveSocketTest {
         // The channel keeps the roles it was opened with, so one opened as an
         // admin would go on hearing the fleet after the role was taken away.
         String username = People.rider(accounts, "live-roles");
-        Tcp channel = open("/ws/live?ticket=" + tickets.issue(username).ticket);
+        Tcp channel = open("/ws/live?ticket=" + tickets.issue(username).ticket());
         try {
             readFrame(channel);
             assertEquals("{\"type\":\"ready\"}", text());
@@ -147,7 +147,7 @@ class LiveSocketTest {
 
     @Test
     void anAdminHearsAboutEveryRideAndTheFleet() throws Exception {
-        Tcp admin = open("/ws/live?ticket=" + tickets.issue(DemoAccounts.ADMIN).ticket);
+        Tcp admin = open("/ws/live?ticket=" + tickets.issue(DemoAccounts.ADMIN).ticket());
         try {
             readFrame(admin);
             assertEquals("{\"type\":\"ready\"}", text());

@@ -27,9 +27,5 @@ import com.codename1.annotations.Mapped;
 /// Why an admin did something: rejected an application, cancelled a ride,
 /// refunded one.
 @Mapped
-public class ReasonDto {
-    public String reason;
-
-    public ReasonDto() {
-    }
+public record ReasonDto(String reason) {
 }

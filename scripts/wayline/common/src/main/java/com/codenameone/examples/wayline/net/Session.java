@@ -160,9 +160,9 @@ public final class Session {
 
     public static void setUser(UserDto described) {
         user = described;
-        if (described != null && described.username != null) {
+        if (described != null && described.username() != null) {
             // What the device keeps about one person is not the next one's.
-            Prefs.ownedBy(described.username);
+            Prefs.ownedBy(described.username());
         }
     }
 

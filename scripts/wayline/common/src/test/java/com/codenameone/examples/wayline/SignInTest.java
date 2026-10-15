@@ -46,8 +46,8 @@ public class SignInTest extends E2e {
         type("password", PASSWORD);
         click("submit");
         waitForForm("Rider");
-        assertEqual(RIDER, Session.user().username);
-        assertTrue(Session.user().rider && !Session.user().driver && !Session.user().admin,
+        assertEqual(RIDER, Session.user().username());
+        assertTrue(Session.user().rider() && !Session.user().driver() && !Session.user().admin(),
                 "the demo rider has the rider role and no other");
         shot("rider-home");
 

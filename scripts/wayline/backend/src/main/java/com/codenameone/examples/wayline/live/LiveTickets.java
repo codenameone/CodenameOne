@@ -59,10 +59,7 @@ public class LiveTickets {
         row.setUsername(username);
         row.setExpiresAt(System.currentTimeMillis() + TICKET_SECONDS * 1000L);
         tickets.insert(row);
-        TicketDto dto = new TicketDto();
-        dto.ticket = ticket;
-        dto.expiresInSeconds = TICKET_SECONDS;
-        return dto;
+        return new TicketDto(ticket, TICKET_SECONDS);
     }
 
     /// The account a ticket was issued to, or null when it is unknown, used or

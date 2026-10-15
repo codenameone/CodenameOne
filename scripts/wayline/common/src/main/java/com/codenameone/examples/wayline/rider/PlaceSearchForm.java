@@ -102,7 +102,7 @@ public final class PlaceSearchForm {
         if (place == null) {
             return count;
         }
-        results.add(Ui.tap(Ui.row(icon, place.name, place.address, null), "known-" + count,
+        results.add(Ui.tap(Ui.row(icon, place.name(), place.address(), null), "known-" + count,
                 e -> {
                     previous.showBack();
                     picked.picked(place);
@@ -139,8 +139,8 @@ public final class PlaceSearchForm {
         }
         for (int iter = 0; places != null && iter < places.size(); iter++) {
             final PlaceDto place = places.get(iter);
-            results.add(Ui.tap(Ui.row(FontImage.MATERIAL_PLACE, place.name, place.address, null),
-                    "place-" + iter, e -> {
+            results.add(Ui.tap(Ui.row(FontImage.MATERIAL_PLACE, place.name(), place.address(),
+                    null), "place-" + iter, e -> {
                         previous.showBack();
                         picked.picked(place);
                     }));

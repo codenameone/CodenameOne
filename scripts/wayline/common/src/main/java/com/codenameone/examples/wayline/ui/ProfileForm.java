@@ -60,9 +60,9 @@ public final class ProfileForm {
 
         Ui.section(page, "About you");
         final TextField name = Ui.field(page, "Name", "name", "What drivers will call you");
-        name.setText(profile == null ? user.displayName : profile.name);
-        final String[] gender = {profile == null || profile.gender == null
-                || profile.gender.length() == 0 ? GENDERS[0] : profile.gender};
+        name.setText(profile == null ? user.displayName() : profile.name());
+        final String[] gender = {profile == null || profile.gender() == null
+                || profile.gender().length() == 0 ? GENDERS[0] : profile.gender()};
         page.add(Ui.label("Gender", "WlLabel"));
         // Two rows of two: four of these do not fit side by side in German.
         page.add(Ui.choice("gender", GENDER_NAMES, GENDERS, gender[0],
@@ -106,7 +106,7 @@ public final class ProfileForm {
 
     private static Container place(final Form form, final Form previous, final Runnable saved,
             char icon, String title, final String which, PlaceDto place) {
-        return Ui.tap(Ui.row(icon, title, place == null ? Lang.tr("Not set") : place.name,
+        return Ui.tap(Ui.row(icon, title, place == null ? Lang.tr("Not set") : place.name(),
                 SettingsForm.chevron()), "place-" + which,
                 e -> PlaceSearchForm.show(form, Locator.here(), picked -> {
                     if ("home".equals(which)) {

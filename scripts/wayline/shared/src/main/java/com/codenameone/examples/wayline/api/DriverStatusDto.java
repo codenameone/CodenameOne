@@ -26,12 +26,5 @@ import com.codename1.annotations.Mapped;
 
 /// A driver going on or off line, or reporting where the car is.
 @Mapped
-public class DriverStatusDto {
-    public boolean online;
-    public double lat;
-    public double lng;
-    public double heading;
-
-    public DriverStatusDto() {
-    }
+public record DriverStatusDto(boolean online, double lat, double lng, double heading) {
 }

@@ -25,22 +25,21 @@ package com.codenameone.examples.wayline.api;
 import com.codename1.annotations.Mapped;
 
 /// One product a ride can be taken as, priced for the ride being quoted.
+///
+/// @param product `standard`, `comfort` or `xl`.
+/// @param fare Cents, like every amount here.
+/// @param total What the rider would pay: [#fare()] plus [#serviceFee()].
+/// @param driversNearby Drivers of this product in reach; 0 when there is none.
+/// @param etaMinutes Minutes for the nearest of them to arrive; 0 when there is none.
 @Mapped
-public class FareOptionDto {
-    /// `standard`, `comfort` or `xl`.
-    public String product;
-    public String name;
-    public String description;
-    public int seats;
-    /// Cents. `total` is what the rider would pay: `fare` plus `serviceFee`.
-    public long fare;
-    public long serviceFee;
-    public long total;
-    /// Drivers of this product in reach, and minutes for the nearest to arrive; 0
-    /// and 0 when there is none.
-    public int driversNearby;
-    public int etaMinutes;
-
-    public FareOptionDto() {
-    }
+public record FareOptionDto(
+        String product,
+        String name,
+        String description,
+        int seats,
+        long fare,
+        long serviceFee,
+        long total,
+        int driversNearby,
+        int etaMinutes) {
 }

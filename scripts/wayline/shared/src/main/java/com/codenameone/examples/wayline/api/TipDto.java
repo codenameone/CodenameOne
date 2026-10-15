@@ -26,9 +26,5 @@ import com.codename1.annotations.Mapped;
 
 /// A tip for the driver of a completed ride, in cents.
 @Mapped
-public class TipDto {
-    public long amount;
-
-    public TipDto() {
-    }
+public record TipDto(long amount) {
 }

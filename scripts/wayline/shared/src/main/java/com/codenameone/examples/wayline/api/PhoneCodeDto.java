@@ -26,9 +26,5 @@ import com.codename1.annotations.Mapped;
 
 /// The code the user typed in.
 @Mapped
-public class PhoneCodeDto {
-    public String code;
-
-    public PhoneCodeDto() {
-    }
+public record PhoneCodeDto(String code) {
 }

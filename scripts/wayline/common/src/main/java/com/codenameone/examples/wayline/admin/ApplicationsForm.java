@@ -99,14 +99,14 @@ public final class ApplicationsForm {
         }
         for (int iter = 0; found != null && iter < found.size(); iter++) {
             final DriverApplicationDto application = found.get(iter);
-            Container row = Ui.row((char) 0, application.name, car(application),
-                    Ui.badge(word(application.status), badge(application.status)));
+            Container row = Ui.row((char) 0, application.name(), car(application),
+                    Ui.badge(word(application.status()), badge(application.status())));
             row.add(BorderLayout.WEST, FlowLayout.encloseCenterMiddle(
-                    Ui.avatar(application.name)));
+                    Ui.avatar(application.name())));
             final Container picked = row;
-            list.add(Ui.tap(row, "application-" + application.username, e -> {
+            list.add(Ui.tap(row, "application-" + application.username(), e -> {
                 panes.picked(picked);
-                review(application.username);
+                review(application.username());
             }));
         }
         panes.refresh();
@@ -120,33 +120,33 @@ public final class ApplicationsForm {
 
     private void show(final DriverApplicationDto application) {
         Container page = Ui.page();
-        Label state = Ui.badge(word(application.status), badge(application.status));
+        Label state = Ui.badge(word(application.status()), badge(application.status()));
         state.setName("applicationStatus");
-        page.add(Ui.person(application.name, application.username, state));
-        if ("rejected".equals(application.status)) {
-            page.add(Ui.text(application.rejectionReason, "WlNotice"));
+        page.add(Ui.person(application.name(), application.username(), state));
+        if ("rejected".equals(application.status())) {
+            page.add(Ui.text(application.rejectionReason(), "WlNotice"));
         }
 
         Ui.section(page, "Applicant");
-        page.add(Ui.fact("Legal name", application.legalName));
-        page.add(Ui.fact("Date of birth", application.dateOfBirth));
-        page.add(Ui.fact("Licence", application.licenceNumber));
-        page.add(Ui.fact("Licence expires", application.licenceExpiry));
-        if (application.submittedAt > 0) {
-            page.add(Ui.fact("Submitted", Ui.when(application.submittedAt)));
+        page.add(Ui.fact("Legal name", application.legalName()));
+        page.add(Ui.fact("Date of birth", application.dateOfBirth()));
+        page.add(Ui.fact("Licence", application.licenceNumber()));
+        page.add(Ui.fact("Licence expires", application.licenceExpiry()));
+        if (application.submittedAt() > 0) {
+            page.add(Ui.fact("Submitted", Ui.when(application.submittedAt())));
         }
-        if (application.reviewedAt > 0) {
-            page.add(Ui.fact("Reviewed", Ui.when(application.reviewedAt)));
-            page.add(Ui.fact("Reviewed by", application.reviewedBy));
+        if (application.reviewedAt() > 0) {
+            page.add(Ui.fact("Reviewed", Ui.when(application.reviewedAt())));
+            page.add(Ui.fact("Reviewed by", application.reviewedBy()));
         }
 
         Ui.section(page, "Vehicle");
         page.add(Ui.fact("Car", car(application)));
-        page.add(Ui.fact("Licence plate", application.vehiclePlate));
-        page.add(Ui.fact("Seats for riders", String.valueOf(application.vehicleSeats)));
-        page.add(Ui.fact("Kind of ride", Lang.tr(Ui.product(application.product))));
-        page.add(Ui.fact("Takes a wheelchair", Lang.tr(application.accessible ? "Yes" : "No")));
-        page.add(Ui.fact("Takes pets", Lang.tr(application.petFriendly ? "Yes" : "No")));
+        page.add(Ui.fact("Licence plate", application.vehiclePlate()));
+        page.add(Ui.fact("Seats for riders", String.valueOf(application.vehicleSeats())));
+        page.add(Ui.fact("Kind of ride", Lang.tr(Ui.product(application.product()))));
+        page.add(Ui.fact("Takes a wheelchair", Lang.tr(application.accessible() ? "Yes" : "No")));
+        page.add(Ui.fact("Takes pets", Lang.tr(application.petFriendly() ? "Yes" : "No")));
 
         Ui.section(page, "Documents");
         for (int iter = 0; iter < KINDS.length; iter++) {
@@ -162,29 +162,28 @@ public final class ApplicationsForm {
                 page.add(row);
             } else {
                 page.add(Ui.tap(row, "document-" + kind,
-                        e -> picture(application.username, kind, title)));
+                        e -> picture(application.username(), kind, title)));
             }
         }
 
-        if ("pending".equals(application.status)) {
+        if ("pending".equals(application.status())) {
             page.add(Ui.primary("Approve", "approve", e -> Api.admin().approve(
-                    application.username, Net.to(approved -> {
+                    application.username(), Net.to(approved -> {
                         Telemetry.applicationReviewed(true);
-                        Ui.say(Lang.tr("{0} can now drive", application.name));
+                        Ui.say(Lang.tr("{0} can now drive", application.name()));
                         panes.home();
                     }, Ui::fail))));
             page.add(Ui.danger("Send back", "reject", e -> panes.reason("Send back",
                     Lang.tr("{0} sees what you write, and can apply again once it is put "
-                            + "right.", application.name), "Send back", why -> {
-                        ReasonDto reason = new ReasonDto();
-                        reason.reason = why;
-                        Api.admin().reject(application.username, reason, Net.to(rejected -> {
+                            + "right.", application.name()), "Send back", why -> {
+                        ReasonDto reason = new ReasonDto(why);
+                        Api.admin().reject(application.username(), reason, Net.to(rejected -> {
                             Telemetry.applicationReviewed(false);
                             panes.home();
                         }, Ui::fail));
                     })));
         }
-        panes.detail(application.name, "ApplicationReview", page);
+        panes.detail(application.name(), "ApplicationReview", page);
     }
 
     /// A document, as large as the screen allows.
@@ -209,11 +208,11 @@ public final class ApplicationsForm {
     }
 
     private static Image decode(DocumentContentDto content) {
-        if (content == null || content.dataBase64 == null || content.dataBase64.length() == 0) {
+        if (content == null || content.dataBase64() == null || content.dataBase64().length() == 0) {
             return null;
         }
         try {
-            byte[] data = Base64.decode(content.dataBase64.getBytes("UTF-8"));
+            byte[] data = Base64.decode(content.dataBase64().getBytes("UTF-8"));
             return data == null ? null : Image.createImage(data, 0, data.length);
         } catch (java.io.UnsupportedEncodingException impossible) {
             Log.e(impossible);
@@ -227,11 +226,11 @@ public final class ApplicationsForm {
     }
 
     private static String status(DriverApplicationDto application, String kind) {
-        for (int iter = 0; application.documents != null && iter < application.documents.size();
+        for (int iter = 0; application.documents() != null && iter < application.documents().size();
                 iter++) {
-            DocumentDto document = application.documents.get(iter);
-            if (kind.equals(document.kind)) {
-                return document.status;
+            DocumentDto document = application.documents().get(iter);
+            if (kind.equals(document.kind())) {
+                return document.status();
             }
         }
         return "missing";
@@ -239,9 +238,9 @@ public final class ApplicationsForm {
 
     private static String car(DriverApplicationDto application) {
         StringBuilder car = new StringBuilder();
-        String[] words = {application.vehicleColor, application.vehicleMake,
-            application.vehicleModel,
-            application.vehicleYear > 0 ? String.valueOf(application.vehicleYear) : ""};
+        String[] words = {application.vehicleColor(), application.vehicleMake(),
+            application.vehicleModel(),
+            application.vehicleYear() > 0 ? String.valueOf(application.vehicleYear()) : ""};
         for (int iter = 0; iter < words.length; iter++) {
             if (words[iter] != null && words[iter].length() > 0) {
                 car.append(car.length() > 0 ? " " : "").append(words[iter]);

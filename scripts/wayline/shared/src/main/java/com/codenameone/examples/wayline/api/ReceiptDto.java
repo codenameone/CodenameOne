@@ -25,35 +25,35 @@ package com.codenameone.examples.wayline.api;
 import com.codename1.annotations.Mapped;
 
 /// What a ride cost and how it was paid. Every amount is in cents.
+///
+/// @param baseFare The part of the fare that does not depend on the trip.
+/// @param distanceFare The part of the fare charged by distance.
+/// @param timeFare The part of the fare charged by time.
+/// @param total The fare, the service fee and the tip, less the discount.
+/// @param status `pending`, `paid`, `failed`, `refunded` or `cash`; while a refund the processor
+///     took has not finished, `refund_pending`, and `refund_failed` when it then did not return the
+///     money.
+/// @param paidAt Milliseconds since the epoch, or 0 while unpaid.
+/// @param riderUsername Who paid. Filled for an admin; a rider's own receipts leave it empty.
 @Mapped
-public class ReceiptDto {
-    public String rideId;
-    public String currency;
-    /// The three parts of the fare.
-    public long baseFare;
-    public long distanceFare;
-    public long timeFare;
-    public long serviceFee;
-    public long tip;
-    public long discount;
-    /// The fare, the service fee and the tip, less the discount.
-    public long total;
-    public String methodLabel;
-    /// `pending`, `paid`, `failed`, `refunded` or `cash`; while a refund the
-    /// processor took has not finished, `refund_pending`, and
-    /// `refund_failed` when it then did not return the money.
-    public String status;
-    /// Milliseconds since the epoch, or 0 while unpaid.
-    public long paidAt;
-    public String pickupName;
-    public String dropoffName;
-    public double distanceMeters;
-    public double durationSeconds;
-    public String driverName;
-    public String vehicle;
-    /// Who paid. Filled for an admin; a rider's own receipts leave it empty.
-    public String riderUsername;
-
-    public ReceiptDto() {
-    }
+public record ReceiptDto(
+        String rideId,
+        String currency,
+        long baseFare,
+        long distanceFare,
+        long timeFare,
+        long serviceFee,
+        long tip,
+        long discount,
+        long total,
+        String methodLabel,
+        String status,
+        long paidAt,
+        String pickupName,
+        String dropoffName,
+        double distanceMeters,
+        double durationSeconds,
+        String driverName,
+        String vehicle,
+        String riderUsername) {
 }

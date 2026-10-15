@@ -87,7 +87,7 @@ public final class Account {
     }
 
     private static void fetch(final Runnable done) {
-        final String owner = Session.user().username;
+        final String owner = Session.user().username();
         final Runnable thenProfile = () -> {
             if (profileLoaded || !signedInAs(owner)) {
                 done.run();
@@ -134,10 +134,8 @@ public final class Account {
             });
             return;
         }
-        ProfileDto wanted = described();
-        wanted.name = name;
-        wanted.gender = gender;
-        final String owner = Session.user() == null ? null : Session.user().username;
+        ProfileDto wanted = described(name, gender);
+        final String owner = Session.user() == null ? null : Session.user().username();
         Api.account().saveProfile(wanted, Net.to(user -> {
             // The answer is about the account that asked; see send().
             if (signedInAs(owner)) {
@@ -207,7 +205,7 @@ public final class Account {
         if (profileChanged) {
             profileChanged = false;
             final ProfileDto wanted = described();
-            final String owner = Session.user().username;
+            final String owner = Session.user().username();
             Api.account().saveProfile(wanted, Net.to(user -> {
                 // Signing out sends what is waiting and does not wait for the
                 // answer. If somebody else has signed in by the time it comes,
@@ -224,43 +222,42 @@ public final class Account {
     /// back after the session it was asked in has ended is not acted on.
     private static boolean signedInAs(String username) {
         UserDto now = Session.user();
-        return now != null && username != null && username.equals(now.username);
+        return now != null && username != null && username.equals(now.username());
     }
 
     private static PreferencesDto preferences() {
-        PreferencesDto dto = new PreferencesDto();
         String language = Prefs.language();
-        dto.language = language.length() == 0 ? com.codenameone.examples.wayline.ui.Lang.current()
-                : language;
-        dto.theme = Prefs.theme();
-        dto.units = Prefs.units();
-        dto.notifyRideUpdates = Prefs.notifyRideUpdates();
-        dto.notifyReceipts = Prefs.notifyReceipts();
-        dto.notifyPromotions = Prefs.notifyPromotions();
-        dto.driverGender = Prefs.driverGender();
-        dto.quietRide = Prefs.quietRide();
-        dto.accessibleVehicle = Prefs.accessibleVehicle();
-        dto.petFriendly = Prefs.petFriendly();
-        dto.petFriendly = Prefs.petFriendly();
-        dto.defaultPaymentMethodId = Prefs.paymentMethod();
-        dto.defaultTipPercent = Prefs.tipPercent();
-        dto.shareTripsWith = Prefs.shareTrips() ? Prefs.emergencyContactPhone() : "";
-        return dto;
+        return new PreferencesDto(
+                language.length() == 0 ? com.codenameone.examples.wayline.ui.Lang.current()
+                        : language,
+                Prefs.theme(),
+                Prefs.units(),
+                Prefs.notifyRideUpdates(),
+                Prefs.notifyReceipts(),
+                Prefs.notifyPromotions(),
+                Prefs.driverGender(),
+                Prefs.quietRide(),
+                Prefs.accessibleVehicle(),
+                Prefs.petFriendly(),
+                Prefs.paymentMethod(),
+                Prefs.tipPercent(),
+                Prefs.shareTrips() ? Prefs.emergencyContactPhone() : "");
     }
 
     /// The profile to send: the one the server gave, with the device's values
     /// for what `Prefs` holds.
     private static ProfileDto described() {
-        ProfileDto dto = new ProfileDto();
-        dto.name = profile == null ? Session.user().displayName : profile.name;
-        dto.gender = profile == null ? Session.user().gender : profile.gender;
-        dto.emergencyContactName = Prefs.emergencyContactName();
-        dto.emergencyContactPhone = Prefs.emergencyContactPhone();
+        return described(profile == null ? Session.user().displayName() : profile.name(),
+                profile == null ? Session.user().gender() : profile.gender());
+    }
+
+    /// The same, with `name` and `gender` in place of the ones held.
+    private static ProfileDto described(String name, String gender) {
         PlaceDto home = Prefs.home();
         PlaceDto work = Prefs.work();
-        dto.homeAddress = home == null ? "" : home.name;
-        dto.workAddress = work == null ? "" : work.name;
-        return dto;
+        return new ProfileDto(name, gender, Prefs.emergencyContactName(),
+                Prefs.emergencyContactPhone(), home == null ? "" : home.name(),
+                work == null ? "" : work.name());
     }
 
     private static void apply(PreferencesDto from) {
@@ -270,23 +267,25 @@ public final class Account {
         applying = true;
         try {
             // An account that has never chosen a language leaves the device's.
-            if (from.language != null && from.language.length() > 0) {
-                Prefs.setLanguage(from.language);
+            if (from.language() != null && from.language().length() > 0) {
+                Prefs.setLanguage(from.language());
             }
-            Prefs.setTheme(from.theme);
-            Prefs.setUnits(from.units);
-            Prefs.setNotifyRideUpdates(from.notifyRideUpdates);
-            Prefs.setNotifyReceipts(from.notifyReceipts);
-            Prefs.setNotifyPromotions(from.notifyPromotions);
-            Prefs.setDriverGender(from.driverGender);
-            Prefs.setQuietRide(from.quietRide);
-            Prefs.setAccessibleVehicle(from.accessibleVehicle);
-            Prefs.setPetFriendly(from.petFriendly);
-            if (from.defaultPaymentMethodId != null && from.defaultPaymentMethodId.length() > 0) {
-                Prefs.setPaymentMethod(from.defaultPaymentMethodId);
+            Prefs.setTheme(from.theme());
+            Prefs.setUnits(from.units());
+            Prefs.setNotifyRideUpdates(from.notifyRideUpdates());
+            Prefs.setNotifyReceipts(from.notifyReceipts());
+            Prefs.setNotifyPromotions(from.notifyPromotions());
+            Prefs.setDriverGender(from.driverGender());
+            Prefs.setQuietRide(from.quietRide());
+            Prefs.setAccessibleVehicle(from.accessibleVehicle());
+            Prefs.setPetFriendly(from.petFriendly());
+            String method = from.defaultPaymentMethodId();
+            if (method != null && method.length() > 0) {
+                Prefs.setPaymentMethod(method);
             }
-            Prefs.setTipPercent(from.defaultTipPercent);
-            Prefs.setShareTrips(from.shareTripsWith != null && from.shareTripsWith.length() > 0);
+            Prefs.setTipPercent(from.defaultTipPercent());
+            String sharedWith = from.shareTripsWith();
+            Prefs.setShareTrips(sharedWith != null && sharedWith.length() > 0);
         } finally {
             applying = false;
         }
@@ -299,10 +298,10 @@ public final class Account {
         profile = from;
         applying = true;
         try {
-            Prefs.setEmergencyContactName(from.emergencyContactName);
-            Prefs.setEmergencyContactPhone(from.emergencyContactPhone);
-            Prefs.setHome(place(Prefs.home(), from.homeAddress));
-            Prefs.setWork(place(Prefs.work(), from.workAddress));
+            Prefs.setEmergencyContactName(from.emergencyContactName());
+            Prefs.setEmergencyContactPhone(from.emergencyContactPhone());
+            Prefs.setHome(place(Prefs.home(), from.homeAddress()));
+            Prefs.setWork(place(Prefs.work(), from.workAddress()));
         } finally {
             applying = false;
         }
@@ -316,12 +315,9 @@ public final class Account {
         if (address == null || address.length() == 0) {
             return null;
         }
-        if (known != null && address.equals(known.name)) {
+        if (known != null && address.equals(known.name())) {
             return known;
         }
-        PlaceDto place = new PlaceDto();
-        place.name = address;
-        place.address = "";
-        return place;
+        return new PlaceDto(address, "", 0d, 0d);
     }
 }

@@ -27,20 +27,20 @@ import com.codename1.annotations.Mapped;
 import java.util.List;
 
 /// One account in full, for the admin deciding what to do about it.
+///
+/// @param rides Rides taken part in, as rider or driver.
+/// @param cancellations How many of those rides were cancelled.
+/// @param rating As a driver; 0 for an account that has not driven.
+/// @param spent Cents paid as a rider.
+/// @param earned Cents earned as a driver.
+/// @param events Newest first.
 @Mapped
-public class UserDetailDto {
-    public UserDto user;
-    /// Rides taken part in, as rider or driver, and how many of them were cancelled.
-    public int rides;
-    public int cancellations;
-    /// As a driver; 0 for an account that has not driven.
-    public double rating;
-    /// Cents paid as a rider and earned as a driver.
-    public long spent;
-    public long earned;
-    /// Newest first.
-    public List<ModerationEventDto> events;
-
-    public UserDetailDto() {
-    }
+public record UserDetailDto(
+        UserDto user,
+        int rides,
+        int cancellations,
+        double rating,
+        long spent,
+        long earned,
+        List<ModerationEventDto> events) {
 }

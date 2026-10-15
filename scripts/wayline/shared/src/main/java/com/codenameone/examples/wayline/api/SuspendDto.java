@@ -25,12 +25,8 @@ package com.codenameone.examples.wayline.api;
 import com.codename1.annotations.Mapped;
 
 /// Blocks an account, or lifts the block.
+///
+/// @param reason Why, for the moderation record. May be empty.
 @Mapped
-public class SuspendDto {
-    public boolean suspended;
-    /// Why, for the moderation record. May be empty.
-    public String reason;
-
-    public SuspendDto() {
-    }
+public record SuspendDto(boolean suspended, String reason) {
 }

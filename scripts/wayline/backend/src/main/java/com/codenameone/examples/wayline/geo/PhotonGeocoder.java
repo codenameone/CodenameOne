@@ -114,12 +114,8 @@ public class PhotonGeocoder implements Geocoder {
         append(address, name.equals(street) ? "" : street);
         append(address, text(p, "city"));
         append(address, text(p, "country"));
-        PlaceDto place = new PlaceDto();
-        place.name = name;
-        place.address = address.toString();
-        place.lat = ((Number) lat).doubleValue();
-        place.lng = ((Number) lng).doubleValue();
-        return place;
+        return new PlaceDto(name, address.toString(), ((Number) lat).doubleValue(),
+                ((Number) lng).doubleValue());
     }
 
     private static String text(Map properties, String key) {

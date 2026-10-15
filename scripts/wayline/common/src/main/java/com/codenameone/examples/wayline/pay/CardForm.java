@@ -53,6 +53,9 @@ import com.codenameone.examples.wayline.ui.Ui;
 public final class CardForm {
     /// The setup the browser was opened for, to finish when the app is back.
     private static CardForm waiting;
+    /// What a hosted setup is finished with: the card went to the processor's
+    /// own page, and nothing of it is here to send.
+    private static final CardDto NO_CARD = new CardDto(null, 0, 0, null, null);
 
     private final Form form = Ui.form("Add a card", "Card");
     private final Form previous;
@@ -83,14 +86,14 @@ public final class CardForm {
     /// The app is in front again. If it left to add a card, see what came of it.
     public static void resumed() {
         if (waiting != null) {
-            waiting.finish(new CardDto());
+            waiting.finish(NO_CARD);
         }
     }
 
     private void begin(PaymentSetupDto setup) {
-        setupId = setup.id;
-        if (setup.hosted) {
-            hosted(setup.url);
+        setupId = setup.id();
+        if (setup.hosted()) {
+            hosted(setup.url());
         } else {
             typed();
         }
@@ -106,7 +109,7 @@ public final class CardForm {
             waiting = this;
             CN.execute(url);
         }));
-        page.add(Ui.secondary("I have finished", "finishHosted", e -> finish(new CardDto())));
+        page.add(Ui.secondary("I have finished", "finishHosted", e -> finish(NO_CARD)));
     }
 
     private void typed() {
@@ -172,12 +175,9 @@ public final class CardForm {
                 Ui.refresh(form);
                 return;
             }
-            CardDto card = new CardDto();
-            card.number = Cards.digits(digits.getText());
-            card.expMonth = Cards.month(expiry.getText());
-            card.expYear = Cards.year(expiry.getText());
-            card.cvc = cvc.getText().trim();
-            card.holder = name.getText().trim();
+            CardDto card = new CardDto(Cards.digits(digits.getText()),
+                    Cards.month(expiry.getText()), Cards.year(expiry.getText()),
+                    cvc.getText().trim(), name.getText().trim());
             finish(card);
         }));
     }

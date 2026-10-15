@@ -26,11 +26,5 @@ import com.codename1.annotations.Mapped;
 
 /// A stored document, picture included.
 @Mapped
-public class DocumentContentDto {
-    public String kind;
-    public String contentType;
-    public String dataBase64;
-
-    public DocumentContentDto() {
-    }
+public record DocumentContentDto(String kind, String contentType, String dataBase64) {
 }

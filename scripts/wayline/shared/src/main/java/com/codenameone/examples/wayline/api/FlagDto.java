@@ -26,10 +26,5 @@ import com.codename1.annotations.Mapped;
 
 /// Marks an account for a closer look, or clears the mark.
 @Mapped
-public class FlagDto {
-    public boolean flagged;
-    public String reason;
-
-    public FlagDto() {
-    }
+public record FlagDto(boolean flagged, String reason) {
 }

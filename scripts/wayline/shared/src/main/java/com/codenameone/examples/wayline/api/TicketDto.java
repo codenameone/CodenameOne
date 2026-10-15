@@ -30,10 +30,5 @@ import com.codename1.annotations.Mapped;
 /// app asks for a ticket over the authenticated API and presents it in the
 /// connection address. It is good for one connection and for a few seconds.
 @Mapped
-public class TicketDto {
-    public String ticket;
-    public int expiresInSeconds;
-
-    public TicketDto() {
-    }
+public record TicketDto(String ticket, int expiresInSeconds) {
 }

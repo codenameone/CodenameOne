@@ -109,11 +109,12 @@ public final class ApplicationForm {
         Ui.back(form, () -> done.run());
         UserDto user = Session.user();
         ProfileDto profile = Account.profile();
-        gender = profile != null && profile.gender != null && profile.gender.length() > 0
-                ? profile.gender : user.gender == null || user.gender.length() == 0
-                ? GENDERS[0] : user.gender;
-        if (application.legalName == null || application.legalName.length() == 0) {
-            application.legalName = user.displayName;
+        gender = profile != null && profile.gender() != null && profile.gender().length() > 0
+                ? profile.gender() : user.gender() == null || user.gender().length() == 0
+                ? GENDERS[0] : user.gender();
+        if (application.legalName() == null || application.legalName().length() == 0) {
+            this.application = filled(user.displayName(), application.dateOfBirth(),
+                    application.licenceNumber(), application.licenceExpiry());
         }
         stepLabel.setName("step");
         error.setName("error");
@@ -171,27 +172,23 @@ public final class ApplicationForm {
         body.add(Ui.text("As it is written on your licence. Riders see only your first name.",
                 "WlMuted"));
         final TextField name = Ui.field(body, "Legal name", "legalName", "");
-        name.setText(application.legalName);
-        final Picker born = date(body, "Date of birth", "dateOfBirth", application.dateOfBirth);
+        name.setText(application.legalName());
+        final Picker born = date(body, "Date of birth", "dateOfBirth", application.dateOfBirth());
         body.add(Ui.label("Gender", "WlLabel"));
         body.add(Ui.choice("gender", GENDER_NAMES, GENDERS, gender, value -> gender = value, 2));
         body.add(Ui.text("Riders who ask for a woman at the wheel are offered to drivers "
                 + "who say they are one.", "WlMuted"));
-        collect = () -> {
-            application.legalName = name.getText().trim();
-            application.dateOfBirth = iso(born);
-        };
+        collect = () -> application = filled(name.getText().trim(), iso(born),
+                application.licenceNumber(), application.licenceExpiry());
     }
 
     private void licence() {
         body.add(Ui.text("The number is on the front of the card.", "WlMuted"));
         final TextField number = Ui.field(body, "Licence number", "licenceNumber", "");
-        number.setText(application.licenceNumber);
-        final Picker expiry = date(body, "Expires", "licenceExpiry", application.licenceExpiry);
-        collect = () -> {
-            application.licenceNumber = number.getText().trim();
-            application.licenceExpiry = iso(expiry);
-        };
+        number.setText(application.licenceNumber());
+        final Picker expiry = date(body, "Expires", "licenceExpiry", application.licenceExpiry());
+        collect = () -> application = filled(application.legalName(),
+                application.dateOfBirth(), number.getText().trim(), iso(expiry));
     }
 
     private void car() {
@@ -217,38 +214,50 @@ public final class ApplicationForm {
                 TextArea.NUMERIC);
         third.add(left).add(right);
         body.add(third);
-        make.setText(application.vehicleMake);
-        model.setText(application.vehicleModel);
-        year.setText(application.vehicleYear > 0 ? String.valueOf(application.vehicleYear) : "");
-        colour.setText(application.vehicleColor);
-        plate.setText(application.vehiclePlate);
-        seats.setText(String.valueOf(application.vehicleSeats > 0 ? application.vehicleSeats : 4));
-        final String[] product = {application.product == null
-                || application.product.length() == 0 ? "standard" : application.product};
+        make.setText(application.vehicleMake());
+        model.setText(application.vehicleModel());
+        year.setText(application.vehicleYear() > 0
+                ? String.valueOf(application.vehicleYear()) : "");
+        colour.setText(application.vehicleColor());
+        plate.setText(application.vehiclePlate());
+        seats.setText(String.valueOf(application.vehicleSeats() > 0
+                ? application.vehicleSeats() : 4));
+        final String[] product = {application.product() == null
+                || application.product().length() == 0 ? "standard" : application.product()};
         body.add(Ui.label("Kind of ride", "WlLabel"));
         body.add(Ui.choice("product", new String[] {"Standard", "Comfort", "XL"},
                 new String[] {"standard", "comfort", "xl"}, product[0],
                 value -> product[0] = value));
         body.add(Ui.text("Comfort is a newer, roomier car. XL seats six or more.", "WlMuted"));
-        final boolean[] accessible = {application.accessible};
+        final boolean[] accessible = {application.accessible()};
         body.add(Ui.row(FontImage.MATERIAL_ACCESSIBLE, "Takes a wheelchair",
                 "A ramp or a lift, and room to secure the chair",
                 Ui.toggle("accessible", accessible[0], on -> accessible[0] = on)));
-        final boolean[] pets = {application.petFriendly};
+        final boolean[] pets = {application.petFriendly()};
         body.add(Ui.row(FontImage.MATERIAL_PETS, "Takes pets",
                 "Riders travelling with a pet are offered to you",
                 Ui.toggle("petFriendly", pets[0], on -> pets[0] = on)));
         collect = () -> {
-            application.vehicleMake = make.getText().trim();
-            application.vehicleModel = model.getText().trim();
-            application.vehicleYear = number(year.getText());
-            application.vehicleColor = colour.getText().trim();
-            application.vehiclePlate = plate.getText().trim();
-            application.vehicleSeats = number(seats.getText());
-            application.product = product[0];
-            application.accessible = accessible[0];
-            application.petFriendly = pets[0];
+            DriverApplicationDto a = application;
+            application = new DriverApplicationDto(a.username(), a.name(), a.status(),
+                    a.legalName(), a.dateOfBirth(), a.licenceNumber(), a.licenceExpiry(),
+                    make.getText().trim(), model.getText().trim(), number(year.getText()),
+                    colour.getText().trim(), plate.getText().trim(), number(seats.getText()),
+                    product[0], accessible[0], pets[0], a.documents(), a.rejectionReason(),
+                    a.submittedAt(), a.reviewedAt(), a.reviewedBy());
         };
+    }
+
+    /// The application as it stands, with the applicant's and the licence's
+    /// details as given.
+    private DriverApplicationDto filled(String legalName, String dateOfBirth,
+            String licenceNumber, String licenceExpiry) {
+        DriverApplicationDto a = application;
+        return new DriverApplicationDto(a.username(), a.name(), a.status(), legalName,
+                dateOfBirth, licenceNumber, licenceExpiry, a.vehicleMake(), a.vehicleModel(),
+                a.vehicleYear(), a.vehicleColor(), a.vehiclePlate(), a.vehicleSeats(),
+                a.product(), a.accessible(), a.petFriendly(), a.documents(),
+                a.rejectionReason(), a.submittedAt(), a.reviewedAt(), a.reviewedBy());
     }
 
     private void documents() {
@@ -303,10 +312,8 @@ public final class ApplicationForm {
     }
 
     private void upload(final String kind, byte[] jpeg, final Image picture) {
-        DocumentUploadDto document = new DocumentUploadDto();
-        document.kind = kind;
-        document.contentType = "image/jpeg";
-        document.dataBase64 = Base64.encodeNoNewline(jpeg);
+        DocumentUploadDto document = new DocumentUploadDto(kind, "image/jpeg",
+                Base64.encodeNoNewline(jpeg));
         Api.driving().upload(document, Net.to(saved -> {
             application = saved;
             thumbs.put(kind, picture);
@@ -320,17 +327,17 @@ public final class ApplicationForm {
         body.add(Ui.text("Have a last look. You can change anything until it is handed in.",
                 "WlMuted"));
         Ui.section(body, "You");
-        body.add(Ui.fact("Legal name", application.legalName));
-        body.add(Ui.fact("Date of birth", application.dateOfBirth));
-        body.add(Ui.fact("Licence", application.licenceNumber));
-        body.add(Ui.fact("Licence expires", application.licenceExpiry));
+        body.add(Ui.fact("Legal name", application.legalName()));
+        body.add(Ui.fact("Date of birth", application.dateOfBirth()));
+        body.add(Ui.fact("Licence", application.licenceNumber()));
+        body.add(Ui.fact("Licence expires", application.licenceExpiry()));
         Ui.section(body, "Your car");
         body.add(Ui.fact("Car", ApplyForm.car(application)));
-        body.add(Ui.fact("Licence plate", application.vehiclePlate));
-        body.add(Ui.fact("Seats for riders", String.valueOf(application.vehicleSeats)));
-        body.add(Ui.fact("Kind of ride", Lang.tr(Ui.product(application.product))));
-        body.add(Ui.fact("Takes a wheelchair", Lang.tr(application.accessible ? "Yes" : "No")));
-        body.add(Ui.fact("Takes pets", Lang.tr(application.petFriendly ? "Yes" : "No")));
+        body.add(Ui.fact("Licence plate", application.vehiclePlate()));
+        body.add(Ui.fact("Seats for riders", String.valueOf(application.vehicleSeats())));
+        body.add(Ui.fact("Kind of ride", Lang.tr(Ui.product(application.product()))));
+        body.add(Ui.fact("Takes a wheelchair", Lang.tr(application.accessible() ? "Yes" : "No")));
+        body.add(Ui.fact("Takes pets", Lang.tr(application.petFriendly() ? "Yes" : "No")));
         Ui.section(body, "Documents");
         int have = KINDS.length - ApplyForm.missing(application);
         Container documents = Ui.fact("Photos added", have + " / " + KINDS.length);
@@ -376,7 +383,7 @@ public final class ApplicationForm {
             if (named) {
                 // The gender is the account's, not the application's.
                 ProfileDto profile = Account.profile();
-                Account.saveProfile(profile == null ? Session.user().displayName : profile.name,
+                Account.saveProfile(profile == null ? Session.user().displayName() : profile.name(),
                         gender, () -> { }, (status, message) -> { });
             }
             step++;
@@ -386,15 +393,15 @@ public final class ApplicationForm {
 
     private boolean incomplete() {
         if (step == 0) {
-            return empty(application.legalName) || empty(application.dateOfBirth);
+            return empty(application.legalName()) || empty(application.dateOfBirth());
         }
         if (step == 1) {
-            return empty(application.licenceNumber) || empty(application.licenceExpiry);
+            return empty(application.licenceNumber()) || empty(application.licenceExpiry());
         }
         if (step == 2) {
-            return empty(application.vehicleMake) || empty(application.vehicleModel)
-                    || empty(application.vehicleColor) || empty(application.vehiclePlate)
-                    || application.vehicleYear <= 0 || application.vehicleSeats <= 0;
+            return empty(application.vehicleMake()) || empty(application.vehicleModel())
+                    || empty(application.vehicleColor()) || empty(application.vehiclePlate())
+                    || application.vehicleYear() <= 0 || application.vehicleSeats() <= 0;
         }
         return false;
     }
@@ -419,11 +426,11 @@ public final class ApplicationForm {
     }
 
     private String status(String kind) {
-        for (int iter = 0; application.documents != null && iter < application.documents.size();
+        for (int iter = 0; application.documents() != null && iter < application.documents().size();
                 iter++) {
-            DocumentDto document = application.documents.get(iter);
-            if (kind.equals(document.kind)) {
-                return document.status;
+            DocumentDto document = application.documents().get(iter);
+            if (kind.equals(document.kind())) {
+                return document.status();
             }
         }
         return "missing";

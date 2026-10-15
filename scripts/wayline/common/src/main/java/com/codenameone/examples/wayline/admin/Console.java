@@ -229,8 +229,8 @@ final class Console {
         panel.setName("side");
         UserDto user = Session.user();
         Container who = new Container(BoxLayout.y());
-        who.add(Ui.plain(user.displayName, "WlSideName"));
-        who.add(Ui.plain(user.username, "WlSideDetail"));
+        who.add(Ui.plain(user.displayName(), "WlSideName"));
+        who.add(Ui.plain(user.username(), "WlSideDetail"));
 
         Container list = new Container(BoxLayout.y());
         list.setScrollableY(true);
@@ -244,7 +244,7 @@ final class Console {
         list.add(Ui.label("Switch to", "WlSideLabel"));
         list.add(entry(FontImage.MATERIAL_HAIL, "Riding", "switch-" + Nav.RIDER,
                 () -> Nav.switchTo(Nav.RIDER)));
-        if (user.driver) {
+        if (user.driver()) {
             list.add(entry(FontImage.MATERIAL_DIRECTIONS_CAR, "Driving", "switch-" + Nav.DRIVER,
                     () -> Nav.switchTo(Nav.DRIVER)));
         }

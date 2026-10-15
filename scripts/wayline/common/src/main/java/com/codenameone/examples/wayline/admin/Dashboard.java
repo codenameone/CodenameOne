@@ -119,7 +119,7 @@ final class Dashboard extends LiveChannel.Adapter {
 
     /// Shows the numbers as nothing, before the first answer.
     void start() {
-        fill(new AdminStatsDto());
+        fill(new AdminStatsDto(0, 0, 0, 0, 0, 0, 0L, null));
     }
 
     /// The page came into view: everything is fetched again.
@@ -173,11 +173,11 @@ final class Dashboard extends LiveChannel.Adapter {
 
     private void fill(AdminStatsDto stats) {
         numbers.clear();
-        numbers.stat(String.valueOf(stats.ridesToday), "Rides today", "ridesToday");
-        numbers.stat(String.valueOf(stats.ridesActive), "Under way", "ridesActive");
-        numbers.stat(stats.driversOnline + " / " + stats.drivers, "Drivers online",
+        numbers.stat(String.valueOf(stats.ridesToday()), "Rides today", "ridesToday");
+        numbers.stat(String.valueOf(stats.ridesActive()), "Under way", "ridesActive");
+        numbers.stat(stats.driversOnline() + " / " + stats.drivers(), "Drivers online",
                 "driversOnline");
-        numbers.stat(Ui.money(stats.revenueCents, stats.currency), "Fares collected",
+        numbers.stat(Ui.money(stats.revenueCents(), stats.currency()), "Fares collected",
                 "revenue");
         refresh();
     }
@@ -185,21 +185,21 @@ final class Dashboard extends LiveChannel.Adapter {
     private void fill(StatsSeriesDto found) {
         last = found;
         alerts.removeAll();
-        if (found.pendingApplications > 0) {
-            alerts.add(alert(FontImage.MATERIAL_ASSIGNMENT_IND, found.pendingApplications == 1
+        if (found.pendingApplications() > 0) {
+            alerts.add(alert(FontImage.MATERIAL_ASSIGNMENT_IND, found.pendingApplications() == 1
                     ? Lang.tr("1 application to review")
                     : Lang.tr("{0} applications to review",
-                            String.valueOf(found.pendingApplications)), "alert-applications",
+                            String.valueOf(found.pendingApplications())), "alert-applications",
                     places::applications));
         }
-        if (found.flaggedUsers > 0) {
-            alerts.add(alert(FontImage.MATERIAL_FLAG, found.flaggedUsers == 1
+        if (found.flaggedUsers() > 0) {
+            alerts.add(alert(FontImage.MATERIAL_FLAG, found.flaggedUsers() == 1
                     ? Lang.tr("1 flagged account") : Lang.tr("{0} flagged accounts",
-                            String.valueOf(found.flaggedUsers)), "alert-flagged",
+                            String.valueOf(found.flaggedUsers())), "alert-flagged",
                     places::flagged));
         }
         series.removeAll();
-        int count = found.days == null ? 0 : found.days.size();
+        int count = found.days() == null ? 0 : found.days().size();
         double[] rides = new double[count];
         double[] revenue = new double[count];
         int asked = 0;
@@ -208,22 +208,22 @@ final class Dashboard extends LiveChannel.Adapter {
         long taken = 0;
         int joined = 0;
         for (int iter = 0; iter < count; iter++) {
-            DayStatsDto day = found.days.get(iter);
-            rides[iter] = day.rides;
-            revenue[iter] = day.revenue;
-            asked += day.rides;
-            completed += day.completed;
-            cancelled += day.cancelled;
-            taken += day.revenue;
-            joined += day.newUsers;
+            DayStatsDto day = found.days().get(iter);
+            rides[iter] = day.rides();
+            revenue[iter] = day.revenue();
+            asked += day.rides();
+            completed += day.completed();
+            cancelled += day.cancelled();
+            taken += day.revenue();
+            joined += day.newUsers();
         }
 
         StatRow rates = Ui.stats(3);
-        rates.stat(Math.round(found.completionRate * 100d) + "%", "Completed",
+        rates.stat(Math.round(found.completionRate() * 100d) + "%", "Completed",
                 "completionRate");
-        rates.stat(Ui.money(found.averageFare, found.currency), "Average fare",
+        rates.stat(Ui.money(found.averageFare(), found.currency()), "Average fare",
                 "averageFare");
-        rates.stat(wait(found.averageWaitSeconds), "Average wait", "averageWait");
+        rates.stat(wait(found.averageWaitSeconds()), "Average wait", "averageWait");
 
         // One column on a phone, in the order they are added. On a wide screen
         // as many columns as fit, dealt out in turn: each tile keeps its own
@@ -248,33 +248,33 @@ final class Dashboard extends LiveChannel.Adapter {
                 Lang.tr("{0} completed, {1} cancelled", String.valueOf(completed),
                         String.valueOf(cancelled)),
                 Chart.of("chartRides", rides, from, to)));
-        column[next++ % columns].add(tile("Fares", Ui.money(taken, found.currency),
+        column[next++ % columns].add(tile("Fares", Ui.money(taken, found.currency()),
                 "seriesRevenue", Lang.tr("{0} new accounts", String.valueOf(joined)),
                 Chart.of("chartRevenue", revenue, from, to)));
         if (columns == 1) {
             series.add(rates);
         }
 
-        int hours = found.byHour == null ? 0 : found.byHour.size();
+        int hours = found.byHour() == null ? 0 : found.byHour().size();
         double[] hourly = new double[hours];
         for (int iter = 0; iter < hours; iter++) {
-            Integer value = found.byHour.get(iter);
+            Integer value = found.byHour().get(iter);
             hourly[iter] = value == null ? 0 : value.intValue();
         }
         column[next++ % columns].add(tile("Requests by hour", null, null,
                 "The busy hours, in UTC", Chart.of("chartHours", hourly, "00:00", "23:00")));
-        column[next++ % columns].add(shares("By outcome", found.byState, true));
-        column[next++ % columns].add(shares("By kind of ride", found.byProduct, false));
+        column[next++ % columns].add(shares("By outcome", found.byState(), true));
+        column[next++ % columns].add(shares("By kind of ride", found.byProduct(), false));
 
-        if (found.topDrivers != null && !found.topDrivers.isEmpty()) {
+        if (found.topDrivers() != null && !found.topDrivers().isEmpty()) {
             Container top = box("Top drivers");
-            for (int iter = 0; iter < found.topDrivers.size(); iter++) {
-                DriverDto driver = found.topDrivers.get(iter);
-                Container row = Ui.row((char) 0, driver.displayName, driver.vehicle,
-                        Ui.plain(Lang.tr("{0} rides", String.valueOf(driver.rides)),
+            for (int iter = 0; iter < found.topDrivers().size(); iter++) {
+                DriverDto driver = found.topDrivers().get(iter);
+                Container row = Ui.row((char) 0, driver.displayName(), driver.vehicle(),
+                        Ui.plain(Lang.tr("{0} rides", String.valueOf(driver.rides())),
                                 "WlRowValue"));
                 row.add(BorderLayout.WEST, FlowLayout.encloseCenterMiddle(
-                        Ui.avatar(driver.displayName)));
+                        Ui.avatar(driver.displayName())));
                 top.add(row);
             }
             column[next++ % columns].add(top);
@@ -319,14 +319,15 @@ final class Dashboard extends LiveChannel.Adapter {
         Container tile = box(title);
         long total = 0;
         for (int iter = 0; parts != null && iter < parts.size(); iter++) {
-            total += parts.get(iter).count;
+            total += parts.get(iter).count();
         }
         for (int iter = 0; parts != null && iter < parts.size(); iter++) {
             NameCountDto part = parts.get(iter);
-            String name = states ? Ui.state(RideState.named(part.name)) : Ui.product(part.name);
-            tile.add(Ui.fact(name.length() == 0 ? part.name : name, String.valueOf(part.count)));
+            String name = states ? Ui.state(RideState.named(part.name())) : Ui.product(part.name());
+            tile.add(Ui.fact(name.length() == 0 ? part.name() : name,
+                    String.valueOf(part.count())));
             // A total of nothing has no shares; the bars are then empty.
-            tile.add(new Chart.Meter(total == 0 ? 0 : part.count / (double) total));
+            tile.add(new Chart.Meter(total == 0 ? 0 : part.count() / (double) total));
         }
         return tile;
     }

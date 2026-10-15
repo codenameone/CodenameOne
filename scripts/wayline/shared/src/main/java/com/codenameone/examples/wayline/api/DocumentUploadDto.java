@@ -26,13 +26,8 @@ import com.codename1.annotations.Mapped;
 
 /// A picture of a document, sent as base64. JPEG or PNG, and small: the app
 /// shrinks a photograph before sending it.
+///
+/// @param contentType `image/jpeg` or `image/png`.
 @Mapped
-public class DocumentUploadDto {
-    public String kind;
-    /// `image/jpeg` or `image/png`.
-    public String contentType;
-    public String dataBase64;
-
-    public DocumentUploadDto() {
-    }
+public record DocumentUploadDto(String kind, String contentType, String dataBase64) {
 }

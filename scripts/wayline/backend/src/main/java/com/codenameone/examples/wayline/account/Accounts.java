@@ -116,8 +116,8 @@ public class Accounts {
     /// The 409 for a registration that failed because the account was opened
     /// meanwhile, or the failure itself when it was something else.
     private <T extends Exception> T taken(RegisterDto request, T failed) {
-        if (request != null && request.email != null
-                && users.userExists(email(request.email))) {
+        if (request != null && request.email() != null
+                && users.userExists(email(request.email()))) {
             throw new ResponseStatusException(409, "That e-mail already has an account");
         }
         return failed;
@@ -128,16 +128,16 @@ public class Accounts {
         if (request == null) {
             throw new ResponseStatusException(400, "Nothing to register");
         }
-        String username = email(request.email);
-        password(request.password);
-        String gender = Text.oneOf(request.gender, GENDERS, GENDERS[0], "gender");
-        String displayName = required(request.displayName, 120, "your name");
-        String phone = phone(request.phone);
+        String username = email(request.email());
+        password(request.password());
+        String gender = Text.oneOf(request.gender(), GENDERS, GENDERS[0], "gender");
+        String displayName = required(request.displayName(), 120, "your name");
+        String phone = phone(request.phone());
         String vehicle = "";
         String plate = "";
-        if (request.driver) {
-            vehicle = required(request.vehicle, 120, "the car you drive");
-            plate = required(request.plate, 32, "its plate");
+        if (request.driver()) {
+            vehicle = required(request.vehicle(), 120, "the car you drive");
+            plate = required(request.plate(), 32, "its plate");
         }
         if (users.userExists(username)) {
             throw new ResponseStatusException(409, "That e-mail already has an account");
@@ -152,9 +152,9 @@ public class Accounts {
         // Every account opens as a rider. Asking to drive -- `driver` is how an
         // older app asks -- begins an application, and the role waits for an
         // admin to approve it.
-        create(username, request.password, displayName, phone, false, vehicle, plate, false,
+        create(username, request.password(), displayName, phone, false, vehicle, plate, false,
                 false, gender, System.currentTimeMillis());
-        if (request.driver || request.wantsToDrive) {
+        if (request.driver() || request.wantsToDrive()) {
             applications.open(username, vehicle, plate);
         }
         return describe(username);
@@ -335,14 +335,8 @@ public class Accounts {
         if (row == null) {
             throw new ResponseStatusException(404, "No such account");
         }
-        ProfileDto dto = new ProfileDto();
-        dto.name = row.getDisplayName();
-        dto.gender = row.getGender();
-        dto.emergencyContactName = row.getEmergencyName();
-        dto.emergencyContactPhone = row.getEmergencyPhone();
-        dto.homeAddress = row.getHomeAddress();
-        dto.workAddress = row.getWorkAddress();
-        return dto;
+        return new ProfileDto(row.getDisplayName(), row.getGender(), row.getEmergencyName(),
+                row.getEmergencyPhone(), row.getHomeAddress(), row.getWorkAddress());
     }
 
     @Transactional(rollbackFor = IOException.class)
@@ -350,17 +344,17 @@ public class Accounts {
         if (profile == null) {
             throw new ResponseStatusException(400, "Nothing to save");
         }
-        String contact = profile.emergencyContactPhone == null ? ""
-                : profile.emergencyContactPhone.trim();
+        String contact = profile.emergencyContactPhone() == null ? ""
+                : profile.emergencyContactPhone().trim();
         // Everything is checked before anything is assigned: the row is written
         // from what it holds when the transaction commits.
-        String name = required(profile.name, 120, "your name");
-        String gender = Text.oneOf(profile.gender, GENDERS, GENDERS[0], "gender");
-        String emergencyName = Text.optional(profile.emergencyContactName, 120,
+        String name = required(profile.name(), 120, "your name");
+        String gender = Text.oneOf(profile.gender(), GENDERS, GENDERS[0], "gender");
+        String emergencyName = Text.optional(profile.emergencyContactName(), 120,
                 "the contact's name");
         String emergencyPhone = contact.length() == 0 ? "" : phone(contact);
-        String home = Text.optional(profile.homeAddress, 255, "an address");
-        String work = Text.optional(profile.workAddress, 255, "an address");
+        String home = Text.optional(profile.homeAddress(), 255, "an address");
+        String work = Text.optional(profile.workAddress(), 255, "an address");
         Profile row = profiles.findById(username);
         if (row == null) {
             throw new ResponseStatusException(404, "No such account");
@@ -417,8 +411,11 @@ public class Accounts {
         // connection is acted on at once, and must not be said about a change
         // that could still be rolled back.
         live.drop(username);
-        was.suspended = true;
-        return was;
+        // The account as it was, answered as what it now is: unable to sign in.
+        return new UserDto(was.username(), was.displayName(), was.phone(), was.phoneVerified(),
+                was.rider(), was.driver(), was.admin(), true, was.vehicle(), was.plate(),
+                was.gender(), was.driverStatus(), was.flagged(), was.flagReason(),
+                was.language());
     }
 
     /// Everything closing an account deletes, as one transaction: either the
@@ -437,7 +434,7 @@ public class Accounts {
             throw new ResponseStatusException(403, "That is not your current password");
         }
         UserDto was = describe(username);
-        if (was.admin) {
+        if (was.admin()) {
             throw new ResponseStatusException(409, "Hand the admin role on before closing");
         }
         if (cleanup.hasRideUnderWay(username)) {
@@ -563,23 +560,13 @@ public class Accounts {
 
     private static UserDto toDto(Profile profile, List<String> authorities, boolean enabled,
             String driverStatus) {
-        UserDto dto = new UserDto();
-        dto.username = profile.getUsername();
-        dto.displayName = profile.getDisplayName();
-        dto.phone = profile.getPhone();
-        dto.phoneVerified = profile.isPhoneVerified();
-        dto.vehicle = profile.getVehicle();
-        dto.plate = profile.getPlate();
-        dto.rider = authorities.contains("ROLE_" + Roles.RIDER);
-        dto.driver = authorities.contains("ROLE_" + Roles.DRIVER);
-        dto.admin = authorities.contains("ROLE_" + Roles.ADMIN);
-        dto.suspended = !enabled;
-        dto.gender = profile.getGender();
-        dto.language = profile.getLanguage();
-        dto.flagged = profile.isFlagged();
-        dto.flagReason = profile.getFlagReason();
-        dto.driverStatus = driverStatus;
-        return dto;
+        boolean rider = authorities.contains("ROLE_" + Roles.RIDER);
+        boolean driver = authorities.contains("ROLE_" + Roles.DRIVER);
+        boolean admin = authorities.contains("ROLE_" + Roles.ADMIN);
+        return new UserDto(profile.getUsername(), profile.getDisplayName(), profile.getPhone(),
+                profile.isPhoneVerified(), rider, driver, admin, !enabled, profile.getVehicle(),
+                profile.getPlate(), profile.getGender(), driverStatus, profile.isFlagged(),
+                profile.getFlagReason(), profile.getLanguage());
     }
 
     /// An e-mail address as an account name: trimmed, and its ASCII letters in

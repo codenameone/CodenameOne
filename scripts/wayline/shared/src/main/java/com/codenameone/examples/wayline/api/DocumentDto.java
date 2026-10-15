@@ -26,15 +26,10 @@ import com.codename1.annotations.Mapped;
 
 /// One of the documents of a driving application. The picture itself is read
 /// separately, and only by the applicant and the admins.
+///
+/// @param kind `photo_id`, `licence`, `selfie`, `vehicle_registration` or `insurance`.
+/// @param status `missing`, `uploaded`, `accepted` or `rejected`.
+/// @param uploadedAt Milliseconds since the epoch, or 0 when missing.
 @Mapped
-public class DocumentDto {
-    /// `photo_id`, `licence`, `selfie`, `vehicle_registration` or `insurance`.
-    public String kind;
-    /// `missing`, `uploaded`, `accepted` or `rejected`.
-    public String status;
-    /// Milliseconds since the epoch, or 0 when missing.
-    public long uploadedAt;
-
-    public DocumentDto() {
-    }
+public record DocumentDto(String kind, String status, long uploadedAt) {
 }

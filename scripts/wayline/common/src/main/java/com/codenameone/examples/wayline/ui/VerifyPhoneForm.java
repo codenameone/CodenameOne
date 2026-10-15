@@ -53,9 +53,9 @@ public final class VerifyPhoneForm {
         final Form form = Ui.form("Verify your number", "VerifyPhone");
         UserDto user = Session.user();
         Container page = Ui.page();
-        page.add(Ui.text(user == null || user.phone == null
+        page.add(Ui.text(user == null || user.phone() == null
                 ? Lang.tr("We sent a six-digit code to your phone.")
-                : Lang.tr("We sent a six-digit code to {0}.", user.phone), "WlText"));
+                : Lang.tr("We sent a six-digit code to {0}.", user.phone()), "WlText"));
         final SpanLabel demo = Ui.text("", "WlNotice");
         demo.setName("demoCode");
         demo.setHidden(true);
@@ -65,8 +65,7 @@ public final class VerifyPhoneForm {
         error.setName("error");
         final Button verify = Ui.primary("Verify", "submit", null);
         verify.addActionListener(e -> {
-            PhoneCodeDto entered = new PhoneCodeDto();
-            entered.code = code.getText().trim();
+            PhoneCodeDto entered = new PhoneCodeDto(code.getText().trim());
             verify.setEnabled(false);
             error.setText("");
             Api.account().verifyPhone(entered, Net.to(verified -> {
@@ -80,9 +79,9 @@ public final class VerifyPhoneForm {
             }));
         });
         final Runnable send = () -> Api.account().startPhoneVerification(Net.to(challenge -> {
-                    if (challenge.demoCode != null && challenge.demoCode.length() > 0) {
+                    if (challenge.demoCode() != null && challenge.demoCode().length() > 0) {
                         demo.setText(Lang.tr("This is a development server, so no text was "
-                                + "sent. Your code is {0}.", challenge.demoCode));
+                                + "sent. Your code is {0}.", challenge.demoCode()));
                         demo.setHidden(false);
                         Ui.refresh(form);
                     }

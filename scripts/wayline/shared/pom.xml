@@ -29,11 +29,14 @@
     app brings its own, and the server must not receive it at all.
 
     Keep it to what both sides can run. No UI classes, and no JDK API the
-    devices lack.
+    devices lack. The language is Java 17, the app's level, so that the
+    transfer objects are records: both the app's generated mappers and the
+    server's JSON codec build a record through its canonical constructor and
+    read it through its accessors.
   -->
   <properties>
-    <maven.compiler.source>1.8</maven.compiler.source>
-    <maven.compiler.target>1.8</maven.compiler.target>
+    <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.target>17</maven.compiler.target>
   </properties>
 
   <dependencies>

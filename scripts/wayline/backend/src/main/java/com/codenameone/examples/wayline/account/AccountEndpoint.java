@@ -73,7 +73,7 @@ public class AccountEndpoint implements AccountApiServer {
 
     @Override
     public UserDto verifyPhone(PhoneCodeDto code) throws Exception {
-        return phones.verify(Caller.name(), code == null ? null : code.code);
+        return phones.verify(Caller.name(), code == null ? null : code.code());
     }
 
     @Override
@@ -103,12 +103,12 @@ public class AccountEndpoint implements AccountApiServer {
 
     @Override
     public UserDto changePassword(PasswordChangeDto change) throws Exception {
-        return accounts.changePassword(Caller.name(), change == null ? null : change.current,
-                change == null ? null : change.replacement);
+        return accounts.changePassword(Caller.name(), change == null ? null : change.current(),
+                change == null ? null : change.replacement());
     }
 
     @Override
     public UserDto deleteAccount(AccountClosureDto closure) throws Exception {
-        return accounts.close(Caller.name(), closure == null ? null : closure.password);
+        return accounts.close(Caller.name(), closure == null ? null : closure.password());
     }
 }

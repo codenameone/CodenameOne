@@ -27,26 +27,24 @@ import com.codename1.annotations.Mapped;
 import java.util.List;
 
 /// The admin's charts: how the service did, day by day.
+///
+/// @param days Oldest first, every day present.
+/// @param byHour Rides asked for in each hour of the day (UTC), 24 numbers.
+/// @param topDrivers The drivers who completed the most rides in the period; `rides` is that count.
+/// @param averageFare Cents.
+/// @param averageWaitSeconds From a ride being asked for to a driver taking it.
+/// @param completionRate Completed rides over rides asked for, 0 to 1.
 @Mapped
-public class StatsSeriesDto {
-    /// Oldest first, every day present.
-    public List<DayStatsDto> days;
-    /// Rides asked for in each hour of the day (UTC), 24 numbers.
-    public List<Integer> byHour;
-    public List<NameCountDto> byState;
-    public List<NameCountDto> byProduct;
-    /// The drivers who completed the most rides in the period; `rides` is that count.
-    public List<DriverDto> topDrivers;
-    /// Cents.
-    public long averageFare;
-    /// From a ride being asked for to a driver taking it.
-    public double averageWaitSeconds;
-    /// Completed rides over rides asked for, 0 to 1.
-    public double completionRate;
-    public int pendingApplications;
-    public int flaggedUsers;
-    public String currency;
-
-    public StatsSeriesDto() {
-    }
+public record StatsSeriesDto(
+        List<DayStatsDto> days,
+        List<Integer> byHour,
+        List<NameCountDto> byState,
+        List<NameCountDto> byProduct,
+        List<DriverDto> topDrivers,
+        long averageFare,
+        double averageWaitSeconds,
+        double completionRate,
+        int pendingApplications,
+        int flaggedUsers,
+        String currency) {
 }

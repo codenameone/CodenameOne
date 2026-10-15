@@ -25,22 +25,20 @@ package com.codenameone.examples.wayline.api;
 import com.codename1.annotations.Mapped;
 
 /// What rides cost. Amounts are cents; the percentages are of the fare.
+///
+/// @param serviceFeePercent Added to the fare and paid by the rider.
+/// @param commissionPercent Kept from the fare; the rest is the driver's.
+/// @param surgeMultiplier Multiplies every fare while demand is high; 1 otherwise.
 @Mapped
-public class PricingDto {
-    public String currency;
-    public long baseFare;
-    public long perKm;
-    public long perMinute;
-    public long minimumFare;
-    /// Added to the fare and paid by the rider.
-    public double serviceFeePercent;
-    /// Kept from the fare; the rest is the driver's.
-    public double commissionPercent;
-    /// Multiplies every fare while demand is high; 1 otherwise.
-    public double surgeMultiplier;
-    public double comfortMultiplier;
-    public double xlMultiplier;
-
-    public PricingDto() {
-    }
+public record PricingDto(
+        String currency,
+        long baseFare,
+        long perKm,
+        long perMinute,
+        long minimumFare,
+        double serviceFeePercent,
+        double commissionPercent,
+        double surgeMultiplier,
+        double comfortMultiplier,
+        double xlMultiplier) {
 }

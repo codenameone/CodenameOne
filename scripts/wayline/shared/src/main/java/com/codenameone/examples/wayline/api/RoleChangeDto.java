@@ -26,10 +26,5 @@ import com.codename1.annotations.Mapped;
 
 /// The modes an admin grants a user beyond riding.
 @Mapped
-public class RoleChangeDto {
-    public boolean driver;
-    public boolean admin;
-
-    public RoleChangeDto() {
-    }
+public record RoleChangeDto(boolean driver, boolean admin) {
 }

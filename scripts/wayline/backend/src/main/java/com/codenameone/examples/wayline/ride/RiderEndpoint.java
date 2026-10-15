@@ -82,6 +82,6 @@ public class RiderEndpoint implements RiderApiServer {
 
     @Override
     public RideDto rate(String id, RatingDto rating) throws Exception {
-        return rides.rate(Caller.name(), id, rating == null ? 0 : rating.stars);
+        return rides.rate(Caller.name(), id, rating == null ? 0 : rating.stars());
     }
 }

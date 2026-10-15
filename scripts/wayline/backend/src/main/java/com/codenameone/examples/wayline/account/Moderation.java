@@ -89,12 +89,8 @@ public class Moderation {
         List<ModerationEventDto> out = new ArrayList<ModerationEventDto>();
         for (int iter = 0; iter < rows.size(); iter++) {
             ModerationEvent row = rows.get(iter);
-            ModerationEventDto dto = new ModerationEventDto();
-            dto.at = row.getCreatedAt();
-            dto.by = row.getActor();
-            dto.action = row.getAction();
-            dto.reason = row.getReason();
-            out.add(dto);
+            out.add(new ModerationEventDto(row.getCreatedAt(), row.getActor(), row.getAction(),
+                    row.getReason()));
         }
         return out;
     }

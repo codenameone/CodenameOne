@@ -131,7 +131,7 @@ public final class LiveChannel {
         final int mine = ++generation;
         Api.account().liveTicket(Net.to(ticket -> {
             if (mine == generation && wanted) {
-                open(ticket.ticket, mine);
+                open(ticket.ticket(), mine);
             }
         }, (status, message) -> lost(mine)));
     }

@@ -202,14 +202,9 @@ public class DemoAccounts {
             PaymentSetupDto setup = payments.startSetup(username, name);
             // Only a simulated card can be made up. With a real processor
             // configured the demo riders pay cash until someone adds a card.
-            if (!setup.hosted) {
-                CardDto visa = new CardDto();
-                visa.number = "4242424242424242";
-                visa.expMonth = 12;
-                visa.expYear = year() + 3;
-                visa.cvc = "123";
-                visa.holder = name;
-                payments.completeSetup(username, setup.id, visa);
+            if (!setup.hosted()) {
+                CardDto visa = new CardDto("4242424242424242", 12, year() + 3, "123", name);
+                payments.completeSetup(username, setup.id(), visa);
             }
         }
     }
@@ -273,24 +268,16 @@ public class DemoAccounts {
         accounts.create(APPLICANT, PASSWORD, "Avery Applicant", "+15550108", true, "", "", false,
                 false, "male", opened(4));
         applications.open(APPLICANT, "", "");
-        DriverApplicationDto form = new DriverApplicationDto();
-        form.legalName = "Avery Jordan Applicant";
-        form.dateOfBirth = "1992-09-03";
-        form.licenceNumber = "D4471902";
-        form.licenceExpiry = (year() + 3) + "-03-31";
-        form.vehicleMake = "Honda";
-        form.vehicleModel = "Civic";
-        form.vehicleYear = year() - 2;
-        form.vehicleColor = "Grey";
-        form.vehiclePlate = "WAY 207";
-        form.vehicleSeats = 4;
-        form.product = Fares.STANDARD;
+        // What an applicant fills in. The rest (who, the status, the documents,
+        // the dates) is the server's to say and is not read from a form.
+        DriverApplicationDto form = new DriverApplicationDto(null, null, null,
+                "Avery Jordan Applicant", "1992-09-03", "D4471902", (year() + 3) + "-03-31",
+                "Honda", "Civic", year() - 2, "Grey", "WAY 207", 4, Fares.STANDARD, false,
+                false, null, null, 0L, 0L, null);
         applications.save(APPLICANT, form);
         for (int iter = 0; iter < Applications.KINDS.length; iter++) {
-            DocumentUploadDto picture = new DocumentUploadDto();
-            picture.kind = Applications.KINDS[iter];
-            picture.contentType = "image/png";
-            picture.dataBase64 = PLACEHOLDER_PICTURE;
+            DocumentUploadDto picture = new DocumentUploadDto(Applications.KINDS[iter],
+                    "image/png", PLACEHOLDER_PICTURE);
             applications.upload(APPLICANT, picture);
         }
         applications.submit(APPLICANT);

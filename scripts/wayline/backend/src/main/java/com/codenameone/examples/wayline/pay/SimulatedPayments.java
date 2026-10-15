@@ -88,19 +88,19 @@ public class SimulatedPayments implements PaymentProvider {
         if (typed == null) {
             throw new PaymentDeclinedException("Enter the card's details");
         }
-        String number = digits(typed.number);
+        String number = digits(typed.number());
         if (number.length() < 12 || number.length() > 19 || !luhn(number)) {
             throw new PaymentDeclinedException("That is not a card number");
         }
-        int year = typed.expYear < 100 ? typed.expYear + 2000 : typed.expYear;
+        int year = typed.expYear() < 100 ? typed.expYear() + 2000 : typed.expYear();
         String today = Days.iso(System.currentTimeMillis());
         int thisYear = Integer.parseInt(today.substring(0, 4));
         int thisMonth = Integer.parseInt(today.substring(5, 7));
-        if (typed.expMonth < 1 || typed.expMonth > 12 || year > thisYear + 25
-                || year < thisYear || (year == thisYear && typed.expMonth < thisMonth)) {
+        if (typed.expMonth() < 1 || typed.expMonth() > 12 || year > thisYear + 25
+                || year < thisYear || (year == thisYear && typed.expMonth() < thisMonth)) {
             throw new PaymentDeclinedException("That card has expired");
         }
-        String cvc = typed.cvc == null ? "" : typed.cvc.trim();
+        String cvc = typed.cvc() == null ? "" : typed.cvc().trim();
         if (cvc.length() < 3 || cvc.length() > 4 || digits(cvc).length() != cvc.length()) {
             throw new PaymentDeclinedException("Check the card's security code");
         }
@@ -110,7 +110,7 @@ public class SimulatedPayments implements PaymentProvider {
         Card card = new Card();
         card.brand = brand(number);
         card.last4 = number.substring(number.length() - 4);
-        card.expMonth = typed.expMonth;
+        card.expMonth = typed.expMonth();
         card.expYear = year;
         card.token = (FAILS_LATER_NUMBER.equals(number) ? FAILING_TOKEN
                 : FAULTY_NUMBER.equals(number) ? FAULTY_TOKEN

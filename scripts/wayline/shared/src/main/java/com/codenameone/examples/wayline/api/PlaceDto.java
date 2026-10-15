@@ -26,12 +26,5 @@ import com.codename1.annotations.Mapped;
 
 /// A place a search or a reverse lookup found.
 @Mapped
-public class PlaceDto {
-    public String name;
-    public String address;
-    public double lat;
-    public double lng;
-
-    public PlaceDto() {
-    }
+public record PlaceDto(String name, String address, double lat, double lng) {
 }

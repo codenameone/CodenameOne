@@ -26,16 +26,13 @@ import com.codename1.annotations.Mapped;
 
 /// The numbers on the admin dashboard.
 @Mapped
-public class AdminStatsDto {
-    public int users;
-    public int drivers;
-    public int driversOnline;
-    public int ridesToday;
-    public int ridesActive;
-    public int ridesCompleted;
-    public long revenueCents;
-    public String currency;
-
-    public AdminStatsDto() {
-    }
+public record AdminStatsDto(
+        int users,
+        int drivers,
+        int driversOnline,
+        int ridesToday,
+        int ridesActive,
+        int ridesCompleted,
+        long revenueCents,
+        String currency) {
 }

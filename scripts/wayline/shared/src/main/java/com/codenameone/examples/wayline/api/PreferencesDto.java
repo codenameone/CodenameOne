@@ -26,29 +26,27 @@ import com.codename1.annotations.Mapped;
 
 /// How one person wants the app and their rides. Kept on the server, so it
 /// follows the account to another phone.
+///
+/// @param language `en`, `es`, `fr`, `de` or `he`.
+/// @param theme `system`, `light` or `dark`.
+/// @param units `km` or `mi`.
+/// @param driverGender `any` or `women`: whom a ride may be offered to.
+/// @param defaultPaymentMethodId A saved method's id, or `cash`.
+/// @param defaultTipPercent 0, 10, 15 or 20.
+/// @param shareTripsWith The phone number trips are shared with, or empty.
 @Mapped
-public class PreferencesDto {
-    /// `en`, `es`, `fr`, `de` or `he`.
-    public String language;
-    /// `system`, `light` or `dark`.
-    public String theme;
-    /// `km` or `mi`.
-    public String units;
-    public boolean notifyRideUpdates;
-    public boolean notifyReceipts;
-    public boolean notifyPromotions;
-    /// `any` or `women`: whom a ride may be offered to.
-    public String driverGender;
-    public boolean quietRide;
-    public boolean accessibleVehicle;
-    public boolean petFriendly;
-    /// A saved method's id, or `cash`.
-    public String defaultPaymentMethodId;
-    /// 0, 10, 15 or 20.
-    public int defaultTipPercent;
-    /// The phone number trips are shared with, or empty.
-    public String shareTripsWith;
-
-    public PreferencesDto() {
-    }
+public record PreferencesDto(
+        String language,
+        String theme,
+        String units,
+        boolean notifyRideUpdates,
+        boolean notifyReceipts,
+        boolean notifyPromotions,
+        String driverGender,
+        boolean quietRide,
+        boolean accessibleVehicle,
+        boolean petFriendly,
+        String defaultPaymentMethodId,
+        int defaultTipPercent,
+        String shareTripsWith) {
 }

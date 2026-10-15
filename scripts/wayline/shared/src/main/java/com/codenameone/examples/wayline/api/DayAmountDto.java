@@ -25,13 +25,8 @@ package com.codenameone.examples.wayline.api;
 import com.codename1.annotations.Mapped;
 
 /// One day of a driver's earnings.
+///
+/// @param date `yyyy-MM-dd`, in UTC.
 @Mapped
-public class DayAmountDto {
-    /// `yyyy-MM-dd`, in UTC.
-    public String date;
-    public long amount;
-    public int trips;
-
-    public DayAmountDto() {
-    }
+public record DayAmountDto(String date, long amount, int trips) {
 }

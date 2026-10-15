@@ -89,9 +89,9 @@ public class FleetForm extends LiveChannel.Adapter {
         Map<String, CarMarker> gone = new HashMap<String, CarMarker>(cars);
         for (int iter = 0; drivers != null && iter < drivers.size(); iter++) {
             DriverDto driver = drivers.get(iter);
-            if (driver.online) {
-                gone.remove(driver.username);
-                place(driver.username, driver.lat, driver.lng, driver.heading);
+            if (driver.online()) {
+                gone.remove(driver.username());
+                place(driver.username(), driver.lat(), driver.lng(), driver.heading());
             }
         }
         for (Map.Entry<String, CarMarker> left : gone.entrySet()) {

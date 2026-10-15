@@ -137,34 +137,27 @@ public class Rides {
     @Transactional(readOnly = true)
     public FareQuoteDto quote(RideRequestDto request) throws IOException {
         validate(request);
-        FareQuoteDto quote = new FareQuoteDto();
-        quote.distanceMeters = fares.distanceMeters(request);
-        quote.durationSeconds = fares.durationSeconds(request, quote.distanceMeters);
-        quote.currency = fares.currency();
-        String wanted = Fares.product(request.product);
+        double distanceMeters = fares.distanceMeters(request);
+        double durationSeconds = fares.durationSeconds(request, distanceMeters);
+        String wanted = Fares.product(request.product());
         PricingDto pricing = fares.pricing();
         // The drivers who could take it as the rider asked for it, of every
         // kind of car, nearest first; each kind then counts its own.
-        List<Matcher.Candidate> near = matcher.nearby(request.pickupLat, request.pickupLng,
+        List<Matcher.Candidate> near = matcher.nearby(request.pickupLat(), request.pickupLng(),
                 Matcher.FAR_METERS, null, WOMEN.equals(driverGender(request)),
-                request.accessibleVehicle, request.petFriendly);
-        quote.options = new ArrayList<FareOptionDto>();
+                request.accessibleVehicle(), request.petFriendly());
+        List<FareOptionDto> options = new ArrayList<FareOptionDto>();
+        long amountCents = 0L;
+        int driversNearby = 0;
+        int etaSeconds = 0;
         for (int iter = 0; iter < Fares.PRODUCTS.length; iter++) {
             String product = Fares.PRODUCTS[iter];
-            Fares.Price price = Fares.price(pricing, quote.distanceMeters, quote.durationSeconds,
-                    product);
-            FareOptionDto option = new FareOptionDto();
-            option.product = product;
-            option.name = PRODUCT_TEXT[iter][0];
-            option.description = PRODUCT_TEXT[iter][1];
-            option.seats = Integer.parseInt(PRODUCT_TEXT[iter][2]);
-            option.fare = price.fare;
-            option.serviceFee = price.fee;
-            option.total = price.fare + price.fee;
+            Fares.Price price = Fares.price(pricing, distanceMeters, durationSeconds, product);
+            int nearby = 0;
             double nearest = -1d;
             for (int d = 0; d < near.size(); d++) {
                 if (product.equals(near.get(d).product)) {
-                    option.driversNearby++;
+                    nearby++;
                     if (nearest < 0d) {
                         nearest = near.get(d).meters;
                     }
@@ -172,17 +165,19 @@ public class Rides {
             }
             int eta = nearest < 0d ? 0 : (int) Math.max(60d, nearest * Fares.ROAD_FACTOR
                     / Fares.METERS_PER_SECOND);
-            option.etaMinutes = (eta + 59) / 60;
-            quote.options.add(option);
+            options.add(new FareOptionDto(product, PRODUCT_TEXT[iter][0], PRODUCT_TEXT[iter][1],
+                    Integer.parseInt(PRODUCT_TEXT[iter][2]), price.fare, price.fee,
+                    price.fare + price.fee, nearby, (eta + 59) / 60));
             if (product.equals(wanted)) {
                 // The quote's own fields are the kind of ride that was asked
                 // about, which is the standard one for an app that names none.
-                quote.amountCents = price.fare;
-                quote.driversNearby = option.driversNearby;
-                quote.etaSeconds = eta;
+                amountCents = price.fare;
+                driversNearby = nearby;
+                etaSeconds = eta;
             }
         }
-        return quote;
+        return new FareQuoteDto(amountCents, fares.currency(), distanceMeters, durationSeconds,
+                driversNearby, etaSeconds, options);
     }
 
     /// The cars near a point, for the map a rider looks at before asking:
@@ -197,12 +192,8 @@ public class Rides {
         List<NearbyDriverDto> out = new ArrayList<NearbyDriverDto>();
         for (int iter = 0; iter < near.size() && iter < 20; iter++) {
             Matcher.Candidate car = near.get(iter);
-            NearbyDriverDto dto = new NearbyDriverDto();
-            dto.lat = Math.round(car.lat * 10000d) / 10000d;
-            dto.lng = Math.round(car.lng * 10000d) / 10000d;
-            dto.heading = car.heading;
-            dto.product = car.product;
-            out.add(dto);
+            out.add(new NearbyDriverDto(Math.round(car.lat * 10000d) / 10000d,
+                    Math.round(car.lng * 10000d) / 10000d, car.heading, car.product));
         }
         return out;
     }
@@ -230,12 +221,12 @@ public class Rides {
         if (rides.findFirstByRiderAndStateIn(rider, ACTIVE) != null) {
             throw new ResponseStatusException(409, "You already have a ride under way");
         }
-        String product = Fares.product(request.product);
+        String product = Fares.product(request.product());
         boolean womenOnly = WOMEN.equals(driverGender(request));
         // Refused here, before there is a ride, when the card named is not the
         // rider's. With none named it is their default, which is cash until
         // they save a card.
-        String[] method = payments.choose(rider, request.paymentMethodId);
+        String[] method = payments.choose(rider, request.paymentMethodId());
         double meters = fares.distanceMeters(request);
         double seconds = fares.durationSeconds(request, meters);
         PricingDto pricing = fares.pricing();
@@ -249,12 +240,12 @@ public class Rides {
         ride.setId(Ids.next());
         ride.setState(RideState.REQUESTED);
         ride.setRider(rider);
-        ride.setPickupLat(request.pickupLat);
-        ride.setPickupLng(request.pickupLng);
-        ride.setPickupAddress(address(request.pickupAddress));
-        ride.setDropoffLat(request.dropoffLat);
-        ride.setDropoffLng(request.dropoffLng);
-        ride.setDropoffAddress(address(request.dropoffAddress));
+        ride.setPickupLat(request.pickupLat());
+        ride.setPickupLng(request.pickupLng());
+        ride.setPickupAddress(address(request.pickupAddress()));
+        ride.setDropoffLat(request.dropoffLat());
+        ride.setDropoffLng(request.dropoffLng());
+        ride.setDropoffAddress(address(request.dropoffAddress()));
         ride.setFareCents(price.fare);
         ride.setCurrency(fares.currency());
         ride.setDistanceMeters(meters);
@@ -272,10 +263,10 @@ public class Rides {
         ride.setFeeCents(price.fee);
         ride.setDriverCents(price.fare - Fares.commission(pricing, price.fare));
         ride.setWomenOnly(womenOnly);
-        ride.setQuiet(request.quietRide);
-        ride.setWheelchair(request.accessibleVehicle);
-        ride.setNote(address(request.note));
-        ride.setPets(request.petFriendly);
+        ride.setQuiet(request.quietRide());
+        ride.setWheelchair(request.accessibleVehicle());
+        ride.setNote(address(request.note()));
+        ride.setPets(request.petFriendly());
         rides.insert(ride);
         event(ride.getId(), RideState.REQUESTED, rider);
         return ride.getId();
@@ -843,9 +834,7 @@ public class Rides {
     }
 
     static RideDto none() {
-        RideDto dto = new RideDto();
-        dto.state = RideState.NONE;
-        return dto;
+        return RideDto.none();
     }
 
     private RideDto toDto(Ride ride, String viewer, Map<String, Profile> cache)
@@ -859,73 +848,56 @@ public class Rides {
     ///     other, and only while they do.
     private RideDto toDto(Ride ride, String viewer, Map<String, Profile> cache, boolean party)
             throws IOException {
-        RideDto dto = new RideDto();
-        dto.id = ride.getId();
-        dto.state = ride.getState();
+        RideState state = ride.getState();
         // An account's name is the e-mail it signs in with. The other party
         // to a ride is shown a display name, and a phone number while the two
         // are meeting; the address is for its owner and for an admin.
         boolean asRider = !party || (viewer != null && viewer.equals(ride.getRider()));
         boolean asDriver = !party || (viewer != null && viewer.equals(ride.getDriver()));
-        if (asRider) {
-            dto.riderUsername = ride.getRider();
-        }
         Profile rider = profile(ride.getRider(), cache);
-        dto.riderName = rider == null ? "" : rider.getDisplayName();
-        dto.pickupLat = ride.getPickupLat();
-        dto.pickupLng = ride.getPickupLng();
-        dto.pickupAddress = ride.getPickupAddress();
-        dto.dropoffLat = ride.getDropoffLat();
-        dto.dropoffLng = ride.getDropoffLng();
-        dto.dropoffAddress = ride.getDropoffAddress();
-        dto.fareCents = ride.getFareCents();
-        dto.currency = ride.getCurrency();
-        dto.distanceMeters = ride.getDistanceMeters();
-        dto.durationSeconds = ride.getDurationSeconds();
-        dto.requestedAt = ride.getRequestedAt();
-        dto.updatedAt = ride.getUpdatedAt();
-        dto.rating = ride.getStars();
-        dto.paymentStatus = ride.getPaymentStatus();
-        dto.product = ride.getProduct();
-        dto.paymentMethodLabel = ride.getMethodLabel();
-        dto.cash = Payments.CASH.equals(ride.getMethodId());
-        dto.serviceFee = ride.getFeeCents();
-        dto.tip = ride.getTipCents();
-        dto.total = dto.fareCents + dto.serviceFee + dto.tip;
-        dto.driverGender = ride.isWomenOnly() ? WOMEN : DRIVER_GENDERS[0];
-        dto.quietRide = ride.isQuiet();
-        dto.accessibleVehicle = ride.isWheelchair();
-        dto.petFriendly = ride.isPets();
-        dto.note = ride.getNote();
-        dto.driverPhotoInitials = "";
+        // What is known of the driver, filled in below for a ride that has one
+        // this viewer may see.
+        String driverUsername = null;
+        String driverName = null;
+        String driverPhotoInitials = "";
+        String vehicle = null;
+        String plate = null;
+        String driverPhone = null;
+        String riderPhone = null;
+        double driverRating = 0d;
+        double driverLat = 0d;
+        double driverLng = 0d;
+        double driverHeading = 0d;
+        int etaMinutes = 0;
+        int offerExpiresInSeconds = 0;
         String driver = ride.getDriver();
-        boolean offered = RideState.OFFERED == dto.state;
+        boolean offered = RideState.OFFERED == state;
         // An offer is between the server and one driver. Until it is taken the
         // rider has no driver, and is not shown who was asked.
         if (driver.length() > 0 && (!offered || driver.equals(viewer))) {
             if (asDriver) {
-                dto.driverUsername = driver;
+                driverUsername = driver;
             }
             Profile who = profile(driver, cache);
             if (who != null) {
-                dto.driverName = who.getDisplayName();
-                dto.driverPhotoInitials = Text.initials(dto.driverName);
-                dto.vehicle = who.getVehicle();
-                dto.plate = who.getPlate();
+                driverName = who.getDisplayName();
+                driverPhotoInitials = Text.initials(driverName);
+                vehicle = who.getVehicle();
+                plate = who.getPlate();
             }
-            boolean meeting = RideState.ACCEPTED == dto.state
-                    || RideState.ARRIVED == dto.state
-                    || RideState.IN_PROGRESS == dto.state;
+            boolean meeting = RideState.ACCEPTED == state
+                    || RideState.ARRIVED == state
+                    || RideState.IN_PROGRESS == state;
             if (party && meeting && viewer != null) {
                 if (viewer.equals(ride.getRider()) && who != null) {
-                    dto.driverPhone = who.getPhone();
+                    driverPhone = who.getPhone();
                 } else if (viewer.equals(driver) && rider != null) {
-                    dto.riderPhone = rider.getPhone();
+                    riderPhone = rider.getPhone();
                 }
             }
             DriverState car = drivers.findById(driver);
             if (car != null) {
-                dto.driverRating = car.rating();
+                driverRating = car.rating();
             }
             // Where the car is belongs to the ride while it brings the two
             // together and carries one of them. A ride that has ended stays in
@@ -933,25 +905,70 @@ public class Rides {
             // where they are for other people's rides: read from here, a past
             // rider could follow them indefinitely.
             if (car != null && meeting) {
-                dto.driverLat = car.getLat();
-                dto.driverLng = car.getLng();
-                dto.driverHeading = car.getHeading();
+                driverLat = car.getLat();
+                driverLng = car.getLng();
+                driverHeading = car.getHeading();
                 // How long until the car is where it is going next: the pickup
                 // until the rider is in it, the destination after.
-                if (RideState.ACCEPTED == dto.state) {
-                    dto.etaMinutes = minutes(dto.driverLat, dto.driverLng, dto.pickupLat,
-                            dto.pickupLng);
-                } else if (RideState.IN_PROGRESS == dto.state) {
-                    dto.etaMinutes = minutes(dto.driverLat, dto.driverLng, dto.dropoffLat,
-                            dto.dropoffLng);
+                if (RideState.ACCEPTED == state) {
+                    etaMinutes = minutes(driverLat, driverLng, ride.getPickupLat(),
+                            ride.getPickupLng());
+                } else if (RideState.IN_PROGRESS == state) {
+                    etaMinutes = minutes(driverLat, driverLng, ride.getDropoffLat(),
+                            ride.getDropoffLng());
                 }
             }
         }
         if (offered) {
-            dto.offerExpiresInSeconds = (int) Math.max(0L,
+            offerExpiresInSeconds = (int) Math.max(0L,
                     (ride.getOfferExpiresAt() - System.currentTimeMillis()) / 1000L);
         }
-        return dto;
+        long fareCents = ride.getFareCents();
+        long serviceFee = ride.getFeeCents();
+        long tip = ride.getTipCents();
+        return new RideDto(
+                ride.getId(),
+                state,
+                asRider ? ride.getRider() : null,
+                rider == null ? "" : rider.getDisplayName(),
+                driverUsername,
+                driverName,
+                vehicle,
+                plate,
+                driverRating,
+                ride.getPickupLat(),
+                ride.getPickupLng(),
+                ride.getPickupAddress(),
+                ride.getDropoffLat(),
+                ride.getDropoffLng(),
+                ride.getDropoffAddress(),
+                driverLat,
+                driverLng,
+                driverHeading,
+                fareCents,
+                ride.getCurrency(),
+                ride.getDistanceMeters(),
+                ride.getDurationSeconds(),
+                ride.getRequestedAt(),
+                ride.getUpdatedAt(),
+                ride.getStars(),
+                ride.getPaymentStatus(),
+                offerExpiresInSeconds,
+                ride.getProduct(),
+                ride.getMethodLabel(),
+                Payments.CASH.equals(ride.getMethodId()),
+                serviceFee,
+                tip,
+                fareCents + serviceFee + tip,
+                driverPhotoInitials,
+                etaMinutes,
+                ride.isWomenOnly() ? WOMEN : DRIVER_GENDERS[0],
+                ride.isQuiet(),
+                ride.isWheelchair(),
+                ride.isPets(),
+                ride.getNote(),
+                driverPhone,
+                riderPhone);
     }
 
     private static int minutes(double fromLat, double fromLng, double toLat, double toLng) {
@@ -961,7 +978,7 @@ public class Rides {
     }
 
     private static String driverGender(RideRequestDto request) {
-        return Text.oneOf(request.driverGender, DRIVER_GENDERS, DRIVER_GENDERS[0], "the driver");
+        return Text.oneOf(request.driverGender(), DRIVER_GENDERS, DRIVER_GENDERS[0], "the driver");
     }
 
     private Profile profile(String username, Map<String, Profile> cache) {
@@ -974,12 +991,12 @@ public class Rides {
     }
 
     private static void validate(RideRequestDto request) {
-        if (request == null || !Geo.isPoint(request.pickupLat, request.pickupLng)
-                || !Geo.isPoint(request.dropoffLat, request.dropoffLng)) {
+        if (request == null || !Geo.isPoint(request.pickupLat(), request.pickupLng())
+                || !Geo.isPoint(request.dropoffLat(), request.dropoffLng())) {
             throw new ResponseStatusException(400, "Choose where the ride starts and ends");
         }
-        double meters = Geo.meters(request.pickupLat, request.pickupLng, request.dropoffLat,
-                request.dropoffLng);
+        double meters = Geo.meters(request.pickupLat(), request.pickupLng(), request.dropoffLat(),
+                request.dropoffLng());
         if (meters < MIN_METERS) {
             throw new ResponseStatusException(400, "That is too close to need a ride");
         }

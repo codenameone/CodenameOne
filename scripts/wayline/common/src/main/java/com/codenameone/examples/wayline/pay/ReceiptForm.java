@@ -75,69 +75,68 @@ public final class ReceiptForm {
     /// @param admin true to name the rider, which an admin needs and a rider does not
     public static Container page(final ReceiptDto receipt, final boolean admin) {
         Container page = Ui.page();
-        final String currency = receipt.currency;
+        final String currency = receipt.currency();
 
-        Label total = Ui.plain(Ui.money(receipt.total, currency), "WlAmount");
+        Label total = Ui.plain(Ui.money(receipt.total(), currency), "WlAmount");
         total.setName("total");
         page.add(total);
-        Label status = Ui.badge(status(receipt.status), badge(receipt.status));
+        Label status = Ui.badge(status(receipt.status()), badge(receipt.status()));
         status.setName("paymentStatus");
         page.add(FlowLayout.encloseCenter(status));
         page.add(FlowLayout.encloseCenter(Ui.plain(
-                receipt.paidAt > 0 ? Ui.when(receipt.paidAt) : "", "WlMuted")));
+                receipt.paidAt() > 0 ? Ui.when(receipt.paidAt()) : "", "WlMuted")));
 
         Ui.section(page, "Trip");
         Container trip = new Container(BoxLayout.y());
-        trip.add(Ui.row(FontImage.MATERIAL_TRIP_ORIGIN, receipt.pickupName, null, null));
-        trip.add(Ui.row(FontImage.MATERIAL_PLACE, receipt.dropoffName,
-                Ui.distance(receipt.distanceMeters) + Ui.DOT
-                        + Ui.minutes(receipt.durationSeconds), null));
-        if (receipt.driverName != null && receipt.driverName.length() > 0) {
-            trip.add(Ui.row(FontImage.MATERIAL_PERSON, receipt.driverName, receipt.vehicle,
+        trip.add(Ui.row(FontImage.MATERIAL_TRIP_ORIGIN, receipt.pickupName(), null, null));
+        trip.add(Ui.row(FontImage.MATERIAL_PLACE, receipt.dropoffName(),
+                Ui.distance(receipt.distanceMeters()) + Ui.DOT
+                        + Ui.minutes(receipt.durationSeconds()), null));
+        if (receipt.driverName() != null && receipt.driverName().length() > 0) {
+            trip.add(Ui.row(FontImage.MATERIAL_PERSON, receipt.driverName(), receipt.vehicle(),
                     null));
         }
-        if (admin && receipt.riderUsername != null && receipt.riderUsername.length() > 0) {
-            trip.add(Ui.row(FontImage.MATERIAL_HAIL, receipt.riderUsername, "Rider", null));
+        if (admin && receipt.riderUsername() != null && receipt.riderUsername().length() > 0) {
+            trip.add(Ui.row(FontImage.MATERIAL_HAIL, receipt.riderUsername(), "Rider", null));
         }
         page.add(trip);
 
         Ui.section(page, "Fare");
         Container fare = new Container(BoxLayout.y());
         fare.setUIID("WlPanel");
-        fare.add(Ui.fact("Base fare", Ui.money(receipt.baseFare, currency)));
-        fare.add(Ui.fact("Distance", Ui.money(receipt.distanceFare, currency)));
-        fare.add(Ui.fact("Time", Ui.money(receipt.timeFare, currency)));
-        fare.add(Ui.fact("Service fee", Ui.money(receipt.serviceFee, currency)));
-        if (receipt.discount > 0) {
-            fare.add(Ui.fact("Discount", "-" + Ui.money(receipt.discount, currency)));
+        fare.add(Ui.fact("Base fare", Ui.money(receipt.baseFare(), currency)));
+        fare.add(Ui.fact("Distance", Ui.money(receipt.distanceFare(), currency)));
+        fare.add(Ui.fact("Time", Ui.money(receipt.timeFare(), currency)));
+        fare.add(Ui.fact("Service fee", Ui.money(receipt.serviceFee(), currency)));
+        if (receipt.discount() > 0) {
+            fare.add(Ui.fact("Discount", "-" + Ui.money(receipt.discount(), currency)));
         }
-        if (receipt.tip > 0) {
-            Container tipped = Ui.fact("Tip", Ui.money(receipt.tip, currency));
+        if (receipt.tip() > 0) {
+            Container tipped = Ui.fact("Tip", Ui.money(receipt.tip(), currency));
             tipped.getComponentAt(1).setName("tipPaid");
             fare.add(tipped);
         }
-        fare.add(Ui.fact("Total", Ui.money(receipt.total, currency), "WlFactTotal"));
-        fare.add(Ui.fact("Paid with", "cash".equals(receipt.status) ? Lang.tr("Cash")
-                : receipt.methodLabel));
+        fare.add(Ui.fact("Total", Ui.money(receipt.total(), currency), "WlFactTotal"));
+        fare.add(Ui.fact("Paid with", "cash".equals(receipt.status()) ? Lang.tr("Cash")
+                : receipt.methodLabel()));
         page.add(fare);
         return page;
     }
 
     private static void actions(final Form form, final Form previous, Container page,
             final ReceiptDto receipt, final boolean admin) {
-        final String currency = receipt.currency;
-        boolean settled = "paid".equals(receipt.status) || "cash".equals(receipt.status);
-        if (!admin && settled && receipt.tip == 0) {
+        final String currency = receipt.currency();
+        boolean settled = "paid".equals(receipt.status()) || "cash".equals(receipt.status());
+        if (!admin && settled && receipt.tip() == 0) {
             tip(form, previous, page, receipt);
         }
-        if (admin && "paid".equals(receipt.status)) {
+        if (admin && "paid".equals(receipt.status())) {
             page.add(Ui.danger("Refund this ride", "refund", e -> Ui.reason(form,
                     "Refund", Lang.tr("{0} goes back to the card it came from.",
-                            Ui.money(receipt.total, currency)), "Refund",
+                            Ui.money(receipt.total(), currency)), "Refund",
                     why -> {
-                        ReasonDto reason = new ReasonDto();
-                        reason.reason = why;
-                        Api.admin().refundRide(receipt.rideId, reason, Net.to(refunded -> {
+                        ReasonDto reason = new ReasonDto(why);
+                        Api.admin().refundRide(receipt.rideId(), reason, Net.to(refunded -> {
                             Telemetry.rideRefunded("receipt");
                             show(previous, refunded, true);
                         }, Ui::fail));
@@ -149,16 +148,16 @@ public final class ReceiptForm {
     private static void tip(final Form form, final Form previous, Container page,
             final ReceiptDto receipt) {
         Ui.section(page, "Add a tip");
-        page.add(Ui.text(receipt.driverName == null || receipt.driverName.length() == 0
+        page.add(Ui.text(receipt.driverName() == null || receipt.driverName().length() == 0
                 ? Lang.tr("All of it goes to your driver.")
-                : Lang.tr("All of it goes to {0}.", receipt.driverName), "WlMuted"));
-        final long fare = receipt.baseFare + receipt.distanceFare + receipt.timeFare;
+                : Lang.tr("All of it goes to {0}.", receipt.driverName()), "WlMuted"));
+        final long fare = receipt.baseFare() + receipt.distanceFare() + receipt.timeFare();
         String[] labels = new String[PERCENTS.length];
         String[] values = new String[PERCENTS.length];
         for (int iter = 0; iter < PERCENTS.length; iter++) {
             long cents = Math.max(100L, Math.round(fare * PERCENTS[iter] / 100d));
             values[iter] = String.valueOf(cents);
-            labels[iter] = PERCENTS[iter] + "%  " + Ui.money(cents, receipt.currency);
+            labels[iter] = PERCENTS[iter] + "%  " + Ui.money(cents, receipt.currency());
         }
         final TextField custom = new TextField("", Lang.tr("Another amount"), 8, TextArea.DECIMAL);
         custom.setUIID("WlField");
@@ -183,8 +182,7 @@ public final class ReceiptForm {
                 Ui.say("Choose an amount for the tip");
                 return;
             }
-            TipDto tip = new TipDto();
-            tip.amount = cents;
+            TipDto tip = new TipDto(cents);
             // Which of the shares it was, when it was one of them.
             int share = 0;
             for (int iter = 0; iter < amounts.length; iter++) {
@@ -194,7 +192,7 @@ public final class ReceiptForm {
                 }
             }
             final int reported = share;
-            Api.payments().tip(receipt.rideId, tip, Net.to(tipped -> {
+            Api.payments().tip(receipt.rideId(), tip, Net.to(tipped -> {
                 Telemetry.tipped("receipt", reported);
                 Ui.say("Thank you. Your tip was sent.");
                 show(previous, tipped, false);

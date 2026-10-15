@@ -65,7 +65,7 @@ public class PaymentEndpoint implements PaymentApiServer {
     @Override
     public PaymentSetupDto startSetup() throws Exception {
         String who = Caller.name();
-        return payments.startSetup(who, accounts.describe(who).displayName);
+        return payments.startSetup(who, accounts.describe(who).displayName());
     }
 
     @Override
@@ -95,6 +95,6 @@ public class PaymentEndpoint implements PaymentApiServer {
 
     @Override
     public ReceiptDto tip(String id, TipDto tip) throws Exception {
-        return payments.tip(Caller.name(), id, tip == null ? 0L : tip.amount);
+        return payments.tip(Caller.name(), id, tip == null ? 0L : tip.amount());
     }
 }

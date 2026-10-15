@@ -26,15 +26,10 @@ import com.codename1.annotations.Mapped;
 
 /// The answer to asking for a verification code: how long the code that was just
 /// sent stays good.
+///
+/// @param demoCode The code itself, but only from a server that has no way to send a text message
+///     and is running on a development profile. It lets the sample be tried end to end without an
+///     SMS account; a server configured with a real sender leaves it null.
 @Mapped
-public class PhoneChallengeDto {
-    public int expiresInSeconds;
-    /// The code itself, but only from a server that has no way to send a text
-    /// message and is running on a development profile. It lets the sample be
-    /// tried end to end without an SMS account; a server configured with a real
-    /// sender leaves it null.
-    public String demoCode;
-
-    public PhoneChallengeDto() {
-    }
+public record PhoneChallengeDto(int expiresInSeconds, String demoCode) {
 }

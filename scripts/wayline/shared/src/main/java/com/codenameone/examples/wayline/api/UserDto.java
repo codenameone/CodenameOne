@@ -27,34 +27,36 @@ import com.codename1.annotations.Mapped;
 /// Who is signed in, as the app needs to know it: enough to greet them, to
 /// decide which modes to offer, and to tell whether they still owe a phone
 /// verification.
+///
+/// @param username The sign-in name, which is the e-mail address the account was opened with.
+/// @param rider Every account can ride.
+/// @param driver Granted: the account may drive.
+/// @param admin Granted: the account may run the service.
+/// @param suspended Blocked by an admin: the account cannot sign in or call the API.
+/// @param vehicle A driver's car, as riders see it. Empty for anyone else.
+/// @param plate The car's licence plate. Empty for anyone else.
+/// @param gender `unspecified`, `female`, `male` or `nonbinary`.
+/// @param driverStatus Where the account stands on driving: `none`, `draft`, `pending`, `approved`
+///     or `rejected`. The DRIVER role follows `approved`.
+/// @param flagged Marked by an admin for a closer look. The account still works; `suspended` is
+///     what stops one.
+/// @param flagReason Why it was flagged, for the other admins.
+/// @param language The language the app is shown in: `en`, `es`, `fr`, `de` or `he`.
 @Mapped
-public class UserDto {
-    /// The sign-in name, which is the e-mail address the account was opened with.
-    public String username;
-    public String displayName;
-    public String phone;
-    public boolean phoneVerified;
-    /// Every account can ride; the other two modes are granted.
-    public boolean rider;
-    public boolean driver;
-    public boolean admin;
-    /// Blocked by an admin: the account cannot sign in or call the API.
-    public boolean suspended;
-    /// A driver's car, as riders see it. Empty for anyone else.
-    public String vehicle;
-    public String plate;
-    /// `unspecified`, `female`, `male` or `nonbinary`.
-    public String gender;
-    /// Where the account stands on driving: `none`, `draft`, `pending`, `approved`
-    /// or `rejected`. The DRIVER role follows `approved`.
-    public String driverStatus;
-    /// Marked by an admin for a closer look. The account still works; `suspended`
-    /// is what stops one.
-    public boolean flagged;
-    public String flagReason;
-    /// The language the app is shown in: `en`, `es`, `fr`, `de` or `he`.
-    public String language;
-
-    public UserDto() {
-    }
+public record UserDto(
+        String username,
+        String displayName,
+        String phone,
+        boolean phoneVerified,
+        boolean rider,
+        boolean driver,
+        boolean admin,
+        boolean suspended,
+        String vehicle,
+        String plate,
+        String gender,
+        String driverStatus,
+        boolean flagged,
+        String flagReason,
+        String language) {
 }

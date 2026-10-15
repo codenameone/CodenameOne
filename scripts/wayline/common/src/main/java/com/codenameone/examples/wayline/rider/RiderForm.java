@@ -99,6 +99,11 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
     private FareQuoteDto fare;
     /// The ride on screen: under way, or just finished and not yet dismissed.
     private RideDto ride;
+    /// Where the ride's car is: as the ride last said, or as the live channel
+    /// said since, which is more recent than any poll.
+    private double carLat;
+    private double carLng;
+    private double carHeading;
     /// What the sheet is showing, so that a poll that changes nothing leaves
     /// it alone.
     private String showing = "";
@@ -120,14 +125,14 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
         menu.item(FontImage.MATERIAL_HISTORY, "Your rides", "history",
                 () -> RideListForm.show(form, "Your rides", cb -> Api.rider().history(cb), false,
                         (list, picked) -> {
-                            if (RideState.COMPLETED == picked.state) {
-                                ReceiptForm.open(list, picked.id);
+                            if (RideState.COMPLETED == picked.state()) {
+                                ReceiptForm.open(list, picked.id());
                             }
                         }));
         menu.item(FontImage.MATERIAL_ACCOUNT_BALANCE_WALLET, "Wallet", "wallet",
                 () -> WalletForm.show(form));
         UserDto user = Session.user();
-        if (!user.driver) {
+        if (!user.driver()) {
             menu.item(FontImage.MATERIAL_DIRECTIONS_CAR, "Drive with Wayline", "drive",
                     () -> Nav.switchTo(Nav.DRIVER));
         }
@@ -162,8 +167,8 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
     public void start() {
         idle();
         Api.geo().reverse(here.getLatitude(), here.getLongitude(), Net.to(place -> {
-            if (place != null && place.name != null && place.name.length() > 0) {
-                hereAddress = place.name;
+            if (place != null && place.name() != null && place.name().length() > 0) {
+                hereAddress = place.name();
             }
         }, QUIET));
     }
@@ -177,7 +182,7 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
 
     private void poll() {
         polls++;
-        if (ride == null || !ride.state.isActive()) {
+        if (ride == null || !ride.state().isActive()) {
             // Nothing to follow, so the map shows who is about: often enough
             // to see them move, seldom enough to cost nothing.
             if (ride == null && polls % 2 == 0) {
@@ -193,7 +198,7 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
 
     private void refresh() {
         if (ride != null) {
-            final String id = ride.id;
+            final String id = ride.id();
             Api.rider().ride(id, Net.to(this::update, QUIET));
         } else {
             Api.rider().active(Net.to(this::update, QUIET));
@@ -207,31 +212,34 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
 
     @Override
     public void driverMoved(String rideId, double lat, double lng, double heading) {
-        if (ride != null && ride.id.equals(rideId)) {
-            ride.driverLat = lat;
-            ride.driverLng = lng;
-            ride.driverHeading = heading;
+        if (ride != null && ride.id().equals(rideId)) {
+            carLat = lat;
+            carLng = lng;
+            carHeading = heading;
             car();
         }
     }
 
     private void update(RideDto latest) {
-        if (latest == null || RideState.NONE == latest.state) {
+        if (latest == null || RideState.NONE == latest.state()) {
             return;
         }
-        boolean first = ride == null || !ride.id.equals(latest.id);
+        boolean first = ride == null || !ride.id().equals(latest.id());
         // Seen to end here, and not found already over when the app started.
-        if (!first && RideState.COMPLETED != ride.state
-                && RideState.COMPLETED == latest.state) {
-            Telemetry.rideCompleted("rider", latest.fareCents, latest.cash);
+        if (!first && RideState.COMPLETED != ride.state()
+                && RideState.COMPLETED == latest.state()) {
+            Telemetry.rideCompleted("rider", latest.fareCents(), latest.cash());
         }
         ride = latest;
+        carLat = latest.driverLat();
+        carLng = latest.driverLng();
+        carHeading = latest.driverHeading();
         if (first) {
             clearNearby();
             draw();
         }
         car();
-        String now = latest.id + ":" + latest.state;
+        String now = latest.id() + ":" + latest.state();
         if (!now.equals(showing)) {
             showing = now;
             rideDisplay();
@@ -256,7 +264,7 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
             return paying;
         }
         for (int iter = 0; methods != null && iter < methods.size(); iter++) {
-            if (methods.get(iter).isDefault) {
+            if (methods.get(iter).isDefault()) {
                 return methods.get(iter);
             }
         }
@@ -280,7 +288,7 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
         nearby.clear();
         for (int iter = 0; cars != null && iter < cars.size(); iter++) {
             NearbyDriverDto found = cars.get(iter);
-            LatLng at = new LatLng(found.lat, found.lng);
+            LatLng at = new LatLng(found.lat(), found.lng());
             int closest = -1;
             double least = 0;
             for (int other = 0; other < free.size(); other++) {
@@ -292,10 +300,10 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
             }
             if (closest >= 0) {
                 CarMarker moved = free.remove(closest);
-                moved.moveTo(at, found.heading);
+                moved.moveTo(at, found.heading());
                 nearby.add(moved);
             } else {
-                nearby.add(new CarMarker(stage.map, form, at, found.heading));
+                nearby.add(new CarMarker(stage.map, form, at, found.heading()));
             }
         }
         for (int iter = 0; iter < free.size(); iter++) {
@@ -344,12 +352,12 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
 
     /// Draws the ride's two ends, and its route once that is known.
     private void draw() {
-        final String id = ride.id;
-        final LatLng pickup = new LatLng(ride.pickupLat, ride.pickupLng);
-        final LatLng dropoff = new LatLng(ride.dropoffLat, ride.dropoffLng);
+        final String id = ride.id();
+        final LatLng pickup = new LatLng(ride.pickupLat(), ride.pickupLng());
+        final LatLng dropoff = new LatLng(ride.dropoffLat(), ride.dropoffLng());
         draw(pickup, dropoff, null);
         Routes.find(pickup, dropoff, route -> {
-            if (ride != null && ride.id.equals(id)) {
+            if (ride != null && ride.id().equals(id)) {
                 draw(pickup, dropoff, route);
                 car();
             }
@@ -361,10 +369,10 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
     private void car() {
         // By the driver's name: the server keeps the driver's sign-in address
         // to the driver.
-        boolean assigned = ride != null && ride.driverName != null
-                && ride.driverName.length() > 0 && ride.state.isActive()
-                && RideState.OFFERED != ride.state
-                && (ride.driverLat != 0 || ride.driverLng != 0);
+        boolean assigned = ride != null && ride.driverName() != null
+                && ride.driverName().length() > 0 && ride.state().isActive()
+                && RideState.OFFERED != ride.state()
+                && (carLat != 0 || carLng != 0);
         if (!assigned) {
             if (car != null) {
                 car.remove();
@@ -375,22 +383,22 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
             }
             return;
         }
-        LatLng at = new LatLng(ride.driverLat, ride.driverLng);
+        LatLng at = new LatLng(carLat, carLng);
         boolean first = false;
         if (car == null) {
-            car = new CarMarker(stage.map, form, at, ride.driverHeading);
+            car = new CarMarker(stage.map, form, at, carHeading);
             first = true;
         } else {
-            car.moveTo(at, ride.driverHeading);
+            car.moveTo(at, carHeading);
         }
         stage.map.repaint();
-        if (RideState.ARRIVED == ride.state) {
+        if (RideState.ARRIVED == ride.state()) {
             stage.chip(Lang.tr("Your driver is here"), FontImage.MATERIAL_PLACE);
             return;
         }
-        boolean aboard = RideState.IN_PROGRESS == ride.state;
-        double meters = Maps.meters(at, aboard ? new LatLng(ride.dropoffLat, ride.dropoffLng)
-                : new LatLng(ride.pickupLat, ride.pickupLng));
+        boolean aboard = RideState.IN_PROGRESS == ride.state();
+        double meters = Maps.meters(at, aboard ? new LatLng(ride.dropoffLat(), ride.dropoffLng())
+                : new LatLng(ride.pickupLat(), ride.pickupLng()));
         stage.chip(Lang.tr(aboard ? "{0} to destination" : "Pickup in {0}",
                 Ui.minutes(meters / CITY_SPEED)) + Ui.DOT + Ui.distance(meters),
                 FontImage.MATERIAL_SCHEDULE);
@@ -401,12 +409,12 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
     }
 
     private void recentre() {
-        if (ride != null && ride.state.isActive()) {
-            stage.frame(new LatLng(ride.pickupLat, ride.pickupLng),
-                    new LatLng(ride.dropoffLat, ride.dropoffLng), car == null ? null
+        if (ride != null && ride.state().isActive()) {
+            stage.frame(new LatLng(ride.pickupLat(), ride.pickupLng()),
+                    new LatLng(ride.dropoffLat(), ride.dropoffLng()), car == null ? null
                             : car.position());
         } else if (destination != null) {
-            stage.frame(here, new LatLng(destination.lat, destination.lng));
+            stage.frame(here, new LatLng(destination.lat(), destination.lng()));
         } else {
             stage.center(here, Maps.STREET_ZOOM);
         }
@@ -459,9 +467,9 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
         header(null);
         UserDto user = Session.user();
         Container peek = sheet.peek();
-        peek.add(Ui.label(Lang.tr("Hello, {0}", firstName(user.displayName)), "WlHeading"));
+        peek.add(Ui.label(Lang.tr("Hello, {0}", firstName(user.displayName())), "WlHeading"));
         peek.add(Ui.label("Where are you going?", "WlMuted"));
-        if (!user.phoneVerified) {
+        if (!user.phoneVerified()) {
             peek.add(Ui.text("Verify your phone number to request a ride.", "WlNotice"));
             peek.add(Ui.link("Verify now", "verify",
                     e -> VerifyPhoneForm.show(() -> new RiderForm().show())));
@@ -475,8 +483,8 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
         List<PlaceDto> recents = Prefs.recents();
         for (int iter = 0; iter < recents.size(); iter++) {
             final PlaceDto place = recents.get(iter);
-            sheet.more().add(Ui.tap(Ui.row(FontImage.MATERIAL_SCHEDULE, place.name, place.address,
-                    null), "recent-" + iter, e -> go(place)));
+            sheet.more().add(Ui.tap(Ui.row(FontImage.MATERIAL_SCHEDULE, place.name(),
+                    place.address(), null), "recent-" + iter, e -> go(place)));
         }
         sheet.ready(false);
         loadNearby();
@@ -505,17 +513,18 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
 
     /// A destination is chosen.
     private void go(final PlaceDto place) {
-        if (place.lat == 0 && place.lng == 0) {
+        if (place.lat() == 0 && place.lng() == 0) {
             // A place that came with the account from another device: the
             // server keeps what it is called, and where that is is looked up.
-            Api.geo().search(place.name, here.getLatitude(), here.getLongitude(), Net.to(found -> {
+            double lat = here.getLatitude();
+            double lng = here.getLongitude();
+            Api.geo().search(place.name(), lat, lng, Net.to(found -> {
                 if (found == null || found.isEmpty()) {
                     Ui.say("That place could not be found. Choose it again.");
                     return;
                 }
-                place.lat = found.get(0).lat;
-                place.lng = found.get(0).lng;
-                go(place);
+                go(new PlaceDto(place.name(), place.address(), found.get(0).lat(),
+                        found.get(0).lng()));
             }, Ui::fail));
             return;
         }
@@ -527,13 +536,13 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
     /// The route to the destination, and what it would cost.
     private void quote() {
         display("quote");
-        header(destination.name);
-        sheet.peek().add(Ui.label(destination.name, "WlHeading"));
+        header(destination.name());
+        sheet.peek().add(Ui.label(destination.name(), "WlHeading"));
         sheet.peek().add(Ui.label("Working out the fare", "WlMuted"));
         sheet.peek().add(FlowLayout.encloseCenter(new Pulse()));
         sheet.ready(false);
         final PlaceDto chosen = destination;
-        final LatLng to = new LatLng(chosen.lat, chosen.lng);
+        final LatLng to = new LatLng(chosen.lat(), chosen.lng());
         Routes.find(here, to, route -> {
             if (destination != chosen) { //NOPMD CompareObjectsWithEquals
                 return;
@@ -544,8 +553,8 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
             Api.rider().quote(request, Net.to(quoted -> {
                 if (destination == chosen) { //NOPMD CompareObjectsWithEquals
                     fare = quoted;
-                    Telemetry.rideQuoted(quoted.options == null ? 0 : quoted.options.size(),
-                            quoted.distanceMeters);
+                    Telemetry.rideQuoted(quoted.options() == null ? 0 : quoted.options().size(),
+                            quoted.distanceMeters());
                     offer();
                 }
             }, (status, message) -> {
@@ -557,20 +566,10 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
 
     /// The request, with what the rider asked for in Settings.
     private RideRequestDto request() {
-        RideRequestDto request = new RideRequestDto();
-        request.pickupLat = here.getLatitude();
-        request.pickupLng = here.getLongitude();
-        request.pickupAddress = hereAddress;
-        request.dropoffLat = destination.lat;
-        request.dropoffLng = destination.lng;
-        request.dropoffAddress = destination.name;
-        request.distanceMeters = way.meters;
-        request.durationSeconds = way.seconds;
-        request.paymentMethodId = Prefs.paymentMethod();
-        request.driverGender = Prefs.driverGender();
-        request.quietRide = Prefs.quietRide();
-        request.accessibleVehicle = Prefs.accessibleVehicle();
-        return request;
+        return new RideRequestDto(here.getLatitude(), here.getLongitude(), hereAddress,
+                destination.lat(), destination.lng(), destination.name(), way.meters, way.seconds,
+                Prefs.paymentMethod(), null, Prefs.driverGender(), Prefs.quietRide(),
+                Prefs.accessibleVehicle(), Prefs.petFriendly(), null);
     }
 
     /// The offer: the kinds of car there are and what each costs, how it is
@@ -583,45 +582,52 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
         // a chip in it would sit on the pins.
         stage.chip(null, (char) 0);
         Container peek = sheet.peek();
-        Label length = Ui.plain(Ui.distance(fare.distanceMeters) + Ui.DOT
-                + Ui.minutes(fare.durationSeconds), "WlMuted");
+        Label length = Ui.plain(Ui.distance(fare.distanceMeters()) + Ui.DOT
+                + Ui.minutes(fare.durationSeconds()), "WlMuted");
         length.setName("tripLength");
         Container headed = new Container(new BorderLayout());
         headed.add(BorderLayout.CENTER, Ui.label("Choose a ride", "WlHeading"));
         headed.add(BorderLayout.EAST, FlowLayout.encloseCenterMiddle(length));
         peek.add(headed);
         FareOptionDto picked = null;
-        List<FareOptionDto> options = fare.options;
+        List<FareOptionDto> options = fare.options();
         for (int iter = 0; options != null && iter < options.size(); iter++) {
             final FareOptionDto option = options.get(iter);
-            boolean mine = option.product.equals(product);
+            boolean mine = option.product().equals(product);
             if (mine) {
                 picked = option;
             }
             peek.add(option(option, mine));
         }
-        long price = picked == null ? fare.amountCents : picked.total;
-        Label total = Ui.plain(Ui.money(price, fare.currency), "WlRowValue");
+        long price = picked == null ? fare.amountCents() : picked.total();
+        Label total = Ui.plain(Ui.money(price, fare.currency()), "WlRowValue");
         total.setName("fare");
         final PaymentMethodDto method = method();
-        Container pay = Ui.row(method == null || "cash".equals(method.kind)
+        Container pay = Ui.row(method == null || "cash".equals(method.kind())
                 ? FontImage.MATERIAL_PAYMENTS : FontImage.MATERIAL_CREDIT_CARD,
                 WalletForm.label(method), asked(), total);
         ((Label) ((Container) pay.getComponentAt(1)).getComponentAt(0)).setName("payWith");
         peek.add(Ui.tap(pay, "payment", e -> WalletForm.pick(form,
-                method == null ? Prefs.PAYMENT_CASH : method.id, chosen -> {
+                method == null ? Prefs.PAYMENT_CASH : method.id(), chosen -> {
                     paying = chosen;
                     offer();
                 })));
         final Button go = Ui.primary(picked == null ? Lang.tr("Request ride")
-                : Lang.tr("Request {0}", Lang.tr(picked.name)), "request", null);
+                : Lang.tr("Request {0}", Lang.tr(picked.name())), "request", null);
         go.addActionListener(e -> {
             go.setEnabled(false);
-            request.product = product;
             PaymentMethodDto with = method();
-            request.paymentMethodId = with == null ? Prefs.PAYMENT_CASH : with.id;
-            final boolean cash = with == null || "cash".equals(with.kind);
-            Api.rider().request(request, Net.to(asked -> {
+            // The trip that was quoted, as the kind of car and the payment
+            // chosen on this sheet.
+            RideRequestDto q = request;
+            RideRequestDto asking = new RideRequestDto(q.pickupLat(), q.pickupLng(),
+                    q.pickupAddress(), q.dropoffLat(), q.dropoffLng(), q.dropoffAddress(),
+                    q.distanceMeters(), q.durationSeconds(),
+                    with == null ? Prefs.PAYMENT_CASH : with.id(), product, q.driverGender(),
+                    q.quietRide(), q.accessibleVehicle(), q.petFriendly(), q.note());
+            request = asking;
+            final boolean cash = with == null || "cash".equals(with.kind());
+            Api.rider().request(asking, Net.to(asked -> {
                 Telemetry.rideRequested(product, cash);
                 update(asked);
             }, (status, message) -> {
@@ -632,7 +638,7 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
         peek.add(go);
         peek.add(Ui.link("Cancel", "back", e -> idle()));
         sheet.ready(false);
-        stage.frame(here, new LatLng(destination.lat, destination.lng));
+        stage.frame(here, new LatLng(destination.lat(), destination.lng()));
     }
 
     /// One kind of car: what it is, how long until one comes, what it costs.
@@ -640,27 +646,27 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
         Container row = new Container(new BorderLayout());
         row.setUIID(picked ? "WlOptionPicked" : "WlOption");
         Label icon = new Label("", "WlOptionIcon");
-        Ui.icon(icon, "xl".equals(option.product)
-                ? FontImage.MATERIAL_AIRPORT_SHUTTLE : "comfort".equals(option.product)
+        Ui.icon(icon, "xl".equals(option.product())
+                ? FontImage.MATERIAL_AIRPORT_SHUTTLE : "comfort".equals(option.product())
                 ? FontImage.MATERIAL_LOCAL_TAXI : FontImage.MATERIAL_DIRECTIONS_CAR, 4.4f);
         row.add(BorderLayout.WEST, FlowLayout.encloseCenterMiddle(icon));
         Container lines = new Container(BoxLayout.y());
         // How many it seats sits beside the name as a figure, which leaves
         // the line under it for how far off a car is, whole in any language.
-        Label seats = Ui.plain(String.valueOf(option.seats), "WlRowDetail");
+        Label seats = Ui.plain(String.valueOf(option.seats()), "WlRowDetail");
         Ui.icon(seats, FontImage.MATERIAL_PERSON, 2.5f);
         Container named = new Container(new BorderLayout());
-        named.add(BorderLayout.WEST, Ui.label(option.name, "WlRowTitle"));
+        named.add(BorderLayout.WEST, Ui.label(option.name(), "WlRowTitle"));
         named.add(BorderLayout.CENTER, seats);
         lines.add(named);
-        lines.add(Ui.plain(option.driversNearby == 0 ? Lang.tr("None nearby")
-                : Lang.tr("{0} away", Ui.minutes(option.etaMinutes * 60d)), "WlRowDetail"));
+        lines.add(Ui.plain(option.driversNearby() == 0 ? Lang.tr("None nearby")
+                : Lang.tr("{0} away", Ui.minutes(option.etaMinutes() * 60d)), "WlRowDetail"));
         row.add(BorderLayout.CENTER, lines);
-        Label price = Ui.plain(Ui.money(option.total, fare.currency), "WlRowValue");
-        price.setName("price-" + option.product);
+        Label price = Ui.plain(Ui.money(option.total(), fare.currency()), "WlRowValue");
+        price.setName("price-" + option.product());
         row.add(BorderLayout.EAST, FlowLayout.encloseCenterMiddle(price));
-        return Ui.tap(row, "product-" + option.product, e -> {
-            product = option.product;
+        return Ui.tap(row, "product-" + option.product(), e -> {
+            product = option.product();
             offer();
         });
     }
@@ -686,15 +692,15 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
     /// A ride exists: the sheet is its state.
     private void rideDisplay() {
         sheet.reset();
-        RideState state = ride.state;
+        RideState state = ride.state();
         Label title = Ui.label(Ui.state(state), "WlHeading");
         title.setName("rideState");
         Container peek = sheet.peek();
-        header(ride.dropoffAddress);
+        header(ride.dropoffAddress());
         if (RideState.REQUESTED == state || RideState.OFFERED == state) {
             stage.chip(null, (char) 0);
             peek.add(title);
-            peek.add(Ui.label(Lang.tr("To {0}", ride.dropoffAddress), "WlMuted"));
+            peek.add(Ui.label(Lang.tr("To {0}", ride.dropoffAddress()), "WlMuted"));
             peek.add(FlowLayout.encloseCenter(new Pulse()));
             peek.add(cancelButton());
         } else if (state.isActive()) {
@@ -702,9 +708,9 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
             peek.add(driverCard());
             peek.add(actions(RideState.IN_PROGRESS != state));
             Container more = sheet.more();
-            more.add(Ui.row(FontImage.MATERIAL_TRIP_ORIGIN, ride.pickupAddress, null, null));
-            more.add(Ui.row(FontImage.MATERIAL_PLACE, ride.dropoffAddress, null,
-                    Ui.label(Ui.money(ride.fareCents, ride.currency), "WlRowValue")));
+            more.add(Ui.row(FontImage.MATERIAL_TRIP_ORIGIN, ride.pickupAddress(), null, null));
+            more.add(Ui.row(FontImage.MATERIAL_PLACE, ride.dropoffAddress(), null,
+                    Ui.label(Ui.money(ride.fareCents(), ride.currency()), "WlRowValue")));
             more.add(Ui.row(FontImage.MATERIAL_PAYMENTS, "Payment", paid(), null));
         } else if (RideState.COMPLETED == state) {
             stage.chip(null, (char) 0);
@@ -726,31 +732,31 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
     private Container driverCard() {
         Container card = new Container(new BorderLayout());
         card.setUIID("WlDriverCard");
-        String initials = ride.driverPhotoInitials;
-        Label face = Ui.avatar(ride.driverName);
+        String initials = ride.driverPhotoInitials();
+        Label face = Ui.avatar(ride.driverName());
         if (initials != null && initials.length() > 0) {
             face.setText(initials);
         }
         Container lines = new Container(BoxLayout.y());
-        Label name = Ui.plain(ride.driverName, "WlRowTitle");
+        Label name = Ui.plain(ride.driverName(), "WlRowTitle");
         Ui.shrink(name, 2.8f);
         lines.add(name);
         // The rating leads the line about the car, with its star.
-        Label car = Ui.plain(ride.driverRating > 0
-                ? Ui.tenths(ride.driverRating) + Ui.DOT + ride.vehicle : ride.vehicle,
+        Label car = Ui.plain(ride.driverRating() > 0
+                ? Ui.tenths(ride.driverRating()) + Ui.DOT + ride.vehicle() : ride.vehicle(),
                 "WlRowDetail");
-        if (ride.driverRating > 0) {
+        if (ride.driverRating() > 0) {
             Ui.icon(car, FontImage.MATERIAL_STAR, 2.5f);
         }
         Ui.shrink(car, 2.2f);
         lines.add(car);
-        if (ride.plate != null && ride.plate.length() > 0) {
+        if (ride.plate() != null && ride.plate().length() > 0) {
             // The plate has a line of its own: beside the name it cut the
             // name short on a narrow phone.
             Label plate = new Label("", "WlPlate");
             // A plate is a plate in any language.
             plate.setShouldLocalize(false);
-            plate.setText(ride.plate);
+            plate.setText(ride.plate());
             lines.add(FlowLayout.encloseIn(plate));
         }
         card.add(BorderLayout.WEST, FlowLayout.encloseCenterMiddle(face));
@@ -767,11 +773,11 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
         actions.add(Ui.action(FontImage.MATERIAL_CALL, "Call", "call", e -> call()));
         actions.add(Ui.action(FontImage.MATERIAL_SMS, "Message", "message", e -> message()));
         actions.add(Ui.action(FontImage.MATERIAL_SHARE, "Share", "share", e -> CN.share(
-                Lang.tr("I am on my way to {0} with {1} in a {2} ({3}).", ride.dropoffAddress,
-                        ride.driverName, ride.vehicle, ride.plate), null, null)));
+                Lang.tr("I am on my way to {0} with {1} in a {2} ({3}).", ride.dropoffAddress(),
+                        ride.driverName(), ride.vehicle(), ride.plate()), null, null)));
         if (cancellable) {
-            final String id = ride.id;
-            final RideState state = ride.state;
+            final String id = ride.id();
+            final RideState state = ride.state();
             Button cancel = Ui.action(FontImage.MATERIAL_CLOSE, "Cancel", "cancel",
                     e -> Api.rider().cancel(id, Net.to(cancelled -> {
                         Telemetry.rideCancelled("rider", state);
@@ -784,7 +790,7 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
     }
 
     private void call() {
-        String number = ride == null ? null : ride.driverPhone;
+        String number = ride == null ? null : ride.driverPhone();
         if (number == null || number.length() == 0 || !CN.canDial()) {
             Ui.say("Calling is not available on this device");
             return;
@@ -793,7 +799,7 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
     }
 
     private void message() {
-        String number = ride == null ? null : ride.driverPhone;
+        String number = ride == null ? null : ride.driverPhone();
         if (number == null || number.length() == 0) {
             Ui.say("Your driver cannot be messaged right now");
             return;
@@ -806,13 +812,13 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
     }
 
     private String paid() {
-        String label = ride.paymentMethodLabel;
-        return ride.cash || label == null || label.length() == 0 ? Lang.tr("Cash") : label;
+        String label = ride.paymentMethodLabel();
+        return ride.cash() || label == null || label.length() == 0 ? Lang.tr("Cash") : label;
     }
 
     private Button cancelButton() {
-        final String id = ride.id;
-        final RideState state = ride.state;
+        final String id = ride.id();
+        final RideState state = ride.state();
         return Ui.danger("Cancel ride", "cancel",
                 e -> Api.rider().cancel(id, Net.to(cancelled -> {
                     Telemetry.rideCancelled("rider", state);
@@ -827,27 +833,27 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
         Container peek = sheet.peek();
         Label title = Ui.label("You have arrived", "WlHeading");
         title.setName("rideState");
-        Label price = Ui.plain(Ui.money(ride.total > 0 ? ride.total : ride.fareCents,
-                ride.currency), "WlPrice");
+        Label price = Ui.plain(Ui.money(ride.total() > 0 ? ride.total() : ride.fareCents(),
+                ride.currency()), "WlPrice");
         price.setName("fare");
         Container top = new Container(new BorderLayout());
         top.add(BorderLayout.CENTER, title);
         top.add(BorderLayout.EAST, price);
         peek.add(top);
-        Label how = Ui.plain(Ui.distance(ride.distanceMeters) + Ui.DOT
-                + Ui.minutes(ride.durationSeconds) + Ui.DOT + paid(), "WlMuted");
+        Label how = Ui.plain(Ui.distance(ride.distanceMeters()) + Ui.DOT
+                + Ui.minutes(ride.durationSeconds()) + Ui.DOT + paid(), "WlMuted");
         how.setName("paidWith");
         peek.add(how);
-        if ("FAILED".equals(ride.paymentStatus)) {
+        if ("FAILED".equals(ride.paymentStatus())) {
             peek.add(Ui.text("The card was declined. Choose another way to pay in your "
                     + "wallet.", "WlNotice"));
         }
         SpanLabel asked = Ui.text("", "WlText");
         asked.setShouldLocalize(false);
-        asked.setText(Lang.tr("How was the ride with {0}?", ride.driverName));
+        asked.setText(Lang.tr("How was the ride with {0}?", ride.driverName()));
         peek.add(asked);
         final Container stars = new Container(new FlowLayout(CN.CENTER));
-        final String id = ride.id;
+        final String id = ride.id();
         for (int star = 1; star <= 5; star++) {
             final int given = star;
             Button button = new Button("", "WlStar");
@@ -860,8 +866,7 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
                                     : FontImage.MATERIAL_STAR_BORDER, 5.6f);
                 }
                 stars.revalidate();
-                RatingDto rating = new RatingDto();
-                rating.stars = given;
+                RatingDto rating = new RatingDto(given);
                 Api.rider().rate(id, rating, Net.to(rated -> Telemetry.rated(given),
                         Ui::fail));
             });
@@ -869,19 +874,18 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
         }
         peek.add(stars);
         final int[] percent = {Prefs.tipPercent()};
-        boolean tippable = "PAID".equals(ride.paymentStatus) && ride.tip == 0;
+        boolean tippable = "PAID".equals(ride.paymentStatus()) && ride.tip() == 0;
         if (tippable) {
             peek.add(Ui.label("Tip", "WlLabel"));
             peek.add(Ui.choice("tip", new String[] {"None", "10%", "15%", "20%"},
                     new String[] {"0", "10", "15", "20"}, String.valueOf(percent[0]),
                     value -> percent[0] = Integer.parseInt(value)));
         }
-        final long fareCents = ride.fareCents;
+        final long fareCents = ride.fareCents();
         final boolean tipping = tippable;
         peek.add(Ui.primary("Done", "done", e -> {
             if (tipping && percent[0] > 0) {
-                TipDto tip = new TipDto();
-                tip.amount = Math.max(100L, Math.round(fareCents * percent[0] / 100d));
+                TipDto tip = new TipDto(Math.max(100L, Math.round(fareCents * percent[0] / 100d)));
                 final int share = percent[0];
                 Api.payments().tip(id, tip, Net.to(tipped -> {
                     Telemetry.tipped("ride", share);
@@ -892,9 +896,9 @@ public class RiderForm extends LiveChannel.Adapter implements Nav.Home {
         }));
         peek.add(Ui.link("View receipt", "receipt", e -> ReceiptForm.open(form, id)));
         Container more = sheet.more();
-        more.add(Ui.row(FontImage.MATERIAL_TRIP_ORIGIN, ride.pickupAddress, null, null));
-        more.add(Ui.row(FontImage.MATERIAL_PLACE, ride.dropoffAddress, null, null));
-        more.add(Ui.row(FontImage.MATERIAL_PERSON, ride.driverName, ride.vehicle, null));
+        more.add(Ui.row(FontImage.MATERIAL_TRIP_ORIGIN, ride.pickupAddress(), null, null));
+        more.add(Ui.row(FontImage.MATERIAL_PLACE, ride.dropoffAddress(), null, null));
+        more.add(Ui.row(FontImage.MATERIAL_PERSON, ride.driverName(), ride.vehicle(), null));
     }
 
     private static String firstName(String name) {

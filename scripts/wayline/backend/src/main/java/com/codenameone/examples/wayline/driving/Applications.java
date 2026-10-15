@@ -166,35 +166,35 @@ public class Applications {
         // on an application that was handed in after it was read.
         hold(username);
         DriverApplication application = editable(username);
-        String birth = date(form.dateOfBirth, "your date of birth");
-        String expiry = date(form.licenceExpiry, "the licence's expiry date");
-        if (form.vehicleYear < 0 || form.vehicleYear > 2200 || form.vehicleSeats < 0
-                || form.vehicleSeats > 20) {
+        String birth = date(form.dateOfBirth(), "your date of birth");
+        String expiry = date(form.licenceExpiry(), "the licence's expiry date");
+        if (form.vehicleYear() < 0 || form.vehicleYear() > 2200 || form.vehicleSeats() < 0
+                || form.vehicleSeats() > 20) {
             throw new ResponseStatusException(400, "Check the vehicle's year and seats");
         }
         // Every field is checked before the first is assigned: the application
         // is a managed entity, and a field assigned ahead of a refusal would be
         // written with the draft.
-        String legalName = Text.optional(form.legalName, 120, "your name");
-        String licenceNumber = Text.optional(form.licenceNumber, 40, "the licence number");
-        String make = Text.optional(form.vehicleMake, 40, "the vehicle's make");
-        String model = Text.optional(form.vehicleModel, 40, "the vehicle's model");
-        String color = Text.optional(form.vehicleColor, 24, "the vehicle's colour");
-        String plate = Text.optional(form.vehiclePlate, 32, "the vehicle's plate");
-        String product = Fares.product(form.product);
+        String legalName = Text.optional(form.legalName(), 120, "your name");
+        String licenceNumber = Text.optional(form.licenceNumber(), 40, "the licence number");
+        String make = Text.optional(form.vehicleMake(), 40, "the vehicle's make");
+        String model = Text.optional(form.vehicleModel(), 40, "the vehicle's model");
+        String color = Text.optional(form.vehicleColor(), 24, "the vehicle's colour");
+        String plate = Text.optional(form.vehiclePlate(), 32, "the vehicle's plate");
+        String product = Fares.product(form.product());
         application.setLegalName(legalName);
         application.setDateOfBirth(birth);
         application.setLicenceNumber(licenceNumber);
         application.setLicenceExpiry(expiry);
         application.setVehicleMake(make);
         application.setVehicleModel(model);
-        application.setVehicleYear(form.vehicleYear);
+        application.setVehicleYear(form.vehicleYear());
         application.setVehicleColor(color);
         application.setVehiclePlate(plate);
-        application.setVehicleSeats(form.vehicleSeats);
+        application.setVehicleSeats(form.vehicleSeats());
         application.setProduct(product);
-        application.setWheelchair(form.accessible);
-        application.setPets(form.petFriendly);
+        application.setWheelchair(form.accessible());
+        application.setPets(form.petFriendly());
         return get(username);
     }
 
@@ -210,11 +210,11 @@ public class Applications {
         if (upload == null) {
             throw new ResponseStatusException(400, "No document to store");
         }
-        String kind = Text.oneOf(upload.kind, KINDS, "", "the kind of document");
+        String kind = Text.oneOf(upload.kind(), KINDS, "", "the kind of document");
         if (kind.length() == 0) {
             throw new ResponseStatusException(400, "Say which document this is");
         }
-        String data = upload.dataBase64 == null ? "" : upload.dataBase64.trim();
+        String data = upload.dataBase64() == null ? "" : upload.dataBase64().trim();
         // Refused by length first, so an oversized upload is not decoded at all.
         if (data.length() == 0 || data.length() > (MAX_DOCUMENT_BYTES / 3 + 1) * 4) {
             throw new ResponseStatusException(data.length() == 0 ? 400 : 413,
@@ -270,11 +270,8 @@ public class Applications {
         if (stored == null) {
             throw new ResponseStatusException(404, "No such document");
         }
-        DocumentContentDto dto = new DocumentContentDto();
-        dto.kind = stored.getKind();
-        dto.contentType = stored.getContentType();
-        dto.dataBase64 = stored.getData();
-        return dto;
+        return new DocumentContentDto(stored.getKind(), stored.getContentType(),
+                stored.getData());
     }
 
     /// Hands the application in. Answers 400, naming what is missing, until it
@@ -292,23 +289,23 @@ public class Applications {
         DriverApplicationDto form = get(username);
         List<String> missing = new ArrayList<String>();
         String today = Days.iso(System.currentTimeMillis());
-        need(missing, form.legalName.length() > 0, "your legal name");
+        need(missing, form.legalName().length() > 0, "your legal name");
         // Dates in this form compare as text. Eighteen years ago is today with
         // the year lowered.
         String adult = (Integer.parseInt(today.substring(0, 4)) - 18) + today.substring(4);
-        need(missing, form.dateOfBirth.length() > 0 && form.dateOfBirth.compareTo(adult) <= 0,
+        need(missing, form.dateOfBirth().length() > 0 && form.dateOfBirth().compareTo(adult) <= 0,
                 "a date of birth that makes you 18");
-        need(missing, form.licenceNumber.length() > 0, "your licence number");
-        need(missing, form.licenceExpiry.compareTo(today) >= 0, "a licence that has not expired");
-        need(missing, form.vehicleMake.length() > 0 && form.vehicleModel.length() > 0,
+        need(missing, form.licenceNumber().length() > 0, "your licence number");
+        need(missing, form.licenceExpiry().compareTo(today) >= 0, "a licence that has not expired");
+        need(missing, form.vehicleMake().length() > 0 && form.vehicleModel().length() > 0,
                 "the vehicle's make and model");
-        need(missing, form.vehicleYear >= 1990, "the vehicle's year");
-        need(missing, form.vehicleColor.length() > 0, "the vehicle's colour");
-        need(missing, form.vehiclePlate.length() > 0, "the vehicle's plate");
-        need(missing, form.vehicleSeats >= (Fares.XL.equals(form.product) ? 6 : 4),
-                Fares.XL.equals(form.product) ? "six seats for XL" : "the number of seats");
-        for (int iter = 0; iter < form.documents.size(); iter++) {
-            need(missing, !"missing".equals(form.documents.get(iter).status), KIND_NAMES[iter]);
+        need(missing, form.vehicleYear() >= 1990, "the vehicle's year");
+        need(missing, form.vehicleColor().length() > 0, "the vehicle's colour");
+        need(missing, form.vehiclePlate().length() > 0, "the vehicle's plate");
+        need(missing, form.vehicleSeats() >= (Fares.XL.equals(form.product()) ? 6 : 4),
+                Fares.XL.equals(form.product()) ? "six seats for XL" : "the number of seats");
+        for (int iter = 0; iter < form.documents().size(); iter++) {
+            need(missing, !"missing".equals(form.documents().get(iter).status()), KIND_NAMES[iter]);
         }
         if (!missing.isEmpty()) {
             StringBuilder what = new StringBuilder("Still needed: ");
@@ -562,42 +559,31 @@ public class Applications {
     /// a list read for several accounts has the owner's name in front.
     private static DriverApplicationDto toDto(String username, String name,
             DriverApplication row, List<Object[]> documents, int from) {
-        DriverApplicationDto dto = new DriverApplicationDto();
-        dto.username = username;
-        dto.name = name;
-        dto.status = row == null ? NONE : row.getStatus();
-        dto.legalName = row == null ? "" : row.getLegalName();
-        dto.dateOfBirth = row == null ? "" : row.getDateOfBirth();
-        dto.licenceNumber = row == null ? "" : row.getLicenceNumber();
-        dto.licenceExpiry = row == null ? "" : row.getLicenceExpiry();
-        dto.vehicleMake = row == null ? "" : row.getVehicleMake();
-        dto.vehicleModel = row == null ? "" : row.getVehicleModel();
-        dto.vehicleYear = row == null ? 0 : row.getVehicleYear();
-        dto.vehicleColor = row == null ? "" : row.getVehicleColor();
-        dto.vehiclePlate = row == null ? "" : row.getVehiclePlate();
-        dto.vehicleSeats = row == null ? 4 : row.getVehicleSeats();
-        dto.product = row == null ? Fares.STANDARD : row.getProduct();
-        dto.accessible = row != null && row.isWheelchair();
-        dto.petFriendly = row != null && row.isPets();
-        dto.rejectionReason = row == null ? "" : row.getRejectionReason();
-        dto.submittedAt = row == null ? 0L : row.getSubmittedAt();
-        dto.reviewedAt = row == null ? 0L : row.getReviewedAt();
-        dto.reviewedBy = row == null ? "" : row.getReviewedBy();
-        dto.documents = new ArrayList<DocumentDto>();
+        List<DocumentDto> listed = new ArrayList<DocumentDto>();
         for (int kind = 0; kind < KINDS.length; kind++) {
-            DocumentDto document = new DocumentDto();
-            document.kind = KINDS[kind];
-            document.status = "missing";
+            String status = "missing";
+            long uploadedAt = 0L;
             for (int iter = 0; iter < documents.size(); iter++) {
                 Object[] stored = documents.get(iter);
                 if (KINDS[kind].equals(stored[from])) {
-                    document.status = (String) stored[from + 1];
+                    status = (String) stored[from + 1];
                     Object at = stored[from + 2];
-                    document.uploadedAt = at instanceof Number ? ((Number) at).longValue() : 0L;
+                    uploadedAt = at instanceof Number ? ((Number) at).longValue() : 0L;
                 }
             }
-            dto.documents.add(document);
+            listed.add(new DocumentDto(KINDS[kind], status, uploadedAt));
         }
-        return dto;
+        if (row == null) {
+            // Nobody has applied: an empty form, on the defaults it opens with.
+            return new DriverApplicationDto(username, name, NONE, "", "", "", "", "", "", 0, "",
+                    "", 4, Fares.STANDARD, false, false, listed, "", 0L, 0L, "");
+        }
+        return new DriverApplicationDto(username, name, row.getStatus(), row.getLegalName(),
+                row.getDateOfBirth(), row.getLicenceNumber(), row.getLicenceExpiry(),
+                row.getVehicleMake(), row.getVehicleModel(), row.getVehicleYear(),
+                row.getVehicleColor(), row.getVehiclePlate(), row.getVehicleSeats(),
+                row.getProduct(), row.isWheelchair(), row.isPets(), listed,
+                row.getRejectionReason(), row.getSubmittedAt(), row.getReviewedAt(),
+                row.getReviewedBy());
     }
 }

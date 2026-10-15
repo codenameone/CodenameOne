@@ -25,19 +25,17 @@ package com.codenameone.examples.wayline.api;
 import com.codename1.annotations.Mapped;
 
 /// A way to pay. Cash is always one of them, under the id `cash`.
+///
+/// @param kind `card` or `cash`.
+/// @param label The method as a person would name it: "Visa 4242", "Cash".
 @Mapped
-public class PaymentMethodDto {
-    public String id;
-    /// `card` or `cash`.
-    public String kind;
-    public String brand;
-    public String last4;
-    public int expMonth;
-    public int expYear;
-    public boolean isDefault;
-    /// The method as a person would name it: "Visa 4242", "Cash".
-    public String label;
-
-    public PaymentMethodDto() {
-    }
+public record PaymentMethodDto(
+        String id,
+        String kind,
+        String brand,
+        String last4,
+        int expMonth,
+        int expYear,
+        boolean isDefault,
+        String label) {
 }

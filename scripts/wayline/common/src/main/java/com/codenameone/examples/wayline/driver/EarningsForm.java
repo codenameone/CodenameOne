@@ -76,65 +76,65 @@ public final class EarningsForm {
 
     private void fill(final EarningsSummaryDto summary, List<PayoutDto> payouts) {
         page.removeAll();
-        final String currency = summary.currency;
+        final String currency = summary.currency();
         Container balance = new Container(BoxLayout.y());
         balance.setUIID("WlPanel");
         balance.add(Ui.label("Ready to cash out", "WlStatLabel"));
-        Label amount = Ui.plain(Ui.money(summary.balance, currency), "WlChartValue");
+        Label amount = Ui.plain(Ui.money(summary.balance(), currency), "WlChartValue");
         amount.setName("balance");
         balance.add(amount);
-        final boolean banked = account != null && account.accountLast4 != null
-                && account.accountLast4.length() > 0;
+        final boolean banked = account != null && account.accountLast4() != null
+                && account.accountLast4().length() > 0;
         Button cash = Ui.primary("Cash out", "cashOut", e -> {
             if (!banked) {
                 account();
                 return;
             }
             Api.driver().cashOut(Net.to(sent -> {
-                Telemetry.payoutRequested(sent.amount);
-                Ui.say(Lang.tr("{0} is on its way to your bank", Ui.money(sent.amount,
+                Telemetry.payoutRequested(sent.amount());
+                Ui.say(Lang.tr("{0} is on its way to your bank", Ui.money(sent.amount(),
                         currency)));
                 load();
             }, Ui::fail));
         });
-        cash.setEnabled(summary.balance > 0);
+        cash.setEnabled(summary.balance() > 0);
         balance.add(cash);
         page.add(balance);
 
         StatRow periods = Ui.stats(3);
-        periods.stat(Ui.money(summary.today, currency), "Today", "earnedToday");
-        periods.stat(Ui.money(summary.week, currency), "This week", "earnedWeek");
-        periods.stat(Ui.money(summary.month, currency), "This month", "earnedMonth");
+        periods.stat(Ui.money(summary.today(), currency), "Today", "earnedToday");
+        periods.stat(Ui.money(summary.week(), currency), "This week", "earnedWeek");
+        periods.stat(Ui.money(summary.month(), currency), "This month", "earnedMonth");
         page.add(periods);
 
         Ui.section(page, "The last two weeks");
-        int days = summary.daily == null ? 0 : summary.daily.size();
+        int days = summary.daily() == null ? 0 : summary.daily().size();
         double[] amounts = new double[days];
         for (int iter = 0; iter < days; iter++) {
-            amounts[iter] = summary.daily.get(iter).amount;
+            amounts[iter] = summary.daily().get(iter).amount();
         }
         page.add(Chart.of("daily", amounts, Lang.tr("{0} days ago", String.valueOf(
                 Math.max(1, days - 1))), Lang.tr("Today")));
 
         StatRow numbers = Ui.stats(2);
-        numbers.stat(String.valueOf(summary.trips), "Trips", "trips");
-        numbers.stat(Ui.money(summary.tips, currency), "Tips", "tips");
-        numbers.stat(summary.rating > 0 ? Ui.tenths(summary.rating) : "-", "Rating",
+        numbers.stat(String.valueOf(summary.trips()), "Trips", "trips");
+        numbers.stat(Ui.money(summary.tips(), currency), "Tips", "tips");
+        numbers.stat(summary.rating() > 0 ? Ui.tenths(summary.rating()) : "-", "Rating",
                 "rating");
-        numbers.stat(Math.round(summary.acceptanceRate * 100d) + "%", "Requests accepted",
+        numbers.stat(Math.round(summary.acceptanceRate() * 100d) + "%", "Requests accepted",
                 "acceptance");
         page.add(numbers);
 
         Ui.section(page, "Payouts");
         page.add(Ui.tap(Ui.row(FontImage.MATERIAL_ACCOUNT_BALANCE,
-                banked ? account.bankName : Lang.tr("Add a bank account"),
-                banked ? Lang.tr("Account ending {0}", account.accountLast4)
+                banked ? account.bankName() : Lang.tr("Add a bank account"),
+                banked ? Lang.tr("Account ending {0}", account.accountLast4())
                         : Lang.tr("Where your earnings are sent"), null), "payoutAccount",
                 e -> account()));
         for (int iter = 0; payouts != null && iter < payouts.size(); iter++) {
             PayoutDto payout = payouts.get(iter);
-            Container row = Ui.row(FontImage.MATERIAL_NORTH_EAST, Ui.when(payout.createdAt),
-                    payout.destination, Ui.plain(Ui.money(payout.amount, currency),
+            Container row = Ui.row(FontImage.MATERIAL_NORTH_EAST, Ui.when(payout.createdAt()),
+                    payout.destination(), Ui.plain(Ui.money(payout.amount(), currency),
                             "WlRowValue"));
             row.setName("payout-" + iter);
             page.add(row);
@@ -157,8 +157,8 @@ public final class EarningsForm {
         final TextField number = Ui.field(fields, "Account number", "accountNumber", "",
                 TextArea.NUMERIC);
         if (account != null) {
-            holder.setText(account.holder);
-            bank.setText(account.bankName);
+            holder.setText(account.holder());
+            bank.setText(account.bankName());
         }
         final SpanLabel error = Ui.text("", "WlError");
         fields.add(error);
@@ -169,10 +169,8 @@ public final class EarningsForm {
                 edit.revalidate();
                 return;
             }
-            PayoutAccountDto wanted = new PayoutAccountDto();
-            wanted.holder = holder.getText().trim();
-            wanted.bankName = bank.getText().trim();
-            wanted.accountLast4 = digits.substring(digits.length() - 4);
+            PayoutAccountDto wanted = new PayoutAccountDto(holder.getText().trim(),
+                    bank.getText().trim(), digits.substring(digits.length() - 4));
             Api.driver().savePayoutAccount(wanted, Net.to(saved -> {
                 form.showBack();
                 load();

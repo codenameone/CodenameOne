@@ -26,10 +26,5 @@ import com.codename1.annotations.Mapped;
 
 /// A slice of a chart: a name and how many.
 @Mapped
-public class NameCountDto {
-    public String name;
-    public int count;
-
-    public NameCountDto() {
-    }
+public record NameCountDto(String name, int count) {
 }

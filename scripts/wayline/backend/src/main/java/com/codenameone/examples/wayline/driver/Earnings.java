@@ -102,14 +102,12 @@ public class Earnings {
     public EarningsSummaryDto summary(String driver) throws IOException {
         long now = System.currentTimeMillis();
         long today = Days.start(now);
-        EarningsSummaryDto dto = new EarningsSummaryDto();
-        dto.currency = fares.currency();
-        dto.daily = new ArrayList<DayAmountDto>();
-        for (int iter = DAYS - 1; iter >= 0; iter--) {
-            DayAmountDto day = new DayAmountDto();
-            day.date = Days.iso(today - iter * Days.MILLIS);
-            dto.daily.add(day);
-        }
+        long month = 0L;
+        long week = 0L;
+        long earnedToday = 0L;
+        // Each day's money and trips, oldest first.
+        long[] dayAmount = new long[DAYS];
+        int[] dayTrips = new int[DAYS];
         // Thirty days of rides, added up here: "group by day" is spelt
         // differently by every database, and a driver's month is a few hundred
         // rows.
@@ -132,30 +130,34 @@ public class Earnings {
             // no money of the driver's. The trip still counts as driven.
             boolean paid = Payments.PAID.equals(ride.getPaymentStatus());
             long earned = (paid ? ride.getDriverCents() : 0L) + (tipped ? ride.getTipCents() : 0L);
-            dto.month += earned;
+            month += earned;
             if (at >= weekStart) {
-                dto.week += earned;
+                week += earned;
             }
             if (at >= today) {
-                dto.today += earned;
+                earnedToday += earned;
             }
             int index = DAYS - 1 - (int) (Days.number(today) - Days.number(at));
             if (index >= 0 && index < DAYS) {
-                DayAmountDto day = dto.daily.get(index);
-                day.amount += earned;
-                day.trips++;
+                dayAmount[index] += earned;
+                dayTrips[index]++;
             }
         }
-        dto.trips = (int) rides.countByDriverAndState(driver, RideState.COMPLETED);
-        dto.tips = tips(driver);
-        dto.balance = balance(driver);
+        List<DayAmountDto> daily = new ArrayList<DayAmountDto>();
+        for (int iter = 0; iter < DAYS; iter++) {
+            daily.add(new DayAmountDto(Days.iso(today - (DAYS - 1 - iter) * Days.MILLIS),
+                    dayAmount[iter], dayTrips[iter]));
+        }
+        int trips = (int) rides.countByDriverAndState(driver, RideState.COMPLETED);
         DriverHours day = hours.findById(Identifier.of(driver, Long.valueOf(Days.number(now))));
-        dto.onlineMinutes = day == null ? 0 : (int) (day.getMillis() / 60000L);
+        int onlineMinutes = day == null ? 0 : (int) (day.getMillis() / 60000L);
         DriverState car = drivers.findById(driver);
-        dto.rating = car == null ? 5d : car.rating();
-        dto.acceptanceRate = Drivers.acceptanceRate(events.countByActorAndState(driver,
+        double rating = car == null ? 5d : car.rating();
+        double acceptanceRate = Drivers.acceptanceRate(events.countByActorAndState(driver,
                 RideState.ACCEPTED), passes.countByDriver(driver));
-        return dto;
+        return new EarningsSummaryDto(fares.currency(), earnedToday, week, month,
+                balance(driver), trips, tips(driver), onlineMinutes, rating, acceptanceRate,
+                daily);
     }
 
     /// The payouts made to a driver, newest first.
@@ -214,7 +216,7 @@ public class Earnings {
         if (wanted == null) {
             throw new ResponseStatusException(400, "Nothing to save");
         }
-        String last4 = wanted.accountLast4 == null ? "" : wanted.accountLast4.trim();
+        String last4 = wanted.accountLast4() == null ? "" : wanted.accountLast4().trim();
         boolean digits = last4.length() == 4;
         for (int iter = 0; digits && iter < 4; iter++) {
             digits = last4.charAt(iter) >= '0' && last4.charAt(iter) <= '9';
@@ -222,8 +224,8 @@ public class Earnings {
         if (!digits) {
             throw new ResponseStatusException(400, "Give the last four digits of the account");
         }
-        String holder = Text.required(wanted.holder, 120, "the account holder's name");
-        String bankName = Text.required(wanted.bankName, 80, "the bank's name");
+        String holder = Text.required(wanted.holder(), 120, "the account holder's name");
+        String bankName = Text.required(wanted.bankName(), 80, "the bank's name");
         // Before the row is looked for. Two first saves at once would both
         // find none and both insert one under the same name, and one would
         // fail; behind the profile's hold the second finds the first's row
@@ -267,20 +269,14 @@ public class Earnings {
     }
 
     private static PayoutAccountDto toDto(PayoutAccount row) {
-        PayoutAccountDto dto = new PayoutAccountDto();
-        dto.holder = row == null ? "" : row.getHolder();
-        dto.bankName = row == null ? "" : row.getBankName();
-        dto.accountLast4 = row == null ? "" : row.getLast4();
-        return dto;
+        if (row == null) {
+            return new PayoutAccountDto("", "", "");
+        }
+        return new PayoutAccountDto(row.getHolder(), row.getBankName(), row.getLast4());
     }
 
     private static PayoutDto toDto(Payout row) {
-        PayoutDto dto = new PayoutDto();
-        dto.id = row.getId();
-        dto.amount = row.getAmountCents();
-        dto.status = row.getStatus();
-        dto.createdAt = row.getCreatedAt();
-        dto.destination = row.getDestination();
-        return dto;
+        return new PayoutDto(row.getId(), row.getAmountCents(), row.getStatus(),
+                row.getCreatedAt(), row.getDestination());
     }
 }

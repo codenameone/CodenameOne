@@ -64,7 +64,7 @@ public class SettingsTest extends E2e {
         // A woman at the wheel: kept with the account, and sent with the ride.
         click("driverGender-women");
         until(() -> Account.lastSent() != null
-                && "women".equals(Account.lastSent().driverGender), 20000,
+                && "women".equals(Account.lastSent().driverGender()), 20000,
                 "the preference to be sent");
         until(() -> {
             Map<String, Object> kept = rider.get("/api/account/preferences");

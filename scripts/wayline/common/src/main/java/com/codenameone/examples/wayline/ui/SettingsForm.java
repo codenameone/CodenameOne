@@ -62,20 +62,20 @@ public final class SettingsForm {
         final UserDto user = Session.user();
         Container page = Ui.page();
 
-        page.add(Ui.person(user.displayName, user.username, null));
+        page.add(Ui.person(user.displayName(), user.username(), null));
 
         Ui.section(page, "Account");
         Container account = group();
         account.add(Ui.tap(Ui.row(FontImage.MATERIAL_PERSON, "Profile",
                 "Name, emergency contact, home and work", chevron()), "profile",
                 e -> ProfileForm.show(form, () -> show(previous))));
-        account.add(Ui.row(FontImage.MATERIAL_PHONE, user.phone,
-                user.phoneVerified ? null : "Needed before your first ride",
-                user.phoneVerified ? Ui.badge("Verified", "WlBadgeGood")
+        account.add(Ui.row(FontImage.MATERIAL_PHONE, user.phone(),
+                user.phoneVerified() ? null : "Needed before your first ride",
+                user.phoneVerified() ? Ui.badge("Verified", "WlBadgeGood")
                         : Ui.link("Verify", "verify",
                                 e -> VerifyPhoneForm.show(() -> show(previous)))));
-        if (user.driver) {
-            account.add(Ui.row(FontImage.MATERIAL_DIRECTIONS_CAR, user.vehicle, user.plate,
+        if (user.driver()) {
+            account.add(Ui.row(FontImage.MATERIAL_DIRECTIONS_CAR, user.vehicle(), user.plate(),
                     null));
         }
         account.add(Ui.tap(Ui.row(FontImage.MATERIAL_LOCK, "Password",
@@ -259,9 +259,8 @@ public final class SettingsForm {
                 Ui.refresh(form);
                 return;
             }
-            PasswordChangeDto change = new PasswordChangeDto();
-            change.current = current.getText();
-            change.replacement = replacement.getText();
+            PasswordChangeDto change = new PasswordChangeDto(current.getText(),
+                    replacement.getText());
             save.setEnabled(false);
             error.setText("");
             Api.account().changePassword(change, Net.to(user -> {
@@ -298,8 +297,7 @@ public final class SettingsForm {
         final Button go = Ui.danger("Delete my account", "confirmDelete", null);
         go.addActionListener(e -> {
             go.setEnabled(false);
-            AccountClosureDto closure = new AccountClosureDto();
-            closure.password = password.getText();
+            AccountClosureDto closure = new AccountClosureDto(password.getText());
             Api.account().deleteAccount(closure, Net.to(gone -> Nav.deleted(), (status, message) -> {
                 go.setEnabled(true);
                 error.setText(message);

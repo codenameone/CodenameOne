@@ -117,7 +117,7 @@ public final class Nav {
         // way there: the application, and what has become of it.
         Home home = ADMIN.equals(mode) ? new AdminForm()
                 : !DRIVER.equals(mode) ? new RiderForm()
-                : user.driver ? new DriverForm() : new ApplyForm();
+                : user.driver() ? new DriverForm() : new ApplyForm();
         home.start();
         return home.form();
     }
@@ -130,8 +130,8 @@ public final class Nav {
     /// account that made it, so the next person to sign in on the same device
     /// starts where their own account does.
     public static String mode(UserDto user) {
-        String saved = AppConfig.mode(user.username);
-        if (ADMIN.equals(saved) && user.admin) {
+        String saved = AppConfig.mode(user.username());
+        if (ADMIN.equals(saved) && user.admin()) {
             return ADMIN;
         }
         // Not only for a driver: someone who is applying to be one is in the
@@ -142,13 +142,13 @@ public final class Nav {
         if (RIDER.equals(saved)) {
             return RIDER;
         }
-        return user.admin ? ADMIN : user.driver ? DRIVER : RIDER;
+        return user.admin() ? ADMIN : user.driver() ? DRIVER : RIDER;
     }
 
     /// The user chose `mode` from the menu.
     public static void switchTo(String mode) {
         UserDto user = Session.user();
-        AppConfig.setMode(mode, user == null ? "" : user.username);
+        AppConfig.setMode(mode, user == null ? "" : user.username());
         home();
     }
 

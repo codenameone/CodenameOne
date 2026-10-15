@@ -75,21 +75,12 @@ public class Fares {
             @Value("${wayline.fare.serviceFeePercent:10}") int serviceFeePercent,
             @Value("${wayline.fare.commissionPercent:20}") int commissionPercent) {
         this.prices = prices;
-        defaults = new PricingDto();
-        defaults.currency = currency;
-        defaults.baseFare = baseCents;
-        defaults.perKm = perKmCents;
-        defaults.perMinute = perMinuteCents;
-        defaults.minimumFare = minimumCents;
-        defaults.serviceFeePercent = serviceFeePercent;
-        defaults.commissionPercent = commissionPercent;
-        defaults.surgeMultiplier = 1d;
-        defaults.comfortMultiplier = 1.35d;
-        defaults.xlMultiplier = 1.7d;
+        defaults = new PricingDto(currency, baseCents, perKmCents, perMinuteCents, minimumCents,
+                serviceFeePercent, commissionPercent, 1d, 1.35d, 1.7d);
     }
 
     public String currency() {
-        return defaults.currency;
+        return defaults.currency();
     }
 
     /// The prices in force: the admin's when they have set any, the settings'
@@ -100,32 +91,14 @@ public class Fares {
     }
 
     private PricingDto toDto(Pricing row) {
-        PricingDto dto = new PricingDto();
+        if (row == null) {
+            return defaults;
+        }
         // The currency is a setting and stays one. Rides already taken are in
         // it, and changing it would not convert them.
-        dto.currency = defaults.currency;
-        if (row == null) {
-            dto.baseFare = defaults.baseFare;
-            dto.perKm = defaults.perKm;
-            dto.perMinute = defaults.perMinute;
-            dto.minimumFare = defaults.minimumFare;
-            dto.serviceFeePercent = defaults.serviceFeePercent;
-            dto.commissionPercent = defaults.commissionPercent;
-            dto.surgeMultiplier = defaults.surgeMultiplier;
-            dto.comfortMultiplier = defaults.comfortMultiplier;
-            dto.xlMultiplier = defaults.xlMultiplier;
-            return dto;
-        }
-        dto.baseFare = row.getBaseCents();
-        dto.perKm = row.getPerKmCents();
-        dto.perMinute = row.getPerMinuteCents();
-        dto.minimumFare = row.getMinimumCents();
-        dto.serviceFeePercent = row.getFeePercent();
-        dto.commissionPercent = row.getCommissionPercent();
-        dto.surgeMultiplier = row.getSurge();
-        dto.comfortMultiplier = row.getComfort();
-        dto.xlMultiplier = row.getXl();
-        return dto;
+        return new PricingDto(defaults.currency(), row.getBaseCents(), row.getPerKmCents(),
+                row.getPerMinuteCents(), row.getMinimumCents(), row.getFeePercent(),
+                row.getCommissionPercent(), row.getSurge(), row.getComfort(), row.getXl());
     }
 
     /// Changes the prices, for the rides asked for from now on. A ride already
@@ -136,29 +109,29 @@ public class Fares {
         if (wanted == null) {
             throw new ResponseStatusException(400, "No prices to save");
         }
-        amount(wanted.baseFare, "the base fare");
-        amount(wanted.perKm, "the price per kilometre");
-        amount(wanted.perMinute, "the price per minute");
-        amount(wanted.minimumFare, "the minimum fare");
-        between(wanted.serviceFeePercent, 0d, 50d, "the service fee");
-        between(wanted.commissionPercent, 0d, 90d, "the commission");
-        between(wanted.surgeMultiplier, 1d, 5d, "the surge multiplier");
-        between(wanted.comfortMultiplier, 1d, 5d, "the comfort multiplier");
-        between(wanted.xlMultiplier, 1d, 5d, "the XL multiplier");
+        amount(wanted.baseFare(), "the base fare");
+        amount(wanted.perKm(), "the price per kilometre");
+        amount(wanted.perMinute(), "the price per minute");
+        amount(wanted.minimumFare(), "the minimum fare");
+        between(wanted.serviceFeePercent(), 0d, 50d, "the service fee");
+        between(wanted.commissionPercent(), 0d, 90d, "the commission");
+        between(wanted.surgeMultiplier(), 1d, 5d, "the surge multiplier");
+        between(wanted.comfortMultiplier(), 1d, 5d, "the comfort multiplier");
+        between(wanted.xlMultiplier(), 1d, 5d, "the XL multiplier");
         Pricing row = prices.findById(PricingRepository.ONLY);
         boolean first = row == null;
         if (first) {
             row = new Pricing();
         }
-        row.setBaseCents(wanted.baseFare);
-        row.setPerKmCents(wanted.perKm);
-        row.setPerMinuteCents(wanted.perMinute);
-        row.setMinimumCents(wanted.minimumFare);
-        row.setFeePercent(wanted.serviceFeePercent);
-        row.setCommissionPercent(wanted.commissionPercent);
-        row.setSurge(wanted.surgeMultiplier);
-        row.setComfort(wanted.comfortMultiplier);
-        row.setXl(wanted.xlMultiplier);
+        row.setBaseCents(wanted.baseFare());
+        row.setPerKmCents(wanted.perKm());
+        row.setPerMinuteCents(wanted.perMinute());
+        row.setMinimumCents(wanted.minimumFare());
+        row.setFeePercent(wanted.serviceFeePercent());
+        row.setCommissionPercent(wanted.commissionPercent());
+        row.setSurge(wanted.surgeMultiplier());
+        row.setComfort(wanted.comfortMultiplier());
+        row.setXl(wanted.xlMultiplier());
         row.setUpdatedAt(System.currentTimeMillis());
         row.setUpdatedBy(by);
         if (first) {
@@ -175,10 +148,10 @@ public class Fares {
     /// from it. So it is believed only between the straight line and four times
     /// it; outside that the server prices from its own estimate.
     public double distanceMeters(RideRequestDto request) {
-        double straight = Geo.meters(request.pickupLat, request.pickupLng, request.dropoffLat,
-                request.dropoffLng);
-        if (request.distanceMeters >= straight && request.distanceMeters <= straight * 4) {
-            return request.distanceMeters;
+        double straight = Geo.meters(request.pickupLat(), request.pickupLng(), request.dropoffLat(),
+                request.dropoffLng());
+        if (request.distanceMeters() >= straight && request.distanceMeters() <= straight * 4) {
+            return request.distanceMeters();
         }
         return straight * ROAD_FACTOR;
     }
@@ -186,9 +159,9 @@ public class Fares {
     /// The duration to price, in seconds; believed on the same terms.
     public double durationSeconds(RideRequestDto request, double distanceMeters) {
         double estimate = distanceMeters / METERS_PER_SECOND;
-        if (distanceMeters == request.distanceMeters && request.durationSeconds >= estimate / 4
-                && request.durationSeconds <= estimate * 4) {
-            return request.durationSeconds;
+        if (distanceMeters == request.distanceMeters() && request.durationSeconds() >= estimate / 4
+                && request.durationSeconds() <= estimate * 4) {
+            return request.durationSeconds();
         }
         return estimate;
     }
@@ -196,31 +169,31 @@ public class Fares {
     /// A ride of this length and duration, taken as `product`, at `pricing`.
     public static Price price(PricingDto pricing, double distanceMeters, double durationSeconds,
             String product) {
-        double times = pricing.surgeMultiplier;
+        double times = pricing.surgeMultiplier();
         if (COMFORT.equals(product)) {
-            times *= pricing.comfortMultiplier;
+            times *= pricing.comfortMultiplier();
         } else if (XL.equals(product)) {
-            times *= pricing.xlMultiplier;
+            times *= pricing.xlMultiplier();
         }
         Price price = new Price();
-        price.base = Math.round(pricing.baseFare * times);
-        price.distance = Math.round(distanceMeters / 1000d * pricing.perKm * times);
-        price.time = Math.round(durationSeconds / 60d * pricing.perMinute * times);
+        price.base = Math.round(pricing.baseFare() * times);
+        price.distance = Math.round(distanceMeters / 1000d * pricing.perKm() * times);
+        price.time = Math.round(durationSeconds / 60d * pricing.perMinute() * times);
         price.fare = price.base + price.distance + price.time;
-        long minimum = Math.round(pricing.minimumFare * times);
+        long minimum = Math.round(pricing.minimumFare() * times);
         if (price.fare < minimum) {
             // The floor is a larger base fare, so the three parts still add up
             // to what is charged.
             price.base += minimum - price.fare;
             price.fare = minimum;
         }
-        price.fee = Math.round(price.fare * pricing.serviceFeePercent / 100d);
+        price.fee = Math.round(price.fare * pricing.serviceFeePercent() / 100d);
         return price;
     }
 
     /// What the service keeps of a fare.
     public static long commission(PricingDto pricing, long fareCents) {
-        return Math.round(fareCents * pricing.commissionPercent / 100d);
+        return Math.round(fareCents * pricing.commissionPercent() / 100d);
     }
 
     /// The product a request names; standard when it names none. Answers 400

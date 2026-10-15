@@ -27,12 +27,5 @@ import com.codename1.annotations.Mapped;
 /// A free driver near a point, for the cars on the rider's map. Says where and
 /// what, and not who.
 @Mapped
-public class NearbyDriverDto {
-    public double lat;
-    public double lng;
-    public double heading;
-    public String product;
-
-    public NearbyDriverDto() {
-    }
+public record NearbyDriverDto(double lat, double lng, double heading, String product) {
 }

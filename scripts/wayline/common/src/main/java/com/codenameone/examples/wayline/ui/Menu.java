@@ -135,9 +135,9 @@ public final class Menu {
         top.setUIID("WlMenuTop");
         Container who = new Container(new BorderLayout());
         Container names = new Container(BoxLayout.y());
-        names.add(Ui.label(user.displayName, "WlMenuName"));
-        names.add(Ui.label(user.username, "WlMenuDetail"));
-        who.add(BorderLayout.WEST, Ui.avatar(user.displayName));
+        names.add(Ui.label(user.displayName(), "WlMenuName"));
+        names.add(Ui.label(user.username(), "WlMenuDetail"));
+        who.add(BorderLayout.WEST, Ui.avatar(user.displayName()));
         who.add(BorderLayout.CENTER, names);
         top.add(who);
         // Which of the three apps this is, said in words at the top of each.
@@ -150,15 +150,15 @@ public final class Menu {
         list.add(places);
         // The other modes, for an account whose roles open more than one.
         // Everyone may ride; driving and administering are granted.
-        if (user.driver || user.admin || !Nav.RIDER.equals(mode)) {
+        if (user.driver() || user.admin() || !Nav.RIDER.equals(mode)) {
             list.add(Ui.label("Switch to", "WlMenuLabel"));
             if (!Nav.RIDER.equals(mode)) {
                 list.add(other(FontImage.MATERIAL_HAIL, "Riding", Nav.RIDER));
             }
-            if (user.driver && !Nav.DRIVER.equals(mode)) {
+            if (user.driver() && !Nav.DRIVER.equals(mode)) {
                 list.add(other(FontImage.MATERIAL_DIRECTIONS_CAR, "Driving", Nav.DRIVER));
             }
-            if (user.admin && !Nav.ADMIN.equals(mode)) {
+            if (user.admin() && !Nav.ADMIN.equals(mode)) {
                 list.add(other(FontImage.MATERIAL_INSIGHTS, "Administration", Nav.ADMIN));
             }
         }

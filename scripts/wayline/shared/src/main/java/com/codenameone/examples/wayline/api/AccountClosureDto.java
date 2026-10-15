@@ -26,9 +26,5 @@ import com.codename1.annotations.Mapped;
 
 /// The request to close an account: the password of whoever is asking.
 @Mapped
-public class AccountClosureDto {
-    public String password;
-
-    public AccountClosureDto() {
-    }
+public record AccountClosureDto(String password) {
 }

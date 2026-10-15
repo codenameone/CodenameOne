@@ -57,7 +57,7 @@ public class DriverOnboardingTest extends E2e {
 
         // Asking to drive does not make a driver. It leads to the application.
         waitForForm("Apply");
-        assertFalse(Session.user().driver, "a new account is not a driver");
+        assertFalse(Session.user().driver(), "a new account is not a driver");
         untilText("applicationStatus", "Not started");
         assertFalse(has("goOnline"), "an applicant can go online");
         click("apply");
@@ -142,7 +142,7 @@ public class DriverOnboardingTest extends E2e {
         // Approved: the same account now opens on the driver's screen, and
         // going online works.
         signIn(email, "Driver");
-        assertTrue(Session.user().driver, "approval makes the account a driver");
+        assertTrue(Session.user().driver(), "approval makes the account a driver");
         untilText("driverState", "You are offline");
         click("goOnline");
         untilText("driverState", "Looking for rides");

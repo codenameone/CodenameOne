@@ -25,12 +25,8 @@ package com.codenameone.examples.wayline.api;
 import com.codename1.annotations.Mapped;
 
 /// How this server takes payments, so the app knows which way to add a card.
+///
+/// @param provider `simulated` or `stripe`.
 @Mapped
-public class PaymentConfigDto {
-    /// `simulated` or `stripe`.
-    public String provider;
-    public String currency;
-
-    public PaymentConfigDto() {
-    }
+public record PaymentConfigDto(String provider, String currency) {
 }

@@ -25,17 +25,15 @@ package com.codenameone.examples.wayline.api;
 import com.codename1.annotations.Mapped;
 
 /// One day of the service.
+///
+/// @param date `yyyy-MM-dd`, in UTC.
+/// @param revenue Cents: the fares of the day's completed, paid rides.
 @Mapped
-public class DayStatsDto {
-    /// `yyyy-MM-dd`, in UTC.
-    public String date;
-    public int rides;
-    public int completed;
-    public int cancelled;
-    /// Cents: the fares of the day's completed, paid rides.
-    public long revenue;
-    public int newUsers;
-
-    public DayStatsDto() {
-    }
+public record DayStatsDto(
+        String date,
+        int rides,
+        int completed,
+        int cancelled,
+        long revenue,
+        int newUsers) {
 }

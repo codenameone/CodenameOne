@@ -69,31 +69,17 @@ public class Preferences {
             throw new ResponseStatusException(404, "No such account");
         }
         Preference row = preferences.findById(username);
-        PreferencesDto dto = new PreferencesDto();
-        dto.language = profile.getLanguage();
-        dto.defaultPaymentMethodId = payments.defaultMethod(username);
+        String language = profile.getLanguage();
+        String method = payments.defaultMethod(username);
         if (row == null) {
             // What someone who never opened the settings gets.
-            dto.theme = THEMES[0];
-            dto.units = UNITS[0];
-            dto.notifyRideUpdates = true;
-            dto.notifyReceipts = true;
-            dto.driverGender = DRIVER_GENDERS[0];
-            dto.shareTripsWith = "";
-            return dto;
+            return new PreferencesDto(language, THEMES[0], UNITS[0], true, true, false,
+                    DRIVER_GENDERS[0], false, false, false, method, 0, "");
         }
-        dto.theme = row.getTheme();
-        dto.units = row.getUnits();
-        dto.notifyRideUpdates = row.isNotifyRides();
-        dto.notifyReceipts = row.isNotifyReceipts();
-        dto.notifyPromotions = row.isNotifyPromotions();
-        dto.driverGender = row.getDriverGender();
-        dto.quietRide = row.isQuietRide();
-        dto.accessibleVehicle = row.isWheelchair();
-        dto.petFriendly = row.isPetFriendly();
-        dto.defaultTipPercent = row.getDefaultTip();
-        dto.shareTripsWith = row.getShareTripsWith();
-        return dto;
+        return new PreferencesDto(language, row.getTheme(), row.getUnits(), row.isNotifyRides(),
+                row.isNotifyReceipts(), row.isNotifyPromotions(), row.getDriverGender(),
+                row.isQuietRide(), row.isWheelchair(), row.isPetFriendly(), method,
+                row.getDefaultTip(), row.getShareTripsWith());
     }
 
     /// Saves all of them. Each is checked against the values it can take: these
@@ -110,19 +96,19 @@ public class Preferences {
         // there from registration, so held, one save waits and finds the
         // other's row.
         profiles.hold(username);
-        int tip = wanted.defaultTipPercent;
+        int tip = wanted.defaultTipPercent();
         if (tip != 0 && tip != 10 && tip != 15 && tip != 20) {
             throw new ResponseStatusException(400, "A default tip is 0, 10, 15 or 20 percent");
         }
-        String share = wanted.shareTripsWith == null ? "" : wanted.shareTripsWith.trim();
-        String theme = Text.oneOf(wanted.theme, THEMES, THEMES[0], "the theme");
-        String units = Text.oneOf(wanted.units, UNITS, UNITS[0], "the units");
-        String driverGender = Text.oneOf(wanted.driverGender, DRIVER_GENDERS, DRIVER_GENDERS[0],
+        String share = wanted.shareTripsWith() == null ? "" : wanted.shareTripsWith().trim();
+        String theme = Text.oneOf(wanted.theme(), THEMES, THEMES[0], "the theme");
+        String units = Text.oneOf(wanted.units(), UNITS, UNITS[0], "the units");
+        String driverGender = Text.oneOf(wanted.driverGender(), DRIVER_GENDERS, DRIVER_GENDERS[0],
                 "the driver");
         String shareWith = share.length() == 0 ? "" : Accounts.phone(share);
-        String language = Text.oneOf(wanted.language, LANGUAGES, LANGUAGES[0], "the language");
-        String method = wanted.defaultPaymentMethodId == null ? ""
-                : wanted.defaultPaymentMethodId.trim();
+        String language = Text.oneOf(wanted.language(), LANGUAGES, LANGUAGES[0], "the language");
+        String method = wanted.defaultPaymentMethodId() == null ? ""
+                : wanted.defaultPaymentMethodId().trim();
         if (method.length() > 0 && !method.equals(payments.defaultMethod(username))) {
             // Answers 404 for a card that is not this user's, before anything
             // else is saved.
@@ -144,13 +130,13 @@ public class Preferences {
         }
         row.setTheme(theme);
         row.setUnits(units);
-        row.setNotifyRides(wanted.notifyRideUpdates);
-        row.setNotifyReceipts(wanted.notifyReceipts);
-        row.setNotifyPromotions(wanted.notifyPromotions);
+        row.setNotifyRides(wanted.notifyRideUpdates());
+        row.setNotifyReceipts(wanted.notifyReceipts());
+        row.setNotifyPromotions(wanted.notifyPromotions());
         row.setDriverGender(driverGender);
-        row.setQuietRide(wanted.quietRide);
-        row.setWheelchair(wanted.accessibleVehicle);
-        row.setPetFriendly(wanted.petFriendly);
+        row.setQuietRide(wanted.quietRide());
+        row.setWheelchair(wanted.accessibleVehicle());
+        row.setPetFriendly(wanted.petFriendly());
         row.setDefaultTip(tip);
         row.setShareTripsWith(shareWith);
         if (unsaved) {

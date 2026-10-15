@@ -67,17 +67,17 @@ public final class RideListForm {
             }
             for (int iter = 0; rides != null && iter < rides.size(); iter++) {
                 final RideDto ride = rides.get(iter);
-                String detail = Ui.when(ride.requestedAt);
+                String detail = Ui.when(ride.requestedAt());
                 if (people) {
-                    detail += "  -  " + (ride.driverName == null
-                            || ride.driverName.length() == 0 ? ride.riderName
-                            : Lang.tr("{0} with {1}", ride.riderName, ride.driverName));
+                    detail += "  -  " + (ride.driverName() == null
+                            || ride.driverName().length() == 0 ? ride.riderName()
+                            : Lang.tr("{0} with {1}", ride.riderName(), ride.driverName()));
                 }
                 Container value = new Container(BoxLayout.y());
-                value.add(Ui.plain(Ui.money(ride.total > 0 ? ride.total : ride.fareCents,
-                        ride.currency), "WlRowValue"));
-                value.add(Ui.badge(Ui.state(ride.state), Ui.stateBadge(ride.state)));
-                Container row = Ui.row(FontImage.MATERIAL_PLACE, ride.dropoffAddress, detail,
+                value.add(Ui.plain(Ui.money(ride.total() > 0 ? ride.total() : ride.fareCents(),
+                        ride.currency()), "WlRowValue"));
+                value.add(Ui.badge(Ui.state(ride.state()), Ui.stateBadge(ride.state())));
+                Container row = Ui.row(FontImage.MATERIAL_PLACE, ride.dropoffAddress(), detail,
                         value);
                 if (opened == null) {
                     row.setName("ride-" + iter);

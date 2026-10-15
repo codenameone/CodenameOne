@@ -29,24 +29,22 @@ import java.util.List;
 /// A driver's money: what came in, what is owed, and how the last two weeks
 /// went. Amounts are cents, and are the driver's share -- the fare less the
 /// service's commission, plus tips.
+///
+/// @param balance Earned and not yet paid out.
+/// @param onlineMinutes Time on line today.
+/// @param acceptanceRate 0 to 1.
+/// @param daily The last 14 days, oldest first, every day present.
 @Mapped
-public class EarningsSummaryDto {
-    public String currency;
-    public long today;
-    public long week;
-    public long month;
-    /// Earned and not yet paid out.
-    public long balance;
-    public int trips;
-    public long tips;
-    /// Time on line today.
-    public int onlineMinutes;
-    public double rating;
-    /// 0 to 1.
-    public double acceptanceRate;
-    /// The last 14 days, oldest first, every day present.
-    public List<DayAmountDto> daily;
-
-    public EarningsSummaryDto() {
-    }
+public record EarningsSummaryDto(
+        String currency,
+        long today,
+        long week,
+        long month,
+        long balance,
+        int trips,
+        long tips,
+        int onlineMinutes,
+        double rating,
+        double acceptanceRate,
+        List<DayAmountDto> daily) {
 }

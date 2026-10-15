@@ -59,17 +59,17 @@ public final class PricingForm {
 
     private static void fill(final Panes panes, final Container page, final PricingDto pricing) {
         page.removeAll();
-        Ui.section(page, Lang.tr("The fare, in {0}", pricing.currency));
-        final TextField base = money(page, "Base fare", "baseFare", pricing.baseFare, null);
+        Ui.section(page, Lang.tr("The fare, in {0}", pricing.currency()));
+        final TextField base = money(page, "Base fare", "baseFare", pricing.baseFare(), null);
         Container pair = new Container(new GridLayout(1, 2));
         Container left = side("WlPairLeft");
         Container right = side("WlPairRight");
-        final TextField perKm = money(left, "Per kilometre", "perKm", pricing.perKm, null);
-        final TextField perMinute = money(right, "Per minute", "perMinute", pricing.perMinute,
+        final TextField perKm = money(left, "Per kilometre", "perKm", pricing.perKm(), null);
+        final TextField perMinute = money(right, "Per minute", "perMinute", pricing.perMinute(),
                 null);
         pair.add(left).add(right);
         page.add(pair);
-        final TextField minimum = money(page, "Minimum fare", "minimumFare", pricing.minimumFare,
+        final TextField minimum = money(page, "Minimum fare", "minimumFare", pricing.minimumFare(),
                 null);
 
         Ui.section(page, "The service's share");
@@ -77,9 +77,9 @@ public final class PricingForm {
         left = side("WlPairLeft");
         right = side("WlPairRight");
         final TextField fee = number(left, "Service fee, %", "serviceFeePercent",
-                pricing.serviceFeePercent);
+                pricing.serviceFeePercent());
         final TextField commission = number(right, "Commission, %", "commissionPercent",
-                pricing.commissionPercent);
+                pricing.commissionPercent());
         pair.add(left).add(right);
         page.add(pair);
         page.add(Ui.text("The fee is added to the fare and paid by the rider. The commission "
@@ -87,13 +87,13 @@ public final class PricingForm {
 
         Ui.section(page, "Multipliers");
         final TextField surge = number(page, "Surge, while demand is high", "surgeMultiplier",
-                pricing.surgeMultiplier);
+                pricing.surgeMultiplier());
         pair = new Container(new GridLayout(1, 2));
         left = side("WlPairLeft");
         right = side("WlPairRight");
         final TextField comfort = number(left, "Comfort", "comfortMultiplier",
-                pricing.comfortMultiplier);
-        final TextField xl = number(right, "XL", "xlMultiplier", pricing.xlMultiplier);
+                pricing.comfortMultiplier());
+        final TextField xl = number(right, "XL", "xlMultiplier", pricing.xlMultiplier());
         pair.add(left).add(right);
         page.add(pair);
 
@@ -101,17 +101,9 @@ public final class PricingForm {
         error.setName("error");
         final Button save = Ui.primary("Save prices", "submit", null);
         save.addActionListener(e -> {
-            PricingDto wanted = new PricingDto();
-            wanted.currency = pricing.currency;
-            wanted.baseFare = cents(base);
-            wanted.perKm = cents(perKm);
-            wanted.perMinute = cents(perMinute);
-            wanted.minimumFare = cents(minimum);
-            wanted.serviceFeePercent = value(fee);
-            wanted.commissionPercent = value(commission);
-            wanted.surgeMultiplier = value(surge);
-            wanted.comfortMultiplier = value(comfort);
-            wanted.xlMultiplier = value(xl);
+            PricingDto wanted = new PricingDto(pricing.currency(), cents(base), cents(perKm),
+                    cents(perMinute), cents(minimum), value(fee), value(commission), value(surge),
+                    value(comfort), value(xl));
             save.setEnabled(false);
             error.setText("");
             Api.admin().savePricing(wanted, Net.to(saved -> {

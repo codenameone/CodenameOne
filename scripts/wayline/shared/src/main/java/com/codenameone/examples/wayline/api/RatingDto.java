@@ -26,9 +26,5 @@ import com.codename1.annotations.Mapped;
 
 /// A rider's rating of a completed ride.
 @Mapped
-public class RatingDto {
-    public int stars;
-
-    public RatingDto() {
-    }
+public record RatingDto(int stars) {
 }

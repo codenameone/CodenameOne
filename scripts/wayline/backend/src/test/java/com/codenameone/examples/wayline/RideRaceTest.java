@@ -114,7 +114,7 @@ class RideRaceTest {
             public void run() {
                 try {
                     RideDto ride = rides.accept(driver, id);
-                    outcomes[slot] = RideState.ACCEPTED == ride.state ? TAKEN : -1;
+                    outcomes[slot] = RideState.ACCEPTED == ride.state() ? TAKEN : -1;
                 } catch (ResponseStatusException refused) {
                     outcomes[slot] = refused.getStatus();
                 } catch (Throwable err) {

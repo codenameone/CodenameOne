@@ -99,15 +99,15 @@ public class Drivers {
     /// report is stored, and not before: what they are told sends them here to
     /// read it.
     public DriverDto report(String driver, DriverStatusDto status) throws IOException {
-        if (status == null || (status.online && !Geo.isPoint(status.lat, status.lng))) {
+        if (status == null || (status.online() && !Geo.isPoint(status.lat(), status.lng()))) {
             throw new ResponseStatusException(400, "Going on line needs the car's position");
         }
         Report made = store(driver, status);
         DriverDto dto = made.driver;
         if (made.rideId != null) {
-            live.driverMoved(made.rider, made.rideId, dto.lat, dto.lng, dto.heading);
+            live.driverMoved(made.rider, made.rideId, dto.lat(), dto.lng(), dto.heading());
         }
-        live.fleetChanged(dto.username, dto.online, dto.lat, dto.lng, dto.heading);
+        live.fleetChanged(dto.username(), dto.online(), dto.lat(), dto.lng(), dto.heading());
         return dto;
     }
 
@@ -137,11 +137,11 @@ public class Drivers {
         // The role lets a driver into this part of the API; the approval is
         // what lets them take rides. They are granted together, but they are
         // kept apart, and it is the approval that is asked for here.
-        if (status.online && !applications.approved(driver)) {
+        if (status.online() && !applications.approved(driver)) {
             throw new ResponseStatusException(403, "Your application to drive is not approved");
         }
         Ride ride = rides.findFirstByDriverAndStateIn(driver, TAKEN);
-        if (!status.online && ride != null) {
+        if (!status.online() && ride != null) {
             throw new ResponseStatusException(409, "Finish the ride before going off line");
         }
         long now = System.currentTimeMillis();
@@ -159,14 +159,14 @@ public class Drivers {
             state = new DriverState();
             state.setUsername(driver);
         }
-        state.setOnline(status.online);
+        state.setOnline(status.online());
         state.setLastSeen(now);
         // Off line keeps the last position: there is none to report. A first
         // report stores whatever came with it.
-        if (status.online || first) {
-            state.setLat(status.lat);
-            state.setLng(status.lng);
-            state.setHeading(status.heading);
+        if (status.online() || first) {
+            state.setLat(status.lat());
+            state.setLng(status.lng());
+            state.setHeading(status.heading());
         }
         if (first) {
             drivers.insert(state);
@@ -185,16 +185,26 @@ public class Drivers {
         return view(driver, drivers.findById(driver));
     }
 
+    /// A driver with `rides` given rather than counted: the rides of a period
+    /// the caller is describing, not of all time.
+    @Transactional(readOnly = true)
+    public DriverDto describe(String driver, int rides) throws IOException {
+        return view(driver, drivers.findById(driver), rides);
+    }
+
     private DriverDto view(String driver, DriverState state) {
+        return view(driver, state, (int) rides.countByDriverAndState(driver,
+                RideState.COMPLETED));
+    }
+
+    private DriverDto view(String driver, DriverState state, int completed) {
         Profile profile = profiles.findById(driver);
         if (profile == null) {
             throw new ResponseStatusException(404, "No such driver");
         }
-        DriverDto dto = toDto(profile, made.findById(driver), state,
-                (int) rides.countByDriverAndState(driver, RideState.COMPLETED));
-        dto.acceptanceRate = acceptanceRate(events.countByActorAndState(driver,
-                RideState.ACCEPTED), passes.countByDriver(driver));
-        return dto;
+        return toDto(profile, made.findById(driver), state, completed,
+                acceptanceRate(events.countByActorAndState(driver, RideState.ACCEPTED),
+                        passes.countByDriver(driver)));
     }
 
     /// Adds time on line to a driver's day. The addition is the database's,
@@ -243,13 +253,12 @@ public class Drivers {
                 continue;
             }
             Long rode = done.get(state.getUsername());
-            DriverDto dto = toDto(profile, forms.get(state.getUsername()), state,
-                    rode == null ? 0 : (int) rode.longValue());
             Long took = accepted.get(state.getUsername());
             Long left = passed.get(state.getUsername());
-            dto.acceptanceRate = acceptanceRate(took == null ? 0L : took.longValue(),
-                    left == null ? 0L : left.longValue());
-            out.add(dto);
+            out.add(toDto(profile, forms.get(state.getUsername()), state,
+                    rode == null ? 0 : (int) rode.longValue(),
+                    acceptanceRate(took == null ? 0L : took.longValue(),
+                            left == null ? 0L : left.longValue())));
         }
         return out;
     }
@@ -260,46 +269,43 @@ public class Drivers {
     @Transactional(readOnly = true)
     public EarningsDto earnings(String driver) throws IOException {
         long now = System.currentTimeMillis();
-        EarningsDto dto = new EarningsDto();
-        dto.currency = fares.currency();
-        dto.todayCents = Rows.number(rides.paidSince(driver, now - now % DAY_MILLIS));
-        dto.weekCents = Rows.number(rides.paidSince(driver, now - 7 * DAY_MILLIS));
+        long today = Rows.number(rides.paidSince(driver, now - now % DAY_MILLIS));
+        long week = Rows.number(rides.paidSince(driver, now - 7 * DAY_MILLIS));
         Object[] total = rides.paidTotals(driver);
-        dto.rides = total == null ? 0 : (int) Rows.number(total[0]);
-        dto.totalCents = total == null ? 0L : Rows.number(total[1]);
-        return dto;
+        int count = total == null ? 0 : (int) Rows.number(total[0]);
+        long all = total == null ? 0L : Rows.number(total[1]);
+        return new EarningsDto(today, week, all, count, fares.currency());
     }
 
     /// @param application the account's application to drive, or null
     /// @param car the account's state, or null when it has never gone on line
     private static DriverDto toDto(Profile profile, DriverApplication application,
-            DriverState car, int rides) {
-        DriverDto dto = new DriverDto();
-        dto.username = profile.getUsername();
-        dto.displayName = profile.getDisplayName();
-        dto.vehicle = profile.getVehicle();
-        dto.plate = profile.getPlate();
-        dto.rides = rides;
-        dto.approved = application != null && Applications.APPROVED.equals(application.getStatus());
+            DriverState car, int rides, double acceptanceRate) {
+        boolean approved = application != null
+                && Applications.APPROVED.equals(application.getStatus());
         // An account with no application has no product; the app is told the
         // standard one so that it always has a word it knows.
         String product = application == null ? "" : application.getProduct();
-        dto.product = product.length() == 0 ? Fares.STANDARD : product;
-        dto.gender = profile.getGender();
-        dto.accessible = application != null && application.isWheelchair();
-        dto.flagged = profile.isFlagged();
-        dto.acceptanceRate = 1d;
-        dto.rating = 5d;
+        boolean accessible = application != null && application.isWheelchair();
+        boolean online = false;
+        double lat = 0d;
+        double lng = 0d;
+        double heading = 0d;
+        double rating = 5d;
+        long lastSeen = 0L;
         if (car != null) {
-            dto.lastSeen = car.getLastSeen();
+            lastSeen = car.getLastSeen();
             // On line means said so and heard from lately; see Matcher.
-            dto.online = car.isOnline()
-                    && System.currentTimeMillis() - dto.lastSeen < Matcher.FRESH_MILLIS;
-            dto.lat = car.getLat();
-            dto.lng = car.getLng();
-            dto.heading = car.getHeading();
-            dto.rating = car.rating();
+            online = car.isOnline()
+                    && System.currentTimeMillis() - lastSeen < Matcher.FRESH_MILLIS;
+            lat = car.getLat();
+            lng = car.getLng();
+            heading = car.getHeading();
+            rating = car.rating();
         }
-        return dto;
+        return new DriverDto(profile.getUsername(), profile.getDisplayName(),
+                profile.getVehicle(), profile.getPlate(), online, lat, lng, heading, rating,
+                lastSeen, rides, approved, product.length() == 0 ? Fares.STANDARD : product,
+                profile.getGender(), accessible, acceptanceRate, profile.isFlagged());
     }
 }

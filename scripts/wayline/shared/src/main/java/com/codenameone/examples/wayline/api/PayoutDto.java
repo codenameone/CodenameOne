@@ -25,17 +25,10 @@ package com.codenameone.examples.wayline.api;
 import com.codename1.annotations.Mapped;
 
 /// Money sent to a driver's bank.
+///
+/// @param status `paid`.
+/// @param createdAt Milliseconds since the epoch.
+/// @param destination The account it went to, as its owner would recognise it.
 @Mapped
-public class PayoutDto {
-    public String id;
-    public long amount;
-    /// `paid`.
-    public String status;
-    /// Milliseconds since the epoch.
-    public long createdAt;
-    /// The account it went to, as its owner would recognise it.
-    public String destination;
-
-    public PayoutDto() {
-    }
+public record PayoutDto(String id, long amount, String status, long createdAt, String destination) {
 }

@@ -160,8 +160,8 @@ class ModerationTest {
         } catch (ResponseStatusException refused) {
             assertEquals(403, refused.getStatus());
         }
-        assertTrue(accounts.describe(first).admin, "the first admin is one still");
-        assertFalse(accounts.describe(first).suspended, "and is not blocked");
+        assertTrue(accounts.describe(first).admin(), "the first admin is one still");
+        assertFalse(accounts.describe(first).suspended(), "and is not blocked");
     }
 
     @Test

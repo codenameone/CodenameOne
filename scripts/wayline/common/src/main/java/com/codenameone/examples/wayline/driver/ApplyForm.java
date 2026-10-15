@@ -95,7 +95,7 @@ public class ApplyForm implements Nav.Home {
     }
 
     private void fill(final DriverApplicationDto application) {
-        String status = application.status == null ? "none" : application.status;
+        String status = application.status() == null ? "none" : application.status();
         if ("approved".equals(status)) {
             // The account is a driver's now: say so to the app, and let it
             // build the screen a driver gets.
@@ -105,7 +105,7 @@ public class ApplyForm implements Nav.Home {
             }
             return;
         }
-        String now = status + ":" + application.submittedAt + ":" + missing(application);
+        String now = status + ":" + application.submittedAt() + ":" + missing(application);
         if (now.equals(showing)) {
             return;
         }
@@ -159,14 +159,14 @@ public class ApplyForm implements Nav.Home {
         page.add(FlowLayout.encloseCenter(state));
         Ui.section(page, "What happens next");
         page.add(Ui.row(FontImage.MATERIAL_CHECK_CIRCLE, "Application received",
-                application.submittedAt > 0 ? Ui.when(application.submittedAt) : null, null));
+                application.submittedAt() > 0 ? Ui.when(application.submittedAt()) : null, null));
         page.add(Ui.row(FontImage.MATERIAL_FACT_CHECK, "Documents checked",
                 "Usually within two working days", null));
         page.add(Ui.row(FontImage.MATERIAL_DIRECTIONS_CAR, "You go online",
                 "This screen becomes your driver's home the moment you are approved", null));
         Ui.section(page, "Your car");
         page.add(Ui.row(FontImage.MATERIAL_DIRECTIONS_CAR, car(application),
-                application.vehiclePlate, null));
+                application.vehiclePlate(), null));
     }
 
     private void rejected(final DriverApplicationDto application) {
@@ -182,7 +182,7 @@ public class ApplyForm implements Nav.Home {
         com.codename1.components.SpanLabel reason = Ui.text("", "WlText");
         // The reviewer's own words, in whatever language they wrote them.
         reason.setShouldLocalize(false);
-        reason.setText(application.rejectionReason);
+        reason.setText(application.rejectionReason());
         reason.setName("rejectionReason");
         said.add(reason);
         page.add(said);
@@ -199,29 +199,29 @@ public class ApplyForm implements Nav.Home {
     }
 
     private static boolean started(DriverApplicationDto application) {
-        return application.legalName != null && application.legalName.length() > 0
+        return application.legalName() != null && application.legalName().length() > 0
                 || missing(application) < 5;
     }
 
     static int missing(DriverApplicationDto application) {
         int missing = 0;
-        for (int iter = 0; application.documents != null && iter < application.documents.size();
+        for (int iter = 0; application.documents() != null && iter < application.documents().size();
                 iter++) {
-            DocumentDto document = application.documents.get(iter);
-            if ("missing".equals(document.status)) {
+            DocumentDto document = application.documents().get(iter);
+            if ("missing".equals(document.status())) {
                 missing++;
             }
         }
-        return application.documents == null ? 5 : missing;
+        return application.documents() == null ? 5 : missing;
     }
 
     static String car(DriverApplicationDto application) {
         StringBuilder car = new StringBuilder();
-        append(car, application.vehicleColor);
-        append(car, application.vehicleMake);
-        append(car, application.vehicleModel);
-        if (application.vehicleYear > 0) {
-            append(car, String.valueOf(application.vehicleYear));
+        append(car, application.vehicleColor());
+        append(car, application.vehicleMake());
+        append(car, application.vehicleModel());
+        if (application.vehicleYear() > 0) {
+            append(car, String.valueOf(application.vehicleYear()));
         }
         return car.toString();
     }

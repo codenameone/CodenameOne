@@ -30,11 +30,5 @@ import com.codename1.annotations.Mapped;
 /// at `url`: open it in the browser, and call complete when the user returns.
 /// Otherwise the app collects a [CardDto] itself and sends it with complete.
 @Mapped
-public class PaymentSetupDto {
-    public String id;
-    public boolean hosted;
-    public String url;
-
-    public PaymentSetupDto() {
-    }
+public record PaymentSetupDto(String id, boolean hosted, String url) {
 }

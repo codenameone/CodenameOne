@@ -26,13 +26,10 @@ import com.codename1.annotations.Mapped;
 
 /// What a driver has earned.
 @Mapped
-public class EarningsDto {
-    public long todayCents;
-    public long weekCents;
-    public long totalCents;
-    public int rides;
-    public String currency;
-
-    public EarningsDto() {
-    }
+public record EarningsDto(
+        long todayCents,
+        long weekCents,
+        long totalCents,
+        int rides,
+        String currency) {
 }

@@ -25,16 +25,14 @@ package com.codenameone.examples.wayline.api;
 import com.codename1.annotations.Mapped;
 
 /// The parts of an account its owner edits.
+///
+/// @param gender `unspecified`, `female`, `male` or `nonbinary`.
 @Mapped
-public class ProfileDto {
-    public String name;
-    /// `unspecified`, `female`, `male` or `nonbinary`.
-    public String gender;
-    public String emergencyContactName;
-    public String emergencyContactPhone;
-    public String homeAddress;
-    public String workAddress;
-
-    public ProfileDto() {
-    }
+public record ProfileDto(
+        String name,
+        String gender,
+        String emergencyContactName,
+        String emergencyContactPhone,
+        String homeAddress,
+        String workAddress) {
 }

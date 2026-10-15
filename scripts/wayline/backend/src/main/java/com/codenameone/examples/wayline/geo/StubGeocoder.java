@@ -71,12 +71,9 @@ public class StubGeocoder implements Geocoder {
     }
 
     private static PlaceDto place(int index) {
-        PlaceDto place = new PlaceDto();
-        place.name = (String) PLACES[index][0];
-        place.address = (String) PLACES[index][1];
-        place.lat = ((Double) PLACES[index][2]).doubleValue();
-        place.lng = ((Double) PLACES[index][3]).doubleValue();
-        return place;
+        return new PlaceDto((String) PLACES[index][0], (String) PLACES[index][1],
+                ((Double) PLACES[index][2]).doubleValue(),
+                ((Double) PLACES[index][3]).doubleValue());
     }
 
     /// Whether `text` contains `part`, whatever the case of either. Compared a

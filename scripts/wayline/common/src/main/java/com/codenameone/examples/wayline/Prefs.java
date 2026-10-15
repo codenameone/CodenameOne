@@ -270,12 +270,12 @@ public final class Prefs {
 
     /// Remembers `place` as the destination chosen last.
     public static void addRecent(PlaceDto place) {
-        if (place == null || place.name == null || place.name.length() == 0) {
+        if (place == null || place.name() == null || place.name().length() == 0) {
             return;
         }
         List<PlaceDto> all = recents();
         for (int iter = all.size() - 1; iter >= 0; iter--) {
-            if (place.name.equals(all.get(iter).name)) {
+            if (place.name().equals(all.get(iter).name())) {
                 all.remove(iter);
             }
         }
@@ -350,20 +350,18 @@ public final class Prefs {
         if (title.length() == 0) {
             return null;
         }
-        PlaceDto place = new PlaceDto();
-        place.name = title;
-        place.address = text(name + ".address", "");
-        place.lat = Preferences.get(PREFIX + name + ".lat", 0d);
-        place.lng = Preferences.get(PREFIX + name + ".lng", 0d);
+        PlaceDto place = new PlaceDto(title, text(name + ".address", ""),
+                Preferences.get(PREFIX + name + ".lat", 0d),
+                Preferences.get(PREFIX + name + ".lng", 0d));
         return place;
     }
 
     private static void store(String name, PlaceDto place) {
-        Preferences.set(PREFIX + name + ".name", place == null ? "" : place.name);
+        Preferences.set(PREFIX + name + ".name", place == null ? "" : place.name());
         Preferences.set(PREFIX + name + ".address",
-                place == null || place.address == null ? "" : place.address);
-        Preferences.set(PREFIX + name + ".lat", place == null ? 0d : place.lat);
-        Preferences.set(PREFIX + name + ".lng", place == null ? 0d : place.lng);
+                place == null || place.address() == null ? "" : place.address());
+        Preferences.set(PREFIX + name + ".lat", place == null ? 0d : place.lat());
+        Preferences.set(PREFIX + name + ".lng", place == null ? 0d : place.lng());
     }
 
     private static void changed(String name) {

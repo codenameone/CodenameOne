@@ -25,31 +25,29 @@ package com.codenameone.examples.wayline.api;
 import com.codename1.annotations.Mapped;
 
 /// A driver, for the admin's fleet view and for the driver's own status.
+///
+/// @param approved Whether the driving application was approved. Only an approved driver can go on
+///     line.
+/// @param product `standard`, `comfort` or `xl`: the kind of ride this car is offered.
+/// @param acceptanceRate The share of the offers this driver was sent that they took, 0 to 1; 1
+///     before any was sent.
 @Mapped
-public class DriverDto {
-    public String username;
-    public String displayName;
-    public String vehicle;
-    public String plate;
-    public boolean online;
-    public double lat;
-    public double lng;
-    public double heading;
-    public double rating;
-    public long lastSeen;
-    public int rides;
-    /// Whether the driving application was approved. Only an approved driver can
-    /// go on line.
-    public boolean approved;
-    /// `standard`, `comfort` or `xl`: the kind of ride this car is offered.
-    public String product;
-    public String gender;
-    public boolean accessible;
-    /// The share of the offers this driver was sent that they took, 0 to 1; 1
-    /// before any was sent.
-    public double acceptanceRate;
-    public boolean flagged;
-
-    public DriverDto() {
-    }
+public record DriverDto(
+        String username,
+        String displayName,
+        String vehicle,
+        String plate,
+        boolean online,
+        double lat,
+        double lng,
+        double heading,
+        double rating,
+        long lastSeen,
+        int rides,
+        boolean approved,
+        String product,
+        String gender,
+        boolean accessible,
+        double acceptanceRate,
+        boolean flagged) {
 }

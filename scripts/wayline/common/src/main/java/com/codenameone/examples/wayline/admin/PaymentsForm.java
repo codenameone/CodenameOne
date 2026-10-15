@@ -57,13 +57,12 @@ public final class PaymentsForm {
     /// A payment, opened: its receipt, and the way to return the money.
     private static void open(final Panes panes, final ReceiptDto payment) {
         Container page = ReceiptForm.page(payment, true);
-        if ("paid".equals(payment.status)) {
+        if ("paid".equals(payment.status())) {
             page.add(Ui.danger("Refund this ride", "refund", e -> panes.reason("Refund",
                     Lang.tr("{0} goes back to the card it came from.",
-                            Ui.money(payment.total, payment.currency)), "Refund", why -> {
-                        ReasonDto reason = new ReasonDto();
-                        reason.reason = why;
-                        Api.admin().refundRide(payment.rideId, reason, Net.to(refunded -> {
+                            Ui.money(payment.total(), payment.currency())), "Refund", why -> {
+                        ReasonDto reason = new ReasonDto(why);
+                        Api.admin().refundRide(payment.rideId(), reason, Net.to(refunded -> {
                             Telemetry.rideRefunded("payments");
                             open(panes, refunded);
                         }, Ui::fail));
@@ -81,14 +80,14 @@ public final class PaymentsForm {
         for (int iter = 0; payments != null && iter < payments.size(); iter++) {
             final ReceiptDto payment = payments.get(iter);
             Container value = new Container(BoxLayout.y());
-            value.add(Ui.plain(Ui.money(payment.total, payment.currency), "WlRowValue"));
-            value.add(Ui.badge(ReceiptForm.status(payment.status),
-                    ReceiptForm.badge(payment.status)));
-            String who = payment.riderUsername == null ? "" : payment.riderUsername;
-            String how = "cash".equals(payment.status) ? Lang.tr("Cash") : payment.methodLabel;
-            final Container picked = Ui.row("cash".equals(payment.status)
+            value.add(Ui.plain(Ui.money(payment.total(), payment.currency()), "WlRowValue"));
+            value.add(Ui.badge(ReceiptForm.status(payment.status()),
+                    ReceiptForm.badge(payment.status())));
+            String who = payment.riderUsername() == null ? "" : payment.riderUsername();
+            String how = "cash".equals(payment.status()) ? Lang.tr("Cash") : payment.methodLabel();
+            final Container picked = Ui.row("cash".equals(payment.status())
                     ? FontImage.MATERIAL_PAYMENTS : FontImage.MATERIAL_CREDIT_CARD,
-                    payment.dropoffName,
+                    payment.dropoffName(),
                     who + (who.length() > 0 && how != null && how.length() > 0 ? Ui.DOT : "")
                             + (how == null ? "" : how), value);
             list.add(Ui.tap(picked, "payment-" + iter, e -> {

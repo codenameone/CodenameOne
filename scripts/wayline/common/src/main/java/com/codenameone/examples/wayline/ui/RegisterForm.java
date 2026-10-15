@@ -72,13 +72,10 @@ public final class RegisterForm {
         error.setName("error");
         final Button create = Ui.primary("Create account", "submit", null);
         create.addActionListener(e -> {
-            final RegisterDto request = new RegisterDto();
-            request.displayName = name.getText().trim();
-            request.email = email.getText().trim();
-            request.phone = phone.getText().trim();
-            request.password = password.getText();
             final boolean driving = Nav.DRIVER.equals(wants[0]);
-            request.wantsToDrive = driving;
+            final RegisterDto request = new RegisterDto(email.getText().trim(), password.getText(),
+                    name.getText().trim(), phone.getText().trim(), false, null, null, driving,
+                    null);
             final Net.Failed failed = (status, message) -> {
                 create.setEnabled(true);
                 error.setText(message);
@@ -88,11 +85,11 @@ public final class RegisterForm {
             error.setText("");
             // The server checks every field and says what is wrong with the
             // first that fails, so nothing is validated twice.
-            Api.account().register(request, Net.to(user -> Session.signIn(request.email,
-                    request.password, () -> {
+            Api.account().register(request, Net.to(user -> Session.signIn(request.email(),
+                    request.password(), () -> {
                         // Someone who came to drive starts on the driver's side,
                         // which for them is the application.
-                        AppConfig.setMode(driving ? Nav.DRIVER : Nav.RIDER, request.email);
+                        AppConfig.setMode(driving ? Nav.DRIVER : Nav.RIDER, request.email());
                         Telemetry.registered(driving);
                         VerifyPhoneForm.show(Nav::enter);
                     }, failed), failed));

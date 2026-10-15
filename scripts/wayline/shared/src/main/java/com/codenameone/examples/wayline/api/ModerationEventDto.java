@@ -25,15 +25,10 @@ package com.codenameone.examples.wayline.api;
 import com.codename1.annotations.Mapped;
 
 /// Something an admin did to an account, and why.
+///
+/// @param at Milliseconds since the epoch.
+/// @param by The admin who did it.
+/// @param action `flag`, `unflag`, `block`, `unblock`, `approve`, `reject`, `roles`.
 @Mapped
-public class ModerationEventDto {
-    /// Milliseconds since the epoch.
-    public long at;
-    public String by;
-    /// `flag`, `unflag`, `block`, `unblock`, `approve`, `reject`, `roles`.
-    public String action;
-    public String reason;
-
-    public ModerationEventDto() {
-    }
+public record ModerationEventDto(long at, String by, String action, String reason) {
 }

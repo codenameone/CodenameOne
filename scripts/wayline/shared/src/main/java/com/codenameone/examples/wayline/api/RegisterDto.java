@@ -26,23 +26,21 @@ import com.codename1.annotations.Mapped;
 
 /// What opening an account takes. The password travels once, in the body of a
 /// request over TLS, and the server keeps only its hash.
+///
+/// @param driver The older spelling of [#wantsToDrive()], kept for apps built before it. It no
+///     longer grants anything: it opens a driving application like the newer flag.
+/// @param wantsToDrive Opens a driving application with the account. The account is a rider until
+///     an admin approves the application.
+/// @param gender `unspecified`, `female`, `male` or `nonbinary`; empty reads as unspecified.
 @Mapped
-public class RegisterDto {
-    public String email;
-    public String password;
-    public String displayName;
-    public String phone;
-    /// The older spelling of [#wantsToDrive], kept for apps built before it. It no
-    /// longer grants anything: it opens a driving application like the newer flag.
-    public boolean driver;
-    public String vehicle;
-    public String plate;
-    /// Opens a driving application with the account. The account is a rider until
-    /// an admin approves the application.
-    public boolean wantsToDrive;
-    /// `unspecified`, `female`, `male` or `nonbinary`; empty reads as unspecified.
-    public String gender;
-
-    public RegisterDto() {
-    }
+public record RegisterDto(
+        String email,
+        String password,
+        String displayName,
+        String phone,
+        boolean driver,
+        String vehicle,
+        String plate,
+        boolean wantsToDrive,
+        String gender) {
 }

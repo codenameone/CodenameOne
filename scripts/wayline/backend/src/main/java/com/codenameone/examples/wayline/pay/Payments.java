@@ -119,10 +119,7 @@ public class Payments {
     }
 
     public PaymentConfigDto config(String currency) {
-        PaymentConfigDto dto = new PaymentConfigDto();
-        dto.provider = provider.name();
-        dto.currency = currency;
-        return dto;
+        return new PaymentConfigDto(provider.name(), currency);
     }
 
     // --------------------------------------------------------------- methods
@@ -136,7 +133,7 @@ public class Payments {
         boolean marked = false;
         for (int iter = 0; iter < rows.size(); iter++) {
             PaymentMethodDto dto = card(rows.get(iter));
-            marked |= dto.isDefault;
+            marked |= dto.isDefault();
             out.add(dto);
         }
         out.add(cash(!marked));
@@ -176,11 +173,7 @@ public class Payments {
             throw unavailable("card setup", failed);
         }
         keepSetup(username, id, setup.reference);
-        PaymentSetupDto dto = new PaymentSetupDto();
-        dto.id = id;
-        dto.hosted = setup.hosted;
-        dto.url = setup.url;
-        return dto;
+        return new PaymentSetupDto(id, setup.hosted, setup.url);
     }
 
     /// The rider's reference at the processor, or null when they have none
@@ -334,7 +327,8 @@ public class Payments {
         // there to be seen below, or it no longer finds the card.
         profiles.hold(username);
         PaymentMethod row = owned(username, id);
-        PaymentMethodDto dto = card(row);
+        // What is answered is the card as it was, no longer anyone's default.
+        PaymentMethodDto dto = card(row, false);
         if (rides.existsByRiderAndMethodIdAndStateIn(username, id, UNDER_WAY)) {
             throw new ResponseStatusException(409, "That card is paying for a ride under way");
         }
@@ -347,7 +341,6 @@ public class Payments {
                     "That card is still paying for a ride. Try again in a few minutes");
         }
         cards.deleteById(row.getId());
-        dto.isDefault = false;
         return dto;
     }
 
@@ -792,44 +785,36 @@ public class Payments {
 
     private ReceiptDto receipt(Ride ride, long paidAt, boolean admin,
             Map<String, Profile> drivers) {
-        ReceiptDto dto = new ReceiptDto();
-        dto.rideId = ride.getId();
-        dto.currency = ride.getCurrency();
         long fare = ride.getFareCents();
-        dto.distanceFare = ride.getDistanceCents();
-        dto.timeFare = ride.getTimeCents();
+        long distanceFare = ride.getDistanceCents();
+        long timeFare = ride.getTimeCents();
         // Whatever of the fare the other two parts do not account for, which
         // for a ride asked for before the parts were kept is all of it.
-        dto.baseFare = fare - dto.distanceFare - dto.timeFare;
-        dto.serviceFee = ride.getFeeCents();
-        dto.tip = ride.getTipCents();
-        dto.total = fare + dto.serviceFee + dto.tip - dto.discount;
-        dto.methodLabel = ride.getMethodLabel();
+        long baseFare = fare - distanceFare - timeFare;
+        long serviceFee = ride.getFeeCents();
+        long tip = ride.getTipCents();
+        long discount = 0L;
         String paid = ride.getPaymentStatus();
         boolean cash = CASH.equals(ride.getMethodId());
+        String status;
         if (PAID.equals(paid)) {
-            dto.status = cash ? "cash" : "paid";
+            status = cash ? "cash" : "paid";
         } else if (FAILED.equals(paid)) {
-            dto.status = "failed";
+            status = "failed";
         } else if (REFUNDED.equals(paid)) {
-            dto.status = "refunded";
+            status = "refunded";
         } else if (REFUND_PENDING.equals(paid)) {
-            dto.status = "refund_pending";
+            status = "refund_pending";
         } else if (REFUND_FAILED.equals(paid)) {
-            dto.status = "refund_failed";
+            status = "refund_failed";
         } else {
-            dto.status = "pending";
+            status = "pending";
         }
         // Every refund state follows a payment that was made.
-        dto.paidAt = PAID.equals(paid) || (paid != null && paid.startsWith("REFUND"))
+        long paidOn = PAID.equals(paid) || (paid != null && paid.startsWith("REFUND"))
                 ? paidAt : 0L;
-        dto.pickupName = ride.getPickupAddress();
-        dto.dropoffName = ride.getDropoffAddress();
-        dto.distanceMeters = ride.getDistanceMeters();
-        dto.durationSeconds = ride.getDurationSeconds();
-        dto.riderUsername = admin ? ride.getRider() : "";
-        dto.driverName = "";
-        dto.vehicle = "";
+        String driverName = "";
+        String vehicle = "";
         String driver = ride.getDriver();
         if (driver.length() > 0 && RideState.OFFERED != ride.getState()) {
             Profile who = drivers.get(driver);
@@ -838,11 +823,15 @@ public class Payments {
                 drivers.put(driver, who);
             }
             if (who != null) {
-                dto.driverName = who.getDisplayName();
-                dto.vehicle = who.getVehicle();
+                driverName = who.getDisplayName();
+                vehicle = who.getVehicle();
             }
         }
-        return dto;
+        return new ReceiptDto(ride.getId(), ride.getCurrency(), baseFare, distanceFare,
+                timeFare, serviceFee, tip, discount, fare + serviceFee + tip - discount,
+                ride.getMethodLabel(), status, paidOn, ride.getPickupAddress(),
+                ride.getDropoffAddress(), ride.getDistanceMeters(), ride.getDurationSeconds(),
+                driverName, vehicle, admin ? ride.getRider() : "");
     }
 
     // ------------------------------------------------------------- internals
@@ -881,27 +870,16 @@ public class Payments {
     }
 
     private static PaymentMethodDto card(PaymentMethod row) {
-        PaymentMethodDto dto = new PaymentMethodDto();
-        dto.id = row.getId();
-        dto.kind = "card";
-        dto.brand = row.getBrand();
-        dto.last4 = row.getLast4();
-        dto.expMonth = row.getExpMonth();
-        dto.expYear = row.getExpYear();
-        dto.isDefault = row.isPreferred();
-        dto.label = label(row);
-        return dto;
+        return card(row, row.isPreferred());
+    }
+
+    private static PaymentMethodDto card(PaymentMethod row, boolean isDefault) {
+        return new PaymentMethodDto(row.getId(), "card", row.getBrand(), row.getLast4(),
+                row.getExpMonth(), row.getExpYear(), isDefault, label(row));
     }
 
     private static PaymentMethodDto cash(boolean isDefault) {
-        PaymentMethodDto dto = new PaymentMethodDto();
-        dto.id = CASH;
-        dto.kind = "cash";
-        dto.brand = "";
-        dto.last4 = "";
-        dto.isDefault = isDefault;
-        dto.label = CASH_LABEL;
-        return dto;
+        return new PaymentMethodDto(CASH, "cash", "", "", 0, 0, isDefault, CASH_LABEL);
     }
 
     private static String label(PaymentMethod method) {

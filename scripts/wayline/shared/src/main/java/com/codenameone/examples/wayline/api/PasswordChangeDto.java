@@ -26,10 +26,5 @@ import com.codename1.annotations.Mapped;
 
 /// A change of password: the one in use, and the one to use from now on.
 @Mapped
-public class PasswordChangeDto {
-    public String current;
-    public String replacement;
-
-    public PasswordChangeDto() {
-    }
+public record PasswordChangeDto(String current, String replacement) {
 }

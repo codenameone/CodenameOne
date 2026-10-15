@@ -68,16 +68,12 @@ public class GeoEndpoint implements GeoApiServer {
             System.err.println("geocoder reverse failed: " + failed.getMessage());
             found = null;
         }
+        // The point asked about, not the centre of whatever was found near it.
         if (found == null) {
             // A pin can be dropped anywhere, and a ride can start there: an
             // address the service does not know is a point without a name.
-            found = new PlaceDto();
-            found.name = "Dropped pin";
-            found.address = "";
+            return new PlaceDto("Dropped pin", "", lat, lng);
         }
-        // The point asked about, not the centre of whatever was found near it.
-        found.lat = lat;
-        found.lng = lng;
-        return found;
+        return new PlaceDto(found.name(), found.address(), lat, lng);
     }
 }

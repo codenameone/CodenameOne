@@ -78,22 +78,18 @@ public class PhoneVerification {
         String codeHash = hash(username, code);
         store(username, codeHash, System.currentTimeMillis());
         try {
-            sms.send(user.phone, "Your Wayline code is " + code);
+            sms.send(user.phone(), "Your Wayline code is " + code);
         } catch (IOException failed) {
             System.err.println("could not send a verification code: " + failed.getMessage());
             discard(username, codeHash);
             throw new ResponseStatusException(503, "We could not send the code. Try again shortly");
         }
-        PhoneChallengeDto challenge = new PhoneChallengeDto();
-        challenge.expiresInSeconds = CODE_SECONDS;
         // Only a server that cannot send a text message, and only on a
         // development profile, tells the app what the code was. Both halves
         // matter: a production server whose SMS settings were forgotten must fail
         // to verify anyone, not verify everyone.
-        if (!sms.delivers() && config.isDevelopmentProfile()) {
-            challenge.demoCode = code;
-        }
-        return challenge;
+        String demoCode = !sms.delivers() && config.isDevelopmentProfile() ? code : null;
+        return new PhoneChallengeDto(CODE_SECONDS, demoCode);
     }
 
     /// Keeps the hash of a new code in place of the one before it. Answers 429

@@ -118,17 +118,17 @@ public final class UsersForm {
             }
             shown++;
             Container marks = new Container(new FlowLayout(Label.RIGHT, Label.CENTER));
-            if (user.flagged) {
+            if (user.flagged()) {
                 marks.add(Ui.badge("Flagged", "WlBadgeWarn"));
             }
-            marks.add(Ui.badge(roles(user), user.suspended ? "WlBadgeBad" : "WlBadge"));
-            Container row = Ui.row((char) 0, user.displayName, user.username, marks);
+            marks.add(Ui.badge(roles(user), user.suspended() ? "WlBadgeBad" : "WlBadge"));
+            Container row = Ui.row((char) 0, user.displayName(), user.username(), marks);
             row.add(BorderLayout.WEST, FlowLayout.encloseCenterMiddle(
-                    Ui.avatar(user.displayName)));
+                    Ui.avatar(user.displayName())));
             final Container picked = row;
-            list.add(Ui.tap(row, "user-" + user.username, e -> {
+            list.add(Ui.tap(row, "user-" + user.username(), e -> {
                 panes.picked(picked);
-                open(user.username);
+                open(user.username());
             }));
         }
         if (shown == 0 && users != null) {
@@ -139,19 +139,19 @@ public final class UsersForm {
 
     private boolean passes(UserDto user) {
         if (FLAGGED.equals(filter)) {
-            return user.flagged;
+            return user.flagged();
         }
         if ("blocked".equals(filter)) {
-            return user.suspended;
+            return user.suspended();
         }
         if ("admins".equals(filter)) {
-            return user.admin;
+            return user.admin();
         }
         if ("drivers".equals(filter)) {
-            return user.driver;
+            return user.driver();
         }
         if ("riders".equals(filter)) {
-            return !user.driver && !user.admin;
+            return !user.driver() && !user.admin();
         }
         return true;
     }
@@ -160,8 +160,8 @@ public final class UsersForm {
     /// are compared a letter at a time: a name is not a protocol token, but
     /// folding it by the device's language would still miss an `I` in Turkish.
     private static boolean matches(UserDto user, String wanted) {
-        return wanted.length() == 0 || contains(user.displayName, wanted)
-                || contains(user.username, wanted);
+        return wanted.length() == 0 || contains(user.displayName(), wanted)
+                || contains(user.username(), wanted);
     }
 
     private static boolean contains(String text, String wanted) {
@@ -177,10 +177,10 @@ public final class UsersForm {
     }
 
     static String roles(UserDto user) {
-        if (user.suspended) {
+        if (user.suspended()) {
             return "Blocked";
         }
-        return user.admin ? "Admin" : user.driver ? "Driver" : "Rider";
+        return user.admin() ? "Admin" : user.driver() ? "Driver" : "Rider";
     }
 
     /// One account in full, fetched each time it is shown.
@@ -189,42 +189,42 @@ public final class UsersForm {
     }
 
     private void show(final UserDetailDto detail) {
-        final UserDto user = detail.user;
+        final UserDto user = detail.user();
         Container page = Ui.page();
 
-        Label standing = Ui.badge(user.suspended ? "Blocked" : user.flagged ? "Flagged"
-                : "In good standing", user.suspended ? "WlBadgeBad" : user.flagged
+        Label standing = Ui.badge(user.suspended() ? "Blocked" : user.flagged() ? "Flagged"
+                : "In good standing", user.suspended() ? "WlBadgeBad" : user.flagged()
                 ? "WlBadgeWarn" : "WlBadgeGood");
         standing.setName("standing");
-        page.add(Ui.person(user.displayName, user.username, standing));
-        if (user.flagged && user.flagReason != null && user.flagReason.length() > 0) {
-            SpanLabel why = Ui.text(user.flagReason, "WlNotice");
+        page.add(Ui.person(user.displayName(), user.username(), standing));
+        if (user.flagged() && user.flagReason() != null && user.flagReason().length() > 0) {
+            SpanLabel why = Ui.text(user.flagReason(), "WlNotice");
             why.setName("flagReason");
             page.add(why);
         }
 
         StatRow numbers = Ui.stats(3);
-        numbers.stat(String.valueOf(detail.rides), "Rides", "userRides");
-        numbers.stat(String.valueOf(detail.cancellations), "Cancelled",
+        numbers.stat(String.valueOf(detail.rides()), "Rides", "userRides");
+        numbers.stat(String.valueOf(detail.cancellations()), "Cancelled",
                 "userCancellations");
-        numbers.stat(detail.rating > 0 ? Ui.tenths(detail.rating) : "-", "Rating",
+        numbers.stat(detail.rating() > 0 ? Ui.tenths(detail.rating()) : "-", "Rating",
                 "userRating");
         page.add(numbers);
         StatRow money = Ui.stats(2);
-        money.stat(Ui.money(detail.spent, null), "Spent riding", "userSpent");
-        money.stat(Ui.money(detail.earned, null), "Earned driving", "userEarned");
+        money.stat(Ui.money(detail.spent(), null), "Spent riding", "userSpent");
+        money.stat(Ui.money(detail.earned(), null), "Earned driving", "userEarned");
         page.add(money);
 
         Ui.section(page, "Contact");
-        page.add(Ui.row(FontImage.MATERIAL_PHONE, user.phone,
-                user.phoneVerified ? "Verified" : "Not verified", null));
-        if (user.driver) {
-            page.add(Ui.row(FontImage.MATERIAL_DIRECTIONS_CAR, user.vehicle, user.plate, null));
+        page.add(Ui.row(FontImage.MATERIAL_PHONE, user.phone(),
+                user.phoneVerified() ? "Verified" : "Not verified", null));
+        if (user.driver()) {
+            page.add(Ui.row(FontImage.MATERIAL_DIRECTIONS_CAR, user.vehicle(), user.plate(), null));
         }
 
         Ui.section(page, "Access");
-        final Switch driver = toggle("driver", user.driver);
-        final Switch admin = toggle("admin", user.admin);
+        final Switch driver = toggle("driver", user.driver());
+        final Switch admin = toggle("admin", user.admin());
         page.add(Ui.row(FontImage.MATERIAL_DIRECTIONS_CAR, "Driver",
                 "May go online and take rides", driver));
         page.add(Ui.row(FontImage.MATERIAL_INSIGHTS, "Admin",
@@ -233,21 +233,21 @@ public final class UsersForm {
         // -- is put back, so the switches always show what is true. Putting
         // one back is itself a change, which `settling` keeps from being sent.
         final boolean[] settling = new boolean[1];
+        // The roles as the server last confirmed them: driver, admin.
+        final boolean[] held = {user.driver(), user.admin()};
         final Runnable roles = () -> {
             if (settling[0]) {
                 return;
             }
-            RoleChangeDto change = new RoleChangeDto();
-            change.driver = driver.isValue();
-            change.admin = admin.isValue();
-            Api.admin().setRoles(user.username, change, Net.to(saved -> {
-                user.driver = saved.driver;
-                user.admin = saved.admin;
+            RoleChangeDto change = new RoleChangeDto(driver.isValue(), admin.isValue());
+            Api.admin().setRoles(user.username(), change, Net.to(saved -> {
+                held[0] = saved.driver();
+                held[1] = saved.admin();
             }, (status, message) -> {
                 Ui.fail(status, message);
                 settling[0] = true;
-                driver.setValue(user.driver);
-                admin.setValue(user.admin);
+                driver.setValue(held[0]);
+                admin.setValue(held[1]);
                 settling[0] = false;
             }));
         };
@@ -258,56 +258,52 @@ public final class UsersForm {
         page.add(Ui.text("A flag marks the account for the admins and changes nothing for "
                 + "its owner. A block signs it out and refuses it until lifted.", "WlMuted"));
         Container actions = new Container(new GridLayout(1, 2));
-        actions.add(pair("WlPairLeft", user.flagged
+        actions.add(pair("WlPairLeft", user.flagged()
                 ? Ui.secondary("Remove flag", "unflag", e -> flag(user, false, ""))
                 : Ui.secondary("Flag", "flag", e -> panes.reason("Flag account",
-                        Lang.tr("Why does {0} need the admins' attention?", user.displayName),
+                        Lang.tr("Why does {0} need the admins' attention?", user.displayName()),
                         "Flag", why -> flag(user, true, why)))));
-        actions.add(pair("WlPairRight", user.suspended
+        actions.add(pair("WlPairRight", user.suspended()
                 ? Ui.secondary("Unblock", "unblock", e -> block(user, false, ""))
                 : Ui.danger("Block", "block", e -> panes.reason("Block account",
                         Lang.tr("{0} is signed out everywhere and cannot sign in again "
-                                + "until the block is lifted.", user.displayName), "Block",
+                                + "until the block is lifted.", user.displayName()), "Block",
                         why -> block(user, true, why)))));
         page.add(actions);
 
         Ui.section(page, "History");
-        List<ModerationEventDto> events = detail.events;
+        List<ModerationEventDto> events = detail.events();
         if (events == null || events.isEmpty()) {
             page.add(Ui.label("Nothing has been done to this account.", "WlMuted"));
         }
         for (int iter = 0; events != null && iter < events.size(); iter++) {
             ModerationEventDto event = events.get(iter);
-            Container row = Ui.row(icon(event.action), action(event.action),
-                    event.reason == null || event.reason.length() == 0 ? null : event.reason,
+            Container row = Ui.row(icon(event.action()), action(event.action()),
+                    event.reason() == null || event.reason().length() == 0 ? null : event.reason(),
                     null);
             row.setName("event-" + iter);
             Container when = new Container(BoxLayout.y());
-            when.add(Ui.plain(Ui.when(event.at), "WlRowDetail"));
-            when.add(Ui.plain(event.by, "WlRowDetail"));
+            when.add(Ui.plain(Ui.when(event.at()), "WlRowDetail"));
+            when.add(Ui.plain(event.by(), "WlRowDetail"));
             row.add(BorderLayout.EAST, when);
             page.add(row);
         }
-        panes.detail(user.displayName, "User", page);
+        panes.detail(user.displayName(), "User", page);
     }
 
     private void flag(UserDto user, boolean flagged, String why) {
-        FlagDto change = new FlagDto();
-        change.flagged = flagged;
-        change.reason = why;
-        Api.admin().flag(user.username, change, Net.to(saved -> {
+        FlagDto change = new FlagDto(flagged, why);
+        Api.admin().flag(user.username(), change, Net.to(saved -> {
             Telemetry.userFlagged(flagged);
-            open(user.username);
+            open(user.username());
         }, Ui::fail));
     }
 
     private void block(UserDto user, boolean blocked, String why) {
-        SuspendDto change = new SuspendDto();
-        change.suspended = blocked;
-        change.reason = why;
-        Api.admin().suspend(user.username, change, Net.to(saved -> {
+        SuspendDto change = new SuspendDto(blocked, why);
+        Api.admin().suspend(user.username(), change, Net.to(saved -> {
             Telemetry.userBlocked(blocked);
-            open(user.username);
+            open(user.username());
         }, Ui::fail));
     }
 

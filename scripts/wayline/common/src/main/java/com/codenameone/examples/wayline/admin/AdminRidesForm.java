@@ -85,14 +85,15 @@ public final class AdminRidesForm {
             if (!passes(ride)) {
                 continue;
             }
-            String people = ride.driverName == null || ride.driverName.length() == 0
-                    ? ride.riderName : Lang.tr("{0} with {1}", ride.riderName, ride.driverName);
+            String people = ride.driverName() == null || ride.driverName().length() == 0
+                    ? ride.riderName()
+                    : Lang.tr("{0} with {1}", ride.riderName(), ride.driverName());
             Container value = new Container(BoxLayout.y());
-            value.add(Ui.plain(Ui.money(ride.total > 0 ? ride.total : ride.fareCents,
-                    ride.currency), "WlRowValue"));
-            value.add(Ui.badge(Ui.state(ride.state), Ui.stateBadge(ride.state)));
-            final Container picked = Ui.row(FontImage.MATERIAL_PLACE, ride.dropoffAddress,
-                    Ui.when(ride.requestedAt) + Ui.DOT + people, value);
+            value.add(Ui.plain(Ui.money(ride.total() > 0 ? ride.total() : ride.fareCents(),
+                    ride.currency()), "WlRowValue"));
+            value.add(Ui.badge(Ui.state(ride.state()), Ui.stateBadge(ride.state())));
+            final Container picked = Ui.row(FontImage.MATERIAL_PLACE, ride.dropoffAddress(),
+                    Ui.when(ride.requestedAt()) + Ui.DOT + people, value);
             list.add(Ui.tap(picked, "ride-" + shown, e -> {
                 panes.picked(picked);
                 show(ride);
@@ -107,71 +108,69 @@ public final class AdminRidesForm {
 
     private boolean passes(RideDto ride) {
         if ("active".equals(filter)) {
-            return ride.state.isActive();
+            return ride.state().isActive();
         }
         if ("completed".equals(filter)) {
-            return RideState.COMPLETED == ride.state;
+            return RideState.COMPLETED == ride.state();
         }
         if ("cancelled".equals(filter)) {
-            return !ride.state.isActive() && RideState.COMPLETED != ride.state;
+            return !ride.state().isActive() && RideState.COMPLETED != ride.state();
         }
         return true;
     }
 
     private void show(final RideDto ride) {
         Container page = Ui.page();
-        Label total = Ui.plain(Ui.money(ride.total > 0 ? ride.total : ride.fareCents,
-                ride.currency), "WlAmount");
+        Label total = Ui.plain(Ui.money(ride.total() > 0 ? ride.total() : ride.fareCents(),
+                ride.currency()), "WlAmount");
         page.add(total);
-        Label state = Ui.badge(Ui.state(ride.state), Ui.stateBadge(ride.state));
+        Label state = Ui.badge(Ui.state(ride.state()), Ui.stateBadge(ride.state()));
         state.setName("rideState");
         page.add(FlowLayout.encloseCenter(state));
-        page.add(FlowLayout.encloseCenter(Ui.plain(Ui.when(ride.requestedAt), "WlMuted")));
+        page.add(FlowLayout.encloseCenter(Ui.plain(Ui.when(ride.requestedAt()), "WlMuted")));
 
         Ui.section(page, "Trip");
-        page.add(Ui.row(FontImage.MATERIAL_TRIP_ORIGIN, ride.pickupAddress, null, null));
-        page.add(Ui.row(FontImage.MATERIAL_PLACE, ride.dropoffAddress,
-                Ui.distance(ride.distanceMeters) + Ui.DOT + Ui.minutes(ride.durationSeconds),
+        page.add(Ui.row(FontImage.MATERIAL_TRIP_ORIGIN, ride.pickupAddress(), null, null));
+        page.add(Ui.row(FontImage.MATERIAL_PLACE, ride.dropoffAddress(),
+                Ui.distance(ride.distanceMeters()) + Ui.DOT + Ui.minutes(ride.durationSeconds()),
                 null));
         Ui.section(page, "People");
-        page.add(Ui.row(FontImage.MATERIAL_HAIL, ride.riderName, ride.riderUsername, null));
-        if (ride.driverName != null && ride.driverName.length() > 0) {
-            page.add(Ui.row(FontImage.MATERIAL_DIRECTIONS_CAR, ride.driverName,
-                    ride.vehicle + (ride.plate == null || ride.plate.length() == 0 ? ""
-                            : Ui.DOT + ride.plate), null));
+        page.add(Ui.row(FontImage.MATERIAL_HAIL, ride.riderName(), ride.riderUsername(), null));
+        if (ride.driverName() != null && ride.driverName().length() > 0) {
+            page.add(Ui.row(FontImage.MATERIAL_DIRECTIONS_CAR, ride.driverName(),
+                    ride.vehicle() + (ride.plate() == null || ride.plate().length() == 0 ? ""
+                            : Ui.DOT + ride.plate()), null));
         }
         Ui.section(page, "Payment");
-        page.add(Ui.fact("Kind of ride", Lang.tr(Ui.product(ride.product))));
-        page.add(Ui.fact("Fare", Ui.money(ride.fareCents, ride.currency)));
-        page.add(Ui.fact("Service fee", Ui.money(ride.serviceFee, ride.currency)));
-        page.add(Ui.fact("Tip", Ui.money(ride.tip, ride.currency)));
-        page.add(Ui.fact("Paid with", ride.cash ? Lang.tr("Cash") : ride.paymentMethodLabel));
-        page.add(Ui.fact("Payment", Lang.tr(payment(ride.paymentStatus))));
+        page.add(Ui.fact("Kind of ride", Lang.tr(Ui.product(ride.product()))));
+        page.add(Ui.fact("Fare", Ui.money(ride.fareCents(), ride.currency())));
+        page.add(Ui.fact("Service fee", Ui.money(ride.serviceFee(), ride.currency())));
+        page.add(Ui.fact("Tip", Ui.money(ride.tip(), ride.currency())));
+        page.add(Ui.fact("Paid with", ride.cash() ? Lang.tr("Cash") : ride.paymentMethodLabel()));
+        page.add(Ui.fact("Payment", Lang.tr(payment(ride.paymentStatus()))));
 
-        if (ride.state.isActive()) {
+        if (ride.state().isActive()) {
             page.add(Ui.danger("Cancel this ride", "cancelRide", e -> panes.reason(
                     "Cancel ride", Lang.tr("The rider and the driver are both told, and "
                             + "nobody is charged."), "Cancel ride", why -> {
-                        ReasonDto reason = new ReasonDto();
-                        reason.reason = why;
-                        Api.admin().cancelRide(ride.id, reason, Net.to(cancelled -> {
-                            Telemetry.rideCancelled("admin", ride.state);
+                        ReasonDto reason = new ReasonDto(why);
+                        Api.admin().cancelRide(ride.id(), reason, Net.to(cancelled -> {
+                            Telemetry.rideCancelled("admin", ride.state());
                             panes.home();
                         }, Ui::fail));
                     })));
         }
-        if ("PAID".equals(ride.paymentStatus) && !ride.cash) {
+        if ("PAID".equals(ride.paymentStatus()) && !ride.cash()) {
             page.add(Ui.danger("Refund this ride", "refund", e -> panes.reason("Refund",
                     Lang.tr("{0} goes back to the card it came from.", Ui.money(
-                            ride.total > 0 ? ride.total : ride.fareCents, ride.currency)),
+                            ride.total() > 0 ? ride.total() : ride.fareCents(), ride.currency())),
                     "Refund", why -> {
-                        ReasonDto reason = new ReasonDto();
-                        reason.reason = why;
-                        Api.admin().refundRide(ride.id, reason, Net.to(refunded -> {
+                        ReasonDto reason = new ReasonDto(why);
+                        Api.admin().refundRide(ride.id(), reason, Net.to(refunded -> {
                             Telemetry.rideRefunded("rides");
                             // The processor may not have returned the money
                             // yet; the receipt says which.
-                            Ui.say("refund_pending".equals(refunded.status)
+                            Ui.say("refund_pending".equals(refunded.status())
                                     ? "The refund is pending" : "The ride was refunded");
                             panes.home();
                         }, Ui::fail));

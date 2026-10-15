@@ -27,20 +27,18 @@ import com.codename1.annotations.Mapped;
 import java.util.List;
 
 /// What a ride would cost and how soon a driver could be there.
+///
+/// @param amountCents The fare of the product asked for, before the service fee.
+/// @param driversNearby Drivers online within reach of the pickup right now.
+/// @param etaSeconds A rough time for the nearest of them to arrive, or 0 when there is none.
+/// @param options The same ride priced as each product, cheapest first.
 @Mapped
-public class FareQuoteDto {
-    /// The fare of the product asked for, before the service fee.
-    public long amountCents;
-    public String currency;
-    public double distanceMeters;
-    public double durationSeconds;
-    /// Drivers online within reach of the pickup right now.
-    public int driversNearby;
-    /// A rough time for the nearest of them to arrive, or 0 when there is none.
-    public int etaSeconds;
-    /// The same ride priced as each product, cheapest first.
-    public List<FareOptionDto> options;
-
-    public FareQuoteDto() {
-    }
+public record FareQuoteDto(
+        long amountCents,
+        String currency,
+        double distanceMeters,
+        double durationSeconds,
+        int driversNearby,
+        int etaSeconds,
+        List<FareOptionDto> options) {
 }

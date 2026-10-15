@@ -96,11 +96,11 @@ public final class WalletForm {
 
     /// The name of a method, as a rider would say it.
     public static String label(PaymentMethodDto method) {
-        if (method == null || "cash".equals(method.kind)) {
+        if (method == null || "cash".equals(method.kind())) {
             return Lang.tr("Cash");
         }
-        return method.label == null || method.label.length() == 0
-                ? method.brand + " " + method.last4 : method.label;
+        return method.label() == null || method.label().length() == 0
+                ? method.brand() + " " + method.last4() : method.label();
     }
 
     private void load() {
@@ -111,8 +111,8 @@ public final class WalletForm {
         list.removeAll();
         for (int iter = 0; methods != null && iter < methods.size(); iter++) {
             final PaymentMethodDto method = methods.get(iter);
-            boolean cash = "cash".equals(method.kind);
-            boolean marked = picked == null ? method.isDefault : method.id.equals(chosen);
+            boolean cash = "cash".equals(method.kind());
+            boolean marked = picked == null ? method.isDefault() : method.id().equals(chosen);
             Container row = new Container(new BorderLayout());
             row.setUIID(marked ? "WlOptionPicked" : "WlOption");
             Label icon = new Label("", "WlOptionIcon");
@@ -125,7 +125,7 @@ public final class WalletForm {
                     : Lang.tr("Expires {0}", expiry(method)), "WlRowDetail"));
             row.add(BorderLayout.CENTER, lines);
             Container end = new Container(new FlowLayout(Label.RIGHT, Label.CENTER));
-            if (method.isDefault) {
+            if (method.isDefault()) {
                 end.add(Ui.badge("Default", "WlBadgeGood"));
             }
             row.add(BorderLayout.EAST, end);
@@ -135,9 +135,9 @@ public final class WalletForm {
                 // Its own line under the card, so that a tap meant for the card
                 // is never a tap on Remove.
                 Button remove = Ui.link("Remove this card", "remove-" + iter, e ->
-                        Api.payments().remove(method.id, Net.to(gone -> {
+                        Api.payments().remove(method.id(), Net.to(gone -> {
                             Telemetry.cardRemoved();
-                            if (method.id.equals(Prefs.paymentMethod())) {
+                            if (method.id().equals(Prefs.paymentMethod())) {
                                 Prefs.setPaymentMethod(Prefs.PAYMENT_CASH);
                             }
                             load();
@@ -154,15 +154,15 @@ public final class WalletForm {
             picked.picked(method);
             return;
         }
-        Api.payments().makeDefault(method.id, Net.to(made -> {
-            Prefs.setPaymentMethod(method.id);
+        Api.payments().makeDefault(method.id(), Net.to(made -> {
+            Prefs.setPaymentMethod(method.id());
             load();
         }, Ui::fail));
     }
 
     private static String expiry(PaymentMethodDto method) {
-        int year = method.expYear % 100;
-        return (method.expMonth < 10 ? "0" : "") + method.expMonth + "/"
+        int year = method.expYear() % 100;
+        return (method.expMonth() < 10 ? "0" : "") + method.expMonth() + "/"
                 + (year < 10 ? "0" : "") + year;
     }
 }

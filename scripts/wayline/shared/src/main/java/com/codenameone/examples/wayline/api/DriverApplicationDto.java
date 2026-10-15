@@ -27,37 +27,38 @@ import com.codename1.annotations.Mapped;
 import java.util.List;
 
 /// An application to drive: who, which car, and the papers that prove both.
+///
+/// @param status `none`, `draft`, `pending`, `approved` or `rejected`.
+/// @param dateOfBirth `yyyy-MM-dd`.
+/// @param licenceExpiry `yyyy-MM-dd`.
+/// @param product `standard`, `comfort` or `xl`.
+/// @param accessible Whether the car takes a wheelchair.
+/// @param petFriendly Whether a rider's pet is welcome in the car.
+/// @param documents One entry for each kind of document asked for, uploaded or not.
+/// @param submittedAt Milliseconds since the epoch; 0 until it is handed in.
+/// @param reviewedAt Milliseconds since the epoch; 0 until an admin decides.
+/// @param reviewedBy The admin who decided; empty until one has.
 @Mapped
-public class DriverApplicationDto {
-    public String username;
-    public String name;
-    /// `none`, `draft`, `pending`, `approved` or `rejected`.
-    public String status;
-    public String legalName;
-    /// Dates are `yyyy-MM-dd`.
-    public String dateOfBirth;
-    public String licenceNumber;
-    public String licenceExpiry;
-    public String vehicleMake;
-    public String vehicleModel;
-    public int vehicleYear;
-    public String vehicleColor;
-    public String vehiclePlate;
-    public int vehicleSeats;
-    /// `standard`, `comfort` or `xl`.
-    public String product;
-    /// Whether the car takes a wheelchair.
-    public boolean accessible;
-    /// Whether a rider's pet is welcome in the car.
-    public boolean petFriendly;
-    /// One entry for each kind of document asked for, uploaded or not.
-    public List<DocumentDto> documents;
-    public String rejectionReason;
-    /// Milliseconds since the epoch; 0 for a step not reached.
-    public long submittedAt;
-    public long reviewedAt;
-    public String reviewedBy;
-
-    public DriverApplicationDto() {
-    }
+public record DriverApplicationDto(
+        String username,
+        String name,
+        String status,
+        String legalName,
+        String dateOfBirth,
+        String licenceNumber,
+        String licenceExpiry,
+        String vehicleMake,
+        String vehicleModel,
+        int vehicleYear,
+        String vehicleColor,
+        String vehiclePlate,
+        int vehicleSeats,
+        String product,
+        boolean accessible,
+        boolean petFriendly,
+        List<DocumentDto> documents,
+        String rejectionReason,
+        long submittedAt,
+        long reviewedAt,
+        String reviewedBy) {
 }

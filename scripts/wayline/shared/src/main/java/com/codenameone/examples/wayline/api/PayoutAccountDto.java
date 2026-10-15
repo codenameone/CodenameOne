@@ -27,11 +27,5 @@ import com.codename1.annotations.Mapped;
 /// Where a driver's payouts go. Only the last four digits of the account are
 /// kept.
 @Mapped
-public class PayoutAccountDto {
-    public String holder;
-    public String bankName;
-    public String accountLast4;
-
-    public PayoutAccountDto() {
-    }
+public record PayoutAccountDto(String holder, String bankName, String accountLast4) {
 }

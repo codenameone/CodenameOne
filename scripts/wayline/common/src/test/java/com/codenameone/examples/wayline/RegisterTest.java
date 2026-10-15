@@ -44,8 +44,8 @@ public class RegisterTest extends E2e {
         // Registered and signed in, and asked for the code. The test server
         // sends no text; it says what the code is.
         waitForForm("VerifyPhone");
-        assertEqual(email, Session.user().username);
-        assertFalse(Session.user().phoneVerified, "a new account starts unverified");
+        assertEqual(email, Session.user().username());
+        assertFalse(Session.user().phoneVerified(), "a new account starts unverified");
         until(() -> text("demoCode").indexOf("code is ") > 0, 20000, "the demo code");
         shot("verify-phone");
         String notice = text("demoCode");
@@ -56,12 +56,12 @@ public class RegisterTest extends E2e {
         type("code", "000000".equals(code) ? "111111" : "000000");
         click("submit");
         until(() -> text("error").length() > 0, 20000, "the wrong-code error");
-        assertFalse(Session.user().phoneVerified);
+        assertFalse(Session.user().phoneVerified());
 
         type("code", code);
         click("submit");
         waitForForm("Rider");
-        assertTrue(Session.user().phoneVerified, "the right code verifies the number");
+        assertTrue(Session.user().phoneVerified(), "the right code verifies the number");
         return true;
     }
 }
