@@ -38,6 +38,7 @@ final class RepositoryGenerator {
     static final String REPOSITORY = PREFIX + "Repository;";
     private static final String BASE = "com/codename1/orm/repository/CrudRepository";
     private static final String PAGE = "com.codename1.orm.repository.PageRequest";
+    private static final String ROW = "[Ljava/lang/Object;";
     private final OrmAnnotationProcessor.EntityClass entity;
     private final String entityType;
     private final String keyType;
@@ -131,7 +132,12 @@ final class RepositoryGenerator {
             int pos = sig == null ? -1 : sig.indexOf(marker);
             if (pos < 0 || !sig.endsWith(">;")) throw invalid("Use " + container + "<ConcreteType>, not a raw " + container + " or wildcard");
             String item = sig.substring(pos + marker.length(), sig.length() - 2);
-            if (!item.startsWith("L") || item.indexOf('<') >= 0 || !item.endsWith(";")) throw invalid(container + " needs a concrete element class");
+            // A row of several values -- `select a.x, count(a) ... group by a.x` --
+            // is an Object[], as Spring Data returns it; checked below to be a
+            // declared JPQL select.
+            if (!item.equals(ROW) && (!item.startsWith("L") || item.indexOf('<') >= 0 || !item.endsWith(";"))) {
+                throw invalid(container + " needs a concrete element class");
+            }
             scalar = Type.getType(item).getClassName();
         }
         int page = -1;
@@ -221,10 +227,12 @@ final class RepositoryGenerator {
             if (count && !scalar.equals("long") || exists && !scalar.equals("boolean")) throw invalid("countBy returns long; existsBy returns boolean");
             if (!delete && !count && !exists && !scalar.equals(entityType)) throw invalid("Derived find returns entity or List<entity>");
         }
+        boolean row = scalar.equals("java.lang.Object[]");
+        if (row && (query == null || nativeSql)) throw invalid("Object[] rows come from a declared JPQL @Query select");
         boolean mutation = modifying || delete;
         if (mutation && (!scalar.equals("int") && !scalar.equals("void") || list || optional || page >= 0)) throw invalid("Modifying queries return int or void without pagination");
         if (optional && (count || exists)) throw invalid("countBy returns long; existsBy returns boolean");
-        if (!mutation && result.getSort() != Type.OBJECT && !count && !exists) throw invalid("Declared scalar selects must use boxed return types for SQL NULL");
+        if (!mutation && result.getSort() != Type.OBJECT && !row && !count && !exists) throw invalid("Declared scalar selects must use boxed return types for SQL NULL");
         if (page >= 0 && limit > 0) throw invalid("Do not combine PageRequest with Top/First");
         String valueType = mutation ? "Object" : count || exists ? "Long" : scalar;
         if (nativeSql && !mutation && !scalar.equals("java.lang.String") && !scalar.equals("java.lang.Long")

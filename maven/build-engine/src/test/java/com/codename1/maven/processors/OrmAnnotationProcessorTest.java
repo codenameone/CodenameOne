@@ -76,6 +76,9 @@ public class OrmAnnotationProcessorTest {
             + "@Lock(com.codename1.orm.session.LockMode.PESSIMISTIC_WRITE) Note findById(Long id); "
             + "@Query(\"select sum(case when e.score>=:floor then 1 else 0 end) from repositories.Note e\") Long qualified(@Param(\"floor\") long floor); "
             + "@Query(\"select max(e.score) from repositories.Note e where e.name='other'\") java.util.Optional<Long> highest(); "
+            + "@Query(\"select e.name, count(e) from repositories.Note e group by e.name\") List<Object[]> countsByName(); "
+            + "@Query(\"select coalesce(sum(e.score),0), count(e) from repositories.Note e where e.name=:name\") Object[] totals(@Param(\"name\") String name); "
+            + "@Query(\"select e.name, e.score from repositories.Note e where e.name=:name order by e.score desc\") java.util.Optional<Object[]> best(@Param(\"name\") String name); "
             + "@Modifying @Query(\"update repositories.Note e set e.score=:score where e.name=:name\") int revise(@Param(\"name\") String name,@Param(\"score\") long score); "
             + "@Query(value=\"SELECT COUNT(*) FROM repository_note WHERE name=:name\",nativeSql=true) Long nativeCount(@Param(\"name\") String name); }");
         // Compile the caller with the interface, before generating any implementation.
@@ -84,6 +87,9 @@ public class OrmAnnotationProcessorTest {
             + "if(repo.count()!=2 || !repo.existsByName(\"same\") || repo.countByName(\"same\")!=2 || repo.nativeCount(\"same\")!=2) throw new AssertionError(\"counts\"); "
             + "if(repo.findByNameAndScoreGreaterThanOrderByScoreDescIdAsc(\"same\",0,new PageRequest(1,1)).get(0)!=a || repo.findTop1ByNameOrderByScoreDesc(\"same\").get(0)!=b || repo.qualified(5)!=1) throw new AssertionError(\"queries\"); "
             + "if(repo.findFirstByNameOrderByScoreAsc(\"same\").get()!=a || repo.findFirstByNameOrderByScoreAsc(\"none\").isPresent() || repo.highest().isPresent()) throw new AssertionError(\"optional\"); "
+            + "java.util.List<Object[]> byName=repo.countsByName(); Object[] totals=repo.totals(\"same\"); "
+            + "if(byName.size()!=1 || !\"same\".equals(byName.get(0)[0]) || ((Number)byName.get(0)[1]).longValue()!=2 || ((Number)totals[0]).longValue()!=12 || ((Number)totals[1]).longValue()!=2 "
+            + "|| ((Number)repo.best(\"same\").get()[1]).longValue()!=9 || repo.best(\"none\").isPresent()) throw new AssertionError(\"row projections\"); "
             + "if(repo.findByActiveTrue().get(0)!=a || repo.findByArchivedFalse().get(0)!=a || repo.findByNameAndScoreIn(\"same\",java.util.Arrays.asList(3L)).get(0)!=a || repo.findByScoreIn(new Long[]{9L}).get(0)!=b || repo.findByNameIn(java.util.Collections.singleton(\"same\")).size()!=2) throw new AssertionError(\"typed finders\"); "
             + "s.beginTransaction(); a.score=4; if(repo.revise(\"same\",11)!=2 || s.contains(a)) throw new AssertionError(\"bulk\"); s.rollbackTransaction(); "
             + "if(s.find(Note.class,a.id).score!=3) throw new AssertionError(\"rollback\"); "
@@ -272,6 +278,9 @@ public class OrmAnnotationProcessorTest {
             "java.util.List<Note> findByScoreIn(java.util.List<? extends Long> values);",
             "java.util.List<Note> findByScoreIn(java.util.List<java.util.List<Long>> values);",
             "@Query(\"select e from badrepo.Note e where e.name=:name\") Note lookup(String name);",
+            "java.util.List<Object[]> findByName(String name);",
+            "@Query(value=\"SELECT name, score FROM note\",nativeSql=true) java.util.List<Object[]> rows();",
+            "@Query(\"select e.name from badrepo.Note e\") java.util.List<String[]> names();",
             "@Query(\"update badrepo.Note e set e.name=:name\") int rename(@Param(\"name\") String name);",
             "@Lock(com.codename1.orm.session.LockMode.PESSIMISTIC_WRITE) Note findByName(String name);"
         }) {
