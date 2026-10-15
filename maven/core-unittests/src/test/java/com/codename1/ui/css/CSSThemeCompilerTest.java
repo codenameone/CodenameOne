@@ -25,14 +25,20 @@ package com.codename1.ui.css;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.Font;
 import com.codename1.ui.Image;
+import com.codename1.ui.Label;
 import com.codename1.ui.plaf.CSSBorder;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.MutableResource;
 import java.util.Hashtable;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -108,12 +114,13 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertEquals("ffc0cb", theme.get("Button.fgColor"));
         assertEquals("112233", theme.get("Button.bgColor"));
         assertEquals("255", theme.get("Button.transparency"));
-        assertEquals("1,2,1,2", theme.get("Button.padding"));
-        assertEquals("2,4,6,8", theme.get("Label.margin"));
+        // Theme storage order is top,bottom,left,right; CSS writes top,right,bottom,left.
+        assertEquals("1,1,2,2", theme.get("Button.padding"));
+        assertEquals("2,6,8,4", theme.get("Label.margin"));
         assertEquals("Label", theme.get("Button.derive"));
         assertEquals("#abc", theme.get("@primary"));
         assertEquals("4px", theme.get("@spacing"));
-        assertEquals("#abc", theme.get("@primarycolor"));
+        assertEquals("#abc", theme.get("@primaryColor"));
         assertEquals(Integer.valueOf(Component.CENTER), theme.get("Button.align"));
         assertTrue(theme.get("Button.border") instanceof CSSBorder);
         assertEquals("00ff00", theme.get("Button.press#fgColor"));
@@ -237,6 +244,157 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertTrue(css.contains("border-style:dashed none none none"));
         assertTrue(css.contains("3px"));
         assertTrue(css.contains("#ff0000ff"));
+    }
+
+    @Test
+    public void testHashConstantsBlockKeepsCaseAndDecodesQuotes() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants {\n"
+                + "    includeNativeBool: true;\n"
+                + "    customMessage: \"Hello\";\n"
+                + "    singleQuotedBool: 'true';\n"
+                + "    withSemicolon: \"a;b\";\n"
+                + "    --accentColor: #ff2d95;\n"
+                + "}\n"
+                + "Label{color:var(--accentColor);}", resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("true", theme.get("@includeNativeBool"));
+        assertFalse(theme.containsKey("@includenativebool"));
+        assertEquals("Hello", theme.get("@customMessage"));
+        assertEquals("true", theme.get("@singleQuotedBool"));
+        assertEquals("a;b", theme.get("@withSemicolon"));
+        assertEquals("#ff2d95", theme.get("@accentColor"));
+        assertEquals("ff2d95", theme.get("Label.fgColor"));
+        // The block is constants only, never a UIID called "#Constants".
+        for (Object key : theme.keySet()) {
+            assertFalse(String.valueOf(key).indexOf("Constants") > -1, String.valueOf(key));
+        }
+    }
+
+    @Test
+    public void testLegacyConstantsBlockStillWorksAndMayFollowItsUse() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Label{color:var(--tint);}"
+                + "@constants{ tint: #102030; quoted: \"x y\"; plain: 12; }"
+                + "@constants{ second: 'two'; }", resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("#102030", theme.get("@tint"));
+        assertEquals("x y", theme.get("@quoted"));
+        assertEquals("12", theme.get("@plain"));
+        assertEquals("two", theme.get("@second"));
+        assertEquals("102030", theme.get("Label.fgColor"));
+    }
+
+    @Test
+    public void testRootCustomPropertiesKeepCase() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile(":root{--mainColor:#123456;}Label{color:var(--mainColor);}",
+                resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("#123456", theme.get("@mainColor"));
+        assertEquals("123456", theme.get("Label.fgColor"));
+    }
+
+    @Test
+    public void testBoxShorthandForEveryLength() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("One{padding:5px;}"
+                + "Two{padding:1px 2px;}"
+                + "Three{padding:1px 2px 3px;}"
+                + "Four{padding:1px 2px 3px 4px;}", resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("5,5,5,5", theme.get("One.padding"));
+        assertEquals("1,1,2,2", theme.get("Two.padding"));
+        assertEquals("1,3,2,2", theme.get("Three.padding"));
+        assertEquals("1,3,4,2", theme.get("Four.padding"));
+        byte px = Style.UNIT_TYPE_PIXELS;
+        assertArrayEquals(new byte[]{px, px, px, px}, (byte[]) theme.get("Four.padUnit"));
+    }
+
+    @Test
+    public void testIssueExampleResolvesToTheRightSides() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Label {\n    padding: 1px 2px 3px 4px;\n    margin: 1mm 2mm;\n}",
+                resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("1,3,4,2", theme.get("Label.padding"));
+        assertEquals("1,1,2,2", theme.get("Label.margin"));
+        byte mm = Style.UNIT_TYPE_DIPS;
+        assertArrayEquals(new byte[]{mm, mm, mm, mm}, (byte[]) theme.get("Label.marUnit"));
+
+        UIManager.getInstance().addThemeProps(theme);
+        Style s = new Label("x").getUnselectedStyle();
+        assertEquals(1f, s.getPaddingFloatValue(false, Component.TOP), 0f);
+        assertEquals(2f, s.getPaddingFloatValue(false, Component.RIGHT), 0f);
+        assertEquals(3f, s.getPaddingFloatValue(false, Component.BOTTOM), 0f);
+        assertEquals(4f, s.getPaddingFloatValue(false, Component.LEFT), 0f);
+        assertEquals(1f, s.getMarginFloatValue(false, Component.TOP), 0f);
+        assertEquals(2f, s.getMarginFloatValue(false, Component.RIGHT), 0f);
+        assertEquals(1f, s.getMarginFloatValue(false, Component.BOTTOM), 0f);
+        assertEquals(2f, s.getMarginFloatValue(false, Component.LEFT), 0f);
+        assertEquals(mm, s.getMarginUnit()[Component.LEFT]);
+        assertEquals(Style.UNIT_TYPE_PIXELS, s.getPaddingUnit()[Component.LEFT]);
+    }
+
+    @Test
+    public void testMixedUnitsKeepEachSidesUnit() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Mixed{padding:1mm 10% 2.5pt 3px;}"
+                + "Mixed:pressed{margin:1.5mm 2cm;}", resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        // top=1mm, bottom=2.5pt (a density independent pixel, rounded), left=3px, right=10%.
+        assertEquals("1,3,3,10", theme.get("Mixed.padding"));
+        assertArrayEquals(new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_PIXELS,
+                        Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_SCREEN_PERCENTAGE},
+                (byte[]) theme.get("Mixed.padUnit"));
+        assertEquals("1.5,1.5,20,20", theme.get("Mixed.press#margin"));
+        byte mm = Style.UNIT_TYPE_DIPS;
+        assertArrayEquals(new byte[]{mm, mm, mm, mm}, (byte[]) theme.get("Mixed.press#marUnit"));
+        org.junit.jupiter.api.Assertions.assertNull(theme.get("Mixed.marUnit"));
+    }
+
+    @Test
+    public void testRejectsMalformedBoxValues() {
+        CSSThemeCompiler compiler = new CSSThemeCompiler();
+        MutableResource resource = new MutableResource();
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
+                compiler.compile("Label{padding:1px 2px 3px 4px 5px;}", resource, "Theme"));
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
+                compiler.compile("Label{margin:wide;}", resource, "Theme"));
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
+                compiler.compile("Label{font-size:huge;}", resource, "Theme"));
+    }
+
+    @Test
+    public void testFontSizeWithFamilyResolvesToTheRequestedSize() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Label {\n    font-family: \"native:MainRegular\";\n    font-size: 3mm;\n}",
+                resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        Font font = (Font) theme.get("Label.font");
+        assertNotNull(font);
+        assertTrue(font.isTTFNativeFont());
+        assertEquals(Display.getInstance().convertToPixels(30, true) / 10f, font.getPixelSize(), 0.001f);
+
+        UIManager.getInstance().addThemeProps(theme);
+        assertEquals(font, new Label("x").getUnselectedStyle().getFont());
+    }
+
+    @Test
+    public void testFontSizeUnitsAndStateWithoutFamily() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Sized{font-size:12px;}"
+                + "Sized:selected{font-size:18pt;}"
+                + "Split{font-family:'native:MainBold';}"
+                + "Split{font-size:2mm;}", resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals(12f, ((Font) theme.get("Sized.font")).getPixelSize(), 0.001f);
+        // 18pt is 6.35mm, the build-time compiler's conversion.
+        float pt = Display.getInstance().convertToPixels((int) (18f / 72f * 25.4f * 10), true) / 10f;
+        assertEquals(pt, ((Font) theme.get("Sized.sel#font")).getPixelSize(), 0.001f);
+        // Family and size declared in two rules for the same UIID still meet.
+        Font split = (Font) theme.get("Split.font");
+        assertEquals(Display.getInstance().convertToPixels(20, true) / 10f, split.getPixelSize(), 0.001f);
     }
 
 }

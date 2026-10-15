@@ -22,10 +22,14 @@
  */
 package com.codename1.ui.css;
 
+import com.codename1.ui.CN;
 import com.codename1.ui.Component;
+import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Font;
 import com.codename1.ui.Image;
 import com.codename1.ui.plaf.CSSBorder;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.MutableResource;
 import java.util.ArrayList;
 import java.util.Hashtable;
@@ -46,9 +50,15 @@ import java.util.Hashtable;
 ///
 /// - `color`
 /// - `background-color`
-/// - `padding`
-/// - `margin`
-/// - `font-family` (mapped to `font` string for later resolution)
+/// - `padding`, `margin`: one to four values in CSS top/right/bottom/left order, stored in the
+///   theme's top/bottom/left/right order together with per-side `padUnit`/`marUnit` metadata.
+///   `px`, `pt` and unitless values are pixels (rounded, as the build-time compiler does), `mm`
+///   and `cm` are millimetres, `%` is a percentage of the screen, and `rem`, `vw`, `vh`,
+///   `vmin`, `vmax` keep their own unit.
+/// - `font-family` and `font-size`: resolved to a {@link Font} with the build-time compiler's
+///   semantics. The family defaults to `native:MainRegular` and the size to the medium system
+///   font; `font-size` accepts `px`, `pt`, `mm`, `cm`, `in`, `rem`, `vw`, `vh`, `vmin`, `vmax`,
+///   `%` and the `small`/`medium`/`large` keywords.
 /// - `cn1-derive`
 /// - `cn1-image-id`
 /// - `cn1-mutable-image`
@@ -57,8 +67,12 @@ import java.util.Hashtable;
 /// ## Theme constants
 ///
 /// - CSS custom property definitions in `:root`, e.g. `--primary: #ff00ff;`
-/// - `@constants { name: value; other: value; }`
+/// - `#Constants { name: value; }`, the block the build-time compiler reads, and the older
+///   `@constants { name: value; other: value; }` spelling.
 /// - `var(--name)` dereferencing in declaration values.
+///
+/// A constant keeps the case of its name (`includeNativeBool` becomes `@includeNativeBool`) and
+/// a quoted value is stored without its quotes, so `'true'` and `"true"` both become `true`.
 public class CSSThemeCompiler {
 
     public static class CSSSyntaxException extends IllegalArgumentException {
@@ -78,10 +92,18 @@ public class CSSThemeCompiler {
         }
 
         String strippedCss = stripComments(css);
-        compileConstants(strippedCss, theme);
         Rule[] rules = parseRulesWithMedia(strippedCss);
+        // Constants first, wherever their block sits, so a var() in any rule can see them.
         for (Rule rule : rules) {
-            applyRule(theme, resources, rule);
+            if (rule.constants) {
+                compileConstants(rule.declarations, theme);
+            }
+        }
+        Hashtable<String, String[]> fonts = new Hashtable<String, String[]>();
+        for (Rule rule : rules) {
+            if (!rule.constants) {
+                applyRule(theme, resources, rule, fonts);
+            }
         }
         inheritHoverDerivations(theme);
         resolveThemeConstantVars(theme);
@@ -193,26 +215,47 @@ public class CSSThemeCompiler {
         }
     }
 
-    private void compileConstants(String css, Hashtable theme) {
-        int constantsStart = css.indexOf("@constants");
-        if (constantsStart < 0) {
-            return;
-        }
-        int open = css.indexOf('{', constantsStart);
-        if (open < 0) {
-            return;
-        }
-        int close = css.indexOf('}', open + 1);
-        if (close <= open) {
-            throw new CSSSyntaxException("Unterminated @constants block");
-        }
-        Declaration[] declarations = parseDeclarations(css.substring(open + 1, close));
+    private void compileConstants(Declaration[] declarations, Hashtable theme) {
         for (Declaration declaration : declarations) {
-            theme.put("@" + declaration.property, declaration.value);
+            String name = declaration.name;
+            // `#Constants { --accent: ...; }` is how the build-time compiler exports a
+            // palette variable as the constant `@accent`.
+            if (name.startsWith("--")) {
+                name = name.substring(2);
+            }
+            theme.put("@" + name, unquote(declaration.value));
         }
     }
 
-    private void applyRule(Hashtable theme, MutableResource resources, Rule rule) {
+    private static boolean isConstantsSelector(String selector) {
+        return "@constants".equalsIgnoreCase(selector) || "#Constants".equalsIgnoreCase(selector);
+    }
+
+    /// Strips one pair of matching quotes, decoding backslash escapes inside them. Anything
+    /// else is returned as it is.
+    private static String unquote(String value) {
+        String v = value.trim();
+        int len = v.length();
+        if (len < 2) {
+            return v;
+        }
+        char quote = v.charAt(0);
+        if ((quote != '"' && quote != '\'') || v.charAt(len - 1) != quote) {
+            return v;
+        }
+        StringBuilder out = new StringBuilder(len - 2);
+        for (int i = 1; i < len - 1; i++) {
+            char c = v.charAt(i);
+            if (c == '\\' && i + 1 < len - 1) {
+                i++;
+                c = v.charAt(i);
+            }
+            out.append(c);
+        }
+        return out.toString();
+    }
+
+    private void applyRule(Hashtable theme, MutableResource resources, Rule rule, Hashtable<String, String[]> fonts) {
         if (":root".equals(rule.selector)) {
             applyRootDeclarations(theme, rule.declarations);
             return;
@@ -228,7 +271,10 @@ public class CSSThemeCompiler {
             String property = declaration.property;
             String value = resolveVars(theme, declaration.value);
 
-            if (applyThemeConstantProperty(theme, property, value)) {
+            if (applyThemeConstantProperty(theme, declaration.name, value)) {
+                continue;
+            }
+            if (applyFontProperty(theme, fonts, uiid + "." + statePrefix, property, value)) {
                 continue;
             }
             if (applySimpleThemeProperty(theme, uiid, statePrefix, property, value)) {
@@ -250,10 +296,10 @@ public class CSSThemeCompiler {
 
     private void applyRootDeclarations(Hashtable theme, Declaration[] declarations) {
         for (Declaration declaration : declarations) {
-            if (!declaration.property.startsWith("--")) {
+            if (!declaration.name.startsWith("--")) {
                 continue;
             }
-            theme.put("@" + declaration.property.substring(2), resolveVars(theme, declaration.value));
+            theme.put("@" + declaration.name.substring(2), unquote(resolveVars(theme, declaration.value)));
         }
     }
 
@@ -261,8 +307,195 @@ public class CSSThemeCompiler {
         if (!property.startsWith("--")) {
             return false;
         }
-        theme.put("@" + property.substring(2), value);
+        theme.put("@" + property.substring(2), unquote(value));
         return true;
+    }
+
+    /// Records a `font-family` or `font-size` for one UIID state and rebuilds that state's font
+    /// from everything declared for it so far, so the two may come from different rules.
+    private boolean applyFontProperty(Hashtable theme, Hashtable<String, String[]> fonts, String keyPrefix,
+                                      String property, String value) {
+        int slot;
+        if ("font-family".equals(property)) {
+            slot = 0;
+        } else if ("font-size".equals(property)) {
+            slot = 1;
+        } else {
+            return false;
+        }
+        String[] spec = fonts.get(keyPrefix);
+        if (spec == null) {
+            spec = new String[2];
+            fonts.put(keyPrefix, spec);
+        }
+        spec[slot] = value;
+        FontSize size = spec[1] == null ? null : parseFontSize(spec[1]);
+        // A font is a live platform object, so it can only be made with a running Display.
+        // Without one -- a tool that only checks that a stylesheet compiles -- the declaration
+        // has still been validated above.
+        if (Display.isInitialized()) {
+            theme.put(keyPrefix + Style.FONT, createFont(spec[0], size));
+        }
+        return true;
+    }
+
+    private Font createFont(String familyList, FontSize size) {
+        String ttfName = "native:MainRegular";
+        boolean monospace = false;
+        if (familyList != null) {
+            String[] families = splitOnComma(familyList);
+            for (String entry : families) {
+                String family = unquote(entry);
+                if (family.startsWith("native:")) {
+                    ttfName = family;
+                    break;
+                }
+                if ("monospace".equalsIgnoreCase(family)) {
+                    monospace = true;
+                    break;
+                }
+                if (isGenericFamily(family)) {
+                    break;
+                }
+                // Any other name has no @font-face here to resolve it, so it is passed over
+                // the way the build-time compiler passes over a family it cannot find.
+            }
+        }
+        int systemSize = size == null ? Font.SIZE_MEDIUM : size.systemSize;
+        if (monospace) {
+            return Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_PLAIN, systemSize);
+        }
+        Font fallback = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, systemSize);
+        float pixels = size == null || size.unit < 0 ? fallback.getHeight() : fontSizeInPixels(size);
+        Font ttf;
+        try {
+            ttf = Font.createTrueTypeFont(ttfName, ttfName);
+        } catch (RuntimeException err) {
+            ttf = null;
+        }
+        // The same fallback a resource file takes for a truetype font the platform cannot load.
+        return ttf == null ? fallback : ttf.derive(pixels, Font.STYLE_PLAIN);
+    }
+
+    private static boolean isGenericFamily(String family) {
+        String[] generic = {"sans-serif", "serif", "times", "courier", "arial", "cursive", "fantasy", "system-ui"};
+        for (String g : generic) {
+            if (g.equalsIgnoreCase(family)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Converts the way `Resources` converts a truetype size read from a resource file.
+    private float fontSizeInPixels(FontSize size) {
+        switch (size.unit) {
+            case Style.UNIT_TYPE_DIPS:
+                return Display.getInstance().convertToPixels((int) (size.value * 10), true) / 10.0f;
+            case Style.UNIT_TYPE_REM:
+                return Font.getDefaultFont().getHeight() * size.value;
+            case Style.UNIT_TYPE_VW:
+                return CN.getDisplayWidth() * size.value / 100f;
+            case Style.UNIT_TYPE_VH:
+                return CN.getDisplayHeight() * size.value / 100f;
+            case Style.UNIT_TYPE_VMIN:
+                return Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()) * size.value / 100f;
+            case Style.UNIT_TYPE_VMAX:
+                return Math.max(CN.getDisplayWidth(), CN.getDisplayHeight()) * size.value / 100f;
+            default:
+                return size.value;
+        }
+    }
+
+    /// Parses a `font-size` with the build-time compiler's conversions: `pt`, `cm` and `in` are
+    /// millimetres, a percentage scales the medium (3mm), small (2mm) or large (4mm) size, and
+    /// a keyword selects that system font size.
+    private FontSize parseFontSize(String value) {
+        String v = value.trim();
+        FontSize out = new FontSize();
+        if (endsWithIgnoreCase(v, "small") || "smaller".equalsIgnoreCase(v)) {
+            out.systemSize = Font.SIZE_SMALL;
+            return out;
+        }
+        if (endsWithIgnoreCase(v, "large") || "larger".equalsIgnoreCase(v)) {
+            out.systemSize = Font.SIZE_LARGE;
+            return out;
+        }
+        if ("medium".equalsIgnoreCase(v)) {
+            return out;
+        }
+        if (v.endsWith("%")) {
+            out.value = 3f * number(v.substring(0, v.length() - 1), value) / 100f;
+            out.unit = Style.UNIT_TYPE_DIPS;
+            return out;
+        }
+        // vmin before in, so the longer suffix wins.
+        String unit = unitSuffix(v, new String[]{"px", "pt", "mm", "cm", "vmin", "in", "rem", "vw", "vh", "vmax"});
+        if (unit == null) {
+            throw new CSSSyntaxException("Unsupported font-size value: " + value);
+        }
+        float n = number(v.substring(0, v.length() - unit.length()), value);
+        out.value = n;
+        if ("px".equals(unit)) {
+            out.unit = Style.UNIT_TYPE_PIXELS;
+        } else if ("pt".equals(unit)) {
+            out.unit = Style.UNIT_TYPE_DIPS;
+            out.value = n / 72f * 25.4f;
+        } else if ("mm".equals(unit)) {
+            out.unit = Style.UNIT_TYPE_DIPS;
+        } else if ("cm".equals(unit)) {
+            out.unit = Style.UNIT_TYPE_DIPS;
+            out.value = n * 10f;
+        } else if ("in".equals(unit)) {
+            out.unit = Style.UNIT_TYPE_DIPS;
+            out.value = n * 25.4f;
+        } else {
+            out.unit = viewportUnit(unit);
+        }
+        return out;
+    }
+
+    /// The first of `units` that `value` ends with, ignoring case, or null.
+    private static String unitSuffix(String value, String[] units) {
+        for (String unit : units) {
+            if (endsWithIgnoreCase(value, unit)) {
+                return unit;
+            }
+        }
+        return null;
+    }
+
+    private static byte viewportUnit(String unit) {
+        if ("rem".equals(unit)) {
+            return Style.UNIT_TYPE_REM;
+        }
+        if ("vw".equals(unit)) {
+            return Style.UNIT_TYPE_VW;
+        }
+        if ("vh".equals(unit)) {
+            return Style.UNIT_TYPE_VH;
+        }
+        if ("vmin".equals(unit)) {
+            return Style.UNIT_TYPE_VMIN;
+        }
+        return Style.UNIT_TYPE_VMAX;
+    }
+
+    private static float number(String text, String original) {
+        String t = text.trim();
+        if (t.length() == 0) {
+            throw new CSSSyntaxException("Missing number in: " + original);
+        }
+        try {
+            return Float.parseFloat(t);
+        } catch (NumberFormatException err) {
+            throw new CSSSyntaxException("Invalid number in: " + original, err);
+        }
+    }
+
+    private static boolean endsWithIgnoreCase(String value, String suffix) {
+        int start = value.length() - suffix.length();
+        return start >= 0 && value.regionMatches(true, start, suffix, 0, suffix.length());
     }
 
     private boolean applySimpleThemeProperty(Hashtable theme, String uiid, String statePrefix, String property, String value) {
@@ -278,7 +511,7 @@ public class CSSThemeCompiler {
             return true;
         }
         if ("padding".equals(property) || "margin".equals(property)) {
-            theme.put(uiid + "." + statePrefix + property, normalizeBox(value));
+            applyBox(theme, uiid + "." + statePrefix, property, value);
             return true;
         }
         if ("cn1-derive".equals(property)) {
@@ -597,28 +830,46 @@ public class CSSThemeCompiler {
         return hex;
     }
 
-    private String normalizeBox(String cssValue) {
+    /// Expands a one to four value `padding`/`margin` from CSS top/right/bottom/left order into
+    /// the theme's top/bottom/left/right value order, and its unit array, which `Style` indexes
+    /// by `Component.TOP`, `LEFT`, `BOTTOM`, `RIGHT`.
+    private void applyBox(Hashtable theme, String keyPrefix, String property, String cssValue) {
         String[] parts = splitOnWhitespace(cssValue.trim());
-        if (parts.length == 1) {
-            return scalar(parts[0]) + "," + scalar(parts[0]) + "," + scalar(parts[0]) + "," + scalar(parts[0]);
+        if (parts.length == 0 || parts.length > 4) {
+            throw new CSSSyntaxException(property + " takes one to four values: " + cssValue);
         }
-        if (parts.length == 2) {
-            return scalar(parts[0]) + "," + scalar(parts[1]) + "," + scalar(parts[0]) + "," + scalar(parts[1]);
-        }
-        if (parts.length == 3) {
-            return scalar(parts[0]) + "," + scalar(parts[1]) + "," + scalar(parts[2]) + "," + scalar(parts[1]);
-        }
-        if (parts.length >= 4) {
-            return scalar(parts[0]) + "," + scalar(parts[1]) + "," + scalar(parts[2]) + "," + scalar(parts[3]);
-        }
-        return "0,0,0,0";
+        Length top = length(parts[0]);
+        Length right = parts.length > 1 ? length(parts[1]) : top;
+        Length bottom = parts.length > 2 ? length(parts[2]) : top;
+        Length left = parts.length > 3 ? length(parts[3]) : right;
+        theme.put(keyPrefix + property, top.text + "," + bottom.text + "," + left.text + "," + right.text);
+        String unitKey = "padding".equals(property) ? Style.PADDING_UNIT : Style.MARGIN_UNIT;
+        theme.put(keyPrefix + unitKey, new byte[]{top.unit, left.unit, bottom.unit, right.unit});
     }
 
-    private String scalar(String value) {
-        String out = value.trim();
-        if (out.endsWith("px")) {
-            out = out.substring(0, out.length() - 2);
+    /// One side of a box. `px`, `pt` and a bare number are pixels rounded to a whole number,
+    /// which is what the build-time compiler stores: its `pt` is a density independent pixel,
+    /// not a CSS point.
+    private Length length(String value) {
+        String v = value.trim();
+        Length out = new Length();
+        String unit = unitSuffix(v, new String[]{"px", "pt", "mm", "cm", "%", "rem", "vw", "vh", "vmin", "vmax"});
+        float n = number(unit == null ? v : v.substring(0, v.length() - unit.length()), value);
+        if (unit == null || "px".equals(unit) || "pt".equals(unit)) {
+            out.unit = Style.UNIT_TYPE_PIXELS;
+            n = Math.round(n);
+        } else if ("mm".equals(unit)) {
+            out.unit = Style.UNIT_TYPE_DIPS;
+        } else if ("cm".equals(unit)) {
+            out.unit = Style.UNIT_TYPE_DIPS;
+            n = n * 10f;
+        } else if ("%".equals(unit)) {
+            out.unit = Style.UNIT_TYPE_SCREEN_PERCENTAGE;
+        } else {
+            out.unit = viewportUnit(unit);
         }
+        String text = String.valueOf(n);
+        out.text = text.endsWith(".0") ? text.substring(0, text.length() - 2) : text;
         return out;
     }
 
@@ -649,7 +900,12 @@ public class CSSThemeCompiler {
                 throw new CSSSyntaxException("Missing '}' for CSS rule: " + selectors);
             }
 
-            if (selectors.startsWith("@constants")) {
+            if (isConstantsSelector(selectors)) {
+                Rule constants = new Rule();
+                constants.selector = selectors;
+                constants.constants = true;
+                constants.declarations = parseDeclarations(css.substring(open + 1, close));
+                out.add(constants);
                 pos = close + 1;
                 continue;
             }
@@ -760,7 +1016,7 @@ public class CSSThemeCompiler {
 
     private Declaration[] parseDeclarations(String body) {
         ArrayList<Declaration> out = new ArrayList<Declaration>();
-        String[] segments = splitOnChar(body, ';');
+        String[] segments = splitDeclarations(body);
         for (String line : segments) {
             String trimmed = line.trim();
             if (trimmed.length() == 0) {
@@ -771,7 +1027,8 @@ public class CSSThemeCompiler {
                 throw new CSSSyntaxException("Malformed declaration: " + trimmed);
             }
             Declaration dec = new Declaration();
-            dec.property = trimmed.substring(0, colon).trim().toLowerCase();
+            dec.name = trimmed.substring(0, colon).trim();
+            dec.property = dec.name.toLowerCase();
             dec.value = trimmed.substring(colon + 1).trim();
             if (dec.property.length() == 0 || dec.value.length() == 0) {
                 throw new CSSSyntaxException("Malformed declaration: " + trimmed);
@@ -779,6 +1036,30 @@ public class CSSThemeCompiler {
             out.add(dec);
         }
         return out.toArray(new Declaration[out.size()]);
+    }
+
+    /// Splits a rule body on `;`, except inside a quoted value such as `"a;b"`.
+    private String[] splitDeclarations(String input) {
+        ArrayList<String> out = new ArrayList<String>();
+        int start = 0;
+        char quote = 0;
+        for (int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+            if (quote != 0) {
+                if (c == '\\') {
+                    i++;
+                } else if (c == quote) {
+                    quote = 0;
+                }
+            } else if (c == '"' || c == '\'') {
+                quote = c;
+            } else if (c == ';') {
+                out.add(input.substring(start, i));
+                start = i + 1;
+            }
+        }
+        out.add(input.substring(start));
+        return out.toArray(new String[out.size()]);
     }
 
     private String[] splitOnChar(String input, char delimiter) {
@@ -837,10 +1118,26 @@ public class CSSThemeCompiler {
     private static class Rule {
         String selector;
         Declaration[] declarations;
+        boolean constants;
     }
 
     private static class Declaration {
+        /// The name as written; constants and custom properties are case sensitive.
+        String name;
+        /// The lower case name ordinary CSS properties are matched by.
         String property;
         String value;
+    }
+
+    private static class Length {
+        String text;
+        byte unit;
+    }
+
+    private static class FontSize {
+        /// A `Style.UNIT_TYPE_*`, or -1 for a size given only as a system size.
+        byte unit = -1;
+        float value;
+        int systemSize = Font.SIZE_MEDIUM;
     }
 }
