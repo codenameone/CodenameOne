@@ -692,17 +692,19 @@ public final class Color extends Paint implements Interpolatable<Color> {
             throw new IllegalArgumentException("Invalid color specification");
         }
         double a = alpha ? component(parts[3], 1, false) : 1;
+        // The product is checked, not clamped: OpenJFX throws for
+        // web("rgba(255,0,0,0.6)", 2), whose opacity comes to 1.2.
         if (hsl) {
-            double h = number(parts[0]);
-            double s = component(parts[1], 1, true);
-            double l = component(parts[2], 1, true);
-            // Lightness to brightness.
-            double v = l + s * Math.min(l, 1 - l);
-            double sv = v == 0 ? 0 : 2 * (1 - l / v);
-            return hsb(h, clamp(sv), clamp(v), clamp(a * opacity));
+            // Read as hue, saturation and BRIGHTNESS, as OpenJFX's Color.web
+            // does -- hsl(0,100%,50%) is 0x800000 there, not red (checked
+            // against OpenJFX 23 and 27). An application keeps the colour it
+            // had on the desktop. Stylesheets do not come through here: the
+            // CSS runtime reads hsl() itself.
+            return hsb(number(parts[0]), component(parts[1], 1, true), component(parts[2], 1, true),
+                    a * opacity);
         }
         return new Color(component(parts[0], 255, false), component(parts[1], 255, false),
-                component(parts[2], 255, false), clamp(a * opacity));
+                component(parts[2], 255, false), a * opacity);
     }
 
     private static double number(String s) {
@@ -713,6 +715,10 @@ public final class Color extends Paint implements Interpolatable<Color> {
         }
     }
 
+    /// A component out of range is clamped, not rejected: OpenJFX reads
+    /// rgb(300,0,0) as red and rgba(255,0,0,1.5) as opaque (checked against
+    /// OpenJFX 23 and 27), as CSS does. Only the opacity the caller passes
+    /// on top is range checked, by the constructor.
     private static double component(String s, double range, boolean percentOnly) {
         if (s.endsWith("%")) {
             return clamp(number(s.substring(0, s.length() - 1).trim()) / 100.0);

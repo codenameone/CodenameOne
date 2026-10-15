@@ -242,6 +242,26 @@ public class ExecutorsTest {
         assertFalse(queuedRan.get());
     }
 
+    /// The largest timeout waits: a deadline of now plus Long.MAX_VALUE
+    /// overflowed into the past and the wait answered false at once.
+    @Test
+    public void anUnboundedAwaitTerminationWaits() throws Exception {
+        ExecutorService pool = Executors.newSingleThreadExecutor();
+        pool.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(200);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+        pool.shutdown();
+        assertTrue(pool.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS));
+        assertTrue(pool.isTerminated());
+    }
+
     @Test
     public void theArgumentsAreChecked() {
         for (int bad : Arrays.asList(Integer.valueOf(0), Integer.valueOf(-1))) {

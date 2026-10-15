@@ -44,6 +44,30 @@ import javafx.util.converter.NumberStringConverter;
 
 public class UtilTest {
 
+    /// Color.web as OpenJFX reads it (each expectation is what OpenJFX 23
+    /// and 27 print): components are clamped, hsl() is hue, saturation
+    /// and brightness, and only the opacity passed on top is refused when
+    /// the product leaves 0-1.
+    @Test
+    public void webColorsReadAsOpenJfxReadsThem() {
+        assertEquals("0xff0000ff", javafx.scene.paint.Color.web("rgb(300,0,0)").toString());
+        assertEquals("0x000000ff", javafx.scene.paint.Color.web("rgb(-5,0,0)").toString());
+        assertEquals("0xff0000ff", javafx.scene.paint.Color.web("rgba(255,0,0,1.5)").toString());
+        assertEquals("0x800000ff", javafx.scene.paint.Color.web("hsl(0,100%,50%)").toString());
+        assertEquals("0x004000ff", javafx.scene.paint.Color.web("hsl(120,100%,25%)").toString());
+        assertEquals("0x6060bfff", javafx.scene.paint.Color.web("hsl(240,50%,75%)").toString());
+        String[][] refused = {{"rgba(255,0,0,0.6)", "2"}, {"rgb(255,0,0)", "2"}, {"rgb(255,0,0)", "-1"},
+            {"hsl(0,100%,50%)", "2"}, {"red", "2"}};
+        for (String[] r : refused) {
+            try {
+                javafx.scene.paint.Color.web(r[0], Double.parseDouble(r[1]));
+                fail(r[0] + " at opacity " + r[1]);
+            } catch (IllegalArgumentException expected) {
+                assertTrue(expected.getMessage(), expected.getMessage().startsWith("Color's opacity value"));
+            }
+        }
+    }
+
     @Test
     public void durationFactoriesAndConversions() {
         assertEquals(1500.0, Duration.seconds(1.5).toMillis(), 0d);

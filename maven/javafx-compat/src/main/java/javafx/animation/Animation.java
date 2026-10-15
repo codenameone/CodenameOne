@@ -86,8 +86,19 @@ public abstract class Animation {
             new ReadOnlyObjectWrapper<Duration>(this, "totalDuration", Duration.ZERO);
     private final ReadOnlyObjectWrapper<Duration> currentTime =
             new ReadOnlyObjectWrapper<Duration>(this, "currentTime", Duration.ZERO);
-    private final ObjectProperty<Duration> delay = new SimpleObjectProperty<Duration>(this, "delay", Duration.ZERO);
-    private final IntegerProperty cycleCount = new SimpleIntegerProperty(this, "cycleCount", 1);
+    /// Checked in the property, as OpenJFX does, so a value set or bound
+    /// through delayProperty() is held to the same rule as setDelay: a
+    /// negative delay becomes zero (unbinding first) and then throws.
+    private final ObjectProperty<Duration> delay = new DelayProperty(this);
+    /// Any count is accepted, as OpenJFX accepts it (checked against 23 and
+    /// 27): one that is neither positive nor INDEFINITE plays one cycle.
+    /// The total duration follows the property however it is set.
+    private final IntegerProperty cycleCount = new SimpleIntegerProperty(this, "cycleCount", 1) {
+        @Override
+        protected void invalidated() {
+            syncTotalDuration();
+        }
+    };
     private final BooleanProperty autoReverse = new SimpleBooleanProperty(this, "autoReverse", false);
     private final ReadOnlyObjectWrapper<Status> status =
             new ReadOnlyObjectWrapper<Status>(this, "status", Status.STOPPED);
@@ -205,12 +216,6 @@ public abstract class Animation {
 
     /// Sets the time the animation waits after it was started.
     public final void setDelay(Duration value) {
-        if (value == null) {
-            throw new NullPointerException("Delay must not be null");
-        }
-        if (value.lessThan(Duration.ZERO) || value.isUnknown()) {
-            throw new IllegalArgumentException("Cannot set delay to negative value. Setting to Duration.ZERO");
-        }
         delay.set(value);
     }
 
@@ -227,11 +232,7 @@ public abstract class Animation {
     /// Sets how many cycles are played; [#INDEFINITE] repeats until the
     /// animation is stopped.
     public final void setCycleCount(int value) {
-        if (value == 0 || value < INDEFINITE) {
-            throw new IllegalArgumentException("Cycle count cannot be 0 or less than INDEFINITE");
-        }
         cycleCount.set(value);
-        syncTotalDuration();
     }
 
     /// Returns how many cycles are played.
@@ -733,5 +734,29 @@ public abstract class Animation {
         startPending = false;
         syncCurrentTime();
         doJumpTo(localTime());
+    }
+
+    /// The delay property, which checks every value however it arrives: a
+    /// negative delay becomes zero (unbinding first) and then throws, as
+    /// OpenJFX's does.
+    private static final class DelayProperty extends SimpleObjectProperty<Duration> {
+        DelayProperty(Object bean) {
+            super(bean, "delay", Duration.ZERO);
+        }
+
+        @Override
+        protected void invalidated() {
+            Duration value = get();
+            if (value == null) {
+                throw new NullPointerException("Delay must not be null");
+            }
+            if (value.lessThan(Duration.ZERO) || value.isUnknown()) {
+                if (isBound()) {
+                    unbind();
+                }
+                set(Duration.ZERO);
+                throw new IllegalArgumentException("Cannot set delay to negative value. Setting to Duration.ZERO");
+            }
+        }
     }
 }

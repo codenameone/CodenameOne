@@ -473,11 +473,55 @@ public class AnimationTest {
         assertFalse(log.contains("finished"));
         t.stop();
         assertFalse(FrameClock.isActive());
+    }
+
+    /// As OpenJFX (checked against 23 and 27): any cycle count is taken, one
+    /// that is neither positive nor INDEFINITE plays a single cycle, and the
+    /// total duration follows the property however it is set.
+    @Test
+    public void aCycleCountIsTakenAsOpenJfxTakesIt() {
+        DoubleProperty x = new SimpleDoubleProperty(0);
+        Timeline t = new Timeline(new KeyFrame(ms(100), new KeyValue(x, 100.0)));
+        t.setCycleCount(0);
+        assertEquals(0, t.getCycleCount());
+        assertEquals(ms(100), t.getTotalDuration());
+        t.cycleCountProperty().set(3);
+        assertEquals(ms(300), t.getTotalDuration());
+        t.cycleCountProperty().set(-5);
+        assertEquals(ms(100), t.getTotalDuration());
+        t.setOnFinished(note("finished"));
+        t.play();
+        FrameClock.advance(150);
+        assertEquals(Arrays.asList("finished"), log);
+        assertEquals(100.0, x.get(), EXACT);
+    }
+
+    /// A negative delay is refused through the property too, as OpenJFX
+    /// refuses it: the delay becomes zero, a binding is dropped, and the
+    /// caller gets the exception.
+    @Test
+    public void aNegativeDelayIsRefusedThroughThePropertyToo() {
+        Timeline t = new Timeline(new KeyFrame(ms(100)));
+        t.setDelay(ms(50));
         try {
-            t.setCycleCount(0);
-            fail("no cycles is not a cycle count");
+            t.delayProperty().set(ms(-1));
+            fail("a negative delay");
         } catch (IllegalArgumentException expected) {
-            // expected
+            assertEquals(Duration.ZERO, t.getDelay());
+        }
+        t.setDelay(ms(50));
+        try {
+            t.delayProperty().bind(new SimpleObjectProperty<Duration>(ms(-5)));
+            fail("a negative delay");
+        } catch (IllegalArgumentException expected) {
+            assertEquals(Duration.ZERO, t.getDelay());
+            assertFalse(t.delayProperty().isBound());
+        }
+        try {
+            t.setDelay(ms(-1));
+            fail("a negative delay");
+        } catch (IllegalArgumentException expected) {
+            assertEquals(Duration.ZERO, t.getDelay());
         }
     }
 

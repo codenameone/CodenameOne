@@ -562,6 +562,39 @@ public class NioFilesDifferentialTest {
         assertTrue(SCRIPT.length > 100);
     }
 
+    /// The walk discovers the tree as it is taken, as the JDK's does: a
+    /// directory is listed when the walk enters it, not when the stream is
+    /// made, so what was created in between is found -- and a walk cut short
+    /// lists nothing past where it stopped.
+    @Test
+    public void aWalkListsADirectoryWhenItGetsThere() throws Exception {
+        java.io.File root = new java.io.File(deviceRoot, "lazy");
+        assertTrue(new java.io.File(root, "sub").mkdirs());
+        Iterator<Path> walk = Files.walk(Paths.get("/lazy")).iterator();
+        assertEquals(Paths.get("/lazy"), walk.next());
+        assertTrue(new java.io.File(root, "later.txt").createNewFile());
+        assertTrue(new java.io.File(root, "sub/deep.txt").createNewFile());
+        List<Path> rest = new ArrayList<Path>();
+        while (walk.hasNext()) {
+            rest.add(walk.next());
+        }
+        assertEquals(Arrays.asList(Paths.get("/lazy/later.txt"), Paths.get("/lazy/sub"),
+                Paths.get("/lazy/sub/deep.txt")), rest);
+
+        Iterator<Path> found = Files.find(Paths.get("/lazy"), Integer.MAX_VALUE,
+                new BiPredicate<Path, BasicFileAttributes>() {
+                    @Override
+                    public boolean test(Path p, BasicFileAttributes attributes) {
+                        return attributes.isRegularFile();
+                    }
+                }).iterator();
+        assertEquals(Paths.get("/lazy/later.txt"), found.next());
+        assertTrue(new java.io.File(root, "sub/deeper.txt").createNewFile());
+        assertEquals(Paths.get("/lazy/sub/deep.txt"), found.next());
+        assertEquals(Paths.get("/lazy/sub/deeper.txt"), found.next());
+        assertFalse(found.hasNext());
+    }
+
     @Test
     public void aRelativePathIsUnderTheApplicationHome() throws Exception {
         Path settings = Paths.get("settings", "app.properties");

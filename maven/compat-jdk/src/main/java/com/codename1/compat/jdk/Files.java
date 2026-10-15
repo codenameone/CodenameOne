@@ -702,13 +702,51 @@ public final class Files {
         return JdkCollections.defaultStream(entries(dir));
     }
 
-    private static void walk(Path path, int depth, int maxDepth, List<Path> out) throws IOException {
-        out.add(path);
-        if (depth < maxDepth && file(path).isDirectory()) {
-            for (Path entry : entries(path)) {
-                walk(entry, depth + 1, maxDepth, out);
+    /// The paths under `start`, depth first, discovered as they are taken --
+    /// as the JDK's walk does: `walk(root).limit(1)` lists no directory, and
+    /// a directory is listed only when the walk is about to enter it. A
+    /// failure to list one surfaces then, as an UncheckedIOException.
+    private static Iterator<Path> walker(final Path start, final int maxDepth) {
+        return new PullIterator<Path>() {
+            /// The entries still to visit, one iterator per open directory.
+            private final List<Iterator<Path>> levels = new ArrayList<Iterator<Path>>();
+            private boolean started;
+            /// The path emitted last, entered on the next advance if it is
+            /// a directory within the depth limit.
+            private Path last;
+            private int lastDepth;
+
+            @Override
+            boolean advance() {
+                if (!started) {
+                    started = true;
+                    return visit(start, 0);
+                }
+                if (last != null && lastDepth < maxDepth && file(last).isDirectory()) {
+                    try {
+                        levels.add(entries(last).iterator());
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                }
+                last = null;
+                while (!levels.isEmpty()) {
+                    Iterator<Path> top = levels.get(levels.size() - 1);
+                    if (top.hasNext()) {
+                        return visit(top.next(), levels.size());
+                    }
+                    levels.remove(levels.size() - 1);
+                }
+                return false;
             }
-        }
+
+            private boolean visit(Path p, int depth) {
+                last = p;
+                lastDepth = depth;
+                emit(p);
+                return true;
+            }
+        };
     }
 
     public static Stream<Path> walk(Path start, int maxDepth, FileVisitOption... options) throws IOException {
@@ -716,16 +754,14 @@ public final class Files {
             throw new IllegalArgumentException("'maxDepth' is negative");
         }
         existing(start);
-        List<Path> out = new ArrayList<Path>();
-        walk(start, 0, maxDepth, out);
-        return JdkCollections.defaultStream(out);
+        return ObjPipeline.over(walker(start, maxDepth));
     }
 
     public static Stream<Path> walk(Path start, FileVisitOption... options) throws IOException {
         return walk(start, Integer.MAX_VALUE, options);
     }
 
-    public static Stream<Path> find(Path start, int maxDepth, BiPredicate<Path, BasicFileAttributes> matcher,
+    public static Stream<Path> find(Path start, int maxDepth, final BiPredicate<Path, BasicFileAttributes> matcher,
                                     FileVisitOption... options) throws IOException {
         if (maxDepth < 0) {
             throw new IllegalArgumentException("'maxDepth' is negative");
@@ -734,15 +770,20 @@ public final class Files {
             throw new NullPointerException();
         }
         existing(start);
-        List<Path> all = new ArrayList<Path>();
-        walk(start, 0, maxDepth, all);
-        List<Path> out = new ArrayList<Path>();
-        for (Path p : all) {
-            if (matcher.test(p, attributes(file(p)))) {
-                out.add(p);
+        final Iterator<Path> all = walker(start, maxDepth);
+        return ObjPipeline.over(new PullIterator<Path>() {
+            @Override
+            boolean advance() {
+                while (all.hasNext()) {
+                    Path p = all.next();
+                    if (matcher.test(p, attributes(file(p)))) {
+                        emit(p);
+                        return true;
+                    }
+                }
+                return false;
             }
-        }
-        return JdkCollections.defaultStream(out);
+        });
     }
 
     public static Path walkFileTree(Path start, FileVisitor<? super Path> visitor) throws IOException {

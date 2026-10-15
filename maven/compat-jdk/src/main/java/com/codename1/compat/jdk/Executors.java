@@ -333,7 +333,10 @@ public final class Executors {
 
         @Override
         public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
-            final long deadline = System.currentTimeMillis() + unit.toMillis(timeout);
+            long now = System.currentTimeMillis();
+            long wait = unit.toMillis(timeout);
+            // Clamped: a huge timeout must wait, not overflow to a deadline in the past.
+            final long deadline = wait > Long.MAX_VALUE - now ? Long.MAX_VALUE : now + wait;
             if (Display.isInitialized() && Display.getInstance().isEdt()) {
                 // The event dispatch thread must not sleep: wait off it.
                 Display.getInstance().invokeAndBlock(new Runnable() {

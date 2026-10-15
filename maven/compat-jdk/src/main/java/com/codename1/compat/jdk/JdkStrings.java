@@ -347,9 +347,11 @@ public final class JdkStrings {
     }
 
     public static StringBuilder replace(StringBuilder sb, int start, int end, String str) {
-        String s = sb.toString();
+        // Computed (and so validated) before the builder is touched: a bad
+        // range or a null replacement throws with the contents intact.
+        String r = replaced(sb.toString(), start, end, str);
         sb.setLength(0);
-        sb.append(replaced(s, start, end, str));
+        sb.append(r);
         return sb;
     }
 
@@ -382,9 +384,11 @@ public final class JdkStrings {
     }
 
     public static StringBuffer replace(StringBuffer sb, int start, int end, String str) {
-        String s = sb.toString();
+        // Computed (and so validated) before the builder is touched: a bad
+        // range or a null replacement throws with the contents intact.
+        String r = replaced(sb.toString(), start, end, str);
         sb.setLength(0);
-        sb.append(replaced(s, start, end, str));
+        sb.append(r);
         return sb;
     }
 

@@ -229,6 +229,21 @@ public class JdkLangDifferentialTest {
         } catch (StringIndexOutOfBoundsException expected) {
             // As StringBuilder.replace.
         }
+        // A refused replacement leaves the contents as they were.
+        StringBuilder kept = new StringBuilder("hello");
+        try {
+            JdkStrings.replace(kept, 3, 1, "x");
+            fail();
+        } catch (StringIndexOutOfBoundsException expected) {
+            assertEquals("hello", kept.toString());
+        }
+        StringBuffer keptBuffer = new StringBuffer("hello");
+        try {
+            JdkStrings.replace(keptBuffer, 0, 1, null);
+            fail();
+        } catch (NullPointerException expected) {
+            assertEquals("hello", keptBuffer.toString());
+        }
         StringBuilder sb = new StringBuilder("a-b-c");
         assertEquals(sb.indexOf("-", 2), JdkStrings.indexOf(sb, "-", 2));
         assertEquals(sb.lastIndexOf("-"), JdkStrings.lastIndexOf(sb, "-"));
