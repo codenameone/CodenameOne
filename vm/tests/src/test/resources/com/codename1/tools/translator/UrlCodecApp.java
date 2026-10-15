@@ -76,53 +76,7 @@ public class UrlCodecApp {
         } catch (java.io.UnsupportedEncodingException expected) {
             sb.append("unsupported;");
         }
-        // A charset is checked when it is named, not when a character first
-        // needs converting: text that needs no conversion is refused too.
-        String[] unknown = {"NO_SUCH_CHARSET", "bad name!", ""};
-        for (int i = 0; i < unknown.length; i++) {
-            sb.append(encodeRefusal("abc", unknown[i])).append(';');
-            sb.append(decodeRefusal("abc", unknown[i])).append(';');
-            // Before the text is looked at at all.
-            sb.append(encodeRefusal(null, unknown[i])).append(';');
-            sb.append(decodeRefusal(null, unknown[i])).append(';');
-        }
-        sb.append(encodeRefusal("abc", null)).append(';');
-        sb.append(decodeRefusal("abc", null)).append(';');
-        // Every charset: what a single byte charset cannot hold is '?', once
-        // for a surrogate pair, a byte US-ASCII cannot read is U+FFFD, and
-        // UTF-16 writes its byte order mark once per run of escapes.
-        String wide = accented + (char) 0x20AC + emoji + (char) 0xD800 + "x";
-        String[] names = {"UTF-8", "utf8", "ISO-8859-1", "ISO8859-1", "iso8859_1", "ISO_8859_1",
-            "ISO_8859-1", "8859_1", "latin1", "l1", "US-ASCII", "ascii", "us", "ISO646-US",
-            "ascii7", "646", "UTF-16", "unicode", "UTF-16BE", "UTF-16LE", "ISO-8859-2", "latin2"};
-        for (int i = 0; i < names.length; i++) {
-            sb.append(URLEncoder.encode(wide, names[i])).append('|');
-            sb.append(codePoints(URLDecoder.decode("%E9A+%41", names[i]))).append(';');
-        }
-        sb.append(URLEncoder.encode(wide, java.nio.charset.StandardCharsets.US_ASCII)).append(';');
-        sb.append(codePoints(URLDecoder.decode("%E9",
-                java.nio.charset.StandardCharsets.US_ASCII))).append(';');
         System.out.println(sb.toString());
-    }
-
-    private static String encodeRefusal(String s, String enc) {
-        try {
-            return "accepted:" + URLEncoder.encode(s, enc);
-        } catch (java.io.UnsupportedEncodingException e) {
-            return "unsupported";
-        } catch (NullPointerException e) {
-            return "npe";
-        }
-    }
-
-    private static String decodeRefusal(String s, String enc) {
-        try {
-            return "accepted:" + URLDecoder.decode(s, enc);
-        } catch (java.io.UnsupportedEncodingException e) {
-            return "unsupported";
-        } catch (NullPointerException e) {
-            return "npe";
-        }
     }
 
     private static String codePoints(String s) {

@@ -23,7 +23,6 @@
 
 package java.lang;
 
-import com.codename1.impl.charset.CharsetSupport;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -247,7 +246,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * JDK1.1
      */
     public String(byte[] bytes, int off, int len, java.lang.String enc) throws java.io.UnsupportedEncodingException{
-        this(decode(bytes, off, len, enc));
+        this(bytesToChars(bytes, off, len, enc));
     }
     
     public String(byte[] bytes, java.nio.charset.Charset charset) throws java.io.UnsupportedEncodingException {
@@ -261,27 +260,10 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * JDK1.1
      */
     public String(byte[] bytes, java.lang.String enc) throws java.io.UnsupportedEncodingException{
-        this(decode(bytes, 0, bytes.length, enc));
+        this(bytesToChars(bytes, 0, bytes.length, enc));
     }
 
     private static native char[] bytesToChars(byte[] b, int off, int len, String encoding); 
-
-    /**
-     * The charset is looked up by name before anything is converted, as the
-     * JDK looks it up, so a name no runtime supports throws
-     * UnsupportedEncodingException on every runtime instead of reaching the
-     * native, which used to read such a name as UTF-8 on Apple targets and as
-     * ISO-8859-1 elsewhere. Only UTF-8 is handed to the native, under its
-     * canonical name; see CharsetSupport for why the others are not.
-     */
-    private static char[] decode(byte[] bytes, int off, int len, String enc)
-            throws java.io.UnsupportedEncodingException {
-        int charset = CharsetSupport.lookup(enc);
-        if (charset == CharsetSupport.UTF_8) {
-            return bytesToChars(bytes, off, len, "UTF-8");
-        }
-        return CharsetSupport.decode(charset, bytes, off, len);
-    }
     
     /**
      * Allocates a new String so that it represents the sequence of characters currently contained in the character array argument. The contents of the character array are copied; subsequent modification of the character array does not affect the newly created string.
@@ -670,7 +652,12 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * Convert this String into bytes according to the platform's default character encoding, storing the result into a new byte array.
      */
     public byte[] getBytes(){
-        return utf8Bytes();
+        try {
+            return getBytes("UTF-8"); 
+        } catch(java.io.UnsupportedEncodingException e) {
+            // dumbass checked exception
+            return null;
+        }
     }
 
     private static native byte[] charsToBytes(char[] arr, char[] encoding);
@@ -678,39 +665,22 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     
     /**
      * Convert this String into bytes according to the specified character encoding, storing the result into a new byte array.
-     *
-     * The charset is looked up by name first, as the JDK looks it up: a null
-     * name is a NullPointerException and a name no runtime supports is an
-     * UnsupportedEncodingException, on every runtime. The native conversion
-     * used to be handed the name itself and wrote UTF-8 for any name it did
-     * not know, so a misspelt or unsupported charset encoded without
-     * complaint. UTF-8 keeps the native path; the compact Latin-1 fast path
-     * also serves ISO-8859-1 and US-ASCII, which it converts correctly on every
-     * runtime that has it, and everything else is converted by CharsetSupport.
      */
     public byte[] getBytes(java.lang.String enc) throws java.io.UnsupportedEncodingException{
-        int charset = CharsetSupport.lookup(enc);
-        if(charset == CharsetSupport.UTF_8) {
-            return utf8Bytes();
-        }
-        if((charset == CharsetSupport.ISO_8859_1 || charset == CharsetSupport.US_ASCII) && isLatin1()) {
-            byte[] compact = compactBytes(CharsetSupport.name(charset));
-            if(compact != null) return compact;
-        }
-        char[] chars = toCharNoCopy();
-        return CharsetSupport.encode(charset, chars, chars.length);
-    }
-
-    /**
-     * UTF-8, which every runtime's native converts correctly. A null name is
-     * the natives' spelling of UTF-8.
-     */
-    private byte[] utf8Bytes() {
         if(isLatin1()) {
-            byte[] compact = compactBytes("UTF-8");
+            byte[] compact = compactBytes(enc);
             if(compact != null) return compact;
         }
-        return charsToBytes(toCharNoCopy(), null);
+        if(isUtf16Exact()) {
+            if(enc == null) {
+                return charsToBytes(toCharNoCopy(), null);
+            }
+            return charsToBytes(toCharNoCopy(), enc.toCharNoCopy()); 
+        } 
+        if(enc == null) {
+            return charsToBytes(toCharArray(), null); 
+        }
+        return charsToBytes(toCharArray(), enc.toCharNoCopy()); 
     }
     
     public byte[] getBytes(Charset charset) throws java.io.UnsupportedEncodingException {

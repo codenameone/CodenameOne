@@ -26,7 +26,6 @@ package com.codename1.io.services;
 
 import com.codename1.io.CharArrayReader;
 import com.codename1.io.ConnectionRequest;
-import com.codename1.io.DeclaredCharset;
 import com.codename1.io.NetworkEvent;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Image;
@@ -36,6 +35,7 @@ import com.codename1.xml.XMLParser;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.Hashtable;
 import java.util.Vector;
 
@@ -115,39 +115,6 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
         return result;
     }
 
-    /// The value of the `encoding` pseudo attribute of an XML declaration, in
-    /// either kind of quotes, or null when the declaration has none.
-    static String xmlDeclaredEncoding(String declaration) {
-        int at = declaration.indexOf("encoding");
-        if (at < 0) {
-            return null;
-        }
-        int i = at + "encoding".length();
-        int len = declaration.length();
-        while (i < len && declaration.charAt(i) <= ' ') {
-            i++;
-        }
-        if (i >= len || declaration.charAt(i) != '=') {
-            return null;
-        }
-        i++;
-        while (i < len && declaration.charAt(i) <= ' ') {
-            i++;
-        }
-        if (i >= len) {
-            return null;
-        }
-        char quote = declaration.charAt(i);
-        if (quote != '"' && quote != '\'') {
-            return null;
-        }
-        int close = declaration.indexOf(quote, i + 1);
-        if (close < 0) {
-            return null;
-        }
-        return declaration.substring(i + 1, close);
-    }
-
     /// {@inheritDoc}
     @Override
     protected void readResponse(InputStream input) throws IOException {
@@ -161,34 +128,35 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
             firstChar = input.read();
         }
         int question = input.read();
-        String cType = null;
+        String cType = "UTF-8";
         if (question == '?') {
             // we are in an XML header, check if the encoding section exists
             StringBuilder cs = new StringBuilder();
             question = input.read();
-            while (question != '>' && question != -1) {
+            while (question != '>') {
                 cs.append((char) question);
                 question = input.read();
             }
-            cType = xmlDeclaredEncoding(cs.toString());
+            String str = cs.toString();
+            int index = str.indexOf("encoding=\"") + 10;
+            if (index > -1) {
+                cType = str.substring(index, Math.max(str.indexOf("\"", index), str.indexOf("'", index)));
+            }
         } else {
             // oops, continue as usual
             input.reset();
         }
 
-        // The header outranks the XML declaration, as it does for any XML
-        // served over HTTP; a Content-Type with no charset parameter leaves the
-        // declaration in force.
-        String headerCharset = DeclaredCharset.name(getResponseContentType());
-        if (headerCharset != null) {
-            cType = headerCharset;
+        String resultType = getResponseContentType();
+        if (resultType != null && resultType.indexOf("charset=") > -1) {
+            cType = resultType.substring(resultType.indexOf("charset=") + 8);
         }
         try {
-            // Both names come from the feed, not from the application, so one
-            // this platform cannot convert is read as UTF-8 rather than thrown:
-            // the simulator and Android support charsets a device may not, and
-            // a feed that loads on one must not fail on the other.
-            p.eventParser(DeclaredCharset.reader(input, cType));
+            int pos2 = cType.indexOf(';');
+            if (pos2 > 0) {
+                cType = cType.substring(0, pos2);
+            }
+            p.eventParser(new InputStreamReader(input, cType));
         } catch (FinishParsing ignor) {
             hasMore = true;
         }

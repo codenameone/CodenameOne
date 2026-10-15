@@ -22,7 +22,6 @@
  */
 package java.net;
 
-import com.codename1.impl.charset.CharsetSupport;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
 
@@ -61,18 +60,23 @@ public class URLEncoder {
     /**
      * Encodes {@code s} with the bytes of the charset named {@code enc}.
      *
-     * @throws UnsupportedEncodingException when the charset is not supported
+     * Charset support is platform specific; this class library is not the
+     * JDK. Only UTF-8 and ISO-8859-1 are supported everywhere. Any other name,
+     * including one the platform does not know, is whatever the platform's
+     * conversion makes of it: it may convert, fall back or throw, and text
+     * that needs no conversion is returned unchecked.
+     *
+     * @throws UnsupportedEncodingException when the charset is empty, or when the
+     *     platform refuses it
      */
     public static String encode(String s, String enc) throws UnsupportedEncodingException {
         if (enc == null) {
             throw new NullPointerException("charsetName");
         }
-        // Named and checked before anything is converted, as the JDK does: a
-        // charset this runtime cannot write is refused for any input, and not
-        // only for the input that happens to need a byte converted. The names
-        // are CharsetSupport's, the one list String and the rest of this
-        // library read too.
-        return encodeWith(s, CharsetSupport.lookup(enc));
+        if (enc.length() == 0) {
+            throw new UnsupportedEncodingException(enc);
+        }
+        return encodeWith(s, enc);
     }
 
     /**
@@ -83,13 +87,13 @@ public class URLEncoder {
             throw new NullPointerException("charset");
         }
         try {
-            return encodeWith(s, CharsetSupport.lookup(charset.name()));
+            return encodeWith(s, charset.name());
         } catch (UnsupportedEncodingException e) {
             throw new IllegalArgumentException(e.toString());
         }
     }
 
-    private static String encodeWith(String s, int enc) {
+    private static String encodeWith(String s, String enc) throws UnsupportedEncodingException {
         int length = s.length();
         StringBuilder out = null;
         int i = 0;
@@ -133,15 +137,13 @@ public class URLEncoder {
     }
 
     /**
-     * Converted in Java rather than by the runtime's natives, so that the same
-     * bytes come out on every runtime and a character the charset cannot hold
-     * is written the way the JDK writes it. UTF-8 is converted here so this
-     * class depends on no native at all; the other charsets are
-     * CharsetSupport's. {@code enc} is one of CharsetSupport's constants.
+     * UTF-8 is converted here rather than by the runtime's charset support, so
+     * that a lone surrogate is written the way the JDK writes it -- as the
+     * replacement byte {@code ?} -- whatever the native conversion would do.
      */
-    private static byte[] bytes(String run, int enc) {
-        if (enc != CharsetSupport.UTF_8) {
-            return CharsetSupport.encode(enc, run.toCharArray(), run.length());
+    private static byte[] bytes(String run, String enc) throws UnsupportedEncodingException {
+        if (!"UTF-8".equalsIgnoreCase(enc) && !"UTF8".equalsIgnoreCase(enc)) {
+            return run.getBytes(enc);
         }
         // At most three bytes per char: a pair is two chars and four bytes.
         byte[] out = new byte[run.length() * 3];

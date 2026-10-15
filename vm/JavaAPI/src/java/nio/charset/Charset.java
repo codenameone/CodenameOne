@@ -22,17 +22,15 @@
  */
 package java.nio.charset;
 
-import com.codename1.impl.charset.CharsetSupport;
-
 /**
  * Added this for Kotlin
  */
 public class Charset implements Comparable<Charset> {
 
     private String name;
-    // Indexed by CharsetSupport's constants, which list every charset this
-    // class library converts.
-    private static final Charset[] CHARSETS = new Charset[CharsetSupport.COUNT];
+    private static final Charset UTF8 = new SimpleCharset("UTF-8");
+    private static final Charset USASCII = new SimpleCharset("US-ASCII");
+    private static final Charset ISO88591 = new SimpleCharset("ISO-8859-1");
     protected Charset(String canonicalName, String[] aliases) {
         name = canonicalName;
     }
@@ -49,28 +47,21 @@ public class Charset implements Comparable<Charset> {
         return name;
     }
     
-    /**
-     * The charset {@code name} names, by its canonical name or any of the JDK's
-     * aliases for it, compared without case. The names are CharsetSupport's,
-     * the one list that String, the reader and writer and the URL codec read
-     * too, so a charset found here is one all of them convert.
-     */
     public static Charset forName(String name) {
         if (name == null) {
             throw new NullPointerException();
         }
-        int charset;
-        try {
-            charset = CharsetSupport.lookup(name);
-        } catch (java.io.UnsupportedEncodingException e) {
-            throw new UnsupportedOperationException("Charset.forName not implemented on this platform: " + name);
+        String normalized = name.toUpperCase().replace('_', '-');
+        if ("UTF-8".equals(normalized)) {
+            return UTF8;
         }
-        Charset c = CHARSETS[charset];
-        if (c == null) {
-            c = new SimpleCharset(CharsetSupport.name(charset));
-            CHARSETS[charset] = c;
+        if ("US-ASCII".equals(normalized) || "ASCII".equals(normalized)) {
+            return USASCII;
         }
-        return c;
+        if ("ISO-8859-1".equals(normalized) || "ISO8859-1".equals(normalized)) {
+            return ISO88591;
+        }
+        throw new UnsupportedOperationException("Charset.forName not implemented on this platform: " + name);
     }
 
     private static final class SimpleCharset extends Charset {

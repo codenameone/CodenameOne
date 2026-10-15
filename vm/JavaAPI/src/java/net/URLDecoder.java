@@ -22,7 +22,6 @@
  */
 package java.net;
 
-import com.codename1.impl.charset.CharsetSupport;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
 
@@ -56,6 +55,10 @@ public class URLDecoder {
     /**
      * Decodes {@code s}, reading escaped bytes in the charset named {@code enc}.
      *
+     * Charset support is platform specific; this class library is not the
+     * JDK. Only UTF-8 and ISO-8859-1 are supported everywhere, and any other
+     * name is whatever the platform's conversion makes of it.
+     *
      * @throws UnsupportedEncodingException when the charset is empty or not supported
      */
     public static String decode(String s, String enc) throws UnsupportedEncodingException {
@@ -65,9 +68,7 @@ public class URLDecoder {
         if (enc.length() == 0) {
             throw new UnsupportedEncodingException("URLDecoder: empty string enc parameter");
         }
-        // Checked before anything is decoded, as the JDK does, so a charset
-        // that is not supported is refused even for text with no escapes.
-        return decodeWith(s, CharsetSupport.lookup(enc));
+        return decodeWith(s, enc);
     }
 
     /**
@@ -78,13 +79,13 @@ public class URLDecoder {
             throw new NullPointerException("Charset");
         }
         try {
-            return decodeWith(s, CharsetSupport.lookup(charset.name()));
+            return decodeWith(s, charset.name());
         } catch (UnsupportedEncodingException e) {
             throw new IllegalArgumentException(e.toString());
         }
     }
 
-    private static String decodeWith(String s, int enc) throws UnsupportedEncodingException {
+    private static String decodeWith(String s, String enc) throws UnsupportedEncodingException {
         int length = s.length();
         StringBuilder out = null;
         int i = 0;
@@ -125,24 +126,8 @@ public class URLDecoder {
                 throw new IllegalArgumentException(
                         "URLDecoder: Incomplete trailing escape (%) pattern");
             }
-            text(out, bytes, count, enc);
+            out.append(new String(bytes, 0, count, enc));
         }
         return out == null ? s : out.toString();
-    }
-
-    /**
-     * Appends {@code count} bytes decoded in {@code enc}, one of
-     * CharsetSupport's constants. UTF-8 is read by String, whose UTF-8 path is
-     * correct on every runtime; the other charsets are read by CharsetSupport,
-     * which replaces what a charset cannot read with U+FFFD as the JDK's
-     * decoders do.
-     */
-    private static void text(StringBuilder out, byte[] bytes, int count, int enc)
-            throws UnsupportedEncodingException {
-        if (enc == CharsetSupport.UTF_8) {
-            out.append(new String(bytes, 0, count, "UTF-8"));
-            return;
-        }
-        out.append(CharsetSupport.decode(enc, bytes, 0, count));
     }
 }
