@@ -39,6 +39,16 @@ import java.util.Map;
 ///
 /// File redirection and inheritIO are not provided in this initial subset. Use
 /// the streams and drain stdout/stderr concurrently, or merge them first.
+///
+/// The members shared with `java.lang.ProcessBuilder` have its names and
+/// parameter types, so desktop code compiled against the JavaSE class runs
+/// against this one once its class references are renamed. JavaSE members
+/// with no counterpart: `directory(File)` and `File directory()` (the device
+/// runtime has no `java.io.File`; the String forms here take an OS path),
+/// `inheritIO()`, the `redirectInput`/`redirectOutput`/`redirectError`
+/// family with `ProcessBuilder.Redirect` (no port can attach a child's
+/// streams to anything but pipes), and `startPipeline(List)`, which needs
+/// those redirects.
 @com.codename1.impl.SharedWithBackend
 public final class ProcessBuilder {
     private List<String> command;

@@ -32,6 +32,16 @@ import java.util.concurrent.TimeUnit;
 /// blocking stream I/O on the EDT. Interrupting a wait does not kill the child.
 /// Unlike JavaSE, this class is AutoCloseable: close forcibly terminates the direct
 /// child and closes its three streams. Descendants are not terminated.
+///
+/// Every member this class shares with `java.lang.Process` has the same name,
+/// parameters and modifiers, and no method is abstract here that is concrete
+/// there, so a desktop class compiled against `java.lang.Process` -- a caller
+/// or a subclass -- runs against this one once its class references are
+/// renamed. The JavaSE members with no counterpart are `toHandle()`,
+/// `onExit()`, `info()`, `children()`, `descendants()`,
+/// `supportsNormalTermination()` and the reader and writer accessors: their
+/// types (`ProcessHandle`, `CompletableFuture`, `BufferedReader`) are not part
+/// of the device runtime.
 @com.codename1.impl.SharedWithBackend
 public abstract class Process implements AutoCloseable {
     /// The child's stdin (the parent writes to it).
@@ -44,8 +54,17 @@ public abstract class Process implements AutoCloseable {
     public abstract int exitValue();
     /// Requests termination of the direct child. On Windows this is forcible.
     public abstract void destroy();
-    /// Forcibly terminates the direct child; completion is asynchronous.
-    public abstract Process destroyForcibly();
+    /// Forcibly terminates the direct child; completion is asynchronous. A
+    /// subclass with no forcible kill inherits [#destroy()], as in JavaSE.
+    public Process destroyForcibly() {
+        destroy();
+        return this;
+    }
+    /// The operating system's id for the child. A port that cannot name it
+    /// throws UnsupportedOperationException, which is also JavaSE's default.
+    public long pid() {
+        throw new UnsupportedOperationException(getClass().getName() + ".pid() not supported");
+    }
     /// Whether the direct child is still running.
     public boolean isAlive() {
         try {
