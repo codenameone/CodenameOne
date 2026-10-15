@@ -255,6 +255,51 @@ class IOSTextInputGeometryTest extends UITestBase {
     }
 
     @FormTest
+    void keyboardHideRelayoutsSavedWindowAfterInputStopsWithStyleEventsSuppressed() {
+        IOSNative oldNative = IOSImplementation.nativeInstance;
+        IOSImplementation oldInstance = IOSImplementation.instance;
+        Port port = new Port();
+        Client client = new Client();
+        implementation.setMultiWindowSupported(true);
+        Window window = new Window("Stopped editor", new BorderLayout());
+        try {
+            IOSImplementation.nativeInstance = new NativeStub();
+            IOSImplementation.instance = port;
+            Form main = new Form("Main", new BorderLayout());
+            main.show();
+            window.add(BorderLayout.CENTER, client);
+            window.show();
+            window.setWindowContentSize(400, 600);
+            flushSerialCalls();
+            com.codename1.ui.plaf.Style style = window.getContentPane().getUnselectedStyle();
+            style.setPaddingUnitBottom(com.codename1.ui.plaf.Style.UNIT_TYPE_DIPS);
+            style.setPadding(Component.BOTTOM, 3);
+            window.revalidate();
+            flushSerialCalls();
+            int heightBefore = client.getHeight();
+            port.startTextInput(client, client.getConfig());
+            IOSImplementation.keyboardWillBeShown();
+            flushSerialCalls();
+            assertTrue(client.getHeight() < heightBefore, "keyboard must shrink the viewport first");
+            style.setSuppressChangeEvents(true);
+            IOSImplementation.keyboardWillBeHidden();
+            port.stopTextInput(client); // ends the session before the queued hide runs
+            flushSerialCalls();
+            assertEquals(3f, style.getPaddingFloatValue(false, Component.BOTTOM));
+            assertEquals(com.codename1.ui.plaf.Style.UNIT_TYPE_DIPS,
+                    style.getPaddingUnit()[Component.BOTTOM]);
+            assertEquals(heightBefore, client.getHeight(),
+                    "the saved window must regain its viewport without a style-change event");
+        } finally {
+            window.getContentPane().getUnselectedStyle().setSuppressChangeEvents(false);
+            port.stopTextInput(client);
+            window.dispose();
+            IOSImplementation.nativeInstance = oldNative;
+            IOSImplementation.instance = oldInstance;
+        }
+    }
+
+    @FormTest
     void secondaryWindowKeyboardReservesItsOwnViewportAndLeavesMainFormAlone() {
         IOSNative oldNative = IOSImplementation.nativeInstance;
         IOSImplementation oldInstance = IOSImplementation.instance;

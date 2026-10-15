@@ -2693,16 +2693,17 @@ public class Toolbar extends Container {
     private final class TitlePadding {
         private final Style style = getStyle();
         private final float[] padding = new float[4];
-        private final byte[] units = new byte[4];
+        private final byte[] units;
         private final boolean suppressed = style.isSuppressChangeEvents();
 
         TitlePadding(int[] insets) {
             int[] sides = {LEFT, RIGHT, TOP, BOTTOM};
             byte[] originalUnits = style.getPaddingUnit();
+            // Style's unit array uses Component side indices, not padding's
+            // top/bottom/left/right argument order. Preserve null (pixels) too.
+            units = originalUnits == null ? null : originalUnits.clone();
             for (int i = 0; i < 4; i++) {
                 padding[i] = style.getPaddingFloatValue(false, sides[i]);
-                units[i] = originalUnits == null ? Style.UNIT_TYPE_PIXELS
-                        : originalUnits[sides[i]];
             }
             int left = style.getPaddingLeftNoRTL();
             int right = style.getPaddingRightNoRTL();
@@ -2723,7 +2724,7 @@ public class Toolbar extends Container {
             for (int i = 0; i < 4; i++) {
                 style.setPadding(sides[i], padding[i], true);
             }
-            style.setPaddingUnit(units[2], units[3], units[0], units[1]);
+            style.setPaddingUnit(units);
             style.setSuppressChangeEvents(suppressed);
         }
     }

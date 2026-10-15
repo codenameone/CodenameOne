@@ -25,10 +25,12 @@ package com.codename1.ui;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.plaf.Style;
 
 import java.util.Vector;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -166,6 +168,38 @@ class DesktopChromeTest extends UITestBase {
         toolbar.layoutContainer();
         assertTrue(content.getX() + content.getWidth() <= toolbar.getWidth() - 90,
                 "OS controls stay on their physical side in an RTL document");
+    }
+
+    @FormTest
+    void nativeTitleInsetsPreserveMixedPaddingUnitsAcrossMeasurementsAndLayouts() {
+        desktopMode("custom");
+        implementation.setNativeTitleBarInsets(70, 130, 6, 4, 50);
+        Form form = new Form("Mixed units");
+        Toolbar toolbar = form.getToolbar();
+        form.show();
+        DisplayTest.flushEdt();
+        Style style = toolbar.getStyle();
+        byte[] units = {Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_PIXELS,
+                Style.UNIT_TYPE_SCREEN_PERCENTAGE, Style.UNIT_TYPE_REM};
+        style.setPaddingUnit(units);
+        style.setPadding(2, 3, 5, 7);
+        for (boolean rtl : new boolean[]{false, true}) {
+            toolbar.setRTL(rtl);
+            for (int pass = 0; pass < 3; pass++) {
+                toolbar.calcPreferredSize();
+                assertArrayEquals(units, style.getPaddingUnit(), "measurement must preserve per-side units");
+                toolbar.doLayout();
+                assertArrayEquals(units, style.getPaddingUnit(), "layout must preserve per-side units");
+                assertEquals(2f, style.getPaddingFloatValue(false, Component.TOP));
+                assertEquals(3f, style.getPaddingFloatValue(false, Component.BOTTOM));
+                assertEquals(5f, style.getPaddingFloatValue(false, Component.LEFT));
+                assertEquals(7f, style.getPaddingFloatValue(false, Component.RIGHT));
+            }
+        }
+        style.setPaddingUnit((byte[]) null);
+        toolbar.calcPreferredSize();
+        toolbar.doLayout();
+        assertNull(style.getPaddingUnit(), "implicit pixel units must stay implicit");
     }
 
     @FormTest

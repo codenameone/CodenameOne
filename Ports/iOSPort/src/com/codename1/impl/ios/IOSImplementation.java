@@ -1169,8 +1169,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
                 instance.restoreKeyboardPadding(layout);
                 com.codename1.ui.TopLevelContainer current = layout.owner;
-                // A newer show owns keyboard layout now, including on the same form.
-                if (instance.keyboardLayout == null && instance.isKeyboardLayoutOwner(current)) {
+                // Editing may already have stopped, so resolve layout against the
+                // saved owner, not the active client. A newer show still takes precedence.
+                if (instance.keyboardLayout == null) {
                     instance.areaUnderVKBOverride = 0;
                     try {
                         current.asContainer().revalidate();
