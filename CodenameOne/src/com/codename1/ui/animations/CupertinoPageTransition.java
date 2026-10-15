@@ -163,12 +163,27 @@ public final class CupertinoPageTransition extends Transition {
             destX = Math.round(w * (1 - front));
         }
 
-        // The covered page first: the arriving one is opaque and passes over it.
-        if (sourceBuffer != null) {
-            g.drawImage(sourceBuffer, sourceX, 0);
-        }
-        if (destBuffer != null) {
-            g.drawImage(destBuffer, destX, 0);
+        // The covered page first, the one on top last: forward, the arriving page
+        // (destBuffer) is on top and passes over the departing one (sourceBuffer).
+        // Back swaps which buffer plays which role -- sourceBuffer is the page
+        // leaving across the whole screen, on top, and destBuffer is the one
+        // underneath coming home -- so back must paint destBuffer first and
+        // sourceBuffer last, or the revealed page covers the one leaving instead
+        // of the other way around.
+        if (back) {
+            if (destBuffer != null) {
+                g.drawImage(destBuffer, destX, 0);
+            }
+            if (sourceBuffer != null) {
+                g.drawImage(sourceBuffer, sourceX, 0);
+            }
+        } else {
+            if (sourceBuffer != null) {
+                g.drawImage(sourceBuffer, sourceX, 0);
+            }
+            if (destBuffer != null) {
+                g.drawImage(destBuffer, destX, 0);
+            }
         }
     }
 

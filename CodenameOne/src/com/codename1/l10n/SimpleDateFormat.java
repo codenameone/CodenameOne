@@ -123,6 +123,13 @@ public class SimpleDateFormat extends DateFormat {
     /// Construct a SimpleDateFormat with no pattern.
     public SimpleDateFormat() {
         super();
+        // Captured now rather than left null: java.text.SimpleDateFormat fixes the
+        // default zone at construction too, via the Calendar its own constructor
+        // builds. Leaving this null and re-reading TimeZone.getDefault() from
+        // getTimeZone() on every call made format/parse/equals/hashCode drift if
+        // the device default changed later -- including mid-format, since format()
+        // itself calls getTimeZone() once per invocation.
+        this.timeZone = TimeZone.getDefault();
     }
 
     /// Construct a SimpleDateFormat with a given pattern.
@@ -133,6 +140,9 @@ public class SimpleDateFormat extends DateFormat {
     public SimpleDateFormat(String pattern) {
         super();
         this.pattern = pattern;
+        // See the no-arg constructor for why this is captured here instead of
+        // left for getTimeZone() to resolve live.
+        this.timeZone = TimeZone.getDefault();
     }
 
     /// #### Returns
@@ -271,16 +281,20 @@ public class SimpleDateFormat extends DateFormat {
     ///
     /// - `zone`: the zone, or null for the device's default
     public void setTimeZone(TimeZone zone) {
-        this.timeZone = zone;
+        // null still means "the device's default", but that default is captured
+        // right now rather than re-read live on every later getTimeZone()/format()/
+        // parse() call -- see the constructors for why a live read is unstable.
+        this.timeZone = zone != null ? zone : TimeZone.getDefault();
     }
 
-    /// The zone set with `setTimeZone`, or the device's default when none was.
+    /// The zone set with `setTimeZone`, or the zone captured at construction when
+    /// none was set.
     ///
     /// #### Returns
     ///
     /// the zone fields are formatted in
     public TimeZone getTimeZone() {
-        return timeZone != null ? timeZone : TimeZone.getDefault();
+        return timeZone;
     }
 
     /*

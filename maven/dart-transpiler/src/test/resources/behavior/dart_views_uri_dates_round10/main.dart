@@ -1,6 +1,8 @@
 // getRange is a live view; containsValue and int-keyed lookups use Dart's ==;
 // Uri.parse normalizes its components; a throwing catchError test completes the
-// returned future; DateTime is proleptic Gregorian.
+// returned future; DateTime is proleptic Gregorian, and fromMicrosecondsSinceEpoch
+// (declared in the dartCore stub alongside fromMillisecondsSinceEpoch) keeps
+// sub-millisecond precision.
 import 'dart:async';
 
 Future<void> main() async {
@@ -46,5 +48,6 @@ Future<void> main() async {
   print(DateTime.utc(2024, 0, 1));
   print(DateTime.utc(-1, 12, 31, 23, 59, 59, 999));
   print(DateTime.fromMillisecondsSinceEpoch(-62135596800001, isUtc: true));
+  print(DateTime.fromMicrosecondsSinceEpoch(1500, isUtc: true));
   print(DateTime.utc(2000, 3, 1).weekday);
 }

@@ -5681,11 +5681,18 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
         @Override
         public String toString() {
+            // Not graphics.toString(): a TestGraphics created to paint onto this
+            // image holds this same TestImage back (its own `image` field), so the
+            // two toString() methods calling each other in full recursed without
+            // end -- harmless until something (a failed Mockito verification, an
+            // assertion message) actually needed the text, which then died with a
+            // StackOverflowError instead of reporting the real failure.
             return "TestImage{" +
                     "width=" + width +
                     ", height=" + height +
                     ", argb=" + Arrays.toString(argb) +
-                    ", graphics=" + graphics +
+                    ", graphics=" + (graphics == null ? "null"
+                            : "TestGraphics@" + Integer.toHexString(System.identityHashCode(graphics))) +
                     '}';
         }
     }

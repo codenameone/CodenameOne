@@ -57,6 +57,7 @@ class DateTime {
   external static DateTime now();
   external static DateTime utc(int year, [int month = 1, int day = 1, int hour = 0, int minute = 0, int second = 0, int millisecond = 0, int microsecond = 0]);
   external static DateTime fromMillisecondsSinceEpoch(int millisecondsSinceEpoch, {bool isUtc});
+  external static DateTime fromMicrosecondsSinceEpoch(int microsecondsSinceEpoch, {bool isUtc});
   external int get year;
   external int get month;
   external int get day;

@@ -334,4 +334,42 @@ class SimpleDateFormatTest extends UITestBase {
             java.util.TimeZone.setDefault(saved);
         }
     }
+
+    @Test
+    void defaultZoneIsCapturedAtConstructionNotReReadLater() throws Exception {
+        java.util.TimeZone saved = java.util.TimeZone.getDefault();
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("UTC"));
+        try {
+            SimpleDateFormat f = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+            assertEquals("UTC", f.getTimeZone().getID());
+
+            // The device default changes AFTER construction. java.text.SimpleDateFormat
+            // captures its zone from the Calendar its own constructor builds and never
+            // re-reads TimeZone.getDefault() later; this formatter must behave the same
+            // rather than tracking the live default on every call.
+            java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("America/New_York"));
+
+            assertEquals("UTC", f.getTimeZone().getID(),
+                    "a formatter's zone must stay the one captured at construction, not "
+                    + "whatever the device default is when getTimeZone() happens to be called");
+
+            java.util.Calendar c = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"));
+            c.clear();
+            c.set(2024, java.util.Calendar.JULY, 1, 12, 0, 0);
+            assertEquals("2024-07-01 12:00", f.format(c.getTime()),
+                    "format must stay in the zone captured at construction even after the "
+                    + "device default changes later");
+            assertEquals(c.getTime().getTime(), f.parse("2024-07-01 12:00").getTime(),
+                    "parse must stay in the zone captured at construction too");
+
+            SimpleDateFormat g = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+            assertEquals("America/New_York", g.getTimeZone().getID(),
+                    "a formatter constructed under the new default captures THAT zone");
+            assertNotEquals(f, g, "f is still UTC and g is now New York -- equals must not "
+                    + "track the live default either");
+            assertNotEquals(f.hashCode(), g.hashCode());
+        } finally {
+            java.util.TimeZone.setDefault(saved);
+        }
+    }
 }

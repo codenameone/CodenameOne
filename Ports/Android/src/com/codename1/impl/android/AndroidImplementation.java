@@ -7565,7 +7565,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public boolean hasBack() {
-            final Boolean [] retVal = new Boolean[1];
+            // Destroyed is "no history", not "unknown" -- initialized so the
+            // destroyed branch below never leaves this null for the unboxing
+            // return to NPE on.
+            final Boolean [] retVal = new Boolean[]{Boolean.FALSE};
             final boolean[] complete = new boolean[1];
 
             act.runOnUiThread(new Runnable() {
@@ -7597,7 +7600,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public boolean hasForward() {
-            final Boolean [] retVal = new Boolean[1];
+            // Same reasoning as hasBack(): destroyed means "no history", never null.
+            final Boolean [] retVal = new Boolean[]{Boolean.FALSE};
             final boolean[] complete = new boolean[1];
 
             act.runOnUiThread(new Runnable() {
