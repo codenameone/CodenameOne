@@ -478,6 +478,11 @@ public class Parser extends ClassVisitor {
     private static final MethodDependencyGraph dependencyGraph = new MethodDependencyGraph();
     private int lambdaCounter;
     private int stringConcatCounter;
+    /// The simple name the InnerClasses attribute gives this class, which is
+    /// what a record's toString starts with; null for a top-level class.
+    private String innerSimpleName;
+    /// The record helpers already added to this class, by name.
+    private final Set<String> recordHelpers = new HashSet<>();
     public static void cleanup() {
         if ("true".equals(System.getProperty("cn1.iteratorCensus"))) {
             // Reported HERE rather than from the census itself: the census runs BEFORE
@@ -2108,6 +2113,7 @@ public class Parser extends ClassVisitor {
     public void visitInnerClass(String name, String outerName, String innerName, int access) {
         if(name.equals(cls.getOriginalClassName())) {
             cls.setIsAnonymous(innerName==null);
+            innerSimpleName = innerName;
         }
         super.visitInnerClass(name, outerName, innerName, access); 
     }
@@ -2337,12 +2343,205 @@ public class Parser extends ClassVisitor {
             super.visitJumpInsn(opcode, label); 
         }
 
+        /**
+         * A record's equals, hashCode or toString. javac does not write these out:
+         * each is an invokedynamic of java.lang.runtime.ObjectMethods, a bootstrap
+         * this runtime does not have, so a record of any kind failed translation
+         * -- a transfer object shared with a server included. The call is replaced
+         * with one to a static helper holding what ObjectMethods would build: the
+         * components compared, hashed (31 * h + each, as the JDK does) and printed
+         * as Name[a=1, b=x]. Float and double components are compared and hashed by
+         * their bits with every NaN made the canonical one, which is what the JDK's
+         * Float.floatToIntBits and Double.doubleToLongBits answer; the native
+         * conversions keep a NaN's payload, so they are not asked. The arguments
+         * are the record class, the component names and one getter handle per
+         * component. Answers false, leaving the call unsupported, for a shape
+         * javac does not emit.
+         */
+        private boolean recordMethod(String name, String desc, Object[] bsmArgs) {
+            if (bsmArgs == null || bsmArgs.length < 2 || !(bsmArgs[0] instanceof Type)) {
+                return false;
+            }
+            String owner = ((Type) bsmArgs[0]).getInternalName();
+            List<Handle> getters = new ArrayList<>();
+            for (int i = 2; i < bsmArgs.length; i++) {
+                if (!(bsmArgs[i] instanceof Handle) || ((Handle) bsmArgs[i]).getTag() != Opcodes.H_GETFIELD) {
+                    return false;
+                }
+                getters.add((Handle) bsmArgs[i]);
+            }
+            String helperName = "cn1$record$" + name;
+            boolean equals = "equals".equals(name) && ("(L" + owner + ";Ljava/lang/Object;)Z").equals(desc);
+            boolean hash = "hashCode".equals(name) && ("(L" + owner + ";)I").equals(desc);
+            boolean text = "toString".equals(name) && ("(L" + owner + ";)Ljava/lang/String;").equals(desc);
+            if (!equals && !hash && !text) {
+                return false;
+            }
+            if (recordHelpers.add(helperName)) {
+                BytecodeMethod helper = new BytecodeMethod(clsName,
+                        Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC, helperName, desc, null, null);
+                cls.addMethod(helper);
+                if (equals) {
+                    Label no = new Label();
+                    helper.addVariableOperation(Opcodes.ALOAD, 1);
+                    helper.addTypeInstruction(Opcodes.INSTANCEOF, owner);
+                    helper.addJump(Opcodes.IFEQ, no);
+                    for (Handle g : getters) {
+                        if ("F".equals(g.getDesc()) || "D".equals(g.getDesc())) {
+                            recordBits(helper, owner, g, 0);
+                            recordBits(helper, owner, g, 1);
+                            if ("D".equals(g.getDesc())) {
+                                helper.addInstruction(Opcodes.LCMP);
+                                helper.addJump(Opcodes.IFNE, no);
+                            } else {
+                                helper.addJump(Opcodes.IF_ICMPNE, no);
+                            }
+                        } else {
+                            recordComponent(helper, owner, g, 0);
+                            recordComponent(helper, owner, g, 1);
+                            helper.addInvoke(Opcodes.INVOKESTATIC, "java/util/Objects", "equals",
+                                    "(Ljava/lang/Object;Ljava/lang/Object;)Z", false);
+                            helper.addJump(Opcodes.IFEQ, no);
+                        }
+                    }
+                    helper.addInstruction(Opcodes.ICONST_1);
+                    helper.addInstruction(Opcodes.IRETURN);
+                    helper.addLabel(no);
+                    helper.addInstruction(Opcodes.ICONST_0);
+                    helper.addInstruction(Opcodes.IRETURN);
+                    helper.setMaxes(8, 2);
+                } else if (hash) {
+                    helper.addInstruction(Opcodes.ICONST_0);
+                    for (Handle g : getters) {
+                        helper.addInstruction(Opcodes.BIPUSH, 31);
+                        helper.addInstruction(Opcodes.IMUL);
+                        if ("Z".equals(g.getDesc())) {
+                            // Boolean.hashCode without a branch: 1237 - 6 * value.
+                            helper.addInstruction(Opcodes.SIPUSH, 1237);
+                            helper.addVariableOperation(Opcodes.ALOAD, 0);
+                            helper.addField(cls, Opcodes.GETFIELD, owner, g.getName(), "Z");
+                            helper.addInstruction(Opcodes.BIPUSH, 6);
+                            helper.addInstruction(Opcodes.IMUL);
+                            helper.addInstruction(Opcodes.ISUB);
+                        } else if ("F".equals(g.getDesc())) {
+                            recordBits(helper, owner, g, 0);
+                        } else if ("D".equals(g.getDesc())) {
+                            recordBits(helper, owner, g, 0);
+                            helper.addInstruction(Opcodes.DUP2);
+                            helper.addInstruction(Opcodes.BIPUSH, 32);
+                            helper.addInstruction(Opcodes.LUSHR);
+                            helper.addInstruction(Opcodes.LXOR);
+                            helper.addInstruction(Opcodes.L2I);
+                        } else {
+                            recordComponent(helper, owner, g, 0);
+                            helper.addInvoke(Opcodes.INVOKESTATIC, "java/util/Objects", "hashCode",
+                                    "(Ljava/lang/Object;)I", false);
+                        }
+                        helper.addInstruction(Opcodes.IADD);
+                    }
+                    helper.addInstruction(Opcodes.IRETURN);
+                    helper.setMaxes(8, 1);
+                } else {
+                    String simple = innerSimpleName != null ? innerSimpleName
+                            : owner.substring(owner.lastIndexOf('/') + 1);
+                    helper.addTypeInstruction(Opcodes.NEW, "java/lang/StringBuilder");
+                    helper.addInstruction(Opcodes.DUP);
+                    helper.addLdc(simple + "[");
+                    helper.addInvoke(Opcodes.INVOKESPECIAL, "java/lang/StringBuilder", "<init>", "(Ljava/lang/String;)V", false);
+                    boolean first = true;
+                    for (Handle g : getters) {
+                        helper.addLdc((first ? "" : ", ") + g.getName() + "=");
+                        helper.addInvoke(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append",
+                                "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
+                        recordComponent(helper, owner, g, 0);
+                        helper.addInvoke(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append",
+                                "(Ljava/lang/Object;)Ljava/lang/StringBuilder;", false);
+                        first = false;
+                    }
+                    helper.addLdc("]");
+                    helper.addInvoke(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append",
+                            "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
+                    helper.addInvoke(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "toString",
+                            "()Ljava/lang/String;", false);
+                    helper.addInstruction(Opcodes.ARETURN);
+                    helper.setMaxes(8, 1);
+                }
+            }
+            mtd.addInvoke(Opcodes.INVOKESTATIC, clsName, helperName, desc, false);
+            return true;
+        }
+
+        /** Pushes a record component, boxed when it is a primitive, read from local `local`. */
+        private void recordComponent(BytecodeMethod helper, String owner, Handle getter, int local) {
+            helper.addVariableOperation(Opcodes.ALOAD, local);
+            if (local != 0) {
+                // Guarded by the INSTANCEOF the equals helper starts with.
+                helper.addTypeInstruction(Opcodes.CHECKCAST, owner);
+            }
+            helper.addField(cls, Opcodes.GETFIELD, owner, getter.getName(), getter.getDesc());
+            String wrapper;
+            switch (getter.getDesc().charAt(0)) {
+                case 'Z': wrapper = "Boolean"; break;
+                case 'B': wrapper = "Byte"; break;
+                case 'C': wrapper = "Character"; break;
+                case 'S': wrapper = "Short"; break;
+                case 'I': wrapper = "Integer"; break;
+                case 'J': wrapper = "Long"; break;
+                case 'F': wrapper = "Float"; break;
+                case 'D': wrapper = "Double"; break;
+                default: return;
+            }
+            helper.addInvoke(Opcodes.INVOKESTATIC, "java/lang/" + wrapper, "valueOf",
+                    "(" + getter.getDesc() + ")Ljava/lang/" + wrapper + ";", false);
+        }
+
+        /** Pushes a float or double component's canonical bits, an int or a long. */
+        private void recordBits(BytecodeMethod helper, String owner, Handle getter, int local) {
+            boolean isDouble = "D".equals(getter.getDesc());
+            String bitsName = isDouble ? "cn1$recordDoubleBits" : "cn1$recordFloatBits";
+            String bitsDesc = isDouble ? "(D)J" : "(F)I";
+            if (recordHelpers.add(bitsName)) {
+                BytecodeMethod bits = new BytecodeMethod(clsName,
+                        Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC, bitsName, bitsDesc, null, null);
+                cls.addMethod(bits);
+                Label notNaN = new Label();
+                int load = isDouble ? Opcodes.DLOAD : Opcodes.FLOAD;
+                bits.addVariableOperation(load, 0);
+                bits.addVariableOperation(load, 0);
+                bits.addInstruction(isDouble ? Opcodes.DCMPL : Opcodes.FCMPL);
+                bits.addJump(Opcodes.IFEQ, notNaN);
+                if (isDouble) {
+                    bits.addLdc(Long.valueOf(0x7ff8000000000000L));
+                    bits.addInstruction(Opcodes.LRETURN);
+                } else {
+                    bits.addLdc(Integer.valueOf(0x7fc00000));
+                    bits.addInstruction(Opcodes.IRETURN);
+                }
+                bits.addLabel(notNaN);
+                bits.addVariableOperation(load, 0);
+                bits.addInvoke(Opcodes.INVOKESTATIC, isDouble ? "java/lang/Double" : "java/lang/Float",
+                        isDouble ? "doubleToLongBits" : "floatToIntBits", bitsDesc, false);
+                bits.addInstruction(isDouble ? Opcodes.LRETURN : Opcodes.IRETURN);
+                bits.setMaxes(4, 2);
+            }
+            helper.addVariableOperation(Opcodes.ALOAD, local);
+            if (local != 0) {
+                helper.addTypeInstruction(Opcodes.CHECKCAST, owner);
+            }
+            helper.addField(cls, Opcodes.GETFIELD, owner, getter.getName(), getter.getDesc());
+            helper.addInvoke(Opcodes.INVOKESTATIC, clsName, bitsName, bitsDesc, false);
+        }
+
         @Override
         public void visitInvokeDynamicInsn(String name, String desc, Handle bsm, Object... bsmArgs) {
             super.visitInvokeDynamicInsn(name, desc, bsm, bsmArgs);
             indyLambdas.add(null);
             if (bsm.getTag() != Opcodes.H_INVOKESTATIC || bsm.isInterface()) {
                 mtd.unsupportedBootstrap(bsm.getOwner() + "." + bsm.getName());
+                return;
+            }
+            if ("java/lang/runtime/ObjectMethods".equals(bsm.getOwner()) && "bootstrap".equals(bsm.getName())
+                    && recordMethod(name, desc, bsmArgs)) {
                 return;
             }
             if ("java/lang/invoke/StringConcatFactory".equals(bsm.getOwner()) &&
