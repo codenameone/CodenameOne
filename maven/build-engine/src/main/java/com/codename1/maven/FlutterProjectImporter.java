@@ -87,6 +87,14 @@ public final class FlutterProjectImporter {
     /// reached by a transpiled build.
     static final String[] IGNORED = {"flutter_test", "flutter_driver", "integration_test", "test", "build_runner"};
 
+    /// The package `cn1:transcode-flutter` (`TranscodeFlutterMojo`) generates
+    /// the transpiled Dart sources into when a project does not override
+    /// `cn1.flutter.package` -- the same default that Mojo's own `@Parameter`
+    /// declares. The generated entry point's `FlutterRegistry.invokeMain()`
+    /// call must agree with whichever package the project actually configured,
+    /// never this constant by itself: see [#importProject].
+    static final String DEFAULT_FLUTTER_PACKAGE = "com.codename1.generated.flutter";
+
     /// flutter_tools' own resolution-variant directory name, matched exactly
     /// (`asset.dart`'s `_assetVariantDirectoryRegExp`): one or more digits,
     /// optionally a `.` and zero or more further digits, then `x` --
@@ -121,9 +129,27 @@ public final class FlutterProjectImporter {
     }
 
     /// Imports `source` (a Flutter project: `pubspec.yaml` beside a `lib`
-    /// directory) into `commonDir`.
+    /// directory) into `commonDir`, with the generated entry point calling
+    /// `FlutterRegistry.invokeMain()` in [#DEFAULT_FLUTTER_PACKAGE] -- correct
+    /// only when the project has not overridden `cn1.flutter.package`. A
+    /// caller that can see that configuration (`ImportFlutterProjectMojo`)
+    /// must use the five-argument overload instead.
     public Result importProject(File source, File commonDir, String mainPackage, String mainClass)
             throws BuildException {
+        return importProject(source, commonDir, mainPackage, mainClass, DEFAULT_FLUTTER_PACKAGE);
+    }
+
+    /// Like the four-argument [#importProject], but generates the entry point
+    /// against `flutterPackage` instead of assuming [#DEFAULT_FLUTTER_PACKAGE]
+    /// -- `cn1:transcode-flutter` emits `FlutterRegistry` into whichever
+    /// package `cn1.flutter.package` configures (`TranscodeFlutterMojo`'s own
+    /// `@Parameter`, same default), and the generated entry point's
+    /// `invokeMain()` call must name that same package or the project fails
+    /// to compile with "cannot find symbol" the moment the override differs
+    /// from the hardcoded default.
+    public Result importProject(File source, File commonDir, String mainPackage, String mainClass,
+            String flutterPackage) throws BuildException {
+        String entryPointPackage = flutterPackage == null ? DEFAULT_FLUTTER_PACKAGE : flutterPackage;
         File pubspecFile = new File(source, "pubspec.yaml");
         File libDir = new File(source, "lib");
         if (!pubspecFile.isFile()) {
@@ -199,7 +225,20 @@ public final class FlutterProjectImporter {
                     assetSrc = new File(pkgLibDir, rest.replace('/', File.separatorChar));
                 }
                 if (!assetSrc.exists()) {
-                    r.missingAssets.add(key);
+                    // flutter_tools' own asset.dart (_AssetBundle.build) only reports a
+                    // single-file key missing when NEITHER the nominal file NOR any of
+                    // its resolution variants exist: "[the main entry] need not exist for
+                    // an image if resolution-specific variant files exist." #copyAssetVariants
+                    // needs only assetSrc's parent directory and name, not assetSrc itself,
+                    // so it can be tried here even though the nominal file is absent.
+                    int before = r.copiedAssets;
+                    r.copiedAssets += copyAssetVariants(assetSrc, clean, target, previous, imported,
+                            declaredAssetKeys);
+                    if (r.copiedAssets == before) {
+                        r.missingAssets.add(key);
+                    } else if (pkgName != null) {
+                        packagesWithCopiedAssets.add(pkgName);
+                    }
                     continue;
                 }
                 declaredAssetKeys.add(clean);
@@ -239,7 +278,7 @@ public final class FlutterProjectImporter {
             writeDeclaredAssetKeys(target, declaredAssetKeys);
 
             if (mainPackage != null && mainClass != null) {
-                writeEntryPoint(new File(commonDir, "src/main/java"), mainPackage, mainClass);
+                writeEntryPoint(new File(commonDir, "src/main/java"), mainPackage, mainClass, entryPointPackage);
             }
             updateSettings(commonDir, pubspec);
 
@@ -359,7 +398,7 @@ public final class FlutterProjectImporter {
         return properties + separator + key + "=" + value + "\n";
     }
 
-    private void writeEntryPoint(File javaDir, String pkg, String cls) throws IOException {
+    private void writeEntryPoint(File javaDir, String pkg, String cls, String flutterPackage) throws IOException {
         File f = new File(javaDir, pkg.replace('.', File.separatorChar) + File.separator + cls + ".java");
         f.getParentFile().mkdirs();
         String src = "package " + pkg + ";\n\n"
@@ -367,7 +406,7 @@ public final class FlutterProjectImporter {
                 + "public class " + cls + " extends com.codename1.system.Lifecycle {\n"
                 + "    @Override\n"
                 + "    public void runApp() {\n"
-                + "        com.codename1.generated.flutter.FlutterRegistry.invokeMain();\n"
+                + "        " + flutterPackage + ".FlutterRegistry.invokeMain();\n"
                 + "    }\n"
                 + "}\n";
         byte[] bytes = src.getBytes(Charset.forName("UTF-8"));
@@ -485,11 +524,16 @@ public final class FlutterProjectImporter {
     /// bundles without a second pubspec entry (flutter_tools' own rule,
     /// `asset.dart`'s `_AssetDirectoryCache.variantsFor`: any sibling directory
     /// matching [#VARIANT_DIR] holding a same-named file). `assetSrc` is the
-    /// already-resolved main file, from either the Flutter project itself or a
+    /// resolved main file's path, from either the Flutter project itself or a
     /// pub package's `lib/`; `cleanKey` is the asset key it was declared under
     /// (`assets/logo.png`, or `packages/<pkg>/assets/logo.png`), and each
     /// variant's own key is built from it the way flutter_tools names the
     /// variant file -- `assets/2.0x/logo.png`.
+    ///
+    /// `assetSrc` itself need not exist: only its parent directory and name are
+    /// read, so [#importProject] also calls this for a single-file key whose
+    /// nominal file is missing, to find any resolution variants before giving
+    /// up on the key as a whole -- `asset.dart`'s own rule for that case.
     ///
     /// Every variant's key is added to `declaredAssetKeys` too, unconditionally
     /// once the variant file is found to exist -- the same rule [#importProject]

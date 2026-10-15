@@ -116,7 +116,35 @@ public class FlutterProjectImporterTest {
 
         File entry = new File(common, "src/main/java/com/example/MyApp.java");
         assertTrue(entry.isFile());
-        assertTrue(read(entry).contains("FlutterRegistry.invokeMain()"));
+        // The four-argument overload (no configured cn1.flutter.package known to the
+        // caller) must fall back to TranscodeFlutterMojo's own default package.
+        assertTrue(read(entry).contains(
+                FlutterProjectImporter.DEFAULT_FLUTTER_PACKAGE + ".FlutterRegistry.invokeMain()"));
+    }
+
+    /// `TranscodeFlutterMojo`'s `cn1.flutter.package` is configurable, and
+    /// `cn1:transcode-flutter` generates `FlutterRegistry` into whichever
+    /// package that resolves to -- never the hardcoded default. The generated
+    /// entry point's `invokeMain()` call must name that SAME package, or the
+    /// project fails to compile the moment the two disagree.
+    @Test
+    public void generatedEntryPointCallsIntoTheConfiguredFlutterPackageNotTheHardcodedDefault() throws Exception {
+        File root = Files.createTempDirectory("flutter-custom-package").toFile();
+        File flutterProject = new File(root, "demo");
+        write(new File(flutterProject, "pubspec.yaml"), "name: demo\nversion: 1.0.0\n"
+                + "dependencies:\n  flutter:\n    sdk: flutter\n");
+        write(new File(flutterProject, "lib/main.dart"), "void main() {}\n");
+
+        File common = new File(root, "common");
+        new FlutterProjectImporter(new com.codename1.build.SystemStreamLog())
+                .importProject(flutterProject, common, "com.example", "MyApp", "com.example.custom.flutter");
+
+        File entry = new File(common, "src/main/java/com/example/MyApp.java");
+        assertTrue(entry.isFile());
+        String generated = read(entry);
+        assertTrue(generated, generated.contains("com.example.custom.flutter.FlutterRegistry.invokeMain()"));
+        assertFalse("must not also reference the hardcoded default package",
+                generated.contains(FlutterProjectImporter.DEFAULT_FLUTTER_PACKAGE + ".FlutterRegistry"));
     }
 
     @Test
@@ -355,6 +383,61 @@ public class FlutterProjectImporterTest {
         File record = new File(flutterDir, FlutterProjectImporter.ASSET_KEYS_RECORD);
         assertEquals(java.util.Arrays.asList("assets/2.0x/logo.png", "assets/3.0x/logo.png", "assets/logo.png"),
                 Files.readAllLines(record.toPath(), java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    /// flutter_tools' own asset.dart (`_AssetBundle.build`) only reports a
+    /// single-file key missing when NEITHER the nominal file NOR any of its
+    /// resolution variants exist: "[the main entry] need not exist for an
+    /// image if resolution-specific variant files exist." A declared
+    /// "assets/logo.png" with no such file, but a real "assets/2.0x/logo.png"
+    /// beside it, is therefore valid: the variant must still be copied and
+    /// recorded, and the key must not be reported missing.
+    @Test
+    public void aSingleFileAssetKeyWithNoNominalFileButARealVariantIsNotReportedMissing() throws Exception {
+        File root = Files.createTempDirectory("flutter-asset-variant-only").toFile();
+        File flutterProject = new File(root, "demo");
+        write(new File(flutterProject, "pubspec.yaml"), "name: demo\nversion: 1.0.0\n"
+                + "dependencies:\n  flutter:\n    sdk: flutter\n"
+                + "flutter:\n  assets:\n    - assets/logo.png\n");
+        write(new File(flutterProject, "lib/main.dart"), "void main() {}\n");
+        // The nominal file itself is never written -- only its resolution variant.
+        write(new File(flutterProject, "assets/2.0x/logo.png"), "LOGO-2X");
+
+        File common = new File(root, "common");
+        FlutterProjectImporter.Result r = new FlutterProjectImporter(new com.codename1.build.SystemStreamLog())
+                .importProject(flutterProject, common, null, null);
+
+        assertTrue(r.missingAssets.toString(), r.missingAssets.isEmpty());
+        assertEquals(1, r.copiedAssets);
+
+        File flutterDir = new File(common, "src/main/flutter");
+        assertFalse("the nominal file was never there and must not be fabricated",
+                new File(flutterDir, "assets/logo.png").exists());
+        assertEquals("LOGO-2X", read(new File(flutterDir, "assets/2.0x/logo.png")));
+
+        File record = new File(flutterDir, FlutterProjectImporter.ASSET_KEYS_RECORD);
+        assertEquals(java.util.Collections.singletonList("assets/2.0x/logo.png"),
+                Files.readAllLines(record.toPath(), java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    /// A key with NEITHER the nominal file NOR any resolution variant is the
+    /// genuinely-missing case this whole mechanism must still catch.
+    @Test
+    public void aSingleFileAssetKeyWithNoFileAndNoVariantIsStillReportedMissing() throws Exception {
+        File root = Files.createTempDirectory("flutter-asset-truly-missing").toFile();
+        File flutterProject = new File(root, "demo");
+        write(new File(flutterProject, "pubspec.yaml"), "name: demo\nversion: 1.0.0\n"
+                + "dependencies:\n  flutter:\n    sdk: flutter\n"
+                + "flutter:\n  assets:\n    - assets/logo.png\n");
+        write(new File(flutterProject, "lib/main.dart"), "void main() {}\n");
+        new File(flutterProject, "assets").mkdirs();
+
+        File common = new File(root, "common");
+        FlutterProjectImporter.Result r = new FlutterProjectImporter(new com.codename1.build.SystemStreamLog())
+                .importProject(flutterProject, common, null, null);
+
+        assertEquals(java.util.Collections.singletonList("assets/logo.png"), r.missingAssets);
+        assertEquals(0, r.copiedAssets);
     }
 
     /// A declared ASSET DIRECTORY ("assets/icons/") follows Flutter's own asset

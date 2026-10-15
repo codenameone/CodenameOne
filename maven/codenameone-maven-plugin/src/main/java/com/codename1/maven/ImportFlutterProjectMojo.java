@@ -47,6 +47,15 @@ public class ImportFlutterProjectMojo extends AbstractCN1Mojo {
     @Parameter(property = "cn1.flutter.import", required = true)
     private File source;
 
+    /// The package `cn1:transcode-flutter` (`TranscodeFlutterMojo`) generates
+    /// `FlutterRegistry` into -- same property and default as that Mojo's own
+    /// `@Parameter`, so a project that sets `cn1.flutter.package` (as a
+    /// project property, since the two goals never share one `<execution>`'s
+    /// `<configuration>`) gets an entry point that calls into the package the
+    /// transpile actually used, instead of the hardcoded default.
+    @Parameter(property = "cn1.flutter.package", defaultValue = "com.codename1.generated.flutter")
+    private String flutterPackage;
+
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
         File common = getCN1ProjectDir();
@@ -58,7 +67,8 @@ public class ImportFlutterProjectMojo extends AbstractCN1Mojo {
         String main = properties == null ? null : properties.getProperty("codename1.mainName");
         FlutterProjectImporter.Result r;
         try {
-            r = new FlutterProjectImporter(MavenLog.of(getLog())).importProject(source, common, pkg, main);
+            r = new FlutterProjectImporter(MavenLog.of(getLog())).importProject(source, common, pkg, main,
+                    flutterPackage);
         } catch (com.codename1.builders.BuildException e) {
             throw new MojoFailureException(e.getMessage(), e);
         }
