@@ -280,9 +280,11 @@ static void cn1_utf8_widen_ascii_neon(const uint8_t* src, JAVA_ARRAY_CHAR* dst, 
 
 // JDK-compatible UTF-16 -> UTF-8 encode. Reads JAVA_ARRAY_CHAR units, joins
 // well-formed surrogate pairs, and emits the canonical 1/2/3/4-byte UTF-8
-// sequence. Unpaired surrogates are encoded as U+FFFD (matching the JDK
-// encoder's REPLACE behaviour). When `out` is NULL only the output length is
-// computed -- callers use this as the size pass before allocating.
+// sequence. An unpaired surrogate is written as '?', the replacement the JDK's
+// UTF-8 encoder uses for String.getBytes -- NOT the three bytes of U+FFFD,
+// which is what this wrote until CharsetCodecTest compared it with the JDK.
+// When `out` is NULL only the output length is computed -- callers use this
+// as the size pass before allocating.
 static size_t cn1_utf8_encode_chars(const JAVA_ARRAY_CHAR* src, size_t len, JAVA_ARRAY_BYTE* out) {
     size_t outLen = 0;
     size_t i = 0;
@@ -296,14 +298,14 @@ static size_t cn1_utf8_encode_chars(const JAVA_ARRAY_CHAR* src, size_t len, JAVA
                     cp = 0x10000 + ((cp - 0xD800) << 10) + (low - 0xDC00);
                     i++;
                 } else {
-                    cp = CN1_REPLACEMENT_CHAR;
+                    cp = '?';
                 }
             } else {
-                cp = CN1_REPLACEMENT_CHAR;
+                cp = '?';
             }
         } else if (cp >= 0xDC00 && cp <= 0xDFFF) {
             // Lone low surrogate.
-            cp = CN1_REPLACEMENT_CHAR;
+            cp = '?';
         }
         if (cp < 0x80) {
             if (out) out[outLen] = (JAVA_ARRAY_BYTE)cp;
@@ -345,6 +347,19 @@ static size_t cn1_utf8_decode_replace(const uint8_t* src, size_t len, JAVA_ARRAY
     uint32_t codepoint = 0;
     size_t i = 0;
     while (i < len) {
+        // An encoded surrogate, ED A0..BF: the DFA rejects it at the second
+        // byte, which is the maximal-subpart rule and gives one U+FFFD per byte.
+        // The JDK instead reads ED and a continuation as the start of an
+        // ordinary three byte sequence and replaces the whole of it once --
+        // ED A0 80 is one U+FFFD, and so are ED A0 at the end and the ED A0 of
+        // ED A0 41 -- on every JDK from 8 to 25.
+        if (state == UTF8_ACCEPT && src[i] == 0xED && i + 1 < len
+                && src[i + 1] >= 0xA0 && src[i + 1] <= 0xBF) {
+            if (out) out[outLen] = (JAVA_ARRAY_CHAR)CN1_REPLACEMENT_CHAR;
+            outLen++;
+            i += (i + 2 < len && (src[i + 2] & 0xC0) == 0x80) ? 3 : 2;
+            continue;
+        }
         uint32_t prev = state;
         decode(&state, &codepoint, src[i]);
         if (state == UTF8_ACCEPT) {

@@ -22,6 +22,8 @@
  */
 
 package java.io;
+
+import com.codename1.impl.charset.CharsetSupport;
 /**
  * An OutputStreamWriter is a bridge from character streams to byte streams: Characters written to it are translated into bytes. The encoding that it uses may be specified by name, or the platform's default encoding may be accepted.
  * Each invocation of a write() method causes the encoding converter to be invoked on the given character(s). The resulting bytes are accumulated in a buffer before being written to the underlying output stream. The size of this buffer may be specified, but by default it is large enough for most purposes. Note that the characters passed to the write() methods are not buffered.
@@ -67,21 +69,13 @@ public class OutputStreamWriter extends java.io.Writer {
      */
     public OutputStreamWriter(java.io.OutputStream os, java.lang.String enc) throws java.io.UnsupportedEncodingException{
          this.os = os;
-         this.enc = enc;
-         utf8 = isUtf8Name(enc);
-    }
-
-    /* The encoding name is ASCII by specification, so it is folded by hand.
-     * String.toLowerCase is locale sensitive and would fold the I of "UTF-8" to a
-     * dotless i on a Turkish device, quietly sending every write down the slow path
-     * -- or worse, down a path that disagrees with the one the same app took
-     * elsewhere. */
-    private static boolean isUtf8Name(String e) {
-        if(e == null) {
-            return false;
-        }
-        return e.equalsIgnoreCase("UTF-8") || e.equalsIgnoreCase("UTF8")
-                || e.equalsIgnoreCase("utf-8");
+         // Looked up here, as the JDK looks it up, so a name no runtime supports
+         // is refused by the constructor instead of being written as UTF-8 by the
+         // first write. The canonical name is kept, so every alias of UTF-8 takes
+         // the direct path below.
+         int charset = CharsetSupport.lookup(enc);
+         this.enc = CharsetSupport.name(charset);
+         utf8 = charset == CharsetSupport.UTF_8;
     }
 
     // Buffering hides the underlying stream from every write, so it can no longer be
@@ -198,6 +192,12 @@ public class OutputStreamWriter extends java.io.Writer {
                 str = str.substring(off, off + len);
             }
             byte[] b = str.getBytes(enc);
+            if(b.length > 0 && "UTF-16".equals(enc)) {
+                // The JDK writes UTF-16's byte order mark once, at the start of
+                // the stream, and getBytes writes one per call: the rest of the
+                // stream is the same big endian units without it.
+                enc = "UTF-16BE";
+            }
             writeBytes(b, 0, b.length);
         }
     }

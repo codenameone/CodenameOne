@@ -22,6 +22,7 @@
  */
 package java.net;
 
+import com.codename1.impl.charset.CharsetSupport;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
 
@@ -66,7 +67,7 @@ public class URLDecoder {
         }
         // Checked before anything is decoded, as the JDK does, so a charset
         // that is not supported is refused even for text with no escapes.
-        return decodeWith(s, URLEncoder.charset(enc));
+        return decodeWith(s, CharsetSupport.lookup(enc));
     }
 
     /**
@@ -77,13 +78,13 @@ public class URLDecoder {
             throw new NullPointerException("Charset");
         }
         try {
-            return decodeWith(s, URLEncoder.charset(charset.name()));
+            return decodeWith(s, CharsetSupport.lookup(charset.name()));
         } catch (UnsupportedEncodingException e) {
             throw new IllegalArgumentException(e.toString());
         }
     }
 
-    private static String decodeWith(String s, String enc) throws UnsupportedEncodingException {
+    private static String decodeWith(String s, int enc) throws UnsupportedEncodingException {
         int length = s.length();
         StringBuilder out = null;
         int i = 0;
@@ -130,22 +131,18 @@ public class URLDecoder {
     }
 
     /**
-     * Appends {@code count} bytes decoded in {@code enc}, a canonical name from
-     * {@link URLEncoder#charset(String)}. The two single byte charsets are
-     * decoded here, so they answer the same on every runtime: ISO-8859-1 maps
-     * each byte to the character of that number, and US-ASCII maps a byte
-     * above 0x7F to U+FFFD, as the JDK's decoder replaces it.
+     * Appends {@code count} bytes decoded in {@code enc}, one of
+     * CharsetSupport's constants. UTF-8 is read by String, whose UTF-8 path is
+     * correct on every runtime; the other charsets are read by CharsetSupport,
+     * which replaces what a charset cannot read with U+FFFD as the JDK's
+     * decoders do.
      */
-    private static void text(StringBuilder out, byte[] bytes, int count, String enc)
+    private static void text(StringBuilder out, byte[] bytes, int count, int enc)
             throws UnsupportedEncodingException {
-        if ("UTF-8".equals(enc)) {
-            out.append(new String(bytes, 0, count, enc));
+        if (enc == CharsetSupport.UTF_8) {
+            out.append(new String(bytes, 0, count, "UTF-8"));
             return;
         }
-        boolean ascii = "US-ASCII".equals(enc);
-        for (int i = 0; i < count; i++) {
-            int b = bytes[i] & 0xff;
-            out.append(ascii && b > 0x7F ? (char) 0xFFFD : (char) b);
-        }
+        out.append(CharsetSupport.decode(enc, bytes, 0, count));
     }
 }

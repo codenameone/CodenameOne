@@ -5868,22 +5868,31 @@ bindNative(["cn1_java_lang_String_cn1FusedConcat4_java_lang_String_java_lang_Str
 bindNative(["cn1_java_lang_String_cn1FusedConcat5_java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_R_java_lang_String"], function(a, b, c, d, e) {
   return createJavaString(cn1FusedConcatArg(a) + cn1FusedConcatArg(b) + cn1FusedConcatArg(c) + cn1FusedConcatArg(d) + cn1FusedConcatArg(e));
 });
+// UTF-8 only: String and InputStreamReader look the charset up in Java
+// (CharsetSupport) and convert every other charset there, so `encoding` is
+// always UTF-8 here. TextDecoder's replacement rule is the JDK's with one
+// exception, an encoded surrogate (ED A0..BF ...): TextDecoder replaces it a
+// byte at a time, the JDK replaces the whole sequence once, so those are cut
+// out and replaced here. ignoreBOM keeps a leading U+FEFF, which the JDK keeps
+// and TextDecoder would otherwise strip.
+function cn1DecodeUtf8(array) {
+  const decoder = new TextDecoder("utf-8", { ignoreBOM: true });
+  const n = array.length;
+  let text = "";
+  let start = 0;
+  for (let i = 0; i + 1 < n; i++) {
+    if (array[i] === 0xED && array[i + 1] >= 0xA0 && array[i + 1] <= 0xBF) {
+      text += decoder.decode(array.subarray(start, i)) + "\uFFFD";
+      i += (i + 2 < n && (array[i + 2] & 0xC0) === 0x80) ? 2 : 1;
+      start = i + 1;
+    }
+  }
+  return text + decoder.decode(array.subarray(start, n));
+}
 bindNative(["cn1_java_lang_String_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY"], function(bytes, off, len, encoding) {
   const slice = bytes.slice(off | 0, (off | 0) + (len | 0));
   const array = Uint8Array.from(slice, function(v) { return v & 0xff; });
-  let text = "";
-  if (typeof TextDecoder !== "undefined") {
-    try {
-      text = new TextDecoder((encoding ? jvm.toNativeString(encoding) : "utf-8")).decode(array);
-    } catch (err) {
-      text = new TextDecoder("utf-8").decode(array);
-    }
-  } else {
-    for (let i = 0; i < array.length; i++) {
-      text += String.fromCharCode(array[i]);
-    }
-  }
-  return createArrayFromNativeString(text);
+  return createArrayFromNativeString(cn1DecodeUtf8(array));
 });
 bindNative(["cn1_java_io_InputStreamReader_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY"], function*(bytes, off, len, encoding) {
   // Adapt the call result so a CHA-sync classification of the
@@ -5915,12 +5924,14 @@ bindNative(["cn1_java_lang_String_charsToBytes_char_1ARRAY_char_1ARRAY_R_byte_1A
     }
     text = parts.join("");
   }
-  let encoded;
-  if (typeof TextEncoder !== "undefined") {
-    encoded = new TextEncoder().encode(text);
-  } else {
-    encoded = Uint8Array.from(text.split("").map(function(ch) { return ch.charCodeAt(0) & 0xff; }));
+  // UTF-8 only, for the reason the decoder above gives. TextEncoder writes an
+  // unpaired surrogate as U+FFFD; the JDK's String.getBytes writes '?'.
+  if (/[\uD800-\uDFFF]/.test(text)) {
+    text = text.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDFFF]/g, function(m) {
+      return m.length === 2 ? m : "?";
+    });
   }
+  const encoded = new TextEncoder().encode(text);
   const out = jvm.newArray(encoded.length, "JAVA_BYTE", 1);
   for (let i = 0; i < encoded.length; i++) {
     // A Java byte is SIGNED: 0xC3 is -61. Storing the encoder's 0..255 made

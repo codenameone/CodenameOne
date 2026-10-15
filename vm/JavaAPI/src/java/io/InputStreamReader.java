@@ -22,6 +22,8 @@
  */
 
 package java.io;
+
+import com.codename1.impl.charset.CharsetSupport;
 /**
  * An InputStreamReader is a bridge from byte streams to character streams: It reads bytes and translates them into characters. The encoding that it uses may be specified by name, or the platform's default encoding may be accepted.
  * Each invocation of one of an InputStreamReader's read() methods may cause one or more bytes to be read from the underlying byte input stream. To enable the efficient conversion of bytes to characters, more bytes may be read ahead from the underlying stream than are necessary to satisfy the current read operation.
@@ -29,7 +31,7 @@ package java.io;
  */
 public class InputStreamReader extends java.io.Reader{
     private InputStream internal; 
-    private java.lang.String enc;
+    private int charset = CharsetSupport.UTF_8;
     private char[] cbuffer;
     private int cbufferOff;
     
@@ -39,12 +41,13 @@ public class InputStreamReader extends java.io.Reader{
      */
     public InputStreamReader(java.io.InputStream is) {
          internal = is;
-         this.enc = "UTF-8";
     }
 
     private void complete() throws IOException{
         byte[] b = readInputStream(internal);
-        cbuffer = bytesToChars(b, 0, b.length, enc);
+        cbuffer = charset == CharsetSupport.UTF_8
+                ? bytesToChars(b, 0, b.length, "UTF-8")
+                : CharsetSupport.decode(charset, b, 0, b.length);
     }
 
     private static byte[] readInputStream(InputStream i) throws IOException {
@@ -71,7 +74,11 @@ public class InputStreamReader extends java.io.Reader{
      */
     public InputStreamReader(java.io.InputStream is, java.lang.String enc) throws java.io.UnsupportedEncodingException{
          internal = is;
-         this.enc = enc.intern();
+         // Looked up here, as the JDK looks it up: a name no runtime supports is
+         // refused now, rather than handed to the native when the stream is
+         // read, which decoded an unknown name as UTF-8 on Apple targets and as
+         // ISO-8859-1 elsewhere. Only UTF-8 goes to the native.
+         this.charset = CharsetSupport.lookup(enc);
     }
 
     private static native char[] bytesToChars(byte[] b, int off, int len, String encoding); 

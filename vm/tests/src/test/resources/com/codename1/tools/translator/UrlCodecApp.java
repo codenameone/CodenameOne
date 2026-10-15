@@ -88,12 +88,13 @@ public class UrlCodecApp {
         }
         sb.append(encodeRefusal("abc", null)).append(';');
         sb.append(decodeRefusal("abc", null)).append(';');
-        // The single byte charsets: what they cannot hold is '?', once for a
-        // surrogate pair, and a byte US-ASCII cannot read is U+FFFD.
+        // Every charset: what a single byte charset cannot hold is '?', once
+        // for a surrogate pair, a byte US-ASCII cannot read is U+FFFD, and
+        // UTF-16 writes its byte order mark once per run of escapes.
         String wide = accented + (char) 0x20AC + emoji + (char) 0xD800 + "x";
         String[] names = {"UTF-8", "utf8", "ISO-8859-1", "ISO8859-1", "iso8859_1", "ISO_8859_1",
             "ISO_8859-1", "8859_1", "latin1", "l1", "US-ASCII", "ascii", "us", "ISO646-US",
-            "ascii7", "646"};
+            "ascii7", "646", "UTF-16", "unicode", "UTF-16BE", "UTF-16LE", "ISO-8859-2", "latin2"};
         for (int i = 0; i < names.length; i++) {
             sb.append(URLEncoder.encode(wide, names[i])).append('|');
             sb.append(codePoints(URLDecoder.decode("%E9A+%41", names[i]))).append(';');
