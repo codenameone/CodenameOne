@@ -48,6 +48,39 @@ import static org.junit.Assert.assertTrue;
 /// which members a class file refers to.
 final class CompatFixtures {
 
+    /// The `cn1res:` URLs the JavaSE and Android ports make for
+    /// [com.codename1.impl.compat.Resources] on a JDK whose `URL` does not
+    /// know the scheme: their stream reads back through `Resources`. A test
+    /// installs it with `Resources.cn1SetUrlFactory` and removes it after.
+    static com.codename1.impl.compat.Resources.UrlFactory cn1resUrls() {
+        final java.net.URLStreamHandler handler = new java.net.URLStreamHandler() {
+            @Override
+            protected java.net.URLConnection openConnection(java.net.URL u) {
+                return new java.net.URLConnection(u) {
+                    @Override
+                    public void connect() {
+                        connected = true;
+                    }
+
+                    @Override
+                    public java.io.InputStream getInputStream() throws IOException {
+                        java.io.InputStream in = com.codename1.impl.compat.Resources.openUrlPath(getURL().getPath());
+                        if (in == null) {
+                            throw new java.io.FileNotFoundException(getURL().toExternalForm());
+                        }
+                        return in;
+                    }
+                };
+            }
+        };
+        return new com.codename1.impl.compat.Resources.UrlFactory() {
+            @Override
+            public java.net.URL create(String encodedPath) throws IOException {
+                return new java.net.URL("cn1res", null, -1, encodedPath, handler);
+            }
+        };
+    }
+
     private CompatFixtures() {
     }
 

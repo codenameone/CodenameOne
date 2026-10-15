@@ -25,9 +25,8 @@ package com.codename1.maven;
 import com.codename1.build.BuildArtifact;
 import com.codename1.build.BuildFailureException;
 import com.codename1.builders.BuildException;
-import com.codename1.compat.jdk.ResourceBundle;
-import com.codename1.compat.jdk.ResourceNames;
-import com.codename1.compat.jdk.Resources;
+import com.codename1.impl.compat.ResourceNames;
+import com.codename1.impl.compat.Resources;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -43,6 +42,8 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.net.URLConnection;
+import java.net.URLStreamHandler;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -84,7 +85,6 @@ public class CompatResourcesTest {
         Locale.setDefault(saved);
         Resources.cn1SetProvider(null);
         Resources.cn1ClearIndex();
-        ResourceBundle.cn1Reset();
     }
 
     private static File write(File root, String path, String text) throws IOException {
@@ -260,68 +260,6 @@ public class CompatResourcesTest {
     }
 
     // ------------------------------------------------------------------
-    // The registry
-    // ------------------------------------------------------------------
-
-    /// More resources than one generated method holds.
-    @Test
-    public void theRegistryIndexesEveryResourceAndSealsTheBundles() throws Exception {
-        List<String> paths = new ArrayList<String>();
-        for (int i = 0; i < 2500; i++) {
-            paths.add("d/f" + i + ".txt");
-        }
-        Map<String, String> bundles = new TreeMap<String, String>();
-        bundles.put("d.Messages", "/d/Messages.properties");
-        Map<String, byte[]> registry = CompatResources.registry(paths, bundles, Collections.<String>emptyList());
-        // 2501 registrations, a thousand to a part.
-        assertEquals(Arrays.asList(CompatResources.REGISTRY, CompatResources.REGISTRY + "$Part0",
-                CompatResources.REGISTRY + "$Part1", CompatResources.REGISTRY + "$Part2"),
-                new ArrayList<String>(registry.keySet()));
-
-        CompatFixtures.Defining loader = new CompatFixtures.Defining(getClass().getClassLoader());
-        Class<?> generated = null;
-        for (Map.Entry<String, byte[]> e : registry.entrySet()) {
-            Class<?> defined = loader.define(e.getValue());
-            generated = CompatResources.REGISTRY.equals(e.getKey()) ? defined : generated;
-        }
-        assertNotNull(generated);
-        assertEquals("com.codename1.compat.jdk.CompatRegistry", generated.getName());
-        assertTrue(ResourceBundle.Cn1Factory.class.isAssignableFrom(generated));
-        generated.getMethod("cn1Install").invoke(null);
-
-        final List<String> asked = new ArrayList<String>();
-        Resources.cn1SetProvider(new Resources.Provider() {
-            @Override
-            public java.io.InputStream open(String flatName) {
-                asked.add(flatName);
-                return null;
-            }
-        });
-        assertTrue(Resources.exists("/d/f0.txt"));
-        assertTrue(Resources.exists("/d/f999.txt"));
-        assertTrue(Resources.exists("/d/f1000.txt"));
-        assertTrue(Resources.exists("/d/f2499.txt"));
-        assertFalse(Resources.exists("/d/f2500.txt"));
-        assertTrue("The index answers; nothing is opened: " + asked, asked.isEmpty());
-        assertNull(((ResourceBundle.Cn1Factory) generated.getConstructor().newInstance()).cn1Create(0));
-        try {
-            // Registered, but its file is not among the indexed resources:
-            // absent, again without anything being opened.
-            ResourceBundle.getBundle("d.Messages");
-            fail();
-        } catch (com.codename1.compat.jdk.MissingResourceException expected) {
-            assertTrue(asked.toString(), asked.isEmpty());
-        }
-        try {
-            // Sealed: a name that was not registered is not looked for.
-            ResourceBundle.getBundle("com.codename1.maven.NoSuchBundle");
-            fail();
-        } catch (com.codename1.compat.jdk.MissingResourceException expected) {
-            assertTrue(asked.toString(), asked.isEmpty());
-        }
-    }
-
-    // ------------------------------------------------------------------
     // End to end
     // ------------------------------------------------------------------
 
@@ -443,10 +381,6 @@ public class CompatResourcesTest {
         return null;
     }
 
-    private File jdkJar() throws IOException {
-        return artifact(Relocation.JDK_ARTIFACT, "com/codename1/compat/jdk/ResourceNames.class");
-    }
-
     private File swingJar() throws IOException {
         String label = CompatRemapperTest.SWING + "javax/swing/JLabel";
         return CompatRemapperTest.jar(new File(tmp.getRoot(), "codenameone-swing-compat-1.jar"),
@@ -455,7 +389,7 @@ public class CompatResourcesTest {
 
     /// The compliance check as a build runs it, against the real device
     /// library and the real core.
-    private void checkCompliance(File classes, File swing, File jdk) throws Exception {
+    private void checkCompliance(File classes, File swing) throws Exception {
         TestProjectHost host = TestProjectHost.empty();
         host.log = CompatRemapperTest.LOG;
         host.buildDir = tmp.newFolder();
@@ -466,9 +400,64 @@ public class CompatResourcesTest {
                 artifact("codenameone-core", "com/codename1/ui/Display.class"), null));
         host.artifacts.add(new BuildArtifact("com.codenameone", "codenameone-swing-compat", "1", null, "jar",
                 "compile", swing, null));
-        host.artifacts.add(new BuildArtifact("com.codenameone", Relocation.JDK_ARTIFACT, "1", null, "jar",
-                "compile", jdk, null));
         new BytecodeCompliance(host).execute();
+    }
+
+    /// Installs into `resources` (the `Resources` class `loader` defined)
+    /// what the JavaSE and Android ports install on a real JDK: `cn1res:`
+    /// URLs whose stream reads through `Resources.openUrlPath`, and a loader
+    /// that answers a nested name the build flattened from the index.
+    private static void installJdkSupport(ClassLoader loader, final Class<?> resources) throws Exception {
+        final Method openUrlPath = resources.getMethod("openUrlPath", String.class);
+        final Method exists = resources.getMethod("exists", String.class);
+        final Method systemResource = resources.getMethod("getSystemResource", String.class);
+        final URLStreamHandler handler = new URLStreamHandler() {
+            @Override
+            protected URLConnection openConnection(URL u) {
+                return new URLConnection(u) {
+                    @Override
+                    public void connect() {
+                        connected = true;
+                    }
+
+                    @Override
+                    public java.io.InputStream getInputStream() throws IOException {
+                        try {
+                            java.io.InputStream in = (java.io.InputStream) openUrlPath.invoke(null, getURL().getPath());
+                            if (in == null) {
+                                throw new java.io.FileNotFoundException(getURL().toExternalForm());
+                            }
+                            return in;
+                        } catch (ReflectiveOperationException e) {
+                            throw new IOException(e);
+                        }
+                    }
+                };
+            }
+        };
+        Class<?> factoryType = loader.loadClass("com.codename1.impl.compat.Resources$UrlFactory");
+        Object factory = Proxy.newProxyInstance(loader, new Class<?>[] {factoryType}, new InvocationHandler() {
+            @Override
+            public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+                if (!"create".equals(method.getName())) {
+                    return method.invoke(this, args);
+                }
+                return new URL("cn1res", null, -1, (String) args[0], handler);
+            }
+        });
+        resources.getMethod("cn1SetUrlFactory", factoryType).invoke(null, factory);
+        ClassLoader flat = new ClassLoader(loader) {
+            @Override
+            protected URL findResource(String name) {
+                try {
+                    return Boolean.TRUE.equals(exists.invoke(null, name)) ? (URL) systemResource.invoke(null, name)
+                            : null;
+                } catch (ReflectiveOperationException e) {
+                    throw new IllegalStateException(e);
+                }
+            }
+        };
+        resources.getMethod("cn1SetClassLoader", ClassLoader.class).invoke(null, flat);
     }
 
     @Test
@@ -490,8 +479,7 @@ public class CompatResourcesTest {
             write(classes, file[0], file[1]);
         }
         File swing = swingJar();
-        File jdk = jdkJar();
-        List<File> classpath = Arrays.asList(swing, jdk);
+        List<File> classpath = Collections.singletonList(swing);
 
         assertTrue(new CompatRemapper(classes, classpath, null, CompatRemapperTest.LOG)
                 .withDesktopSourceDirectory(desktop).run());
@@ -504,7 +492,7 @@ public class CompatResourcesTest {
         assertFalse(new File(classes, "p/img").exists());
         assertFalse(new File(classes, "x").exists());
         assertFalse(new File(classes, "p/Messages.properties").exists());
-        assertTrue(new File(classes, CompatResources.REGISTRY + ".class").isFile());
+        assertTrue(new File(classes, ApplicationRegistry.NAME + ".class").isFile());
 
         // A second run is a no-op, the registry included.
         Map<String, byte[]> first = snapshot(classes);
@@ -513,11 +501,14 @@ public class CompatResourcesTest {
         assertSameTree(first, snapshot(classes));
 
         // Everything that ships exists on the device.
-        checkCompliance(classes, swing, jdk);
+        checkCompliance(classes, swing);
 
         // The device bundle: the files at the root of the classes
         // directory and nothing else. The application's loader sees the
-        // classes and the core; the JDK stands in for the device library.
+        // classes and the core, and the JDK is the class library -- as on
+        // the JavaSE and Android ports, which install what a real JDK needs
+        // to read a flat bundle: a URL handler for `cn1res:` and a loader
+        // that falls back to the index. `installJdkSupport` is the same.
         final File bundle = tmp.newFolder("bundle");
         for (File f : classes.listFiles()) {
             if (f.isFile()) {
@@ -526,9 +517,10 @@ public class CompatResourcesTest {
         }
         final List<String> asked = new ArrayList<String>();
         URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL(),
-            artifact("codenameone-core", "com/codename1/ui/Display.class").toURI().toURL()}, null);
+            artifact("codenameone-core", "com/codename1/ui/Display.class").toURI().toURL(),
+            RealCompatJars.jdkHost(tmp.newFolder()).toURI().toURL()}, null);
         try {
-            Class<?> provider = loader.loadClass("com.codename1.compat.jdk.Resources$Provider");
+            Class<?> provider = loader.loadClass("com.codename1.impl.compat.Resources$Provider");
             Object flat = Proxy.newProxyInstance(loader, new Class<?>[] {provider}, new InvocationHandler() {
                 @Override
                 public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
@@ -540,8 +532,11 @@ public class CompatResourcesTest {
                     return f.isFile() ? new FileInputStream(f) : null;
                 }
             });
-            loader.loadClass("com.codename1.compat.jdk.Resources").getMethod("cn1SetProvider", provider)
-                    .invoke(null, flat);
+            Class<?> resourcesClass = loader.loadClass("com.codename1.impl.compat.Resources");
+            resourcesClass.getMethod("cn1SetProvider", provider).invoke(null, flat);
+            installJdkSupport(loader, resourcesClass);
+            // What the application's lifecycle does first.
+            loader.loadClass(ApplicationRegistry.NAME.replace('/', '.')).getMethod("cn1Install").invoke(null);
 
             Class<?> foo = loader.loadClass("p.Foo");
             Object instance = foo.getConstructor().newInstance();
@@ -568,10 +563,9 @@ public class CompatResourcesTest {
         File classes = tmp.newFolder("classes");
         CompatFixtures.compile(tmp.newFolder("src"), classes, "p/Loads.java", LOADS);
         File swing = swingJar();
-        File jdk = jdkJar();
-        assertTrue(new CompatRemapper(classes, Arrays.asList(swing, jdk), null, CompatRemapperTest.LOG).run());
+        assertTrue(new CompatRemapper(classes, Collections.singletonList(swing), null, CompatRemapperTest.LOG).run());
         try {
-            checkCompliance(classes, swing, jdk);
+            checkCompliance(classes, swing);
             fail("A device loads no classes at run time");
         } catch (BuildFailureException expected) {
             assertTrue(expected.getMessage(), expected.getMessage().contains("URLClassLoader"));
@@ -585,10 +579,9 @@ public class CompatResourcesTest {
         File classes = tmp.newFolder("classes");
         CompatFixtures.compile(tmp.newFolder("src"), classes, "p/Asks.java", ASKS);
         File swing = swingJar();
-        File jdk = jdkJar();
-        assertTrue(new CompatRemapper(classes, Arrays.asList(swing, jdk), null, CompatRemapperTest.LOG).run());
+        assertTrue(new CompatRemapper(classes, Collections.singletonList(swing), null, CompatRemapperTest.LOG).run());
         assertTrue(CompatFixtures.members(Files.readAllBytes(new File(classes, "p/Asks.class").toPath()))
-                .contains("com/codename1/compat/jdk/Resources.loadClass"));
-        checkCompliance(classes, swing, jdk);
+                .contains("com/codename1/impl/compat/Resources.loadClass"));
+        checkCompliance(classes, swing);
     }
 }

@@ -158,7 +158,7 @@ public class IkonliFontIconTest {
         List<File> ikonli = Arrays.asList(RealCompatJars.jar("ikonli-swing", scratch),
                 RealCompatJars.jar("ikonli-core", scratch), RealCompatJars.jar("ikonli-fontawesome5-pack", scratch));
         List<File> runtimes = Arrays.asList(RealCompatJars.swing(scratch), RealCompatJars.javafx(scratch),
-                RealCompatJars.jdk(scratch), RealCompatJars.core(scratch));
+                RealCompatJars.core(scratch));
 
         // javac, as the application's build runs it: against the JDK's
         // Swing and the three jars.

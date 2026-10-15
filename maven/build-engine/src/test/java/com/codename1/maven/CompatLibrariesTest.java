@@ -54,13 +54,14 @@ public class CompatLibrariesTest {
 
     private static final String PANEL = "package org.fancy;\n"
             + "public class FancyPanel extends javax.swing.JPanel {\n"
-            + "    public String title() { return String.join(\"-\", \"fancy\", \"panel\"); }\n"
+            + "    public String title() { return \"fancy panel\".replaceAll(\" \", \"-\"); }\n"
             + "}\n";
 
-    /// As [#PANEL], and starting a process: nothing a device can do.
+    /// As [#PANEL], and asking for the JVM's management beans: nothing a
+    /// device has.
     private static final String BAD_PANEL = "package org.fancy;\n"
             + "public class FancyPanel extends javax.swing.JPanel {\n"
-            + "    public Object launch() { return new ProcessBuilder(\"ls\"); }\n"
+            + "    public Object launch() { return java.lang.management.ManagementFactory.getRuntimeMXBean(); }\n"
             + "}\n";
 
     /// As [#PANEL], with the corners a real Swing library has: it can save
@@ -135,7 +136,7 @@ public class CompatLibrariesTest {
             scratch = tmp.newFolder("jars");
         }
         return new ArrayList<File>(Arrays.asList(RealCompatJars.swing(scratch), RealCompatJars.javafx(scratch),
-                RealCompatJars.jdk(scratch), RealCompatJars.core(scratch)));
+                RealCompatJars.core(scratch)));
     }
 
     /// Compiles one class against the layers and packs it as `name`, with a
@@ -197,9 +198,9 @@ public class CompatLibrariesTest {
         assertFalse(new File(classes, "org/fancy/notes.properties").exists());
         assertFalse("The jar's manifest is not the application's",
                 new File(classes, "META-INF/MANIFEST.MF").exists());
-        // What a device lacks is redirected in the library as in the application.
+        // What moves is redirected in the library as in the application.
         assertTrue(CompatFixtures.members(Files.readAllBytes(panel.toPath()))
-                .contains("com/codename1/compat/jdk/JdkStrings.join"));
+                .contains("com/codename1/util/regex/StringRegex.replaceAll"));
         assertFalse("A library the application never reaches ships nothing",
                 new File(classes, "org/plain/Words.class").exists());
         assertFalse(new File(classes, "org/plain/notes.properties").exists());
@@ -248,14 +249,14 @@ public class CompatLibrariesTest {
 
     private static final String SPLITTER = "package org.plain;\n"
             + "class Splitter {\n"
-            + "    static String[] split(String s) { return new String[] {String.join(\"-\", s, s)}; }\n"
+            + "    static String[] split(String s) { return (s + \" \" + s).split(\" \"); }\n"
             + "}\n";
 
     /// The part of the library the application has no use for, and which no
     /// device could run.
     private static final String SHELL = "package org.plain;\n"
             + "public class Shell {\n"
-            + "    public Object run() { return new ProcessBuilder(\"ls\"); }\n"
+            + "    public Object run() { return java.lang.management.ManagementFactory.getRuntimeMXBean(); }\n"
             + "}\n";
 
     private File plainLibrary(Object... extra) throws Exception {
@@ -286,9 +287,9 @@ public class CompatLibrariesTest {
         assertFalse("Nothing leads to it", new File(classes, "org/plain/Shell.class").exists());
         assertTrue(new File(classes, "org__plain__words.properties").isFile());
         assertFalse(new File(classes, "module-info.class").exists());
-        // A pure-Java library is relocated for the JDK classes a device lacks.
+        // A pure-Java library is relocated for the JDK members that move.
         assertTrue(CompatFixtures.members(Files.readAllBytes(new File(classes, "org/plain/Splitter.class").toPath()))
-                .contains("com/codename1/compat/jdk/JdkStrings.join"));
+                .contains("com/codename1/util/regex/StringRegex.split"));
         assertTrue(logged.toString(), logged.toString().contains(
                 "info: Bundling 2 of the 3 classes of plain-lib-1.0.jar with the application"));
         CompatLibraries.Library lib = CompatLibraries.libraries(classes).get("plain-lib-1.0.jar");
@@ -386,7 +387,7 @@ public class CompatLibrariesTest {
         assertTrue(remapper(classes, Collections.singletonList(newer), newer).run());
         assertTrue(logged.toString(), logged.toString().contains("Bundling fancy-lib-1.0.jar"));
         assertTrue(CompatFixtures.members(Files.readAllBytes(panel.toPath())).toString(),
-                CompatFixtures.members(Files.readAllBytes(panel.toPath())).contains("java/lang/ProcessBuilder.<init>"));
+                CompatFixtures.members(Files.readAllBytes(panel.toPath())).contains("java/lang/management/ManagementFactory.getRuntimeMXBean"));
         assertEquals("com/codename1/desktopcompat/javax/swing/JPanel", superName(panel));
     }
 
@@ -409,7 +410,7 @@ public class CompatLibrariesTest {
         CompatFixtures.compileAgainst(runtimes(), tmp.newFolder(), classes, "org/fancy/FancyPanel.java", PANEL);
         assertTrue(remapper(classes, Collections.singletonList(fancy), fancy).run());
         assertFalse(CompatFixtures.members(Files.readAllBytes(new File(classes, "org/fancy/FancyPanel.class")
-                .toPath())).contains("java/lang/ProcessBuilder.<init>"));
+                .toPath())).contains("java/lang/management/ManagementFactory.getRuntimeMXBean"));
         assertTrue(CompatLibraries.classOrigins(classes).isEmpty());
         new BytecodeCompliance(host(classes, fancy)).execute();
     }
@@ -423,9 +424,9 @@ public class CompatLibrariesTest {
         assertTrue(remapper(classes, Collections.singletonList(fancy), fancy).run());
         byte[] panel = Files.readAllBytes(new File(classes, "org/fancy/FancyPanel.class").toPath());
         assertTrue(CompatFixtures.members(panel).toString(),
-                CompatFixtures.members(panel).contains("com/codename1/compat/jdk/Resources.loadClass"));
+                CompatFixtures.members(panel).contains("com/codename1/impl/compat/Resources.loadClass"));
         assertTrue(CompatFixtures.members(panel).toString(),
-                CompatFixtures.members(panel).contains("com/codename1/compat/jdk/ObjectOutput.writeInt"));
+                CompatFixtures.members(panel).contains("java/io/ObjectOutput.writeInt"));
         // No finding: the library names link-only classes, and it may.
         new BytecodeCompliance(host(classes, fancy)).execute();
     }
@@ -456,10 +457,10 @@ public class CompatLibrariesTest {
         assertTrue(remapper(classes, Collections.singletonList(fancy), fancy).run());
         try {
             new BytecodeCompliance(host(classes, fancy)).execute();
-            fail("ProcessBuilder is not on a device");
+            fail("ManagementFactory is not on a device");
         } catch (Exception e) {
             String message = e.getMessage();
-            assertTrue(message, message.contains("java/lang/ProcessBuilder"));
+            assertTrue(message, message.contains("java/lang/management/ManagementFactory"));
             assertTrue(message, message.contains("org/fancy/FancyPanel") || message.contains("org.fancy.FancyPanel"));
             assertTrue(message, message.contains(
                     "in the library fancy-lib-1.0.jar, which is bundled and relocated with the application"));

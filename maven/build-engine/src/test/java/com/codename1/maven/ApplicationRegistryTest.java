@@ -80,7 +80,9 @@ public class ApplicationRegistryTest {
     }
 
     /// Defines the generated classes and nothing else; everything they name
-    /// resolves from this test's class path.
+    /// resolves from this test's class path. The generated classes come
+    /// first: the layers' jars on that class path carry the placeholder of
+    /// the same name.
     private static final class Loader extends ClassLoader {
         private final Map<String, byte[]> classes;
 
@@ -90,12 +92,19 @@ public class ApplicationRegistryTest {
         }
 
         @Override
-        protected Class<?> findClass(String name) throws ClassNotFoundException {
+        protected synchronized Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
             byte[] b = classes.get(name.replace('.', '/'));
             if (b == null) {
-                throw new ClassNotFoundException(name);
+                return super.loadClass(name, resolve);
             }
-            return defineClass(name, b, 0, b.length);
+            Class<?> c = findLoadedClass(name);
+            if (c == null) {
+                c = defineClass(name, b, 0, b.length);
+            }
+            if (resolve) {
+                resolveClass(c);
+            }
+            return c;
         }
     }
 
@@ -196,30 +205,10 @@ public class ApplicationRegistryTest {
         String text = "# header\r\n\n  org.a.One   # first\norg.a.Two\r\norg.a.One\nnot a name\n\t\n"
                 + "9bad\norg.a.$Three\n#org.a.Four\norg.a.Five#x";
         List<String> illegal = new ArrayList<String>();
-        List<String> compatIllegal = new ArrayList<String>();
-        assertEquals(com.codename1.compat.jdk.ServiceLoader.cn1ProviderNames(text, compatIllegal),
+        assertEquals(Arrays.asList("org.a.One", "org.a.Two", "org.a.$Three", "org.a.Five"),
                 ServiceProviderNames.of(text, illegal));
-        assertEquals(compatIllegal, illegal);
         assertEquals(Arrays.asList("org.a.One", "org.a.Two", "org.a.$Three", "org.a.Five"),
                 ServiceProviderNames.of(text, null));
         assertEquals(Arrays.asList("not a name", "9bad"), illegal);
-    }
-
-    /// The core's resource names are the compat layer's, which the shipped
-    /// applications were flattened by.
-    @Test
-    public void coreResourceNamesMatchTheCompatOnes() {
-        String[] paths = {"a.txt", "a/b.txt", "META-INF/resources/x/y.png", "a__b/c", "x/./y/../z.txt",
-            "/lead/slash.txt", "a/b/", "dots.in.dir/f.v.txt"};
-        for (String p : paths) {
-            assertEquals(p, com.codename1.compat.jdk.ResourceNames.normalize(p),
-                    com.codename1.impl.compat.ResourceNames.normalize(p));
-            String flat = com.codename1.compat.jdk.ResourceNames.flatName(p);
-            assertEquals(p, flat, com.codename1.impl.compat.ResourceNames.flatName(p));
-            assertEquals(p, com.codename1.compat.jdk.ResourceNames.nestedPath(flat),
-                    com.codename1.impl.compat.ResourceNames.nestedPath(flat));
-            assertEquals(p, com.codename1.compat.jdk.ResourceNames.resolve("com.acme.Main", p),
-                    com.codename1.impl.compat.ResourceNames.resolve("com.acme.Main", p));
-        }
     }
 }

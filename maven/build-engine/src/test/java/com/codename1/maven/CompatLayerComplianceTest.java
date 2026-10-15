@@ -214,7 +214,7 @@ public class CompatLayerComplianceTest {
         String component = SWING + "javax/swing/JComponent";
         return CompatRemapperTest.jar(new File(tmp.getRoot(), "codenameone-swing-compat-1.jar"),
                 table + ".class", apiClass(table, false, component, new String[] {"AUTO_RESIZE_OFF", "I"},
-                        "<init>", "()V", "setRowHeight", "(I)V", "setFile", "(Ljava/io/File;)V"),
+                        "<init>", "()V", "setRowHeight", "(I)V", "setFile", "(Ljava/util/regex/Pattern;)V"),
                 component + ".class", apiClass(component, false, "java/lang/Object", null, "<init>", "()V",
                         "repaint", "()V"),
                 listener + ".class", apiClass(listener, true, "java/lang/Object", null,
@@ -299,7 +299,7 @@ public class CompatLayerComplianceTest {
             call(mv, Opcodes.INVOKEVIRTUAL, "javax/swing/JTable", "setRowHeight", "(I)V");
             // Inherited from the layer's own superclass.
             call(mv, Opcodes.INVOKEVIRTUAL, "javax/swing/JTable", "repaint", "()V");
-            call(mv, Opcodes.INVOKEVIRTUAL, "javax/swing/JTable", "setFile", "(Ljava/io/File;)V");
+            call(mv, Opcodes.INVOKEVIRTUAL, "javax/swing/JTable", "setFile", "(Ljava/util/regex/Pattern;)V");
             getStatic(mv, "javax/swing/JTable", "AUTO_RESIZE_OFF", "I");
             line(mv, 11);
             lambda(mv, "actionPerformed", "()Ljava/awt/event/ActionListener;",
@@ -602,8 +602,8 @@ public class CompatLayerComplianceTest {
         Map<String, ?> swing = buildClassIndex(check, Collections.singletonList(swingJar()));
         assertEquals(4, swing.size());
         Set<?> methods = (Set<?>) field(swing.get(SWING + "javax/swing/JTable"), "methods");
-        assertTrue(methods.toString(), methods.contains("setFile(Lcom/codename1/compat/jdk/File;)V"));
-        assertFalse(methods.toString(), methods.contains("setFile(Ljava/io/File;)V"));
+        assertTrue(methods.toString(), methods.contains("setFile(Lcom/codename1/util/regex/Pattern;)V"));
+        assertFalse(methods.toString(), methods.contains("setFile(Ljava/util/regex/Pattern;)V"));
 
         // A runtime authored under the API's own names is indexed under both.
         File fx = CompatRemapperTest.jar(new File(tmp.getRoot(), "codenameone-javafx-compat-1.jar"),

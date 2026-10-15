@@ -137,7 +137,7 @@ public class DesktopCompatScenesTest {
         scratch = tmp.newFolder("jars");
         File swingx = RealCompatJars.jar("swingx-all", scratch);
         List<File> jars = new ArrayList<File>(Arrays.asList(RealCompatJars.swing(scratch),
-                RealCompatJars.javafx(scratch), RealCompatJars.jdk(scratch), RealCompatJars.core(scratch)));
+                RealCompatJars.javafx(scratch), RealCompatJars.core(scratch)));
 
         // prepare-desktop-sources: the style sheet becomes a table. The FXML
         // document is only recorded here; the remap below compiles it,
@@ -273,6 +273,7 @@ public class DesktopCompatScenesTest {
             classes.toURI().toURL(),
             RealCompatJars.jar("codenameone-compat-testing", scratch).toURI().toURL(),
             RealCompatJars.core(scratch).toURI().toURL(),
+            RealCompatJars.jdkHost(scratch).toURI().toURL(),
         };
         final URLClassLoader loader = new URLClassLoader(urls, ClassLoader.getSystemClassLoader().getParent());
         try {

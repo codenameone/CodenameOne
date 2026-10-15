@@ -48,11 +48,13 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-/// The stream rewrites, differentially: an application javac compiled against
-/// `java.util.stream` is run as it is, on the JDK, and run again after the
-/// remap, on the shared JDK classes and nothing else -- and has to answer the
-/// same. The compliance check runs over the remapped build in between, so the
-/// stream classes themselves are held to what a device has.
+/// Streams through the remap: an application javac compiled against
+/// `java.util.stream` keeps every stream call as written, since the device's
+/// class library has the package under the JDK's name. It is run as it is
+/// and again after the remap -- the regular expressions it uses then on the
+/// framework's matcher -- and has to answer the same, and the compliance check
+/// runs over the remapped build in between, so every stream member it calls
+/// is held to what a device has.
 public class CompatStreamRewritesTest {
 
     private static final String[] FIXTURE = {
@@ -230,8 +232,6 @@ public class CompatStreamRewritesTest {
             + "}\n"
     };
 
-    private static final String JDK = Relocation.JDK_PACKAGE;
-
     @Rule
     public TemporaryFolder tmp = new TemporaryFolder();
 
@@ -251,10 +251,10 @@ public class CompatStreamRewritesTest {
         File classes = tmp.newFolder("classes");
         SwingGallerySampleTest.copy(compiled, classes);
         List<File> cp = new ArrayList<File>(Arrays.asList(RealCompatJars.swing(scratch), RealCompatJars.javafx(scratch),
-                RealCompatJars.jdk(scratch), RealCompatJars.core(scratch)));
+                RealCompatJars.core(scratch)));
         assertTrue(new CompatRemapper(classes, cp, null, CompatRemapperTest.LOG).run());
-        // Throws on a single finding: in the application, or in a class of
-        // the stream shims the remap copied in.
+        // Throws on a single finding: a stream member the device's class
+        // library lacks is one.
         new BytecodeCompliance(RealCompatJars.host(classes, tmp.newFolder(), scratch)).execute();
         return classes;
     }
@@ -284,12 +284,17 @@ public class CompatStreamRewritesTest {
         }
 
         File classes = remapped(compiled);
-        assertTrue("The stream runtime was not extracted", new File(classes, JDK + "ObjPipeline.class").isFile());
+        // The device's class library has java.util.stream under its own
+        // name, so the remap leaves every stream call as javac wrote it.
+        Set<String> members = CompatFixtures.members(read(classes, "s/S.class"));
+        assertTrue(members.toString(), members.contains("java/util/stream/Collectors.toList"));
+        assertTrue(members.toString(), members.contains("java/util/List.stream"));
         // Nothing of this JVM's classpath but the JDK: the application, the
         // runtime the remap put beside it, and the framework.
         Object[] mine;
         URLClassLoader device = new URLClassLoader(
-                new URL[] {classes.toURI().toURL(), RealCompatJars.core(scratch).toURI().toURL()},
+                new URL[] {classes.toURI().toURL(), RealCompatJars.core(scratch).toURI().toURL(),
+                    RealCompatJars.jdkHost(scratch).toURI().toURL()},
                 ClassLoader.getSystemClassLoader().getParent());
         try {
             mine = run(device);
@@ -307,327 +312,5 @@ public class CompatStreamRewritesTest {
         assertEquals("r1/r2", mine[29]);
         assertEquals("p1", mine[30]);
         assertEquals("lambda", mine[31]);
-    }
-
-    @Test
-    public void noStreamCallSurvivesAndASecondPassChangesNothing() throws Exception {
-        File compiled = compile();
-        ClassRelocator swing = new ClassRelocator(CompatLayers.SWING);
-        Set<String> after = new TreeSet<String>();
-        for (String name : new String[] {"s/S.class", "s/Loud.class", "s/Repo.class", "s/Source.class",
-            "s/Bag.class", "s/Items.class", "s/ItemList.class"}) {
-            byte[] original = read(compiled, name);
-            byte[] relocated = swing.remap(original);
-            assertArrayEquals(name, relocated, swing.remap(relocated));
-            after.addAll(CompatFixtures.members(relocated));
-        }
-        Set<String> before = CompatFixtures.members(read(compiled, "s/S.class"));
-        before.addAll(CompatFixtures.members(read(compiled, "s/Loud.class")));
-        for (String gone : new String[] {"java/util/List.stream", "java/util/List.parallelStream",
-            "java/util/Collection.stream", "java/util/ArrayList.stream", "java/util/Set.stream",
-            "java/util/Arrays.stream", "java/util/stream/Stream.of", "java/util/stream/IntStream.range",
-            "java/util/stream/Collectors.toList", "java/lang/String.split", "java/lang/String.chars",
-            "java/lang/StringBuilder.chars", "java/util/Comparator.comparingInt", "java/util/Comparator.reversed",
-            "java/util/Comparator.thenComparing", "java/util/Comparator.naturalOrder",
-            "java/util/function/Predicate.negate", "java/util/function/Predicate.and",
-            "java/util/function/Function.identity", "java/util/Map$Entry.comparingByValue",
-            "java/util/Iterator.forEachRemaining", "s/Bag.stream", "s/Bag.parallelStream", "s/Items.stream",
-            "s/Loud.stream", "s/Repo.stream", "s/Repo.parallelStream", "s/Source.stream"}) {
-            assertTrue("The fixture does not use " + gone, before.contains(gone));
-            assertFalse(gone + " survived: " + after, after.contains(gone));
-        }
-        for (String member : after) {
-            assertFalse(member, member.startsWith("java/util/stream/"));
-        }
-        for (String there : new String[] {JDK + "JdkCollections.stream", JDK + "JdkCollections.parallelStream",
-            JDK + "JdkCollections.streamOf", JDK + "JdkCollections.parallelStreamOf",
-            JDK + "JdkCollections.defaultStream", JDK + "JdkCollections.forEachRemaining",
-            JDK + "JdkCollections.comparingByValue", JDK + "JdkRegex.split", JDK + "JdkStrings.chars",
-            JDK + "JdkFunctions.reversed", JDK + "JdkFunctions.thenComparing", JDK + "JdkFunctions.comparingInt",
-            JDK + "JdkFunctions.negate", JDK + "JdkFunctions.identity", JDK + "Stream.of", JDK + "Stream.filter",
-            JDK + "IntStream.range", JDK + "Collectors.groupingBy",
-            // What the device has is left exactly as written.
-            "java/util/List.iterator", "java/util/Map.entrySet", "java/util/List.add"}) {
-            assertTrue(there + " is missing: " + after, after.contains(there));
-        }
-    }
-
-    private static List<String> interfaces(byte[] cls) {
-        return Arrays.asList(new ClassReader(cls).getInterfaces());
-    }
-
-    private static int access(byte[] cls, final String method) {
-        final int[] access = {-1};
-        new ClassReader(cls).accept(new ClassVisitor(Opcodes.ASM9) {
-            @Override
-            public MethodVisitor visitMethod(int a, String name, String descriptor, String signature,
-                                             String[] exceptions) {
-                if (name.equals(method)) {
-                    access[0] = a;
-                }
-                return null;
-            }
-        }, 0);
-        return access[0];
-    }
-
-    @Test
-    public void aClassThatDeclaresStreamIsMarkedAndNoOther() throws Exception {
-        File compiled = compile();
-        ClassRelocator swing = new ClassRelocator(CompatLayers.SWING);
-        byte[] loud = swing.remap(read(compiled, "s/Loud.class"));
-        assertTrue(interfaces(loud).contains(JDK + "StreamSource"));
-        assertFalse(interfaces(loud).contains(JDK + "ParallelStreamSource"));
-        // The generic signature still says what the class is.
-        String signature = signatureOf(loud);
-        assertTrue(signature, signature.startsWith("<T:Ljava/lang/Object;>Ljava/util/ArrayList<TT;>;"));
-        assertTrue(signature, signature.endsWith("L" + JDK + "StreamSource;"));
-
-        byte[] repo = swing.remap(read(compiled, "s/Repo.class"));
-        assertEquals(Arrays.asList(JDK + "StreamSource", JDK + "ParallelStreamSource"), interfaces(repo));
-        // An interface method is public; the package's and the protected
-        // one were widened to be.
-        assertEquals(Opcodes.ACC_PUBLIC, access(repo, "stream"));
-        assertEquals(Opcodes.ACC_PUBLIC, access(repo, "parallelStream"));
-
-        byte[] source = swing.remap(read(compiled, "s/Source.class"));
-        assertEquals(Arrays.asList(JDK + "StreamSource"), interfaces(source));
-
-        assertTrue(interfaces(swing.remap(read(compiled, "s/Bag.class"))).isEmpty());
-        assertEquals(Arrays.asList("s/Items"), interfaces(swing.remap(read(compiled, "s/ItemList.class"))));
-        assertTrue(interfaces(swing.remap(read(compiled, "s/S.class"))).isEmpty());
-    }
-
-    private static String signatureOf(byte[] cls) {
-        final String[] signature = {null};
-        new ClassReader(cls).accept(new ClassVisitor(Opcodes.ASM9) {
-            @Override
-            public void visit(int version, int access, String name, String s, String superName, String[] interfaces) {
-                signature[0] = s;
-            }
-        }, 0);
-        return signature[0];
-    }
-
-    /// The Android layer's applications are not given these rules, as they
-    /// are given none of the others.
-    @Test
-    public void theAndroidLayerAloneRewritesNoStreamCall() throws Exception {
-        File compiled = compile();
-        ClassRelocator android = new ClassRelocator(AndroidRemapper.RELOCATION);
-        Set<String> after = CompatFixtures.members(android.remap(read(compiled, "s/S.class")));
-        assertTrue(after.toString(), after.contains("java/util/List.stream"));
-        assertTrue(after.toString(), after.contains("s/Bag.stream"));
-        for (String member : after) {
-            assertFalse(member, member.startsWith(JDK + "Jdk"));
-        }
-        assertTrue(interfaces(android.remap(read(compiled, "s/Loud.class"))).isEmpty());
-    }
-
-    // ---- what a newer javac writes: emitted, since this one cannot ----
-
-    /// A class `x/Probe` with one static `run()` answering an object.
-    private interface Body {
-        void emit(MethodVisitor mv);
-    }
-
-    private static byte[] probe(Body body) {
-        ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-        cw.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "x/Probe", null, "java/lang/Object", null);
-        MethodVisitor mv = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "run", "()Ljava/lang/Object;",
-                null, null);
-        mv.visitCode();
-        body.emit(mv);
-        mv.visitInsn(Opcodes.ARETURN);
-        mv.visitMaxs(0, 0);
-        mv.visitEnd();
-        cw.visitEnd();
-        return cw.toByteArray();
-    }
-
-    private Object runProbe(Body body) throws Exception {
-        byte[] relocated = new ClassRelocator(CompatLayers.SWING).remap(probe(body));
-        for (String member : CompatFixtures.members(relocated)) {
-            assertTrue(member + " was not redirected", member.startsWith(JDK) || member.startsWith("java/lang/Object")
-                    || member.startsWith("java/lang/Boolean") || member.startsWith("java/util/List.")
-                    || member.startsWith("java/util/Map.get") || member.startsWith("java/util/Set.size")
-                    || member.startsWith("java/lang/Integer"));
-        }
-        Class<?> cls = new CompatFixtures.Defining(getClass().getClassLoader()).define(relocated);
-        try {
-            return cls.getMethod("run").invoke(null);
-        } catch (InvocationTargetException e) {
-            throw e.getCause() instanceof Exception ? (Exception) e.getCause() : e;
-        }
-    }
-
-    private static final String O = "Ljava/lang/Object;";
-
-    @Test
-    public void listOfIsImmutableOnceRewritten() throws Exception {
-        Body listOf = new Body() {
-            @Override
-            public void emit(MethodVisitor mv) {
-                mv.visitLdcInsn("a");
-                mv.visitLdcInsn("b");
-                mv.visitLdcInsn("c");
-                mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/util/List", "of", "(" + O + O + O + ")Ljava/util/List;",
-                        true);
-            }
-        };
-        List<?> list = (List<?>) runProbe(listOf);
-        assertEquals(Arrays.asList("a", "b", "c"), list);
-        try {
-            list.remove(0);
-            fail();
-        } catch (UnsupportedOperationException expected) {
-            // List.of's contract.
-        }
-        try {
-            runProbe(new Body() {
-                @Override
-                public void emit(MethodVisitor mv) {
-                    mv.visitLdcInsn("a");
-                    mv.visitInsn(Opcodes.ACONST_NULL);
-                    mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/util/List", "of", "(" + O + O + ")Ljava/util/List;",
-                            true);
-                }
-            });
-            fail();
-        } catch (NullPointerException expected) {
-            // And no nulls.
-        }
-    }
-
-    @Test
-    public void theOtherFactoriesAndTheLaterMembers() throws Exception {
-        // Set.of(1, 2).size()
-        assertEquals(Integer.valueOf(2), runProbe(new Body() {
-            @Override
-            public void emit(MethodVisitor mv) {
-                mv.visitLdcInsn("a");
-                mv.visitLdcInsn("b");
-                mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/util/Set", "of", "(" + O + O + ")Ljava/util/Set;", true);
-                mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/util/Set", "size", "()I", true);
-                mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;",
-                        false);
-            }
-        }));
-        // Map.of("k", "v").get("k")
-        assertEquals("v", runProbe(new Body() {
-            @Override
-            public void emit(MethodVisitor mv) {
-                mv.visitLdcInsn("k");
-                mv.visitLdcInsn("v");
-                mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/util/Map", "of", "(" + O + O + ")Ljava/util/Map;", true);
-                mv.visitLdcInsn("k");
-                mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/util/Map", "get", "(" + O + ")" + O, true);
-            }
-        }));
-        // List.copyOf(List.of("z"))
-        assertEquals(Arrays.asList("z"), runProbe(new Body() {
-            @Override
-            public void emit(MethodVisitor mv) {
-                mv.visitLdcInsn("z");
-                mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/util/List", "of", "(" + O + ")Ljava/util/List;", true);
-                mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/util/List", "copyOf",
-                        "(Ljava/util/Collection;)Ljava/util/List;", true);
-            }
-        }));
-        // " \t".isBlank()
-        assertEquals(Boolean.TRUE, runProbe(new Body() {
-            @Override
-            public void emit(MethodVisitor mv) {
-                mv.visitLdcInsn(" \t");
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "isBlank", "()Z", false);
-                mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;",
-                        false);
-            }
-        }));
-        // " ab ".strip().repeat(3)
-        assertEquals("ababab", runProbe(new Body() {
-            @Override
-            public void emit(MethodVisitor mv) {
-                mv.visitLdcInsn(" ab ");
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "strip", "()Ljava/lang/String;", false);
-                mv.visitInsn(Opcodes.ICONST_3);
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "repeat", "(I)Ljava/lang/String;",
-                        false);
-            }
-        }));
-        // Stream.of("p").toList() -- a member of the stream itself, which is
-        // replaced whole and needs no rule.
-        assertEquals(Arrays.asList("p"), runProbe(new Body() {
-            @Override
-            public void emit(MethodVisitor mv) {
-                mv.visitLdcInsn("p");
-                mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/util/stream/Stream", "of",
-                        "(" + O + ")Ljava/util/stream/Stream;", true);
-                mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/util/stream/Stream", "toList", "()Ljava/util/List;",
-                        true);
-            }
-        }));
-        // Optional.empty().isEmpty()
-        assertEquals(Boolean.TRUE, runProbe(new Body() {
-            @Override
-            public void emit(MethodVisitor mv) {
-                mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/util/Optional", "empty", "()Ljava/util/Optional;",
-                        false);
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/util/Optional", "isEmpty", "()Z", false);
-                mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;",
-                        false);
-            }
-        }));
-    }
-
-    // ---- the rule for a type nothing names ----
-
-    private static Set<String> membersAfter(final int opcode, final String owner, final String name,
-                                            final String descriptor) {
-        byte[] cls = probe(new Body() {
-            @Override
-            public void emit(MethodVisitor mv) {
-                mv.visitInsn(Opcodes.ACONST_NULL);
-                mv.visitMethodInsn(opcode, owner, name, descriptor, opcode == Opcodes.INVOKEINTERFACE);
-            }
-        });
-        return CompatFixtures.members(new ClassRelocator(CompatLayers.SWING).remap(cls));
-    }
-
-    @Test
-    public void aCallThatArrivesAlreadyRelocatedIsRecognised() {
-        String moved = "()L" + JDK + "Stream;";
-        assertEquals(new TreeSet<String>(Arrays.asList(JDK + "JdkCollections.streamOf")),
-                membersAfter(Opcodes.INVOKEVIRTUAL, "x/Bag", "stream", moved));
-        assertEquals(new TreeSet<String>(Arrays.asList(JDK + "JdkCollections.parallelStreamOf")),
-                membersAfter(Opcodes.INVOKEINTERFACE, "x/Items", "parallelStream", moved));
-        // Another layer's list type, and a JDK collection no row names.
-        assertEquals(new TreeSet<String>(Arrays.asList(JDK + "JdkCollections.streamOf")),
-                membersAfter(Opcodes.INVOKEINTERFACE, "javafx/collections/ObservableList", "stream",
-                        "()Ljava/util/stream/Stream;"));
-        assertEquals(new TreeSet<String>(Arrays.asList(JDK + "JdkCollections.streamOf")),
-                membersAfter(Opcodes.INVOKEVIRTUAL, "java/util/concurrent/CopyOnWriteArrayList", "stream",
-                        "()Ljava/util/stream/Stream;"));
-    }
-
-    @Test
-    public void whatIsNotACollectionsStreamIsLeftAlone() {
-        String stream = "()Ljava/util/stream/Stream;";
-        // JDK classes that have a stream() and are no collection: left for
-        // the compliance check to name.
-        assertEquals(new TreeSet<String>(Arrays.asList("java/util/zip/ZipFile.stream")),
-                membersAfter(Opcodes.INVOKEVIRTUAL, "java/util/zip/ZipFile", "stream", stream));
-        // ServiceLoader and Optional are replaced whole, stream() and all.
-        assertEquals(new TreeSet<String>(Arrays.asList(JDK + "ServiceLoader.stream")),
-                membersAfter(Opcodes.INVOKEVIRTUAL, "java/util/ServiceLoader", "stream", stream));
-        assertEquals(new TreeSet<String>(Arrays.asList(JDK + "Optional.stream")),
-                membersAfter(Opcodes.INVOKEVIRTUAL, "java/util/Optional", "stream", stream));
-        // Another name, other arguments, another return type.
-        assertEquals(new TreeSet<String>(Arrays.asList("x/Bag.streams")),
-                membersAfter(Opcodes.INVOKEVIRTUAL, "x/Bag", "streams", stream));
-        assertEquals(new TreeSet<String>(Arrays.asList("x/Bag.stream")),
-                membersAfter(Opcodes.INVOKEVIRTUAL, "x/Bag", "stream", "()Ljava/util/List;"));
-        assertEquals(new TreeSet<String>(Arrays.asList("java/util/BitSet.stream")),
-                membersAfter(Opcodes.INVOKEVIRTUAL, "java/util/BitSet", "stream", "()Ljava/util/stream/IntStream;"));
     }
 }

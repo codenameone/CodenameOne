@@ -222,12 +222,8 @@ public final class CompatLayers {
     }
 
     /// Whether `rel` (a directory inside a classes directory, with its
-    /// trailing slash) is where some layer's runtime, or the shared JDK
-    /// classes, are extracted.
+    /// trailing slash) is where some layer's runtime is extracted.
     static boolean isExtractedRuntime(String rel) {
-        if (rel.startsWith(Relocation.JDK_PACKAGE)) {
-            return true;
-        }
         for (Relocation r : ALL) {
             if (rel.startsWith(r.target())) {
                 return true;
@@ -273,16 +269,5 @@ public final class CompatLayers {
                     + "com.codename1.ui components for UI logic.";
         }
         return null;
-    }
-
-    /// The jar of shared JDK classes among `classpath`, or null.
-    public static File jdkJar(Iterable<File> classpath) {
-        File found = null;
-        for (File f : classpath) {
-            if (f != null && f.getName().startsWith(Relocation.JDK_ARTIFACT + "-") && f.getName().endsWith(".jar")) {
-                found = f;
-            }
-        }
-        return found;
     }
 }

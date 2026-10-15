@@ -43,6 +43,10 @@ import static org.junit.Assert.assertTrue;
 /// after the remap step pointed it at the stand-ins a device has -- and
 /// answers both sets of results for a test to compare.
 ///
+/// Most of the JDK keeps its name through the remap, since the device's class
+/// library carries it; for those, [#keeps(String...)] says the remapped
+/// classes still name it and the two runs are the JDK's both times.
+///
 /// The piece is the body of a method that adds what it computed to a list
 /// named `out`. Source that needs a newer language level than the JVM running
 /// the tests is compiled and run by the JDK that `JAVA17_HOME` names; with
@@ -226,6 +230,21 @@ final class RemapDifferential {
         assertEquals(Arrays.asList(both[0]).toString().replace(", ", ",\n "),
                 Arrays.asList(both[1]).toString().replace(", ", ",\n "));
         assertTrue("only " + both[0].length + " results", both[0].length >= atLeast);
+    }
+
+    /// Requires every remapped class file together to still name each of
+    /// `names`: what the device's class library has under the JDK's name, and
+    /// the remap step therefore leaves alone. Called after [#same].
+    void keeps(String... names) throws Exception {
+        File[] classes = new File(work, "remapped/q").listFiles();
+        assertNotNull(classes);
+        StringBuilder all = new StringBuilder();
+        for (File c : classes) {
+            all.append(new String(Files.readAllBytes(c.toPath()), "ISO-8859-1"));
+        }
+        for (String name : names) {
+            assertTrue("The remapped classes no longer name " + name, all.indexOf(name) >= 0);
+        }
     }
 
     private void compile(File jdk, File classes, List<String> files) throws Exception {

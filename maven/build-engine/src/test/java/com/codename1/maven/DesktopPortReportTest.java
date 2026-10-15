@@ -69,11 +69,11 @@ public class DesktopPortReportTest {
 
     private static final String GIT = "package com.acme.port;\n"
             + "public class Git {\n"
-            + "    public Process status() throws java.io.IOException {\n"
-            + "        return new ProcessBuilder(\"git\", \"status\").start();\n"
+            + "    public Object status() {\n"
+            + "        return java.lang.management.ManagementFactory.getRuntimeMXBean().getName();\n"
             + "    }\n"
-            + "    public Process log() throws java.io.IOException {\n"
-            + "        return new ProcessBuilder(\"git\", \"log\").start();\n"
+            + "    public Object log() {\n"
+            + "        return java.lang.management.ManagementFactory.getRuntimeMXBean().getName();\n"
             + "    }\n"
             + "    public java.sql.Connection index() throws java.sql.SQLException {\n"
             + "        return java.sql.DriverManager.getConnection(\"jdbc:index\");\n"
@@ -96,10 +96,12 @@ public class DesktopPortReportTest {
             + "    public String title() { return \"fancy\"; }\n"
             + "}\n";
 
-    /// As [#PANEL], and starting a process: nothing a device can do.
+    /// As [#PANEL], and asking for the JVM's management beans: nothing a
+    /// device has. (A process is not the example any more: `ProcessBuilder`
+    /// is relocated to `com.codename1.io`, which desktop ports implement.)
     private static final String BAD_PANEL = "package org.fancy;\n"
             + "public class FancyPanel extends javax.swing.JPanel {\n"
-            + "    public Object launch() { return new ProcessBuilder(\"ls\"); }\n"
+            + "    public Object launch() { return java.lang.management.ManagementFactory.getRuntimeMXBean(); }\n"
             + "}\n";
 
     private static final String WORDS = "package org.plain;\n"
@@ -121,7 +123,7 @@ public class DesktopPortReportTest {
             scratch = tmp.newFolder("jars");
         }
         return new ArrayList<File>(Arrays.asList(RealCompatJars.swing(scratch), RealCompatJars.javafx(scratch),
-                RealCompatJars.jdk(scratch), RealCompatJars.core(scratch)));
+                RealCompatJars.core(scratch)));
     }
 
     private File library(String name, String path, String source) throws Exception {
@@ -208,7 +210,7 @@ public class DesktopPortReportTest {
         String message;
         try {
             new BytecodeCompliance(host).execute();
-            fail("The application starts processes");
+            fail("The application asks for JMX beans");
             return;
         } catch (BuildFailureException expected) {
             message = expected.getMessage();
@@ -220,7 +222,7 @@ public class DesktopPortReportTest {
         // says where the rest is.
         assertTrue(message, message.contains("What to change, file by file: " + file.getAbsolutePath()));
         assertTrue(message, message.contains("  The application: "));
-        assertTrue(message, message.contains("\n  fancy-lib-1.0.jar: 2 call sites, 2 APIs -- processes 2"));
+        assertTrue(message, message.contains("\n  fancy-lib-1.0.jar: 1 call site, 1 API -- management 1"));
         String check = read(new File(host.buildDir, "codenameone/compliance_check.txt"));
         assertTrue(check, check.contains("The port report, which lists the same findings by source file, is "
                 + file.getAbsolutePath()));
@@ -367,21 +369,20 @@ public class DesktopPortReportTest {
                 DependencyClassifierTest.uses()));
         ClassWriter cw = new ClassWriter(0);
         cw.visit(Opcodes.V21, Opcodes.ACC_PUBLIC, "com/acme/port/Newer", null, "java/lang/Object", null);
-        MethodVisitor mv = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "last",
-                "(Ljava/util/List;)Ljava/lang/Object;", null, null);
+        MethodVisitor mv = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "emoji", "(I)Z", null, null);
         mv.visitCode();
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/util/List", "getLast", "()Ljava/lang/Object;", true);
-        mv.visitInsn(Opcodes.ARETURN);
+        mv.visitVarInsn(Opcodes.ILOAD, 0);
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Character", "isEmoji", "(I)Z", false);
+        mv.visitInsn(Opcodes.IRETURN);
         mv.visitMaxs(1, 1);
         mv.visitEnd();
         cw.visitEnd();
         put(host.outputDir, "com/acme/port/Newer", cw.toByteArray());
         try {
             new BytecodeCompliance(host).execute();
-            fail("List.getLast() is Java 21's");
+            fail("Character.isEmoji(int) is Java 21's");
         } catch (BuildFailureException expected) {
-            assertTrue(expected.getMessage(), expected.getMessage().contains("getLast"));
+            assertTrue(expected.getMessage(), expected.getMessage().contains("isEmoji"));
         }
         byte[] rewritten = Files.readAllBytes(new File(host.outputDir, "com/acme/port/Newer.class").toPath());
         assertEquals("The class file is Java 17's now", Opcodes.V17, rewritten[7] & 0xff);

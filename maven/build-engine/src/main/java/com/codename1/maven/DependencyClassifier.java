@@ -71,9 +71,9 @@ import java.util.zip.ZipFile;
 /// A device has no class path. Every class of the application is translated
 /// or dexed into it, so a library class nothing refers to is dead weight,
 /// and one that is referred to has to be relocated with the application --
-/// its descriptors name `java.io.File`, which the application's relocated
-/// calls now spell `com.codename1.compat.jdk.File` -- and checked like the
-/// application's own code. [#reach] therefore walks from the application's
+/// its descriptors name `java.util.regex.Pattern`, which the application's
+/// relocated calls now spell `com.codename1.util.regex.Pattern` -- and
+/// checked like the application's own code. [#reach] therefore walks from the application's
 /// classes through the libraries, and only what it reaches is unpacked.
 /// Classes found only by reflection are not reached: a device has none. A
 /// class named by a string constant (`Class.forName("a.b.C")`) is.
@@ -102,7 +102,7 @@ public final class DependencyClassifier {
         /// toolkit. Only the classes the application reaches ship.
         INCIDENTAL_TOOLKIT("pure Java, incidental toolkit use"),
         /// Names no desktop toolkit. The classes the application reaches
-        /// ship, relocated for the JDK classes a device lacks, and checked.
+        /// ship, relocated like the application's, and checked.
         PURE_JAVA("pure Java"),
         /// Something the Codename One build handles on its own: a library
         /// written against the Codename One API, or the Kotlin runtime.

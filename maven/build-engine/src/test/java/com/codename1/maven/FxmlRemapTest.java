@@ -142,7 +142,7 @@ public class FxmlRemapTest {
         if (scratch == null) {
             scratch = tmp.newFolder("jars");
         }
-        return Arrays.asList(RealCompatJars.javafx(scratch), RealCompatJars.jdk(scratch), RealCompatJars.core(scratch));
+        return Arrays.asList(RealCompatJars.javafx(scratch), RealCompatJars.core(scratch));
     }
 
     private static void write(File f, String text) throws Exception {
@@ -256,7 +256,7 @@ public class FxmlRemapTest {
         assertTrue(members.toString(), members.contains("com/acme/fx/ShopController.<init>"));
         // The compiled sheet ships under its flat name.
         assertTrue(new File(classes, "ui_shop.css.cn1css").isFile()
-                || new File(classes, com.codename1.compat.jdk.ResourceNames.flatName("ui/shop.css") + ".cn1css")
+                || new File(classes, com.codename1.impl.compat.ResourceNames.flatName("ui/shop.css") + ".cn1css")
                         .isFile());
 
         new BytecodeCompliance(RealCompatJars.host(classes, tmp.newFolder(), scratch)).execute();

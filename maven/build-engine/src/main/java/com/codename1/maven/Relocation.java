@@ -32,238 +32,30 @@ package com.codename1.maven;
 /// rewrites the compiled classes by these rules.
 public final class Relocation {
 
-    /// The artifact carrying the JDK classes the device runtime lacks. Every
-    /// layer ships it, so its names are the same whichever layers are active.
-    public static final String JDK_ARTIFACT = "codenameone-compat-jdk";
-    public static final String JDK_PACKAGE = "com/codename1/compat/jdk/";
-
     /// Where `org.osgi.framework`'s "not in a framework" answer lives: core,
     /// because every layer shares [#JDK_SHIMS] and the core jar ships with
     /// every application.
     static final String OSGI_PACKAGE = "com/codename1/impl/compat/osgi/";
 
-    /// JDK classes the Codename One runtime lacks, redirected to the
-    /// implementations in [#JDK_ARTIFACT].
+    /// The few JDK classes that ship under another name, shared by every
+    /// layer.
+    ///
+    /// Everything else of `java.*` keeps its name: the device's class library
+    /// (`vm/JavaAPI`) carries the JDK API an application is compiled against,
+    /// and on JavaSE and Android the JDK itself answers. What is here is what
+    /// a device cannot have under the JDK's name, or what the framework
+    /// already implements under its own.
     static final String[][] JDK_SHIMS = {
-        {"java/io/BufferedReader", JDK_PACKAGE + "BufferedReader"},
-        {"java/io/BufferedWriter", JDK_PACKAGE + "BufferedWriter"},
-        {"java/io/BufferedInputStream", JDK_PACKAGE + "BufferedInputStream"},
-        {"java/io/BufferedOutputStream", JDK_PACKAGE + "BufferedOutputStream"},
-        {"java/io/File", JDK_PACKAGE + "File"},
-        {"java/io/FileFilter", JDK_PACKAGE + "FileFilter"},
-        {"java/io/FilenameFilter", JDK_PACKAGE + "FilenameFilter"},
-        {"java/io/FileInputStream", JDK_PACKAGE + "FileInputStream"},
-        {"java/io/FileOutputStream", JDK_PACKAGE + "FileOutputStream"},
-        {"java/io/FileReader", JDK_PACKAGE + "FileReader"},
-        {"java/io/FileWriter", JDK_PACKAGE + "FileWriter"},
-        {"java/io/FilterInputStream", JDK_PACKAGE + "FilterInputStream"},
-        {"java/io/FilterOutputStream", JDK_PACKAGE + "FilterOutputStream"},
-        {"java/io/PrintWriter", JDK_PACKAGE + "PrintWriter"},
-        {"java/io/UncheckedIOException", JDK_PACKAGE + "UncheckedIOException"},
-        // Java serialization does not exist on a device; the interfaces do,
-        // for the classes that implement them.
-        {"java/io/Externalizable", JDK_PACKAGE + "Externalizable"},
-        {"java/io/ObjectInput", JDK_PACKAGE + "ObjectInput"},
-        {"java/io/ObjectOutput", JDK_PACKAGE + "ObjectOutput"},
-        // Every Codename One stream, reader and writer is AutoCloseable, and
-        // close() is the interface's only method, so code holding a Closeable
-        // runs unchanged against it.
-        {"java/io/Closeable", "java/lang/AutoCloseable"},
-        // java.util classes the device library leaves out.
-        {"java/util/EventObject", JDK_PACKAGE + "EventObject"},
-        {"java/util/Optional", JDK_PACKAGE + "Optional"},
-        {"java/util/StringJoiner", JDK_PACKAGE + "StringJoiner"},
-        {"java/util/ResourceBundle", JDK_PACKAGE + "ResourceBundle"},
-        {"java/util/PropertyResourceBundle", JDK_PACKAGE + "PropertyResourceBundle"},
-        {"java/util/ListResourceBundle", JDK_PACKAGE + "ListResourceBundle"},
-        {"java/util/MissingResourceException", JDK_PACKAGE + "MissingResourceException"},
-        {"java/util/Properties", JDK_PACKAGE + "Properties"},
-        {"java/util/UUID", JDK_PACKAGE + "UUID"},
-        {"java/util/WeakHashMap", JDK_PACKAGE + "WeakHashMap"},
-        // java.util.concurrent. The device has the atomics and
-        // ThreadLocalRandom; these it does not. None of them synchronizes:
-        // application code is confined to one thread.
-        {"java/util/concurrent/Callable", JDK_PACKAGE + "Callable"},
-        {"java/util/concurrent/Future", JDK_PACKAGE + "Future"},
-        {"java/util/concurrent/ExecutionException", JDK_PACKAGE + "ExecutionException"},
-        {"java/util/concurrent/CancellationException", JDK_PACKAGE + "CancellationException"},
-        {"java/util/concurrent/TimeoutException", JDK_PACKAGE + "TimeoutException"},
-        {"java/util/concurrent/TimeUnit", JDK_PACKAGE + "TimeUnit"},
-        {"java/util/concurrent/ConcurrentMap", JDK_PACKAGE + "ConcurrentMap"},
-        {"java/util/concurrent/ConcurrentHashMap", JDK_PACKAGE + "ConcurrentHashMap"},
-        // keySet() is declared to return this nested class, so compiled
-        // callers name it in the method descriptor.
-        {"java/util/concurrent/ConcurrentHashMap$KeySetView", JDK_PACKAGE + "ConcurrentHashMap$KeySetView"},
-        {"java/util/concurrent/CopyOnWriteArrayList", JDK_PACKAGE + "CopyOnWriteArrayList"},
-        {"java/util/concurrent/CopyOnWriteArraySet", JDK_PACKAGE + "CopyOnWriteArraySet"},
-        // Executors run their tasks on Codename One background threads,
-        // never on the event dispatch thread.
-        {"java/util/concurrent/Executor", JDK_PACKAGE + "Executor"},
-        {"java/util/concurrent/ExecutorService", JDK_PACKAGE + "ExecutorService"},
-        {"java/util/concurrent/Executors", JDK_PACKAGE + "Executors"},
-        {"java/util/concurrent/RejectedExecutionException", JDK_PACKAGE + "RejectedExecutionException"},
-        // java.text. The device has Format, DateFormat, SimpleDateFormat,
-        // DateFormatSymbols and ParseException, and those stay its own.
-        {"java/text/NumberFormat", JDK_PACKAGE + "NumberFormat"},
-        {"java/text/DecimalFormat", JDK_PACKAGE + "DecimalFormat"},
-        {"java/text/DecimalFormatSymbols", JDK_PACKAGE + "DecimalFormatSymbols"},
-        {"java/text/ChoiceFormat", JDK_PACKAGE + "ChoiceFormat"},
-        {"java/text/MessageFormat", JDK_PACKAGE + "MessageFormat"},
-        {"java/text/FieldPosition", JDK_PACKAGE + "FieldPosition"},
-        {"java/text/ParsePosition", JDK_PACKAGE + "ParsePosition"},
-        // java.lang. Thread has no nested handler interface on the device,
-        // and nothing there can be invoked reflectively: the exception is
-        // only ever declared, caught or wrapped.
-        {"java/lang/Thread$UncaughtExceptionHandler", JDK_PACKAGE + "UncaughtExceptionHandler"},
-        {"java/lang/reflect/InvocationTargetException", JDK_PACKAGE + "InvocationTargetException"},
-        // java.util.logging, over Codename One's Log, and java.util.prefs,
-        // over its Preferences.
-        {"java/util/logging/Logger", JDK_PACKAGE + "Logger"},
-        {"java/util/logging/Level", JDK_PACKAGE + "Level"},
-        {"java/util/prefs/Preferences", JDK_PACKAGE + "Preferences"},
-        {"java/util/prefs/BackingStoreException", JDK_PACKAGE + "BackingStoreException"},
-        // java.net. The device has URI and URISyntaxException.
-        {"java/net/URL", JDK_PACKAGE + "URL"},
-        {"java/net/MalformedURLException", JDK_PACKAGE + "MalformedURLException"},
-        // java.util.stream, whole. The device has four classes of that
-        // package, with a handful of methods and factories that answer
-        // null; none of them may be reached, so every name an application
-        // can write is redirected.
-        {"java/util/stream/BaseStream", JDK_PACKAGE + "BaseStream"},
-        {"java/util/stream/Stream", JDK_PACKAGE + "Stream"},
-        {"java/util/stream/Stream$Builder", JDK_PACKAGE + "Stream$Builder"},
-        {"java/util/stream/IntStream", JDK_PACKAGE + "IntStream"},
-        {"java/util/stream/LongStream", JDK_PACKAGE + "LongStream"},
-        {"java/util/stream/DoubleStream", JDK_PACKAGE + "DoubleStream"},
-        {"java/util/stream/Collector", JDK_PACKAGE + "Collector"},
-        {"java/util/stream/Collector$Characteristics", JDK_PACKAGE + "Collector$Characteristics"},
-        {"java/util/stream/Collectors", JDK_PACKAGE + "Collectors"},
-        // What the streams answer and iterate with.
-        {"java/util/OptionalInt", JDK_PACKAGE + "OptionalInt"},
-        {"java/util/OptionalLong", JDK_PACKAGE + "OptionalLong"},
-        {"java/util/OptionalDouble", JDK_PACKAGE + "OptionalDouble"},
-        {"java/util/IntSummaryStatistics", JDK_PACKAGE + "IntSummaryStatistics"},
-        {"java/util/LongSummaryStatistics", JDK_PACKAGE + "LongSummaryStatistics"},
-        {"java/util/DoubleSummaryStatistics", JDK_PACKAGE + "DoubleSummaryStatistics"},
-        {"java/util/PrimitiveIterator", JDK_PACKAGE + "PrimitiveIterator"},
-        {"java/util/PrimitiveIterator$OfInt", JDK_PACKAGE + "PrimitiveIterator$OfInt"},
-        {"java/util/PrimitiveIterator$OfLong", JDK_PACKAGE + "PrimitiveIterator$OfLong"},
-        {"java/util/PrimitiveIterator$OfDouble", JDK_PACKAGE + "PrimitiveIterator$OfDouble"},
-        // java.util.function. The device has the eight interfaces over
-        // objects (BiConsumer, BiFunction, BinaryOperator, Consumer,
-        // Function, Predicate, Supplier, UnaryOperator) and none of the
-        // primitive ones.
-        {"java/util/function/BiPredicate", JDK_PACKAGE + "BiPredicate"},
-        {"java/util/function/BooleanSupplier", JDK_PACKAGE + "BooleanSupplier"},
-        {"java/util/function/DoubleBinaryOperator", JDK_PACKAGE + "DoubleBinaryOperator"},
-        {"java/util/function/DoubleConsumer", JDK_PACKAGE + "DoubleConsumer"},
-        {"java/util/function/DoubleFunction", JDK_PACKAGE + "DoubleFunction"},
-        {"java/util/function/DoublePredicate", JDK_PACKAGE + "DoublePredicate"},
-        {"java/util/function/DoubleSupplier", JDK_PACKAGE + "DoubleSupplier"},
-        {"java/util/function/DoubleToIntFunction", JDK_PACKAGE + "DoubleToIntFunction"},
-        {"java/util/function/DoubleToLongFunction", JDK_PACKAGE + "DoubleToLongFunction"},
-        {"java/util/function/DoubleUnaryOperator", JDK_PACKAGE + "DoubleUnaryOperator"},
-        {"java/util/function/IntBinaryOperator", JDK_PACKAGE + "IntBinaryOperator"},
-        {"java/util/function/IntConsumer", JDK_PACKAGE + "IntConsumer"},
-        {"java/util/function/IntFunction", JDK_PACKAGE + "IntFunction"},
-        {"java/util/function/IntPredicate", JDK_PACKAGE + "IntPredicate"},
-        {"java/util/function/IntSupplier", JDK_PACKAGE + "IntSupplier"},
-        {"java/util/function/IntToDoubleFunction", JDK_PACKAGE + "IntToDoubleFunction"},
-        {"java/util/function/IntToLongFunction", JDK_PACKAGE + "IntToLongFunction"},
-        {"java/util/function/IntUnaryOperator", JDK_PACKAGE + "IntUnaryOperator"},
-        {"java/util/function/LongBinaryOperator", JDK_PACKAGE + "LongBinaryOperator"},
-        {"java/util/function/LongConsumer", JDK_PACKAGE + "LongConsumer"},
-        {"java/util/function/LongFunction", JDK_PACKAGE + "LongFunction"},
-        {"java/util/function/LongPredicate", JDK_PACKAGE + "LongPredicate"},
-        {"java/util/function/LongSupplier", JDK_PACKAGE + "LongSupplier"},
-        {"java/util/function/LongToDoubleFunction", JDK_PACKAGE + "LongToDoubleFunction"},
-        {"java/util/function/LongToIntFunction", JDK_PACKAGE + "LongToIntFunction"},
-        {"java/util/function/LongUnaryOperator", JDK_PACKAGE + "LongUnaryOperator"},
-        {"java/util/function/ObjDoubleConsumer", JDK_PACKAGE + "ObjDoubleConsumer"},
-        {"java/util/function/ObjIntConsumer", JDK_PACKAGE + "ObjIntConsumer"},
-        {"java/util/function/ObjLongConsumer", JDK_PACKAGE + "ObjLongConsumer"},
-        {"java/util/function/ToDoubleBiFunction", JDK_PACKAGE + "ToDoubleBiFunction"},
-        {"java/util/function/ToDoubleFunction", JDK_PACKAGE + "ToDoubleFunction"},
-        {"java/util/function/ToIntBiFunction", JDK_PACKAGE + "ToIntBiFunction"},
-        {"java/util/function/ToIntFunction", JDK_PACKAGE + "ToIntFunction"},
-        {"java/util/function/ToLongBiFunction", JDK_PACKAGE + "ToLongBiFunction"},
-        {"java/util/function/ToLongFunction", JDK_PACKAGE + "ToLongFunction"},
-        // java.time. A query is what parse(text, LocalDate::from) takes.
-        {"java/time/temporal/TemporalQuery", JDK_PACKAGE + "TemporalQuery"},
-        // java.nio.file, over the one file system a device has. Watching,
-        // channels, file stores and POSIX attributes have no row: nothing
-        // on a device answers for them.
-        {"java/nio/file/Path", JDK_PACKAGE + "Path"},
-        {"java/nio/file/Paths", JDK_PACKAGE + "Paths"},
-        {"java/nio/file/Files", JDK_PACKAGE + "Files"},
-        {"java/nio/file/OpenOption", JDK_PACKAGE + "OpenOption"},
-        {"java/nio/file/CopyOption", JDK_PACKAGE + "CopyOption"},
-        {"java/nio/file/LinkOption", JDK_PACKAGE + "LinkOption"},
-        {"java/nio/file/StandardOpenOption", JDK_PACKAGE + "StandardOpenOption"},
-        {"java/nio/file/StandardCopyOption", JDK_PACKAGE + "StandardCopyOption"},
-        {"java/nio/file/FileVisitOption", JDK_PACKAGE + "FileVisitOption"},
-        {"java/nio/file/FileVisitResult", JDK_PACKAGE + "FileVisitResult"},
-        {"java/nio/file/FileVisitor", JDK_PACKAGE + "FileVisitor"},
-        {"java/nio/file/SimpleFileVisitor", JDK_PACKAGE + "SimpleFileVisitor"},
-        {"java/nio/file/DirectoryStream", JDK_PACKAGE + "DirectoryStream"},
-        {"java/nio/file/DirectoryStream$Filter", JDK_PACKAGE + "DirectoryStream$Filter"},
-        {"java/nio/file/DirectoryIteratorException", JDK_PACKAGE + "DirectoryIteratorException"},
-        {"java/nio/file/FileSystemException", JDK_PACKAGE + "FileSystemException"},
-        {"java/nio/file/NoSuchFileException", JDK_PACKAGE + "NoSuchFileException"},
-        {"java/nio/file/FileAlreadyExistsException", JDK_PACKAGE + "FileAlreadyExistsException"},
-        {"java/nio/file/DirectoryNotEmptyException", JDK_PACKAGE + "DirectoryNotEmptyException"},
-        {"java/nio/file/NotDirectoryException", JDK_PACKAGE + "NotDirectoryException"},
-        {"java/nio/file/AccessDeniedException", JDK_PACKAGE + "AccessDeniedException"},
-        {"java/nio/file/InvalidPathException", JDK_PACKAGE + "InvalidPathException"},
-        {"java/nio/file/attribute/FileAttribute", JDK_PACKAGE + "FileAttribute"},
-        {"java/nio/file/attribute/BasicFileAttributes", JDK_PACKAGE + "BasicFileAttributes"},
-        {"java/nio/file/attribute/FileTime", JDK_PACKAGE + "FileTime"},
-        // java.util.regex: a matcher written for this runtime, with the JDK's syntax.
+        // java.util.regex: the framework's matcher, with the JDK's syntax.
         // What it lacks it refuses by name when a pattern is compiled.
-        {"java/util/regex/Pattern", JDK_PACKAGE + "Pattern"},
-        {"java/util/regex/Matcher", JDK_PACKAGE + "Matcher"},
-        {"java/util/regex/MatchResult", JDK_PACKAGE + "MatchResult"},
-        {"java/util/regex/PatternSyntaxException", JDK_PACKAGE + "PatternSyntaxException"},
-        // java.util.concurrent: futures that complete each other, latches and work run later,
-        // on Codename One's threads.
-        {"java/util/concurrent/CompletableFuture", JDK_PACKAGE + "CompletableFuture"},
-        {"java/util/concurrent/CompletionStage", JDK_PACKAGE + "CompletionStage"},
-        {"java/util/concurrent/CompletionException", JDK_PACKAGE + "CompletionException"},
-        {"java/util/concurrent/CountDownLatch", JDK_PACKAGE + "CountDownLatch"},
-        {"java/util/concurrent/ThreadFactory", JDK_PACKAGE + "ThreadFactory"},
-        {"java/util/concurrent/ScheduledExecutorService", JDK_PACKAGE + "ScheduledExecutorService"},
-        {"java/util/concurrent/ScheduledFuture", JDK_PACKAGE + "ScheduledFuture"},
-        // java.time: the days, the months and the units, as enums of the JDK's shape.
-        // Temporal goes to the one interface every date and time class of the
-        // device implements, so a method declared over it takes any of them.
-        {"java/time/DayOfWeek", JDK_PACKAGE + "DayOfWeek"},
-        {"java/time/Month", JDK_PACKAGE + "Month"},
-        {"java/time/temporal/ChronoUnit", JDK_PACKAGE + "ChronoUnit"},
-        {"java/time/temporal/TemporalUnit", JDK_PACKAGE + "TemporalUnit"},
-        {"java/time/temporal/Temporal", "java/time/temporal/TemporalAccessor"},
-        // Text forms and digests: URL, Base64 and hexadecimal coding written
-        // here, the digests and the random bytes over Codename One's own.
-        {"java/net/URLDecoder", JDK_PACKAGE + "URLDecoder"},
-        {"java/net/URLEncoder", JDK_PACKAGE + "URLEncoder"},
-        {"java/util/Base64", JDK_PACKAGE + "Base64"},
-        {"java/util/Base64$Encoder", JDK_PACKAGE + "Base64$Encoder"},
-        {"java/util/Base64$Decoder", JDK_PACKAGE + "Base64$Decoder"},
-        {"java/util/HexFormat", JDK_PACKAGE + "HexFormat"},
-        {"java/security/MessageDigest", JDK_PACKAGE + "MessageDigest"},
-        {"java/security/NoSuchAlgorithmException", JDK_PACKAGE + "NoSuchAlgorithmException"},
-        {"java/security/GeneralSecurityException", JDK_PACKAGE + "GeneralSecurityException"},
-        {"java/security/SecureRandom", JDK_PACKAGE + "SecureRandom"},
-        // What an exhaustive pattern switch throws; javac names it in every one.
-        {"java/lang/MatchException", JDK_PACKAGE + "MatchException"},
-        // Service providers, from the META-INF/services files the build read:
-        // the generated registry creates each with "new".
-        {"java/util/ServiceLoader", JDK_PACKAGE + "ServiceLoader"},
-        {"java/util/ServiceLoader$Provider", JDK_PACKAGE + "ServiceLoader$Provider"},
-        {"java/util/ServiceConfigurationError", JDK_PACKAGE + "ServiceConfigurationError"},
-        // The one unnamed module of an application without modules, and the
-        // layer it is not in. Class.getModule() itself is a CompatRewrites rule.
-        {"java/lang/Module", JDK_PACKAGE + "Module"},
-        {"java/lang/ModuleLayer", JDK_PACKAGE + "ModuleLayer"},
+        {"java/util/regex/Pattern", "com/codename1/util/regex/Pattern"},
+        {"java/util/regex/Matcher", "com/codename1/util/regex/Matcher"},
+        {"java/util/regex/MatchResult", "com/codename1/util/regex/MatchResult"},
+        {"java/util/regex/PatternSyntaxException", "com/codename1/util/regex/PatternSyntaxException"},
+        // Processes, over the framework's own classes of the same shape;
+        // Runtime.exec is a CompatRewrites rule onto them.
+        {"java/lang/ProcessBuilder", "com/codename1/io/ProcessBuilder"},
+        {"java/lang/Process", "com/codename1/io/Process"},
         // "Not running in OSGi", for a library that asks before it takes its
         // class path route. These four types and no more: nothing here is an
         // OSGi framework.

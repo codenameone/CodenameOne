@@ -24,11 +24,9 @@ package com.codename1.maven;
 
 import com.codename1.build.Log;
 import com.codename1.builders.BuildException;
-import com.codename1.compat.jdk.ResourceNames;
+import com.codename1.impl.compat.ResourceNames;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
@@ -55,19 +53,18 @@ import java.util.TreeSet;
 /// A device bundle has no directories. Every file of the desktop resource
 /// directories that sits in a directory is written to the root of the
 /// classes directory under the flat name
-/// `com.codename1.compat.jdk.ResourceNames.flatName` gives its path, and the
+/// `com.codename1.impl.compat.ResourceNames.flatName` gives its path, and the
 /// nested copy the build tool put there is removed. A file already at the
 /// root keeps its name and is left alone.
 ///
 /// The flat name is computed by that one method, which the runtime calls too
 /// when it turns the name an application asks for into the name to read:
-/// this module depends on the shared JDK classes' artifact for exactly that
-/// reason. The alternatives were a second copy of the rule in this module --
-/// two implementations that must agree character for character, with nothing
+/// this module reads it from the core for exactly that reason. The
+/// alternatives were a second copy of the rule in this module -- two
+/// implementations that must agree character for character, with nothing
 /// but a test to say so -- or a mapping table generated into the application,
 /// which costs every shipped resource a second string for something a pure
-/// function answers. The artifact depends only on the core, so nothing
-/// becomes circular.
+/// function answers.
 ///
 /// A flat name that some OTHER file already has is a build error, never an
 /// overwrite: two different resources would answer to one name on the
@@ -75,13 +72,14 @@ import java.util.TreeSet;
 ///
 /// #### The registry
 ///
-/// `com.codename1.compat.jdk.CompatRegistry` is generated with the path of
-/// every shipped resource, every `.properties` bundle among them and every
-/// bundle that is a class, the last created with `new` in a `switch` since a
-/// device creates nothing by name. The shared JDK classes carry an empty
-/// class of that name so that they compile; `CompatBoot.cn1Init()` runs
-/// whichever of the two ships. The registrations themselves sit in part
-/// classes beside it, `CompatRegistry$Part0` onwards; see [#registry].
+/// `com.codename1.generated.compat.CompatRegistry` is generated with the
+/// path of every shipped resource, every bundle that is a class and every
+/// service provider, the classes created with `new` since a device creates
+/// nothing by name; see [ApplicationRegistry]. A `.properties` bundle needs
+/// no entry of its own: the class library's `ResourceBundle` reads it as the
+/// resource it is. The desktop layers' jars carry an empty class of that name
+/// so that their lifecycles, which call its `cn1Install()`, compile; the
+/// generated one is the one that ships.
 ///
 /// #### Bundled libraries
 ///
@@ -103,7 +101,7 @@ import java.util.TreeSet;
 /// the runtime's own `ServiceLoader` applies, so the two agree on what a line
 /// means --
 /// and each provider it lists is registered under the service's name with a
-/// number the registry's `cn1CreateService` turns into a `new`. The
+/// number the registry's `cn1Create` turns into a `new`. The
 /// application's files come first, then the libraries' in the order they
 /// were bundled, each file in its own order; a provider listed twice for a
 /// service is registered once.
@@ -126,19 +124,11 @@ import java.util.TreeSet;
 /// its own earlier output from somebody else's file of the same name.
 final class CompatResources {
 
-    static final String REGISTRY = Relocation.JDK_PACKAGE + "CompatRegistry";
-    private static final String RESOURCES = Relocation.JDK_PACKAGE + "Resources";
-    private static final String BUNDLE = Relocation.JDK_PACKAGE + "ResourceBundle";
-    private static final String FACTORY = BUNDLE + "$Cn1Factory";
-    private static final String LOADER = Relocation.JDK_PACKAGE + "ServiceLoader";
-    private static final String SERVICE_FACTORY = LOADER + "$Cn1Factory";
+    /// What a bundle class descends from, as the application names it: the
+    /// class library's own, which keeps the JDK's names.
     private static final String[] BUNDLE_BASES = {
-        BUNDLE, Relocation.JDK_PACKAGE + "ListResourceBundle", Relocation.JDK_PACKAGE + "PropertyResourceBundle",
+        "java/util/ResourceBundle", "java/util/ListResourceBundle", "java/util/PropertyResourceBundle",
     };
-    /// What follows the registry's name in the name of one of its parts.
-    private static final String PART = "$Part";
-    /// How many registrations one part holds.
-    private static final int CHUNK = 1000;
     private static final String PROPERTIES_SUFFIX = ".properties";
 
     private final File classesDir;
@@ -214,25 +204,18 @@ final class CompatResources {
         }
         flatten(resources, fromLibraries);
 
-        TreeMap<String, String> propertyBundles = new TreeMap<String, String>();
+        int propertyBundles = 0;
         for (String path : resources.keySet()) {
             if (path.endsWith(PROPERTIES_SUFFIX)) {
-                String name = path.substring(0, path.length() - PROPERTIES_SUFFIX.length());
-                propertyBundles.put(name.replace('/', '.'), "/" + path);
+                propertyBundles++;
             }
         }
         Map<String, Seen> seen = scanClasses();
         List<String> bundleClasses = bundleClasses(seen);
         List<String[]> services = services(listed, seen);
-        writeRegistry(registry(new ArrayList<String>(resources.keySet()), propertyBundles, bundleClasses,
-                services));
-        // The registry the class library's ResourceBundle and ServiceLoader
-        // read through JdkHost. Generated beside the compat one and installed
-        // by nothing yet: the generated entry points still install the
-        // compat registry, and switch to this one with the compat layer.
         ApplicationRegistry.write(classesDir, ApplicationRegistry.generate(
                 new ArrayList<String>(resources.keySet()), bundleClasses, services), log);
-        log.debug("Shipped " + resources.size() + " desktop resources, " + propertyBundles.size()
+        log.debug("Shipped " + resources.size() + " desktop resources, " + propertyBundles
                 + " properties bundles, " + bundleClasses.size() + " bundle classes and " + services.size()
                 + " service providers");
     }
@@ -500,201 +483,6 @@ final class CompatResources {
                     }
                 }, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
             }
-        }
-    }
-
-    /// The registry: the class itself and its parts, by internal name.
-    /// `resources` are the shipped paths, without their leading slash;
-    /// `propertyBundles` maps a bundle's dotted name to the path of its file;
-    /// `bundleClasses` are dotted class names.
-    ///
-    /// The registrations are dealt out to part classes, each with one
-    /// static `install` method, because a method's code is limited to 64KB
-    /// and an application has as many resources as it has. They are classes
-    /// of their own rather than further methods of the registry because the
-    /// compliance check knows the registry by the placeholder in the shared
-    /// JDK classes' jar: a method the placeholder does not declare would be
-    /// reported as one that does not exist.
-    static Map<String, byte[]> registry(List<String> resources, Map<String, String> propertyBundles,
-                                        List<String> bundleClasses) {
-        return registry(resources, propertyBundles, bundleClasses, new ArrayList<String[]>());
-    }
-
-    /// As above, with the service providers: each `{service, provider}`, the
-    /// service a dotted name and the provider an internal one, in the order
-    /// `ServiceLoader` is to offer them. A provider's number is its place in
-    /// the list.
-    static Map<String, byte[]> registry(List<String> resources, Map<String, String> propertyBundles,
-                                        List<String> bundleClasses, List<String[]> services) {
-        Map<String, byte[]> out = new TreeMap<String, byte[]>();
-        List<Map.Entry<String, String>> files = new ArrayList<Map.Entry<String, String>>(propertyBundles.entrySet());
-        int firstService = resources.size() + files.size() + bundleClasses.size();
-        int total = firstService + services.size();
-        List<String> parts = new ArrayList<String>();
-        for (int from = 0; from < total; from += CHUNK) {
-            String part = REGISTRY + PART + parts.size();
-            parts.add(part);
-            ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-            cw.visit(Opcodes.V1_5, Opcodes.ACC_FINAL | Opcodes.ACC_SUPER, part, null, "java/lang/Object", null);
-            MethodVisitor mv = cw.visitMethod(Opcodes.ACC_STATIC, "install", "()V", null, null);
-            mv.visitCode();
-            boolean hasFactory = false;
-            for (int i = from; i < total && i < from + CHUNK; i++) {
-                if (i < resources.size()) {
-                    mv.visitLdcInsn(resources.get(i));
-                    mv.visitMethodInsn(Opcodes.INVOKESTATIC, RESOURCES, "cn1AddResource", "(Ljava/lang/String;)V",
-                            false);
-                } else if (i < resources.size() + files.size()) {
-                    Map.Entry<String, String> file = files.get(i - resources.size());
-                    mv.visitLdcInsn(file.getKey());
-                    mv.visitLdcInsn(file.getValue());
-                    mv.visitMethodInsn(Opcodes.INVOKESTATIC, BUNDLE, "cn1RegisterProperties",
-                            "(Ljava/lang/String;Ljava/lang/String;)V", false);
-                } else if (i >= firstService) {
-                    if (!hasFactory) {
-                        mv.visitTypeInsn(Opcodes.NEW, REGISTRY);
-                        mv.visitInsn(Opcodes.DUP);
-                        mv.visitMethodInsn(Opcodes.INVOKESPECIAL, REGISTRY, "<init>", "()V", false);
-                        mv.visitVarInsn(Opcodes.ASTORE, 0);
-                        hasFactory = true;
-                    }
-                    int id = i - firstService;
-                    mv.visitLdcInsn(services.get(id)[0]);
-                    mv.visitVarInsn(Opcodes.ALOAD, 0);
-                    mv.visitLdcInsn(Integer.valueOf(id));
-                    mv.visitMethodInsn(Opcodes.INVOKESTATIC, LOADER, "cn1RegisterProvider",
-                            "(Ljava/lang/String;L" + SERVICE_FACTORY + ";I)V", false);
-                } else {
-                    if (!hasFactory) {
-                        mv.visitTypeInsn(Opcodes.NEW, REGISTRY);
-                        mv.visitInsn(Opcodes.DUP);
-                        mv.visitMethodInsn(Opcodes.INVOKESPECIAL, REGISTRY, "<init>", "()V", false);
-                        mv.visitVarInsn(Opcodes.ASTORE, 0);
-                        hasFactory = true;
-                    }
-                    int id = i - resources.size() - files.size();
-                    mv.visitLdcInsn(bundleClasses.get(id));
-                    mv.visitVarInsn(Opcodes.ALOAD, 0);
-                    mv.visitLdcInsn(Integer.valueOf(id));
-                    mv.visitMethodInsn(Opcodes.INVOKESTATIC, BUNDLE, "cn1RegisterBundleClass",
-                            "(Ljava/lang/String;L" + FACTORY + ";I)V", false);
-                }
-            }
-            mv.visitInsn(Opcodes.RETURN);
-            mv.visitMaxs(0, 0);
-            mv.visitEnd();
-            cw.visitEnd();
-            out.put(part, cw.toByteArray());
-        }
-
-        ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-        cw.visit(Opcodes.V1_5, Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL | Opcodes.ACC_SUPER, REGISTRY, null,
-                "java/lang/Object", new String[] {FACTORY, SERVICE_FACTORY});
-
-        MethodVisitor init = cw.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
-        init.visitCode();
-        init.visitVarInsn(Opcodes.ALOAD, 0);
-        init.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
-        init.visitInsn(Opcodes.RETURN);
-        init.visitMaxs(0, 0);
-        init.visitEnd();
-
-        MethodVisitor install = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "cn1Install", "()V", null,
-                null);
-        install.visitCode();
-        install.visitMethodInsn(Opcodes.INVOKESTATIC, RESOURCES, "cn1BeginIndex", "()V", false);
-        for (String part : parts) {
-            install.visitMethodInsn(Opcodes.INVOKESTATIC, part, "install", "()V", false);
-        }
-        install.visitMethodInsn(Opcodes.INVOKESTATIC, BUNDLE, "cn1Seal", "()V", false);
-        install.visitMethodInsn(Opcodes.INVOKESTATIC, LOADER, "cn1Seal", "()V", false);
-        install.visitInsn(Opcodes.RETURN);
-        install.visitMaxs(0, 0);
-        install.visitEnd();
-
-        MethodVisitor create = cw.visitMethod(Opcodes.ACC_PUBLIC, "cn1Create", "(I)L" + BUNDLE + ";", null, null);
-        create.visitCode();
-        Label none = new Label();
-        if (!bundleClasses.isEmpty()) {
-            Label[] cases = new Label[bundleClasses.size()];
-            for (int i = 0; i < cases.length; i++) {
-                cases[i] = new Label();
-            }
-            create.visitVarInsn(Opcodes.ILOAD, 1);
-            create.visitTableSwitchInsn(0, cases.length - 1, none, cases);
-            for (int i = 0; i < cases.length; i++) {
-                String type = bundleClasses.get(i).replace('.', '/');
-                create.visitLabel(cases[i]);
-                create.visitTypeInsn(Opcodes.NEW, type);
-                create.visitInsn(Opcodes.DUP);
-                create.visitMethodInsn(Opcodes.INVOKESPECIAL, type, "<init>", "()V", false);
-                create.visitInsn(Opcodes.ARETURN);
-            }
-        }
-        create.visitLabel(none);
-        create.visitInsn(Opcodes.ACONST_NULL);
-        create.visitInsn(Opcodes.ARETURN);
-        create.visitMaxs(0, 0);
-        create.visitEnd();
-
-        // The two halves of ServiceLoader's factory: what a provider is,
-        // which is asked without creating it, and the provider itself.
-        for (int half = 0; half < 2; half++) {
-            MethodVisitor mv = half == 0
-                    ? cw.visitMethod(Opcodes.ACC_PUBLIC, "cn1CreateService", "(I)Ljava/lang/Object;", null, null)
-                    : cw.visitMethod(Opcodes.ACC_PUBLIC, "cn1ServiceType", "(I)Ljava/lang/Class;", null, null);
-            mv.visitCode();
-            Label absent = new Label();
-            if (!services.isEmpty()) {
-                Label[] cases = new Label[services.size()];
-                for (int i = 0; i < cases.length; i++) {
-                    cases[i] = new Label();
-                }
-                mv.visitVarInsn(Opcodes.ILOAD, 1);
-                mv.visitTableSwitchInsn(0, cases.length - 1, absent, cases);
-                for (int i = 0; i < cases.length; i++) {
-                    String type = services.get(i)[1];
-                    mv.visitLabel(cases[i]);
-                    if (half == 0) {
-                        mv.visitTypeInsn(Opcodes.NEW, type);
-                        mv.visitInsn(Opcodes.DUP);
-                        mv.visitMethodInsn(Opcodes.INVOKESPECIAL, type, "<init>", "()V", false);
-                    } else {
-                        mv.visitLdcInsn(org.objectweb.asm.Type.getObjectType(type));
-                    }
-                    mv.visitInsn(Opcodes.ARETURN);
-                }
-            }
-            mv.visitLabel(absent);
-            mv.visitInsn(Opcodes.ACONST_NULL);
-            mv.visitInsn(Opcodes.ARETURN);
-            mv.visitMaxs(0, 0);
-            mv.visitEnd();
-        }
-
-        cw.visitEnd();
-        out.put(REGISTRY, cw.toByteArray());
-        return out;
-    }
-
-    /// Writes the registry's classes and removes the parts an earlier,
-    /// larger registry left behind.
-    private void writeRegistry(Map<String, byte[]> classes) throws IOException {
-        File dir = new File(classesDir, REGISTRY + ".class").getParentFile();
-        String prefix = REGISTRY.substring(REGISTRY.lastIndexOf('/') + 1) + PART;
-        File[] existing = dir.listFiles();
-        if (existing != null) {
-            for (File f : existing) {
-                String name = f.getName();
-                if (name.startsWith(prefix) && name.endsWith(".class")
-                        && !classes.containsKey(Relocation.JDK_PACKAGE + name.substring(0, name.length() - 6))
-                        && !f.delete()) {
-                    log.warn("Could not delete " + f);
-                }
-            }
-        }
-        for (Map.Entry<String, byte[]> e : classes.entrySet()) {
-            ClassRelocator.writeIfDifferent(new File(classesDir, e.getKey() + ".class"), e.getValue());
         }
     }
 }

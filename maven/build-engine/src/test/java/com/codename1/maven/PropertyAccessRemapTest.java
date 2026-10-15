@@ -103,7 +103,7 @@ public class PropertyAccessRemapTest {
         if (scratch == null) {
             scratch = tmp.newFolder("jars");
         }
-        return Arrays.asList(RealCompatJars.javafx(scratch), RealCompatJars.jdk(scratch), RealCompatJars.core(scratch));
+        return Arrays.asList(RealCompatJars.javafx(scratch), RealCompatJars.core(scratch));
     }
 
     private File build() throws Exception {

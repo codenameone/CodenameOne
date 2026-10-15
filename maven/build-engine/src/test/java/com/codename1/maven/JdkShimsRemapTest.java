@@ -26,8 +26,15 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-/// The JDK stand-ins, end to end: source written against the JDK is compiled,
-/// run, relocated by the remap step and run again, and has to answer the same.
+/// The remap step and the JDK, end to end: source written against the JDK is
+/// compiled, run, relocated by the remap step and run again, and has to
+/// answer the same.
+///
+/// What a device's class library has under the JDK's name -- nearly all of
+/// it -- keeps its name, and a case says so with [RemapDifferential#keeps].
+/// What is moved -- regular expressions to the framework's matcher, resource
+/// and service lookups to `com.codename1.impl.compat.Resources` -- has to be
+/// named by no remapped class, so the second run really is the stand-in's.
 public class JdkShimsRemapTest {
 
     @Rule
@@ -39,7 +46,8 @@ public class JdkShimsRemapTest {
 
     @Test
     public void textIsEncodedAndDecodedByCharset() throws Exception {
-        java8().same(""
+        RemapDifferential d = java8();
+        d.same(""
                 + "byte[] utf = \"caf\\u00e9 \\u20ac\".getBytes(StandardCharsets.UTF_8);\n"
                 + "out.add(utf);\n"
                 + "out.add(new String(utf, StandardCharsets.UTF_8));\n"
@@ -62,14 +70,16 @@ public class JdkShimsRemapTest {
                 + "w.write(\"na\\u00efve\");\n"
                 + "w.close();\n"
                 + "out.add(bytes.toByteArray());\n"
-                + "out.add(bytes.toString(\"UTF-8\"));\n", 14, "Charset.forName");
+                + "out.add(bytes.toString(\"UTF-8\"));\n", 14);
+        d.keeps("java/nio/charset/Charset", "forName");
     }
 
     /// On a JDK that has `findFirst` and `stream`, which is also the one
     /// whose iterations share what either created. The providers come from
     /// a services file with the comments, blank lines and repeats the format
-    /// allows; the stand-in reads it itself here, where no build generated
-    /// a registry (`ServiceProvidersTest` covers that one).
+    /// allows. `ServiceLoader.load` goes through `Resources`, which with no
+    /// port loader installed is the JDK's own call; the device's registry is
+    /// `ServiceProvidersTest`'s.
     @Test
     public void serviceProvidersAreLoadedInFileOrderAndLazily() throws Exception {
         RemapDifferential d = new RemapDifferential(tmp.newFolder(), 17);
@@ -113,7 +123,8 @@ public class JdkShimsRemapTest {
                 + "out.add(ServiceLoader.load(Shape.class, Shape.class.getClassLoader()).iterator().next().name());\n"
                 + "out.add(ServiceLoader.loadInstalled(Shape.class).iterator().hasNext());\n"
                 + "try { ServiceLoader.load(null); out.add(\"no\"); } catch (NullPointerException e) { out.add(\"npe\"); }\n",
-                18, "java/util/ServiceLoader");
+                18);
+        d.keeps("java/util/ServiceLoader", "com/codename1/impl/compat/Resources");
     }
 
     @Test
@@ -131,12 +142,14 @@ public class JdkShimsRemapTest {
                 + "out.add(none);\n"
                 + "try { ServiceLoader.load(none, Here.class); out.add(\"no\"); }"
                 + " catch (NullPointerException e) { out.add(\"npe\"); }\n",
-                6, "java/lang/Module", "java/lang/ModuleLayer");
+                6);
+        d.keeps("java/lang/Module", "java/lang/ModuleLayer");
     }
 
     @Test
     public void aCopyOnWriteSetIteratesOverWhatItHeldWhenAsked() throws Exception {
-        java8().same(""
+        RemapDifferential d = java8();
+        d.same(""
                 + "CopyOnWriteArraySet<String> set = new CopyOnWriteArraySet<>(Arrays.asList(\"b\", \"a\", \"b\"));\n"
                 + "out.add(set.toString() + set.size());\n"
                 + "out.add(set.add(\"a\") + \" \" + set.add(\"c\"));\n"
@@ -158,7 +171,8 @@ public class JdkShimsRemapTest {
                 + "set.clear();\n"
                 + "out.add(set.isEmpty());\n"
                 + "out.add(new CopyOnWriteArraySet<Integer>().iterator().hasNext());\n",
-                13, "java/util/concurrent/CopyOnWriteArraySet");
+                13);
+        d.keeps("java/util/concurrent/CopyOnWriteArraySet");
     }
 
     /// The four OSGi types a library asks about before taking its class
@@ -212,6 +226,7 @@ public class JdkShimsRemapTest {
                 + "    d2.appendReplacement(sb, \"<\" + d2.group() + \">\");\n"
                 + "}\n"
                 + "out.add(d2.appendTail(sb).toString());\n", 20, "java/util/regex/");
+        d.keeps("com/codename1/util/regex/Pattern", "com/codename1/util/regex/StringRegex");
     }
 
     @Test
@@ -355,7 +370,9 @@ public class JdkShimsRemapTest {
                 + "ExecutorService named = Executors.newSingleThreadExecutor(r -> new Thread(r, \"named\"));\n"
                 + "out.add(named.submit(() -> 7).get());\n"
                 + "named.shutdown();\n"
-                + "out.add(Executors.newCachedThreadPool(Executors.defaultThreadFactory()).submit(() -> 8).get());\n", 45, "java/util/concurrent/C", "java/util/concurrent/S", "java/util/concurrent/T");
+                + "out.add(Executors.newCachedThreadPool(Executors.defaultThreadFactory()).submit(() -> 8).get());\n", 45);
+        d.keeps("java/util/concurrent/CompletableFuture", "java/util/concurrent/ScheduledExecutorService",
+                "java/util/concurrent/TimeUnit");
     }
 
     @Test
@@ -418,7 +435,8 @@ public class JdkShimsRemapTest {
                 + "out.add(du.multipliedBy(3) + \" \" + du.dividedBy(7) + \" \" + Duration.ofNanos(-1) + \" \" + Duration.of(90, ChronoUnit.MINUTES) + \" \" + Duration.of(5, ChronoUnit.MICROS));\n"
                 + "Date date = new Date(1700000000123L);\n"
                 + "out.add(date.toInstant() + \" \" + Date.from(i).getTime() + \" \" + date.after(new Date(0)) + \" \" + date.before(new Date(0)));\n"
-                + "out.add((date.getYear() + 1900) + \" \" + date.getMonth() + \" \" + (date.getDate() > 0) + \" \" + (date.getDay() >= 0) + \" \" + (date.getHours() < 24) + \" \" + date.getMinutes() + \" \" + date.getSeconds());\n", 50, "java/time/DayOfWeek", "java/time/Month", "java/time/temporal/ChronoUnit");
+                + "out.add((date.getYear() + 1900) + \" \" + date.getMonth() + \" \" + (date.getDate() > 0) + \" \" + (date.getDay() >= 0) + \" \" + (date.getHours() < 24) + \" \" + date.getMinutes() + \" \" + date.getSeconds());\n", 50);
+        d.keeps("java/time/DayOfWeek", "java/time/Month", "java/time/temporal/ChronoUnit");
     }
 
     @Test
@@ -490,7 +508,8 @@ public class JdkShimsRemapTest {
                 + "out.add(sb.isEmpty() + \" \" + sb.appendCodePoint(0x1F600).appendCodePoint('x').length() + \" \" + sb.isEmpty() + \" \" + new StringBuffer().appendCodePoint(65) + \" \" + new StringBuffer().isEmpty());\n"
                 + "out.add(Arrays.toString(\"a\\ud83d\\ude00b\".codePoints().toArray()) + \" \" + sb.codePoints().count() + \" \" + Character.toString(0x1F600).length() + \" \" + Character.toString(66));\n"
                 + "CharSequence seq = \"\";\n"
-                + "out.add(seq.isEmpty() + \" \" + \"x\".isEmpty());\n", 30, "java/util/Base64", "java/util/HexFormat", "java/security/", "java/net/URL");
+                + "out.add(seq.isEmpty() + \" \" + \"x\".isEmpty());\n", 30);
+        d.keeps("java/util/Base64", "java/util/HexFormat", "java/security/", "java/net/URL");
     }
 
     @Test
@@ -724,6 +743,7 @@ public class JdkShimsRemapTest {
                 + "} catch (NullPointerException e) {\n"
                 + "    out.add(\"null selector\");\n"
                 + "}\n"
-                + "out.add(Shapes.nullable(null) + \" \" + Shapes.nullable(\"s\"));\n", 35, "java/lang/runtime/SwitchBootstraps", "java/lang/runtime/ObjectMethods", "java/lang/MatchException");
+                + "out.add(Shapes.nullable(null) + \" \" + Shapes.nullable(\"s\"));\n", 35, "java/lang/runtime/SwitchBootstraps", "java/lang/runtime/ObjectMethods");
+        d.keeps("java/lang/MatchException");
     }
 }

@@ -23,7 +23,7 @@
 package com.codename1.maven;
 
 import com.codename1.build.Log;
-import com.codename1.compat.jdk.ResourceNames;
+import com.codename1.impl.compat.ResourceNames;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;

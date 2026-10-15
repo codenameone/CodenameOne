@@ -60,7 +60,7 @@ import java.util.zip.ZipFile;
 /// Several layers can be active in one application -- Android sources beside
 /// Swing ones -- and they are applied as ONE pass with the union of their
 /// rules. Running a pass per layer would have each walk the other's relocated
-/// runtime, and two layers redirect the same JDK classes.
+/// runtime, and every layer redirects the same few JDK classes.
 public final class ClassRelocator {
 
     private final List<Relocation> relocations;
@@ -373,11 +373,8 @@ public final class ClassRelocator {
     }
 
     /// Whether `rel` (a directory, with its trailing slash) is where some
-    /// active layer's runtime, or the shared JDK classes, were extracted.
+    /// active layer's runtime was extracted.
     private boolean isShipped(String rel) {
-        if (rel.startsWith(Relocation.JDK_PACKAGE)) {
-            return true;
-        }
         for (Relocation r : relocations) {
             if (rel.startsWith(r.target())) {
                 return true;

@@ -22,7 +22,7 @@
  */
 package com.codename1.maven;
 
-import com.codename1.compat.jdk.Resources;
+import com.codename1.impl.compat.Resources;
 import org.junit.After;
 import org.junit.Rule;
 import org.junit.Test;
@@ -51,12 +51,12 @@ public class CompatRewritesTest {
 
     private static final String SOURCE = "package q;\n"
             + "import java.io.InputStream;\n"
-            + "import java.net.URL;\n"
             + "import java.util.ArrayList;\n"
             + "import java.util.List;\n"
             + "import java.util.Locale;\n"
             + "import java.util.Objects;\n"
-            + "import java.util.function.Function;\n"
+            + "import java.util.function.BiFunction;\n"
+            + "import java.util.function.DoubleUnaryOperator;\n"
             + "import java.util.function.Predicate;\n"
             + "public class R {\n"
             + "    public static Object[] run() throws Exception {\n"
@@ -64,21 +64,8 @@ public class CompatRewritesTest {
             + "        out.add(Objects.isNull(null));\n"
             + "        Predicate<Object> isNull = Objects::isNull;\n"
             + "        out.add(isNull.test(\"x\"));\n"
-            + "        try {\n"
-            + "            Objects.requireNonNull(null, () -> \"supplied\");\n"
-            + "        } catch (NullPointerException e) {\n"
-            + "            out.add(e.getMessage());\n"
-            + "        }\n"
-            + "        Locale fr = new Locale(\"fr\");\n"
-            + "        out.add(fr.getLanguage() + \"|\" + fr.getCountry());\n"
-            + "        Locale swiss = new Locale(\"de\", \"CH\", \"1996\");\n"
-            + "        out.add(swiss.getLanguage() + \"|\" + swiss.getCountry() + \"|\" + swiss.getVariant());\n"
-            + "        out.add(Locale.FRANCE.equals(new Locale(\"fr\", \"FR\")));\n"
-            + "        out.add(Locale.CANADA_FRENCH.toString());\n"
-            + "        out.add(Locale.forLanguageTag(\"en-US\").toLanguageTag());\n"
-            + "        out.add(new Locale(\"pt\", \"BR\").hashCode() == new Locale(\"pt\", \"BR\").hashCode());\n"
-            + "        Function<Locale, String> tag = Locale::toLanguageTag;\n"
-            + "        out.add(tag.apply(Locale.UK));\n"
+            + "        Locale fr = new Locale(\"fr\", \"FR\");\n"
+            + "        out.add(fr.toLanguageTag());\n"
             + "        out.add(String.valueOf(R.class.getResource(\"data/r.txt\")));\n"
             + "        out.add(read(R.class.getResourceAsStream(\"/q/data/r.txt\")));\n"
             + "        ClassLoader loader = Thread.currentThread().getContextClassLoader();\n"
@@ -86,6 +73,17 @@ public class CompatRewritesTest {
             + "        out.add(read(loader.getResourceAsStream(\"q/data/r.txt\")));\n"
             + "        out.add(String.valueOf(ClassLoader.getSystemResource(\"q/none.txt\")));\n"
             + "        out.add(R.class.getClassLoader().getResources(\"q/data/r.txt\").hasMoreElements());\n"
+            + "        out.add(\"a1b22c\".matches(\"[a-c0-9]+\"));\n"
+            + "        out.add(String.join(\"|\", \"a,b,,c\".split(\",\")));\n"
+            + "        out.add(\"a,b,c\".split(\",\", 2).length);\n"
+            + "        out.add(\"x1y22\".replaceAll(\"[0-9]+\", \"#\"));\n"
+            + "        out.add(\"x1y22\".replaceFirst(\"[0-9]+\", \"#\"));\n"
+            + "        BiFunction<String, String, Boolean> matches = String::matches;\n"
+            + "        out.add(matches.apply(\"abc\", \"a.c\"));\n"
+            + "        out.add(Math.round(Math.pow(2, 10)));\n"
+            + "        out.add(Math.round(StrictMath.exp(0) * 1000));\n"
+            + "        DoubleUnaryOperator log = Math::log10;\n"
+            + "        out.add(Math.round(log.applyAsDouble(1000)));\n"
             + "        return out.toArray();\n"
             + "    }\n"
             + "    static String read(InputStream in) throws Exception {\n"
@@ -99,6 +97,18 @@ public class CompatRewritesTest {
             + "    static Class<?> load(ClassLoader loader) throws Exception {\n"
             + "        return loader.loadClass(\"q.Other\");\n"
             + "    }\n"
+            + "    static Object bundle() {\n"
+            + "        return java.util.ResourceBundle.getBundle(\"q.Texts\", Locale.ROOT);\n"
+            + "    }\n"
+            + "    static Object services() {\n"
+            + "        return java.util.ServiceLoader.load(Runnable.class);\n"
+            + "    }\n"
+            + "    static void handler() {\n"
+            + "        Thread.setDefaultUncaughtExceptionHandler(null);\n"
+            + "    }\n"
+            + "    static Object exec() throws Exception {\n"
+            + "        return Runtime.getRuntime().exec(new String[] {\"true\"});\n"
+            + "    }\n"
             + "}\n";
 
     @Rule
@@ -107,6 +117,7 @@ public class CompatRewritesTest {
     @After
     public void restore() {
         Resources.cn1SetProvider(null);
+        Resources.cn1SetUrlFactory(null);
         Resources.cn1ClearIndex();
     }
 
@@ -116,10 +127,14 @@ public class CompatRewritesTest {
         return Files.readAllBytes(new File(classes, "q/R.class").toPath());
     }
 
+    /// Running the class links it, so the JVM verifies every rewritten call
+    /// -- `Runtime.exec`'s among them, whose stand-in answers the
+    /// framework's `Process` that `java.lang.Process` is relocated to.
     @Test
     public void aRewrittenClassRunsAndReachesTheStandIns() throws Exception {
         byte[] relocated = new ClassRelocator(CompatLayers.SWING).remap(compiled());
 
+        Resources.cn1SetUrlFactory(CompatFixtures.cn1resUrls());
         Resources.cn1BeginIndex();
         Resources.cn1AddResource("q/data/r.txt");
         Resources.cn1SetProvider(new Resources.Provider() {
@@ -132,11 +147,10 @@ public class CompatRewritesTest {
         Object[] out = (Object[]) r.getMethod("run").invoke(null);
 
         assertEquals(Arrays.asList(
-                Boolean.TRUE, Boolean.FALSE, "supplied",
-                // A language alone is the empty country; a variant is dropped.
-                "fr|", "de|CH|",
-                Boolean.TRUE, "fr_CA", "en-US", Boolean.TRUE, "en-GB",
-                "cn1res:/q/data/r.txt", "DATA", "cn1res:/q/data/r.txt", "DATA", "null", Boolean.TRUE),
+                Boolean.TRUE, Boolean.FALSE, "fr-FR",
+                "cn1res:/q/data/r.txt", "DATA", "cn1res:/q/data/r.txt", "DATA", "null", Boolean.TRUE,
+                Boolean.TRUE, "a|b||c", Integer.valueOf(2), "x#y#", "x#y22", Boolean.TRUE,
+                Long.valueOf(1024), Long.valueOf(1000), Long.valueOf(3)),
                 Arrays.asList(out));
     }
 
@@ -151,23 +165,28 @@ public class CompatRewritesTest {
         for (String gone : new String[] {"java/lang/Class.getResource", "java/lang/Class.getResourceAsStream",
             "java/lang/ClassLoader.getResource", "java/lang/ClassLoader.getResourceAsStream",
             "java/lang/ClassLoader.getResources", "java/lang/ClassLoader.getSystemResource",
-            "java/lang/ClassLoader.loadClass", "java/lang/Thread.getContextClassLoader", "java/util/Objects.isNull", "java/util/Objects.requireNonNull",
-            "java/util/Locale.FRANCE", "java/util/Locale.UK", "java/util/Locale.CANADA_FRENCH",
-            "java/util/Locale.equals", "java/util/Locale.hashCode", "java/util/Locale.toString",
-            "java/util/Locale.forLanguageTag", "java/util/Locale.toLanguageTag", "java/util/Locale.getVariant"}) {
+            "java/lang/ClassLoader.loadClass", "java/lang/Thread.getContextClassLoader",
+            "java/lang/String.matches", "java/lang/String.split", "java/lang/String.replaceAll",
+            "java/lang/String.replaceFirst", "java/lang/Math.pow", "java/lang/StrictMath.exp",
+            "java/lang/Math.log10", "java/util/ResourceBundle.getBundle", "java/util/ServiceLoader.load",
+            "java/lang/Thread.setDefaultUncaughtExceptionHandler", "java/lang/Runtime.exec"}) {
             assertTrue("The fixture does not use " + gone, before.contains(gone));
             assertFalse(gone + " survived: " + after, after.contains(gone));
         }
-        String jdk = Relocation.JDK_PACKAGE;
-        for (String there : new String[] {jdk + "Resources.getResource", jdk + "Resources.getResourceAsStream",
-            jdk + "Resources.getResources", jdk + "Resources.getSystemResource",
-            jdk + "Resources.getContextClassLoader", jdk + "JdkObjects.isNull", jdk + "JdkObjects.requireNonNull",
-            jdk + "JdkLocale.FRANCE", jdk + "JdkLocale.equals", jdk + "JdkLocale.toLanguageTag",
-            // Left exactly as written: what the device has, and what it
-            // lacks and nothing stands in for.
-            "java/util/Locale.<init>", "java/util/Locale.getLanguage", "java/lang/Class.getClassLoader",
+        String resources = "com/codename1/impl/compat/Resources.";
+        for (String there : new String[] {resources + "getResource", resources + "getResourceAsStream",
+            resources + "getResources", resources + "getSystemResource", resources + "getContextClassLoader",
+            resources + "getBundle", resources + "load",
+            "com/codename1/impl/compat/UncaughtExceptions.setDefaultUncaughtExceptionHandler",
+            "com/codename1/util/regex/StringRegex.matches", "com/codename1/util/regex/StringRegex.split",
+            "com/codename1/util/MathUtil.pow", "com/codename1/util/MathUtil.exp",
+            "com/codename1/util/MathUtil.log10", "com/codename1/impl/process/RuntimeExec.exec",
+            // Left exactly as written: the device's class library has them
+            // under the JDK's names.
+            "java/util/Objects.isNull", "java/util/Locale.<init>", "java/util/Locale.toLanguageTag",
+            "java/lang/Math.round", "java/lang/Class.getClassLoader", "java/lang/String.join",
             // Asking the one loader for a class by name is Class.forName.
-            jdk + "Resources.loadClass"}) {
+            resources + "loadClass"}) {
             assertTrue(there + " is missing: " + after, after.contains(there));
         }
         // A second pass finds nothing left to do.
@@ -181,11 +200,9 @@ public class CompatRewritesTest {
     public void theAndroidLayerAloneRewritesNoMember() throws Exception {
         Set<String> after = CompatFixtures.members(new ClassRelocator(AndroidRemapper.RELOCATION).remap(compiled()));
         assertTrue(after.toString(), after.contains("java/lang/Class.getResource"));
-        assertTrue(after.toString(), after.contains("java/util/Objects.isNull"));
-        assertTrue(after.toString(), after.contains("java/util/Locale.FRANCE"));
+        assertTrue(after.toString(), after.contains("java/lang/String.split"));
         for (String member : after) {
-            assertFalse(member, member.startsWith(Relocation.JDK_PACKAGE + "Resources"));
-            assertFalse(member, member.startsWith(Relocation.JDK_PACKAGE + "Jdk"));
+            assertFalse(member, member.startsWith("com/codename1/impl/compat/"));
         }
         // With a desktop layer beside it, the rules apply.
         Set<String> mixed = CompatFixtures.members(
@@ -193,13 +210,13 @@ public class CompatRewritesTest {
         assertFalse(mixed.toString(), mixed.contains("java/lang/Class.getResource"));
     }
 
-    /// `Resources` reads the bundle through `Class.getResourceAsStream`; a
-    /// rule applied to the shared JDK classes would send that call back to
-    /// `Resources` for ever.
+    /// The Android layer's runtime asks for resources by their flat names
+    /// already, and a rule applied to it would change what it reads.
     @Test
-    public void theSharedJdkClassesAreNotRewritten() {
+    public void theAndroidRuntimeIsNotRewritten() {
         ClassWriter cw = new ClassWriter(0);
-        cw.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, Relocation.JDK_PACKAGE + "Probe", null, "java/lang/Object", null);
+        cw.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, AndroidRemapper.RELOCATION.target() + "android/Probe", null,
+                "java/lang/Object", null);
         MethodVisitor mv = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "open",
                 "(Ljava/lang/Class;)Ljava/io/InputStream;", null, null);
         mv.visitCode();
@@ -211,102 +228,9 @@ public class CompatRewritesTest {
         mv.visitMaxs(2, 1);
         mv.visitEnd();
         cw.visitEnd();
-        Set<String> after = CompatFixtures.members(new ClassRelocator(CompatLayers.SWING).remap(cw.toByteArray()));
+        Set<String> after = CompatFixtures.members(
+                new ClassRelocator(AndroidRemapper.RELOCATION, CompatLayers.SWING).remap(cw.toByteArray()));
         assertEquals(after.toString(), 1, after.size());
         assertTrue(after.contains("java/lang/Class.getResourceAsStream"));
-    }
-
-    private static final String REFS_SOURCE = "package q;\n"
-            + "import java.io.ByteArrayInputStream;\n"
-            + "import java.io.InputStream;\n"
-            + "import java.io.InputStreamReader;\n"
-            + "import java.io.Reader;\n"
-            + "import java.nio.charset.Charset;\n"
-            + "import java.util.Locale;\n"
-            + "import java.util.function.BiFunction;\n"
-            + "import java.util.function.Function;\n"
-            + "public class C {\n"
-            + "    interface Tri<A, B, D, R> { R apply(A a, B b, D d); }\n"
-            + "    public static Object[] run() throws Exception {\n"
-            + "        Function<String, Locale> one = Locale::new;\n"
-            + "        Tri<String, String, String, Locale> three = Locale::new;\n"
-            + "        BiFunction<InputStream, Charset, Reader> reader = InputStreamReader::new;\n"
-            + "        Locale fr = one.apply(\"fr\");\n"
-            + "        Locale ch = three.apply(\"de\", \"CH\", \"1996\");\n"
-            + "        Reader r = reader.apply(new ByteArrayInputStream(new byte[] {104, 105}), Charset.forName(\"UTF-8\"));\n"
-            + "        char[] buf = new char[2];\n"
-            + "        r.read(buf);\n"
-            + "        return new Object[] {fr.getLanguage() + \"|\" + fr.getCountry(),\n"
-            + "            ch.getLanguage() + \"|\" + ch.getCountry() + \"|\" + ch.getVariant(), new String(buf)};\n"
-            + "    }\n"
-            + "}\n";
-
-    /// A constructor reference to a constructor the device lacks goes to a
-    /// factory that takes the same arguments, as a direct call is adapted:
-    /// a handle cannot convert an argument on its own.
-    @Test
-    public void aConstructorReferenceIsAdaptedAsACallIs() throws Exception {
-        File classes = tmp.newFolder();
-        CompatFixtures.compile(tmp.newFolder(), classes, "q/C.java", REFS_SOURCE);
-        byte[] original = Files.readAllBytes(new File(classes, "q/C.class").toPath());
-        assertTrue(CompatFixtures.members(original).contains("java/util/Locale.<init>"));
-        byte[] relocated = new ClassRelocator(CompatLayers.SWING).remap(original);
-        Set<String> after = CompatFixtures.members(relocated);
-        assertFalse(after.toString(), after.contains("java/util/Locale.<init>"));
-        assertFalse(after.toString(), after.contains("java/io/InputStreamReader.<init>"));
-        assertTrue(after.toString(), after.contains(Relocation.JDK_PACKAGE + "JdkLocale.newLocale"));
-        assertTrue(after.toString(), after.contains(Relocation.JDK_PACKAGE + "JdkCharsets.reader"));
-        CompatFixtures.Defining loader = new CompatFixtures.Defining(getClass().getClassLoader());
-        loader.define(new ClassRelocator(CompatLayers.SWING).remap(
-                Files.readAllBytes(new File(classes, "q/C$Tri.class").toPath())));
-        Class<?> c = loader.define(relocated);
-        Object[] out = (Object[]) c.getMethod("run").invoke(null);
-        // As from a direct call: a language alone is the empty country, and
-        // the variant is dropped.
-        assertEquals(Arrays.asList("fr|", "de|CH|", "hi"), Arrays.asList(out));
-    }
-
-    private static final String TIME_SOURCE = "package q;\n"
-            + "import java.time.Instant;\n"
-            + "import java.time.LocalTime;\n"
-            + "import java.time.ZoneId;\n"
-            + "import java.time.ZoneOffset;\n"
-            + "import java.time.ZonedDateTime;\n"
-            + "import java.time.format.DateTimeFormatter;\n"
-            + "public class T {\n"
-            + "    public static Object[] run() {\n"
-            + "        DateTimeFormatter plain = DateTimeFormatter.ofPattern(\"HH:mm:ss\");\n"
-            + "        DateTimeFormatter zoned = plain.withZone(ZoneId.of(\"GMT+02:00\"));\n"
-            + "        Instant at = Instant.ofEpochSecond(5 * 3600 + 7 * 60 + 9);\n"
-            + "        return new Object[] {zoned.format(at), LocalTime.of(1, 2, 3).format(zoned),\n"
-            + "            String.valueOf(zoned.getZone()), String.valueOf(plain.getZone()),\n"
-            + "            ZonedDateTime.ofInstant(at, ZoneOffset.UTC).format(zoned),\n"
-            + "            plain.format(LocalTime.of(4, 5, 6))};\n"
-            + "    }\n"
-            + "}\n";
-
-    /// `withZone` has nowhere to live on the device's formatter, so the
-    /// zone is kept beside it: a formatter made, zoned and used by
-    /// rewritten calls shows an instant in that zone.
-    @Test
-    public void aFormatterKeepsItsOverrideZone() throws Exception {
-        File classes = tmp.newFolder();
-        CompatFixtures.compile(tmp.newFolder(), classes, "q/T.java", TIME_SOURCE);
-        byte[] original = Files.readAllBytes(new File(classes, "q/T.class").toPath());
-        byte[] relocated = new ClassRelocator(CompatLayers.JAVAFX).remap(original);
-        Set<String> after = CompatFixtures.members(relocated);
-        for (String gone : new String[] {"java/time/format/DateTimeFormatter.withZone",
-            "java/time/format/DateTimeFormatter.getZone", "java/time/format/DateTimeFormatter.ofPattern",
-            "java/time/format/DateTimeFormatter.format", "java/time/ZonedDateTime.format"}) {
-            assertFalse(gone + " survived: " + after, after.contains(gone));
-        }
-        assertTrue(after.toString(), after.contains(Relocation.JDK_PACKAGE + "JdkTime.withZone"));
-        // A time alone is not left to the device's formatter either: of a
-        // pattern, it throws "Unsupported temporal type" for one.
-        assertFalse(after.toString(), after.contains("java/time/LocalTime.format"));
-        Class<?> t = new CompatFixtures.Defining(getClass().getClassLoader()).define(relocated);
-        Object[] out = (Object[]) t.getMethod("run").invoke(null);
-        assertEquals(Arrays.asList("07:07:09", "01:02:03", "GMT+02:00", "null", "07:07:09", "04:05:06"),
-                Arrays.asList(out));
     }
 }

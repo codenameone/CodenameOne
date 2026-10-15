@@ -56,9 +56,12 @@ import java.util.TreeMap;
 ///
 /// and then installs itself as the registry `JdkHost` serves.
 ///
-/// The name is in a package of its own, never in a runtime jar, so that no
-/// placeholder of the same name ships anywhere: an Android build would see
-/// two classes of one name. The registrations sit in part classes beside it,
+/// The name is in a package of its own. The Swing and JavaFX runtime jars
+/// carry an empty placeholder of it, so that their lifecycles compile
+/// against `cn1Install()`, but the remap step never extracts that one
+/// (`ClassRelocator.generating`) and the runtime jars themselves are not
+/// shipped, so only the generated class ships: an Android build would
+/// otherwise see two classes of one name. The registrations sit in part classes beside it,
 /// `CompatRegistry$Part0` onwards, each with one static `install` method,
 /// because a method's code is limited to 64KB and an application has as many
 /// resources as it has.

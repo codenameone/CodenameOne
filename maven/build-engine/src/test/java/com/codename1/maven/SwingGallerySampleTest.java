@@ -137,7 +137,7 @@ public class SwingGallerySampleTest {
             scratch = tmp.newFolder("jars");
         }
         return new ArrayList<File>(Arrays.asList(RealCompatJars.swing(scratch), RealCompatJars.javafx(scratch),
-                RealCompatJars.jdk(scratch), RealCompatJars.core(scratch)));
+                RealCompatJars.core(scratch)));
     }
 
     /// Compiles and remaps the sample; answers the classes directory.
@@ -200,7 +200,7 @@ public class SwingGallerySampleTest {
         assertTrue(new CompatRemapper(classes, runtimes(), null, CompatRemapperTest.LOG).run());
 
         int shipped = 0;
-        for (File jar : new File[] {RealCompatJars.swing(scratch), RealCompatJars.jdk(scratch)}) {
+        for (File jar : new File[] {RealCompatJars.swing(scratch)}) {
             ZipFile zip = new ZipFile(jar);
             try {
                 Enumeration<? extends ZipEntry> entries = zip.entries();
@@ -235,6 +235,7 @@ public class SwingGallerySampleTest {
             classes.toURI().toURL(),
             RealCompatJars.jar("codenameone-compat-testing", scratch).toURI().toURL(),
             RealCompatJars.core(scratch).toURI().toURL(),
+            RealCompatJars.jdkHost(scratch).toURI().toURL(),
         };
         final URLClassLoader loader = new URLClassLoader(urls, ClassLoader.getSystemClassLoader().getParent());
         try {

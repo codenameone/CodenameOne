@@ -41,6 +41,18 @@ public final class RemappedProbeMain {
         int result = 0;
         try {
             Class.forName("com.codename1.compat.testing.HeadlessImplementation").getMethod("install").invoke(null);
+            // What a lifecycle or the generated main class does first: hand
+            // the application's generated registry (resources, bundles,
+            // service providers) to the class library.
+            Class<?> registry;
+            try {
+                registry = Class.forName(ApplicationRegistry.NAME.replace('/', '.'));
+            } catch (ClassNotFoundException none) {
+                registry = null;
+            }
+            if (registry != null) {
+                registry.getMethod("cn1Install").invoke(null);
+            }
             Class<?> displayClass = Class.forName("com.codename1.ui.Display");
             Object display = displayClass.getMethod("getInstance").invoke(null);
             final Object[] answer = new Object[1];

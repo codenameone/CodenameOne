@@ -104,8 +104,9 @@ public class CompatRemapperTest {
     }
 
     /// An application class that touches every layer: it extends a Swing
-    /// frame, holds a JavaFX stage, has an `android:onClick` handler and
-    /// opens a `java.io.File`.
+    /// frame, holds a JavaFX stage, has an `android:onClick` handler, opens a
+    /// `java.io.File`, which keeps its name, and a
+    /// `java.util.regex.Pattern`, which moves to the framework's.
     private static byte[] appClass() {
         ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         cw.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "com/x/Main", null, "javax/swing/JFrame", null);
@@ -114,6 +115,8 @@ public class CompatRemapperTest {
         MethodVisitor mv = cw.visitMethod(Opcodes.ACC_PUBLIC, "tapped", "(Landroid/view/View;)V", null, null);
         mv.visitCode();
         mv.visitTypeInsn(Opcodes.NEW, "java/io/File");
+        mv.visitInsn(Opcodes.POP);
+        mv.visitTypeInsn(Opcodes.NEW, "java/util/regex/Pattern");
         mv.visitInsn(Opcodes.POP);
         mv.visitTypeInsn(Opcodes.NEW, "java/awt/Color");
         mv.visitInsn(Opcodes.POP);
@@ -156,10 +159,11 @@ public class CompatRemapperTest {
 
     private File swingJar() throws IOException {
         // Authored under the names it ships with; one class uses a JDK class
-        // the device lacks, which is redirected as it is extracted.
+        // the device has under another name, which is redirected as it is
+        // extracted.
         ClassWriter cw = new ClassWriter(0);
         cw.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, SWING + "javax/swing/JFileChooser", null, "java/lang/Object", null);
-        cw.visitField(Opcodes.ACC_PRIVATE, "selected", "Ljava/io/File;", null, null).visitEnd();
+        cw.visitField(Opcodes.ACC_PRIVATE, "selected", "Ljava/util/regex/Pattern;", null, null).visitEnd();
         cw.visitEnd();
         return jar(new File(tmp.getRoot(), "codenameone-swing-compat-1.jar"),
                 SWING + "javax/swing/JFrame.class", emptyClass(SWING + "javax/swing/JFrame", "java/lang/Object"),
@@ -181,11 +185,6 @@ public class CompatRemapperTest {
                 "android/view/View.class", emptyClass("android/view/View", "java/lang/Object"),
                 "com/codename1/androidcompat/runtime/AndroidApp.class",
                 emptyClass("com/codename1/androidcompat/runtime/AndroidApp", "java/lang/Object"));
-    }
-
-    private File jdkJar() throws IOException {
-        return jar(new File(tmp.getRoot(), "codenameone-compat-jdk-1.jar"),
-                "com/codename1/compat/jdk/File.class", emptyClass("com/codename1/compat/jdk/File", "java/lang/Object"));
     }
 
     private File classesWithApp(String folder) throws IOException {
@@ -236,7 +235,9 @@ public class CompatRemapperTest {
         assertEquals(SWING + "org/jdesktop/layout/GroupLayout", every.map("org/jdesktop/layout/GroupLayout"));
         assertEquals(FX + "javafx/stage/Stage", every.map("javafx/stage/Stage"));
         assertEquals(FX + "rt/FxApp", every.map(FX + "runtime/FxApp"));
-        assertEquals("com/codename1/compat/jdk/File", every.map("java/io/File"));
+        assertEquals("com/codename1/util/regex/Pattern", every.map("java/util/regex/Pattern"));
+        // The device's class library has the rest of the JDK under its name.
+        assertEquals("java/io/File", every.map("java/io/File"));
         // The names the Swing runtime is authored under are final already.
         assertEquals(SWING + "javax/swing/JTable", every.map(SWING + "javax/swing/JTable"));
         assertEquals(SWING + "rt/SwingApp", every.map(SWING + "rt/SwingApp"));
@@ -253,7 +254,7 @@ public class CompatRemapperTest {
     @Test
     public void relocatesSwingReferencesOntoARuntimeAuthoredUnderItsFinalNames() throws Exception {
         File classes = classesWithApp("classes");
-        List<File> classpath = Arrays.asList(swingJar(), jdkJar(), new File(tmp.getRoot(), "other-1.jar"));
+        List<File> classpath = Arrays.asList(swingJar(), new File(tmp.getRoot(), "other-1.jar"));
 
         CompatRemapper remapper = new CompatRemapper(classes, classpath, null, LOG);
         assertEquals(Collections.singletonList(CompatLayers.SWING), remapper.activeLayers());
@@ -262,7 +263,8 @@ public class CompatRemapperTest {
         List<String> app = refs(Files.readAllBytes(new File(classes, "com/x/Main.class").toPath()));
         assertTrue(app.toString(), app.contains(SWING + "javax/swing/JFrame"));
         assertTrue(app.toString(), app.contains(SWING + "java/awt/Color"));
-        assertTrue(app.toString(), app.contains("com/codename1/compat/jdk/File"));
+        assertTrue(app.toString(), app.contains("com/codename1/util/regex/Pattern"));
+        assertTrue(app.toString(), app.contains("java/io/File"));
         // Layers that are not active leave their names alone.
         assertTrue(app.toString(), app.contains("Ljavafx/stage/Stage;"));
         assertTrue(app.toString(), app.contains("(Landroid/view/View;)V"));
@@ -270,15 +272,16 @@ public class CompatRemapperTest {
         assertTrue(new File(classes, SWING + "javax/swing/JFrame.class").isFile());
         assertTrue(new File(classes, SWING + "rt/SwingApp.class").isFile());
         assertTrue(new File(classes, "cn1_swing_defaults.bin").isFile());
-        assertTrue(new File(classes, "com/codename1/compat/jdk/File.class").isFile());
+        // Nothing of the JDK is extracted: the framework has what moved.
+        assertFalse(new File(classes, "com/codename1/util").exists());
         assertFalse(new File(classes, "javax").exists());
         assertFalse(new File(classes, "META-INF").exists());
         // No Android step ran.
         assertFalse(new File(classes, AndroidRemapper.ON_CLICK_DISPATCH + ".class").exists());
-        // The runtime's own use of a JDK class the device lacks is redirected.
+        // The runtime's own use of a JDK class that moves is redirected.
         List<String> chooser = refs(Files.readAllBytes(
                 new File(classes, SWING + "javax/swing/JFileChooser.class").toPath()));
-        assertTrue(chooser.toString(), chooser.contains("Lcom/codename1/compat/jdk/File;"));
+        assertTrue(chooser.toString(), chooser.contains("Lcom/codename1/util/regex/Pattern;"));
     }
 
     @Test
@@ -286,7 +289,7 @@ public class CompatRemapperTest {
         File classes = classesWithApp("classes");
         File onClick = tmp.newFile("onclick.txt");
         Files.write(onClick.toPath(), "tapped\n".getBytes("UTF-8"));
-        List<File> classpath = Arrays.asList(androidJar(), swingJar(), javafxJar(), jdkJar());
+        List<File> classpath = Arrays.asList(androidJar(), swingJar(), javafxJar());
 
         CompatRemapper remapper = new CompatRemapper(classes, classpath, onClick, LOG);
         assertEquals(CompatLayers.ALL, remapper.activeLayers());
@@ -297,7 +300,8 @@ public class CompatRemapperTest {
         assertTrue(app.toString(), app.contains(SWING + "javax/swing/JFrame"));
         assertTrue(app.toString(), app.contains("L" + FX + "javafx/stage/Stage;"));
         assertTrue(app.toString(), app.contains("(Lcom/codename1/androidcompat/android/view/View;)V"));
-        assertTrue(app.toString(), app.contains("com/codename1/compat/jdk/File"));
+        assertTrue(app.toString(), app.contains("com/codename1/util/regex/Pattern"));
+        assertTrue(app.toString(), app.contains("java/io/File"));
 
         assertTrue(new File(classes, "com/codename1/androidcompat/android/view/View.class").isFile());
         assertTrue(new File(classes, "com/codename1/androidcompat/rt/AndroidApp.class").isFile());
@@ -307,7 +311,8 @@ public class CompatRemapperTest {
         assertFalse(new File(classes, FX + "runtime").exists());
         assertFalse(new File(classes, "javafx").exists());
         assertFalse(new File(classes, "android").exists());
-        assertTrue(new File(classes, "com/codename1/compat/jdk/File.class").isFile());
+        // Nothing of the JDK is extracted: the framework has what moved.
+        assertFalse(new File(classes, "com/codename1/util").exists());
         // The JavaFX runtime's reference to its own API moved with it.
         assertTrue(refs(Files.readAllBytes(new File(classes, FX + "rt/FxApp.class").toPath()))
                 .contains(FX + "javafx/stage/Stage"));
@@ -331,7 +336,7 @@ public class CompatRemapperTest {
     @Test
     public void aSecondRunChangesNothing() throws Exception {
         File swingOnly = classesWithApp("swing");
-        List<File> swingClasspath = Arrays.asList(swingJar(), jdkJar());
+        List<File> swingClasspath = Arrays.asList(swingJar());
         assertTrue(new CompatRemapper(swingOnly, swingClasspath, null, LOG).run());
         Map<String, byte[]> first = snapshot(swingOnly);
         assertTrue(new CompatRemapper(swingOnly, swingClasspath, null, LOG).run());
@@ -340,7 +345,7 @@ public class CompatRemapperTest {
         File all = classesWithApp("all");
         File onClick = tmp.newFile("onclick.txt");
         Files.write(onClick.toPath(), "tapped\n".getBytes("UTF-8"));
-        List<File> classpath = Arrays.asList(androidJar(), swingJar(), javafxJar(), jdkJar());
+        List<File> classpath = Arrays.asList(androidJar(), swingJar(), javafxJar());
         assertTrue(new CompatRemapper(all, classpath, onClick, LOG).run());
         first = snapshot(all);
         assertTrue(new CompatRemapper(all, classpath, onClick, LOG).run());
@@ -355,7 +360,7 @@ public class CompatRemapperTest {
         Map<String, byte[]> before = snapshot(classes);
 
         CompatRemapper remapper = new CompatRemapper(classes,
-                Arrays.asList(jdkJar(), new File(tmp.getRoot(), "codenameone-core-1.jar")), null, LOG);
+                Arrays.asList(new File(tmp.getRoot(), "codenameone-core-1.jar")), null, LOG);
         assertTrue(remapper.activeLayers().isEmpty());
         assertFalse(remapper.run());
         assertSameTree(before, snapshot(classes));
@@ -370,7 +375,7 @@ public class CompatRemapperTest {
     @Test
     public void anInactiveLayersNamesAreLeftForTheComplianceCheck() throws Exception {
         File classes = classesWithApp("classes");
-        assertTrue(new CompatRemapper(classes, Arrays.asList(androidJar(), jdkJar()), null, LOG).run());
+        assertTrue(new CompatRemapper(classes, Arrays.asList(androidJar()), null, LOG).run());
 
         List<String> app = refs(Files.readAllBytes(new File(classes, "com/x/Main.class").toPath()));
         assertTrue(app.toString(), app.contains("javax/swing/JFrame"));
@@ -386,12 +391,11 @@ public class CompatRemapperTest {
         File onClick = tmp.newFile("onclick.txt");
         Files.write(onClick.toPath(), "tapped\nmissing\n".getBytes("UTF-8"));
         File android = androidJar();
-        File jdk = jdkJar();
 
         File direct = classesWithApp("direct");
-        new AndroidRemapper(direct, android, onClick, LOG).withSupportJars(Collections.singletonList(jdk)).run();
+        new AndroidRemapper(direct, android, onClick, LOG).run();
         File generic = classesWithApp("generic");
-        assertTrue(new CompatRemapper(generic, Arrays.asList(android, jdk), onClick, LOG).run());
+        assertTrue(new CompatRemapper(generic, Collections.singletonList(android), onClick, LOG).run());
 
         assertSameTree(snapshot(direct), snapshot(generic));
     }
@@ -412,7 +416,7 @@ public class CompatRemapperTest {
         File classes = tmp.newFolder("classes");
         assertTrue(new File(classes, "com/x").mkdirs());
         Files.write(new File(classes, "com/x/Main.class").toPath(), swingOnlyClass("com/x/Main"));
-        List<File> classpath = Arrays.asList(swingJar(), javafxJar(), jdkJar());
+        List<File> classpath = Arrays.asList(swingJar(), javafxJar());
 
         CompatRemapper remapper = new CompatRemapper(classes, classpath, null, LOG);
         assertEquals(Collections.singletonList(CompatLayers.SWING), remapper.activeLayers());
@@ -438,7 +442,7 @@ public class CompatRemapperTest {
         Files.write(new File(classes, "com/x/Plain.class").toPath(), emptyClass("com/x/Plain", "java/lang/Object"));
         Map<String, byte[]> before = snapshot(classes);
 
-        CompatRemapper remapper = new CompatRemapper(classes, Arrays.asList(swingJar(), javafxJar(), jdkJar()),
+        CompatRemapper remapper = new CompatRemapper(classes, Arrays.asList(swingJar(), javafxJar()),
                 null, LOG);
         assertTrue(remapper.activeLayers().isEmpty());
         assertFalse(remapper.run());
@@ -459,7 +463,7 @@ public class CompatRemapperTest {
         cw.visitField(Opcodes.ACC_PRIVATE, "stage", "Ljavafx/stage/Stage;", null, null).visitEnd();
         cw.visitEnd();
         Files.write(new File(kotlin, "com/x/View.class").toPath(), cw.toByteArray());
-        List<File> classpath = Arrays.asList(swingJar(), javafxJar(), jdkJar());
+        List<File> classpath = Arrays.asList(swingJar(), javafxJar());
 
         CompatRemapper remapper = new CompatRemapper(classes, classpath, null, LOG)
                 .withHandlerDirectories(Collections.singletonList(kotlin));
@@ -485,7 +489,7 @@ public class CompatRemapperTest {
         assertFalse(CompatLayers.activeByPresence(CompatLayers.SWING));
         assertFalse(CompatLayers.activeByPresence(CompatLayers.JAVAFX));
         assertEquals(Collections.singletonList(AndroidRemapper.RELOCATION),
-                CompatLayers.active(Arrays.asList(androidJar(), swingJar(), javafxJar(), jdkJar()),
+                CompatLayers.active(Arrays.asList(androidJar(), swingJar(), javafxJar()),
                         Collections.singletonList(classes)));
     }
 
@@ -502,7 +506,7 @@ public class CompatRemapperTest {
     @Test
     public void relocateOnlyShipsNoRuntime() throws Exception {
         File classes = classesWithApp("classes");
-        assertTrue(new CompatRemapper(classes, Arrays.asList(swingJar(), javafxJar(), jdkJar()), null, LOG)
+        assertTrue(new CompatRemapper(classes, Arrays.asList(swingJar(), javafxJar()), null, LOG)
                 .relocateOnly().run());
 
         List<String> app = refs(Files.readAllBytes(new File(classes, "com/x/Main.class").toPath()));

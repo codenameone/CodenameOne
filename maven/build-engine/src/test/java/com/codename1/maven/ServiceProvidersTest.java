@@ -137,7 +137,7 @@ public class ServiceProvidersTest {
             scratch = tmp.newFolder("jars");
         }
         return new ArrayList<File>(Arrays.asList(RealCompatJars.swing(scratch), RealCompatJars.javafx(scratch),
-                RealCompatJars.jdk(scratch), RealCompatJars.core(scratch)));
+                RealCompatJars.core(scratch)));
     }
 
     /// The library: a service, the class that loads it, and providers of
@@ -191,10 +191,13 @@ public class ServiceProvidersTest {
             classes.toURI().toURL(),
             RealCompatJars.jar("codenameone-compat-testing", scratch).toURI().toURL(),
             RealCompatJars.core(scratch).toURI().toURL(),
+            RealCompatJars.jdkHost(scratch).toURI().toURL(),
         };
         URLClassLoader loader = new URLClassLoader(urls, ClassLoader.getSystemClassLoader().getParent());
         try {
             loader.loadClass("com.codename1.compat.testing.HeadlessImplementation").getMethod("install").invoke(null);
+            // What the application's lifecycle does first.
+            loader.loadClass(ApplicationRegistry.NAME.replace('/', '.')).getMethod("cn1Install").invoke(null);
             return (String) loader.loadClass("com.acme.swingapp.Main").getMethod("report").invoke(null);
         } catch (InvocationTargetException e) {
             Throwable cause = e.getCause();
@@ -274,11 +277,11 @@ public class ServiceProvidersTest {
         assertEquals(expected, report(classes));
 
         // A second build over the same directory changes nothing.
-        byte[] registry = Files.readAllBytes(new File(classes, CompatResources.REGISTRY + ".class").toPath());
+        byte[] registry = Files.readAllBytes(new File(classes, ApplicationRegistry.NAME + ".class").toPath());
         logged.clear();
         assertTrue(remapper(classes, resources, lib).run());
         assertArrayEquals(registry,
-                Files.readAllBytes(new File(classes, CompatResources.REGISTRY + ".class").toPath()));
+                Files.readAllBytes(new File(classes, ApplicationRegistry.NAME + ".class").toPath()));
         assertTrue(new File(classes, "org__codecs__table.txt").isFile());
         assertFalse(new File(classes, "org/codecs/table.txt").exists());
         assertEquals(expected, report(classes));
@@ -313,30 +316,5 @@ public class ServiceProvidersTest {
                 + "ServiceLoader will not offer it on a device."), logged);
         new BytecodeCompliance(RealCompatJars.host(classes, tmp.newFolder(), scratch)).execute();
         assertEquals("false", report(classes));
-    }
-
-    /// The registry itself: a provider's number is its place in the list,
-    /// and the two factory methods answer for exactly the numbers given.
-    @Test
-    public void theRegistryCreatesEachProviderByItsNumber() throws Exception {
-        List<String[]> services = new ArrayList<String[]>();
-        services.add(new String[] {"java.lang.CharSequence", "java/lang/StringBuilder"});
-        services.add(new String[] {"java.lang.Object", "java/util/ArrayList"});
-        byte[] registry = CompatResources.registry(new ArrayList<String>(),
-                new java.util.TreeMap<String, String>(), new ArrayList<String>(), services)
-                .get(CompatResources.REGISTRY);
-        // Defined ahead of the placeholder of the same name on this class path.
-        Class<?> generated = new CompatFixtures.Defining(getClass().getClassLoader()).define(registry);
-        Object factory = generated.getConstructor().newInstance();
-        assertTrue(factory instanceof com.codename1.compat.jdk.ServiceLoader.Cn1Factory);
-        com.codename1.compat.jdk.ServiceLoader.Cn1Factory f = (com.codename1.compat.jdk.ServiceLoader.Cn1Factory) factory;
-        assertEquals(StringBuilder.class, f.cn1ServiceType(0));
-        assertEquals(ArrayList.class, f.cn1ServiceType(1));
-        assertEquals(null, f.cn1ServiceType(2));
-        assertEquals(null, f.cn1ServiceType(-1));
-        assertTrue(f.cn1CreateService(0) instanceof StringBuilder);
-        assertTrue(f.cn1CreateService(1) instanceof ArrayList);
-        assertTrue(f.cn1CreateService(1) != f.cn1CreateService(1));
-        assertEquals(null, f.cn1CreateService(2));
     }
 }

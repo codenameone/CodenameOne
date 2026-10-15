@@ -1389,7 +1389,7 @@ public class BytecodeCompliance {
                     // A runtime authored under the names it ships with (the
                     // Swing layer's) keeps its name through relocation. It is
                     // then one class, not two, and the relocated reading is
-                    // the one to keep: its members name the JDK classes the
+                    // the one to keep: its members name the classes the
                     // device has, as the application's relocated calls do.
                     if (metadata != null && (moved == null || !metadata.name.equals(moved.name))) {
                         index.putIfAbsent(metadata.name, metadata);
@@ -2240,11 +2240,9 @@ public class BytecodeCompliance {
         /// under: the name the application was compiled against.
         private String originalName(String internalName) {
             String original = layerNames.original(internalName);
-            if (original.startsWith(Relocation.JDK_PACKAGE) || original.startsWith(Relocation.OSGI_PACKAGE)) {
-                for (String[] shim : Relocation.JDK_SHIMS) {
-                    if (shim[1].equals(original)) {
-                        return shim[0];
-                    }
+            for (String[] shim : Relocation.JDK_SHIMS) {
+                if (shim[1].equals(original)) {
+                    return shim[0];
                 }
             }
             return original;

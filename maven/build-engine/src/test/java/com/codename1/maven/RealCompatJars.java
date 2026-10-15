@@ -34,8 +34,7 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
 /// The jars a desktop application is really built against -- the layers'
-/// runtimes, the shared JDK classes, the framework and the device's class
-/// library -- as this module's test classpath holds them.
+/// runtimes, the framework and the device's class library -- as this module's test classpath holds them.
 ///
 /// A test that compiles a fixture against these and remaps it sees what a
 /// project's build sees, where the other tests use a runtime of three
@@ -119,12 +118,49 @@ final class RealCompatJars {
         return jar(CompatLayers.JAVAFX.artifactId(), scratch);
     }
 
-    static File jdk(File scratch) throws IOException {
-        return jar(Relocation.JDK_ARTIFACT, scratch);
-    }
-
     static File core(File scratch) throws IOException {
         return jar("codenameone-core", scratch);
+    }
+
+    /// `com.codename1.impl.JdkHost` alone, out of the device's class library:
+    /// what the JavaSE and Android ports carry a copy of, and the generated
+    /// registry implements an interface of. A loader that runs an application
+    /// on this JVM with the framework but no port puts it beside the core,
+    /// where the rest of the class library is the JDK's own.
+    static File jdkHost(File scratch) throws IOException {
+        File out = new File(scratch, "jdk-host-0.jar");
+        if (out.isFile()) {
+            return out;
+        }
+        java.util.zip.ZipFile runtime = new java.util.zip.ZipFile(jar("java-runtime", scratch));
+        try {
+            JarOutputStream host = new JarOutputStream(new FileOutputStream(out));
+            try {
+                java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = runtime.entries();
+                while (entries.hasMoreElements()) {
+                    java.util.zip.ZipEntry e = entries.nextElement();
+                    String name = e.getName();
+                    if (name.startsWith("com/codename1/impl/JdkHost") && name.endsWith(".class")) {
+                        host.putNextEntry(new JarEntry(name));
+                        java.io.InputStream in = runtime.getInputStream(e);
+                        try {
+                            byte[] buf = new byte[8192];
+                            for (int n = in.read(buf); n > 0; n = in.read(buf)) {
+                                host.write(buf, 0, n);
+                            }
+                        } finally {
+                            in.close();
+                        }
+                        host.closeEntry();
+                    }
+                }
+            } finally {
+                host.close();
+            }
+        } finally {
+            runtime.close();
+        }
+        return out;
     }
 
     /// A project host whose dependencies are the real jars, scoped as the
@@ -139,7 +175,6 @@ final class RealCompatJars {
         add(host, "codenameone-core", "provided", core(scratch));
         add(host, CompatLayers.SWING.artifactId(), "provided", swing(scratch));
         add(host, CompatLayers.JAVAFX.artifactId(), "provided", javafx(scratch));
-        add(host, Relocation.JDK_ARTIFACT, "provided", jdk(scratch));
         return host;
     }
 

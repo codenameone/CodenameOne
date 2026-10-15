@@ -102,7 +102,6 @@ public final class AndroidRemapper {
     private final Log log;
     private boolean shipRuntime = true;
     private final List<File> handlerDirs = new ArrayList<File>();
-    private final List<File> supportJars = new ArrayList<File>();
     private ClassRelocator relocator = ANDROID;
     private List<String> applicationClasses = new ArrayList<String>();
 
@@ -127,19 +126,6 @@ public final class AndroidRemapper {
             for (File d : dirs) {
                 if (d != null && d.isDirectory() && !d.equals(classesDir)) {
                     handlerDirs.add(d);
-                }
-            }
-        }
-        return this;
-    }
-
-    /// Jars the runtime needs beside it in the application -- the shared JDK
-    /// classes ([Relocation#JDK_ARTIFACT]) -- extracted the way the runtime is.
-    public AndroidRemapper withSupportJars(List<File> jars) {
-        if (jars != null) {
-            for (File j : jars) {
-                if (j != null && j.isFile()) {
-                    supportJars.add(j);
                 }
             }
         }
@@ -179,9 +165,6 @@ public final class AndroidRemapper {
                 return;
             }
             int runtime = relocator.extractRuntime(compatJar, classesDir);
-            for (File jar : supportJars) {
-                runtime += relocator.extractRuntime(jar, classesDir);
-            }
             int handlers = writeOnClickDispatch(appClasses);
             int fragments = writeFragmentFactory();
             int viewModels = writeViewModelFactory();

@@ -62,7 +62,7 @@ public class ComplianceAlternativesTest {
         File scratch = tmp.newFolder();
         Map<String, Set<String>> out = new HashMap<String, Set<String>>();
         for (File jar : new File[] {RealCompatJars.core(scratch), RealCompatJars.jar("java-runtime", scratch),
-            RealCompatJars.swing(scratch), RealCompatJars.javafx(scratch), RealCompatJars.jdk(scratch)}) {
+            RealCompatJars.swing(scratch), RealCompatJars.javafx(scratch)}) {
             ZipFile zip = new ZipFile(jar);
             try {
                 java.util.Enumeration<? extends ZipEntry> entries = zip.entries();

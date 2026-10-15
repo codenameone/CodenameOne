@@ -109,7 +109,7 @@ public class JavaFxGallerySampleTest {
     /// Compiles and remaps the sample; answers the classes directory.
     private File build() throws Exception {
         scratch = tmp.newFolder("jars");
-        List<File> cp = Arrays.asList(RealCompatJars.javafx(scratch), RealCompatJars.jdk(scratch),
+        List<File> cp = Arrays.asList(RealCompatJars.javafx(scratch),
                 RealCompatJars.core(scratch));
 
         // prepare-desktop-sources.
@@ -182,6 +182,7 @@ public class JavaFxGallerySampleTest {
             classes.toURI().toURL(),
             RealCompatJars.jar("codenameone-compat-testing", scratch).toURI().toURL(),
             RealCompatJars.core(scratch).toURI().toURL(),
+            RealCompatJars.jdkHost(scratch).toURI().toURL(),
         };
         final URLClassLoader loader = new URLClassLoader(urls, ClassLoader.getSystemClassLoader().getParent());
         try {
