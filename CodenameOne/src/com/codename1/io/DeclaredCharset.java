@@ -54,7 +54,7 @@ import java.util.Hashtable;
 /// and other parameters are dropped. A media type with no `charset`
 /// parameter declares nothing, and is read as UTF-8 without a log line.
 public final class DeclaredCharset {
-    private static final String CHARSET_PARAMETER = "charset=";
+    private static final String CHARSET_PARAMETER = "charset";
 
     // The names already logged, so a feed polled every minute logs its
     // unsupported label once rather than once a minute. Bounded, because the
@@ -79,32 +79,111 @@ public final class DeclaredCharset {
         if (declared == null) {
             return null;
         }
-        int start = indexOfIgnoreCase(declared, CHARSET_PARAMETER);
-        if (start >= 0) {
-            start += CHARSET_PARAMETER.length();
-        } else if (declared.indexOf('/') >= 0) {
-            // A media type without a charset parameter: it names no charset.
-            return null;
+        // The declaration is parsed into its parameters rather than searched
+        // for "charset=": a search also matches a parameter whose name merely
+        // ends in charset (`x-charset=windows-1252`) and text inside another
+        // parameter's quoted value (`foo="a;charset=b"`), and either one was
+        // taken as the content charset.
+        int length = declared.length();
+        int first = endOfValue(declared, 0);
+        String head = declared.substring(0, first).trim();
+        int pos;
+        String bare = null;
+        if (head.indexOf('=') >= 0) {
+            // It starts with a parameter (`charset=utf-8; foo`): parse it as one.
+            pos = 0;
         } else {
-            start = 0;
-        }
-        int end = declared.length();
-        for (int i = start; i < end; i++) {
-            char c = declared.charAt(i);
-            if (c == ';' || c == ',') {
-                end = i;
-                break;
+            if (head.indexOf('/') < 0) {
+                // A bare name (`ISO-8859-1`, `'koi8-r'`), unless a charset
+                // parameter follows it.
+                bare = head;
             }
+            pos = first < length ? first + 1 : length;
         }
-        String name = declared.substring(start, end).trim();
+        while (pos < length) {
+            int eq = pos;
+            while (eq < length && declared.charAt(eq) != '=' && !isDelimiter(declared.charAt(eq))) {
+                eq++;
+            }
+            if (eq >= length || declared.charAt(eq) != '=') {
+                // A parameter without a value names nothing.
+                pos = eq + 1;
+                continue;
+            }
+            boolean charset = isCharsetName(declared, pos, eq);
+            int valueStart = eq + 1;
+            int valueEnd = endOfValue(declared, valueStart);
+            if (charset) {
+                return unquote(declared.substring(valueStart, valueEnd));
+            }
+            pos = valueEnd + 1;
+        }
+        return bare == null ? null : unquote(bare);
+    }
+
+    // The parameter name between from and to, with its surrounding white
+    // space, is exactly "charset". regionMatches compares without case and
+    // without the device's locale, which toLowerCase would bring in.
+    private static boolean isCharsetName(String s, int from, int to) {
+        while (from < to && s.charAt(from) <= ' ') {
+            from++;
+        }
+        while (to > from && s.charAt(to - 1) <= ' ') {
+            to--;
+        }
+        return to - from == CHARSET_PARAMETER.length()
+                && s.regionMatches(true, from, CHARSET_PARAMETER, 0, CHARSET_PARAMETER.length());
+    }
+
+    private static boolean isDelimiter(char c) {
+        return c == ';' || c == ',';
+    }
+
+    // Where the value starting at from ends: at the first delimiter that is
+    // not inside a quoted string. A quote opens a string only where the value
+    // begins, as in a header; an escaped character inside double quotes is
+    // skipped, so `\"` does not close it. An unclosed string runs to the end.
+    private static int endOfValue(String s, int from) {
+        int length = s.length();
+        int i = from;
+        while (i < length && s.charAt(i) <= ' ') {
+            i++;
+        }
+        if (i < length && (s.charAt(i) == '"' || s.charAt(i) == '\'')) {
+            char quote = s.charAt(i);
+            i++;
+            while (i < length && s.charAt(i) != quote) {
+                if (quote == '"' && s.charAt(i) == '\\') {
+                    i++;
+                }
+                i++;
+            }
+            i++;
+        }
+        while (i < length && !isDelimiter(s.charAt(i))) {
+            i++;
+        }
+        return i < length ? i : length;
+    }
+
+    // The value with its white space and surrounding quotes removed, and the
+    // escapes of a double quoted string resolved; null when nothing is left.
+    private static String unquote(String value) {
+        String name = value.trim();
         if (name.length() > 0 && (name.charAt(0) == '"' || name.charAt(0) == '\'')) {
             char quote = name.charAt(0);
-            name = name.substring(1);
-            int close = name.indexOf(quote);
-            if (close >= 0) {
-                name = name.substring(0, close);
+            StringBuilder sb = new StringBuilder();
+            for (int i = 1; i < name.length(); i++) {
+                char c = name.charAt(i);
+                if (c == quote) {
+                    break;
+                }
+                if (quote == '"' && c == '\\' && i + 1 < name.length()) {
+                    c = name.charAt(++i);
+                }
+                sb.append(c);
             }
-            name = name.trim();
+            name = sb.toString().trim();
         }
         return name.length() == 0 ? null : name;
     }
@@ -170,17 +249,5 @@ public final class DeclaredCharset {
         LOGGED.put(name, name);
         Log.p("The data declares the charset \"" + name
                 + "\", which this platform does not support; using UTF-8 instead", Log.WARNING);
-    }
-
-    // regionMatches compares without case and without the device's locale,
-    // which toLowerCase would bring in.
-    private static int indexOfIgnoreCase(String s, String part) {
-        int last = s.length() - part.length();
-        for (int i = 0; i <= last; i++) {
-            if (s.regionMatches(true, i, part, 0, part.length())) {
-                return i;
-            }
-        }
-        return -1;
     }
 }

@@ -71,6 +71,31 @@ class DeclaredCharsetTest extends UITestBase {
     }
 
     @FormTest
+    void onlyAParameterNamedCharsetDeclaresOne() {
+        // A parameter whose name merely ends in charset is someone else's.
+        assertNull(DeclaredCharset.name("text/xml; x-charset=windows-1252"));
+        assertEquals("UTF-8", DeclaredCharset.name("text/xml; x-charset=windows-1252; charset=UTF-8"));
+        assertNull(DeclaredCharset.name("x-charset=windows-1252"));
+        assertNull(DeclaredCharset.name("text/xml; mycharset=\"koi8-r\""));
+        // Nor is text inside another parameter's quoted value.
+        assertNull(DeclaredCharset.name("text/xml; foo=\"a;charset=koi8-r\""));
+        assertEquals("UTF-8", DeclaredCharset.name("text/xml; foo=\"a;charset=koi8-r\"; charset=UTF-8"));
+        assertEquals("UTF-8", DeclaredCharset.name("text/xml; foo=\"x\\\"; charset=koi8-r\"; charset=UTF-8"));
+        // White space around the name and the equals sign is allowed.
+        assertEquals("UTF-8", DeclaredCharset.name("text/xml;  charset = UTF-8 ;x=y"));
+        assertEquals("UTF-8", DeclaredCharset.name("text/xml; flag; charset=UTF-8"));
+        assertEquals("utf-8", DeclaredCharset.name("utf-8; x-charset=koi8-r"));
+    }
+
+    @FormTest
+    void anExtensionParameterDoesNotChangeTheDecoding() throws Exception {
+        byte[] utf8 = EURO_QUOTED.getBytes("UTF-8");
+        Reader r = DeclaredCharset.reader(new ByteArrayInputStream(utf8),
+                "text/xml; x-charset=windows-1252");
+        assertEquals(EURO_QUOTED, readAll(r));
+    }
+
+    @FormTest
     void aSupportedDeclarationIsHonoured() throws Exception {
         Reader r = DeclaredCharset.reader(new ByteArrayInputStream(EURO_QUOTED_1252),
                 "text/html; charset=\"windows-1252\"");
