@@ -99,8 +99,9 @@ import java.util.TreeSet;
 /// from its name, so `ServiceLoader` is answered from the registry as well.
 /// Every `META-INF/services/<service>` file among the application's
 /// resources, and every one a bundled library has for a service the
-/// application reaches, is read here -- by the runtime's own
-/// `ServiceLoader.cn1ProviderNames`, so the two agree on what a line means --
+/// application reaches, is read here -- by `ServiceProviderNames`, the rule
+/// the runtime's own `ServiceLoader` applies, so the two agree on what a line
+/// means --
 /// and each provider it lists is registered under the service's name with a
 /// number the registry's `cn1CreateService` turns into a `new`. The
 /// application's files come first, then the libraries' in the order they
@@ -190,7 +191,7 @@ final class CompatResources {
                 String text = new String(Files.readAllBytes((built.isFile() ? built : e.getValue()).toPath()),
                         "UTF-8");
                 String service = path.substring(DependencyClassifier.SERVICES.length());
-                for (String provider : com.codename1.compat.jdk.ServiceLoader.cn1ProviderNames(text, null)) {
+                for (String provider : ServiceProviderNames.of(text, null)) {
                     listed.add(new String[] {path, service, provider});
                 }
             }
@@ -225,6 +226,12 @@ final class CompatResources {
         List<String[]> services = services(listed, seen);
         writeRegistry(registry(new ArrayList<String>(resources.keySet()), propertyBundles, bundleClasses,
                 services));
+        // The registry the class library's ResourceBundle and ServiceLoader
+        // read through JdkHost. Generated beside the compat one and installed
+        // by nothing yet: the generated entry points still install the
+        // compat registry, and switch to this one with the compat layer.
+        ApplicationRegistry.write(classesDir, ApplicationRegistry.generate(
+                new ArrayList<String>(resources.keySet()), bundleClasses, services), log);
         log.debug("Shipped " + resources.size() + " desktop resources, " + propertyBundles.size()
                 + " properties bundles, " + bundleClasses.size() + " bundle classes and " + services.size()
                 + " service providers");

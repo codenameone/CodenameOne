@@ -46,7 +46,7 @@
         <javaapi.src.dir>${project.basedir}/../../vm/JavaAPI/src</javaapi.src.dir>
         <!-- The classes renamed under jdkparity/. Each name takes its nested
              classes with it. A slice adds the classes it tests here. -->
-        <jdkparity.relocate>java/util/Optional,java/util/prefs/Preferences,java/util/prefs/BackingStoreException,java/util/logging/Logger,java/util/logging/Level,java/net/URL,java/net/MalformedURLException,java/security/MessageDigest,java/security/SecureRandom,java/security/GeneralSecurityException,java/security/NoSuchAlgorithmException</jdkparity.relocate>
+        <jdkparity.relocate>java/util/Optional,java/util/prefs/Preferences,java/util/prefs/BackingStoreException,java/util/logging/Logger,java/util/logging/Level,java/net/URL,java/net/MalformedURLException,java/security/MessageDigest,java/security/SecureRandom,java/security/GeneralSecurityException,java/security/NoSuchAlgorithmException,java/util/ResourceBundle,java/util/PropertyResourceBundle,java/util/ListResourceBundle,java/util/MissingResourceException,java/util/ServiceLoader,java/util/ServiceConfigurationError</jdkparity.relocate>
     </properties>
 
     <dependencies>

@@ -301,13 +301,12 @@ public class CoreJdkHost extends JdkHost {
         }
     }
 
+    /// Through `com.codename1.impl.compat.Resources`, which knows the flat
+    /// name a nested resource ships under and the index the generated
+    /// registry recorded.
     @Override
     public InputStream resource(String name) {
-        String absolute = name.startsWith("/") ? name : "/" + name;
-        if (Display.isInitialized()) {
-            return Display.getInstance().getResourceAsStream(CoreJdkHost.class, absolute);
-        }
-        return CoreJdkHost.class.getResourceAsStream(absolute);
+        return com.codename1.impl.compat.Resources.open(name);
     }
 
     /// Derived from what `L10NManager` formats, since it exposes the

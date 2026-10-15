@@ -1713,7 +1713,7 @@ public class BytecodeCompliance {
         /// neither a layer's runtime nor a library unpacked beside it.
         private boolean isApplicationClass() {
             return className != null && !CompatLayers.isExtractedRuntime(className)
-                    && !libraryOrigins.containsKey(className);
+                    && !libraryOrigins.containsKey(className) && !ApplicationRegistry.isGenerated(className);
         }
 
         /// Counts one reference of the application into a layer.

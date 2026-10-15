@@ -349,6 +349,10 @@ public final class CompatRemapper {
                 runtime += relocator.extractRuntime(CompatLayers.runtimeJar(layer, classpath), classesDir);
                 names.append(names.length() == 0 ? "" : ", ").append(layer.name());
             }
+            // The registry an earlier run generated is not the application's:
+            // read as one, its class literals would change what this run
+            // generates from them, and a second run would not be a no-op.
+            ApplicationRegistry.removeGenerated(appClasses);
             List<String> unmodifiable = Collections.unmodifiableList(appClasses);
             if (isActive(CompatLayers.SWING)) {
                 generateSwingResources(unmodifiable);

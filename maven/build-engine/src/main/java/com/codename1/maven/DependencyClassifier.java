@@ -369,9 +369,9 @@ public final class DependencyClassifier {
                     InputStream in = zip.getInputStream(e);
                     try {
                         // Read as the runtime's ServiceLoader reads one: comments,
-                        // blank lines and repeats dropped, by the same method.
-                        lib.services.put(name.substring(SERVICES.length()), com.codename1.compat.jdk.ServiceLoader
-                                .cn1ProviderNames(new String(readAll(in), StandardCharsets.UTF_8), null));
+                        // blank lines and repeats dropped, by the same rule.
+                        lib.services.put(name.substring(SERVICES.length()), ServiceProviderNames
+                                .of(new String(readAll(in), StandardCharsets.UTF_8), null));
                     } finally {
                         in.close();
                     }

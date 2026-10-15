@@ -283,6 +283,14 @@ public abstract class JdkHost {
         return r == null ? null : r.newInstance(className);
     }
 
+    /// The class of the application class `className`, as the [Registry]
+    /// knows it, so that its type can be tested without creating one; null
+    /// when it does not know the class.
+    public Class<?> type(String className) {
+        Registry r = registry;
+        return r == null ? null : r.type(className);
+    }
+
     /// The decimal separator, grouping separator and currency symbol of the
     /// device's locale, any of them null when unknown; or null when the
     /// platform cannot tell.
@@ -349,13 +357,18 @@ public abstract class JdkHost {
     }
 
     /// What an application declares for `java.util.ServiceLoader` and
-    /// `java.util.ResourceBundle`, generated with the application.
+    /// `java.util.ResourceBundle`, generated with the application. Once one
+    /// is installed it is the whole answer: the class library creates no
+    /// class from its name and reads no services file.
     public interface Registry {
         /// The provider class names declared for `service`, or null.
         String[] providers(String service);
 
         /// A new instance of `className`, or null.
         Object newInstance(String className);
+
+        /// The class `className`, or null when the registry does not know it.
+        Class<?> type(String className);
     }
 
     /// The host [#get] answers when none was installed.
