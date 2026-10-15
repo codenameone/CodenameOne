@@ -28,6 +28,9 @@ public class JsFileIoProgram {
     public static int result;
 
     public static void main(String[] args) throws Exception {
+        // A program translated without Codename One brings its own file
+        // system; without it java.io.File sees an empty one.
+        com.codename1.impl.JdkHost.install(new com.codename1.impl.PosixJdkHost());
         int mask = 0;
         File root = new File(args[0]);
         File dir = new File(root, "a/b");

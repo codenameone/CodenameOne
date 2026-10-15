@@ -46,6 +46,46 @@ public class PrintWriter extends Writer {
         this(utf8(out), autoFlush);
     }
 
+    /// Writes to the file `fileName` in UTF-8, creating it or truncating it.
+    public PrintWriter(String fileName) throws FileNotFoundException {
+        this(new BufferedWriter(utf8(new FileOutputStream(fileName))), false);
+    }
+
+    /// Writes to the file `fileName` in the charset `csn`.
+    public PrintWriter(String fileName, String csn) throws FileNotFoundException, UnsupportedEncodingException {
+        this(encoded(new File(fileName), csn), false);
+    }
+
+    /// Writes to the file `fileName` in the charset `cs`.
+    public PrintWriter(String fileName, java.nio.charset.Charset cs) throws IOException {
+        this(encoded(new File(fileName), cs.name()), false);
+    }
+
+    /// Writes to `file` in UTF-8, creating it or truncating it.
+    public PrintWriter(File file) throws FileNotFoundException {
+        this(new BufferedWriter(utf8(new FileOutputStream(file))), false);
+    }
+
+    /// Writes to `file` in the charset `csn`.
+    public PrintWriter(File file, String csn) throws FileNotFoundException, UnsupportedEncodingException {
+        this(encoded(file, csn), false);
+    }
+
+    /// Writes to `file` in the charset `cs`.
+    public PrintWriter(File file, java.nio.charset.Charset cs) throws IOException {
+        this(encoded(file, cs.name()), false);
+    }
+
+    /// Checks the charset before the file is opened, so an unknown name
+    /// leaves the file as it was, as the JDK does.
+    private static Writer encoded(File file, String csn) throws FileNotFoundException, UnsupportedEncodingException {
+        if (csn == null) {
+            throw new NullPointerException("charsetName");
+        }
+        "".getBytes(csn);
+        return new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file), csn));
+    }
+
     private static Writer utf8(OutputStream out) {
         try {
             return new OutputStreamWriter(out, "UTF-8");

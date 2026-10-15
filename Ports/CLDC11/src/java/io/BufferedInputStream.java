@@ -109,6 +109,9 @@ public class BufferedInputStream extends FilterInputStream {
         return buf[pos++] & 0xff;
     }
 
+    /// Reads as the JDK does: on past the buffer while the stream underneath
+    /// has bytes available without blocking, so a small buffer does not make
+    /// every read a short one.
     @Override
     public int read(byte[] b, int off, int len) throws IOException {
         ensureOpen();
@@ -118,6 +121,24 @@ public class BufferedInputStream extends FilterInputStream {
         if (len == 0) {
             return 0;
         }
+        int total = 0;
+        while (true) {
+            int n = readOnce(b, off + total, len - total);
+            if (n <= 0) {
+                return total == 0 ? n : total;
+            }
+            total += n;
+            if (total >= len) {
+                return total;
+            }
+            InputStream input = in;
+            if (input != null && input.available() <= 0) {
+                return total;
+            }
+        }
+    }
+
+    private int readOnce(byte[] b, int off, int len) throws IOException {
         int avail = count - pos;
         if (avail <= 0) {
             if (len >= buf.length && markpos < 0) {

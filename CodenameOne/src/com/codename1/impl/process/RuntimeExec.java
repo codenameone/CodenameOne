@@ -24,6 +24,7 @@ package com.codename1.impl.process;
 
 import com.codename1.io.Process;
 import com.codename1.io.ProcessBuilder;
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,10 +38,7 @@ import java.util.Map;
 /// method does what the JavaSE overload of the same parameters does: a
 /// command string is split at whitespace with no quoting (a shell is never
 /// implied), and an environment array, when not null, replaces the inherited
-/// environment entirely.
-///
-/// The overloads that take a working directory are absent: their parameter is
-/// a `java.io.File`, which the device runtime does not have.
+/// environment entirely, and a null working directory inherits the parent's.
 /// @hidden
 public final class RuntimeExec {
     private RuntimeExec() {
@@ -53,13 +51,18 @@ public final class RuntimeExec {
 
     /// `Runtime.exec(String, String[])`.
     public static Process exec(Runtime runtime, String command, String[] envp) throws IOException {
+        return exec(runtime, command, envp, null);
+    }
+
+    /// `Runtime.exec(String, String[], File)`.
+    public static Process exec(Runtime runtime, String command, String[] envp, File dir) throws IOException {
         if (command == null) {
             throw new NullPointerException("command");
         }
         if (command.length() == 0) {
             throw new IllegalArgumentException("Empty command");
         }
-        return exec(runtime, split(command), envp);
+        return exec(runtime, split(command), envp, dir);
     }
 
     /// `Runtime.exec(String[])`.
@@ -69,6 +72,11 @@ public final class RuntimeExec {
 
     /// `Runtime.exec(String[], String[])`.
     public static Process exec(Runtime runtime, String[] cmdarray, String[] envp) throws IOException {
+        return exec(runtime, cmdarray, envp, null);
+    }
+
+    /// `Runtime.exec(String[], String[], File)`.
+    public static Process exec(Runtime runtime, String[] cmdarray, String[] envp, File dir) throws IOException {
         if (runtime == null) {
             // What calling exec on a null Runtime throws.
             throw new NullPointerException("runtime");
@@ -95,6 +103,7 @@ public final class RuntimeExec {
                 }
             }
         }
+        builder.directory(dir);
         return builder.start();
     }
 

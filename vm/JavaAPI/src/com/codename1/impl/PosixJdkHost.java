@@ -22,75 +22,141 @@
  */
 package com.codename1.impl;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.PosixFileAccess;
 
 /// The [JdkHost] of a program translated without Codename One -- the
 /// self-hosted translator, the backend, a VM test -- over the native file
 /// system.
 ///
-/// It reaches the file natives through `java.io.File` and the file streams,
-/// whose behaviour it leaves exactly as it is. Only such a program installs
-/// it: an application never names this class, so the translator's
-/// reachability keeps those natives out of watch, TV and JavaScript builds,
-/// which do not link them. Installed with
-/// `JdkHost.install(new PosixJdkHost())` from the program's own start-up.
+/// It reaches the file natives through `java.io.PosixFileAccess`, never
+/// through `java.io.File` or the file streams, which themselves go through
+/// the installed host. Only such a program installs it: an application never
+/// names this class, so the translator's reachability keeps those natives out
+/// of watch, TV and JavaScript builds, which do not link them. Installed with
+/// `JdkHost.install(new PosixJdkHost())` from the program's own start-up;
+/// without it `java.io.File` sees the empty file system of the defaults.
 ///
 /// Preferences stay the in-memory defaults; a program that needs them kept
 /// stores them itself.
 public class PosixJdkHost extends JdkHost {
     @Override
     public FileStat fileStat(String path) {
-        File f = new File(path);
-        if (!f.exists()) {
+        if (!PosixFileAccess.exists(path)) {
             return null;
         }
-        boolean directory = f.isDirectory();
-        return new FileStat(directory, directory ? 0L : f.length(), f.lastModified());
+        boolean directory = PosixFileAccess.isDirectory(path);
+        return new FileStat(directory, directory ? 0L : PosixFileAccess.length(path),
+                PosixFileAccess.lastModified(path));
     }
 
     @Override
     public String[] fileList(String path) throws IOException {
-        File f = new File(path);
-        return f.isDirectory() ? f.list() : null;
+        return PosixFileAccess.isDirectory(path) ? PosixFileAccess.list(path) : null;
     }
 
     @Override
     public InputStream fileRead(String path) throws IOException {
-        return new FileInputStream(path);
+        if (PosixFileAccess.isDirectory(path)) {
+            throw new FileNotFoundException(path + " (Is a directory)");
+        }
+        return PosixFileAccess.openRead(path);
     }
 
     @Override
     public OutputStream fileWrite(String path, boolean append) throws IOException {
-        return new FileOutputStream(path, append);
+        if (PosixFileAccess.isDirectory(path)) {
+            throw new FileNotFoundException(path + " (Is a directory)");
+        }
+        return PosixFileAccess.openWrite(path, append);
     }
 
     @Override
     public boolean fileMkdir(String path) {
-        return new File(path).mkdir();
+        return PosixFileAccess.mkdir(path);
     }
 
     @Override
     public boolean fileDelete(String path) {
-        return new File(path).delete();
+        return PosixFileAccess.delete(path);
     }
 
     @Override
     public boolean fileRename(String from, String to) {
-        File dest = new File(to);
         // rename(2) replaces an existing destination; this contract does not.
-        return !dest.exists() && new File(from).renameTo(dest);
+        return !PosixFileAccess.exists(to) && PosixFileAccess.rename(from, to);
+    }
+
+    @Override
+    public boolean fileReplace(String from, String to) {
+        return PosixFileAccess.rename(from, to);
+    }
+
+    @Override
+    public boolean fileTest(String path, int what) {
+        switch (what) {
+            case FILE_EXISTS:
+                return PosixFileAccess.exists(path);
+            case FILE_DIRECTORY:
+                return PosixFileAccess.isDirectory(path);
+            case FILE_REGULAR:
+                return PosixFileAccess.isFile(path);
+            case FILE_READABLE:
+                return PosixFileAccess.canRead(path);
+            case FILE_WRITABLE:
+                return PosixFileAccess.canWrite(path);
+            case FILE_EXECUTABLE:
+                return PosixFileAccess.canExecute(path);
+            case FILE_HIDDEN:
+                return PosixFileAccess.isHidden(path);
+            default:
+                return false;
+        }
+    }
+
+    @Override
+    public boolean fileSet(String path, int what, boolean on) {
+        switch (what) {
+            case FILE_READABLE:
+                return PosixFileAccess.setReadable(path, on);
+            case FILE_WRITABLE:
+                return PosixFileAccess.setWritable(path, on);
+            case FILE_EXECUTABLE:
+                return PosixFileAccess.setExecutable(path, on);
+            default:
+                return false;
+        }
+    }
+
+    @Override
+    public long fileLength(String path) {
+        return PosixFileAccess.length(path);
+    }
+
+    @Override
+    public long fileLastModified(String path) {
+        return PosixFileAccess.lastModified(path);
+    }
+
+    /// Atomic: the native creates with `O_CREAT | O_EXCL`.
+    @Override
+    public boolean fileCreate(String path) throws IOException {
+        return PosixFileAccess.createNewFile(path);
+    }
+
+    @Override
+    public String fileCanonicalPath(String path) throws IOException {
+        return PosixFileAccess.canonicalPath(path);
     }
 
     @Override
     public String appHome() {
         // The working directory. Resolving "." and dropping the "." keeps it
         // independent of whether a target's native also normalizes the path.
-        String abs = new File(".").getAbsolutePath();
+        String abs = PosixFileAccess.absolutePath(".");
         if (abs.endsWith("/.") || abs.endsWith("\\.")) {
             abs = abs.substring(0, abs.length() - 2);
         }
@@ -113,12 +179,17 @@ public class PosixJdkHost extends JdkHost {
 
     @Override
     public long fileTotalSpace(String path) {
-        return new File(path).getTotalSpace();
+        return PosixFileAccess.totalSpace(path);
     }
 
     @Override
     public long fileUsableSpace(String path) {
-        return new File(path).getUsableSpace();
+        return PosixFileAccess.usableSpace(path);
+    }
+
+    @Override
+    public long fileFreeSpace(String path) {
+        return PosixFileAccess.freeSpace(path);
     }
 
     /// Reads `/dev/urandom`, which every POSIX system the translator and the
@@ -126,7 +197,7 @@ public class PosixJdkHost extends JdkHost {
     @Override
     public void randomBytes(byte[] out) {
         try {
-            InputStream in = new FileInputStream("/dev/urandom");
+            InputStream in = PosixFileAccess.openRead("/dev/urandom");
             try {
                 int off = 0;
                 while (off < out.length) {

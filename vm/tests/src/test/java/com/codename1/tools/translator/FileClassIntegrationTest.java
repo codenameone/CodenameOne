@@ -122,6 +122,8 @@ public class FileClassIntegrationTest {
         return "import java.io.File;\n" +
                "public class FileTestApp {\n" +
                "    public static void main(String[] args) {\n" +
+               "        // Translated without Codename One: the program brings its file system.\n" +
+               "        com.codename1.impl.JdkHost.install(new com.codename1.impl.PosixJdkHost());\n" +
                "        try {\n" +
                "            // Construct string manually to avoid constant pool issues in test env\n" +
                "            char[] pathChars = new char[]{'t','e','s','t','f','i','l','e','.','t','x','t'};\n" +

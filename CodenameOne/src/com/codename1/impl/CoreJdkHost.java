@@ -50,16 +50,33 @@ import java.io.OutputStream;
 /// the Java SE and Android ports carry a copy so this class always has its
 /// superclass.
 ///
-/// Paths are `FileSystemStorage` paths. Nothing here runs before the display
-/// is initialized except what checks for it.
+/// Paths are `FileSystemStorage` paths, or plain absolute paths, which are
+/// taken as `file://` paths: `java.io.File` hands a path over as the
+/// application wrote it. Nothing here runs before the display is initialized
+/// except what checks for it.
 public class CoreJdkHost extends JdkHost {
 
     private static FileSystemStorage fs() {
         return FileSystemStorage.getInstance();
     }
 
+    /// `path` as a `FileSystemStorage` path: `/x` and a drive path `C:/x`
+    /// gain the `file://` scheme; anything with a scheme is left alone.
+    static String storage(String path) {
+        if (path.startsWith("/")) {
+            return "file://" + path;
+        }
+        if (path.length() >= 3 && path.charAt(1) == ':' && path.charAt(2) == '/'
+                && ((path.charAt(0) >= 'A' && path.charAt(0) <= 'Z')
+                || (path.charAt(0) >= 'a' && path.charAt(0) <= 'z'))) {
+            return "file:///" + path;
+        }
+        return path;
+    }
+
     @Override
     public FileStat fileStat(String path) {
+        path = storage(path);
         FileSystemStorage fs = fs();
         if (!fs.exists(path)) {
             return null;
@@ -70,6 +87,7 @@ public class CoreJdkHost extends JdkHost {
 
     @Override
     public String[] fileList(String path) throws IOException {
+        path = storage(path);
         FileSystemStorage fs = fs();
         if (!fs.exists(path) || !fs.isDirectory(path)) {
             return null;
@@ -79,6 +97,7 @@ public class CoreJdkHost extends JdkHost {
 
     @Override
     public InputStream fileRead(String path) throws IOException {
+        path = storage(path);
         FileSystemStorage fs = fs();
         if (!fs.exists(path) || fs.isDirectory(path)) {
             throw new FileNotFoundException(path);
@@ -88,7 +107,11 @@ public class CoreJdkHost extends JdkHost {
 
     @Override
     public OutputStream fileWrite(String path, boolean append) throws IOException {
+        path = storage(path);
         FileSystemStorage fs = fs();
+        if (fs.exists(path) && fs.isDirectory(path)) {
+            throw new FileNotFoundException(path + " (Is a directory)");
+        }
         if (append && fs.exists(path)) {
             long length = fs.getLength(path);
             if (length > Integer.MAX_VALUE) {
@@ -103,8 +126,15 @@ public class CoreJdkHost extends JdkHost {
 
     @Override
     public boolean fileMkdir(String path) {
+        path = storage(path);
         FileSystemStorage fs = fs();
         if (fs.exists(path)) {
+            return false;
+        }
+        // mkdir(2) creates one level; a storage that creates the missing
+        // parents too would make File.mkdir answer true where the JDK does not.
+        String parent = parentOf(path);
+        if (parent != null && !(fs.exists(parent) && fs.isDirectory(parent))) {
             return false;
         }
         fs.mkdir(path);
@@ -113,9 +143,23 @@ public class CoreJdkHost extends JdkHost {
 
     @Override
     public boolean fileDelete(String path) {
+        path = storage(path);
         FileSystemStorage fs = fs();
         if (!fs.exists(path)) {
             return false;
+        }
+        if (fs.isDirectory(path)) {
+            // The JDK deletes only an empty directory; some storages delete
+            // the whole tree.
+            String[] entries;
+            try {
+                entries = fs.listFiles(path);
+            } catch (IOException e) {
+                return false;
+            }
+            if (entries != null && entries.length > 0) {
+                return false;
+            }
         }
         fs.delete(path);
         return !fs.exists(path);
@@ -125,6 +169,8 @@ public class CoreJdkHost extends JdkHost {
     /// a move to another directory answers false and the caller copies.
     @Override
     public boolean fileRename(String from, String to) {
+        from = storage(from);
+        to = storage(to);
         FileSystemStorage fs = fs();
         int fromSlash = lastSeparator(from);
         int toSlash = lastSeparator(to);
@@ -134,6 +180,21 @@ public class CoreJdkHost extends JdkHost {
         }
         fs.rename(from, to.substring(toSlash + 1));
         return fs.exists(to) && !fs.exists(from);
+    }
+
+    /// The parent of the storage path `path`, or null at a root.
+    private static String parentOf(String path) {
+        String p = path;
+        while (p.length() > 1 && p.endsWith("/")) {
+            p = p.substring(0, p.length() - 1);
+        }
+        int slash = lastSeparator(p);
+        if (slash <= 0) {
+            return null;
+        }
+        String parent = p.substring(0, slash);
+        // "file://" itself is no directory: the parent of /x is the root.
+        return parent.endsWith(":/") || parent.endsWith(":") ? parent + "/" : parent;
     }
 
     private static int lastSeparator(String path) {
@@ -160,13 +221,13 @@ public class CoreJdkHost extends JdkHost {
 
     @Override
     public long fileTotalSpace(String path) {
-        String root = rootOf(path);
+        String root = rootOf(storage(path));
         return root == null ? 0L : fs().getRootSizeBytes(root);
     }
 
     @Override
     public long fileUsableSpace(String path) {
-        String root = rootOf(path);
+        String root = rootOf(storage(path));
         return root == null ? 0L : fs().getRootAvailableSpace(root);
     }
 
@@ -183,6 +244,16 @@ public class CoreJdkHost extends JdkHost {
             }
         }
         return best != null ? best : roots[0];
+    }
+
+    @Override
+    public boolean fileTest(String path, int what) {
+        if (what == FILE_HIDDEN) {
+            String p = storage(path);
+            FileSystemStorage fs = fs();
+            return fs.exists(p) && fs.isHidden(p);
+        }
+        return super.fileTest(path, what);
     }
 
     @Override

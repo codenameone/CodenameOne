@@ -24,6 +24,7 @@ package com.codename1.io;
 
 import com.codename1.impl.ImplementationFactory;
 import com.codename1.impl.process.ProcessSupport;
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -31,7 +32,7 @@ import java.util.List;
 import java.util.Map;
 
 /// Creates desktop/backend subprocesses using JavaSE-style command lists and pipes.
-/// The working directory is an OS path String, not a Codename One file URL.
+/// The working directory is a `java.io.File`, as in JavaSE.
 /// Shell parsing is never implicit: invoke a shell explicitly if needed.
 /// Mobile/browser ports compile this API but start() throws
 /// UnsupportedOperationException. Support does not imply permission to run every
@@ -43,16 +44,14 @@ import java.util.Map;
 /// The members shared with `java.lang.ProcessBuilder` have its names and
 /// parameter types, so desktop code compiled against the JavaSE class runs
 /// against this one once its class references are renamed. JavaSE members
-/// with no counterpart: `directory(File)` and `File directory()` (the device
-/// runtime has no `java.io.File`; the String forms here take an OS path),
-/// `inheritIO()`, the `redirectInput`/`redirectOutput`/`redirectError`
+/// with no counterpart: `inheritIO()`, the `redirectInput`/`redirectOutput`/`redirectError`
 /// family with `ProcessBuilder.Redirect` (no port can attach a child's
 /// streams to anything but pipes), and `startPipeline(List)`, which needs
 /// those redirects.
 @com.codename1.impl.SharedWithBackend
 public final class ProcessBuilder {
     private List<String> command;
-    private String directory;
+    private File directory;
     private Map<String, String> environment;
     private boolean mergeError;
 
@@ -92,15 +91,12 @@ public final class ProcessBuilder {
         }
         return this;
     }
-    /// Null inherits the parent's working directory. Paths are native OS paths.
-    public ProcessBuilder directory(String directory) {
-        if (directory != null) {
-            checkString(directory);
-        }
+    /// Null inherits the parent's working directory.
+    public ProcessBuilder directory(File directory) {
         this.directory = directory;
         return this;
     }
-    public String directory() {
+    public File directory() {
         return directory;
     }
     /// A mutable copy of the inherited environment, initialized on first access.
@@ -153,7 +149,34 @@ public final class ProcessBuilder {
                 }
             }
         }
-        return support.start(args, directory, env, mergeError);
+        String dir = null;
+        if (directory != null) {
+            dir = osPath(directory.getAbsolutePath());
+            checkString(dir);
+        }
+        return support.start(args, dir, env, mergeError);
+    }
+
+    /// The OS path of an absolute `File` path. On a port whose `java.io.File`
+    /// sits over `FileSystemStorage` that path can carry the `file:` scheme,
+    /// which a child process's working directory cannot.
+    static String osPath(String path) {
+        if (!path.startsWith("file:")) {
+            return path;
+        }
+        int i = 5;
+        while (i + 1 < path.length() && path.charAt(i) == '/' && path.charAt(i + 1) == '/') {
+            i++;
+        }
+        String p = path.substring(i);
+        // file:///C:/x names the drive path C:/x.
+        if (p.length() >= 4 && p.charAt(0) == '/' && p.charAt(2) == ':' && p.charAt(3) == '/') {
+            char d = p.charAt(1);
+            if ((d >= 'A' && d <= 'Z') || (d >= 'a' && d <= 'z')) {
+                return p.substring(1);
+            }
+        }
+        return p;
     }
     private static void checkString(String value) {
         if (value == null) {

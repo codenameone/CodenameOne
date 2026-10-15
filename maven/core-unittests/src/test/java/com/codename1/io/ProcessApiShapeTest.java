@@ -46,7 +46,7 @@ class ProcessApiShapeTest {
             "errorReader()", "errorReader(java.nio.charset.Charset)",
             "outputWriter()", "outputWriter(java.nio.charset.Charset)"));
     private static final Set<String> BUILDER_ABSENT = new HashSet<String>(Arrays.asList(
-            "directory()", "directory(java.io.File)", "inheritIO()",
+            "inheritIO()",
             "redirectInput()", "redirectOutput()", "redirectError()",
             "redirectInput(java.lang.ProcessBuilder$Redirect)",
             "redirectOutput(java.lang.ProcessBuilder$Redirect)",

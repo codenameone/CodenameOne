@@ -56,7 +56,7 @@ echo "== building arms =="
 ./translate-and-build.sh IoBench "$OUT/iobench-bin" >/dev/null
 mkdir -p "$OUT/host-classes"
 "$J8/bin/javac" -nowarn -encoding UTF-8 -d "$OUT/host-classes" \
-    src/com/bench/Bench.java src/com/bench/IoBench.java \
+    src/com/bench/Bench.java src/com/bench/IoBench.java host/com/bench/PosixHost.java \
     common/src/main/java/com/bench/CommonWorkloads.java
 # The AOT cache REFUSES an exploded directory on the classpath ("Cannot have
 # non-empty directory in paths"), so the host arm runs from a jar. Both the record

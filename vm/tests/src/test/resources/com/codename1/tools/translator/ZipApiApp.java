@@ -882,7 +882,19 @@ public class ZipApiApp {
                     "unrelated extra preserved");
         }
     }
+    /// Gives the translated runtime its file system. Its own class, so the JDK
+    /// runs that have no JavaAPI on the class path fail to load only this.
+    static final class PosixHost {
+        static void install() {
+            com.codename1.impl.JdkHost.install(new com.codename1.impl.PosixJdkHost());
+        }
+    }
     public static void main(String[] args) throws Exception {
+        try {
+            PosixHost.install();
+        } catch (LinkageError onTheJdk) {
+            // The JDK's java.io needs no host.
+        }
         byte[] data = payload();
         checksums();
         systemPropertyConfiguration();

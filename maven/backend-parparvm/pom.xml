@@ -91,12 +91,20 @@
                                 <!-- The production FileIo installs the class
                                      library's POSIX JdkHost. Both classes are
                                      vm/JavaAPI's, which the JDK compiled here
-                                     does not have; analysed elsewhere. -->
+                                     does not have; analysed elsewhere.
+                                     PosixJdkHost reaches the natives through
+                                     java.io.PosixFileAccess, which no JDK has,
+                                     so it is stood in for by an empty
+                                     subclass: FileIo only constructs it. -->
                                 <delete dir="${javaapi.host.dir}"/>
                                 <copy todir="${javaapi.host.dir}">
                                     <fileset dir="${project.basedir}/../../vm/JavaAPI/src"
-                                             includes="com/codename1/impl/JdkHost.java,com/codename1/impl/PosixJdkHost.java"/>
+                                             includes="com/codename1/impl/JdkHost.java"/>
                                 </copy>
+                                <echo file="${javaapi.host.dir}/com/codename1/impl/PosixJdkHost.java">package com.codename1.impl;
+public class PosixJdkHost extends JdkHost {
+}
+</echo>
                             </target>
                         </configuration>
                     </execution>

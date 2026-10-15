@@ -171,6 +171,109 @@ public abstract class JdkHost {
         return 0L;
     }
 
+    /// The bytes free on the volume holding `path`, counting what only a
+    /// privileged user may use; [#fileUsableSpace] unless the host knows
+    /// better.
+    public long fileFreeSpace(String path) {
+        return fileUsableSpace(path);
+    }
+
+    /// [#fileTest]: something is at the path.
+    public static final int FILE_EXISTS = 1;
+    /// [#fileTest]: the path is a directory.
+    public static final int FILE_DIRECTORY = 2;
+    /// [#fileTest]: the path is a file that is not a directory.
+    public static final int FILE_REGULAR = 3;
+    /// [#fileTest] and [#fileSet]: the path may be read.
+    public static final int FILE_READABLE = 4;
+    /// [#fileTest] and [#fileSet]: the path may be written.
+    public static final int FILE_WRITABLE = 5;
+    /// [#fileTest] and [#fileSet]: the path may be executed, or for a
+    /// directory, entered.
+    public static final int FILE_EXECUTABLE = 6;
+    /// [#fileTest]: the path is hidden.
+    public static final int FILE_HIDDEN = 7;
+
+    /// Whether `path` has the property `what`, one of the `FILE_` constants.
+    ///
+    /// The defaults read [#fileStat]: a file system without permissions lets
+    /// everything that exists be read and written, a directory be entered and
+    /// nothing be run, and hides a name that starts with a dot.
+    public boolean fileTest(String path, int what) {
+        if (what == FILE_HIDDEN) {
+            int slash = path.lastIndexOf('/');
+            return path.startsWith(".", slash + 1);
+        }
+        FileStat st = fileStat(path);
+        if (st == null) {
+            return false;
+        }
+        if (what == FILE_DIRECTORY || what == FILE_EXECUTABLE) {
+            return st.isDirectory();
+        }
+        if (what == FILE_REGULAR) {
+            return !st.isDirectory();
+        }
+        return true;
+    }
+
+    /// Grants (`on`) or takes away the permission `what` on `path`, one of
+    /// [#FILE_READABLE], [#FILE_WRITABLE] and [#FILE_EXECUTABLE]; false when
+    /// the path is not left that way.
+    ///
+    /// The defaults change nothing, so they answer whether the path already is
+    /// as asked, by the rules of [#fileTest].
+    public boolean fileSet(String path, int what, boolean on) {
+        FileStat st = fileStat(path);
+        if (st == null) {
+            return false;
+        }
+        if (what == FILE_EXECUTABLE) {
+            return on == st.isDirectory();
+        }
+        return on;
+    }
+
+    /// The length in bytes of the file `path`; 0 for a directory or when
+    /// nothing is there.
+    public long fileLength(String path) {
+        FileStat st = fileStat(path);
+        return st == null || st.isDirectory() ? 0L : st.length();
+    }
+
+    /// When `path` was last modified, in milliseconds since the epoch; 0 when
+    /// nothing is there.
+    public long fileLastModified(String path) {
+        FileStat st = fileStat(path);
+        return st == null ? 0L : st.lastModified();
+    }
+
+    /// Creates the empty file `path` when nothing is there; false when
+    /// something was.
+    ///
+    /// The default checks and then creates, which is not atomic: two threads
+    /// racing on one path can both be answered true.
+    public boolean fileCreate(String path) throws IOException {
+        if (fileStat(path) != null) {
+            return false;
+        }
+        fileWrite(path, false).close();
+        return true;
+    }
+
+    /// Moves `from` over `to`, replacing the file there. False when it did not
+    /// happen, which is all the defaults answer; the caller then copies.
+    public boolean fileReplace(String from, String to) {
+        return false;
+    }
+
+    /// The absolute `path` with symbolic links, `.` and `..` resolved, or
+    /// null when the host cannot resolve links and the caller should resolve
+    /// the dots by itself.
+    public String fileCanonicalPath(String path) throws IOException {
+        return null;
+    }
+
     // ------------------------------------------------------------------
     // Preferences
 
