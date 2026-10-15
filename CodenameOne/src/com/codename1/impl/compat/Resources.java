@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.compat;
 
+import com.codename1.impl.JdkHost;
 import com.codename1.ui.Display;
 
 import java.io.IOException;
@@ -32,6 +33,9 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.ResourceBundle;
+import java.util.ServiceLoader;
 import java.util.Set;
 
 /// Classpath resources for an application built from desktop or Android
@@ -78,6 +82,21 @@ import java.util.Set;
 /// image or stylesheet loader keeps working: the loader opens the string as a
 /// URL again, or hands its path to [#open(String)].
 ///
+/// The device's own `java.net.URL` knows the scheme. A port that runs on a
+/// real JDK, whose `URL` does not, installs a [UrlFactory] that attaches a
+/// handler reading through [#openUrlPath(String)].
+///
+/// #### Bundles and services on a real JDK
+///
+/// The JDK's `ResourceBundle` and `ServiceLoader` look a nested name up
+/// through a class loader, which cannot see a resource the build flattened.
+/// A port on a real JDK therefore installs, with
+/// [#cn1SetClassLoader(ClassLoader)], a loader that falls back to this
+/// class, and the build sends an application's `ResourceBundle.getBundle`
+/// and `ServiceLoader.load` calls to the methods here that pass it. Where
+/// none is installed -- a device, whose class library reads the generated
+/// registry -- those methods are the calls they stand in for.
+///
 /// #### Class names
 ///
 /// A relative name is resolved against `Class.getName()`. A build that
@@ -92,6 +111,10 @@ public final class Resources {
     private static Provider provider;
 
     private static ClassLoader contextLoader;
+
+    private static UrlFactory urlFactory;
+
+    private static ClassLoader portLoader;
 
     private Resources() {
     }
@@ -108,6 +131,88 @@ public final class Resources {
     /// Replaces the source of resource bytes; null restores the default.
     public static void cn1SetProvider(Provider p) {
         provider = p;
+    }
+
+    /// Makes the `cn1res:` URLs [#getResource(Class, String)] answers, for a
+    /// port whose `java.net.URL` does not know the scheme.
+    public interface UrlFactory {
+        /// The `cn1res:` URL of `encodedPath`, an absolute path that is
+        /// already percent-encoded; [Resources#openUrlPath(String)] reads it.
+        URL create(String encodedPath) throws IOException;
+    }
+
+    /// Installs the port's URL factory; null restores the default
+    /// `new URL("cn1res", null, path)`.
+    public static void cn1SetUrlFactory(UrlFactory factory) {
+        urlFactory = factory;
+    }
+
+    /// Installs the class loader a port on a real JDK resolves flattened
+    /// resources through; see the class description. Null removes it.
+    public static void cn1SetClassLoader(ClassLoader loader) {
+        portLoader = loader;
+    }
+
+    /// The loader [#cn1SetClassLoader(ClassLoader)] installed, or null.
+    public static ClassLoader cn1ClassLoader() {
+        return portLoader;
+    }
+
+    /// Opens the resource a `cn1res:` URL names by `encodedPath`, its
+    /// percent-encoded path: what such a URL's stream reads.
+    public static InputStream openUrlPath(String encodedPath) {
+        String path = decode(encodedPath);
+        return path == null ? null : open(path);
+    }
+
+    /// `ResourceBundle.getBundle(baseName)`, through the port's loader when
+    /// one is installed.
+    public static ResourceBundle getBundle(String baseName) {
+        return getBundle(baseName, Locale.getDefault());
+    }
+
+    /// `ResourceBundle.getBundle(baseName, locale)`, through the port's
+    /// loader when one is installed.
+    public static ResourceBundle getBundle(String baseName, Locale locale) {
+        ClassLoader loader = portLoader;
+        if (loader == null) {
+            return ResourceBundle.getBundle(baseName, locale);
+        }
+        return ResourceBundle.getBundle(baseName, locale, loader);
+    }
+
+    /// The folder of the services files `ServiceLoader` reads on a JDK.
+    public static final String SERVICES = "META-INF/services/";
+
+    /// For a port on a real JDK, whose `ServiceLoader` reads services files
+    /// through the installed loader: the services file to read for `service`
+    /// (dotted, as `Class.getName()` answers it), listing what the generated
+    /// registry lists -- the application's providers, then each bundled
+    /// library's, and only those that ship, as on a device. Empty when the
+    /// registry lists none; null when no generated registry is installed, and
+    /// the files on the class path are all there is.
+    public static String cn1ServicesFile(String service) {
+        if (!CompatRegistryBase.cn1Installed()) {
+            return null;
+        }
+        String[] providers = JdkHost.getRegistry().providers(service);
+        StringBuilder out = new StringBuilder();
+        if (providers != null) {
+            for (int i = 0; i < providers.length; i++) {
+                out.append(providers[i]).append('\n');
+            }
+        }
+        return out.toString();
+    }
+
+    /// `ServiceLoader.load(service)`, through the port's loader when one is
+    /// installed.
+    public static <S> ServiceLoader<S> load(Class<S> service) {
+        ClassLoader loader = portLoader;
+        if (loader == null) {
+            return ServiceLoader.load(service);
+        }
+        return ServiceLoader.load(service, loader);
     }
 
     /// Starts an index: from here on a nested path exists only if
@@ -210,7 +315,10 @@ public final class Resources {
         if (thread == null) {
             throw new NullPointerException();
         }
-        return contextLoader == null ? ClassLoader.getSystemClassLoader() : contextLoader;
+        if (contextLoader != null) {
+            return contextLoader;
+        }
+        return portLoader != null ? portLoader : ClassLoader.getSystemClassLoader();
     }
 
     /// `loader.loadClass(name)`: the class of that name when the application
@@ -303,12 +411,59 @@ public final class Resources {
         if (p == null || !exists(p)) {
             return null;
         }
+        String encoded = "/" + encode(p);
+        UrlFactory factory = urlFactory;
         try {
-            return new URL("cn1res", null, "/" + encode(p));
+            if (factory != null) {
+                return factory.create(encoded);
+            }
+            return new URL("cn1res", null, encoded);
         } catch (MalformedURLException e) {
-            // cn1res is a protocol URL knows; this cannot happen.
+            // The device's URL knows cn1res, and a port that runs elsewhere
+            // installs a factory; a URL nobody can make is no resource.
+            return null;
+        } catch (IOException e) {
             return null;
         }
+    }
+
+    /// The inverse of [#encode(String)]: UTF-8 percent escapes decoded,
+    /// anything else as it stands. Null for a malformed escape.
+    static String decode(String encoded) {
+        if (encoded == null || encoded.indexOf('%') < 0) {
+            return encoded;
+        }
+        int n = encoded.length();
+        byte[] bytes = new byte[n];
+        StringBuilder out = new StringBuilder(n);
+        int i = 0;
+        while (i < n) {
+            char c = encoded.charAt(i);
+            if (c != '%') {
+                out.append(c);
+                i++;
+                continue;
+            }
+            int count = 0;
+            while (i < n && encoded.charAt(i) == '%') {
+                if (i + 2 >= n) {
+                    return null;
+                }
+                int high = Character.digit(encoded.charAt(i + 1), 16);
+                int low = Character.digit(encoded.charAt(i + 2), 16);
+                if (high < 0 || low < 0) {
+                    return null;
+                }
+                bytes[count++] = (byte) ((high << 4) | low);
+                i += 3;
+            }
+            try {
+                out.append(new String(bytes, 0, count, "UTF-8"));
+            } catch (java.io.UnsupportedEncodingException e) {
+                return null;
+            }
+        }
+        return out.toString();
     }
 
     private static String requireName(String name) {

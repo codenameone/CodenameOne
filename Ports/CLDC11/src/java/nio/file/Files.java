@@ -35,6 +35,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.io.UncheckedIOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -46,6 +47,11 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.Spliterator;
+import java.util.Spliterators;
+import java.util.function.BiPredicate;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 /// Operations on files, directories and their contents, over `java.io.File`
 /// and the file streams, so over the platform's file system as
@@ -72,9 +78,13 @@ import java.util.Set;
 /// Channels (`newByteChannel`), POSIX permissions, owners, file stores, hard
 /// and symbolic links, `probeContentType`, `setLastModifiedTime` and the
 /// attribute views by name. A device has no equivalent, and a call to any of
-/// them is a build error. So are the methods that answer a `Stream` --
-/// `lines`, `list`, `walk` and `find` -- for now; `readAllLines`,
-/// `newDirectoryStream` and `walkFileTree` do the same work.
+/// them is a build error.
+///
+/// `lines`, `list`, `walk` and `find` are lazy, as in the JDK: `lines` reads
+/// the file as the stream asks for lines, and `walk` lists a directory only
+/// when it is about to enter it, so `walk(root).limit(1)` lists nothing. A
+/// failure found that late surfaces as an `UncheckedIOException`. Close the
+/// stream `lines` answers (try-with-resources) to close the file.
 public final class Files {
 
     private static final String LINE = "\n";
@@ -755,6 +765,165 @@ public final class Files {
             }
         }
         return out;
+    }
+
+    /// The lines of `path` as UTF-8. See [#lines(Path, Charset)].
+    public static Stream<String> lines(Path path) throws IOException {
+        return lines(path, StandardCharsets.UTF_8);
+    }
+
+    /// The lines of `path`, read as the stream asks for them: `findFirst`
+    /// reads the start of a large file, not all of it. The file is opened
+    /// here, so a missing one throws now, and closing the stream closes it.
+    public static Stream<String> lines(Path path, Charset cs) throws IOException {
+        BufferedReader reader = newBufferedReader(path, cs);
+        return reader.lines().onClose(new CloseReader(reader));
+    }
+
+    /// The entries of `dir`, sorted by name.
+    public static Stream<Path> list(Path dir) throws IOException {
+        return lazy(entries(dir).iterator());
+    }
+
+    /// The paths under `start`, `start` first, depth first, to `maxDepth`
+    /// levels below it.
+    public static Stream<Path> walk(Path start, int maxDepth, FileVisitOption... options) throws IOException {
+        if (maxDepth < 0) {
+            throw new IllegalArgumentException("'maxDepth' is negative");
+        }
+        existing(start);
+        return lazy(new Walker(start, maxDepth));
+    }
+
+    /// The paths under `start`, at every depth. See
+    /// [#walk(Path, int, FileVisitOption...)].
+    public static Stream<Path> walk(Path start, FileVisitOption... options) throws IOException {
+        return walk(start, Integer.MAX_VALUE, options);
+    }
+
+    /// The paths [#walk(Path, int, FileVisitOption...)] would answer for
+    /// which `matcher` holds, given each path's attributes.
+    public static Stream<Path> find(Path start, int maxDepth, BiPredicate<Path, BasicFileAttributes> matcher,
+                                    FileVisitOption... options) throws IOException {
+        if (maxDepth < 0) {
+            throw new IllegalArgumentException("'maxDepth' is negative");
+        }
+        if (matcher == null) {
+            throw new NullPointerException();
+        }
+        existing(start);
+        return lazy(new Finder(new Walker(start, maxDepth), matcher));
+    }
+
+    private static <T> Stream<T> lazy(Iterator<T> it) {
+        return StreamSupport.stream(Spliterators.spliteratorUnknownSize(it,
+                Spliterator.ORDERED | Spliterator.NONNULL), false);
+    }
+
+    private static final class CloseReader implements Runnable {
+        private final BufferedReader reader;
+
+        CloseReader(BufferedReader reader) {
+            this.reader = reader;
+        }
+
+        @Override
+        public void run() {
+            try {
+                reader.close();
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+    }
+
+    /// Depth first, discovering as it goes: a directory is listed when the
+    /// walk advances past it, never before, and a failure to list it
+    /// surfaces then.
+    private static final class Walker implements Iterator<Path> {
+        /// The entries still to visit, one iterator per open directory.
+        private final List<Iterator<Path>> levels = new ArrayList<Iterator<Path>>();
+        private final int maxDepth;
+        private Path pending;
+        private int pendingDepth;
+        /// The path answered last, entered on the next advance if it is a
+        /// directory within the depth limit.
+        private Path last;
+        private int lastDepth;
+
+        Walker(Path start, int maxDepth) {
+            this.maxDepth = maxDepth;
+            this.pending = start;
+        }
+
+        @Override
+        public boolean hasNext() {
+            if (pending != null) {
+                return true;
+            }
+            if (last != null && lastDepth < maxDepth && file(last).isDirectory()) {
+                try {
+                    levels.add(entries(last).iterator());
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
+            last = null;
+            while (!levels.isEmpty()) {
+                Iterator<Path> top = levels.get(levels.size() - 1);
+                if (top.hasNext()) {
+                    pending = top.next();
+                    pendingDepth = levels.size();
+                    return true;
+                }
+                levels.remove(levels.size() - 1);
+            }
+            return false;
+        }
+
+        @Override
+        public Path next() {
+            if (!hasNext()) {
+                throw new NoSuchElementException();
+            }
+            Path p = pending;
+            pending = null;
+            last = p;
+            lastDepth = pendingDepth;
+            return p;
+        }
+    }
+
+    private static final class Finder implements Iterator<Path> {
+        private final Iterator<Path> all;
+        private final BiPredicate<Path, BasicFileAttributes> matcher;
+        private Path next;
+
+        Finder(Iterator<Path> all, BiPredicate<Path, BasicFileAttributes> matcher) {
+            this.all = all;
+            this.matcher = matcher;
+        }
+
+        @Override
+        public boolean hasNext() {
+            while (next == null && all.hasNext()) {
+                Path p = all.next();
+                if (matcher.test(p, attributes(file(p)))) {
+                    next = p;
+                }
+            }
+            return next != null;
+        }
+
+        @Override
+        public Path next() {
+            if (!hasNext()) {
+                throw new NoSuchElementException();
+            }
+            Path p = next;
+            next = null;
+            return p;
+        }
     }
 
     public static Path walkFileTree(Path start, FileVisitor<? super Path> visitor) throws IOException {

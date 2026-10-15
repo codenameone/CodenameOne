@@ -1824,6 +1824,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void init(Object m) {
+        // cn1res: URLs and flattened resources for applications built from
+        // desktop or Android sources, which ART cannot resolve on its own.
+        CompatResourceSupport.install();
         // NOTE:  Do not explicitly set the PlayServices instance to anything other than
         // an instance of the base PlayServices class.  The Build Server will automatically
         // swap this for the appropriate subclass depending on the playServicesVersion of 

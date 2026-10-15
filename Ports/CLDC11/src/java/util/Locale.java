@@ -415,34 +415,42 @@ public class Locale {
         };
     }
 
-    private static final String[] LANGUAGE_NAMES = {
-        "ar", "Arabic", "bg", "Bulgarian", "ca", "Catalan", "cs", "Czech", "da", "Danish",
-        "de", "German", "el", "Greek", "en", "English", "es", "Spanish", "et", "Estonian",
-        "fa", "Persian", "fi", "Finnish", "fr", "French", "he", "Hebrew", "hi", "Hindi",
-        "hr", "Croatian", "hu", "Hungarian", "id", "Indonesian", "is", "Icelandic", "it", "Italian",
-        "ja", "Japanese", "ko", "Korean", "lt", "Lithuanian", "lv", "Latvian", "ms", "Malay",
-        "nl", "Dutch", "no", "Norwegian", "pl", "Polish", "pt", "Portuguese", "ro", "Romanian",
-        "ru", "Russian", "sk", "Slovak", "sl", "Slovenian", "sr", "Serbian", "sv", "Swedish",
-        "th", "Thai", "tr", "Turkish", "uk", "Ukrainian", "vi", "Vietnamese", "zh", "Chinese"
-    };
+    /// The English names, in a holder so that the tables are built the
+    /// first time a display name is asked for, not by every use of a
+    /// `Locale`.
+    private static final class Names {
+        private Names() {
+        }
 
-    private static final String[] COUNTRY_NAMES = {
-        "AR", "Argentina", "AT", "Austria", "AU", "Australia", "BE", "Belgium", "BR", "Brazil",
-        "CA", "Canada", "CH", "Switzerland", "CN", "China", "CZ", "Czechia", "DE", "Germany",
-        "DK", "Denmark", "ES", "Spain", "FI", "Finland", "FR", "France", "GB", "United Kingdom",
-        "GR", "Greece", "HK", "Hong Kong SAR China", "IE", "Ireland", "IL", "Israel", "IN", "India",
-        "IT", "Italy", "JP", "Japan", "KR", "South Korea", "MX", "Mexico", "NL", "Netherlands",
-        "NO", "Norway", "NZ", "New Zealand", "PL", "Poland", "PT", "Portugal", "RU", "Russia",
-        "SE", "Sweden", "TR", "Turkey", "TW", "Taiwan", "UA", "Ukraine", "US", "United States",
-        "ZA", "South Africa"
-    };
+        private static final String[] LANGUAGE_NAMES = {
+            "ar", "Arabic", "bg", "Bulgarian", "ca", "Catalan", "cs", "Czech", "da", "Danish",
+            "de", "German", "el", "Greek", "en", "English", "es", "Spanish", "et", "Estonian",
+            "fa", "Persian", "fi", "Finnish", "fr", "French", "he", "Hebrew", "hi", "Hindi",
+            "hr", "Croatian", "hu", "Hungarian", "id", "Indonesian", "is", "Icelandic", "it", "Italian",
+            "ja", "Japanese", "ko", "Korean", "lt", "Lithuanian", "lv", "Latvian", "ms", "Malay",
+            "nl", "Dutch", "no", "Norwegian", "pl", "Polish", "pt", "Portuguese", "ro", "Romanian",
+            "ru", "Russian", "sk", "Slovak", "sl", "Slovenian", "sr", "Serbian", "sv", "Swedish",
+            "th", "Thai", "tr", "Turkish", "uk", "Ukrainian", "vi", "Vietnamese", "zh", "Chinese"
+        };
+
+        private static final String[] COUNTRY_NAMES = {
+            "AR", "Argentina", "AT", "Austria", "AU", "Australia", "BE", "Belgium", "BR", "Brazil",
+            "CA", "Canada", "CH", "Switzerland", "CN", "China", "CZ", "Czechia", "DE", "Germany",
+            "DK", "Denmark", "ES", "Spain", "FI", "Finland", "FR", "France", "GB", "United Kingdom",
+            "GR", "Greece", "HK", "Hong Kong SAR China", "IE", "Ireland", "IL", "Israel", "IN", "India",
+            "IT", "Italy", "JP", "Japan", "KR", "South Korea", "MX", "Mexico", "NL", "Netherlands",
+            "NO", "Norway", "NZ", "New Zealand", "PL", "Poland", "PT", "Portugal", "RU", "Russia",
+            "SE", "Sweden", "TR", "Turkey", "TW", "Taiwan", "UA", "Ukraine", "US", "United States",
+            "ZA", "South Africa"
+        };
+    }
 
     private static String displayLanguage(String code) {
-        return lookup(LANGUAGE_NAMES, code);
+        return lookup(Names.LANGUAGE_NAMES, code);
     }
 
     private static String displayCountry(String code) {
-        return lookup(COUNTRY_NAMES, code);
+        return lookup(Names.COUNTRY_NAMES, code);
     }
 
     private static String lookup(String[] table, String code) {

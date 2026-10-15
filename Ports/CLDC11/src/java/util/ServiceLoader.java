@@ -113,6 +113,16 @@ public final class ServiceLoader<S> implements Iterable<S> {
         return new ServiceLoader<S>(service, false);
     }
 
+    /// As [#load(Class)], for a layer that is not null. Nothing here hands
+    /// out a module layer -- [Module#getLayer()] answers null -- so code
+    /// reaches this only with the null the JDK refuses as well.
+    public static <S> ServiceLoader<S> load(ModuleLayer layer, Class<S> service) {
+        if (layer == null) {
+            throw new NullPointerException();
+        }
+        return new ServiceLoader<S>(service, false);
+    }
+
     /// The providers installed in the platform: on a desktop, the ones the
     /// platform class loader sees. An application's own providers are not
     /// among those, and a device installs none, so the loader is empty.
@@ -322,6 +332,13 @@ public final class ServiceLoader<S> implements Iterable<S> {
         }
     }
 
+    /// The first provider, created if it has not been, or an empty optional
+    /// when the service has none.
+    public Optional<S> findFirst() {
+        Iterator<S> it = iterator();
+        return it.hasNext() ? Optional.<S>of(it.next()) : Optional.<S>empty();
+    }
+
     /// The providers, none of them created: [Provider#get()] creates one,
     /// anew on every call.
     public Stream<Provider<S>> stream() {
@@ -334,7 +351,7 @@ public final class ServiceLoader<S> implements Iterable<S> {
                 out.add(new Lazy<S>(this, className, type));
             }
         }
-        throw new RuntimeException("Compile-time stub");
+        return out.stream();
     }
 
     private static final class Lazy<S> implements Provider<S> {

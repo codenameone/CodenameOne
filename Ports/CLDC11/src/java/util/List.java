@@ -447,6 +447,41 @@ public interface List<E> extends Collection<E> {
     default void sort(Comparator<? super E> c) {
     }
 
+    /// Inserts `e` before the first element. Stubbed in the CLDC11
+    /// subset; the implementation comes from the platform at runtime.
+    default void addFirst(E e) {
+    }
+
+    /// Appends `e` after the last element. Stubbed in the CLDC11 subset.
+    default void addLast(E e) {
+    }
+
+    /// The first element. Stubbed in the CLDC11 subset.
+    default E getFirst() {
+        return null;
+    }
+
+    /// The last element. Stubbed in the CLDC11 subset.
+    default E getLast() {
+        return null;
+    }
+
+    /// Removes and answers the first element. Stubbed in the CLDC11 subset.
+    default E removeFirst() {
+        return null;
+    }
+
+    /// Removes and answers the last element. Stubbed in the CLDC11 subset.
+    default E removeLast() {
+        return null;
+    }
+
+    /// A view of this list in the opposite order. Stubbed in the CLDC11
+    /// subset.
+    default List<E> reversed() {
+        return null;
+    }
+
     /// An unmodifiable list of no elements.
     static <E> List<E> of() {
         return ImmutableCollections.list(new Object[] {});

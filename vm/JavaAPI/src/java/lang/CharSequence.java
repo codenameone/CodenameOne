@@ -77,6 +77,47 @@ public interface CharSequence {
         return length() == 0;
     }
 
+    /// The sequence's `char` values, zero-extended to `int`. The
+    /// characters are read when this is called, not when the stream runs,
+    /// which is the same answer as the JDK's for any sequence that is not
+    /// modified between the two.
+    default java.util.stream.IntStream chars() {
+        int n = length();
+        int[] out = new int[n];
+        for (int i = 0; i < n; i++) {
+            out[i] = charAt(i);
+        }
+        return java.util.stream.IntStream.of(out);
+    }
+
+    /// The sequence's code points: a valid surrogate pair becomes one
+    /// supplementary code point, and an unpaired surrogate is passed
+    /// through as its own value, as the JDK does.
+    default java.util.stream.IntStream codePoints() {
+        int n = length();
+        int[] out = new int[n];
+        int count = 0;
+        int i = 0;
+        while (i < n) {
+            char c = charAt(i++);
+            if (Character.isHighSurrogate(c) && i < n) {
+                char d = charAt(i);
+                if (Character.isLowSurrogate(d)) {
+                    i++;
+                    out[count++] = Character.toCodePoint(c, d);
+                    continue;
+                }
+            }
+            out[count++] = c;
+        }
+        if (count == n) {
+            return java.util.stream.IntStream.of(out);
+        }
+        int[] trimmed = new int[count];
+        System.arraycopy(out, 0, trimmed, 0, count);
+        return java.util.stream.IntStream.of(trimmed);
+    }
+
     /// Compares two sequences lexicographically, char by char, the shorter
     /// first when one is a prefix of the other.
     public static int compare(CharSequence cs1, CharSequence cs2) {

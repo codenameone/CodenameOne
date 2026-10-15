@@ -236,4 +236,59 @@ public class BufferedReader extends Reader {
         buf = null;
         in.close();
     }
+
+    /// The remaining lines, read as the stream asks for them. A read that
+    /// fails surfaces as an UncheckedIOException; closing the stream does
+    /// not close this reader, as in the JDK.
+    public java.util.stream.Stream<String> lines() {
+        return java.util.stream.StreamSupport.stream(
+                java.util.Spliterators.spliteratorUnknownSize(new LineIterator(this),
+                        java.util.Spliterator.ORDERED | java.util.Spliterator.NONNULL), false);
+    }
+
+    /// Reads one line ahead, so `hasNext` can answer without losing one.
+    private static final class LineIterator implements java.util.Iterator<String> {
+        private final BufferedReader reader;
+        private String next;
+        private boolean done;
+
+        LineIterator(BufferedReader reader) {
+            this.reader = reader;
+        }
+
+        @Override
+        public boolean hasNext() {
+            if (next != null) {
+                return true;
+            }
+            if (done) {
+                return false;
+            }
+            try {
+                next = reader.readLine();
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            if (next == null) {
+                done = true;
+                return false;
+            }
+            return true;
+        }
+
+        @Override
+        public String next() {
+            if (!hasNext()) {
+                throw new java.util.NoSuchElementException();
+            }
+            String line = next;
+            next = null;
+            return line;
+        }
+
+        @Override
+        public void remove() {
+            throw new UnsupportedOperationException();
+        }
+    }
 }

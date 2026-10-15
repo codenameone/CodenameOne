@@ -11306,6 +11306,9 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void init(Object m) {
         inInit = true;
         installGeneratedSvgRegistry();
+        // cn1res: URLs and flattened resources for applications built from
+        // desktop sources, which this JDK cannot resolve on its own.
+        CompatResourceSupport.install();
 
         // Make the desktop stdio and loopback socket MCP transports available to
         // com.codename1.mcp.MCP.

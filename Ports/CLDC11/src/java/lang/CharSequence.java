@@ -87,6 +87,17 @@ public interface CharSequence {
         return false;
     }
 
+    /// The sequence's `char` values, zero-extended to `int`. Stubbed in
+    /// the CLDC11 subset; the implementation comes from the platform.
+    default java.util.stream.IntStream chars() {
+        return null;
+    }
+
+    /// The sequence's code points. Stubbed in the CLDC11 subset.
+    default java.util.stream.IntStream codePoints() {
+        return null;
+    }
+
     /// Compares two sequences lexicographically, char by char, the shorter
     /// first when one is a prefix of the other.
     public static int compare(CharSequence cs1, CharSequence cs2) {

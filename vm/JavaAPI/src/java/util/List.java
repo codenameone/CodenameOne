@@ -381,6 +381,56 @@ public interface List<E> extends Collection<E> {
         }
     }
 
+    /// Inserts `e` before the first element.
+    default void addFirst(E e) {
+        add(0, e);
+    }
+
+    /// Appends `e` after the last element.
+    default void addLast(E e) {
+        add(e);
+    }
+
+    /// The first element; NoSuchElementException when there is none.
+    default E getFirst() {
+        if (isEmpty()) {
+            throw new NoSuchElementException();
+        }
+        return get(0);
+    }
+
+    /// The last element; NoSuchElementException when there is none.
+    default E getLast() {
+        if (isEmpty()) {
+            throw new NoSuchElementException();
+        }
+        return get(size() - 1);
+    }
+
+    /// Removes and answers the first element; NoSuchElementException when
+    /// there is none.
+    default E removeFirst() {
+        if (isEmpty()) {
+            throw new NoSuchElementException();
+        }
+        return remove(0);
+    }
+
+    /// Removes and answers the last element; NoSuchElementException when
+    /// there is none.
+    default E removeLast() {
+        if (isEmpty()) {
+            throw new NoSuchElementException();
+        }
+        return remove(size() - 1);
+    }
+
+    /// A view of this list in the opposite order. It reads and writes
+    /// through to this list, and its own `reversed()` is this list.
+    default List<E> reversed() {
+        return new ReversedList<E>(this);
+    }
+
     /// An unmodifiable list of no elements.
     static <E> List<E> of() {
         return ImmutableCollections.list(new Object[] {});

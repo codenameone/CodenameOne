@@ -2519,6 +2519,12 @@ public class Collections {
         return EMPTY_LIST;
     }
 
+    /// An empty, immutable `Iterator`.
+    @SuppressWarnings("unchecked")
+    public static final <T> Iterator<T> emptyIterator() {
+        return EMPTY_LIST.iterator();
+    }
+
     /// Returns a type-safe empty, immutable `Set`.
     ///
     /// #### Returns
