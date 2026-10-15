@@ -45,6 +45,28 @@
     }
    }
   },
+  "macos-arm64": {
+   "objectAllocation": {
+    "all": {
+     "from": {
+      "memory": 0.814,
+      "time": 1.106,
+      "tolerance": {
+       "memory": 0.3,
+       "time": 0.5
+      }
+     },
+     "memory": 1.15,
+     "reason": "The translator retires fewer objects when their frame ends (an object whose only callee is a native method is no longer retired early), so more of objectAllocation's garbage waits for the collector and peak RAM rises, as hello and translator RAM did on the other runners. macOS arm64 run for 7f6b4ee9d7, rounds 1.50 0.87 1.19 0.94 1.15 (median 1.15) against 0.81; time is unchanged at 1.06 to 1.14. The rounds spread widely, so the memory tolerance is 0.35, as the bimodal hello rows on Windows carry.",
+     "runs": 1,
+     "time": 1.106,
+     "tolerance": {
+      "memory": 0.35,
+      "time": 0.5
+     }
+    }
+   }
+  },
   "windows-arm64@armv8-64-bit-family-8-model-d49-microsoft-corporation": {
    "hello": {
     "all": {
