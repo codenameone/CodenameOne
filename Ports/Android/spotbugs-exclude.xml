@@ -586,4 +586,13 @@
             <Bug pattern="MS_EXPOSE_REP" />
         </Or>
     </Match>
+    <!-- CompatResourceSupport.install creates the flat resource loader that
+         resolves an application's flattened resources and services files.
+         ART has no SecurityManager, so AccessController.doPrivileged would
+         wrap the construction in a check that never runs. -->
+    <Match>
+        <Class name="com.codename1.impl.android.CompatResourceSupport" />
+        <Method name="install" />
+        <Bug pattern="DP_CREATE_CLASSLOADER_INSIDE_DO_PRIVILEGED" />
+    </Match>
 </FindBugsFilter>
